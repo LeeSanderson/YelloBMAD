@@ -1,0 +1,628 @@
+<title>Yello Architecture Review</title>
+
+<style>
+  :root {
+    --ground: #F6F5F1;
+    --surface: #FFFFFF;
+    --sunk: #EEECE5;
+    --ink: #1B1A16;
+    --muted: #6E6B61;
+    --rule: #DFDCD3;
+    --accent: #9A6B08;
+    --accent-soft: #F0E4C6;
+    --critical: #9B3A26;
+    --critical-soft: #F3DED8;
+    --ok: #3D6B4E;
+    --ok-soft: #DCE8DE;
+
+    --display: "Segoe UI Variable Display", "Segoe UI", -apple-system, system-ui, sans-serif;
+    --body: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, SFMono-Regular, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #161511;
+      --surface: #1E1C17;
+      --sunk: #24211B;
+      --ink: #EBE8DE;
+      --muted: #9A968A;
+      --rule: #35312A;
+      --accent: #E3B24A;
+      --accent-soft: #3A301A;
+      --critical: #E08C72;
+      --critical-soft: #3B241D;
+      --ok: #8CBE9A;
+      --ok-soft: #21301F;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #161511;
+    --surface: #1E1C17;
+    --sunk: #24211B;
+    --ink: #EBE8DE;
+    --muted: #9A968A;
+    --rule: #35312A;
+    --accent: #E3B24A;
+    --accent-soft: #3A301A;
+    --critical: #E08C72;
+    --critical-soft: #3B241D;
+    --ok: #8CBE9A;
+    --ok-soft: #21301F;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: 46rem;
+    margin: 0 auto;
+    padding: 4.5rem 1.5rem 7rem;
+    display: flex;
+    flex-direction: column;
+    gap: 2.75rem;
+  }
+
+  header.masthead { display: flex; flex-direction: column; gap: 0.85rem; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(2.1rem, 5.5vw, 3rem);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.08;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .standfirst { font-size: 1.12rem; color: var(--muted); margin: 0; max-width: 34rem; }
+
+  .meta {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.25rem;
+    border-top: 1px solid var(--rule);
+    padding-top: 0.9rem;
+  }
+
+  section { display: flex; flex-direction: column; gap: 1.1rem; }
+
+  h2 {
+    font-family: var(--display);
+    font-size: 1.55rem;
+    font-weight: 650;
+    letter-spacing: -0.018em;
+    line-height: 1.2;
+    text-wrap: balance;
+    margin: 1.5rem 0 0;
+    padding-bottom: 0.6rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  h3 {
+    font-family: var(--display);
+    font-size: 1.06rem;
+    font-weight: 650;
+    letter-spacing: -0.008em;
+    margin: 0;
+    text-wrap: balance;
+  }
+
+  p { margin: 0; }
+  p + p { margin-top: 0.85rem; }
+
+  strong { font-weight: 600; }
+
+  code, .mono { font-family: var(--mono); font-size: 0.86em; }
+
+  code {
+    background: var(--sunk);
+    padding: 0.08em 0.34em;
+    border-radius: 2px;
+  }
+
+  a { color: var(--accent); text-underline-offset: 0.18em; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  /* --- decision blocks --- */
+  .decision {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--accent);
+    padding: 1.25rem 1.4rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  .decision.risk { border-left-color: var(--critical); }
+  .decision.caught { border-left-color: var(--ok); }
+
+  .dhead { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 2px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    white-space: nowrap;
+  }
+  .tag.r { background: var(--critical-soft); color: var(--critical); }
+  .tag.g { background: var(--ok-soft); color: var(--ok); }
+
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+  @media (max-width: 34rem) { .split { grid-template-columns: 1fr; } }
+
+  .cell { display: flex; flex-direction: column; gap: 0.3rem; }
+  .cell .label {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .cell .val { font-size: 0.94rem; }
+
+  .cost {
+    font-size: 0.94rem;
+    border-top: 1px dashed var(--rule);
+    padding-top: 0.7rem;
+    color: var(--muted);
+  }
+  .cost b { color: var(--ink); font-weight: 600; }
+
+  ul { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.45rem; }
+  li::marker { color: var(--accent); }
+
+  /* --- figures --- */
+  figure { margin: 0.5rem 0; display: flex; flex-direction: column; gap: 0.6rem; }
+  .figbox { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); padding: 1.1rem; }
+  figure svg { max-width: 100%; height: auto; color: var(--ink); display: block; }
+  figcaption { font-size: 0.86rem; color: var(--muted); }
+
+  svg text { font-family: var(--mono); font-size: 12px; fill: currentColor; }
+  svg .sm { font-size: 10.5px; }
+  svg .box { fill: var(--surface); stroke: currentColor; stroke-width: 1.25; }
+  svg .fill { fill: var(--sunk); stroke: currentColor; stroke-width: 1.25; }
+  svg .ln { stroke: currentColor; stroke-width: 1.25; fill: none; }
+  svg .dash { stroke: currentColor; stroke-width: 1.15; fill: none; stroke-dasharray: 4 3; }
+  svg .accent { color: var(--accent); }
+  svg .bad { color: var(--critical); }
+  svg .dim { color: var(--muted); }
+
+  /* --- table --- */
+  .tablewrap { overflow-x: auto; border: 1px solid var(--rule); background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 400;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .pull {
+    border-left: 3px solid var(--accent);
+    padding: 0.15rem 0 0.15rem 1.1rem;
+    font-size: 1.1rem;
+    color: var(--ink);
+  }
+
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 1.2rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+  }
+</style>
+
+<div class="wrap">
+
+<header class="masthead">
+  <div class="eyebrow">Architecture spine · design review</div>
+  <h1>Yello Architecture Review</h1>
+  <p class="standfirst">What was decided, what was rejected, what it cost — and the four things the review pass caught before they reached a story.</p>
+  <div class="meta">
+    <span>17 Aug 2026</span>
+    <span>25 invariants</span>
+    <span>41 FR · 9 NFR</span>
+    <span>greenfield · built by dev agents</span>
+  </div>
+</header>
+
+<section>
+  <h2>How to judge this</h2>
+  <p>The spine fixes invariants, not structure. Its test is narrow: <em>if two units one level down were built independently, could they choose incompatibly?</em> Everything that passes that test is in. Everything else is named under Deferred and left to the code.</p>
+  <p>So the question to ask of it is not "is this how I would build Yello?" but <strong>"can a dev agent write a story-sized change that obeys every rule here and still breaks the product?"</strong> Where the answer is yes, there's a missing invariant. Four such gaps were found and closed during review; they're listed near the end.</p>
+</section>
+
+<section>
+  <h2>The four forces</h2>
+  <p>Most of the PRD is ordinary. Four things aren't, and they're coupled — every decision below is downstream of at least one.</p>
+
+  <div class="decision">
+    <div class="dhead"><h3>FR-34 is the spine</h3><span class="tag">load-bearing</span></div>
+    <p>A demotion or removal must land on an <em>open editing session</em> within five seconds, discard the unsynchronised text, and keep what was already synchronised. That single requirement kills the conventional real-time architecture — authorise at connect, then relay opaque blobs — and forces authorisation <em>inside</em> the sync path, on every message, against state that changes underneath it.</p>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><h3>Isolation and cost pull opposite ways</h3><span class="tag">tension</span></div>
+    <p>NFR-1 has no acceptable failure rate; a single verified cross-Space disclosure blocks release. Absolute isolation is easiest with hard separation — but £30/month forbids anything per-Space. So isolation must be enforced <em>by construction</em> inside one shared deployment, in a way a story written six months from now cannot forget.</p>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><h3>Two ordering problems, not one</h3><span class="tag">scope</span></div>
+    <p>Text convergence (FR-31) and Board ordering (FR-29) are distinct problems. A CRDT for the first does nothing for the second. They get separate mechanisms: a merge port, and a jittered fractional index.</p>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><h3>The API is the isolation test</h3><span class="tag">leverage</span></div>
+    <p>Every rule must hold on a surface with no UI to hide behind. That's a gift: it forces enforcement below the presentation layer, and it makes "the interface hid the button" an unavailable excuse.</p>
+  </div>
+</section>
+
+<section>
+  <h2>What the constraints forced</h2>
+  <p>Three decisions weren't judgement calls — the numbers made them.</p>
+
+  <div class="decision">
+    <div class="dhead"><h3>You cannot buy the WebSocket</h3><span class="tag r">forced</span></div>
+    <p>Azure Web PubSub's free tier caps at 20 concurrent connections and 20,000 messages a day, one unit maximum. NFR-8 alone requires 50 concurrent Sessions <em>per Space</em>. Standard is roughly $49/month per unit — the entire ceiling, before compute or storage. Azure SignalR Service has the same shape.</p>
+    <div class="cost">Consequence: <b>the WebSocket terminates in our own container.</b> Which is where FR-34's per-message authorisation seam had to live anyway — the budget and the requirement agree.</div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><h3>Azure Functions cannot carry it either</h3><span class="tag r">forced</span></div>
+    <p>Functions cannot hold persistent WebSocket connections; Microsoft's prescribed answer is Web PubSub, already priced out. Separately, the Static Web Apps backend proxy states plainly that <em>only HTTP requests are supported for APIs — WebSocket, for example, is not supported</em>, caps requests at 45 seconds, and requires the Standard plan.</p>
+    <div class="cost">Consequence: the API and the sync endpoint share <b>one Container App</b>. Splitting them would make FR-34's revocation a cross-process, cross-runtime concern — turning the product's most important requirement into a distributed one.</div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><h3>The database is free, permanently — with a rule attached</h3><span class="tag g">favourable</span></div>
+    <p>The Azure SQL Database free offer gives 100,000 vCore-seconds, 32 GB data and 32 GB backup per month <em>for the lifetime of the subscription</em>. That's about 55 hours of active half-vCore compute a month.</p>
+    <p>So anything touching the database on a timer — a health check that queries, a background poller, a connection that never idles out — both prevents auto-pause and silently drains the entire allowance.</p>
+    <div class="cost">Consequence: <b>NFR-2's five-second revocation cannot be polled.</b> The operation that changes a Membership pushes the notification. The cost constraint forces the better design — and it's a rule a dev agent would otherwise break on story three, with nobody noticing until the bill.</div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 720 250" role="img" aria-label="Deployment topology: browser talks to Static Web Apps for assets and to one Container App for both the REST API and the sync WebSocket; the Container App talks to Azure SQL and to Communication Services Email.">
+        <defs>
+          <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <rect class="box" x="12" y="86" width="118" height="52" rx="2"/>
+        <text x="71" y="107" text-anchor="middle">Browser</text>
+        <text x="71" y="123" text-anchor="middle" class="sm">Blazor WASM</text>
+
+        <rect class="fill" x="196" y="14" width="150" height="52" rx="2"/>
+        <text x="271" y="35" text-anchor="middle">Static Web Apps</text>
+        <text x="271" y="51" text-anchor="middle" class="sm">free · assets only</text>
+
+        <rect class="box" x="196" y="140" width="150" height="70" rx="2"/>
+        <text x="271" y="164" text-anchor="middle">Container App</text>
+        <text x="271" y="180" text-anchor="middle" class="sm">API + /sync + outbox</text>
+        <text x="271" y="196" text-anchor="middle" class="sm">max 1 replica</text>
+
+        <rect class="box" x="424" y="140" width="140" height="52" rx="2"/>
+        <text x="494" y="161" text-anchor="middle">Azure SQL</text>
+        <text x="494" y="177" text-anchor="middle" class="sm">serverless · RLS</text>
+
+        <rect class="box" x="424" y="42" width="140" height="52" rx="2"/>
+        <text x="494" y="63" text-anchor="middle">ACS Email</text>
+        <text x="494" y="79" text-anchor="middle" class="sm">via outbox</text>
+
+        <path class="ln" d="M 130 100 L 196 46" marker-end="url(#ar)"/>
+        <text x="139" y="66" class="sm dim">assets</text>
+
+        <path class="ln" d="M 130 118 L 196 158" marker-end="url(#ar)"/>
+        <text x="128" y="152" class="sm dim">HTTPS + cookie</text>
+
+        <g class="accent">
+          <path class="ln" d="M 130 130 L 196 186" marker-end="url(#ar)"/>
+          <text x="130" y="202" class="sm">WSS /sync</text>
+        </g>
+
+        <path class="ln" d="M 346 172 L 424 168" marker-end="url(#ar)"/>
+        <path class="ln" d="M 346 150 L 424 84" marker-end="url(#ar)"/>
+
+        <g class="dim">
+          <path class="dash" d="M 600 40 L 600 210"/>
+          <text x="612" y="126">£0–15/mo</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>Two deployables. The WebSocket and the REST API share a process specifically so that revoking a Membership can reach an open editor without crossing a network.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>The decisions</h2>
+  <p>Each of these was a real fork with a real cost. The rationale lives here; the spine itself records only the rule.</p>
+
+  <div class="decision">
+    <div class="dhead"><h3>.NET 10 LTS, C# everywhere</h3><span class="tag">stack</span></div>
+    <div class="split">
+      <div class="cell"><span class="label">Chosen</span><span class="val">.NET 10.0.11 LTS server, Blazor WebAssembly client.</span></div>
+      <div class="cell"><span class="label">Rejected</span><span class="val">TypeScript end-to-end with Yjs; a .NET backend with a React client.</span></div>
+    </div>
+    <div class="cost">Cost accepted: <b>the CRDT ecosystem is far thinner on .NET.</b> YDotNet — bindings over Rust <code>yrs</code> — sees about 85 downloads a day against Yjs's 920,000 a week, and its own README says it is early with an API subject to change. More sharply: it ships Windows, Linux and macOS natives only, so it cannot load in WebAssembly at all.</div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><h3>The merge algorithm is deferred behind a port</h3><span class="tag">AD-12</span></div>
+    <p>Choosing Blazor WASM and "use a proven CRDT rather than hand-roll" put two decisions in direct conflict: the good library can't run in the browser, and the only pure-C# port (Ycs) has no NuGet package, no releases at all, and is tested against a Yjs six minor versions old.</p>
+    <div class="split">
+      <div class="cell"><span class="label">Fixed now</span><span class="val">Transport, the per-frame authorisation seam, push-based revocation, append-only persistence, and one merge port.</span></div>
+      <div class="cell"><span class="label">Deferred</span><span class="val">What actually merges. The port's contract is a conformance suite encoding FR-31, FR-33 and NFR-4, written first.</span></div>
+    </div>
+    <div class="cost">This is safe only because the persistence shape — an append-only change log plus a derived projection — satisfies both a sequence CRDT and last-writer-wins. Swapping later is a registration change, not a migration.</div>
+  </div>
+
+  <div class="decision risk">
+    <div class="dhead"><h3>Last-writer-wins is excluded — by the tests, not by decree</h3><span class="tag r">contested</span></div>
+    <p>LWW was raised as a simpler option. It fails two testable PRD consequences outright:</p>
+    <ul>
+      <li><strong>FR-31:</strong> "two Users editing <em>different parts</em> both retain their changes" — whole-field LWW overwrites one entirely.</li>
+      <li><strong>FR-33:</strong> after a five-minute disconnect, your changes apply exactly once <em>and</em> theirs are present — LWW can deliver one or the other, never both.</li>
+    </ul>
+    <p>It also reverses the addendum's own documented rejection of "presence + optimistic field updates", and voids the P3 carrier in the coverage tracker.</p>
+    <div class="cost">Framed correctly: <b>adopting LWW is a PRD amendment, not an architecture decision.</b> The conformance suite is what enforces this, so no story can adopt it quietly.</div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><h3>Azure SQL serverless, with row-level security as the isolation floor</h3><span class="tag">AD-2</span></div>
+    <p>RLS turns out to produce exactly the error semantics FR-15 demands, rather than the code having to remember them: out-of-Space rows are <em>invisible</em>, so a cross-Space request naturally 404s; a within-Space wrong-role request still sees the row, so the application returns 403.</p>
+    <div class="cost">Cost accepted: local parity needs a SQL Server container rather than the same engine. <b>Azure SQL Developer</b> — the actual cloud engine in a local container — would remove that cost entirely, but it was still private preview and credential-gated as of 23 July 2026. Logged as Deferred.</div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><h3>Vertical slices inside a hexagonal shell</h3><span class="tag">paradigm</span></div>
+    <div class="split">
+      <div class="cell"><span class="label">Why this shape</span><span class="val">One folder per use case means a story maps 1:1 to code — which matters when stories are written by agents in isolation.</span></div>
+      <div class="cell"><span class="label">Why the shell</span><span class="val">Cross-cutting invariants live in a pipeline every slice traverses, so they're never re-derived per slice.</span></div>
+    </div>
+    <div class="cost">The dependency rule is enforced by an ArchUnitNET test that <b>fails the build</b>, not by convention. A convention erodes one story at a time; a build gate doesn't.</div>
+  </div>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 720 300" role="img" aria-label="Dependency direction: Host depends on Infrastructure, which depends on Application, which depends on Domain. The Blazor client and the Host both depend on one shared merge project, compiled to WebAssembly and to native respectively.">
+        <defs>
+          <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <rect class="box" x="16" y="30" width="150" height="50" rx="2"/>
+        <text x="91" y="52" text-anchor="middle">Host</text>
+        <text x="91" y="68" text-anchor="middle" class="sm">endpoints · /sync</text>
+
+        <rect class="box" x="204" y="30" width="150" height="50" rx="2"/>
+        <text x="279" y="52" text-anchor="middle">Infrastructure</text>
+        <text x="279" y="68" text-anchor="middle" class="sm">EF Core · Identity</text>
+
+        <rect class="box" x="392" y="30" width="150" height="50" rx="2"/>
+        <text x="467" y="52" text-anchor="middle">Application</text>
+        <text x="467" y="68" text-anchor="middle" class="sm">one folder per slice</text>
+
+        <rect class="fill" x="580" y="30" width="124" height="50" rx="2"/>
+        <text x="642" y="52" text-anchor="middle">Domain</text>
+        <text x="642" y="68" text-anchor="middle" class="sm">references none</text>
+
+        <path class="ln" d="M 166 55 L 204 55" marker-end="url(#ar2)"/>
+        <path class="ln" d="M 354 55 L 392 55" marker-end="url(#ar2)"/>
+        <path class="ln" d="M 542 55 L 580 55" marker-end="url(#ar2)"/>
+        <text x="360" y="20" text-anchor="middle" class="sm dim">depends on →</text>
+
+        <rect class="box" x="16" y="200" width="150" height="50" rx="2"/>
+        <text x="91" y="222" text-anchor="middle">Blazor client</text>
+        <text x="91" y="238" text-anchor="middle" class="sm">WebAssembly</text>
+
+        <g class="accent">
+          <rect class="box" x="300" y="200" width="200" height="50" rx="2"/>
+          <text x="400" y="222" text-anchor="middle">Yello.Merge</text>
+          <text x="400" y="238" text-anchor="middle" class="sm">one source, both ends</text>
+
+          <path class="ln" d="M 166 225 L 300 225" marker-end="url(#ar2)"/>
+          <text x="233" y="215" text-anchor="middle" class="sm">to WASM</text>
+
+          <path class="ln" d="M 91 80 L 91 160 L 400 160 L 400 200" marker-end="url(#ar2)"/>
+          <text x="410" y="180" class="sm">to native</text>
+        </g>
+      </svg>
+    </div>
+    <figcaption>The merge implementation is compiled twice from one source — the only arrangement that gives client and server a single merge implementation rather than two that must stay compatible forever.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>The mechanism that matters</h2>
+  <p>FR-34 is what the PRD says the product should be judged on. Everything in the sync design exists to make this one sequence true.</p>
+
+  <figure>
+    <div class="figbox">
+      <svg viewBox="0 0 720 400" role="img" aria-label="Revocation sequence: an editor's frame is admitted and persisted while the lease is valid; removing the Membership pushes an in-process notification that invalidates the lease; a later frame carrying unsynchronised text is discarded and never persisted, while earlier admitted changes are retained.">
+        <defs>
+          <marker id="ar3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+
+        <rect class="fill" x="16" y="12" width="132" height="34" rx="2"/>
+        <text x="82" y="34" text-anchor="middle">Editor</text>
+        <rect class="fill" x="216" y="12" width="132" height="34" rx="2"/>
+        <text x="282" y="34" text-anchor="middle">/sync</text>
+        <rect class="fill" x="416" y="12" width="150" height="34" rx="2"/>
+        <text x="491" y="34" text-anchor="middle">API slice</text>
+        <rect class="fill" x="614" y="12" width="92" height="34" rx="2"/>
+        <text x="660" y="34" text-anchor="middle">SQL</text>
+
+        <path class="dash dim" d="M 82 46 L 82 384"/>
+        <path class="dash dim" d="M 282 46 L 282 384"/>
+        <path class="dash dim" d="M 491 46 L 491 384"/>
+        <path class="dash dim" d="M 660 46 L 660 384"/>
+
+        <path class="ln" d="M 82 82 L 282 82" marker-end="url(#ar3)"/>
+        <text x="90" y="74" class="sm">frame · lease valid</text>
+
+        <path class="ln" d="M 282 118 L 660 118" marker-end="url(#ar3)"/>
+        <text x="290" y="110" class="sm">append change + reproject (one tx)</text>
+
+        <path class="dash" d="M 282 152 L 82 152" marker-end="url(#ar3)"/>
+        <text x="92" y="144" class="sm dim">admitted</text>
+
+        <path class="ln" d="M 491 202 L 660 202" marker-end="url(#ar3)"/>
+        <text x="499" y="194" class="sm">delete Membership (tx)</text>
+
+        <g class="accent">
+          <path class="ln" d="M 491 238 L 282 238" marker-end="url(#ar3)"/>
+          <text x="300" y="230" class="sm">MembershipChanged · in-process</text>
+
+          <path class="ln" d="M 282 258 L 330 258 L 330 284 L 292 284" marker-end="url(#ar3)"/>
+          <text x="340" y="276" class="sm">invalidate lease</text>
+        </g>
+
+        <path class="ln" d="M 82 322 L 282 322" marker-end="url(#ar3)"/>
+        <text x="90" y="314" class="sm">frame · unsynchronised text</text>
+
+        <g class="bad">
+          <path class="ln" d="M 282 352 L 360 352"/>
+          <path class="ln" d="M 352 344 L 368 360"/>
+          <path class="ln" d="M 368 344 L 352 360"/>
+          <text x="380" y="356" class="sm">discarded — never persisted</text>
+        </g>
+
+        <text x="82" y="378" class="sm dim">changes admitted before invalidation are retained</text>
+      </svg>
+    </div>
+    <figcaption>The lease has no TTL. It holds until push-invalidated — because a lease expiring on a timer would require a database read per connection per interval, which the free-tier allowance cannot afford.</figcaption>
+  </figure>
+</section>
+
+<section>
+  <h2>What review caught</h2>
+  <p>The gate ran a rubric walk plus two adversarial lenses: verify every named technology against the live web, and construct two units that obey every rule and still build incompatibly. It found six things worth reporting. Two were defects in the draft itself.</p>
+
+  <div class="decision risk">
+    <div class="dhead"><h3>SESSION_CONTEXT under connection pooling is a live data-leak class</h3><span class="tag r">critical</span></div>
+    <p>Two compounding facts. Returning a connection to the pool does not itself clear session state, so setting the Space once per connection can serve a <em>later</em> request for a different Space. And a documented SQL Server defect — 2019 CU14–CU31, 2022 CU1–CU23, 2025 RTM–CU2 — means a parallel plan reading <code>SESSION_CONTEXT()</code> on a pool-reset session can return another tenant's rows <em>silently and successfully</em> under RLS.</p>
+    <div class="cost">Fixed in AD-2: session context set per <b>unit of work</b> with <code>@read_only = 1</code>; database-scoped <code>MAXDOP = 1</code> to remove the parallel class outright; EF global query filters restated as an <b>independent</b> second layer so neither carries NFR-1 alone; and a pooled-connection-reuse case added to the isolation suite. The documented trace-flag workaround isn't available on Azure SQL, so whether Azure SQL is affected at all is logged as an open item.</div>
+  </div>
+
+  <div class="decision caught">
+    <div class="dhead"><h3>UUIDv7 was wrong, and it was mine</h3><span class="tag g">fixed</span></div>
+    <p>The first draft specified <code>Guid.CreateVersion7()</code> for all ids. SQL Server's <code>uniqueidentifier</code> collation orders the low-order bytes first, so a v7's leading timestamp buys nothing — it fragments an index exactly like a v4. A documented case had inserts go from about twenty minutes to hours.</p>
+    <div class="cost">Corrected to EF Core's <code>SequentialGuidValueGenerator</code>.</div>
+  </div>
+
+  <div class="decision caught">
+    <div class="dhead"><h3>Four seams where obedient units still diverge</h3><span class="tag g">closed</span></div>
+    <ul>
+      <li><strong>Lease TTL contradicted the cost rule.</strong> A five-second TTL implied a database read per connection per interval — exactly what AD-10 forbids. Leases now hold until push-invalidated.</li>
+      <li><strong>The outbox needed a poll that AD-10 banned.</strong> Resolved by having the recovery sweep run at process start and piggyback on inbound traffic, so it never wakes an idle database.</li>
+      <li><strong>Nobody owned <em>when</em> the description projection is written.</strong> An eager and a lazy implementation would race. Now recomputed in the same transaction as the append.</li>
+      <li><strong>Two paths create an Account.</strong> Registration and accept-invitation could each provision a Personal Space. AD-22 gives them one implementation and one transaction.</li>
+    </ul>
+  </div>
+
+  <div class="decision caught">
+    <div class="dhead"><h3>Four requirements the AD structure had dropped</h3><span class="tag g">added</span></div>
+    <ul>
+      <li><strong>AD-23</strong> — account-existence non-disclosure. Registration, authentication and invitation must be identical in status, body <em>and duration</em>; otherwise registration is an enumeration oracle. Two slices would certainly have differed on returning <code>409</code>.</li>
+      <li><strong>AD-24</strong> — "list my Spaces" has no active Space to filter by, so it had no defined home under RLS. The Space switcher and Account settings are now the only Account-scoped surfaces, running under an <code>AccountId</code> predicate rather than a bypass.</li>
+      <li><strong>AD-25</strong> — NFR-8's bounds enforced as refusals at one choke point. NFR-8 requires visible degradation; nothing said where.</li>
+      <li><strong>AD-5</strong> — three deletion behaviours where a cascade is the obvious reach and all three are wrong: Account tombstones preserve attribution, removing a Membership must not delete Invitations it issued, and losing an Assignee nulls the field rather than deleting the Task.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>Risks carried into the build</h2>
+  <div class="tablewrap">
+    <table>
+      <thead>
+        <tr><th>Risk</th><th>Why it's accepted</th><th class="num">Resolve by</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Cold start against NFR-5</td>
+          <td>Scale-to-zero plus SQL auto-pause means sparse traffic makes most requests cold, against a 300 ms p95 read budget. Mitigation available: pin min replicas to 1 (~$12–15/mo, still inside the ceiling).</td>
+          <td class="num">first measurement</td>
+        </tr>
+        <tr>
+          <td>Hand-rolled merge correctness</td>
+          <td>Plain text only, ≤10 editors, small documents — the tractable end of the problem. Property-based convergence tests are the gate, and they're written before the implementation.</td>
+          <td class="num">collab epic</td>
+        </tr>
+        <tr>
+          <td>Single sync replica</td>
+          <td>AD-14 forbids designs that need a backplane, keeping horizontal scaling possible; it does not build one. The budget doesn't buy a backplane today.</td>
+          <td class="num">if NFR-8 is approached</td>
+        </tr>
+        <tr>
+          <td>Free-tier vCore exhaustion</td>
+          <td>55 hours of active compute a month is generous for this scale but finite. An alert fires at 10% remaining and the database auto-pauses rather than billing over.</td>
+          <td class="num">continuous</td>
+        </tr>
+        <tr>
+          <td>Board ordering interleaving</td>
+          <td>Jitter mitigates concurrent same-slot inserts; it does not eliminate them. A non-interleaving sequence CRDT is the escalation.</td>
+          <td class="num">if observed</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h2>Still open</h2>
+  <p class="pull">Three of these change the build. The rest can wait for evidence.</p>
+  <ul>
+    <li><strong>Cold start.</strong> Pin a warm replica, or declare NFR-5 measured-warm and exempt the cold path. Either is defensible; silence isn't.</li>
+    <li><strong>Azure SQL's exposure to the SESSION_CONTEXT defect.</strong> <code>MAXDOP = 1</code> is cheap insurance at this scale, but it's worth knowing whether it's needed.</li>
+    <li><strong>The PRD's six open questions</strong> are untouched by this spine — ownership transfer without acceptance, the revocation budget, and whether the NFR-8 bounds are defensible all remain product calls.</li>
+  </ul>
+</section>
+
+<footer>
+  <span>Spine: ARCHITECTURE-SPINE.md · 25 ADs · lint clean</span>
+  <span>Decision trail: .memlog.md · 43 entries</span>
+  <span>Source: prd-YelloBMAD-2026-08-15 (final) + addendum</span>
+</footer>
+
+</div>

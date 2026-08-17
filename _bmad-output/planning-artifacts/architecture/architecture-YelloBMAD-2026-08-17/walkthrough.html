@@ -1,0 +1,572 @@
+<title>Walking the Yello Spine</title>
+
+<style>
+  :root {
+    --ground: #F6F5F1;
+    --surface: #FFFFFF;
+    --sunk: #EEECE5;
+    --ink: #1B1A16;
+    --muted: #6E6B61;
+    --rule: #DFDCD3;
+    --accent: #9A6B08;
+    --accent-soft: #F0E4C6;
+    --critical: #9B3A26;
+    --critical-soft: #F3DED8;
+    --ok: #3D6B4E;
+
+    --display: "Segoe UI Variable Display", "Segoe UI", -apple-system, system-ui, sans-serif;
+    --body: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --mono: "Cascadia Mono", "Cascadia Code", Consolas, ui-monospace, SFMono-Regular, monospace;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #161511;
+      --surface: #1E1C17;
+      --sunk: #24211B;
+      --ink: #EBE8DE;
+      --muted: #9A968A;
+      --rule: #35312A;
+      --accent: #E3B24A;
+      --accent-soft: #3A301A;
+      --critical: #E08C72;
+      --critical-soft: #3B241D;
+      --ok: #8CBE9A;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #161511;
+    --surface: #1E1C17;
+    --sunk: #24211B;
+    --ink: #EBE8DE;
+    --muted: #9A968A;
+    --rule: #35312A;
+    --accent: #E3B24A;
+    --accent-soft: #3A301A;
+    --critical: #E08C72;
+    --critical-soft: #3B241D;
+    --ok: #8CBE9A;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 17px;
+    line-height: 1.6;
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* --- rail --- */
+  .rail {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--ground);
+    border-bottom: 1px solid var(--rule);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.7rem 1.5rem;
+  }
+
+  .brand {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  .dots { display: flex; gap: 5px; flex: 1; flex-wrap: wrap; }
+
+  .dot {
+    width: 26px;
+    height: 5px;
+    border: none;
+    padding: 0;
+    background: var(--rule);
+    cursor: pointer;
+    border-radius: 1px;
+    transition: background 0.2s;
+  }
+  .dot[aria-current="true"] { background: var(--accent); }
+  .dot:hover { background: var(--muted); }
+  .dot:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .count {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  /* --- steps --- */
+  main { flex: 1; display: flex; }
+
+  .step {
+    display: none;
+    width: 100%;
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 2rem;
+    flex-direction: column;
+    gap: 1.35rem;
+  }
+  .step.on { display: flex; animation: rise 0.32s ease-out; }
+
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @media (prefers-reduced-motion: reduce) {
+    .step.on { animation: none; }
+    .dot { transition: none; }
+  }
+
+  .kicker {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(1.9rem, 4.8vw, 2.7rem);
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    line-height: 1.1;
+    text-wrap: balance;
+    margin: 0;
+    max-width: 22ch;
+  }
+
+  h2 {
+    font-family: var(--display);
+    font-size: clamp(1.5rem, 3.6vw, 2rem);
+    font-weight: 650;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+    text-wrap: balance;
+    margin: 0;
+    max-width: 24ch;
+  }
+
+  p { margin: 0; max-width: 62ch; }
+  .lede { font-size: 1.12rem; color: var(--muted); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--sunk);
+    padding: 0.08em 0.34em;
+    border-radius: 2px;
+  }
+
+  strong { font-weight: 600; }
+  em { font-style: italic; }
+
+  .quote {
+    border-left: 3px solid var(--accent);
+    padding: 0.35rem 0 0.35rem 1.1rem;
+    font-size: 1.06rem;
+    max-width: 56ch;
+  }
+  .quote cite {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    font-style: normal;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-top: 0.5rem;
+  }
+
+  ul { margin: 0; padding-left: 1.15rem; display: flex; flex-direction: column; gap: 0.5rem; max-width: 62ch; }
+  li::marker { color: var(--accent); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.9rem; }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-top: 3px solid var(--accent);
+    padding: 1rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .card.no { border-top-color: var(--critical); }
+  .card.yes { border-top-color: var(--ok); }
+  .card h3 {
+    font-family: var(--display);
+    font-size: 0.98rem;
+    font-weight: 650;
+    margin: 0;
+  }
+  .card p { font-size: 0.92rem; }
+
+  .ad {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    background: var(--accent-soft);
+    padding: 0.18rem 0.45rem;
+    border-radius: 2px;
+    align-self: flex-start;
+  }
+
+  figure { margin: 0; display: flex; flex-direction: column; gap: 0.55rem; }
+  .figbox { overflow-x: auto; background: var(--surface); border: 1px solid var(--rule); padding: 1rem; }
+  figure svg { max-width: 100%; height: auto; color: var(--ink); display: block; }
+  figcaption { font-size: 0.85rem; color: var(--muted); max-width: 62ch; }
+
+  svg text { font-family: var(--mono); font-size: 12px; fill: currentColor; }
+  svg .sm { font-size: 10.5px; }
+  svg .box { fill: var(--surface); stroke: currentColor; stroke-width: 1.25; }
+  svg .fill { fill: var(--sunk); stroke: currentColor; stroke-width: 1.25; }
+  svg .ln { stroke: currentColor; stroke-width: 1.25; fill: none; }
+  svg .dash { stroke: currentColor; stroke-width: 1.15; fill: none; stroke-dasharray: 4 3; }
+  svg .accent { color: var(--accent); }
+  svg .bad { color: var(--critical); }
+  svg .dim { color: var(--muted); }
+
+  /* --- nav --- */
+  .nav {
+    position: sticky;
+    bottom: 0;
+    background: var(--ground);
+    border-top: 1px solid var(--rule);
+    display: flex;
+    gap: 0.6rem;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.7rem 1.5rem;
+  }
+
+  .nav button {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.06em;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--rule);
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    border-radius: 2px;
+  }
+  .nav button:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .nav button:disabled { opacity: 0.35; cursor: default; }
+  .nav button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .hint { font-family: var(--mono); font-size: 0.7rem; color: var(--muted); }
+  @media (max-width: 34rem) { .hint { display: none; } }
+</style>
+
+<div class="rail">
+  <span class="brand">Yello · spine</span>
+  <div class="dots" id="dots" role="tablist" aria-label="Steps"></div>
+  <span class="count" id="count">1 / 11</span>
+</div>
+
+<main>
+
+  <section class="step on" data-t="The bet">
+    <span class="kicker">Walkthrough · architecture spine</span>
+    <h1>Walking the Yello Spine</h1>
+    <p class="lede">Eleven steps through the invariants that keep Yello consistent — and the three places where the design is still genuinely open.</p>
+    <p>Yello's bet is that a private notebook, a client engagement and a whole company's shared work are the same primitive: a <strong>Space</strong>. What follows from that is the part that shapes everything — the interesting user lives in several Spaces at once, with a different standing in each. So identity is global and permission is contextual.</p>
+    <div class="quote">
+      Every question about what someone may do is answered against a specific Space, never against the person.
+      <cite>PRD §1</cite>
+    </div>
+    <p class="hint">Use ← → or the buttons below.</p>
+  </section>
+
+  <section class="step" data-t="FR-34">
+    <span class="kicker">Step 2 · the requirement everything follows from</span>
+    <h2>One requirement decides the architecture</h2>
+    <p>Beatriz is removed from a Space while she has a Task open in another tab, mid-sentence, with unsynchronised text in hand.</p>
+    <ul>
+      <li>Her editor goes inert within <strong>five seconds</strong>, without her doing anything.</li>
+      <li>The text she typed after removal <strong>never reaches the Space</strong> — including via a delayed or retried sync.</li>
+      <li>Everything she'd already synchronised <strong>stays</strong>. Revocation stops future writes; it doesn't roll back past ones.</li>
+    </ul>
+    <div class="quote">
+      FR-34 is the acceptance criterion this product should be judged on. If everything else works and this does not, the isolation model is decorative.
+      <cite>PRD §4.9, note to PM</cite>
+    </div>
+  </section>
+
+  <section class="step" data-t="What it kills">
+    <span class="kicker">Step 3 · the design it rules out</span>
+    <h2>That kills the conventional real-time design</h2>
+    <p>Almost every collaborative editor authorises once, when the socket opens, then relays document updates as opaque blobs. Under FR-34 that architecture cannot be repaired — the authority was spent at connect and there's nothing left to check.</p>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 700 300" role="img" aria-label="Comparison: in the conventional design the socket is authorised once at connect and later frames are relayed unchecked, so a revocation has nothing to act on. In Yello every frame is checked against a lease that a pushed revocation invalidates.">
+          <defs>
+            <marker id="w1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <text x="14" y="20" class="dim">CONVENTIONAL</text>
+          <rect class="box" x="14" y="34" width="112" height="46" rx="2"/>
+          <text x="70" y="62" text-anchor="middle">Client</text>
+          <rect class="fill" x="196" y="34" width="150" height="46" rx="2"/>
+          <text x="271" y="55" text-anchor="middle">authorise</text>
+          <text x="271" y="70" text-anchor="middle" class="sm">once, at connect</text>
+          <rect class="box" x="416" y="34" width="112" height="46" rx="2"/>
+          <text x="472" y="62" text-anchor="middle">relay</text>
+          <rect class="box" x="576" y="34" width="106" height="46" rx="2"/>
+          <text x="629" y="62" text-anchor="middle">store</text>
+
+          <path class="ln" d="M 126 57 L 196 57" marker-end="url(#w1)"/>
+          <path class="ln" d="M 346 57 L 416 57" marker-end="url(#w1)"/>
+          <path class="ln" d="M 528 57 L 576 57" marker-end="url(#w1)"/>
+
+          <g class="bad">
+            <path class="dash" d="M 271 130 L 271 88" marker-end="url(#w1)"/>
+            <text x="190" y="146" class="sm">revocation arrives — nothing left to check</text>
+          </g>
+
+          <path class="dash dim" d="M 14 172 L 686 172"/>
+
+          <text x="14" y="200" class="accent">YELLO</text>
+          <rect class="box" x="14" y="214" width="112" height="46" rx="2"/>
+          <text x="70" y="242" text-anchor="middle">Client</text>
+
+          <g class="accent">
+            <rect class="box" x="196" y="214" width="150" height="46" rx="2"/>
+            <text x="271" y="235" text-anchor="middle">check lease</text>
+            <text x="271" y="250" text-anchor="middle" class="sm">every frame</text>
+          </g>
+
+          <rect class="box" x="416" y="214" width="112" height="46" rx="2"/>
+          <text x="472" y="242" text-anchor="middle">relay</text>
+          <rect class="box" x="576" y="214" width="106" height="46" rx="2"/>
+          <text x="629" y="242" text-anchor="middle">store</text>
+
+          <path class="ln" d="M 126 237 L 196 237" marker-end="url(#w1)"/>
+          <path class="ln" d="M 346 237 L 416 237" marker-end="url(#w1)"/>
+          <path class="ln" d="M 528 237 L 576 237" marker-end="url(#w1)"/>
+
+          <g class="accent">
+            <path class="ln" d="M 271 292 L 271 262" marker-end="url(#w1)"/>
+            <text x="286" y="288" class="sm">revocation invalidates the lease</text>
+          </g>
+        </svg>
+      </div>
+      <figcaption>The difference is one box. Authorisation moves from the connection to the frame — and revocation suddenly has a surface to act on.</figcaption>
+    </figure>
+    <span class="ad">AD-8 · the sync channel carries no authority</span>
+  </section>
+
+  <section class="step" data-t="Isolation">
+    <span class="kicker">Step 4 · the requirement with no acceptable failure rate</span>
+    <h2>Isolation lives in the database, not the code</h2>
+    <p>NFR-1 is the one requirement where a single verified failure blocks release. The code is written by dev agents, story by story — so a rule that depends on every future story remembering to add <code>WHERE SpaceId =</code> is not a rule.</p>
+    <div class="cards">
+      <div class="card">
+        <h3>Row-level security</h3>
+        <p>Every Space-scoped table has a policy keyed on the active Space. Out-of-Space rows are invisible to the query, not merely filtered by it.</p>
+      </div>
+      <div class="card">
+        <h3>Query filters</h3>
+        <p>EF Core restates each policy independently, derived from application state rather than session context — so neither layer carries NFR-1 alone.</p>
+      </div>
+      <div class="card">
+        <h3>Composite keys</h3>
+        <p>An Assignee is <code>(SpaceId, MembershipId)</code>, so "assign only within the Space" holds by construction rather than by validation.</p>
+      </div>
+    </div>
+    <span class="ad">AD-2 · enforced in the database</span>
+  </section>
+
+  <section class="step" data-t="403 / 404">
+    <span class="kicker">Step 5 · the mechanism produces the semantics</span>
+    <h2>The 403/404 line falls out for free</h2>
+    <p>The PRD demands a subtle distinction: a resource in a Space you don't belong to must be <em>indistinguishable from one that doesn't exist</em>, while a resource in a Space you <em>do</em> belong to but lack the Role for must report a permission failure.</p>
+    <p>Row-level security produces exactly that without the code remembering to. Out-of-Space, the row isn't there — so the handler naturally 404s. In-Space, the row <em>is</em> there — so the application layer decides, and returns 403.</p>
+    <div class="quote">
+      The distinction is drawn at the Space boundary, not below it.
+      <cite>PRD FR-15</cite>
+    </div>
+    <span class="ad">AD-3 · one line, drawn once</span>
+  </section>
+
+  <section class="step" data-t="Cost">
+    <span class="kicker">Step 6 · what £30 a month decided</span>
+    <h2>You cannot buy the WebSocket</h2>
+    <p>The obvious Azure answer for real-time is a managed broker. The numbers close that door before it opens.</p>
+    <div class="cards">
+      <div class="card no">
+        <h3>Web PubSub free</h3>
+        <p>20 concurrent connections, 20k messages/day, one unit. NFR-8 needs 50 concurrent Sessions <em>per Space</em>.</p>
+      </div>
+      <div class="card no">
+        <h3>Web PubSub standard</h3>
+        <p>~$49/month per unit — the whole ceiling, before compute or storage exists.</p>
+      </div>
+      <div class="card no">
+        <h3>Azure Functions</h3>
+        <p>Cannot hold persistent WebSocket connections at all. The prescribed remedy is the broker above.</p>
+      </div>
+    </div>
+    <p>So the socket terminates in our own container — which is exactly where FR-34's per-frame check had to live anyway. <strong>The budget and the hardest requirement agree.</strong></p>
+  </section>
+
+  <section class="step" data-t="No polling">
+    <span class="kicker">Step 7 · the constraint that improved the design</span>
+    <h2>Nothing may poll the database</h2>
+    <p>The Azure SQL free offer gives 100,000 vCore-seconds a month, permanently — about 55 hours of active compute. Anything that queries on a timer both prevents auto-pause and drains the allowance.</p>
+    <p>Which means NFR-2's five-second revocation <em>cannot</em> be a poll. The operation that removes the Membership pushes the notification, in-process, at its transaction boundary.</p>
+    <div class="cards">
+      <div class="card yes">
+        <h3>Leases don't expire</h3>
+        <p>A TTL would mean a database read per connection per interval. Leases hold until push-invalidated; the five-second bound is met by push latency.</p>
+      </div>
+      <div class="card yes">
+        <h3>The outbox piggybacks</h3>
+        <p>Its recovery sweep runs at process start and rides on inbound traffic, so it never wakes an idle database.</p>
+      </div>
+      <div class="card yes">
+        <h3>Probes stay local</h3>
+        <p>Liveness and readiness answer from process state, with no round trip.</p>
+      </div>
+    </div>
+    <span class="ad">AD-9 · pushed, never polled · AD-10</span>
+  </section>
+
+  <section class="step" data-t="The port">
+    <span class="kicker">Step 8 · what the spine refuses to decide</span>
+    <h2>The merge algorithm is deliberately not decided</h2>
+    <p>The spine fixes the seam and defers the algorithm. That's only safe because the persistence shape — an append-only change log plus a derived plain-text projection — serves a sequence CRDT and last-writer-wins equally, so swapping later is a registration change rather than a migration.</p>
+    <p>The port's contract isn't prose. It's a <strong>conformance suite</strong> encoding FR-31, FR-33 and NFR-4, written before any implementation exists.</p>
+    <div class="quote">
+      "CRDT or last-writer-wins?" stops being a judgement an agent makes on story 27 and becomes something the tests decide.
+      <cite>AD-12</cite>
+    </div>
+    <p>Last-writer-wins cannot pass that suite: it overwrites one of two people editing different parts of the same description, and after a five-minute disconnect it can preserve your changes or theirs, never both. Adopting it would be a PRD amendment, not an architecture decision.</p>
+  </section>
+
+  <section class="step" data-t="The tension">
+    <span class="kicker">Step 9 · where two good choices collided</span>
+    <h2>C# everywhere, and a CRDT that won't run there</h2>
+    <p>Two decisions pulled against each other: <em>use a proven CRDT rather than hand-roll one</em>, and <em>C# everywhere, including the browser</em>.</p>
+    <div class="cards">
+      <div class="card no">
+        <h3>YDotNet</h3>
+        <p>The good binding, over Rust <code>yrs</code>. Ships Windows, Linux and macOS natives only — <strong>no WebAssembly target</strong>. Fine on the server, impossible in Blazor.</p>
+      </div>
+      <div class="card no">
+        <h3>Ycs</h3>
+        <p>The only pure-C# port, so the only one that <em>could</em> run in WASM. No NuGet package, no releases at all, tested against a Yjs six minor versions old.</p>
+      </div>
+      <div class="card yes">
+        <h3>Shared C# merge</h3>
+        <p>One source compiled twice — WASM for the client, native for the server. The only option giving a <strong>single</strong> merge implementation rather than two that must stay compatible forever.</p>
+      </div>
+    </div>
+    <p>The rich-text complexity that makes CRDTs brutal doesn't apply here: the PRD only ever asks for plain text, ten editors, small documents.</p>
+  </section>
+
+  <section class="step" data-t="Review">
+    <span class="kicker">Step 10 · what the gate caught</span>
+    <h2>Six findings, two of them in my own draft</h2>
+    <div class="cards">
+      <div class="card no">
+        <h3>A live data-leak class</h3>
+        <p>Pooled connections don't clear session state on return, and a documented SQL Server defect lets a parallel plan reading session context return <em>another tenant's rows</em> under RLS — silently, successfully. Fixed with per-unit-of-work context, <code>MAXDOP = 1</code>, and a pooled-reuse isolation test.</p>
+      </div>
+      <div class="card no">
+        <h3>UUIDv7 was wrong</h3>
+        <p>SQL Server orders <code>uniqueidentifier</code> low-order bytes first, so a v7 fragments an index exactly like a v4. Corrected to sequential GUIDs.</p>
+      </div>
+      <div class="card yes">
+        <h3>Four seams closed</h3>
+        <p>A lease TTL that contradicted the no-polling rule; an outbox that needed a banned poll; an unowned projection write that could race; and two paths that could each provision a Personal Space.</p>
+      </div>
+      <div class="card yes">
+        <h3>Four requirements recovered</h3>
+        <p>Account-existence non-disclosure; the Account-scoped surfaces that RLS had no home for; NFR-8's bounds as refusals; and three deletion behaviours where a cascade is the obvious reach and all three are wrong.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="step" data-t="Open">
+    <span class="kicker">Step 11 · what to talk about</span>
+    <h2>Three things still open</h2>
+    <ul>
+      <li><strong>Cold start against NFR-5.</strong> Scale-to-zero plus auto-pause means sparse traffic makes most requests cold, against a 300 ms p95 budget. Pin a warm replica for ~$12–15/month, or declare NFR-5 measured-warm. Either is defensible; silence isn't.</li>
+      <li><strong>Is Azure SQL affected by the session-context defect at all?</strong> <code>MAXDOP = 1</code> is cheap insurance at this scale, but the documented trace-flag workaround isn't available on Azure SQL, and nobody has confirmed the exposure.</li>
+      <li><strong>The merge algorithm.</strong> Deferred on purpose. The conformance suite decides admissibility — but someone still has to write it, and it should be written before the epic, not during.</li>
+    </ul>
+    <p class="lede">The PRD's own six open questions — ownership transfer without acceptance, the five-second revocation budget, whether the NFR-8 bounds are defensible — are untouched by this spine. They remain product calls.</p>
+  </section>
+
+</main>
+
+<div class="nav">
+  <button id="prev" type="button">← Back</button>
+  <span class="hint" id="label">The bet</span>
+  <button id="next" type="button">Next →</button>
+</div>
+
+<script>
+  var steps = Array.prototype.slice.call(document.querySelectorAll('.step'));
+  var dots = document.getElementById('dots');
+  var count = document.getElementById('count');
+  var label = document.getElementById('label');
+  var prev = document.getElementById('prev');
+  var next = document.getElementById('next');
+  var i = 0;
+
+  steps.forEach(function (s, n) {
+    var b = document.createElement('button');
+    b.className = 'dot';
+    b.type = 'button';
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-label', 'Step ' + (n + 1) + ': ' + s.dataset.t);
+    b.addEventListener('click', function () { go(n); });
+    dots.appendChild(b);
+  });
+
+  function go(n) {
+    i = Math.max(0, Math.min(steps.length - 1, n));
+    steps.forEach(function (s, k) { s.classList.toggle('on', k === i); });
+    Array.prototype.forEach.call(dots.children, function (d, k) {
+      d.setAttribute('aria-current', k === i ? 'true' : 'false');
+    });
+    count.textContent = (i + 1) + ' / ' + steps.length;
+    label.textContent = steps[i].dataset.t;
+    prev.disabled = i === 0;
+    next.disabled = i === steps.length - 1;
+    if (location.hash !== '#' + (i + 1)) history.replaceState(null, '', '#' + (i + 1));
+    window.scrollTo(0, 0);
+  }
+
+  prev.addEventListener('click', function () { go(i - 1); });
+  next.addEventListener('click', function () { go(i + 1); });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    if (e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); go(i + 1); }
+    if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(i - 1); }
+    if (e.key === 'Home') { e.preventDefault(); go(0); }
+    if (e.key === 'End') { e.preventDefault(); go(steps.length - 1); }
+  });
+
+  var start = parseInt((location.hash || '').replace('#', ''), 10);
+  go(isNaN(start) ? 0 : start - 1);
+</script>
