@@ -15,6 +15,7 @@ These terms are used **verbatim** in every downstream artifact — epics, storie
 - **Member** — Creates and edits Projects and Tasks. May not manage Membership.
 - **Viewer** — Reads Projects and Tasks. Creates and edits nothing.
 - **Invitation** — A pending offer of Membership in one Space at one Role, addressed to an email address. Issued by an Owner or Admin. Becomes a Membership when accepted. Revocable before acceptance.
+- **Ownership Offer** — A pending offer to become the Owner of one Space, addressed to an existing Membership of that Space. Issued by that Space's Owner, who remains Owner until it is accepted. At most one is pending per Space. Revocable before acceptance, declinable by the recipient, and lapses if the recipient's Membership ends.
 - **Project** — A named collection of Tasks within one Space. Belongs to exactly one Space and never moves between Spaces.
 - **Task** — The unit of work. Belongs to exactly one Project at any moment, and may be moved between Projects within the same Space (CAP-41). Carries a title, description, Status, optional Assignee, optional due date and zero or more Labels.
 - **Status** — The workflow position of a Task, drawn from the effective Status set of the Task's Project: the Space defaults with that Project's delta applied. Determines the Board column a Task appears in.
@@ -25,3 +26,5 @@ These terms are used **verbatim** in every downstream artifact — epics, storie
 - **Presence** — The live indication that other Users are viewing or editing the same Task.
 - **API Token** — A credential authenticating API requests as one Account within exactly one Space, at that Account's Role in that Space. Never grants access beyond the Space it was issued for.
 - **Session** — An authenticated browser context for one Account. Spans all Spaces the Account belongs to; carries no permission of its own.
+
+> **One definition is scheduled to change.** **Account** is defined above as unique *by email address*. The P6 mid-flight change (OAuth sign-in) breaks that: a provider may return a different address than the one on file, or none. The definition above is correct for v1 and is what stories should implement — but do not build on email-as-identity in a way that cannot be revisited. See `harness-constraints.md`.

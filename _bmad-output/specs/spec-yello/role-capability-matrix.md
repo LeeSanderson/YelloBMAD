@@ -20,9 +20,12 @@ Every Role is per-Space. A capability is meaningless without naming the Space it
 | Change a Membership's Role | ✔ | Member ↔ Viewer only | — | — |
 | Remove a Membership | ✔ | Members and Viewers only | — | — |
 | Rename the Space | ✔ | ✔ | — | — |
-| Transfer ownership | ✔ | — | — | — |
+| Offer to transfer ownership | ✔ | — | — | — |
+| Accept or decline an Ownership Offer | — | ✔ † | ✔ † | ✔ † |
 | Delete the Space | ✔ | — | — | — |
 | Issue an API Token for oneself | ✔ | ✔ | ✔ | ✔ |
+
+† Only the single Membership a pending Ownership Offer names, and only while it is pending. Any Role may be named. The Owner cannot accept one, because the Owner is who makes it.
 
 ## Testable consequences
 
@@ -32,8 +35,9 @@ Every Role is per-Space. A capability is meaningless without naming the Space it
 
 ## Boundaries the matrix does not express
 
-- **Owner uniqueness.** Exactly one Owner per Space at all times. No Role change can produce a second Owner or remove the sole Owner; ownership moves only by transfer (CAP-8).
-- **Owner removability.** The Owner's Membership cannot be removed by anyone, including the Owner, while it holds ownership.
+- **Owner uniqueness.** Exactly one Owner per Space at all times. No Role change can produce a second Owner or remove the sole Owner; ownership moves only by an Ownership Offer (CAP-8) accepted under CAP-42, and it moves in one atomic step.
+- **Owner removability.** The Owner's Membership cannot be removed by anyone, including the Owner, while it holds ownership. The Owner leaves by having an Ownership Offer accepted, or by deleting the Space.
+- **Ownership requires consent.** Ownership never arrives unrequested. An Owner may only *offer* it, and the named Membership must accept. This is what stops one Account making another the unremovable Owner of a Space and thereby blocking that Account's own deletion.
 - **Admin symmetry.** Admins cannot modify each other. Only the Owner can promote a Membership to Admin or demote one from Admin. *Recorded as an assumption in `SPEC.md`, not a settled decision.*
 - **Invitation Role ceiling.** An Invitation can never be issued at Owner Role.
 - **Assignment is not capability.** Assigning a Task to a Viewer is permitted and grants no write capability over it. Responsibility and capability are deliberately separable, so a demotion to Viewer never silently unassigns that person's work.

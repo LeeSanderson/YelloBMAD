@@ -44,10 +44,11 @@ Ravi wins work with a design studio. He creates a second Space, "Northwind Redes
 
 Nadia gets an email and clicks through. She has no Account, so she registers — and a personal Space is created for her too, which she ignores.
 
-- **Path:** open invitation → register → land in "Northwind Redesign".
+- **Path:** open invitation → see the Space and the Role offered → register, which is her deliberate act of acceptance → land in "Northwind Redesign".
 - **Climax:** she can see the Projects and Tasks in that Space and nothing else in Yello. No directory of other Spaces, no search reaching beyond her Membership, no sign that Ravi has other clients.
 - **Resolution:** Nadia is a Member of one Space and Owner of a personal Space she may never use.
 - **Edge case:** if her invitation was revoked before she accepted it, the link tells her it is no longer valid without disclosing who revoked it or what the Space contains.
+- **Edge case:** if the invitation link is fetched by a mail security scanner, prefetched by her browser, or forwarded to a colleague, **no Membership is created.** The link presents the offer and nothing more; only she, authenticated as the invited Account, can accept it.
 
 ### UJ-4 — Ravi switches context three times before lunch
 
@@ -58,9 +59,9 @@ Ravi is Owner of "Ravi's Space", Admin of "Northwind Redesign", and Viewer on a 
 - **Path:** Space switcher → pick Space → the entire working surface changes.
 - **Climax:** in the third Space every affordance to create or edit is **absent — not present-and-failing** — so he can tell his standing from the interface without attempting an action.
 - **Resolution:** he is never in doubt about which Space he is operating in or what he may do there.
-- **Edge case, partly unresolved:** opening a deep link to a Task in a Space he has since been removed from must return him **to a Space he does belong to**. No capability carries this redirect; it is required here and nowhere else.
+- **Edge case:** opening a deep link to a Task in a Space he has since been removed from tells him only that the resource is not available to him — naming neither "it does not exist" nor "you lost access" as the real reason — and returns him **to a Space he does belong to**. No capability carries the redirect; it is required here and nowhere else.
 
-> ⚠️ **Live contradiction — do not implement from this journey alone.** The source PRD also states in this edge case that he is "told he no longer has access, not that the Task does not exist." That contradicts CAP-15, which requires a resource in a Space the caller holds no Membership in to be *indistinguishable* from one that does not exist, and it contradicts the architecture spine's AD-3, which implements CAP-15 as a hard 404 whose body carries no existence hint. The architecture has already taken CAP-15's side. `SPEC.md` carries this as an open question; the redirect requirement above is unaffected and stands either way.
+> **Resolved — this journey previously contradicted CAP-15.** The source PRD stated here that he is "told he no longer has access, not that the Task does not exist." That contradicted CAP-15, which requires a resource in a Space the caller holds no Membership in to be *indistinguishable* from one that does not exist, and the spine's AD-3, which implements CAP-15 as a hard 404 whose body carries no existence hint. **CAP-15 wins; the edge case above is the corrected version.** UJ-4 had described the cold-deep-link case using CAP-34's live-session behaviour — safe there only because that connection had already been authorised for the Space, and a cold request has no such standing. The usability cost is paid with deliberately ambiguous copy rather than with a disclosure (see CAP-15 in `acceptance-criteria.md`). No architecture change: AD-3 and AD-24 stand, and no removed-Membership tombstone is introduced.
 
 ### UJ-5 — Nadia and Ravi write the same Task description at the same time
 
@@ -96,12 +97,14 @@ Tomás runs a small studio and already has a deployment script. He wants a Task 
 
 ### UJ-8 — Ravi hands a Space over and leaves
 
-*Carried by CAP-8, CAP-14, CAP-3.*
+*Carried by CAP-8, CAP-42, CAP-14, CAP-3.*
 
-Ravi finishes the Northwind engagement and wants out cleanly, but the work must survive. He transfers ownership to Nadia and removes himself.
+Ravi finishes the Northwind engagement and wants out cleanly, but the work must survive. He offers ownership to Nadia; she accepts, and he removes himself.
 
-- **Climax:** the Space continues with all its Projects and Tasks intact, Nadia is now Owner, and Ravi is gone — no residual access, no orphaned Space.
+- **Path:** offer ownership → Nadia accepts → Ravi, now an Admin, removes his own Membership.
+- **Climax:** the Space continues with all its Projects and Tasks intact, Nadia is Owner **by her own agreement**, and Ravi is gone — no residual access, no orphaned Space.
 - **Resolution:** Ravi's remaining Spaces are unaffected.
+- **Edge case:** if Nadia declines, or simply never answers and the offer lapses, Ravi is still the Owner and still cannot leave. His remaining exits are to offer it to someone else or to delete the Space. **Wanting out does not by itself get him out** — which is the deliberate price of nobody being made an Owner against their will.
 - **Edge case:** if Ravi instead deletes his entire Account, every Space he still owns must be resolved first — he cannot leave a Space ownerless, and other people's work cannot vanish because he left.
 
 ## Surface inventory

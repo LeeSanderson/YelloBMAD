@@ -27,7 +27,14 @@ Yello must genuinely have all nine. Each unlocks BMad surfaces that stay dormant
 | P8 | Falsifiable non-functional requirements | The NFR evidence audit needs claims that can actually *fail* | NFR-1 … NFR-9 plus the two gating metrics. NFR-1 has no acceptable failure rate; NFR-8 gives every budget a stated domain |
 | P9 | Enough epics that ordering matters | Story sequencing and dependency management. With two epics, sequencing teaches nothing | 41 capabilities across 11 groups with genuine dependency ordering: identity → Spaces → Membership → Access Control → Projects → Tasks → Status config → Views → Collaboration, with API and Notifications cutting across |
 
-Carriers are named at capability level, not epic level, because epics did not exist when they were assigned. **The mapping needs revisiting once epics exist**, since one capability group may split across several.
+**Obligation on the epics phase.** Carriers above are named at capability level because epics did not exist when they were assigned. After `bmad-create-epics-and-stories` runs, remap every carrier to the epic that delivers it, and record the result in `docs/bmad-coverage.md` rather than here.
+
+Two cautions for whoever does that:
+
+- **The eleven capability groups in `SPEC.md` are not candidate epics.** They are domain groupings inherited from the PRD's feature structure. `bmad-create-epics-and-stories` organises epics by *user value* and explicitly rejects groupings by technical layer, so several will not survive as epics. **Access Control is the clearest case** — CAP-15 and CAP-16 are cross-cutting, present in every other group, and are not something a user accomplishes.
+- **P9 is a special case: it is unverified, not merely mis-levelled.** Its carrier *is* the epic list, so the claim that there are enough epics for ordering to matter cannot be checked until that list exists. Do not restate it as carried until it has been.
+
+No epic split is proposed here on purpose: proposing one would pre-empt an approval-gated collaborative step whose unaided output is itself a data point this project exists to collect.
 
 ## The P4 gap — reported, not contrived
 
@@ -37,20 +44,32 @@ Two of P4's three purposes are carried; one is not.
 - **Contract testing** — carried. The public API is a published contract with a stable shape, which is what consumer-driven contract testing needs.
 - **Third-party failure handling** — **not carried.** Yello depends on almost nothing external. Email delivery is the only outbound integration and it is fire-and-forget. There is no third-party API to be rate-limited by, time out against, or receive a breaking change from.
 
-**Resolution: report the gap for v1 and close it later with OAuth sign-in** — a feature wanted regardless, deferred rather than ruled out. It introduces Yello's first genuine inbound third-party dependency and with it provider outage, token expiry, revoked consent and provider contract change. Because it is independently wanted, it closes P4 without triggering the contrived-complexity anti-pattern.
+**Resolution: report the gap for v1 and close it with OAuth sign-in, now selected as the P6 change and scheduled** — a feature wanted regardless, deferred rather than ruled out. It introduces Yello's first genuine inbound third-party dependency and with it provider outage, token expiry, revoked consent and provider contract change. Because it is independently wanted, it closes P4 without triggering the contrived-complexity anti-pattern.
 
 **Rejected:** bolting on calendar sync or a similar dependency purely to reach the surface. Webhooks remain available as a further option (outbound delivery, retry, backoff, replay).
 
-## The P6 reserve — v1 is deliberately not frozen
+## The P6 change — selected and scheduled
 
-A mid-flight requirements change is a *required property*, so one is held back on purpose. Two candidates are both genuinely wanted rather than manufactured, and both sit in the deferred list in `SPEC.md`:
+A mid-flight requirements change is a *required property*, so one is held back on purpose. **OAuth sign-in is the selected change**, chosen over iteration planning because it is the only candidate that fires P6 **and** closes P4, the single reported coverage gap in the tracker.
 
-| Candidate | Shape of the ripple |
+**Timing: once the identity epic has shipped, while Spaces and Membership are in flight.** The dependency order puts identity first, so by that point authentication is already built — which is the condition correct-course needs. A change that only affects work not yet started tests nothing.
+
+### Assumptions that must stay soft until it fires
+
+This is the reason the choice had to be made before sprint planning. Stories touching identity must not harden these:
+
+| Must stay soft | Why OAuth breaks it |
 |---|---|
-| **Iteration planning** (cycles/sprints) | Ripples **wide** — through Task, Board, API and permissions simultaneously |
-| **OAuth sign-in** | Ripples **deep** into one subsystem (authentication), and closes the P4 gap at the same time |
+| **`Account` is unique by email address** (`glossary.md`) | A provider may return a different address than the one already on file, or none at all. **This is the load-bearing one** — it is a Glossary-level claim, so it reaches every artifact |
+| CAP-1 — an Account is created with an email address **and a password** | An OAuth Account has no password. Nothing may assume a password exists on every Account |
+| NFR-6 — password storage and work-factor requirements | Must tolerate Accounts that hold no password at all, rather than treating that as an invalid state |
+| AD-23 — uniform responses that never disclose existence | The guarantee must hold identically on the OAuth path, which is a new disclosure surface |
 
-Either works; running both would exercise correct-course twice against changes of different shapes. **`SPEC.md` carries an open question on which fires and when**, because the choice determines which v1 assumptions must stay soft — deciding it after sprint planning is too late.
+One assumption is **already soft and needs no action**: AD-22 anticipates two Account-creation paths and requires them to share one slice, so a third path fits the rule it already states.
+
+### Iteration planning — retained, not scheduled
+
+Iteration planning remains available as a *second* change if a comparison is wanted: it ripples **wide** (Task, Board, API and permissions simultaneously) where OAuth ripples **deep**, so running both would test whether correct-course behaves differently on a focused change versus one spanning epics. Not committed — that decision is better taken after the first firing has shown what it teaches. Note that CAP-37 bans removing, renaming or retyping a field within a version but permits *adding* one, so iteration planning might not force a v2 at all.
 
 ## Anti-patterns — reject these
 
@@ -62,6 +81,27 @@ Each would produce a comfortable, useless test.
 - **Contrived complexity** — a requirement bolted on purely to reach a BMad skill. Teaches you how BMad handles a fake project, which is a weak signal. *Avoided, and tested once:* the P4 gap was left open rather than closed with a bolted-on dependency.
 
 **Authentic complexity is worth materially more than contrived complexity that ticks the same box.** When the two conflict, report the gap.
+
+## Data protection — deferred behind a gate
+
+**v1 claims no data-protection posture, and does not need one while the operator is the only data subject.** This is a harness constraint rather than a product decision: there are no users, and the regulated-environment audience is already ruled out in `SPEC.md`.
+
+The gate has a **testable trigger**, not an aspiration: *the first Account created by anyone other than the operator.* From that moment this spec is non-compliant until amended, and the following are prerequisites for continued use — not a backlog.
+
+| Required at the gate | Why it is absent now |
+|---|---|
+| Lawful basis for holding email addresses and authored content | No data subject other than the operator |
+| A stated data region, and no replication outside it | Nothing pins a region — not the spec, not the architecture |
+| Encryption at rest asserted | NFR-6 covers transit only; at-rest is incidental |
+| A breach-notification position | Undefined. Note that a verified cross-Space disclosure would be notifiable by definition |
+| A subject-access or export route | CAP-3 covers erasure; nothing covers access or portability |
+
+**What already holds, incidentally.** Recorded so a future reader does not rebuild it:
+
+- **Erasure** — CAP-3 is a hard delete: every Membership goes, the email address is freed for reuse, and the new Account inherits no Membership, Space or history. The irreversible-deletion constraint reads as a risk elsewhere in this spec; here it is an asset. **This holds only because ownership cannot be forced on an Account (CAP-42)** — under the PRD's original immediate transfer, another Account could have blocked deletion indefinitely.
+- **Minimisation** — no behavioural analytics on Space contents, and email addresses are readable only by Owners and Admins of a Space the Account is a Member of.
+- **Retention limit** — authorisation refusal records are capped at 90 days (NFR-7).
+- **Privacy by design** — an Account's existence is never disclosed, and its Memberships cannot be enumerated by anyone, including a Space's Owner.
 
 ## Working relationship
 

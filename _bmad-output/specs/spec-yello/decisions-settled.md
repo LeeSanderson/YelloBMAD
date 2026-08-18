@@ -24,10 +24,24 @@ The starting concept was one line: *a multi-tenant project/task management platf
 | Decision | Selected | Rejected |
 |---|---|---|
 | Personal Space type | An ordinary Space, auto-created | A distinct undeletable type (adds a second concept and a special case to every lifecycle rule); a permanently private type (contradicts the shareability the model depends on) |
-| Ownership | Exactly one Owner, transferable; the old Owner drops to Admin | Immutable creator-ownership (orphans Spaces on Account deletion, or cascades into deleting other people's work); multiple Owners (collapses the Owner/Admin distinction) |
+| Ownership | Exactly one Owner. Transfer is an **offer the recipient must accept**; the old Owner drops to Admin | Immutable creator-ownership (orphans Spaces on Account deletion, or cascades into deleting other people's work); multiple Owners (collapses the Owner/Admin distinction); **immediate unilateral transfer** — see below |
 | Who may invite | Owner and Admin | Any Member (three of four Roles behaving identically weakens the Role model); per-Space configurable (a config dimension on every invitation path) |
 | Who may be invited | Any email address, no restriction | Domain-locked invitation — it presumes an organisation concept Yello does not have, and is ruled out alongside SSO |
 | Admin symmetry | Admins cannot modify each other | **Not a settled decision** — recorded as an assumption in `SPEC.md`. Keeps the Owner meaningfully distinct from Admin |
+
+### Why transfer needs consent
+
+The PRD specified transfer as immediate and unilateral, and left "can ownership be transferred to someone who then declines it?" as an open question. Resolved: **it cannot, because ownership is now an offer.** The reason is not politeness but a defect the original wording permitted.
+
+Chained together, three rules trapped the recipient:
+
+1. Transfer was immediate and needed no agreement.
+2. An Owner's Membership cannot be removed while it holds ownership — so the new Owner could not leave.
+3. Account deletion is refused while the Account owns any Space — so the new Owner could not delete their Account.
+
+An Owner could therefore transfer a Space to any Membership, immediately remove their own now-Admin Membership, and leave that person permanently unable to delete their Yello Account. Their only exits were to destroy the Space irreversibly or to impose the same thing on a third party. **One Account could unilaterally block another's erasure.**
+
+Requiring acceptance closes it at the root and costs one capability (CAP-42). Two cheaper fixes were rejected: letting the recipient reverse the transfer fails in exactly the abusive case, because a departed previous Owner leaves nobody to reverse it to; and documenting the asymmetry without fixing it would have left the erasure route in `harness-constraints.md` conditional on nobody exploiting it.
 
 ## Status configuration
 
@@ -47,7 +61,7 @@ Settled semantics:
 - **Removal is always a migration**, at either level. This makes "a Task holds a Status its Project does not expose" unreachable by construction rather than by validation.
 - A removed Status can be re-added at any time.
 - A Space-level rename propagates to non-conflicting Projects automatically; where a Project renamed the same Status, the operation reports the conflict and offers to cascade as a single choice.
-- Space-level removal uses one destination Status applied Space-wide, atomically.
+- Space-level removal uses one destination Status applied Space-wide, **plus a per-Project destination for any Project whose effective set cannot accept it** — reported and asked, never guessed — all applied atomically. An earlier draft let such Tasks fall to the Project's first Status; rejected because it made one half of the capability guess while the other half asked.
 
 **Forced consequence:** a Project's delta must reference Statuses **by identity, not by name**. The cascade offer requires detecting that a Project renamed *the same* Status object; name-keyed deltas cannot express that.
 

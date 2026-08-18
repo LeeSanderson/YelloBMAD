@@ -7,17 +7,17 @@ updated: 2026-08-16
 
 # PRD: Yello
 
-*Working title — confirm.*
-
 ## 0. Document Purpose
 
 This PRD defines Yello for the people who will design, architect and build it. It is the source of truth for *what* Yello does and *why*; it deliberately does not specify *how*. Technology choices, data models, transport mechanisms and rejected alternatives live in `addendum.md` alongside this document.
 
-Read it in this order. §1–§3 establish what Yello is and the vocabulary the rest of the document uses without deviation. §4 is the substance: features grouped by capability, with functional requirements nested underneath and numbered globally (FR-1 … FR-41) so downstream artifacts can reference them stably even if features get reorganised — the numbers are identifiers, not positions. §5 sets the system-wide quality bar and §6 the constraints Yello accepts. §7 names the surfaces. §8 and §9 draw the boundary — what Yello will never be, and what v1 leaves out. §10 says how we would know it worked. §11 and §12 collect what is still unresolved.
+Read it in this order. §1–§3 establish what Yello is and the vocabulary the rest of the document uses without deviation. §4 is the substance: features grouped by capability, with functional requirements nested underneath and numbered globally (FR-1 … FR-42) so downstream artifacts can reference them stably even if features get reorganised — the numbers are identifiers, not positions. §5 sets the system-wide quality bar and §6 the constraints Yello accepts. §7 names the surfaces. §8 and §9 draw the boundary — what Yello will never be, and what v1 leaves out. §10 says how we would know it worked. §11 records the questions that were open and how each was resolved; §12 collects what remains assumed.
 
 Two conventions matter. Terms defined in §2 Glossary are used verbatim everywhere else — where you see **Space**, no other document should say "workspace", "tenant" or "org". And every inference made without confirmation carries an inline `[ASSUMPTION]` tag, indexed in §12, so nothing quietly hardens into fact.
 
-No UX specification or architecture document exists yet. This PRD is upstream of both, and its depth is calibrated to what those phases need in order to proceed rather than to the size of Yello's audience.
+An architecture spine now exists at `planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md` and is binding on mechanism; where it has settled something this document left open, it is authoritative. No UX specification exists yet. This PRD's depth is calibrated to what the downstream phases need in order to proceed rather than to the size of Yello's audience.
+
+**Revision note.** This document was revised on 2026-08-18 after a `bmad-spec` pass distilled it and surfaced defects: an internal contradiction between UJ-4 and FR-15, an ownership-transfer trap, a revocation budget that no implementation of the chosen architecture could violate, a collision between the Board and the scale envelope, and an asymmetry inside FR-27. All six of §11's open questions are now resolved. The audit trail of how each was decided is `specs/spec-yello/.memlog.md`.
 
 ## 1. Vision
 
@@ -31,7 +31,7 @@ What follows from that is the part that actually matters: **the interesting user
 
 *These terms are used verbatim throughout this document and all downstream artifacts. Synonyms are a discipline violation. If a new domain noun appears in §4, it is added here in the same pass.*
 
-- **Account** — A registered identity in Yello, unique by email address. Global: one Account exists across all Spaces. An Account is never owned by a Space.
+- **Account** — A registered identity in Yello, unique by email address. Global: one Account exists across all Spaces. An Account is never owned by a Space. *Uniqueness by email address is correct for v1 but is not permanent: OAuth sign-in (§9.2) breaks it, since a provider may return a different address than the one on file, or none. Do not build on email-as-identity in a way that cannot be revisited.*
 - **User** — An Account acting in the context of a specific Space. "User" is always relative to a Space; where the Space is not established, the correct term is Account.
 - **Space** — The unit of both work containment and access control. Contains Projects. Has exactly one Owner and zero or more other Memberships. An Account may belong to unlimited Spaces. Nothing is visible across a Space boundary.
 - **Personal Space** — Descriptive only, not a distinct type. The Space created automatically when an Account registers. It is an ordinary Space in every respect: shareable, renameable, deletable, transferable.
@@ -42,6 +42,7 @@ What follows from that is the part that actually matters: **the interesting user
 - **Member** — Creates and edits Projects and Tasks. May not manage Membership.
 - **Viewer** — Reads Projects and Tasks. Creates and edits nothing.
 - **Invitation** — A pending offer of Membership in one Space at one Role, addressed to an email address. Issued by an Owner or Admin. Becomes a Membership when accepted. Revocable before acceptance.
+- **Ownership Offer** — A pending offer to become the Owner of one Space, addressed to an existing Membership of that Space. Issued by that Space's Owner, who remains Owner until it is accepted. At most one is pending per Space. Revocable before acceptance, declinable by the recipient, and it lapses if the recipient's Membership ends.
 - **Project** — A named collection of Tasks within one Space. Belongs to exactly one Space and never moves between Spaces.
 - **Task** — The unit of work. Belongs to exactly one Project at any moment, and may be moved between Projects within the same Space (FR-41). Carries a title, description, Status, optional Assignee, optional due date and zero or more Labels.
 - **Status** — The workflow position of a Task, drawn from the effective Status set of the Task's Project: the Space defaults with that Project's delta applied (§4.7). Determines the Board column a Task appears in.
@@ -84,10 +85,10 @@ What follows from that is the part that actually matters: **the interesting user
   Three weeks later Ravi wins work with a design studio. He creates a second Space, "Northwind Redesign", and invites the studio's producer Nadia by email as a Member, and Beatriz — Northwind's marketing lead, who is paying for the work and wants to watch it land — as a Viewer. Neither has a Yello Account. **Path:** create Space → invite by email address → assign Role at invitation time → send. **Climax:** Ravi's personal Space is not mentioned anywhere in what either invitee receives or sees; the invitation is scoped to one Space and carries one Role. **Resolution:** Ravi is Owner of two Spaces with different Memberships. **Edge case:** if he invites an address that already has a Yello Account, they join their existing Account rather than creating a second one, and their other Spaces remain invisible to Ravi.
 
 - **UJ-3. Nadia accepts an invitation and sees exactly one thing.**
-  Nadia, the studio's producer, gets an email and clicks through. She has no Yello Account, so she registers — and in doing so a personal Space is created for her too, which she ignores. **Path:** open invitation → register → land in "Northwind Redesign". **Climax:** she can see the Projects and Tasks in that Space and nothing else in Yello. There is no directory of other Spaces, no search that reaches beyond her Membership, no sign that Ravi has other clients. **Resolution:** Nadia is a Member of one Space and Owner of a personal Space she may never use. **Edge case:** if her invitation was revoked before she accepted it, the link tells her it is no longer valid without disclosing who revoked it or what the Space contains.
+  Nadia, the studio's producer, gets an email and clicks through. She has no Yello Account, so she registers — and in doing so a personal Space is created for her too, which she ignores. **Path:** open invitation → see the Space and the Role offered → register, which is her deliberate act of acceptance → land in "Northwind Redesign". **Climax:** she can see the Projects and Tasks in that Space and nothing else in Yello. There is no directory of other Spaces, no search that reaches beyond her Membership, no sign that Ravi has other clients. **Resolution:** Nadia is a Member of one Space and Owner of a personal Space she may never use. **Edge cases:** if her invitation was revoked before she accepted it, the link tells her it is no longer valid without disclosing who revoked it or what the Space contains. And if the link is fetched by a mail security scanner, prefetched by her browser, or forwarded to a colleague, no Membership is created — the link presents the offer and nothing more (FR-11).
 
 - **UJ-4. Ravi switches context three times before lunch.**
-  Ravi is Owner of "Ravi's Space", Admin of "Northwind Redesign", and Viewer on a Space belonging to a company he contracts for. In one morning he moves between all three. **Path:** Space switcher → pick Space → the entire working surface changes. **Climax:** in the third Space every affordance to create or edit is absent — not present-and-failing, absent — so he can tell his standing from the interface without attempting an action. **Resolution:** he is never in doubt about which Space he is operating in or what he may do there. **Edge case:** if he opens a deep link to a Task in a Space he has since been removed from, he is told he no longer has access, not that the Task does not exist — and is returned to a Space he does belong to.
+  Ravi is Owner of "Ravi's Space", Admin of "Northwind Redesign", and Viewer on a Space belonging to a company he contracts for. In one morning he moves between all three. **Path:** Space switcher → pick Space → the entire working surface changes. **Climax:** in the third Space every affordance to create or edit is absent — not present-and-failing, absent — so he can tell his standing from the interface without attempting an action. **Resolution:** he is never in doubt about which Space he is operating in or what he may do there. **Edge case:** if he opens a deep link to a Task in a Space he has since been removed from, he is told only that the resource is not available to him — naming neither "it does not exist" nor "you lost access" as the real reason, because FR-15 requires the two to be indistinguishable — and he is returned to a Space he does belong to. *An earlier draft of this edge case said he is told he no longer has access; that contradicted FR-15 and NFR-1 and has been corrected. The usability cost is paid with deliberately ambiguous copy rather than with a disclosure.*
 
 - **UJ-5. Nadia and Ravi write the same Task description at the same time.**
   Nadia is fleshing out the acceptance criteria on a Task while Ravi, on a call, is adding a constraint to the same description. Both see the other's presence and both see the text evolve. **Path:** open Task → begin typing → observe the other participant → continue. **Climax:** neither one's work is discarded and both end at the same text; no one is shown a merge dialog or a "someone else has changed this" warning. **Resolution:** the Task description reflects both contributions and shows who contributed. **Edge case:** Ravi's connection drops for forty seconds mid-sentence; when it returns his local edits are reconciled rather than lost or duplicated.
@@ -99,11 +100,11 @@ What follows from that is the part that actually matters: **the interesting user
   Tomás runs a small studio and already has a deployment script. He wants a Task created in Yello whenever a release goes out. **Path:** generate an API Token scoped to one Space → call the API from the script → Task appears. **Climax:** the API Token cannot touch any Space other than the one it was issued for, including Spaces its creator owns. **Resolution:** Yello participates in a workflow that does not involve opening a browser. **Edge case:** when Yello's API changes shape, Tomás's script keeps working against the version it was written for and he is told, in advance, when that stops being true.
 
 - **UJ-8. Ravi hands a Space over and leaves.**
-  Ravi finishes the Northwind engagement and wants out cleanly, but the work must survive. He transfers ownership of "Northwind Redesign" to Nadia and removes himself. **Climax:** the Space continues with all its Projects and Tasks intact, Nadia is now Owner, and Ravi is gone — no residual access, no orphaned Space. **Resolution:** Ravi's remaining Spaces are unaffected. **Edge case:** if Ravi instead deletes his entire Account, every Space he still owns must be resolved first — he cannot leave a Space ownerless, and other people's work cannot vanish because he left.
+  Ravi finishes the Northwind engagement and wants out cleanly, but the work must survive. He offers ownership of "Northwind Redesign" to Nadia; she accepts, and he removes himself. **Path:** offer ownership → Nadia accepts (FR-42) → Ravi, now an Admin, removes his own Membership. **Climax:** the Space continues with all its Projects and Tasks intact, Nadia is Owner *by her own agreement*, and Ravi is gone — no residual access, no orphaned Space. **Resolution:** Ravi's remaining Spaces are unaffected. **Edge case:** if Nadia declines, or lets the offer lapse, Ravi is still the Owner and still cannot leave; his remaining exits are to offer it to someone else or to delete the Space. Wanting out does not by itself get him out — the deliberate price of nobody being made an Owner against their will. **Edge case:** if Ravi instead deletes his entire Account, every Space he still owns must be resolved first — he cannot leave a Space ownerless, and other people's work cannot vanish because he left.
 
 ## 4. Features
 
-*Each subsection is a coherent capability. Functional requirements are nested under the feature they belong to and numbered globally (FR-1 … FR-41) so downstream artifacts can reference them stably even if features are reorganised. Consequences are written to be testable; where one could pass by accident, it is written to be failable instead.*
+*Each subsection is a coherent capability. Functional requirements are nested under the feature they belong to and numbered globally (FR-1 … FR-42) so downstream artifacts can reference them stably even if features are reorganised. Consequences are written to be testable; where one could pass by accident, it is written to be failable instead.*
 
 ### 4.1 Accounts and Authentication
 
@@ -136,7 +137,7 @@ An Account can authenticate and receive a Session that persists across requests 
 An Account can delete itself. Deletion must not orphan a Space or destroy work belonging to other Accounts. Realizes UJ-8.
 
 **Consequences (testable):**
-- Deletion is refused while the Account is the Owner of any Space; each such Space must first be transferred (FR-8) or deleted (FR-7).
+- Deletion is refused while the Account is the Owner of any Space; each such Space must first be transferred away (offered under FR-8 and accepted under FR-42) or deleted (FR-7). Because a transfer requires someone else to accept, deleting the Space is the only exit the Account controls unilaterally — an Owner who can find no willing recipient can still always leave, at that cost.
 - On deletion, every remaining Membership held by the Account is removed, and the Account disappears from every Space it belonged to.
 - Tasks the deleted Account was Assignee of become unassigned; the Tasks themselves survive.
 - Content authored by the deleted Account in Spaces it did not own is retained; attribution renders as a deleted Account rather than disappearing.
@@ -189,16 +190,32 @@ An Owner can delete a Space, destroying its Projects, Tasks, Memberships and Inv
 - An Account may delete its last remaining Space. Belonging to no Space is a valid state: the Account persists, and is offered the chance to create a Space rather than having one created for it. No Space is undeletable.
 - `[ASSUMPTION: deletion is immediate and irreversible in v1 — no trash, no restore window. Flagged for review: this is the most destructive operation in the product and the only one with no undo.]`
 
-#### FR-8: Transfer ownership
+#### FR-8: Offer to transfer ownership
 
-An Owner can transfer ownership of a Space to another Membership in that Space. Realizes UJ-8.
+An Owner can offer ownership of a Space to another Membership in that Space. Ownership does not move until the offer is accepted (FR-42). Realizes UJ-8.
 
 **Consequences (testable):**
-- After transfer the Space has exactly one Owner, and it is the recipient.
-- The previous Owner becomes an Admin of that Space and does not lose access as a side effect of transferring.
-- Ownership can only be transferred to an existing Membership; it cannot be transferred to an email address, an Invitation, or an Account with no Membership in that Space.
-- At no point during the operation does the Space have zero Owners or two Owners.
-- The Owner's Membership cannot be removed by FR-13 while it holds ownership.
+- Ownership can only be offered to an existing Membership; it cannot be offered to an email address, an Invitation, or an Account with no Membership in that Space. Any Role may be named.
+- Making the offer does not move ownership. The offering Owner remains the Owner, with every capability of the Role, until the offer is accepted.
+- At most one Ownership Offer is pending per Space at a time.
+- The offering Owner may revoke a pending offer, and revocation leaves every Membership and Role exactly as it was.
+- A pending offer lapses if the named recipient's Membership is removed (FR-14) or their Account is deleted (FR-3), and lapsing changes no Role.
+- The offering Owner's Membership still cannot be removed by FR-14, and their Account deletion is still refused by FR-3, while an offer is pending — making an offer is not itself an exit.
+- `[ASSUMPTION: the offer expires after 7 days, mirroring FR-39, and is surfaced in Space settings rather than emailed — the recipient is already a Member of the Space.]`
+
+#### FR-42: Accept or decline an Ownership Offer
+
+The Membership an Ownership Offer names can accept it, becoming Owner, or decline it. Realizes UJ-8.
+
+**Consequences (testable):**
+- Only the single Membership the offer names can accept or decline it, and only while it is pending.
+- On acceptance, ownership moves in one atomic step: the recipient becomes the sole Owner and the previous Owner becomes an Admin without losing access. At no point does the Space have zero Owners or two Owners.
+- No Account becomes an Owner without having agreed to it. There is no route, the API included, by which ownership arrives unrequested.
+- Declining leaves every Membership and Role exactly as it was, and the offering Owner is told it was declined.
+- A declined or lapsed offer cannot afterwards be accepted; the Owner must make a new offer.
+- After acceptance the new Owner is bound by every rule that binds any Owner: their Membership cannot be removed while they hold ownership (FR-14), and their Account deletion is refused until they transfer the Space onward or delete it (FR-3).
+
+**Why this is not an immediate transfer.** The original FR-8 moved ownership unilaterally. Combined with FR-14 (an Owner's Membership cannot be removed while it holds ownership) and FR-3 (Account deletion is refused while the Account owns any Space), that let an Owner transfer a Space to any Membership, immediately remove their own now-Admin Membership, and leave that person permanently unable to delete their Yello Account — with only irreversible Space deletion or imposing the same thing on a third party as exits. One Account could unilaterally block another's erasure. Requiring acceptance closes it at the root. Rejected alternatives are recorded in `addendum.md`.
 
 #### FR-9: Establish and switch Space context
 
@@ -223,9 +240,10 @@ An Owner or Admin can invite an email address to a Space at a specified Role. Re
 - Members and Viewers cannot issue Invitations.
 - Any email address can be invited. There is no domain restriction, no allowlist, and no requirement that the address already have an Account.
 - The Invitation carries exactly one Space and exactly one Role, fixed at issue time.
-- An Invitation cannot be issued at Owner Role; ownership moves only via FR-8.
+- An Invitation cannot be issued at Owner Role; ownership moves only by an Ownership Offer accepted under FR-42.
 - Issuing an Invitation to an address that already holds Membership in that Space is refused.
 - The response to the issuer is identical whether or not the address corresponds to an existing Account; issuing an Invitation never discloses whether someone uses Yello.
+- The Invitation record retains its terminal state once it leaves pending — accepted, revoked or expired — rather than being deleted. No product surface reads it; §10's SM-4 and SM-C3 are underivable without it.
 
 #### FR-11: Accept an Invitation
 
@@ -233,6 +251,8 @@ An invited person can accept, gaining Membership at the Role the Invitation spec
 
 **Consequences (testable):**
 - Accepting creates exactly one Membership, in exactly the invited Space, at exactly the invited Role.
+- The Invitation token identifies the offer; it never authorises acceptance. Acceptance requires the invitee authenticated as the Account the Invitation addresses. A bare fetch of the acceptance route — by a mail security scanner, a link prefetcher, or anyone the mail was forwarded to — creates no Membership and changes nothing.
+- Acceptance is a deliberate act, taken after the Space and the Role have been shown. For an invitee with no Account, completing registration is that act; for an invitee who already has one, it is an explicit confirmation. Neither is satisfied by loading a URL.
 - An invitee without an Account registers as part of accepting, and that registration provisions their own Personal Space (FR-4) independently of the Space they were invited to.
 - An invitee with an existing Account joins with that Account; no second Account is created, and their other Memberships are neither visible to nor affected by the inviter.
 - An Invitation can be accepted once. A second attempt with the same Invitation is refused.
@@ -254,7 +274,7 @@ An Owner or Admin can change the Role of a Membership within the constraints of 
 **Consequences (testable):**
 - An Admin can change Memberships between Member and Viewer only.
 - Only an Owner can promote a Membership to Admin, or demote one from Admin. `[ASSUMPTION: Admins cannot modify each other — asserted to keep the Owner meaningfully distinct from Admin.]`
-- No Role change can produce a second Owner or remove the sole Owner; ownership moves only via FR-8.
+- No Role change can produce a second Owner or remove the sole Owner; ownership moves only by an Ownership Offer accepted under FR-42.
 - A Role change takes effect on the target's active Sessions without requiring them to re-authenticate (see FR-34).
 
 #### FR-14: Remove a Membership, or leave a Space
@@ -263,7 +283,7 @@ An Owner or Admin can remove a Membership; any Account can remove its own. Reali
 
 **Consequences (testable):**
 - An Admin can remove Members and Viewers, and cannot remove the Owner or another Admin.
-- The Owner's Membership cannot be removed by anyone, including the Owner, while it holds ownership; the Owner leaves by transferring first (FR-8).
+- The Owner's Membership cannot be removed by anyone, including the Owner, while it holds ownership; the Owner leaves by offering ownership (FR-8) and having it accepted (FR-42), or by deleting the Space (FR-7). A pending offer is not an exit.
 - Removal revokes access immediately and takes effect on the removed Account's active Sessions and open editors (FR-34).
 - Removal invalidates every API Token that Account holds for that Space (FR-36).
 - Tasks the removed Account was Assignee of become unassigned; the Tasks survive.
@@ -401,6 +421,15 @@ An Owner, Admin or Member can move a Task to a different Project within the same
 - Assignee, Labels, due date and description survive the move unchanged, because both Projects share a Space and therefore share its Memberships and Labels.
 - An active collaborative editing session on the Task continues across the move; participants are not disconnected.
 
+**Bulk form.** Every Task currently in one Status can be moved from one Project to another in the same Space in a single operation.
+
+- Because the selection shares a Status by construction, the operation carries exactly one mapping decision, on the same terms as the single-Task form: the Status is preserved where the destination exposes it, and one destination Status is required where it does not.
+- The bulk form is reachable from a Board column and from a List View filtered to one Status, and is available on the API on the same terms as the single-Task form (FR-35).
+- A bulk move is atomic: every selected Task moves, or none does. A bulk move that cannot complete is refused rather than partially applied, consistent with FR-26, and the refusal is visible rather than silent.
+- A Viewer cannot use either form.
+- Active collaborative editing sessions on the moved Tasks continue across a bulk move.
+- This is the safe path for retiring a Project without losing its work — one move per Status in its effective set rather than one per Task, against a Project deletion that is irreversible (FR-17). Mixed-Status selections remain one at a time; a per-Status mapping table was considered and rejected (`addendum.md`).
+
 ### 4.7 Status Configuration
 
 **Description:** A Space defines a default set of Statuses. Each Project holds a **delta** over that set — Statuses added, removed, renamed or reordered — and its effective set is the Space defaults with its delta applied. This is chosen over the two simpler models: a single fixed set everywhere removes the resolution rule entirely, and fully independent per-Project sets make Boards incomparable within a Space and multiply every Status problem by the number of Projects. There is no concept of a Project "inheriting" versus "overriding" as a mode, and no operation reverts a Project to the defaults; a Project's Status set is simply editable for as long as the Project exists. The rule that makes this safe is universal: **removing a Status, at either level, requires mapping the Tasks that occupy it to another Status.** Removal is a migration, always — which is why no Task can ever hold a Status that its Project does not expose.
@@ -445,10 +474,13 @@ Changes to the Space default set reach every Project according to that Project's
 - Adding a Status at Space level adds it to every Project that has not removed it.
 - Renaming a Status at Space level renames it in every Project that has not itself renamed it, including Projects that have reordered it.
 - Where one or more Projects have themselves renamed that Status, the operation reports the conflict and offers to cascade. Cascading replaces those Projects' names; declining preserves them. The Space-level rename applies either way to non-conflicting Projects.
-- Removing a Status at Space level requires mapping under FR-26. A single destination Status is chosen once and applied across every affected Project, as one atomic operation.
+- Removing a Status at Space level requires mapping under FR-26. A single destination Status is chosen once and applied across every affected Project that can accept it.
 - Removing a Status at Space level has no effect on Projects that had already removed it.
 - `[ASSUMPTION: the cascade offer is a single choice applied to every conflicting Project at once, consistent with the single Space-wide mapping decision above.]`
-- `[ASSUMPTION: where the single mapping destination does not exist in a given Project's effective set, that Project's affected Tasks fall to the first Status in its own effective set. Flagged — this is the one place the Space-wide mapping decision can produce a result the Admin did not literally choose.]`
+- Where a Project's post-removal effective set does not contain the chosen destination, the operation reports that Project — and how many of its Tasks are affected — and requires a destination drawn from that Project's own post-removal effective set. There is no fallback and no silent placement.
+- Nothing applies until every reported Project has a destination. The Space-level removal, the Space-wide mapping and every per-Project exception apply as one transaction or not at all.
+- This is always satisfiable: a Project's effective set can never be empty (FR-25), so a valid destination exists in every affected Project.
+- Both halves of this requirement behave the same way on conflict — rename reports and asks, removal reports and asks. Neither decides for the Admin. *An earlier draft let affected Tasks fall to the Project's first Status; rejected because it made one half of the requirement guess while the other asked.*
 
 **Notes:** Because a Space-level rename must detect that a Project renamed *the same* Status in order to offer the cascade, a Project's delta necessarily references Statuses by identity rather than by name. Stated here because it constrains the data model; the mechanism itself belongs in the architecture.
 
@@ -466,6 +498,7 @@ Any Membership can view a Project's Tasks as columns ordered by the Project's ef
 - Columns appear in the Project's effective order, including where a delta reordered them.
 - Every Task in the Project appears in exactly one column.
 - A Viewer sees the identical Board to a Member, with no manipulation affordances present.
+- At the NFR-8 bound of 5,000 Tasks in a Project, the Board still satisfies NFR-5 and NFR-9. Every Task remains reachable and appears in exactly one column. How the view achieves that at that size — paging, virtualisation, or something else — is the architecture's call; nothing in this document provides it, and the three requirements cannot all hold naively.
 
 #### FR-29: Move and order Tasks on a Board
 
@@ -484,6 +517,7 @@ Any Membership can view a Project's Tasks as rows, filtered and sorted by Status
 **Consequences (testable):**
 - Filters never surface a Task from another Project or another Space.
 - Filtering by Assignee offers only Memberships of the active Space.
+- At the NFR-8 bound of 5,000 Tasks in a Project, the List View still satisfies NFR-5 and NFR-9, on the same terms as FR-28.
 
 ### 4.9 Collaborative Task Editing
 
@@ -591,6 +625,7 @@ Issuing an Invitation sends an email to the invited address containing a means o
 - The email names the Space and the Role offered, and identifies who issued it.
 - The email discloses nothing about the Space's contents, its other Members, or any other Space.
 - Following the acceptance route after revocation reports only that the Invitation is no longer valid (FR-11).
+- Following the acceptance route does not by itself join the invitee. It presents the offer; acceptance is separate and requires authentication as the invited Account (FR-11).
 - `[ASSUMPTION: the acceptance route expires after a fixed period — 7 days — after which the Invitation must be reissued.]`
 
 #### FR-40: Notify on assignment
@@ -601,6 +636,9 @@ An Account assigned to a Task is notified.
 - The notification names the Space, Project and Task, and nothing from any other Space.
 - An Account is not notified of its own action.
 - `[ASSUMPTION: assignment notification is email, and is per-event rather than digested. Frequency control is a v2 concern.]`
+
+**Feature-specific NFRs:**
+- A record that a notification was sent is retained — Space, kind and timestamp, never message content or recipient address — so §10's SM-C4 is derivable. No product surface reads it.
 
 ## 5. Cross-Cutting Non-Functional Requirements
 
@@ -619,9 +657,13 @@ No data belonging to a Space reaches any Account without a Membership in that Sp
 
 No authorisation decision is served from a cache that could outlive the Membership it was derived from.
 
-- A Role change or Membership removal is reflected in authorisation decisions **within 5 seconds**, without the affected Account acting.
+- **On the request path — reflected on the very next request. No tolerance.** A Role change or Membership removal governs the next request that Account makes, on the browser and the API alike. There is no budget here because there is nothing to spend it on: no cache may outlive a request, so a delay of even one request means a cache was introduced, which is the failure this requirement exists to catch.
+- **On the live-session path — within 1 second** of the transaction boundary, without the affected Account acting. Generous against NFR-3's 300 ms remote-edit budget, and tight enough that a poller or a cross-replica hop fails it.
+- FR-34's guarantee is independent of both timings: unsynchronised local changes are never applied, however long propagation takes.
 - No request is authorised using a Role established during a previous active Space.
 - Applies to API Tokens on the same terms (FR-36).
+
+*Revised 2026-08-18. This was one 5-second budget for both paths. Against the chosen architecture that could not fail — authorisation is resolved per request from the Membership row with no cache permitted to outlive the request, and permission change is pushed in-process at the transaction boundary on a single replica. A budget no plausible implementation can violate is the sentiment §5 opens by warning against, and §10's SM-2 gates release on it. Both clauses above can fail.*
 
 #### NFR-3: Collaborative editing feels immediate
 
@@ -647,6 +689,7 @@ No authorisation decision is served from a cache that could outlive the Membersh
 - API Tokens are stored such that a read of the datastore does not yield usable Tokens, and are displayed exactly once (FR-36).
 - No password or Token appears in any log, error message, notification, analytics event or API response.
 - All traffic is encrypted in transit.
+- Encryption **at rest is not required here**. Whatever the datastore provides is incidental rather than specified; asserting it is one of the prerequisites behind the §6.4 data-protection gate.
 
 #### NFR-7: Refusals are observable
 
@@ -667,7 +710,9 @@ The system is required to hold its other guarantees within these bounds, and is 
 | Concurrent editors per Task | 10 |
 | Concurrent active Sessions per Space | 50 |
 
-Exceeding a bound must degrade visibly rather than silently — a refusal, not a wrong answer. `[ASSUMPTION: these bounds are set by judgement, not measurement. They exist so that performance claims have a stated domain; revise on evidence.]`
+Exceeding a bound must degrade visibly rather than silently — a refusal, not a wrong answer. A bound that is not enforced is a defect, not a relaxation.
+
+These bounds are set by judgement rather than measurement, and are **confirmed final for v1**. §11 asked that they be revisited with evidence before the architecture was shaped around them; that ordering was missed, and with no users there is no usage evidence to gather. The only obtainable evidence is load testing, so the verification is scheduled at the NFR-evidence audit, against the single choke point the architecture enforces them at. Revising a bound after that is an architecture change, not a document edit.
 
 #### NFR-9: The primary flows are accessible
 
@@ -683,6 +728,7 @@ Exceeding a bound must degrade visibly rather than silently — a refusal, not a
 - An Account's Memberships are visible only within each Space. Nobody can enumerate the Spaces another Account belongs to, including a Space's Owner.
 - Email addresses are visible to Owners and Admins of Spaces the Account is a Member of, and to nobody else.
 - Yello collects no behavioural analytics on the contents of Spaces.
+- No product surface aggregates across Spaces. The behavioural measures in §10 are not a product feature: they are aggregates the operator computes by querying the datastore directly, outside the request path and outside the authorisation model. This rules out an in-product metrics dashboard, an admin analytics view, and any endpoint returning a count spanning Spaces — each would breach §6.1 and NFR-1 to produce a number nobody is entitled to.
 
 ### 6.2 Data lifecycle
 
@@ -696,6 +742,22 @@ Exceeding a bound must degrade visibly rather than silently — a refusal, not a
 - Total running cost stays under **£30 per month** at the scale in NFR-8. A design an architect cannot cost against that ceiling has not been specified enough to accept. `[ASSUMPTION: the figure is set by what the project is worth spending rather than by pricing analysis. It exists so that "too expensive" is a decidable question; revise it deliberately rather than drifting past it.]`
 - No design requiring always-on dedicated infrastructure per Space, or per active editing session, fits that ceiling.
 - The real-time requirements in NFR-3 and NFR-4 are the most likely source of cost pressure and must be satisfied within a single modest deployment.
+
+### 6.4 Data protection
+
+v1 is a **single-operator deployment** and claims no data-protection posture. No lawful basis, data region, encryption-at-rest assertion, breach-notification position or subject-access route is specified, and none is required while the operator is the only data subject. §3.2 already rules out regulated environments as an audience.
+
+The gate is testable rather than aspirational: **the first Account created by anyone other than the operator makes this document non-compliant until amended.** From that moment the following are prerequisites for continued use, not a backlog:
+
+| Required at the gate | Why it is absent now |
+|---|---|
+| Lawful basis for holding email addresses and authored content | No data subject other than the operator |
+| A stated data region, and no replication outside it | Nothing pins a region — not this document, not the architecture |
+| Encryption at rest asserted | NFR-6 covers transit only |
+| A breach-notification position | Undefined. A verified cross-Space disclosure would be notifiable by definition |
+| A subject-access or export route | FR-3 covers erasure; nothing covers access or portability |
+
+**What already holds, incidentally** — recorded so a later reader does not rebuild it. **Erasure:** FR-3 is a hard delete; every Membership goes, the email address is freed for reuse, and the new Account inherits nothing. This holds only because ownership cannot be forced on an Account (FR-42) — under the original immediate transfer, another Account could have blocked deletion indefinitely. **Minimisation:** no behavioural analytics on Space contents, and email addresses readable only by Owners and Admins of a Space the Account is a Member of. **Retention limit:** refusal records capped at 90 days (NFR-7). **Privacy by design:** an Account's existence is never disclosed, and its Memberships cannot be enumerated by anyone, including a Space's Owner.
 
 ## 7. Information Architecture
 
@@ -725,7 +787,7 @@ The acting Role must be legible from the interface at all times, and capabilitie
 
 ### 9.1 In scope
 
-Everything in §4 — all forty-one functional requirements across eleven features: Accounts and Authentication, Spaces, Membership and Invitations, Access Control, Projects, Tasks, Status Configuration, Board and List Views, Collaborative Task Editing, Public API, Notifications. Nothing specified in §4 is deferred. What was considered and left out is below.
+Everything in §4 — all forty-two functional requirements across eleven features: Accounts and Authentication, Spaces, Membership and Invitations, Access Control, Projects, Tasks, Status Configuration, Board and List Views, Collaborative Task Editing, Public API, Notifications. Nothing specified in §4 is deferred. What was considered and left out is below.
 
 ### 9.2 Out of scope for MVP
 
@@ -738,60 +800,67 @@ Everything in §4 — all forty-one functional requirements across eleven featur
 - **Custom fields** — Task shape is fixed.
 - **Recurring Tasks.**
 - **Enterprise SSO, directory sync, domain-restricted invitation** — see §8; these require an organisation concept Yello does not have.
-- **OAuth sign-in** — signing in with an existing third-party identity as an alternative to email and password. Deferred, not ruled out: this is a wanted addition and is distinct from enterprise SSO, since it authenticates an individual Account rather than presupposing an organisation that owns it. When added, it introduces Yello's first genuine inbound dependency on a third party, and with it the failure modes — provider outage, token expiry, revoked consent, changed provider contract — that FR-1 and FR-2 currently have no reason to handle.
+- **OAuth sign-in** — signing in with an existing third-party identity as an alternative to email and password. Deferred, not ruled out: this is a wanted addition and is distinct from enterprise SSO, since it authenticates an individual Account rather than presupposing an organisation that owns it. When added, it introduces Yello's first genuine inbound dependency on a third party, and with it the failure modes — provider outage, token expiry, revoked consent, changed provider contract — that FR-1 and FR-2 currently have no reason to handle. It also breaks §2's definition of an Account as unique *by email address*, since a provider may return a different address than the one on file, or none; and it requires NFR-6 to tolerate Accounts holding no password. Implement FR-1, FR-2 and NFR-6 so those can change without redesign.
 - **Mobile applications** — the web interface is responsive; there is no native client.
 - **Notification preferences** — notifications are per-event and not configurable (FR-40).
+- **Session telemetry** — nothing records session duration, so §10's SM-C2 (time in application) is defined but not measurable in v1. Stated rather than quietly assumed.
+- **Bulk Task move across mixed Statuses** — FR-41's bulk form is scoped to one Status at a time. A mixed-selection move with a per-Status mapping table was considered and rejected (`addendum.md`).
 - **Billing and plan limits** — no monetisation of any kind in v1.
 
 ## 10. Success Metrics
 
-*Two kinds of metric, deliberately separated. The gating metrics are measurable from the first build and a release fails without them. The behavioural metrics are defined but carry no thresholds: Yello has no users, and a target invented now would be indistinguishable from one that had been earned. They are stated so that the right things get instrumented, and so that whoever sets thresholds later knows which direction each should move.*
+*Two kinds of metric, deliberately separated. The gating metrics are measurable from the first build and a release fails without them. The behavioural metrics are defined but carry no thresholds: Yello has no users, and a target invented now would be indistinguishable from one that had been earned. They are stated so that the right things stay queryable, and so that whoever sets thresholds later knows which direction each should move.*
+
+*How the behavioural measures are obtained: they are **not a product feature**. Each is an aggregate the operator computes by querying the datastore directly (§6.1). None reads Task titles, descriptions, Labels or Project names — they are structural and metadata counts only, which is what keeps them clear of §6.1's no-analytics rule. Three retention guarantees exist solely to keep them derivable, and are carried as requirements rather than here: the Invitation record keeps its terminal state (FR-10), a notification send record is kept (FR-40), and compaction of the Task description change log must preserve per-author change counts and timestamps — the last of these is an obligation on the architecture, which currently does not guarantee it.*
 
 **Gating — a release fails without these**
 
 - **SM-1: Isolation integrity.** Zero verified cross-Space disclosures, across browser and API, in any released build. Measured by an isolation test suite exercised on every change. Validates FR-15, FR-16, FR-35, FR-36, NFR-1.
-- **SM-2: Revocation latency.** Permission changes take effect on live sessions within 5 seconds in 100% of tested cases, including sessions holding unsynchronised local edits. Validates FR-34, NFR-2.
+- **SM-2: Revocation latency.** Permission changes govern the affected Account's very next request with no tolerance, and take effect on open live sessions within 1 second, in 100% of tested cases — including sessions holding unsynchronised local edits. Validates FR-34, NFR-2.
 
 **Behavioural — instrument now, threshold later**
 
 *No targets are set. Each entry names what is measured and which direction is good.*
 
 - **SM-3: Multi-Space adoption.** Proportion of Accounts holding Membership in two or more Spaces. Higher is better. This is the product's central bet — if people only ever use one Space, the primitive did not earn its generality, and §1's thesis is wrong. The most important number in this group. Validates FR-5, FR-9, FR-11.
-- **SM-4: Invitation conversion.** Proportion of issued Invitations accepted. Higher is better, but read it alongside SM-C3. Validates FR-10, FR-11, FR-39.
+- **SM-4: Invitation conversion.** Proportion of issued Invitations accepted. Higher is better, but read it alongside SM-C3. Note the funnel carries a deliberate extra step — acceptance requires authentication plus an explicit act (FR-11) — so this reads lower than a one-click design would, by choice rather than by defect. Validates FR-10, FR-11, FR-39.
 - **SM-5: Concurrent editing actually happens.** Proportion of multi-Member Spaces in which a Task description is edited by two Users within the same session. Higher is better. If it stays near zero, the most expensive feature in the product is unused and §4.9 should be reconsidered rather than optimised. Validates FR-31, FR-32.
 - **SM-6: API adoption.** Proportion of Spaces with at least one active API Token. Higher is better, though a low figure is not itself a failure — the API exists to make the isolation model hold on a second surface as much as to be popular. Validates FR-35 – FR-38.
 
 **Counter-metrics (do not optimise)**
 
 - **SM-C1: Spaces created per Account.** Should *not* be maximised. A high Space count with low Task counts per Space indicates the primitive is confusing rather than adopted — people creating Spaces because they cannot tell what one is for. Counterbalances SM-3.
-- **SM-C2: Time in application.** Should *not* be maximised. UJ-1's success condition is Ravi closing the tab. A task tool people spend longer inside is working worse, not harder. Counterbalances SM-5.
+- **SM-C2: Time in application.** **Defined but not measurable in v1** — nothing records session duration, and session telemetry is out of scope (§9.2). Kept so that whoever adds telemetry later knows this number exists and which direction it should not move. Should *not* be maximised. UJ-1's success condition is Ravi closing the tab. A task tool people spend longer inside is working worse, not harder. Counterbalances SM-5.
 - **SM-C3: Invitations issued.** Should *not* be maximised. The goal is the right people in a Space, not more people. Growth in invitations without corresponding growth in SM-5 means Spaces are accumulating spectators. Counterbalances SM-4.
 - **SM-C4: Notification volume.** Should *not* increase to drive SM-3 or SM-4. Every additional notification is a cost to the recipient, and §8 rules out Yello becoming a communication tool. Counterbalances SM-4.
 
-## 11. Open Questions
+## 11. Open Questions — resolved
 
-1. **Can ownership be transferred to someone who then declines it?** FR-8 transfers immediately with no acceptance step. The recipient acquires responsibility for a Space, including the sole right to delete it, without agreeing to it.
-2. **Should a Space-level Status removal be possible at all when Projects have diverged significantly?** FR-27 resolves this with a single Space-wide destination plus a fallback, but the fallback can produce a placement the Admin did not choose. Indexed as an assumption; revisit if divergence turns out to be common.
-3. **Is 5 seconds the right revocation budget?** NFR-2 states it; nothing validates it. For a Viewer who should never have seen a Task, five seconds may be four too many.
-4. **Are the NFR-8 scale bounds defensible?** They are asserted by judgement. If the architecture is shaped around them, they should be revisited with evidence first.
-5. **Should acceptance of an Invitation by an existing Account require confirmation?** FR-11 joins them silently. Being added to a Space changes someone's working environment without their say-so.
-6. **Does FR-41 need a bulk form?** Moving Tasks one at a time between Projects is tedious at any real volume, and a bulk move interacts awkwardly with the per-Task Status mapping the single-Task version requires.
+*All six questions this document originally carried were resolved on 2026-08-18. They are kept here with their resolutions rather than deleted, so a reader who saw the earlier version can see what changed and why. Rejected alternatives are in `addendum.md`; the full decision trail is `specs/spec-yello/.memlog.md`.*
+
+1. **Can ownership be transferred to someone who then declines it?** — **Resolved: it cannot, because ownership is now an offer.** FR-8 became an offer and FR-42 was added to accept or decline it. The original immediate transfer permitted a trap: chained with FR-14 and FR-3, an Owner could transfer a Space to any Membership, remove their own now-Admin Membership, and leave that person permanently unable to delete their Account. See FR-42.
+2. **Should a Space-level Status removal be possible when Projects have diverged significantly?** — **Resolved: yes, but it reports and asks instead of guessing.** FR-27 now names every Project that cannot accept the Space-wide destination and requires a destination for each. The first-Status fallback is gone. The real defect was that FR-27's rename half asked while its removal half guessed.
+3. **Is 5 seconds the right revocation budget?** — **Resolved: no, and it could not fail.** NFR-2 is now two clauses: the very next request on the request path, and 1 second on the live-session path. Against per-request authorisation with no cache outliving a request, and an in-process push at the transaction boundary, a 5-second budget was unfailable while SM-2 gated release on it.
+4. **Are the NFR-8 scale bounds defensible?** — **Resolved: confirmed final for v1, with the verification rescheduled.** The revisit was to happen before the architecture was shaped around them and did not. With no users there is no usage evidence; the only obtainable evidence is load testing, so verification moves to the NFR-evidence audit. Separately, this surfaced that 5,000 Tasks per Project collides with FR-28 and FR-30 against NFR-5 and NFR-9 — now stated on both requirements.
+5. **Should acceptance of an Invitation by an existing Account require confirmation?** — **Resolved: yes, and the token was never sufficient authority.** FR-11 now requires the invitee authenticated as the invited Account plus a deliberate act. A bare fetch of the acceptance route creates nothing, which also closes acceptance by mail scanners, prefetchers and forwarded links.
+6. **Does FR-41 need a bulk form?** — **Resolved: yes, scoped to one Status at a time.** Sharing a Status means exactly one mapping decision rather than a per-Status table. The motivation is not tedium but that Project deletion destroys Tasks irreversibly, so without a bulk form the safe path for retiring a large Project needed one operation per Task while the destructive path needed one click.
+
+**Still genuinely open, and owned elsewhere.** Whether NFR-5 is measured warm or cold is undecided; the chosen deployment shape makes most requests cold under sparse traffic against a 300 ms p95 read budget. That deferral belongs to the architecture, not to this document.
 
 ## 12. Assumptions Index
 
-*Every `[ASSUMPTION]` in this document, surfaced for explicit confirmation.*
+*Every `[ASSUMPTION]` in this document, surfaced for explicit confirmation. Two entries were retired on 2026-08-18 because they became decisions rather than assumptions — the FR-27 first-Status fallback (replaced by report-and-ask) and the NFR-8 bounds (confirmed final). One was added for the Ownership Offer. Four of those below have hardened into architecture and now cost more than a document edit to reverse; they are marked † and all remain unconfirmed.*
 
 1. §4.2 FR-4 — The auto-provisioned Space is named from the Account's display name and is immediately renameable.
-2. §4.2 FR-7 — Space deletion is immediate and irreversible; no trash, no restore window.
-3. §4.3 FR-13 — Admins cannot change each other's Role; only the Owner can promote to or demote from Admin.
-4. §4.5 FR-17 — Project deletion is immediate and irreversible.
-5. §4.7 FR-24 — Default Space Status set is Todo / In Progress / Done.
-6. §4.7 FR-27 — The rename cascade offer is a single choice applied to every conflicting Project at once.
-7. §4.7 FR-27 — Where the single mapping destination does not exist in a Project's effective set, affected Tasks fall to that Project's first Status.
-8. §4.10 FR-37 — API version is selected by URL path segment; exactly two versions are supported concurrently.
+2. §4.2 FR-7 — Space deletion is immediate and irreversible; no trash, no restore window. †
+3. §4.2 FR-8 — An Ownership Offer expires after 7 days, mirroring FR-39, and is surfaced in Space settings rather than emailed.
+4. §4.3 FR-13 — Admins cannot change each other's Role; only the Owner can promote to or demote from Admin.
+5. §4.5 FR-17 — Project deletion is immediate and irreversible. †
+6. §4.7 FR-24 — Default Space Status set is Todo / In Progress / Done.
+7. §4.7 FR-27 — The rename cascade offer is a single choice applied to every conflicting Project at once.
+8. §4.10 FR-37 — API version is selected by URL path segment; exactly two versions are supported concurrently. †
 9. §4.11 FR-39 — The Invitation acceptance route expires after 7 days.
 10. §4.11 FR-40 — Assignment notification is email, per-event, not digested.
-11. §5 NFR-7 — Authorisation refusal records are retained for 90 days.
-12. §5 NFR-8 — Scale bounds are set by judgement rather than measurement.
-13. §6.2 — Backups exist for disaster recovery but are not a restore path for deliberate deletion.
-14. §6.3 — The £30/month cost ceiling is set by what the project is worth spending, not by pricing analysis.
+11. §5 NFR-7 — Authorisation refusal records are retained for 90 days. †
+12. §6.2 — Backups exist for disaster recovery but are not a restore path for deliberate deletion.
+13. §6.3 — The £30/month cost ceiling is set by what the project is worth spending, not by pricing analysis.

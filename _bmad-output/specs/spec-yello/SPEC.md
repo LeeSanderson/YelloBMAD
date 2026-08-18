@@ -19,6 +19,8 @@ sources:
 
 > **Canonical contract.** This SPEC and the files in `companions:` are the complete, preservation-validated contract for what to build, test, and validate. Source documents listed in frontmatter are for traceability only — consult them only if you need narrative rationale or prose color this contract intentionally omits.
 
+> ⚠️ **Consumer note, 2026-08-18 — read before relying on this file.** No installed BMad skill downstream of `bmad-architecture` reads `SPEC.md`. `bmad-create-epics-and-stories`, `bmad-check-implementation-readiness`, `bmad-sprint-planning`, `bmad-create-story` and `bmad-dev-story` all discover requirements from the **PRD**. Every load-bearing resolution recorded here has therefore been folded back into `prd.md` and `addendum.md`, which are the documents the implementation chain actually consumes — `prd.md` now carries FR-1 … FR-42 and its open questions are resolved. **Treat this spec as the reasoning record and audit trail, not as the live contract.** Where the two ever disagree, `prd.md` is what gets built; report the divergence rather than resolving it silently.
+
 # Yello — multi-Space task management
 
 ## Why
@@ -29,7 +31,7 @@ sources:
 
 ## Capabilities
 
-Capability IDs mirror the source PRD's functional requirement numbers one-to-one: **CAP-N is FR-N**. Numbers are identifiers, not positions — CAP-41 belongs to Tasks and sits out of sequence for that reason. Each `success:` below is the *decisive* criterion; the complete testable consequence list for every capability is in `acceptance-criteria.md`.
+**CAP-1 … CAP-41 mirror the source PRD's functional requirements one-to-one: CAP-N is FR-N.** Numbers are identifiers, not positions — CAP-41 belongs to Tasks and sits out of sequence for that reason, and CAP-42 sits with Spaces. **CAP-42 onward have no PRD counterpart**; they were introduced by decisions taken while resolving this spec's open questions, and each records the decision that created it. Each `success:` below is the *decisive* criterion; the complete testable consequence list for every capability is in `acceptance-criteria.md`.
 
 **Accounts and Authentication** — global identity, self-service only. No administrator anywhere in Yello can create, disable or reset another person's Account.
 
@@ -58,8 +60,11 @@ Capability IDs mirror the source PRD's functional requirement numbers one-to-one
   - **intent:** An Owner can delete a Space, destroying its Projects, Tasks, Memberships and Invitations.
   - **success:** Only the Owner can — Admins cannot — and deletion removes every Membership and invalidates every API Token issued for that Space; belonging to no Space afterwards is a valid state.
 - **CAP-8**
-  - **intent:** An Owner can transfer ownership of a Space to another Membership in that Space.
-  - **success:** At no point during the operation does the Space have zero Owners or two, and the previous Owner becomes an Admin without losing access.
+  - **intent:** An Owner can offer ownership of a Space to another Membership in that Space.
+  - **success:** Ownership does not move until the offer is accepted — the offering Owner remains Owner throughout, so the Space never has zero Owners or two — and an offer revoked by the offerer or declined by the recipient leaves every Role exactly as it was.
+- **CAP-42** *(no PRD counterpart — added to close the ownership-consent defect)*
+  - **intent:** The Membership an ownership offer names can accept it, becoming Owner, or decline it.
+  - **success:** Acceptance moves ownership in one atomic step, leaving exactly one Owner — the recipient — with the previous Owner an Admin who has not lost access; no Account ever becomes an Owner without having agreed to it.
 - **CAP-9**
   - **intent:** An Account can move between the Spaces it holds Membership in, and the active Space determines everything subsequently visible and permitted.
   - **success:** Only Spaces the acting Account holds Membership in are listed by any means, and a request with no resolvable Space context is refused rather than defaulted.
@@ -71,7 +76,7 @@ Capability IDs mirror the source PRD's functional requirement numbers one-to-one
   - **success:** The response to the issuer is identical whether or not the address corresponds to an existing Account, and no Invitation can be issued at Owner Role.
 - **CAP-11**
   - **intent:** An invited person can accept, gaining Membership at the Role the Invitation specified.
-  - **success:** Accepting creates exactly one Membership, in exactly the invited Space, at exactly the invited Role; an invitee with an existing Account joins with it, and their other Memberships are neither visible to nor affected by the inviter.
+  - **success:** Acceptance requires the invitee authenticated as the invited Account plus a deliberate act naming the Space and Role — a bare fetch of the acceptance route creates nothing — and produces exactly one Membership, in exactly the invited Space, at exactly the invited Role, with the invitee's other Memberships neither visible to nor affected by the inviter.
 - **CAP-12**
   - **intent:** An Owner or Admin can revoke an Invitation that has not been accepted.
   - **success:** A revoked Invitation can never afterwards be accepted, and an Invitation remains valid when its issuer is later demoted, removed or deleted.
@@ -118,8 +123,8 @@ Capability IDs mirror the source PRD's functional requirement numbers one-to-one
   - **intent:** An Owner, Admin or Member can delete a Task.
   - **success:** A Viewer cannot, and any active collaborative editing session on the Task terminates with participants told it was deleted rather than losing their connection silently.
 - **CAP-41**
-  - **intent:** An Owner, Admin or Member can move a Task to a different Project within the same Space.
-  - **success:** Only Projects in the Task's own Space are accepted including via the API; where the destination's effective Status set lacks the Task's Status, the move does not take effect without a destination Status supplied in the same operation.
+  - **intent:** An Owner, Admin or Member can move a Task — or every Task sharing one Status — to a different Project within the same Space.
+  - **success:** Only Projects in the Task's own Space are accepted, including via the API; where the destination's effective Status set lacks the moving Tasks' Status, nothing takes effect without a destination Status supplied in the same operation — exactly one such decision, because a bulk move carries a single Status by construction.
 
 **Status Configuration** — a Space defines defaults; each Project holds a delta over them.
 
@@ -134,7 +139,7 @@ Capability IDs mirror the source PRD's functional requirement numbers one-to-one
   - **success:** No Task is ever left holding a Status absent from its Project's effective set, before, during or after the operation, and there is no partial application.
 - **CAP-27**
   - **intent:** Changes to the Space default Status set reach every Project according to that Project's delta.
-  - **success:** A Space-level rename applies to every Project that has not itself renamed that Status, and where one has, the operation reports the conflict and offers to cascade rather than silently overwriting or silently skipping.
+  - **success:** Neither half of this capability ever acts silently — a rename reports the conflict and offers to cascade where a Project renamed the same Status, and a removal reports every Project that cannot accept the Space-wide destination and requires a destination for each before anything applies.
 
 **Board and List Views** — the two ways of looking at a Project's Tasks. Both are read-available to every Role; only the manipulation differs.
 
@@ -192,6 +197,8 @@ Capability IDs mirror the source PRD's functional requirement numbers one-to-one
 - **Authorisation is a function of `(Account, Space)`, never of Account alone, and the active Space is resolved before any authorisation decision is possible.** This rules out a uniform tenant-column filter, and forbids any requirement, story or test phrased as "an Admin can X" without naming the Space.
 - **Isolation has no acceptable failure rate.** A single verified cross-Space disclosure blocks release. This makes the isolation suite a release gate rather than a report, and it holds identically for reads, writes, listings, aggregates, search results, notifications, error messages and identifiers — possessing the identifier of a Task, Project or Space confers nothing.
 - **Membership is the only route into a Space.** No share link, no public Board, no read-only URL, no anonymous access.
+- **An emailed acceptance route identifies an offer; it never authorises acting on it.** Following a link never mutates state by itself: acceptance requires the recipient authenticated as the addressed Account, plus a deliberate act. This rules out state-changing GETs on any invitation or offer route — which mail scanners and link prefetchers would otherwise trigger — and stops a forwarded link joining the wrong person. API Tokens are the deliberate exception, since authorising is their entire purpose (CAP-36).
+- **Neither Membership nor ownership ever arrives unrequested.** Both require the receiving Account to agree: an Invitation must be accepted by the addressed Account (CAP-11), and ownership must be accepted by the named Membership (CAP-42). Nothing about another Account's action can change what an Account holds.
 - **A Project never moves between Spaces and a Task never leaves its Space.** The cross-Space leak is closed by construction rather than by validation.
 - **Removing a Status, at either level, requires mapping every occupying Task in the same atomic operation.** Removal is always a migration, which makes "a Task holding a Status its Project does not expose" unreachable rather than merely invalid.
 - **A Project's Status delta references Statuses by identity, not by name.** Forced by CAP-27: the system cannot report that a Project renamed *the same* Status the Space is now renaming unless it can tell they are the same object. Name-keyed deltas cannot express this.
@@ -201,10 +208,13 @@ Capability IDs mirror the source PRD's functional requirement numbers one-to-one
 - **Deletion of an Account, Space, Project or Task is irreversible in v1.** No trash, no restore, no undo — including on the most destructive operation in the product. Backups exist for disaster recovery and are not a restore path for deliberate deletion.
 - **Total running cost stays under £30 per month at the scale envelope in `quality-budgets.md`.** This rules out always-on dedicated infrastructure per Space or per active editing session, which is where the real-time requirements will push hardest. A design that cannot be costed against the ceiling has not been specified enough to accept.
 - **An Account's existence is never disclosed to anyone not given it.** Registration, authentication and invitation-issue responses are uniform whether or not the address is known to Yello, and nobody can enumerate the Spaces another Account belongs to — including a Space's Owner. Email addresses are visible to Owners and Admins of Spaces the Account is a Member of, and to nobody else.
-- **Yello collects no behavioural analytics on the contents of Spaces.** This rules out any instrumentation that reads Task titles, descriptions, Labels or Project names, and it is the constraint the instrumentation open question runs into.
+- **Yello collects no behavioural analytics on the contents of Spaces.** This rules out any instrumentation that reads Task titles, descriptions, Labels or Project names.
+- **No product surface aggregates across Spaces, and the behavioural measures are not a product feature.** The measures in `success-metrics.md` are computed by the operator querying the datastore directly, outside the request path and outside the authorisation model. This rules out an in-product metrics dashboard, an admin analytics view, and any endpoint returning a count spanning Spaces — each would require a third non-Space-scoped surface and would breach isolation to produce a number nobody is entitled to.
+- **Compaction of the Task description change log preserves per-author change counts and timestamps.** Compaction may discard change *content*; it may not discard the record that a given Membership changed a given description at a given time. That metadata is the only evidence SM-5 is derivable from, and once compacted away it is unrecoverable.
 - **Capabilities the acting Role lacks are absent from the interface, not present-and-failing, and the acting Role is legible at all times.** Separately and independently: the interface hiding an action is never the mechanism that enforces it. Every refusal is enforced server-side and identically on both surfaces.
 - **Credentials are never recoverable and never observable.** Passwords are stored using a deliberately slow one-way function; API Tokens are stored so a read of the datastore does not yield usable Tokens; neither appears in any log, error message, notification, analytics event or API response.
 - **Glossary terms are used verbatim in every downstream artifact.** A synonym is a discipline violation, not a style choice. Where you see **Space**, no document says "workspace", "tenant" or "org".
+- **v1 is a single-operator deployment and claims no data-protection posture.** No lawful basis, data region, encryption-at-rest assertion, breach position or subject-access route is specified, and none is required while the operator is the only data subject. The gate is testable rather than aspirational: **the first Account created by anyone other than the operator makes this spec non-compliant until amended.** `harness-constraints.md` records what the gate requires, and which protections already hold incidentally.
 - **Authentic complexity only.** No requirement exists in order to reach a BMad surface. A coverage gap is reported rather than closed with a contrived carrier — which is why third-party failure handling is left openly uncovered in `harness-constraints.md` rather than manufactured.
 
 ## Non-goals
@@ -227,8 +237,8 @@ Capability IDs mirror the source PRD's functional requirement numbers one-to-one
 
 **Out of scope for v1 — deferred, not rejected.**
 
-- Iteration planning: no cycles, sprints, backlogs or time-boxing. **Held as a mid-flight change candidate** — see `harness-constraints.md`.
-- OAuth sign-in, as an alternative to email and password. Distinct from enterprise SSO because it authenticates an individual rather than presupposing an organisation. **Held as a mid-flight change candidate**, and the intended closure of the third-party-integration coverage gap.
+- Iteration planning: no cycles, sprints, backlogs or time-boxing. Retained as a *second* mid-flight change if a wide-ripple comparison is wanted later; not scheduled.
+- OAuth sign-in, as an alternative to email and password. Distinct from enterprise SSO because it authenticates an individual rather than presupposing an organisation. **Selected as the P6 mid-flight change and scheduled to fire once the identity epic has shipped**, closing the third-party-integration coverage gap at the same time. Stories for CAP-1, CAP-2 and NFR-6 must leave the assumptions it breaks soft — enumerated in `harness-constraints.md`.
 - Task comments and activity history — no discussion thread, no audit trail of who changed what. *The most likely regret among these; worth revisiting if timeline permits.*
 - Subtasks and Task relationships: no hierarchy, no blocking, no linking.
 - Attachments: no file upload or storage.
@@ -238,16 +248,17 @@ Capability IDs mirror the source PRD's functional requirement numbers one-to-one
 - Recurring Tasks.
 - Mobile applications. The web interface is responsive; there is no native client.
 - Notification preferences. Notifications are per-event and not configurable.
+- Session telemetry. Time-in-application (SM-C2) is defined as a counter-metric but not measurable in v1, because nothing records session duration and nothing is added to.
 - Billing and plan limits: no monetisation of any kind in v1.
 
 ## Success signal
 
-Ravi holds three Memberships at three different Roles and works across all of them in one morning. He creates freely in the Space he owns; he manages Membership in the client engagement he administers; and in the third — where he is a Viewer — every affordance to create or change anything is *absent* rather than present-and-failing, so he reads his standing off the interface without attempting an action. Then, while Nadia has that Space's Task description open with a sentence she has not finished, he removes her: within five seconds her editor goes inert, the unsynchronised sentence never reaches the Space, and she is told her access has ended — without her having touched anything. An isolation suite run against the same build reports zero cross-Space disclosures across browser and API.
+Ravi holds three Memberships at three different Roles and works across all of them in one morning. He creates freely in the Space he owns; he manages Membership in the client engagement he administers; and in the third — where he is a Viewer — every affordance to create or change anything is *absent* rather than present-and-failing, so he reads his standing off the interface without attempting an action. Then, while Nadia has that Space's Task description open with a sentence she has not finished, he removes her: within a second her editor goes inert, the unsynchronised sentence never reaches the Space, and she is told her access has ended — without her having touched anything. Her next ordinary request, had she made one, would already have been refused. An isolation suite run against the same build reports zero cross-Space disclosures across browser and API.
 
 Two gating criteria; a release fails without them.
 
 - **Isolation integrity.** Zero verified cross-Space disclosures, across browser and API, in any released build, measured by an isolation test suite exercised on every change. Validates CAP-15, CAP-16, CAP-35, CAP-36.
-- **Revocation latency.** Permission changes take effect on live sessions within 5 seconds in 100% of tested cases, including sessions holding unsynchronised local edits. Validates CAP-34.
+- **Revocation latency.** Permission changes govern the affected Account's very next request with no tolerance, and take effect on open live sessions within 1 second, in 100% of tested cases — including sessions holding unsynchronised local edits. Validates CAP-34, NFR-2.
 
 Behavioural measures are defined without thresholds in `success-metrics.md`: Yello has no users, and a target invented now would be indistinguishable from one that had been earned.
 
@@ -259,22 +270,14 @@ Behavioural measures are defined without thresholds in `success-metrics.md`: Yel
 - Admins cannot change each other's Role — only the Owner can promote to or demote from Admin. Asserted to keep the Owner meaningfully distinct from Admin; recorded as an assumption rather than a settled decision.
 - The default Space Status set is Todo / In Progress / Done.
 - The CAP-27 rename cascade offer is a single choice applied to every conflicting Project at once, consistent with the single Space-wide mapping decision.
-- Where a Space-wide mapping destination does not exist in a given Project's effective set, that Project's affected Tasks fall to the first Status in its own effective set. This is the one place the Space-wide mapping decision can produce a result the Admin did not literally choose.
 - The Invitation acceptance route expires after 7 days, after which the Invitation must be reissued.
+- An Ownership Offer expires after 7 days, mirroring the Invitation, and is surfaced in Space settings rather than emailed — the recipient is already a Member of the Space. Adding an email for it would be a new notification capability, deliberately not taken.
 - Assignment notification is email, per-event rather than digested.
-- Four assumptions have since hardened into architecture and now cost more than a document edit to reverse: API version by URL path segment with exactly two concurrent versions; 90-day retention of authorisation refusal records; the scale bounds in `quality-budgets.md` being set by judgement rather than measurement; and the £30 ceiling being set by what the project is worth spending rather than by pricing analysis. All four remain unconfirmed.
+- The scale bounds in `quality-budgets.md` are set by judgement rather than measurement, and are **confirmed final for v1**. With no users there is no usage evidence to gather, so the only obtainable evidence is load testing; that verification is scheduled at the NFR-evidence audit, against the single choke point the architecture enforces them at. Revising a bound after that point is an architecture change, not a document edit.
+- Three further assumptions have hardened into architecture and now cost more than a document edit to reverse: API version by URL path segment with exactly two concurrent versions; 90-day retention of authorisation refusal records; and the £30 ceiling being set by what the project is worth spending rather than by pricing analysis. All three remain unconfirmed.
 
 ## Open Questions
 
-- **Two source claims contradict each other and the spec does not choose between them.** UJ-4's edge case (in `surfaces-and-journeys.md`) states that a deep link into a Space the Account was removed from tells them they no longer have access, "not that the Task does not exist". CAP-15 requires the opposite — indistinguishable from not-found — and the architecture spine's AD-3 has already implemented CAP-15 as a hard 404 carrying no existence hint. The cases may be separable: CAP-34 requires a *live* session to be told access has ended, over a connection already authorised, whereas a *cold* deep link after removal has no such session and falls to CAP-15. If that split is intended, UJ-4 describes the cold case using the live case's behaviour and should be corrected. The question to settle: **may a removed Account learn that the resource still exists?**
-- **Instrumentation has no capability carrying it.** No CAP authorises collecting the behavioural measures in `success-metrics.md`, and one constraint states Yello collects no behavioural analytics on the contents of Spaces. Is instrumentation in v1 scope at all, and does measuring *that* a description was co-edited fall inside or outside that constraint?
-- **The scale bounds revisit is overdue, not pending.** The PRD asked that the bounds be revisited with evidence *before* the architecture was shaped around them. The architecture now enforces every bound as a refusal at one choke point, so that ordering was missed. Confirm the bounds or revise them knowing the cost has changed.
-- **No data-protection posture is named.** v1 stores email addresses and user-authored content, and deletion is irreversible; there is no stated lawful basis, no erasure route beyond CAP-3, and no breach-notification position. Deliberate for a harness with no users, or a gap the moment Yello is exposed publicly?
-- **Which mid-flight change fires, and when?** Two genuinely wanted requirements are held outside v1 for this purpose. The choice determines which v1 assumptions must stay soft, so it is needed before sprint planning rather than after.
-- **Is the product name settled?** The source PRD still carries "*Working title — confirm*". Every artifact now says Yello; confirm or rename before epics fix it into story text.
-- **Can ownership be transferred to someone who then declines it?** CAP-8 transfers immediately with no acceptance step, so the recipient acquires sole right to delete a Space without agreeing to it.
-- **Should acceptance of an Invitation by an existing Account require confirmation?** CAP-11 joins them silently, changing someone's working environment without their say-so.
-- **Is 5 seconds the right revocation budget?** It is stated and gated on, but nothing validates it. For a Viewer who should never have seen a Task, five seconds may be four too many.
-- **Should a Space-level Status removal be possible at all when Projects have diverged significantly?** CAP-27 resolves it with a single Space-wide destination plus a fallback, but the fallback can place a Task where the Admin did not choose.
-- **Does CAP-41 need a bulk form?** Moving Tasks one at a time between Projects is tedious at any real volume, and a bulk move interacts awkwardly with the per-Task Status mapping the single-Task version requires.
-- **Property carriers are named at feature and FR level, not epic level**, because epics did not exist when they were assigned. The mapping needs revisiting once epics exist, since a feature may split across several.
+*None. All twelve questions this spec opened with were resolved on 2026-08-18 — eleven by decision, and the twelfth reclassified as a hand-off obligation on the epics phase (recorded in `harness-constraints.md`) because nothing about it was undecided. The resolutions and their rejected alternatives are folded into `prd.md` §11 and `addendum.md` §8; the decision trail is `.memlog.md`.*
+
+*One item remains genuinely unresolved but is **owned by the architecture spine**, not by this spec: whether NFR-5 is measured warm or cold.*

@@ -28,7 +28,7 @@ Global identity, self-service only. Registration is the only path in. Authentica
 
 ### CAP-3 — Delete an Account
 
-- Deletion is refused while the Account is the Owner of any Space; each such Space must first be transferred (CAP-8) or deleted (CAP-7).
+- Deletion is refused while the Account is the Owner of any Space; each such Space must first be transferred away (offered under CAP-8 and accepted under CAP-42) or deleted (CAP-7). Because a transfer now requires someone else to accept, **deleting the Space is the only exit the Account controls unilaterally** — an Owner who can find no willing recipient can still always leave, at that cost.
 - On deletion, every remaining Membership held by the Account is removed, and the Account disappears from every Space it belonged to.
 - Tasks the deleted Account was Assignee of become unassigned; the Tasks themselves survive.
 - Content authored by the deleted Account in Spaces it did not own is retained; attribution renders as a deleted Account rather than disappearing.
@@ -69,13 +69,26 @@ The same object serves as private notebook, client engagement and whole-company 
 - That deletion destroys the Space's contents for every Member is stated **at the point of the action**, not only in documentation.
 - *Assumed:* deletion is immediate and irreversible in v1 — no trash, no restore window. This is the most destructive operation in the product and the only one with no undo.
 
-### CAP-8 — Transfer ownership
+### CAP-8 — Offer to transfer ownership
 
-- After transfer the Space has exactly one Owner, and it is the recipient.
-- The previous Owner becomes an Admin of that Space and does not lose access as a side effect of transferring.
-- Ownership can only be transferred to an existing Membership; not to an email address, an Invitation, or an Account with no Membership in that Space.
-- At no point during the operation does the Space have zero Owners or two Owners.
-- The Owner's Membership cannot be removed by CAP-14 while it holds ownership.
+- Ownership can only be offered to an existing Membership; not to an email address, an Invitation, or an Account with no Membership in that Space. Any Role may be named.
+- **Making the offer does not move ownership.** The offering Owner remains the Owner, with every capability of the Role, until the offer is accepted.
+- At most one Ownership Offer is pending per Space at a time.
+- The offering Owner may revoke a pending offer, and revocation leaves every Membership and Role exactly as it was.
+- A pending offer lapses if the named recipient's Membership is removed (CAP-14) or their Account is deleted (CAP-3), and lapsing changes no Role.
+- The offering Owner's Membership still cannot be removed by CAP-14, and their Account deletion is still refused by CAP-3, while an offer is pending — making an offer is not itself an exit.
+- *Assumed:* the offer expires after 7 days, mirroring the Invitation, and is surfaced in Space settings rather than emailed.
+
+### CAP-42 — Accept or decline an Ownership Offer
+
+*No PRD counterpart. Added to close a defect found while resolving this spec's open questions: with an immediate unilateral transfer, one Account could make another the unremovable Owner of a Space and thereby block that Account's own deletion indefinitely.*
+
+- Only the single Membership the offer names can accept or decline it, and only while it is pending.
+- **On acceptance, ownership moves in one atomic step:** the recipient becomes the sole Owner and the previous Owner becomes an Admin without losing access. At no point does the Space have zero Owners or two.
+- **No Account becomes an Owner without having agreed to it.** There is no route, API included, by which ownership arrives unrequested.
+- Declining leaves every Membership and Role exactly as it was, and the offering Owner is told it was declined.
+- A declined or lapsed offer cannot afterwards be accepted; the Owner must make a new offer.
+- After acceptance the new Owner is subject to every rule that binds any Owner: their Membership cannot be removed while they hold ownership, and their Account deletion is refused until they transfer the Space onward or delete it.
 
 ### CAP-9 — Establish and switch Space context
 
@@ -94,13 +107,16 @@ Membership is the only mechanism by which an Account gains access to a Space. In
 - Members and Viewers cannot issue Invitations.
 - Any email address can be invited. No domain restriction, no allowlist, no requirement that the address already have an Account.
 - The Invitation carries exactly one Space and exactly one Role, fixed at issue time.
-- An Invitation cannot be issued at Owner Role; ownership moves only via CAP-8.
+- An Invitation cannot be issued at Owner Role; ownership moves only by an Ownership Offer accepted under CAP-42.
 - Issuing an Invitation to an address that already holds Membership in that Space is refused.
 - The response to the issuer is identical whether or not the address corresponds to an existing Account; issuing an Invitation never discloses whether someone uses Yello.
+- **The Invitation record retains its terminal state once it leaves pending** — accepted, revoked or expired — rather than being deleted. No product surface reads it; the operator does, and SM-4 and SM-C3 are underivable without it.
 
 ### CAP-11 — Accept an Invitation
 
 - Accepting creates exactly one Membership, in exactly the invited Space, at exactly the invited Role.
+- **The Invitation token identifies the offer; it never authorises acceptance.** Acceptance requires the invitee authenticated as the Account the Invitation addresses. A bare fetch of the acceptance route — by a mail security scanner, a link prefetcher, or anyone the mail was forwarded to — creates no Membership and changes nothing.
+- **Acceptance is a deliberate act, taken after the Space and the Role have been shown.** For an invitee with no Account, completing registration is that act; for an invitee who already has one, it is an explicit confirmation. Neither is satisfied by loading a URL.
 - An invitee without an Account registers as part of accepting, and that registration provisions their own Personal Space (CAP-4) independently of the Space they were invited to.
 - An invitee with an existing Account joins with that Account; no second Account is created, and their other Memberships are neither visible to nor affected by the inviter.
 - An Invitation can be accepted once. A second attempt with the same Invitation is refused.
@@ -116,13 +132,13 @@ Membership is the only mechanism by which an Account gains access to a Space. In
 
 - An Admin can change Memberships between Member and Viewer only.
 - Only an Owner can promote a Membership to Admin, or demote one from Admin. *Assumed: Admins cannot modify each other — asserted to keep the Owner meaningfully distinct from Admin.*
-- No Role change can produce a second Owner or remove the sole Owner; ownership moves only via CAP-8.
+- No Role change can produce a second Owner or remove the sole Owner; ownership moves only by an Ownership Offer accepted under CAP-42.
 - A Role change takes effect on the target's active Sessions without requiring them to re-authenticate (CAP-34).
 
 ### CAP-14 — Remove a Membership, or leave a Space
 
 - An Admin can remove Members and Viewers, and cannot remove the Owner or another Admin.
-- The Owner's Membership cannot be removed by anyone, including the Owner, while it holds ownership; the Owner leaves by transferring first (CAP-8).
+- The Owner's Membership cannot be removed by anyone, including the Owner, while it holds ownership; the Owner leaves by offering ownership (CAP-8) and having it accepted (CAP-42), or by deleting the Space (CAP-7). A pending offer is not an exit.
 - Removal revokes access immediately and takes effect on the removed Account's active Sessions and open editors (CAP-34).
 - Removal invalidates every API Token that Account holds for that Space (CAP-36).
 - Tasks the removed Account was Assignee of become unassigned; the Tasks survive.
@@ -141,6 +157,8 @@ Authorisation is a function of `(Account, Space)`, never of Account alone. No ca
 - Requesting a resource in a Space the caller *does* belong to, but lacks the Role for, reports a **permission failure rather than a not-found** — the distinction is drawn at the Space boundary, not below it.
 - An Owner of one Space has no elevated standing in any other Space, regardless of Membership.
 - Authorisation is evaluated per request; it is never cached across a Space switch or inferred from a prior request.
+- **The message shown for a not-found refusal names both possibilities and commits to neither** — "this isn't available to you; it may not exist, or you may not have access." Ambiguous copy carries the usability cost so that no disclosure has to. A Role refusal *inside* a Space the caller does belong to may be specific, because no Space boundary is being crossed there.
+- **A failed deep link returns the caller to a Space they do hold Membership in** rather than leaving them on a dead surface (UJ-4). Where the caller holds no Membership anywhere, they are offered the chance to create a Space, consistent with CAP-7.
 
 ### CAP-16 — Apply the Role capability matrix
 
@@ -210,6 +228,15 @@ Covers title, Status, due date and Labels. Description editing is CAP-31.
 - Assignee, Labels, due date and description survive the move unchanged, because both Projects share a Space and therefore share its Memberships and Labels.
 - An active collaborative editing session on the Task continues across the move; participants are not disconnected.
 
+**Bulk form.**
+
+- **Every Task currently in one Status can be moved from one Project to another in the same Space in a single operation.** Because the selection shares a Status by construction, the operation carries **exactly one** mapping decision, on the same terms as the single-Task form: the Status is preserved where the destination exposes it, and one destination Status is required where it does not.
+- The bulk form is reachable from a Board column and from a List View filtered to one Status, and is available on the API on the same terms as the single-Task form (CAP-35).
+- **A bulk move is atomic: every selected Task moves, or none does.** A bulk move that cannot complete is refused rather than partially applied, consistent with CAP-26, and the refusal is visible rather than silent.
+- A Viewer cannot use either form.
+- Active collaborative editing sessions on the moved Tasks continue across a bulk move, as with the single-Task form.
+- **This is the safe path for retiring a Project without losing its work** — one move per Status in its effective set, rather than one per Task, against a Project deletion that is irreversible (CAP-17).
+
 ---
 
 ## Status Configuration — CAP-24 … CAP-27
@@ -244,10 +271,13 @@ Delta operations are add, remove, rename and reorder.
 - Adding a Status at Space level adds it to every Project that has not removed it.
 - Renaming a Status at Space level renames it in every Project that has not itself renamed it, including Projects that have reordered it.
 - Where one or more Projects have themselves renamed that Status, the operation reports the conflict and offers to cascade. Cascading replaces those Projects' names; declining preserves them. The Space-level rename applies either way to non-conflicting Projects.
-- Removing a Status at Space level requires mapping under CAP-26. A single destination Status is chosen once and applied across every affected Project, as one atomic operation.
+- Removing a Status at Space level requires mapping under CAP-26. A single destination Status is chosen once and applied across every affected Project that can accept it.
 - Removing a Status at Space level has no effect on Projects that had already removed it.
 - *Assumed:* the cascade offer is a single choice applied to every conflicting Project at once, consistent with the single Space-wide mapping decision.
-- *Assumed, and flagged:* where the single mapping destination does not exist in a given Project's effective set, that Project's affected Tasks fall to the first Status in its own effective set. This is the one place the Space-wide mapping decision can produce a result the Admin did not literally choose.
+- **Where a Project's post-removal effective set does not contain the chosen destination, the operation reports that Project — and how many of its Tasks are affected — and requires a destination drawn from that Project's own post-removal effective set.** There is no fallback and no silent placement.
+- Nothing applies until every reported Project has a destination. The Space-level removal, the Space-wide mapping and every per-Project exception apply as **one transaction or not at all**.
+- This is always satisfiable: a Project's effective set can never be empty (CAP-25), so a valid destination exists in every affected Project.
+- **Both halves of this capability behave the same way on conflict** — rename reports and asks, removal reports and asks. Neither decides for the Admin.
 
 **Constrains the data model:** because a Space-level rename must detect that a Project renamed *the same* Status in order to offer the cascade, a Project's delta necessarily references Statuses by **identity rather than by name**.
 
@@ -262,6 +292,7 @@ Both views are read-available to every Role; only the manipulation differs.
 - Columns appear in the Project's effective order, including where a delta reordered them.
 - Every Task in the Project appears in exactly one column.
 - A Viewer sees the identical Board to a Member, with no manipulation affordances present.
+- **At the NFR-8 bound of 5,000 Tasks in a Project, the Board still satisfies NFR-5 and NFR-9.** Every Task remains reachable and appears in exactly one column. How the view achieves that at that size — paging, virtualisation, or something else — is the architecture's call; nothing in v1 currently provides it, and the three requirements cannot all hold naively.
 
 ### CAP-29 — Move and order Tasks on a Board
 
@@ -274,6 +305,7 @@ Both views are read-available to every Role; only the manipulation differs.
 
 - Filters never surface a Task from another Project or another Space.
 - Filtering by Assignee offers only Memberships of the active Space.
+- **At the NFR-8 bound of 5,000 Tasks in a Project, the List View still satisfies NFR-5 and NFR-9**, on the same terms as CAP-28.
 
 ---
 
@@ -354,6 +386,7 @@ Email only where an action outside the product is required, or where someone nee
 - The email names the Space and the Role offered, and identifies who issued it.
 - The email discloses nothing about the Space's contents, its other Members, or any other Space.
 - Following the acceptance route after revocation reports only that the Invitation is no longer valid (CAP-11).
+- Following the acceptance route does not by itself join the invitee. It presents the offer; acceptance is separate and requires authentication as the invited Account (CAP-11).
 - *Assumed:* the acceptance route expires after 7 days, after which the Invitation must be reissued.
 
 ### CAP-40 — Notify on assignment
@@ -361,3 +394,5 @@ Email only where an action outside the product is required, or where someone nee
 - The notification names the Space, Project and Task, and nothing from any other Space.
 - An Account is not notified of its own action.
 - *Assumed:* assignment notification is email, and is per-event rather than digested. Frequency control is a v2 concern.
+
+**Feature-specific:** a record that a notification was sent is retained — Space, kind and timestamp, never message content or recipient address — so notification volume (SM-C4) is derivable. No product surface reads it.

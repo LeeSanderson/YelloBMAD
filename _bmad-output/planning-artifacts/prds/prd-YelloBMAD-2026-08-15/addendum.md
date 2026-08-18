@@ -4,6 +4,8 @@ Companion to `prd.md`. Holds material that informed the PRD but does not belong 
 
 Intended readers: whoever writes the architecture, the UX specification, and the epics.
 
+**Revised 2026-08-18.** A `bmad-spec` pass distilled `prd.md`, surfaced defects, and all six of its open questions were resolved. Sections 2, 3 and 7 below are updated; §8 is new and records what was rejected in that pass. The full decision trail is `specs/spec-yello/.memlog.md`.
+
 ---
 
 ## 1. Domain shape — options considered
@@ -28,10 +30,29 @@ The starting concept was one line: *"a multi-tenant project/task management plat
 | Decision | Selected | Alternatives rejected |
 |---|---|---|
 | Personal Space type | Ordinary Space, auto-created | A distinct undeletable type (adds a second concept and a special case to every lifecycle rule); a permanently private type (contradicts the shareability the model depends on) |
-| Ownership | Exactly one Owner, transferable; old Owner drops to Admin | Immutable creator-ownership (orphans Spaces on account deletion, or cascades into deleting other people's work); multiple Owners (collapses the Owner/Admin distinction) |
+| Ownership | Exactly one Owner. Transfer is an **offer the recipient must accept** (FR-8 + FR-42); old Owner drops to Admin | Immutable creator-ownership (orphans Spaces on account deletion, or cascades into deleting other people's work); multiple Owners (collapses the Owner/Admin distinction); **immediate unilateral transfer** — see below |
 | Who may invite | Owner and Admin | Any Member (three of four Roles behaving identically weakens the Role model); per-Space configurable (config dimension on every invitation path) |
 | Who may be invited | Any email address, no restriction | Domain-locked invitation was ruled out with SSO in §8 — it presumes an organisation concept Yello does not have |
 | Admin symmetry | Admins cannot modify each other | Recorded as an assumption in the PRD, not a settled decision. Keeps Owner meaningfully distinct |
+
+### Why ownership transfer needs consent
+
+The PRD originally specified transfer as immediate and unilateral, and asked as an open question whether ownership could be given to someone who then declines it. It cannot, because ownership is now an offer — and the reason is a defect the original wording permitted, not politeness.
+
+Three rules chained into a trap:
+
+1. Transfer was immediate and needed no agreement (FR-8).
+2. An Owner's Membership cannot be removed while it holds ownership (FR-14) — so the new Owner could not leave.
+3. Account deletion is refused while the Account owns any Space (FR-3) — so the new Owner could not delete their Account.
+
+An Owner could therefore transfer a Space to any Membership, immediately remove their own now-Admin Membership, and leave that person **permanently unable to delete their Yello Account**. Their only exits were to destroy the Space irreversibly or to impose the same thing on a third party. One Account could unilaterally block another's erasure — which also made FR-3 a conditional erasure route rather than a real one, a point §6.4 of the PRD now depends on.
+
+Two cheaper fixes were rejected:
+
+- **Let the recipient reverse the transfer.** Fails in exactly the abusive case: a previous Owner who has already left leaves nobody to reverse it to.
+- **Document the asymmetry without fixing it.** Would have shipped a defect that blocks Account deletion, and left §6.4's erasure claim true only while nobody exploited it.
+
+Consent is now a single principle rather than two local rules: **neither Membership nor ownership ever arrives unrequested** (FR-11, FR-42).
 
 ## 3. Status configuration — options considered
 
@@ -51,7 +72,7 @@ Three models were put forward and a fourth was authored in response.
 - **Removal is always a migration.** Removing a Status at either level requires mapping occupying Tasks to another Status, in the same operation. This makes the "Task holds a Status its Project does not expose" state unreachable by construction rather than by validation.
 - A removed Status can be re-added at any time.
 - Space-level rename propagates to non-conflicting Projects automatically; where a Project renamed the same Status, the operation reports the conflict and offers to cascade as a single choice.
-- Space-level removal uses one destination Status applied Space-wide, atomically.
+- Space-level removal uses one destination Status applied Space-wide, **plus a per-Project destination for any Project whose effective set cannot accept it** — reported and asked, never guessed — all applied atomically. An earlier draft let such Tasks fall to the Project's first Status; rejected because it made one half of FR-27 guess while the other half asked. Always satisfiable, since FR-25 guarantees a non-empty effective set.
 
 ### Constraint on mechanism
 
@@ -95,10 +116,39 @@ Items cut from MVP where the reasoning matters downstream:
 - **Cross-Project search** — deferred rather than ruled out, but note the tension with §8: search must never span Spaces, so any future implementation inherits the isolation requirement in full.
 - **Cross-Space aggregate views** — not deferred, ruled out. A surface that spans Spaces contradicts the model. Recorded here so a future reader does not mistake it for an oversight.
 
-## 7. Open architectural questions raised but not settled
+## 7. Architectural questions — status
 
-1. Whether the effective Status set is derived per read or materialised and invalidated (§3 above).
-2. Where authorisation is evaluated within the real-time synchronisation path (§4 above).
-3. How Board ordering converges under concurrent drag operations (FR-29). This is a second ordering problem, distinct from the text convergence in §4 above and not solved by the same mechanism. Whether ordering is exposed over the API is settled — readable, not writable (FR-35) — but how it converges is not.
-4. Whether the NFR-8 scale bounds should shape the architecture before they are validated — PRD Open Question 4.
-5. How FR-41 (moving a Task between Projects) interacts with the Status delta model. A move into a Project whose effective set lacks the Task's Status requires mapping on the same terms as FR-26, which means the move is not a simple reparenting — it is a reparent plus a conditional migration, and it must be atomic.
+*Raised when this document was written; four were settled by the architecture spine of 2026-08-17, one by the PRD revision of 2026-08-18. Kept with their outcomes so nobody re-opens a closed question.*
+
+| # | Question | Status |
+|---|---|---|
+| 1 | Whether the effective Status set is derived per read or materialised and invalidated (§3) | **Closed by AD-16** — derived on read, never stored; caching permitted only within a single request |
+| 2 | Where authorisation is evaluated within the real-time synchronisation path (§4) | **Closed by AD-8 and AD-9** — the sync channel carries no authority, every inbound frame is authorised, and permission change is pushed at the transaction boundary rather than polled |
+| 3 | How Board ordering converges under concurrent drag operations (FR-29) | **Closed by AD-15** — a jittered fractional index scoped to (Project, Status); a move writes only the moved Task's key. Interleaving under concurrent same-slot inserts is mitigated, not eliminated, and remains a spine deferral |
+| 4 | Whether the NFR-8 bounds should shape the architecture before they are validated | **Closed by the 2026-08-18 revision** — AD-25 already enforces every bound, so the intended ordering was missed. The bounds are confirmed final for v1 and the verification is rescheduled to the NFR-evidence audit |
+| 5 | How FR-41 interacts with the Status delta model | **Closed by AD-17** — reparent plus conditional migration in one transaction; no endpoint accepts the move without the mapping it requires. FR-41's bulk form inherits the same atomicity |
+
+**Still open, and owned by the spine rather than by this document:** whether NFR-5 is measured warm or cold. Scale-to-zero plus auto-pause makes most requests cold under sparse traffic, against a 300 ms p95 read budget.
+
+**New obligations on the architecture** raised by the 2026-08-18 revision:
+
+- **AD-13 must guarantee what compaction preserves.** It currently permits replacing a log prefix with a snapshot row without saying what survives. Per-author change counts and timestamps must, or §10's SM-5 becomes underivable and unrecoverably so.
+- **FR-42 needs an `OwnershipOffer` entity** and four slices — offer, accept, decline, revoke. AD-5 still holds: the filtered unique index continues to guarantee one Owner, and acceptance remains one transaction. Note AD-10 forbids unconditional timers, so the 7-day offer expiry must be evaluated lazily on read, exactly as FR-39's expiry already must be.
+- **FR-27's removal endpoint** now carries a per-Project destination map rather than a single value.
+- **FR-28 and FR-30 must hold NFR-5 and NFR-9 at 5,000 Tasks.** Nothing currently pages or virtualises, and the three requirements cannot all hold naively.
+
+## 8. Rejected in the 2026-08-18 revision
+
+Recorded so downstream does not re-propose them.
+
+| Proposal | Rejected because |
+|---|---|
+| Tell a removed Account that its access ended, rather than returning an undifferentiated not-found | Needs a removed-Membership tombstone readable by someone with no Membership, so it cannot sit under the Space-scoped context. Costs an AD-3 exception, a third non-Space-scoped surface against AD-24, and a sanctioned carve-out in NFR-1 — the one requirement stated as having no acceptable failure rate. The usability cost is paid with deliberately ambiguous copy instead |
+| Push a removal notice to live Sessions at removal time | Not chosen, but the cheapest way to revisit the same usability gap later: it rides AD-9's existing `MembershipChanged` event and needs no new persistent state |
+| An in-product metrics endpoint or dashboard for §10's behavioural measures | Would need a third non-Space-scoped surface (AD-24) and would breach NFR-1 to produce a number nobody is entitled to. The measures are operator-side aggregates instead (§6.1) |
+| A subject-access / data-export capability | An Account-scoped export spanning Spaces reopens the same AD-24 objection. Held behind the §6.4 gate |
+| Lowering Tasks per Project from 5,000 to ~500 to dissolve the Board collision | Revises a bound to dodge a problem rather than on evidence, and removes the substantial-UI difficulty deliberately |
+| Keeping the 5-second revocation budget as headroom for a future sync backplane | AD-14 forbids designs needing a backplane, so the headroom would protect a design that does not exist, at the cost of a release gate that cannot fail |
+| Refusing a Space-level Status removal until diverged Projects are fixed individually | Honest, but tedious at 50 Projects per Space, and it would leave FR-27's two halves still asymmetric — rename asking, removal refusing |
+| Keeping FR-27's first-Status fallback behind a confirmation preview | Removes the silence but still denies the Admin a per-Project choice: accept the whole operation or abandon it |
+| A mixed-selection bulk Task move with a per-Status mapping table | Largest new surface proposed, and it opens a transaction-size question at the 5,000-Task bound that neither NFR-5 nor NFR-8 answers. FR-41's bulk form is scoped to one Status instead |

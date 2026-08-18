@@ -19,9 +19,13 @@ No data belonging to a Space reaches any Account without a Membership in that Sp
 
 No authorisation decision is served from a cache that could outlive the Membership it was derived from.
 
-- A Role change or Membership removal is reflected in authorisation decisions **within 5 seconds**, without the affected Account acting.
+- **On the request path — reflected on the very next request. No tolerance.** A Role change or Membership removal governs the next request that Account makes, on the browser and the API alike. There is no budget here because there is nothing to spend it on: no cache may outlive a request, so a delay of even one request means a cache was introduced, which is the failure this requirement exists to catch.
+- **On the live-session path — within 1 second** of the transaction boundary, without the affected Account acting. Generous against the 300 ms remote-edit budget in NFR-3, and tight enough that a poller, or a cross-replica hop, fails it.
+- CAP-34's guarantee is independent of both timings: unsynchronised local changes are never applied, however long propagation takes.
 - No request is authorised using a Role established during a previous active Space.
 - Applies to API Tokens on the same terms (CAP-36).
+
+> **Why these numbers and not a single looser one.** The source PRD stated one 5-second budget for both paths. Against this architecture that could not fail — authorisation is resolved per request from the Membership row with no cache permitted to outlive the request, and permission change is pushed in-process at the transaction boundary on a single replica. A budget no plausible implementation can violate is the sentiment this document opens by warning against, and NFR-2 is one of the two claims a release gates on. Both clauses above can fail.
 
 ## NFR-3 — Collaborative editing feels immediate
 
@@ -50,6 +54,8 @@ No authorisation decision is served from a cache that could outlive the Membersh
 - No password or Token appears in any log, error message, notification, analytics event or API response.
 - All traffic is encrypted in transit.
 
+> **Encryption at rest is not asserted here.** NFR-6 covers transit only. Whatever the datastore provides at rest is incidental rather than required, and stating it is one of the items behind the data-protection gate in `harness-constraints.md`.
+
 ## NFR-7 — Refusals are observable
 
 - Every authorisation refusal is recorded with the acting Account, the target Space, the capability attempted and the outcome.
@@ -71,7 +77,7 @@ The system holds its other guarantees within these bounds and is not required to
 
 Exceeding a bound must degrade **visibly** rather than silently — a refusal, not a wrong answer. A bound that is not enforced is a defect, not a relaxation.
 
-*These bounds are set by judgement, not measurement. They exist so performance claims have a stated domain. `SPEC.md` carries an open question about them: the revisit-with-evidence the PRD asked for was meant to happen before the architecture was shaped around them, and it did not.*
+*These bounds are set by judgement, not measurement, and are **confirmed final for v1**. They exist so performance claims have a stated domain. The PRD asked that they be revisited with evidence before the architecture was shaped around them; that ordering was missed, and with no users there is no usage evidence to gather. The only obtainable evidence is load testing, so the verification is scheduled at the NFR-evidence audit, with the architecture's single enforcement choke point as the thing under test. Revising a bound after that is an architecture change, not a document edit.*
 
 ## NFR-9 — The primary flows are accessible
 
