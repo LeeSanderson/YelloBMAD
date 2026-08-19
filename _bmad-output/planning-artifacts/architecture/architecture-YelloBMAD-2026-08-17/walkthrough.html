@@ -275,7 +275,7 @@
 <div class="rail">
   <span class="brand">Yello · spine</span>
   <div class="dots" id="dots" role="tablist" aria-label="Steps"></div>
-  <span class="count" id="count">1 / 11</span>
+  <span class="count" id="count">1 / 12</span>
 </div>
 
 <main>
@@ -283,7 +283,7 @@
   <section class="step on" data-t="The bet">
     <span class="kicker">Walkthrough · architecture spine</span>
     <h1>Walking the Yello Spine</h1>
-    <p class="lede">Eleven steps through the invariants that keep Yello consistent — and the three places where the design is still genuinely open.</p>
+    <p class="lede">Twelve steps through the invariants that keep Yello consistent — and the four places where the design is still genuinely open.</p>
     <p>Yello's bet is that a private notebook, a client engagement and a whole company's shared work are the same primitive: a <strong>Space</strong>. What follows from that is the part that shapes everything — the interesting user lives in several Spaces at once, with a different standing in each. So identity is global and permission is contextual.</p>
     <div class="quote">
       Every question about what someone may do is answered against a specific Space, never against the person.
@@ -297,7 +297,8 @@
     <h2>One requirement decides the architecture</h2>
     <p>Beatriz is removed from a Space while she has a Task open in another tab, mid-sentence, with unsynchronised text in hand.</p>
     <ul>
-      <li>Her editor goes inert within <strong>five seconds</strong>, without her doing anything.</li>
+      <li>Her editor goes inert within <strong>one second</strong> of the transaction boundary, without her doing anything.</li>
+      <li>On the ordinary request path there is no budget at all — the change governs her <strong>very next request</strong>. No cache may outlive a request, so a delay of even one request means a cache was introduced, which is the failure the requirement exists to catch.</li>
       <li>The text she typed after removal <strong>never reaches the Space</strong> — including via a delayed or retried sync.</li>
       <li>Everything she'd already synchronised <strong>stays</strong>. Revocation stops future writes; it doesn't roll back past ones.</li>
     </ul>
@@ -405,8 +406,73 @@
     <span class="ad">AD-3 · one line, drawn once</span>
   </section>
 
+  <section class="step" data-t="Handover">
+    <span class="kicker">Step 6 · the one capability the Role matrix doesn't decide</span>
+    <h2>Nobody is made an Owner against their will</h2>
+    <p>Ravi finishes the Northwind engagement and wants out. The work must survive, so he hands the Space to Nadia and removes himself. That's UJ-8, and until 18 August the design had a trap in it.</p>
+    <p>Ownership moved <em>unilaterally</em>. Chained with two other rules — an Owner's Membership can't be removed while it holds ownership, and Account deletion is refused while you own a Space — Ravi could hand Northwind to anyone, remove his own now-Admin Membership, and leave them <strong>permanently unable to delete their Yello Account</strong>. One person could unilaterally block another's erasure.</p>
+    <div class="quote">
+      Wanting out does not by itself get him out — the deliberate price of nobody being made an Owner against their will.
+      <cite>PRD UJ-8</cite>
+    </div>
+    <p>So ownership moves in two halves, and a Space now holds pending state between them. Which makes the atomic-swap requirement — <em>at no point does the Space have zero Owners or two Owners</em> — a two-row update against the index that guarantees Owner uniqueness.</p>
+    <figure>
+      <div class="figbox">
+        <svg viewBox="0 0 700 262" role="img" aria-label="The filtered unique index on Role equals Owner for one Space. Before the swap it holds one row for Ravi. After demoting Ravi it holds zero rows, which is legal. After promoting Nadia it holds one row again. Promoting first would transiently hold two rows and violate the index.">
+          <defs>
+            <marker id="o1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+
+          <text x="14" y="18" class="dim">THE FILTERED INDEX ON Role = Owner · ONE SPACE</text>
+
+          <text x="14" y="42" class="sm dim">1 · before</text>
+          <rect class="box" x="14" y="50" width="182" height="70" rx="2"/>
+          <text x="105" y="82" text-anchor="middle">Ravi</text>
+          <text x="105" y="106" text-anchor="middle" class="sm dim">1 row · legal</text>
+
+          <path class="ln" d="M 200 85 L 254 85" marker-end="url(#o1)"/>
+          <text x="227" y="76" text-anchor="middle" class="sm">demote</text>
+
+          <g class="accent">
+            <text x="258" y="42" class="sm">2 · after demote</text>
+            <rect class="box" x="258" y="50" width="182" height="70" rx="2"/>
+            <text x="349" y="82" text-anchor="middle" class="sm">— empty —</text>
+            <text x="349" y="106" text-anchor="middle" class="sm">0 rows · still legal</text>
+          </g>
+
+          <path class="ln" d="M 444 85 L 498 85" marker-end="url(#o1)"/>
+          <text x="471" y="76" text-anchor="middle" class="sm">promote</text>
+
+          <text x="502" y="42" class="sm dim">3 · after promote</text>
+          <rect class="box" x="502" y="50" width="182" height="70" rx="2"/>
+          <text x="593" y="82" text-anchor="middle">Nadia</text>
+          <text x="593" y="106" text-anchor="middle" class="sm dim">1 row · legal</text>
+
+          <path class="dash dim" d="M 14 146 L 686 146"/>
+
+          <g class="bad">
+            <text x="14" y="172" class="sm">PROMOTE FIRST</text>
+            <rect class="box" x="14" y="180" width="182" height="70" rx="2"/>
+            <text x="105" y="204" text-anchor="middle" class="sm">Ravi</text>
+            <text x="105" y="222" text-anchor="middle" class="sm">Nadia</text>
+            <text x="105" y="242" text-anchor="middle" class="sm">2 rows · violation</text>
+          </g>
+
+          <text x="216" y="206" class="sm dim">SQL Server checks uniqueness per row as the index is</text>
+          <text x="216" y="222" class="sm dim">maintained — there is no deferral to lean on. And which</text>
+          <text x="216" y="238" class="sm dim">order EF Core picks for two tracked rows is EF Core's choice.</text>
+        </svg>
+      </div>
+      <figcaption>Zero Owners in the index is fine; two is fatal. Because the index is <em>filtered</em>, demoting removes the row entirely rather than leaving a placeholder — which is why this needs no temporary-value workaround, only an order.</figcaption>
+    </figure>
+    <p>One more consequence, and it's the interesting one. Any Role may be named in an offer, so <strong>acceptance is authorised by row identity, not by Role</strong> — the only capability in Yello that the Role matrix doesn't decide.</p>
+    <span class="ad">AD-26 · ownership is an offer · AD-27</span>
+  </section>
+
   <section class="step" data-t="Cost">
-    <span class="kicker">Step 6 · what £30 a month decided</span>
+    <span class="kicker">Step 7 · what £30 a month decided</span>
     <h2>You cannot buy the WebSocket</h2>
     <p>The obvious Azure answer for real-time is a managed broker. The numbers close that door before it opens.</p>
     <div class="cards">
@@ -427,14 +493,14 @@
   </section>
 
   <section class="step" data-t="No polling">
-    <span class="kicker">Step 7 · the constraint that improved the design</span>
+    <span class="kicker">Step 8 · the constraint that improved the design</span>
     <h2>Nothing may poll the database</h2>
     <p>The Azure SQL free offer gives 100,000 vCore-seconds a month, permanently — about 55 hours of active compute. Anything that queries on a timer both prevents auto-pause and drains the allowance.</p>
-    <p>Which means NFR-2's five-second revocation <em>cannot</em> be a poll. The operation that removes the Membership pushes the notification, in-process, at its transaction boundary.</p>
+    <p>Which means NFR-2's revocation <em>cannot</em> be a poll — its live-session clause is one second from the transaction boundary, worded deliberately tight so that a poller, or a hop between replicas, fails it. The operation that removes the Membership pushes the notification, in-process, at its transaction boundary.</p>
     <div class="cards">
       <div class="card yes">
         <h3>Leases don't expire</h3>
-        <p>A TTL would mean a database read per connection per interval. Leases hold until push-invalidated; the five-second bound is met by push latency.</p>
+        <p>A TTL would mean a database read per connection per interval. Leases hold until push-invalidated; the one-second bound is met by push latency, on a single replica, by a wide margin.</p>
       </div>
       <div class="card yes">
         <h3>The outbox piggybacks</h3>
@@ -449,7 +515,7 @@
   </section>
 
   <section class="step" data-t="The port">
-    <span class="kicker">Step 8 · what the spine refuses to decide</span>
+    <span class="kicker">Step 9 · what the spine refuses to decide</span>
     <h2>The merge algorithm is deliberately not decided</h2>
     <p>The spine fixes the seam and defers the algorithm. That's only safe because the persistence shape — an append-only change log plus a derived plain-text projection — serves a sequence CRDT and last-writer-wins equally, so swapping later is a registration change rather than a migration.</p>
     <p>The port's contract isn't prose. It's a <strong>conformance suite</strong> encoding FR-31, FR-33 and NFR-4, written before any implementation exists.</p>
@@ -461,7 +527,7 @@
   </section>
 
   <section class="step" data-t="The tension">
-    <span class="kicker">Step 9 · where two good choices collided</span>
+    <span class="kicker">Step 10 · where two good choices collided</span>
     <h2>C# everywhere, and a CRDT that won't run there</h2>
     <p>Two decisions pulled against each other: <em>use a proven CRDT rather than hand-roll one</em>, and <em>C# everywhere, including the browser</em>.</p>
     <div class="cards">
@@ -482,8 +548,9 @@
   </section>
 
   <section class="step" data-t="Review">
-    <span class="kicker">Step 10 · what the gate caught</span>
-    <h2>Six findings, two of them in my own draft</h2>
+    <span class="kicker">Step 11 · what the gate caught</span>
+    <h2>Ten findings, three of them in my own draft</h2>
+    <p>The gate ran twice — once when the spine was written, once when the PRD moved underneath it. The second run had no independent reviewers available, so it ran inline; the property it relies on, a fresh reader finding what the author talked past, was absent. Its findings stand on cited sources instead.</p>
     <div class="cards">
       <div class="card no">
         <h3>A live data-leak class</h3>
@@ -493,26 +560,43 @@
         <h3>UUIDv7 was wrong</h3>
         <p>SQL Server orders <code>uniqueidentifier</code> low-order bytes first, so a v7 fragments an index exactly like a v4. Corrected to sequential GUIDs.</p>
       </div>
+      <div class="card no">
+        <h3>The ownership swap was wrong</h3>
+        <p>I claimed SQL Server evaluates a unique index at <em>statement</em> completion, so order wouldn't matter. It has no deferred enforcement at all — that's PostgreSQL and Oracle. A single statement could promote first, transiently write two Owners, and fail. Plan-dependent, which is worse than reliably broken.</p>
+      </div>
+      <div class="card no">
+        <h3>Two claims, two defects</h3>
+        <p>Both web-lens findings in this spine were confident assertions about SQL Server <em>index</em> behaviour, and both were wrong. Treat any claim about this engine here as unverified until checked. The failure mode isn't ignorance — it's fluency.</p>
+      </div>
+      <div class="card yes">
+        <h3>Three more seams closed</h3>
+        <p>Expiry checkable against two different clocks with a race between check and transition; no fixed status for a state-conflict refusal, so three slices could return 404, 409 and 500 while all obeying every rule; and a read path that invited a cross-Space offers inbox, quietly breaching AD-24.</p>
+      </div>
+      <div class="card yes">
+        <h3>A requirement that landed nowhere</h3>
+        <p>An invitation token must identify an offer, never authorise acceptance — closing acceptance by mail scanners, prefetchers and forwarded links. The spine said nothing, and a route that mutates on a bare fetch is exactly the first shape you'd reach for.</p>
+      </div>
       <div class="card yes">
         <h3>Four seams closed</h3>
         <p>A lease TTL that contradicted the no-polling rule; an outbox that needed a banned poll; an unowned projection write that could race; and two paths that could each provision a Personal Space.</p>
       </div>
       <div class="card yes">
         <h3>Four requirements recovered</h3>
-        <p>Account-existence non-disclosure; the Account-scoped surfaces that RLS had no home for; NFR-8's bounds as refusals; and three deletion behaviours where a cascade is the obvious reach and all three are wrong.</p>
+        <p>Account-existence non-disclosure; the Account-scoped surfaces that RLS had no home for; NFR-8's bounds as refusals; and the deletion behaviours where a cascade is the obvious reach and every one of them is wrong.</p>
       </div>
     </div>
   </section>
 
   <section class="step" data-t="Open">
-    <span class="kicker">Step 11 · what to talk about</span>
-    <h2>Three things still open</h2>
+    <span class="kicker">Step 12 · what to talk about</span>
+    <h2>Four things still open</h2>
     <ul>
       <li><strong>Cold start against NFR-5.</strong> Scale-to-zero plus auto-pause means sparse traffic makes most requests cold, against a 300 ms p95 budget. Pin a warm replica for ~$12–15/month, or declare NFR-5 measured-warm. Either is defensible; silence isn't.</li>
       <li><strong>Is Azure SQL affected by the session-context defect at all?</strong> <code>MAXDOP = 1</code> is cheap insurance at this scale, but the documented trace-flag workaround isn't available on Azure SQL, and nobody has confirmed the exposure.</li>
       <li><strong>The merge algorithm.</strong> Deferred on purpose. The conformance suite decides admissibility — but someone still has to write it, and it should be written before the epic, not during.</li>
+      <li><strong>Where Nadia accepts.</strong> The architecture fixes that a pending offer is read inside the Space, at whatever Role the recipient holds — and rules out a cross-Space inbox. But the PRD scopes Space settings to Owner and Admin, and Nadia is a Member when she accepts. So a Member can hold a capability with no surface to exercise it on. That's a product and UX call, not an architecture one.</li>
     </ul>
-    <p class="lede">The PRD's own six open questions — ownership transfer without acceptance, the five-second revocation budget, whether the NFR-8 bounds are defensible — are untouched by this spine. They remain product calls.</p>
+    <p class="lede">The PRD's own six open questions are now closed — all of them, on 18 August. Three changed this spine: ownership became an offer, the five-second revocation budget became two clauses, and invitation acceptance became a deliberate act. The NFR-8 bounds were confirmed rather than revised.</p>
   </section>
 
 </main>

@@ -4,10 +4,10 @@ type: architecture-spine
 purpose: build-substrate
 altitude: initiative
 paradigm: 'Vertical slices inside a hexagonal shell'
-scope: 'Yello v1 — the whole system. FR-1…FR-41, NFR-1…NFR-9.'
+scope: 'Yello v1 — the whole system. FR-1…FR-42, NFR-1…NFR-9.'
 status: final
 created: '2026-08-17'
-updated: '2026-08-17'
+updated: '2026-08-19'
 binds:
   - '4.1 Accounts and Authentication'
   - '4.2 Spaces'
@@ -99,9 +99,9 @@ graph TD
 
 ### AD-5 — Owner uniqueness is a schema guarantee
 
-- **Binds:** FR-3, FR-5, FR-7, FR-8, FR-13, FR-14
+- **Binds:** FR-3, FR-5, FR-7, FR-8, FR-13, FR-14, FR-42
 - **Prevents:** two slices enforcing "exactly one Owner" differently in application code, and transfer passing through zero or two Owners.
-- **Rule:** A filtered unique index on `Membership(SpaceId) WHERE Role = Owner` guarantees at most one Owner per Space. Ownership transfer is one transaction. Removing the Owner's Membership is rejected while it holds ownership. Account deletion is refused inside the same transaction that checks for owned Spaces. Three deletion behaviours are fixed here because a cascade is the default an implementer reaches for and all three are wrong: a deleted Account leaves a tombstone so authored content keeps attribution (FR-3); removing a Membership does **not** delete Invitations that Membership issued (FR-12); and removing a Membership or deleting an Account sets dependent `Task.AssigneeMembershipId` to null and never deletes the Task (FR-21).
+- **Rule:** A filtered unique index on `Membership(SpaceId) WHERE Role = Owner` guarantees at most one Owner per Space. Ownership does **not** move in one step: it is an offer the named Membership must accept (AD-26), so the Space holds durable pending state between the two halves. Removing the Owner's Membership is rejected while it holds ownership, and a pending offer does not relax that — making an offer is not itself an exit (FR-8). Account deletion is refused inside the same transaction that checks for owned Spaces. Four deletion behaviours are fixed here because a cascade is the default an implementer reaches for and all four are wrong: a deleted Account leaves a tombstone so authored content keeps attribution (FR-3); removing a Membership does **not** delete Invitations that Membership issued (FR-12); removing a Membership or deleting an Account sets dependent `Task.AssigneeMembershipId` to null and never deletes the Task (FR-21); and those same two events **lapse** a pending Ownership Offer naming that Membership rather than deleting it or leaving it orphaned (FR-8, FR-14, FR-3).
 
 ### AD-6 — An API Token's capability resolves at request time
 
@@ -119,13 +119,13 @@ graph TD
 
 - **Binds:** FR-31, FR-33, FR-34, NFR-2 — *the load-bearing decision*
 - **Prevents:** the conventional "authorise at connect, then relay" design, under which FR-34 is unsatisfiable.
-- **Rule:** A WebSocket connection grants nothing. Each connection holds an authorisation lease carrying `(AccountId, SpaceId, Role)`, established at connect and held **until invalidated by push** (AD-9). There is no TTL and no periodic revalidation — a lease that expired on a timer would require a database read per connection per interval, which AD-10 forbids and the free-tier allowance cannot afford; NFR-2's 5-second bound is met by push latency, not by expiry. Every inbound frame is checked against a valid lease before it is applied, persisted or broadcast. A frame arriving on an invalidated lease is **discarded, not queued and not persisted**, and the connection is closed with an access-ended reason. Leases do not survive a process restart; connections re-establish and re-authorise.
+- **Rule:** A WebSocket connection grants nothing. Each connection holds an authorisation lease carrying `(AccountId, SpaceId, Role)`, established at connect and held **until invalidated by push** (AD-9). There is no TTL and no periodic revalidation — a lease that expired on a timer would require a database read per connection per interval, which AD-10 forbids and the free-tier allowance cannot afford; NFR-2's live-session clause — within **1 second** of the transaction boundary — is met by push latency, not by expiry: in-process push on a single replica (AD-14) clears it by a wide margin, and NFR-2 is deliberately worded so that a poller or a cross-replica hop would fail it. Every inbound frame is checked against a valid lease before it is applied, persisted or broadcast. A frame arriving on an invalidated lease is **discarded, not queued and not persisted**, and the connection is closed with an access-ended reason. Leases do not survive a process restart; connections re-establish and re-authorise.
 
 ### AD-9 — Permission change is pushed to the sync layer, never polled
 
-- **Binds:** FR-13, FR-14, FR-34, NFR-2
+- **Binds:** FR-13, FR-14, FR-34, FR-42, NFR-2
 - **Prevents:** a revocation that arrives whenever a poller happens to run, and per-slice divergence in how revocation propagates.
-- **Rule:** Any operation mutating a Membership publishes `MembershipChanged(AccountId, SpaceId)` at its transaction boundary, delivered in-process to the sync layer, which invalidates matching leases immediately. Effect is observable without the affected participant acting. Changes admitted before invalidation are retained; nothing authored after it is admitted by any route, including a delayed or retried frame.
+- **Rule:** Any operation mutating a Membership publishes `MembershipChanged(AccountId, SpaceId)` at its transaction boundary, delivered in-process to the sync layer, which invalidates matching leases immediately. An operation mutating more than one Membership publishes once **per affected Account**: accepting an Ownership Offer moves two Roles (AD-26) and must publish both, because a lease carries `Role` (AD-8). Effect is observable without the affected participant acting. Changes admitted before invalidation are retained; nothing authored after it is admitted by any route, including a delayed or retried frame.
 
 ### AD-10 — Nothing touches the database on an unconditional timer
 
@@ -223,6 +223,24 @@ graph TD
 - **Prevents:** each creation slice deciding independently whether a limit exists, so that some refuse, some silently accept and the stated scale envelope means nothing.
 - **Rule:** Every bound in NFR-8 — Spaces per Account, Memberships per Space, Projects per Space, Tasks per Project, concurrent editors per Task, concurrent Sessions per Space — is declared in one place and checked by the pipeline, not by the slice. Exceeding a bound is a refusal with a machine-readable reason, inside the same transaction as the creation it refuses. A bound that is not enforced is a defect, not a relaxation: NFR-8 requires visible degradation, never a wrong answer.
 
+### AD-26 — An Ownership Offer is durable pending state, and accepting one is authorised by row identity rather than Role
+
+- **Binds:** FR-8, FR-42, FR-3, FR-14, NFR-1
+- **Prevents:** at-most-one-pending-offer enforced differently in each slice; an implementer Role-gating the offer because every other capability is Role-gated; and a two-row ownership swap that transiently shows two Owners.
+- **Rule:** An `OwnershipOffer` carries `SpaceId`, the named recipient `MembershipId`, `ExpiresAt`, and a `State` of `Pending`, `Accepted`, `Declined`, `Revoked` or `Lapsed`. A filtered unique index on `OwnershipOffer(SpaceId) WHERE State = Pending` guarantees at most one pending offer per Space — the same schema-level guarantee AD-5 gives Owner uniqueness, for the same reason. **Accepting or declining is authorised by row identity — is the caller the named Membership — never by Role.** FR-8 permits any Role to be named, so this is the only capability in Yello decided outside the FR-16 Role matrix. Every transition is guarded in the slice by `WHERE State = Pending` with a rowcount check, not by the endpoint's `Idempotency-Key` alone (AD-18 still applies on top), because FR-42 admits no route — the API included — by which ownership arrives unrequested. Acceptance performs the Role change as **two `UPDATE` statements inside one transaction, in this order**: demote the current Owner to `Admin`, *then* promote the recipient to `Owner`. The order is load-bearing, not a style choice. SQL Server has no deferred constraint enforcement — uniqueness is checked per row as the index is maintained, and `SET CONSTRAINTS … DEFERRED` does not exist — so promote-before-demote transiently writes a second `Owner` row for the Space and fails on AD-5's filtered unique index. Demote-first is safe because that index is **filtered**: demoting removes the row from it entirely, leaving zero matching rows, and zero never violates uniqueness. This is also why the usual swap-via-temporary-value dance is unnecessary here. Performing the change through tracked-entity `SaveChanges` is **forbidden**: EF Core picks its own statement order for two tracked rows, so correctness would rest on an ordering it does not guarantee — use two explicit ordered `ExecuteUpdate` calls. FR-42's *never zero or two Owners* is an invariant on **observable** state, delivered by the single transaction; splitting it across two transactions violates it, and an invariant test asserts no Space ever holds zero or two Owner Memberships — the same gating pattern AD-17 uses for Status. A transition refused because the offer is no longer `Pending` — already accepted, declined, revoked, lapsed, or lost to a concurrent offer hitting the filtered index — returns **409** with a stable problem `type`, never 404: the caller holds a Membership in the Space, so AD-3's boundary rule does not apply and inventing a 404 here would be a divergence, not a disclosure. The named recipient reads a pending offer **inside the Space's own context** under AD-2, at whatever Role they hold; this deliberately needs no third Account-scoped surface, so AD-24 stands unamended and an offers inbox spanning Spaces is not the way to surface this.
+
+### AD-27 — Time-based expiry is computed on read, never written by a timer
+
+- **Binds:** FR-8, FR-11, FR-39, FR-42, §6.3 cost ceiling
+- **Prevents:** each slice deciding for itself whether an expired Invitation or Offer is still actionable, and a cleanup job becoming the thing that makes expiry true.
+- **Rule:** Anything expiring by the passage of time carries `ExpiresAt` and is evaluated by exactly one predicate — `State = Pending AND ExpiresAt > now` — declared once as a shared specification and applied by every read and every transition, never restated per slice. The predicate is evaluated **server-side inside the guarded statement's own `WHERE` clause**, against the database clock — never loaded into memory and checked in C# first, which would both split the check from the transition into a race and let two slices disagree across two clock sources. Consistent with the `DateTimeOffset`/UTC convention; a client-supplied time is never an input to expiry. No job and no timer writes the lapsed state, which is what keeps AD-10 intact: expiry costs no database wakeup and cannot drain the free vCore allowance. The architecture suite (AD-21) fails the build on a scheduled component writing a terminal expiry state, so this holds by construction rather than by discipline. Rows are never deleted on expiry, so SM-4's invitation-conversion figure stays derivable by an operator applying the same predicate (§10). Lapse **by event** is the opposite case and *is* written: removing a Membership or deleting an Account lapses a pending Ownership Offer inside that transaction (AD-5). The two are deliberately not unified — one is the passage of time, the other an effect of a transaction.
+
+### AD-28 — An Invitation token identifies an offer; it never authorises acceptance
+
+- **Binds:** FR-10, FR-11, FR-12, FR-39, NFR-1
+- **Prevents:** an acceptance route that mutates on a bare fetch, so a mail security scanner, a link prefetcher or a forwarded link silently creates a Membership; and a token treated as a bearer credential, which would let anyone holding the link into a Space.
+- **Rule:** Presenting an Invitation is a **safe, side-effect-free read** — fetching the acceptance route creates nothing and changes nothing. Membership is created only by a **separate explicit state-changing request**, authorised on the authenticated Account matching the address the Invitation names: the token identifies *which* offer is in play and is never the authority for accepting it. For an invitee with no Account, completing registration is that explicit act, and AD-22 provisions their own Personal Space in the same transaction independently of the Space they were invited to; for an invitee who already has an Account, it is a confirmation issued as its own request. Neither is satisfied by loading a URL. Acceptance transitions the Invitation out of `Pending` under the same guarded-`WHERE`-plus-rowcount discipline as AD-26, so a replayed or second attempt is refused rather than creating a second Membership. A revoked, accepted or lapsed Invitation reports only that it is no longer valid, disclosing neither the Space, its contents, nor who revoked it (AD-23).
+
 ## Consistency Conventions
 
 | Concern | Convention |
@@ -238,7 +256,7 @@ graph TD
 | Config & secrets | Configuration via environment variables only. Connection strings and the ACS key from Azure Key Vault via managed identity in Azure, user-secrets locally. No secret in source, appsettings, or a container image. |
 | Logging | Structured logs to stdout. Never log a password, API Token, session cookie, or Task/Project/Space content (NFR-6, §6.1). Correlate on request id; include `SpaceId` as a field, never the Space name. |
 | Migrations | EF Core migrations, including the RLS policies and the filtered Owner index. Applied as an explicit deploy step, never on application start. |
-| Tests | xUnit v3. Four suites gate release: **isolation** (SM-1, every case on both surfaces), **revocation** (SM-2, FR-34), **merge conformance** (AD-12), **architecture** (AD-21). Integration tests run against `mssql/server:2025-latest` via Testcontainers — never an in-memory provider, which cannot exercise RLS. |
+| Tests | xUnit v3. Four suites gate release: **isolation** (SM-1, every case on both surfaces), **revocation** (SM-2, FR-34 — asserting both NFR-2 clauses: next-request on the request path, 1 s on the live-session path), **merge conformance** (AD-12), **architecture** (AD-21). Integration tests run against `mssql/server:2025-latest` via Testcontainers — never an in-memory provider, which cannot exercise RLS. |
 | Accessibility | NFR-9 applies to registration, Space switching, the Board, the Task editor and invitation. Every Board pointer operation has a keyboard equivalent. Presence and permission-change notices are announced via ARIA live regions. |
 | Operations | The free-tier vCore allowance is load-bearing, so a metric alert fires at 10% of the monthly `Free amount remaining`. `Behavior when free limit reached` is set to **auto-pause until next month**, never to paid overage — exceeding the budget must be visible (§6.3), not billed silently. Free-tier exhaustion and rate-limit refusals are the two operational signals worth alerting on. |
 
@@ -323,6 +341,8 @@ erDiagram
     ACCOUNT ||--o{ API_TOKEN : issues
     SPACE ||--o{ MEMBERSHIP : grants
     SPACE ||--o{ INVITATION : offers
+    SPACE ||--o| OWNERSHIP_OFFER : "has at most one pending"
+    MEMBERSHIP ||--o{ OWNERSHIP_OFFER : "is offered to"
     SPACE ||--o{ PROJECT : contains
     SPACE ||--o{ LABEL : defines
     SPACE ||--o{ STATUS_DEFINITION : defaults
@@ -348,6 +368,7 @@ Yello/
   Yello.Application/          # use-case slices + the request pipeline
     Spaces/CreateSpace/
     Memberships/RevokeInvitation/
+    Spaces/AcceptOwnershipOffer/
     Tasks/MoveTaskToProject/
     ...                       # one folder per FR-level use case
   Yello.Infrastructure/       # EF Core, Identity, RLS session, outbox, email, merge adapter
@@ -368,8 +389,8 @@ Yello/
 | Capability / Area | Lives in | Governed by |
 | --- | --- | --- |
 | 4.1 Accounts and Authentication | `Application/Accounts/*`, Identity in Infrastructure | AD-1, AD-5, AD-7, AD-22, AD-23, AD-24 |
-| 4.2 Spaces | `Application/Spaces/*` | AD-1, AD-2, AD-5, AD-24, AD-25 |
-| 4.3 Membership and Invitations | `Application/Memberships/*`, `Application/Invitations/*` | AD-1, AD-5, AD-9, AD-22, AD-23, AD-25 |
+| 4.2 Spaces | `Application/Spaces/*` | AD-1, AD-2, AD-5, AD-24, AD-25, AD-26, AD-27 |
+| 4.3 Membership and Invitations | `Application/Memberships/*`, `Application/Invitations/*` | AD-1, AD-5, AD-9, AD-22, AD-23, AD-25, AD-27, AD-28 |
 | 4.4 Access Control | the request pipeline; RLS policies in migrations | AD-1, AD-2, AD-3, AD-4, AD-20, AD-24 |
 | 4.5 Projects | `Application/Projects/*` | AD-2, AD-16, AD-25 |
 | 4.6 Tasks | `Application/Tasks/*` | AD-2, AD-13, AD-15, AD-17, AD-25 |
@@ -390,7 +411,7 @@ Yello/
 | **Azure SQL Developer for local parity.** Private preview and credential-gated as of 2026-07-23; `mssql/server:2025-latest` is bound instead. | At public preview. It would remove the only real cost of choosing Azure SQL over PostgreSQL. |
 | **Board ordering interleaving.** Jitter mitigates concurrent same-slot inserts (AD-15); it does not eliminate them. | If interleaving is observed in use. A non-interleaving sequence CRDT is the escalation. |
 | **OAuth sign-in.** PRD §9.2 defers it; it would be Yello's first genuine inbound third-party dependency, bringing provider outage, token expiry and revoked consent — none of which FR-1 or FR-2 handle today. | When scheduled. It is also the P4 coverage gap and a P6 candidate in `docs/bmad-coverage.md`. |
-| **Trash and restore.** PRD assumptions 2 and 4 make deletion immediate and irreversible; nothing here softens that. | If the assumption is reversed. It would change the delete path for Space, Project and Task simultaneously. |
+| **Trash and restore.** The PRD assumptions on FR-7 and FR-17 make deletion immediate and irreversible; nothing here softens that. | If the assumption is reversed. It would change the delete path for Space, Project and Task simultaneously. |
 | **Audit store growth.** `AccessRefusal` lives in the same database and consumes the free-tier storage and vCore allowance. | If refusal volume becomes material, or the 32 GB data limit comes into view. |
 | **Search.** PRD §9.2 scopes search to a Project in v1; nothing here provides an index. | When cross-Project search is scheduled. It inherits AD-2 and AD-3 in full. |
 | **Disaster recovery beyond the included backups.** The free offer gives 7-day point-in-time restore and locally redundant backup only. | If the data ever matters more than the budget. |

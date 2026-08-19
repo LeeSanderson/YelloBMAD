@@ -253,11 +253,11 @@
 <header class="masthead">
   <div class="eyebrow">Architecture spine · design review</div>
   <h1>Yello Architecture Review</h1>
-  <p class="standfirst">What was decided, what was rejected, what it cost — and the four things the review pass caught before they reached a story.</p>
+  <p class="standfirst">What was decided, what was rejected, what it cost — and what two review passes caught before any of it reached a story.</p>
   <div class="meta">
-    <span>17 Aug 2026</span>
-    <span>25 invariants</span>
-    <span>41 FR · 9 NFR</span>
+    <span>17 Aug 2026 · revised 19 Aug</span>
+    <span>28 invariants</span>
+    <span>42 FR · 9 NFR</span>
     <span>greenfield · built by dev agents</span>
   </div>
 </header>
@@ -265,7 +265,7 @@
 <section>
   <h2>How to judge this</h2>
   <p>The spine fixes invariants, not structure. Its test is narrow: <em>if two units one level down were built independently, could they choose incompatibly?</em> Everything that passes that test is in. Everything else is named under Deferred and left to the code.</p>
-  <p>So the question to ask of it is not "is this how I would build Yello?" but <strong>"can a dev agent write a story-sized change that obeys every rule here and still breaks the product?"</strong> Where the answer is yes, there's a missing invariant. Four such gaps were found and closed during review; they're listed near the end.</p>
+  <p>So the question to ask of it is not "is this how I would build Yello?" but <strong>"can a dev agent write a story-sized change that obeys every rule here and still breaks the product?"</strong> Where the answer is yes, there's a missing invariant. Four such gaps were found and closed in the first review pass; three more were found in the second, when the PRD moved underneath a finalised spine. Both sets are listed near the end.</p>
 </section>
 
 <section>
@@ -274,7 +274,7 @@
 
   <div class="decision">
     <div class="dhead"><h3>FR-34 is the spine</h3><span class="tag">load-bearing</span></div>
-    <p>A demotion or removal must land on an <em>open editing session</em> within five seconds, discard the unsynchronised text, and keep what was already synchronised. That single requirement kills the conventional real-time architecture — authorise at connect, then relay opaque blobs — and forces authorisation <em>inside</em> the sync path, on every message, against state that changes underneath it.</p>
+    <p>A demotion or removal must land on an <em>open editing session</em> within <strong>one second</strong> of the transaction boundary, discard the unsynchronised text, and keep what was already synchronised. On the ordinary request path there is no budget at all — the change governs the very next request that Account makes, because no cache may outlive a request. That single requirement kills the conventional real-time architecture — authorise at connect, then relay opaque blobs — and forces authorisation <em>inside</em> the sync path, on every message, against state that changes underneath it.</p>
   </div>
 
   <div class="decision">
@@ -313,7 +313,7 @@
     <div class="dhead"><h3>The database is free, permanently — with a rule attached</h3><span class="tag g">favourable</span></div>
     <p>The Azure SQL Database free offer gives 100,000 vCore-seconds, 32 GB data and 32 GB backup per month <em>for the lifetime of the subscription</em>. That's about 55 hours of active half-vCore compute a month.</p>
     <p>So anything touching the database on a timer — a health check that queries, a background poller, a connection that never idles out — both prevents auto-pause and silently drains the entire allowance.</p>
-    <div class="cost">Consequence: <b>NFR-2's five-second revocation cannot be polled.</b> The operation that changes a Membership pushes the notification. The cost constraint forces the better design — and it's a rule a dev agent would otherwise break on story three, with nobody noticing until the bill.</div>
+    <div class="cost">Consequence: <b>NFR-2's revocation cannot be polled.</b> Its live-session clause is one second from the transaction boundary — deliberately worded so that a poller, or a hop between replicas, fails it. The operation that changes a Membership pushes the notification. The cost constraint forces the better design — and it's a rule a dev agent would otherwise break on story three, with nobody noticing until the bill.</div>
   </div>
 
   <figure>
@@ -535,8 +535,69 @@
 </section>
 
 <section>
+  <h2>What changed on 19 August</h2>
+  <p>The spine was finalised on 17 August. <code>bmad-spec</code> ran the next day, resolved the PRD's six open questions, and folded them back into the PRD — which left the spine describing a product that had moved. This is a <strong>sequencing</strong> defect, not a modelling one, and it's recorded at <code>docs/bmad-coverage.md</code>. Five things had gone stale; the amendments below are kept visible rather than quietly rewritten, so a reader who saw the first version can see what moved.</p>
+
+  <div class="decision">
+    <div class="dhead"><h3>Ownership is now an offer, not a transfer</h3><span class="tag">AD-26</span></div>
+    <p>The original FR-8 moved ownership unilaterally, and that turned out to be a trap. Chained with FR-14 and FR-3, an Owner could hand a Space to any Membership, remove their own now-Admin Membership, and leave that person <em>permanently unable to delete their Yello Account</em>. One Account could unilaterally block another's erasure.</p>
+    <p>So ownership moves in two halves with durable state between them, and the architecture consequence is larger than it looks: a Space now holds pending state that outlives the request that created it.</p>
+    <div class="split">
+      <div class="cell"><span class="label">Schema, not code</span><span class="val">"At most one Offer pending per Space" is the same shape as "exactly one Owner per Space" — so it gets the same answer: a filtered unique index, not a validation two slices would implement differently.</span></div>
+      <div class="cell"><span class="label">Authorised by row identity</span><span class="val">The named recipient may accept whatever Role they hold. This is the <em>only</em> capability in Yello that isn't decided by the Role matrix — stated explicitly, because it looks like an omission otherwise.</span></div>
+    </div>
+    <div class="cost">Consequence: <b>a Member or Viewer can hold a capability Space settings won't show them.</b> The architecture fixes where the offer is readable from — inside the Space, at any Role. Which surface renders it is a PRD and UX question, still open, and tracked in the UX run.</div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><h3>Expiry is computed, never written</h3><span class="tag">AD-27</span></div>
+    <p>Two requirements wanted a seven-day expiry — FR-39's Invitation and the Ownership Offer — and neither had a mechanism. The obvious implementation is a nightly job that writes the lapsed state, and AD-10 forbids it: anything touching the database on a timer both prevents auto-pause and drains the free-tier allowance.</p>
+    <p>Instead a pending row past its expiry simply <em>reads</em> as lapsed. No timer, no writer, and rows are never deleted — so the invitation funnel stays derivable.</p>
+    <div class="cost">One deliberate asymmetry, worth knowing before it looks like an inconsistency: lapse-<b>by-time</b> is computed on read, while lapse-<b>by-event</b> — the recipient's Membership vanishing — is written, because there's a transaction there to write it in.</div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><h3>An invitation token identifies; it never authorises</h3><span class="tag">AD-28</span></div>
+    <p>This one had landed nowhere. The PRD's fifth resolution requires that a bare fetch of the acceptance route create nothing — which closes acceptance by mail scanners, link prefetchers and forwarded links. <code>GET /invitations/{token}/accept</code> creating a Membership is exactly the shape an implementer reaches for first.</p>
+    <div class="cost">Presenting an invitation is now a <b>side-effect-free read</b>. Membership is created only by a separate explicit request, authorised on the authenticated Account matching the address the invitation names. For an invitee with no Account, registration is that act.</div>
+  </div>
+
+  <div class="decision">
+    <div class="dhead"><h3>Two amendments and a rotted cross-reference</h3><span class="tag">housekeeping</span></div>
+    <ul>
+      <li><strong>AD-8</strong> cited NFR-2's retired five-second budget — in the AD governing the requirement the PRD says the product should be judged on, and which SM-2 gates release on. The mechanism was already right; the target was 5× too loose, so the suite could not have failed.</li>
+      <li><strong>AD-9</strong> published one notification per Membership mutation. Acceptance moves <em>two</em> Roles, so it must publish for both — a lease carries the Role.</li>
+      <li><strong>Deferred</strong> cited "PRD assumptions 2 and 4" by position, and the list had renumbered underneath it. Now cited by FR. It was the only positional reference in the document, and the only one that broke.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
   <h2>What review caught</h2>
-  <p>The gate ran a rubric walk plus two adversarial lenses: verify every named technology against the live web, and construct two units that obey every rule and still build incompatibly. It found six things worth reporting. Two were defects in the draft itself.</p>
+  <p>The gate ran a rubric walk plus two adversarial lenses: verify every named technology against the live web, and construct two units that obey every rule and still build incompatibly. It ran twice — once per pass. The first found six things worth reporting, two of them defects in the draft itself; the second found four more, one of them critical. Every entry below was caught before a story was written.</p>
+  <p><strong>One caveat on the second run.</strong> Subagents were unavailable, so it ran inline rather than as independent reviewers. The property the gate relies on — a fresh reader finds what the author talks past — was therefore absent, and its findings stand on cited sources rather than on independence. Weight them accordingly.</p>
+
+  <div class="decision risk">
+    <div class="dhead"><h3>The ownership swap rested on a false claim about SQL Server — also mine</h3><span class="tag r">critical</span></div>
+    <p>The draft moved both Roles in a single <code>UPDATE</code> with a <code>CASE</code>, justified by the claim that <em>SQL Server evaluates a filtered unique index at statement completion, so statement order cannot matter</em>. That is false. <code>SET CONSTRAINTS … DEFERRED</code> exists in PostgreSQL and Oracle; SQL Server has no deferred uniqueness enforcement of any kind, and checks per row as the index is maintained. A single statement could process the promote first, transiently write a second Owner, and fail — plan-dependent, which is worse than reliably broken.</p>
+    <div class="cost">Corrected to <b>two ordered statements: demote, then promote.</b> And it needs no temporary-value workaround, which is the non-obvious part — the index is <em>filtered</em> on <code>Role = Owner</code>, so demoting removes the row from it entirely, leaving <b>zero</b> matching rows. Zero never violates uniqueness. The classic swap dance is only needed when both rows must continuously hold a constrained value. Order is load-bearing, so tracked-entity <code>SaveChanges</code> is forbidden here — EF Core picks its own statement order.</div>
+  </div>
+
+  <div class="decision risk">
+    <div class="dhead"><h3>Two SQL Server claims, two defects</h3><span class="tag r">pattern</span></div>
+    <p>Both defects the web lens has found in this spine were confident assertions about SQL Server <em>index</em> behaviour, produced from model priors and wrong: UUIDv7 in the first pass, deferred constraint evaluation in the second. Two for two.</p>
+    <div class="cost">Standing recommendation: treat any claim about SQL Server engine behaviour in this project as <b>unverified until checked against Microsoft's documentation</b>. The failure mode is not ignorance — it's fluency. Both claims read as expert knowledge.</div>
+  </div>
+
+  <div class="decision caught">
+    <div class="dhead"><h3>Three more seams, and a requirement that had landed nowhere</h3><span class="tag g">closed</span></div>
+    <ul>
+      <li><strong>Expiry could be checked against two different clocks.</strong> One slice evaluating the predicate in C# and another in SQL both obeyed the rule as written, yet disagreed under skew — and the C# variant split the check from the transition into a race. The predicate is now evaluated server-side inside the guarded statement's own <code>WHERE</code>.</li>
+      <li><strong>Nothing fixed the status for a state-conflict refusal.</strong> Three slices could return <code>404</code>, <code>409</code> and <code>500</code> while each obeyed every rule. Now <code>409</code>, never <code>404</code> — the caller holds a Membership, so the boundary rule that justifies a 404 doesn't apply, and conflating conflict with non-existence is corrosive in a product whose refusal model turns on that distinction.</li>
+      <li><strong>The recipient's read path invited a third Account-scoped surface.</strong> A requirement with no surface is how an implementer talks themselves into an "offers awaiting you" view spanning Spaces — which breaches AD-24 quietly. The offer is now read inside the Space's own context, so AD-24 stands unamended.</li>
+      <li><strong>FR-42's headline invariant was asserted but ungated.</strong> <em>Never zero or two Owners</em> had no test behind it. It has one now.</li>
+    </ul>
+  </div>
 
   <div class="decision risk">
     <div class="dhead"><h3>SESSION_CONTEXT under connection pooling is a live data-leak class</h3><span class="tag r">critical</span></div>
@@ -566,7 +627,7 @@
       <li><strong>AD-23</strong> — account-existence non-disclosure. Registration, authentication and invitation must be identical in status, body <em>and duration</em>; otherwise registration is an enumeration oracle. Two slices would certainly have differed on returning <code>409</code>.</li>
       <li><strong>AD-24</strong> — "list my Spaces" has no active Space to filter by, so it had no defined home under RLS. The Space switcher and Account settings are now the only Account-scoped surfaces, running under an <code>AccountId</code> predicate rather than a bypass.</li>
       <li><strong>AD-25</strong> — NFR-8's bounds enforced as refusals at one choke point. NFR-8 requires visible degradation; nothing said where.</li>
-      <li><strong>AD-5</strong> — three deletion behaviours where a cascade is the obvious reach and all three are wrong: Account tombstones preserve attribution, removing a Membership must not delete Invitations it issued, and losing an Assignee nulls the field rather than deleting the Task.</li>
+      <li><strong>AD-5</strong> — deletion behaviours where a cascade is the obvious reach and every one of them is wrong: Account tombstones preserve attribution, removing a Membership must not delete Invitations it issued, and losing an Assignee nulls the field rather than deleting the Task. A fourth was added on 19 August, once ownership became an offer.</li>
     </ul>
   </div>
 </section>
@@ -615,14 +676,16 @@
   <ul>
     <li><strong>Cold start.</strong> Pin a warm replica, or declare NFR-5 measured-warm and exempt the cold path. Either is defensible; silence isn't.</li>
     <li><strong>Azure SQL's exposure to the SESSION_CONTEXT defect.</strong> <code>MAXDOP = 1</code> is cheap insurance at this scale, but it's worth knowing whether it's needed.</li>
-    <li><strong>The PRD's six open questions</strong> are untouched by this spine — ownership transfer without acceptance, the revocation budget, and whether the NFR-8 bounds are defensible all remain product calls.</li>
+    <li><strong>The PRD's six open questions are now closed</strong> — all of them, on 18 August, and the 19 August pass reconciled the spine to them. Three changed the architecture: ownership became an offer, the revocation budget became two clauses, and invitation acceptance became a deliberate act. The NFR-8 bounds were <em>confirmed</em> rather than revised, so AD-25 stands as written.</li>
+    <li><strong>The forbidden <code>SaveChanges</code> on the ownership swap is prose, not a build gate.</strong> This project's own bar is that a rule relying on discipline is not a rule — dependency direction fails the build, and the Identity role APIs are architecture-tested. "Don't do <em>this particular</em> two-row update through the change tracker" isn't mechanically detectable the same way. The invariant test catches the symptom; it's the weakest link in the update.</li>
   </ul>
 </section>
 
 <footer>
-  <span>Spine: ARCHITECTURE-SPINE.md · 25 ADs · lint clean</span>
-  <span>Decision trail: .memlog.md · 43 entries</span>
-  <span>Source: prd-YelloBMAD-2026-08-15 (final) + addendum</span>
+  <span>Spine: ARCHITECTURE-SPINE.md · 28 ADs · lint clean</span>
+  <span>Decision trail: .memlog.md · 58 entries</span>
+  <span>Reviews: reviews/review-{web-verification, adversarial-seam, rubric-walker}.md</span>
+  <span>Source: prd-YelloBMAD-2026-08-15 (final, revised 2026-08-18) + addendum</span>
 </footer>
 
 </div>
