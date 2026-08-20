@@ -28,17 +28,17 @@ Three substrate facts shape the experience more than any design choice:
 - **AD-1 / AD-2** — authorisation is a function of `(Account, Space)`, resolved per request from a Membership row. Nothing is visible or permitted until an active Space is established, which makes the context bar a functional mechanism rather than navigation chrome.
 - **AD-8 / AD-9** — a permission change is *pushed* to open sessions at the transaction boundary, never polled. Revocation happens *to* the User without them acting, so **the interface has to be built to be interrupted** — and every surface, not only the Task editor.
 
-### Open against this spine
+### Resolved upstream since this spine was written
 
-Three items are not settled. They are listed here rather than only at their point of use, because a consumer building from this contract needs to know what it does *not* answer before they rely on it.
+Three items were escalated out of this spine and all three were closed on 2026-08-20. Recorded because the resolutions changed what this spine can rely on, and one of them changed a rule this spine states.
 
-| Item | Owner | Where |
-|---|---|---|
-| **The 403/404 timing oracle.** AD-20 writes an `AccessRefusal` row for a Space-boundary 404 and not for an ordinary not-found, so the two are distinguishable by duration however identical the copy. AD-23 already makes duration contractual for registration; nothing does so here. | `bmad-architecture` | § Isolation and Refusal |
-| **The FR-28 × NFR-5 × NFR-9 collision.** The PRD defers the mechanism to the architecture and says the three cannot all hold naively; the 28 ADs never choose paging, virtualisation or windowing; this spine states the contract any mechanism must satisfy but cannot pick one. | `bmad-architecture` | § Responsive & Platform |
-| **Emailing the Ownership Offer.** FR-8's assumption says the offer is surfaced in-Space and *not* emailed, and §4.11 has no ownership notification — which traps an Owner indefinitely if the recipient never logs in. UJ-8 is written against the amended behaviour. | `bmad-prd` | UJ-8 |
+| Item | Outcome |
+|---|---|
+| **Emailing the Ownership Offer** → `bmad-prd` | **Landed.** FR-8's assumption lost its not-emailed half and **FR-43** was added, carrying an explicit disclosure constraint: the email names the Space, the offer and who made it, and nothing about the Space's contents, its other Memberships or any other Space. UJ-8 below is written against this and is now current rather than anticipatory. |
+| **FR-28 × NFR-5 × NFR-9** → `bmad-architecture` | **Decided as AD-29.** Board columns and List View pages are **keyset-paginated** on the position key and rendered rows are appended, never recycled — so the focus-identity contract this spine states is satisfied *by construction* rather than by careful virtualiser implementation. DOM virtualisation is now forbidden. The accessibility obligations under *Board at scale* and in the focus table are unchanged; they are simply no longer at risk from the mechanism. |
+| **The 403/404 timing oracle** → `bmad-architecture` | **Corrected, not implemented — and this spine was wrong.** The oracle does not hold: `spaceId` is always the first path segment, and AD-1 refuses *no such Space* and *no Membership in it* identically, so both write a refusal record and the timing is the same. The record fires on exactly the condition the caller already knows. What *is* real is the precondition, now bound in AD-3: the oracle appears the moment a route resolves a Space-scoped resource **without** `spaceId` in the path — a shareable deep link by bare Task id. The isolation suite gains a timing case. See the note in § Isolation and Refusal, which is retained because the reasoning is still worth reading. |
 
-Five `[ASSUMPTION]` tags are also live, each stating its own reasoning: no webfont, no density control, breakpoints at 768/1280, FR-6's inherited surface gap, and accepted spellcheck egress. None blocks implementation.
+Five `[ASSUMPTION]` tags remain live, each stating its own reasoning: no webfont, no density control, breakpoints at 768/1280, FR-6's inherited surface gap, and accepted spellcheck egress. None blocks implementation.
 
 ## Information Architecture
 
@@ -135,7 +135,7 @@ AD-3 draws the line at the Space boundary and nowhere else:
 
 **The two 404 cases must be indistinguishable in every respect the interface controls** — same words, same layout, same focus behaviour, same page-not-toast treatment, and no client-side branch on which case occurred. UJ-4 accepts the usability cost explicitly: it is *"paid with deliberately ambiguous copy rather than with a disclosure."*
 
-> **Timing is not one of those respects, and that is an escalation rather than an omission.** AD-20 has the pipeline write an `AccessRefusal` row for every **Space-boundary** 404, while a genuinely non-existent resource crosses no boundary and so plausibly writes nothing. Different work means different duration, which makes the pair a timing oracle no amount of identical copy can close: probe an id, time the refusal, learn whether it exists somewhere in Yello. AD-23 already makes duration part of the contract for registration and authentication; the same discipline is owed here and no AD states it. **Flagged for `bmad-architecture`** — the fix is in the pipeline (write the refusal record off the response path, or pad boundary refusals to a floor), and the isolation suite needs a *timing* case, since SM-1 currently measures disclosure rather than duration.
+> **Timing is not one of those respects the interface can deliver alone — now resolved upstream in AD-3.** AD-20 has the pipeline write an `AccessRefusal` row for every **Space-boundary** 404, while a genuinely non-existent resource crosses no boundary and so plausibly writes nothing. Different work means different duration, which makes the pair a timing oracle no amount of identical copy can close: probe an id, time the refusal, learn whether it exists somewhere in Yello. AD-23 already makes duration part of the contract for registration and authentication; the same discipline is owed here and no AD states it. **Resolved in AD-3 (2026-08-20), and the escalated framing was corrected in the process.** The oracle does not exist today: `spaceId` is always the first path segment and AD-1 refuses *no such Space* and *no Membership in it* identically, so both write a record and both take the same time — the record fires on the one condition the caller already knows. AD-3 now binds the *precondition* instead: every Space-scoped route carries `{spaceId}`, enforced by a build gate, so a bare-id deep link cannot introduce the case. The isolation suite gains a timing case regardless, since SM-1 measures disclosure rather than duration.
 
 Hard rules:
 
@@ -422,11 +422,11 @@ The Role chip and the Offer indicator survive **every** breakpoint. If something
 
 Phones are for reading and light editing. The Board at 5,000 Tasks is a desktop proposition; the small-viewport path must stay *correct* at that size, not fast.
 
-### Unresolved: the FR-28 collision belongs to nobody
+### The FR-28 collision, and who owns it now
 
 FR-28 requires the Board to satisfy **NFR-5** (300 ms p95 reads) and **NFR-9** (WCAG 2.1 AA, full keyboard operation) simultaneously at **5,000 Tasks in a Project** — and the PRD states plainly the three *"cannot all hold naively"*, then defers the mechanism to the architecture. The architecture's 28 ADs never decide it: AD-13 and AD-15 fix persistence and ordering, AD-25 enforces the bound as a creation refusal, and nothing chooses paging, virtualisation or windowing. §4.8 maps only to AD-13/AD-15/AD-16.
 
-**That is a three-way deferral, so no document owns it** — and its accessibility half is a release gate. This spine's obligation is to state the contract any mechanism must satisfy, which *Board at scale* and the focus table above now do: keyboard drives the window, row identity is keyed to the Task id, focus restores by id, and `aria-setsize`/`aria-posinset` carry the true total. **Flagged for `bmad-architecture`.** Whoever decides the mechanism must decide focus and announcement behaviour in the same pass.
+That was a three-way deferral in which no document owned it, and **it was closed on 2026-08-20 as AD-29**: Board columns and List View pages are keyset-paginated on the position key, never `OFFSET`, and rendered rows are appended rather than recycled. The choice was made on this spine's own grounds — a recycled row silently re-points keyboard focus at a different Task, so appending removes the defect instead of mitigating it. The obligations stated above (keyboard drives the window, row identity keyed to the Task id, focus restored by id, `aria-setsize`/`aria-posinset` carrying the true total) are unchanged and are now satisfied by construction.
 
 ## Internationalisation
 
@@ -550,7 +550,7 @@ Failure — the API changes shape: his script keeps working against `/api/v1` wh
 
 Failure — she declines or lets it lapse: Ravi is still Owner and still cannot leave. His remaining exits are to offer it to someone else or delete the Space (FR-3). Failure — no longer pending when she answers: **409 for her, because she holds a Membership**; a caller with none gets 404 on the same route.
 
-> **Upstream dependency.** Step 2 requires a PRD amendment. FR-8's assumption currently says the offer is *"surfaced in Space settings rather than emailed"*, and §4.11 has no ownership notification. Composed with the 7-day expiry and read-time evaluation (AD-27), the recipient is never told and must happen to enter the Space in time — so an Owner can be trapped indefinitely because someone never logged in. Being assigned a Task emails you (FR-40); being offered an entire Space does not. The amendment must carry the disclosure constraint in step 2, not just the notification trigger. Recorded in `.memlog.md` as an action for `bmad-prd`.
+> **Why step 2 exists.** It was added by a PRD amendment this spine caused, landed 2026-08-20 as **FR-43**. FR-8's assumption previously said the offer was *"surfaced in Space settings rather than emailed"* and §4.11 had no ownership notification. Composed with the 7-day expiry and read-time evaluation (AD-27), the recipient was never told and had to happen to enter the Space in time — so an Owner could be trapped indefinitely because somebody else never logged in, with FR-14 forbidding removal of their Membership and FR-3 refusing their Account deletion. The asymmetry made it plain: FR-40 emails you for one Task assignment, and nothing emailed you when offered an entire Space. The amendment carries the disclosure constraint in step 2, not merely the notification trigger. Mechanism is AD-26 — one email, enqueued in the same transaction as the offer, and nothing on revoke, decline or lapse.
 
 ### UJ-9 — Ravi retires a Project safely *(new)*
 

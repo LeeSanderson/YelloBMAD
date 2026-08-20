@@ -2,7 +2,7 @@
 title: Yello
 status: final
 created: 2026-08-15
-updated: 2026-08-16
+updated: 2026-08-20
 ---
 
 # PRD: Yello
@@ -11,13 +11,15 @@ updated: 2026-08-16
 
 This PRD defines Yello for the people who will design, architect and build it. It is the source of truth for *what* Yello does and *why*; it deliberately does not specify *how*. Technology choices, data models, transport mechanisms and rejected alternatives live in `addendum.md` alongside this document.
 
-Read it in this order. §1–§3 establish what Yello is and the vocabulary the rest of the document uses without deviation. §4 is the substance: features grouped by capability, with functional requirements nested underneath and numbered globally (FR-1 … FR-42) so downstream artifacts can reference them stably even if features get reorganised — the numbers are identifiers, not positions. §5 sets the system-wide quality bar and §6 the constraints Yello accepts. §7 names the surfaces. §8 and §9 draw the boundary — what Yello will never be, and what v1 leaves out. §10 says how we would know it worked. §11 records the questions that were open and how each was resolved; §12 collects what remains assumed.
+Read it in this order. §1–§3 establish what Yello is and the vocabulary the rest of the document uses without deviation. §4 is the substance: features grouped by capability, with functional requirements nested underneath and numbered globally (FR-1 … FR-43) so downstream artifacts can reference them stably even if features get reorganised — the numbers are identifiers, not positions. §5 sets the system-wide quality bar and §6 the constraints Yello accepts. §7 names the surfaces. §8 and §9 draw the boundary — what Yello will never be, and what v1 leaves out. §10 says how we would know it worked. §11 records the questions that were open and how each was resolved; §12 collects what remains assumed.
 
 Two conventions matter. Terms defined in §2 Glossary are used verbatim everywhere else — where you see **Space**, no other document should say "workspace", "tenant" or "org". And every inference made without confirmation carries an inline `[ASSUMPTION]` tag, indexed in §12, so nothing quietly hardens into fact.
 
 An architecture spine now exists at `planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md` and is binding on mechanism; where it has settled something this document left open, it is authoritative. No UX specification exists yet. This PRD's depth is calibrated to what the downstream phases need in order to proceed rather than to the size of Yello's audience.
 
 **Revision note.** This document was revised on 2026-08-18 after a `bmad-spec` pass distilled it and surfaced defects: an internal contradiction between UJ-4 and FR-15, an ownership-transfer trap, a revocation budget that no implementation of the chosen architecture could violate, a collision between the Board and the scale envelope, and an asymmetry inside FR-27. All six of §11's open questions are now resolved. The audit trail of how each was decided is `specs/spec-yello/.memlog.md`.
+
+**Revised again on 2026-08-20**, after a `bmad-ux` pass produced `DESIGN.md` and `EXPERIENCE.md` and found one defect this document had carried since the ownership rework: the Ownership Offer had an expiry and no notification, so its 7-day clock could run out on a recipient who was never told. FR-8's assumption lost its not-emailed half and **FR-43** was added. Nothing else changed. The audit trail is `planning-artifacts/ux-designs/ux-YelloBMAD-2026-08-18/.memlog.md`.
 
 ## 1. Vision
 
@@ -104,7 +106,7 @@ What follows from that is the part that actually matters: **the interesting user
 
 ## 4. Features
 
-*Each subsection is a coherent capability. Functional requirements are nested under the feature they belong to and numbered globally (FR-1 … FR-42) so downstream artifacts can reference them stably even if features are reorganised. Consequences are written to be testable; where one could pass by accident, it is written to be failable instead.*
+*Each subsection is a coherent capability. Functional requirements are nested under the feature they belong to and numbered globally (FR-1 … FR-43) so downstream artifacts can reference them stably even if features are reorganised. Consequences are written to be testable; where one could pass by accident, it is written to be failable instead.*
 
 ### 4.1 Accounts and Authentication
 
@@ -201,7 +203,10 @@ An Owner can offer ownership of a Space to another Membership in that Space. Own
 - The offering Owner may revoke a pending offer, and revocation leaves every Membership and Role exactly as it was.
 - A pending offer lapses if the named recipient's Membership is removed (FR-14) or their Account is deleted (FR-3), and lapsing changes no Role.
 - The offering Owner's Membership still cannot be removed by FR-14, and their Account deletion is still refused by FR-3, while an offer is pending — making an offer is not itself an exit.
-- `[ASSUMPTION: the offer expires after 7 days, mirroring FR-39, and is surfaced in Space settings rather than emailed — the recipient is already a Member of the Space.]`
+- The named recipient is told the offer exists (FR-43). Being a Membership of the Space is not the same as being present in it, and the offer expires.
+- `[ASSUMPTION: the offer expires after 7 days, mirroring FR-39.]`
+
+**Why the recipient is emailed.** An earlier draft of this assumption also said the offer was *"surfaced in Space settings rather than emailed — the recipient is already a Member of the Space."* That reasoning was true and insufficient. Composed with the 7-day expiry and with expiry evaluated only when something reads the offer, a recipient who simply does not open that Space for a week never learns the offer existed. UJ-8's edge case then bites the wrong person: the offer lapses, the offering Owner remains Owner, FR-14 still forbids removing their Membership and FR-3 still refuses their Account deletion — so **an Owner can be held in a Space indefinitely because somebody else never logged in**, with deleting the Space as their only unilateral exit. The asymmetry made it plainer: FR-40 emails you when you are assigned a single Task, and nothing emailed you when you were offered an entire Space.
 
 #### FR-42: Accept or decline an Ownership Offer
 
@@ -613,7 +618,7 @@ The API limits request rate per Token.
 
 ### 4.11 Notifications
 
-**Description:** Yello sends email only where an action outside the product is required or where someone needs to know something happened while they were not looking. Invitation delivery is load-bearing — without it, FR-11 has no entry point for an invitee who has never used Yello. Realizes UJ-2, UJ-3.
+**Description:** Yello sends email only where an action outside the product is required or where someone needs to know something happened while they were not looking. Invitation delivery is load-bearing — without it, FR-11 has no entry point for an invitee who has never used Yello. Ownership Offer delivery is load-bearing for a different reason: without it, FR-8's expiry closes on a recipient who was never told (FR-43). Realizes UJ-2, UJ-3, UJ-8.
 
 **Functional Requirements:**
 
@@ -636,6 +641,19 @@ An Account assigned to a Task is notified.
 - The notification names the Space, Project and Task, and nothing from any other Space.
 - An Account is not notified of its own action.
 - `[ASSUMPTION: assignment notification is email, and is per-event rather than digested. Frequency control is a v2 concern.]`
+
+#### FR-43: Deliver an Ownership Offer by email
+
+Issuing an Ownership Offer sends an email to the named recipient's Account. Realizes UJ-8.
+
+**Consequences (testable):**
+- The email names the Space, states that the recipient is being offered ownership of it, and identifies who offered it.
+- The email discloses nothing about the Space's contents, its other Memberships, or any other Space. Stated as a consequence rather than left to implementation because NFR-1 binds notifications, and an email already delivered cannot be recalled when the offer is later revoked or lapses (FR-8).
+- The email carries no means of accepting. Acceptance and declining happen inside the Space under FR-42; the email exists to bring the recipient back before the offer expires, and authorises nothing on its own.
+- Revoking the offer, declining it, or letting it lapse sends no further email. There is exactly one email per offer.
+- Because an Ownership Offer can only name an existing Membership (FR-8), the recipient's address is already known to the Space's Owner and Admins, so sending this email discloses no address that §6.1 protects.
+
+**Why this does not violate SM-C4.** §10 names notification volume as a counter-metric, so adding a notification needs saying out loud. SM-C4's concern is precisely stated: volume *"should not increase to drive SM-3 or SM-4"* — it guards against notifications added to chase adoption or Invitation conversion. This one drives no metric. It exists because without it a specific, reachable trap closes on an Owner who has done nothing wrong. One email per offer, against at most one pending offer per Space (FR-8), is the smallest possible volume that removes the trap.
 
 **Feature-specific NFRs:**
 - A record that a notification was sent is retained — Space, kind and timestamp, never message content or recipient address — so §10's SM-C4 is derivable. No product surface reads it.
@@ -787,7 +805,7 @@ The acting Role must be legible from the interface at all times, and capabilitie
 
 ### 9.1 In scope
 
-Everything in §4 — all forty-two functional requirements across eleven features: Accounts and Authentication, Spaces, Membership and Invitations, Access Control, Projects, Tasks, Status Configuration, Board and List Views, Collaborative Task Editing, Public API, Notifications. Nothing specified in §4 is deferred. What was considered and left out is below.
+Everything in §4 — all forty-three functional requirements across eleven features: Accounts and Authentication, Spaces, Membership and Invitations, Access Control, Projects, Tasks, Status Configuration, Board and List Views, Collaborative Task Editing, Public API, Notifications. Nothing specified in §4 is deferred. What was considered and left out is below.
 
 ### 9.2 Out of scope for MVP
 
@@ -853,7 +871,7 @@ Everything in §4 — all forty-two functional requirements across eleven featur
 
 1. §4.2 FR-4 — The auto-provisioned Space is named from the Account's display name and is immediately renameable.
 2. §4.2 FR-7 — Space deletion is immediate and irreversible; no trash, no restore window. †
-3. §4.2 FR-8 — An Ownership Offer expires after 7 days, mirroring FR-39, and is surfaced in Space settings rather than emailed.
+3. §4.2 FR-8 — An Ownership Offer expires after 7 days, mirroring FR-39. *The not-emailed half of this assumption was retired on 2026-08-20; the recipient is now emailed under FR-43.*
 4. §4.3 FR-13 — Admins cannot change each other's Role; only the Owner can promote to or demote from Admin.
 5. §4.5 FR-17 — Project deletion is immediate and irreversible. †
 6. §4.7 FR-24 — Default Space Status set is Todo / In Progress / Done.

@@ -54,6 +54,21 @@ Two cheaper fixes were rejected:
 
 Consent is now a single principle rather than two local rules: **neither Membership nor ownership ever arrives unrequested** (FR-11, FR-42).
 
+### Why the offer is emailed — options considered (2026-08-20)
+
+Making transfer consensual closed the original trap and opened a smaller one, found during the `bmad-ux` pass. Consent needs the recipient to *know*, and the offer had an expiry with no notification: the 7-day clock could run out on somebody who simply had not opened that Space. The lapse then returns the Owner to the same position FR-42 was written to rescue them from — held in a Space, unable to remove their own Membership (FR-14) or delete their Account (FR-3), with irreversible Space deletion as their only unilateral exit. The trap moved rather than closing.
+
+Four options were weighed. **Email the offer** was taken (FR-43).
+
+| Option | Why not taken |
+|---|---|
+| **Email the offer** — *taken* | — |
+| **Drop the 7-day expiry** so a silent offer can never lapse unnoticed | Removes the symptom and keeps the recipient uninformed. An offer pending indefinitely still leaves the Owner waiting on somebody who does not know they are being waited on, and it makes the pending state unbounded in time. |
+| **Accept it; warn the offering Owner in the interface** that the recipient will not be notified and the offer dies in seven days | Honest, and free. But it ships a known trap with a label on it, and makes the product's correctness depend on the Owner remembering to go and tell the recipient out of band. |
+| **Badge the Space in the Space switcher** so the recipient sees it without entering the Space | **Not legal under the architecture.** AD-24 permits the switcher to return Space identity only — no Membership state crosses a Space boundary through it — and AD-26 rules out a cross-Space offers inbox explicitly. This was the intuitive answer and it breaches NFR-1. |
+
+**Why the disclosure constraint on FR-43 is a stated consequence rather than an implementation note.** The offer email is the only genuinely new outbound artefact the ownership rework created, NFR-1 binds notifications as firmly as it binds reads, and delivery is irreversible: AD-5 lapses a pending offer when the recipient's Membership ends, but an email already sent cannot be recalled, so anything it carried outlives the Membership that justified carrying it. Left unconstrained, the helpful implementation — *"You've been offered ownership of Northwind Redesign (12 Projects, 340 Tasks, 8 Members)"* — leaks a Space's shape to an address, with nothing in the requirement telling anyone not to.
+
 ## 3. Status configuration — options considered
 
 Three models were put forward and a fourth was authored in response.
