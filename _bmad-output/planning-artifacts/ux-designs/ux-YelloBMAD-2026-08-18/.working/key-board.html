@@ -1,0 +1,195 @@
+<title>Yello — Key Screen: Board</title>
+<style>
+/* ============================================================
+   KEY SCREEN — Project Board (the primary working surface)
+   Governed by:
+     DESIGN.md  Colors (Dusk dark canonical) - Layout & Spacing
+                Elevation & Depth (no shadow) - Shapes - Components
+                (task-card, column, column-count, context-bar,
+                 role-chip, label-chip, presence-indicator, avatar,
+                 focus-ring, picker)
+     EXPERIENCE.md  Information Architecture (Project - Board)
+                Space Context and Role Legibility (absent-not-disabled)
+                Component Patterns (Task card, Column, Context bar,
+                 Role chip, Column count, Picker)
+                State Patterns (Board at scale)
+                Interaction Primitives (canonical Move control;
+                 pointer / touch / keyboard accelerators)
+                Key Flows UJ-4, UJ-9
+   Corrected tokens applied: border-hairline #6478A8 (was #33406B,
+   raised to clear WCAG 1.4.11 3:1); role-chip now carries a 1px border.
+   ============================================================ */
+:root{
+  --page:#0B1020; --col:#121A31; --card:#18213C; --border:#6478A8;
+  --text:#E6EAF5; --muted:#9AA6C4; --accent:#8B80F9; --accentOn:#14103A;
+  --focus:#ADA4FB; --presence:#38BDF8; --danger:#FB7185;
+  --role:#241F52; --roleOn:#C3BCFC;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:#14141a;font:14px/1.5 var(--sans)}
+header{padding:26px 24px 18px;border-bottom:1px solid #e4e4e9;background:#fbfbfd}
+header h1{margin:0 0 5px;font-size:19px;letter-spacing:-.01em}
+header p{margin:0;max-width:88ch;color:#55555f;font-size:13.5px}
+h2.s{margin:26px 24px 4px;font-size:15px;letter-spacing:-.005em}
+p.c{margin:0 24px 12px;font-size:13px;color:#6a6a74;max-width:88ch}
+.wrap{padding:0 24px 26px}
+.frame{border:1px solid #d9d9e0;border-radius:9px;overflow:hidden;box-shadow:0 2px 10px rgba(20,20,26,.07);max-width:1120px}
+.chr{display:flex;align-items:center;gap:6px;padding:7px 11px;background:#ececed;border-bottom:1px solid #d9d9e0}
+.chr i{width:9px;height:9px;border-radius:50%;background:#c9c9cf}
+.chr span{margin-left:8px;font:10.5px var(--mono);color:#7a7a84}
+
+/* ---- app ---- */
+.app{background:var(--page);color:var(--text);padding:12px;position:relative}
+.ctx{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--border);
+     border-radius:3px;padding:6px 10px;margin-bottom:9px}
+.ctx .nm{font:700 13.5px/1.3 var(--sans);letter-spacing:-.005em}
+.ctx .cv{color:var(--muted);font-size:10px}
+.ctx .pj{color:var(--muted);font:500 10px var(--mono)}
+.role{margin-left:auto;background:var(--role);color:var(--roleOn);border:1px solid var(--border);
+      border-radius:2px;font:700 9px/1 var(--mono);letter-spacing:.07em;padding:4px 7px}
+.cols{display:flex;gap:9px;align-items:flex-start}
+.cw{flex:1 1 0;min-width:0;background:var(--col);border:1px solid var(--border);border-radius:3px;padding:9px}
+.ch{display:flex;align-items:center;gap:7px;margin-bottom:6px;padding:0 2px}
+.ch .t{font:700 10.5px/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase}
+.ch .n{font:500 10px/1 var(--mono);color:var(--muted);background:var(--card);
+       border:1px solid var(--border);border-radius:9999px;padding:2px 6px}
+.ch .add{margin-left:auto;color:var(--muted);font-size:14px;line-height:1;cursor:default}
+.tk{background:var(--card);border:1px solid var(--border);border-radius:3px;padding:9px 10px;margin-bottom:6px}
+.tk:last-child{margin-bottom:0}
+.tk .ti{font:600 13px/1.35 var(--sans);letter-spacing:-.003em}
+.tk .mt{display:flex;align-items:center;gap:6px;margin-top:8px}
+.lb{font:500 10px/1 var(--mono);letter-spacing:.05em;text-transform:uppercase;border-radius:2px;
+    padding:3px 6px;background:#241F52;color:#C3BCFC}
+.lb.n{background:#222C48;color:#9AA6C4}
+.av{margin-left:auto;width:20px;height:20px;border-radius:3px;display:grid;place-items:center;
+    font:700 10px/1 var(--mono);background:#374363;color:#E6EAF5}
+.ps{display:inline-flex;align-items:center;gap:4px;color:var(--presence);font:500 10px/1 var(--mono)}
+.ps i{width:6px;height:6px;border-radius:50%;background:var(--presence)}
+.tk.fo{outline:2px solid var(--focus);outline-offset:2px}
+.tk.lift{box-shadow:0 6px 0 rgba(0,0,0,.6);transform:rotate(-1deg)}
+.dz{border:2px dashed var(--focus);border-radius:3px;height:30px;margin-bottom:6px;display:grid;
+    place-items:center;font:500 10px var(--mono);color:var(--focus);letter-spacing:.03em}
+
+/* picker / move menu */
+.menu{position:absolute;background:var(--card);border:1px solid var(--border);border-radius:3px;
+      padding:5px;width:200px;box-shadow:0 6px 0 rgba(0,0,0,.5)}
+.menu .hd{font:500 9px var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);padding:5px 7px 6px}
+.menu a{display:flex;align-items:center;gap:7px;padding:6px 7px;border-radius:2px;
+        font:600 13px var(--sans);color:var(--text);text-decoration:none}
+.menu a.on{background:var(--accent);color:var(--accentOn)}
+.menu a .k{margin-left:auto;font:500 9px var(--mono);opacity:.75}
+.menu .sep{height:1px;background:var(--border);margin:5px 3px}
+.note{margin:9px 0 0;font-size:12px;color:#6a6a74;max-width:88ch}
+.note b{color:#14141a}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin:10px 0 0;font-size:11.5px;color:#6a6a74}
+.legend span{display:inline-flex;align-items:center;gap:5px}
+.sw{width:11px;height:11px;border-radius:2px;display:inline-block}
+</style>
+
+<header>
+  <h1>Key screen — Project Board</h1>
+  <p>The primary working surface: a <b>Board</b> is a <em>view</em> of the Project &ldquo;Website Rebuild&rdquo; in the Space &ldquo;Northwind Redesign&rdquo;, with columns by Status. Rendered with the corrected <code>border-hairline #6478A8</code>, so this shows how much more gridded the accessibility fix actually made direction 4. The Role chip now carries a border too &mdash; without it the chip fill sat at 1.05:1 against the bar and read as loose text.</p>
+</header>
+
+<h2 class="s">1 &middot; At rest, acting as Admin</h2>
+<p class="c">Column counts are the <b>true total</b>, not the loaded count &mdash; at FR-28 scale the two differ, and a count that tracks virtualisation is a lie. One card is shown focused, which is the keyboard path NFR-9 mandates.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/northwind/p/website-rebuild</span></div>
+    <div class="app">
+      <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pj">Website Rebuild</span><span class="role">ADMIN</span></div>
+      <div class="cols">
+        <div class="cw"><div class="ch"><span class="t">Todo</span><span class="n">2</span><span class="add">+</span></div>
+          <div class="tk"><div class="ti">Wire up contact form validation</div><div class="mt"><span class="lb n">Build</span></div></div>
+          <div class="tk"><div class="ti">Audit alt text on gallery images</div><div class="mt"><span class="lb">Content</span><span class="av">NA</span></div></div>
+        </div>
+        <div class="cw"><div class="ch"><span class="t">In Progress</span><span class="n">2</span><span class="add">+</span></div>
+          <div class="tk fo"><div class="ti">Draft homepage acceptance criteria</div><div class="mt"><span class="lb">Content</span><span class="ps"><i></i>2 editing</span><span class="av">NA</span></div></div>
+          <div class="tk"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+        </div>
+        <div class="cw"><div class="ch"><span class="t">Done</span><span class="n">1</span><span class="add">+</span></div>
+          <div class="tk"><div class="ti">Migrate legacy blog posts</div><div class="mt"><span class="lb">Content</span><span class="av">RA</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="legend">
+    <span><span class="sw" style="background:#ADA4FB"></span>focus ring &mdash; 7.17:1</span>
+    <span><span class="sw" style="background:#38BDF8"></span>presence, always with its count</span>
+    <span><span class="sw" style="background:#6478A8"></span>border &mdash; 3.63:1 on card</span>
+    <span><span class="sw" style="background:#241F52;border:1px solid #6478A8"></span>role chip, now bordered</span>
+  </div>
+</div>
+
+<h2 class="s">2 &middot; The canonical Move control</h2>
+<p class="c">Opened from the Task&rsquo;s context menu &mdash; by pointer, by <code>Enter</code> on a focused Task, or by the context-menu key. <b>This is the conformance path, not a fallback.</b> A drag is path-based, so WCAG 2.5.1 (Level A) requires a single-pointer alternative; between 768&ndash;1279px on a touch tablet there is no keyboard and no pager, so drag was previously the only route. It also works in NVDA and JAWS browse mode, where the arrow-key grammar cannot reach.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/northwind/p/website-rebuild</span></div>
+    <div class="app" style="min-height:250px">
+      <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pj">Website Rebuild</span><span class="role">ADMIN</span></div>
+      <div class="cols">
+        <div class="cw"><div class="ch"><span class="t">Todo</span><span class="n">2</span><span class="add">+</span></div>
+          <div class="tk"><div class="ti">Wire up contact form validation</div><div class="mt"><span class="lb n">Build</span></div></div>
+          <div class="tk fo"><div class="ti">Audit alt text on gallery images</div><div class="mt"><span class="lb">Content</span><span class="av">NA</span></div></div>
+        </div>
+        <div class="cw"><div class="ch"><span class="t">In Progress</span><span class="n">2</span><span class="add">+</span></div>
+          <div class="tk"><div class="ti">Draft homepage acceptance criteria</div><div class="mt"><span class="lb">Content</span><span class="ps"><i></i>2 editing</span><span class="av">NA</span></div></div>
+          <div class="tk"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+        </div>
+        <div class="cw"><div class="ch"><span class="t">Done</span><span class="n">1</span><span class="add">+</span></div>
+          <div class="tk"><div class="ti">Migrate legacy blog posts</div><div class="mt"><span class="lb">Content</span><span class="av">RA</span></div></div>
+        </div>
+      </div>
+      <div class="menu" style="left:88px;top:150px">
+        <div class="hd">Move to Status</div>
+        <a href="#">Todo <span class="k">current</span></a>
+        <a class="on" href="#">In Progress <span class="k">&crarr;</span></a>
+        <a href="#">Done</a>
+        <div class="sep"></div>
+        <div class="hd">Position</div>
+        <a href="#">Top of column</a>
+        <a href="#">Bottom of column</a>
+      </div>
+    </div>
+  </div>
+  <p class="note"><b>No default is pre-selected where the choice is consequential.</b> Here the current Status is labelled rather than checked, so nothing is chosen on the user&rsquo;s behalf.</p>
+</div>
+
+<h2 class="s">3 &middot; Mid-drag, and the same Board as a Viewer</h2>
+<p class="c">Left: a lifted Task with its drop zone &mdash; the only place in the design where an object leaves the plane, using a hard offset rather than a blur, because a blurred shadow does not read on a tinted ground. Right: identical data, acting as a <b>Viewer</b>. Every create and edit affordance is <b>absent, not dimmed</b> &mdash; no <code>+</code> on any column, no Move control, no drag. UJ-4 requires Ravi to know his standing without attempting an action.</p>
+<div class="wrap" style="display:flex;gap:14px;flex-wrap:wrap">
+  <div class="frame" style="flex:1 1 480px">
+    <div class="chr"><i></i><i></i><i></i><span>dragging &mdash; Admin</span></div>
+    <div class="app">
+      <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="role">ADMIN</span></div>
+      <div class="cols">
+        <div class="cw"><div class="ch"><span class="t">In Progress</span><span class="n">2</span><span class="add">+</span></div>
+          <div class="dz">Drop here</div>
+          <div class="tk lift"><div class="ti">Audit alt text on gallery images</div><div class="mt"><span class="lb">Content</span><span class="av">NA</span></div></div>
+          <div class="tk"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+        </div>
+        <div class="cw"><div class="ch"><span class="t">Done</span><span class="n">1</span><span class="add">+</span></div>
+          <div class="tk"><div class="ti">Migrate legacy blog posts</div><div class="mt"><span class="lb">Content</span><span class="av">RA</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="frame" style="flex:1 1 480px">
+    <div class="chr"><i></i><i></i><i></i><span>same Board &mdash; Viewer</span></div>
+    <div class="app">
+      <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="role">VIEWER</span></div>
+      <div class="cols">
+        <div class="cw"><div class="ch"><span class="t">In Progress</span><span class="n">2</span></div>
+          <div class="tk"><div class="ti">Draft homepage acceptance criteria</div><div class="mt"><span class="lb">Content</span><span class="av">NA</span></div></div>
+          <div class="tk"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+        </div>
+        <div class="cw"><div class="ch"><span class="t">Done</span><span class="n">1</span></div>
+          <div class="tk"><div class="ti">Migrate legacy blog posts</div><div class="mt"><span class="lb">Content</span><span class="av">RA</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

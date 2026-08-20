@@ -1,0 +1,159 @@
+<title>Yello — Key Screen: Ownership Offer</title>
+<style>
+/* ============================================================
+   KEY SCREEN — Ownership Offer (the surface that unblocked IA)
+   Governed by:
+     DESIGN.md  Components (offer-indicator, context-bar, role-chip,
+                dialog, button-primary, text-link) - Colors (accent is
+                the ONLY chrome accent, because the indicator is the
+                only chrome element that is a proposition)
+     EXPERIENCE.md  Information Architecture (Space context bar)
+                Component Patterns (Offer indicator, Ownership panel)
+                State Patterns (Offer pending recipient / Owner,
+                 Offer no longer pending)
+                Voice and Tone (terse default, OVERRIDDEN here -
+                 accepting gets full explanation)
+                Key Flow UJ-8
+   Constraint boundary this surface had to satisfy:
+     FR-8   an offer may name a Membership of ANY Role
+     AD-26  acceptance authorised by ROW IDENTITY, not Role
+     AD-26  read inside the Space's own context; a cross-Space
+            offers inbox is explicitly ruled out
+     AD-24  only 2 surfaces are Account-scoped; badging the Space
+            switcher would breach it
+     PRD 7  Space settings is Owner and Admin only - so a Member
+            named in an offer had NOWHERE to see it
+   ============================================================ */
+:root{
+  --page:#0B1020; --col:#121A31; --card:#18213C; --border:#6478A8;
+  --text:#E6EAF5; --muted:#9AA6C4; --accent:#8B80F9; --accentOn:#14103A;
+  --focus:#ADA4FB; --danger:#FB7185; --role:#241F52; --roleOn:#C3BCFC;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:#14141a;font:14px/1.5 var(--sans)}
+header{padding:26px 24px 18px;border-bottom:1px solid #e4e4e9;background:#fbfbfd}
+header h1{margin:0 0 5px;font-size:19px;letter-spacing:-.01em}
+header p{margin:0 0 6px;max-width:90ch;color:#55555f;font-size:13.5px}
+h2.s{margin:26px 24px 4px;font-size:15px}
+p.c{margin:0 24px 12px;font-size:13px;color:#6a6a74;max-width:90ch}
+.wrap{padding:0 24px 26px}
+.frame{border:1px solid #d9d9e0;border-radius:9px;overflow:hidden;box-shadow:0 2px 10px rgba(20,20,26,.07);max-width:900px}
+.chr{display:flex;align-items:center;gap:6px;padding:7px 11px;background:#ececed;border-bottom:1px solid #d9d9e0}
+.chr i{width:9px;height:9px;border-radius:50%;background:#c9c9cf}
+.chr span{margin-left:8px;font:10.5px var(--mono);color:#7a7a84}
+.app{background:var(--page);color:var(--text);padding:12px;position:relative;min-height:120px}
+.ctx{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--border);
+     border-radius:3px;padding:6px 10px}
+.ctx .nm{font:700 13.5px/1.3 var(--sans);letter-spacing:-.005em}
+.ctx .cv{color:var(--muted);font-size:10px}
+.ctx .pj{color:var(--muted);font:500 10px var(--mono)}
+.offer{margin-left:auto;background:var(--accent);color:var(--accentOn);border-radius:2px;
+       font:700 9px/1 var(--mono);letter-spacing:.07em;padding:4px 7px}
+.role{background:var(--role);color:var(--roleOn);border:1px solid var(--border);border-radius:2px;
+      font:700 9px/1 var(--mono);letter-spacing:.07em;padding:4px 7px}
+.rt{margin-left:auto;display:flex;gap:6px;align-items:center}
+.cols{display:flex;gap:9px;margin-top:9px}
+.cw{flex:1;background:var(--col);border:1px solid var(--border);border-radius:3px;padding:9px}
+.ch{font:700 10.5px/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px}
+.tk{background:var(--card);border:1px solid var(--border);border-radius:3px;padding:9px 10px;margin-bottom:6px}
+.tk .ti{font:600 13px/1.35 var(--sans)}
+.scrim{position:absolute;inset:0;background:rgba(4,7,18,.66)}
+.dlg{position:absolute;left:50%;top:22px;transform:translateX(-50%);width:430px;background:var(--card);
+     border:1px solid var(--border);border-radius:6px;padding:18px}
+.dlg h3{margin:0 0 10px;font:650 16px/1.35 var(--sans);letter-spacing:-.008em}
+.dlg p{margin:0 0 10px;font:400 14px/1.55 var(--sans);color:var(--text)}
+.dlg p.m{color:var(--muted);font-size:13px}
+.dlg ul{margin:0 0 12px;padding-left:17px;font:400 13.5px/1.6 var(--sans)}
+.dlg li{margin:3px 0}
+.exp{font:500 10px var(--mono);color:var(--muted);letter-spacing:.04em;margin:0 0 14px}
+.acts{display:flex;gap:8px;align-items:center}
+.btn{border-radius:2px;padding:8px 14px;font:600 13px/1 var(--sans);border:1px solid transparent}
+.btn.p{background:var(--accent);color:var(--accentOn)}
+.btn.s{background:transparent;color:var(--text);border-color:var(--border)}
+.lnk{margin-left:auto;color:var(--accent);text-decoration:underline;font-size:13px}
+.stale{border-color:var(--border)}
+.stale h3{color:var(--text)}
+.note{margin:10px 0 0;font-size:12.5px;color:#6a6a74;max-width:90ch}
+.note b{color:#14141a}
+.warn{margin:10px 0 0;padding:10px 12px;border-left:3px solid #FB7185;background:#fff5f6;
+       font-size:12.5px;color:#5a2b31;max-width:90ch;border-radius:0 4px 4px 0}
+</style>
+
+<header>
+  <h1>Key screen — Ownership Offer</h1>
+  <p>The surface with no precedent in any product, and the decision that unblocked information architecture. A Member or Viewer named in an Ownership Offer previously had <b>nowhere at all</b> to see it: <code>FR-8</code> lets any Role be named, <code>AD-26</code> authorises acceptance by <em>row identity rather than Role</em>, and PRD &sect;7 scopes Space settings to Owner and Admin.</p>
+  <p>The obvious answer &mdash; badge the Space in the switcher so Nadia sees it without going in &mdash; is <b>illegal</b>. <code>AD-24</code> permits that surface to return Space identity only, and <code>AD-26</code> rules out an offers inbox explicitly. So the indicator lives on the <b>Space context bar</b>: already present for every Role, already Space-scoped, and already the thing that answers &ldquo;what is my standing here?&rdquo;</p>
+</header>
+
+<h2 class="s">1 &middot; The indicator &mdash; Nadia, acting as a Member</h2>
+<p class="c">Accent appears in chrome exactly once in the whole product, and this is it &mdash; because it is the only chrome element that is a <em>proposition</em> rather than a statement. Note she is a <b>MEMBER</b>: the affordance reaches her because acceptance is authorised by row identity, not by the FR-16 Role matrix.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/northwind</span></div>
+    <div class="app">
+      <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pj">Website Rebuild</span>
+        <span class="rt"><span class="offer">OWNERSHIP OFFERED</span><span class="role">MEMBER</span></span></div>
+      <div class="cols">
+        <div class="cw"><div class="ch">In Progress</div>
+          <div class="tk"><div class="ti">Draft homepage acceptance criteria</div></div>
+        </div>
+        <div class="cw"><div class="ch">Done</div>
+          <div class="tk"><div class="ti">Migrate legacy blog posts</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note"><b>It is an indicator only.</b> The decision opens in a dialog with room to explain, because what she is agreeing to is genuinely consequential and cannot be conveyed in a chrome-sized affordance.</p>
+</div>
+
+<h2 class="s">2 &middot; The decision</h2>
+<p class="c">This is one of only two places the terse voice is <b>deliberately overridden</b>. FR-42 binds the new Owner immediately &mdash; her Membership cannot be removed while she holds ownership, and her Account deletion is refused until she transfers the Space onward or deletes it. Nobody should agree to that from a one-line dialog.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/northwind &mdash; ownership offer</span></div>
+    <div class="app" style="min-height:400px">
+      <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span>
+        <span class="rt"><span class="offer">OWNERSHIP OFFERED</span><span class="role">MEMBER</span></span></div>
+      <div class="scrim"></div>
+      <div class="dlg">
+        <h3>Ravi Anand has offered you ownership of Northwind Redesign.</h3>
+        <p>Accepting makes you the Owner. Ravi becomes an Admin and keeps his access.</p>
+        <p class="m">As Owner you would take on three things that cannot be undone by leaving:</p>
+        <ul>
+          <li>You could not remove your own Membership while you hold ownership.</li>
+          <li>You could not delete your Yello Account until you pass ownership on, or delete this Space.</li>
+          <li>Passing it on needs someone else to accept. Nobody can be made an Owner without agreeing.</li>
+        </ul>
+        <p class="exp">EXPIRES IN 6 DAYS &middot; 19 AUG 2026, 11:41 UTC</p>
+        <div class="acts">
+          <button class="btn p">Accept ownership</button>
+          <button class="btn s">Decline</button>
+          <a class="lnk" href="#">What Owners can do</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note"><b>Accept and Decline are both explicit and neither is the default</b> &mdash; there is no pre-focused primary, because a mis-hit <code>Enter</code> should not transfer a Space. The link is underlined, not accent-coloured alone: accent against body text is only <b>2.66:1</b>, below what WCAG 1.4.1 requires when colour is the sole cue.</p>
+  <div class="warn"><b>Expiry is only visible here because of an upstream change.</b> FR-8 originally surfaced the offer in-Space and explicitly <em>not</em> by email, with a 7-day expiry evaluated on read. Composed, Nadia was never told and had to happen to walk in within a week &mdash; and UJ-8&rsquo;s own edge case then traps Ravi as Owner indefinitely. Being assigned a Task emails you (FR-40); being offered an entire Space did not. Emailing the offer is a pending PRD amendment.</div>
+</div>
+
+<h2 class="s">3 &middot; No longer open</h2>
+<p class="c">A designed state, not an error toast &mdash; she may have had the dialog open for a while, and the offer may have been revoked, declined elsewhere, lapsed, or lost to a concurrent offer hitting the filtered unique index.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/northwind &mdash; 409</span></div>
+    <div class="app" style="min-height:190px">
+      <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span>
+        <span class="rt"><span class="role">MEMBER</span></span></div>
+      <div class="scrim"></div>
+      <div class="dlg stale" style="width:390px">
+        <h3>This offer is no longer open.</h3>
+        <p class="m">Nothing has changed about your access to this Space.</p>
+        <div class="acts"><button class="btn s">Close</button></div>
+      </div>
+    </div>
+  </div>
+  <p class="note">The indicator has already gone from the context bar &mdash; it is present only while the offer is <code>Pending</code>. Note what the copy does <b>not</b> say: not which of the five reasons applied, and not who acted. <b>And the status code is Role-dependent:</b> 409 is correct for Nadia <em>because she holds a Membership</em>, so AD-3&rsquo;s boundary rule does not apply to her. A caller with no Membership must get 404 on the same route &mdash; 409 would confirm that the Space, and an offer inside it, exist.</p>
+</div>

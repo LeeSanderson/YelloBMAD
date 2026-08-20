@@ -1,0 +1,209 @@
+<title>Yello — Key Screen: Space Settings</title>
+<style>
+/* ============================================================
+   KEY SCREEN — Space settings
+   Governed by:
+     DESIGN.md  Components (role-chip, picker, dialog,
+                destructive-confirm, button-danger, text-link)
+     EXPERIENCE.md  Information Architecture (Space settings)
+                Component Patterns (Membership list, Invitation list,
+                 Ownership panel, Picker/Role, Destructive confirm)
+                State Patterns (Delete Membership, Delete Space,
+                 Ownership Offer pending as Owner, Scale bound,
+                 Role drops below a surface's requirement)
+                Isolation and Refusal -> Email addresses
+                Key Flows UJ-2, UJ-6, UJ-8
+   Three rules this screen is the only place to see:
+     1. FR-13 Role narrowing - an Admin may offer Member<->Viewer
+        only, and the controls they lack are ABSENT not dimmed.
+     2. Section 6.1 - email addresses are visible HERE and nowhere
+        else in the entire product.
+     3. FR-14 - the Owner's row carries no remove control for
+        anyone, including the Owner.
+   ============================================================ */
+:root{
+  --page:#0B1020; --col:#121A31; --card:#18213C; --border:#6478A8;
+  --text:#E6EAF5; --muted:#9AA6C4; --accent:#8B80F9; --accentOn:#14103A;
+  --focus:#ADA4FB; --danger:#FB7185; --dangerOn:#3B0A15;
+  --role:#241F52; --roleOn:#C3BCFC;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:#14141a;font:14px/1.5 var(--sans)}
+header{padding:26px 24px 18px;border-bottom:1px solid #e4e4e9;background:#fbfbfd}
+header h1{margin:0 0 5px;font-size:19px;letter-spacing:-.01em}
+header p{margin:0 0 7px;max-width:92ch;color:#55555f;font-size:13.5px}
+h2.s{margin:26px 24px 4px;font-size:15px}
+p.c{margin:0 24px 12px;font-size:13px;color:#6a6a74;max-width:92ch}
+.wrap{padding:0 24px 24px}
+.row2{display:flex;gap:14px;flex-wrap:wrap}
+.frame{border:1px solid #d9d9e0;border-radius:9px;overflow:hidden;box-shadow:0 2px 10px rgba(20,20,26,.07);max-width:860px}
+.chr{display:flex;align-items:center;gap:6px;padding:7px 11px;background:#ececed;border-bottom:1px solid #d9d9e0}
+.chr i{width:9px;height:9px;border-radius:50%;background:#c9c9cf}
+.chr span{margin-left:8px;font:10.5px var(--mono);color:#7a7a84}
+.app{background:var(--page);color:var(--text);padding:12px;position:relative}
+.ctx{display:flex;align-items:center;gap:9px;background:var(--card);border:1.5px solid var(--border);
+     border-radius:3px;padding:6px 10px;margin-bottom:9px}
+.ctx .nm{font:700 .875rem/1.5 var(--sans);letter-spacing:-.005em}
+.ctx .cv{color:var(--muted);font-size:10px}
+.ctx .pj{color:var(--muted);font:500 .6875rem/1.5 var(--mono)}
+.role{margin-left:auto;background:var(--role);color:var(--roleOn);border:1.5px solid var(--border);
+      border-radius:2px;font:700 .6875rem/1.5 var(--mono);letter-spacing:.07em;padding:3px 7px}
+.panel{background:var(--col);border:1.5px solid var(--border);border-radius:3px;padding:14px;margin-bottom:9px}
+.ph{font:700 .6875rem/1.5 var(--sans);letter-spacing:.12em;text-transform:uppercase;margin:0 0 4px;display:flex;align-items:center;gap:8px}
+.ph .cnt{font:500 .6875rem/1.5 var(--mono);color:var(--muted);background:var(--card);
+         border:1.5px solid var(--border);border-radius:9999px;padding:1px 7px;letter-spacing:0;text-transform:none}
+.psub{font:400 .875rem/1.6 var(--sans);color:var(--muted);margin:0 0 12px}
+.m{display:flex;align-items:center;gap:10px;background:var(--card);border:1.5px solid var(--border);
+   border-radius:3px;padding:8px 10px;margin-bottom:6px}
+.av{width:1.25rem;height:1.25rem;border-radius:3px;display:grid;place-items:center;
+    font:700 .6875rem/1 var(--mono);background:#374363;color:#E6EAF5;flex:0 0 auto}
+.who{min-width:0}
+.who .n1{font:600 .8125rem/1.4 var(--sans)}
+.who .e1{font:500 .6875rem/1.4 var(--mono);color:var(--muted)}
+.sel{margin-left:auto;background:var(--col);border:1.5px solid var(--border);border-radius:3px;
+     padding:4px 8px;font:400 .8125rem var(--sans);color:var(--text);min-height:24px;
+     display:inline-flex;align-items:center;gap:7px}
+.sel .cv2{color:var(--muted);font-size:9px}
+.fixed{margin-left:auto;background:var(--role);color:var(--roleOn);border:1.5px solid var(--border);
+       border-radius:2px;font:700 .6875rem/1.5 var(--mono);letter-spacing:.07em;padding:3px 7px}
+.rm{color:var(--muted);font-size:13px;flex:0 0 auto}
+.live{font:500 .6875rem/1.5 var(--mono);color:#38BDF8;letter-spacing:.04em}
+.inv{display:flex;align-items:center;gap:10px;background:var(--card);border:1.5px solid var(--border);
+     border-radius:3px;padding:8px 10px;margin-bottom:6px;font-size:.8125rem}
+.inv .e2{font:500 .6875rem/1.4 var(--mono);color:var(--text)}
+.inv .st{margin-left:auto;font:500 .6875rem/1.5 var(--mono);color:var(--muted);letter-spacing:.04em}
+.lnk{color:var(--accent);text-decoration:underline;font:600 .8125rem var(--sans)}
+.own{display:flex;align-items:center;gap:10px;font-size:.8125rem}
+.pend{background:var(--card);border:1.5px solid var(--accent);border-radius:3px;padding:9px 11px;
+      display:flex;align-items:center;gap:10px;font-size:.8125rem}
+.pend .ex{margin-left:auto;font:500 .6875rem/1.5 var(--mono);color:var(--muted);letter-spacing:.04em}
+.dz{border-top:1.5px solid var(--border);margin-top:12px;padding-top:12px}
+.btn{border-radius:2px;padding:.5rem .8125rem;font:600 .8125rem/1 var(--sans);border:1.5px solid transparent;min-height:24px}
+.btn.d{background:var(--danger);color:var(--dangerOn)}
+.btn.s{background:transparent;color:var(--text);border-color:var(--border)}
+.btn.p{background:var(--accent);color:var(--accentOn)}
+.btn[disabled]{opacity:.45}
+.scrim{position:absolute;inset:0;background:rgba(4,7,18,.68)}
+.dlg{position:absolute;left:50%;top:20px;transform:translateX(-50%);width:430px;background:var(--card);
+     border:2px solid var(--danger);border-radius:6px;padding:18px}
+.dlg h3{margin:0 0 10px;font:650 1rem/1.5 var(--sans);letter-spacing:-.008em}
+.dlg p{margin:0 0 10px;font:400 .875rem/1.6 var(--sans)}
+.dlg p.mu{color:var(--muted)}
+.dlg ul{margin:0 0 12px;padding-left:17px;font:400 .8125rem/1.6 var(--sans);color:var(--muted)}
+.inp{width:100%;background:var(--page);border:1.5px solid var(--border);border-radius:3px;
+     padding:7px 9px;font:400 .875rem var(--sans);color:var(--text);margin:0 0 12px}
+.lab{display:block;font:500 .6875rem/1.5 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+     color:var(--muted);margin:0 0 5px}
+.acts{display:flex;gap:8px;align-items:center}
+.note{margin:10px 24px 0;font-size:12.5px;color:#6a6a74;max-width:92ch}
+.note b{color:#14141a}
+.tag{display:inline-block;font:600 10px var(--mono);letter-spacing:.06em;background:#eef0f4;
+     border:1px solid #d9dde5;border-radius:3px;padding:2px 6px;color:#4a4e57;margin-left:6px}
+</style>
+
+<header>
+  <h1>Key screen — Space settings</h1>
+  <p>Three rules live here and nowhere else in the product, which is why this surface earned a mock. <b>Email addresses appear on this screen only</b> — §6.1 confines them to Owners and Admins of a Space the Account is a Member of, and every other surface identifies a Membership by display name and initials. <b>FR-13's Role narrowing is visible as absence</b>, not as disabled controls. And <b>the Owner's row carries no remove control for anyone, including the Owner</b> (FR-14).</p>
+</header>
+
+<h2 class="s">1 &middot; As the Owner</h2>
+<p class="c">Ravi's own view. Every Role is editable, the Ownership panel is present, and deletion is available &mdash; the only Role that can reach it.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/northwind/settings</span></div>
+    <div class="app">
+      <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pj">Space settings</span><span class="role">OWNER</span></div>
+
+      <div class="panel">
+        <p class="ph">Members <span class="cnt">4 of 100</span></p>
+        <p class="psub">Email addresses are visible here because you're an Owner. They appear nowhere else in Yello.</p>
+        <div class="m"><span class="av">RA</span><span class="who"><span class="n1">Ravi Anand</span><br><span class="e1">ravi@anand.dev</span></span><span class="fixed">OWNER</span></div>
+        <div class="m"><span class="av">NA</span><span class="who"><span class="n1">Nadia Ansari</span><br><span class="e1">nadia@studio.co</span></span><span class="sel">Member <span class="cv2">&#9662;</span></span><span class="rm">&times;</span></div>
+        <div class="m"><span class="av">BR</span><span class="who"><span class="n1">Beatriz Rocha</span><br><span class="e1">b.rocha@northwind.com</span></span><span class="live">EDITING NOW</span><span class="sel">Viewer <span class="cv2">&#9662;</span></span><span class="rm">&times;</span></div>
+        <div class="m"><span class="av">TO</span><span class="who"><span class="n1">Tomás Oliveira</span><br><span class="e1">tomas@oliveira.studio</span></span><span class="sel">Admin <span class="cv2">&#9662;</span></span><span class="rm">&times;</span></div>
+      </div>
+
+      <div class="panel">
+        <p class="ph">Invitations <span class="cnt">2</span></p>
+        <div class="inv"><span class="e2">design@northwind.com</span><span class="st">VIEWER &middot; SENT BY RAVI &middot; 3 DAYS AGO</span><a class="lnk" href="#">Revoke</a></div>
+        <div class="inv"><span class="e2">pm@studio.co</span><span class="st">MEMBER &middot; SENT BY TOM&Aacute;S &middot; 6 DAYS AGO</span><a class="lnk" href="#">Revoke</a></div>
+        <a class="lnk" href="#" style="display:inline-block;margin-top:4px">Invite by email</a>
+      </div>
+
+      <div class="panel">
+        <p class="ph">Ownership</p>
+        <div class="pend"><span>Ownership offered to <b>Nadia Ansari</b>. Waiting for her to accept.</span><span class="ex">EXPIRES IN 6 DAYS</span><a class="lnk" href="#">Revoke</a></div>
+        <div class="dz">
+          <p class="ph">Space name</p>
+          <input class="inp" value="Northwind Redesign" autocomplete="off" style="margin-bottom:0">
+        </div>
+        <div class="dz">
+          <button class="btn d">Delete this Space</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note"><b>Two details that are requirements.</b> Beatriz's row shows <span class="live" style="font-size:11px">EDITING NOW</span> &mdash; removing her interrupts a live session mid-sentence (UJ-6), and the remover should know that before they click. And the Space name field carries <code>autocomplete="off"</code>: form autofill is origin-scoped and Account-agnostic, so without it the next Account on this browser profile is offered another Account's Space name. <span class="tag">FR-14 &middot; &sect;6.1</span></p>
+  <p class="note"><b>Ravi has no remove control on his own row.</b> The Owner's Membership cannot be removed by anyone, including the Owner, while it holds ownership &mdash; he leaves by having an offer accepted, or by deleting the Space. The pending offer above is not itself an exit.</p>
+</div>
+
+<h2 class="s">2 &middot; The same screen as an Admin</h2>
+<p class="c">Tomás's view of identical data. This is what &ldquo;absent, not disabled&rdquo; looks like on a settings surface rather than on the Board.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/northwind/settings &mdash; as Admin</span></div>
+    <div class="app">
+      <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pj">Space settings</span><span class="role">ADMIN</span></div>
+      <div class="panel">
+        <p class="ph">Members <span class="cnt">4 of 100</span></p>
+        <div class="m"><span class="av">RA</span><span class="who"><span class="n1">Ravi Anand</span><br><span class="e1">ravi@anand.dev</span></span><span class="fixed">OWNER</span></div>
+        <div class="m"><span class="av">NA</span><span class="who"><span class="n1">Nadia Ansari</span><br><span class="e1">nadia@studio.co</span></span><span class="sel">Member <span class="cv2">&#9662;</span></span><span class="rm">&times;</span></div>
+        <div class="m"><span class="av">BR</span><span class="who"><span class="n1">Beatriz Rocha</span><br><span class="e1">b.rocha@northwind.com</span></span><span class="live">EDITING NOW</span><span class="sel">Viewer <span class="cv2">&#9662;</span></span><span class="rm">&times;</span></div>
+        <div class="m"><span class="av">TO</span><span class="who"><span class="n1">Tomás Oliveira</span><br><span class="e1">tomas@oliveira.studio</span></span><span class="fixed">ADMIN &middot; YOU</span></div>
+      </div>
+      <div class="panel">
+        <p class="ph">Invitations <span class="cnt">2</span></p>
+        <div class="inv"><span class="e2">design@northwind.com</span><span class="st">VIEWER &middot; SENT BY RAVI &middot; 3 DAYS AGO</span><a class="lnk" href="#">Revoke</a></div>
+        <div class="inv"><span class="e2">pm@studio.co</span><span class="st">MEMBER &middot; SENT BY YOU &middot; 6 DAYS AGO</span><a class="lnk" href="#">Revoke</a></div>
+        <a class="lnk" href="#" style="display:inline-block;margin-top:4px">Invite by email</a>
+      </div>
+      <div class="panel">
+        <p class="ph">Space name</p>
+        <input class="inp" value="Northwind Redesign" autocomplete="off" style="margin-bottom:0">
+      </div>
+    </div>
+  </div>
+  <p class="note"><b>Four differences, every one an absence.</b> The Owner's row has no Role picker. Tomás's own row shows his Role as a fact, not a control &mdash; Admins cannot modify each other. There is <b>no Ownership panel and no delete button at all</b>, rather than greyed-out ones. And the Role pickers he does have offer Member and Viewer only. Nothing on this screen tells him what he cannot do; the context bar's accessible name does that on arrival.</p>
+  <p class="note">He can still revoke the Invitation Ravi issued &mdash; FR-12 makes any Owner or Admin able to revoke any pending Invitation, including one whose issuer has since been demoted, removed or deleted.</p>
+</div>
+
+<h2 class="s">3 &middot; Deleting the Space</h2>
+<p class="c">The most destructive operation in the product and the only one with no undo. §6.2 requires that this is stated at the point of the action.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/northwind/settings &mdash; delete</span></div>
+    <div class="app" style="min-height:330px">
+      <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pj">Space settings</span><span class="role">OWNER</span></div>
+      <div class="scrim"></div>
+      <div class="dlg">
+        <h3>Delete Northwind Redesign?</h3>
+        <p>This cannot be undone.</p>
+        <p class="mu">You will destroy:</p>
+        <ul>
+          <li>5 Projects and 1,284 Tasks</li>
+          <li>3 other people's access to all of it</li>
+          <li>2 pending invitations and every API Token for this Space</li>
+        </ul>
+        <label class="lab" for="cf">Type the Space name to confirm</label>
+        <input class="inp" id="cf" placeholder="Northwind Redesign" autocomplete="off">
+        <div class="acts">
+          <button class="btn d" disabled>Delete this Space</button>
+          <button class="btn s">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note"><b>Friction scaled to blast radius</b>, which is the mitigation the UX owes for keeping deletion irreversible. It names the object, states irreversibility in four words, counts what goes, and says plainly that <em>other people</em> lose access &mdash; the consequence an Owner is least likely to have in mind. The copy carries the destructiveness; the danger border only reinforces it, because accent and danger sit 1.19:1 apart and converge under deuteranopia.</p>
+</div>

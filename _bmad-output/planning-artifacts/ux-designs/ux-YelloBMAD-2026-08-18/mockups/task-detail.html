@@ -1,0 +1,160 @@
+<title>Yello — Key Screen: Task Detail and Access Ended</title>
+<style>
+/* ============================================================
+   KEY SCREEN — Task detail, Presence, and the FR-34 interruption
+   Governed by:
+     DESIGN.md  Components (task-detail, description-editor,
+                description-editor-inert, presence-indicator, avatar,
+                picker, label-chip, role-chip) - Colors (danger)
+     EXPERIENCE.md  Component Patterns (Task detail, Description
+                editor, Presence indicator, Picker)
+                State Patterns (Access ended mid-edit, Demoted to
+                 Viewer mid-edit, Disconnected mid-edit,
+                 Removed while disconnected)
+                Accessibility Floor (focus destinations for remote
+                 events; live-region politeness split and throttling)
+                Key Flows UJ-5, UJ-6
+   FR-34 is the requirement the PRD says the product should be
+   judged on: "If everything else works and this does not, the
+   isolation model is decorative."
+   ============================================================ */
+:root{
+  --page:#0B1020; --col:#121A31; --card:#18213C; --border:#6478A8;
+  --text:#E6EAF5; --muted:#9AA6C4; --accent:#8B80F9; --accentOn:#14103A;
+  --focus:#ADA4FB; --presence:#38BDF8; --danger:#FB7185;
+  --role:#241F52; --roleOn:#C3BCFC;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:#14141a;font:14px/1.5 var(--sans)}
+header{padding:26px 24px 18px;border-bottom:1px solid #e4e4e9;background:#fbfbfd}
+header h1{margin:0 0 5px;font-size:19px;letter-spacing:-.01em}
+header p{margin:0;max-width:90ch;color:#55555f;font-size:13.5px}
+h2.s{margin:26px 24px 4px;font-size:15px}
+p.c{margin:0 24px 12px;font-size:13px;color:#6a6a74;max-width:90ch}
+.wrap{padding:0 24px 26px;display:flex;gap:14px;flex-wrap:wrap}
+.frame{border:1px solid #d9d9e0;border-radius:9px;overflow:hidden;box-shadow:0 2px 10px rgba(20,20,26,.07);flex:1 1 430px;min-width:390px}
+.chr{display:flex;align-items:center;gap:6px;padding:7px 11px;background:#ececed;border-bottom:1px solid #d9d9e0}
+.chr i{width:9px;height:9px;border-radius:50%;background:#c9c9cf}
+.chr span{margin-left:8px;font:10.5px var(--mono);color:#7a7a84}
+.app{background:var(--page);color:var(--text);padding:12px}
+.panel{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:18px}
+.pt{font:650 16px/1.35 var(--sans);letter-spacing:-.008em;margin:0 0 12px}
+.meta{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.pill{background:var(--col);border:1px solid var(--border);border-radius:2px;padding:4px 7px;
+      font:500 10px/1 var(--mono);letter-spacing:.05em;color:var(--muted)}
+.pill b{color:var(--text);font-weight:700}
+.lb{background:#241F52;color:#C3BCFC;border-radius:2px;padding:4px 7px;font:500 10px/1 var(--mono);
+    letter-spacing:.05em;text-transform:uppercase}
+.pres{display:flex;align-items:center;gap:6px;margin-bottom:12px}
+.pres .lab{color:var(--presence);font:500 10px/1 var(--mono);display:inline-flex;align-items:center;gap:4px}
+.pres .lab i{width:6px;height:6px;border-radius:50%;background:var(--presence)}
+.av{width:20px;height:20px;border-radius:3px;display:grid;place-items:center;
+    font:700 10px/1 var(--mono);background:#374363;color:#E6EAF5}
+.av.p{background:var(--presence);color:#062338}
+.ed{background:var(--page);border:1px solid var(--border);border-radius:3px;padding:9px;
+    font:400 14px/1.55 var(--sans);min-height:104px}
+.ed .car{display:inline-block;width:1.5px;height:15px;background:var(--presence);vertical-align:-2px;margin:0 1px}
+.ed .mine{display:inline-block;width:1.5px;height:15px;background:var(--text);vertical-align:-2px;margin:0 1px}
+.ed.inert{border-color:var(--danger);color:var(--muted)}
+.ban{border-radius:3px;padding:9px 11px;margin-bottom:12px;font:600 13px/1.45 var(--sans);
+     display:flex;gap:9px;align-items:flex-start}
+.ban.d{background:#2B1220;border:1px solid var(--danger);color:#FFD9DF;outline:2px solid var(--focus);outline-offset:2px}
+.ban.n{background:var(--col);border:1px solid var(--border);color:var(--text)}
+.ban .sub{display:block;font-weight:400;color:var(--muted);font-size:12.5px;margin-top:3px}
+.lr{margin-top:12px;font:500 9.5px var(--mono);letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+.note{margin:10px 24px 0;font-size:12.5px;color:#6a6a74;max-width:90ch}
+.note b{color:#14141a}
+.tag{display:inline-block;font:600 10px var(--mono);letter-spacing:.06em;background:#eef0f4;
+     border:1px solid #d9dde5;border-radius:3px;padding:2px 6px;color:#4a4e57;margin-left:6px}
+</style>
+
+<header>
+  <h1>Key screen — Task detail, and access ending mid-sentence</h1>
+  <p>Left is UJ-5: two people writing one description, Presence visible, and — per FR-31 — <b>no merge dialog, no lock, no stale-content warning, ever</b>. Right is UJ-6 and FR-34, which the PRD names as the criterion the product should be judged on: <em>&ldquo;If everything else works and this does not, the isolation model is decorative.&rdquo;</em></p>
+</header>
+
+<h2 class="s">1 &middot; Concurrent editing, and the interruption</h2>
+<p class="c">There is no save button anywhere in Yello. AD-11 has the client editing a local replica, so keystrokes render within 16ms without waiting on the network and the server admits or rejects afterwards.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>Nadia &mdash; editing, Ravi present</span></div>
+    <div class="app">
+      <div class="panel">
+        <p class="pt">Draft homepage acceptance criteria</p>
+        <div class="meta">
+          <span class="pill">STATUS <b>IN PROGRESS</b></span>
+          <span class="pill">DUE <b>22 AUG</b></span>
+          <span class="lb">Content</span>
+        </div>
+        <div class="pres">
+          <span class="lab"><i></i>2 editing</span>
+          <span class="av p">NA</span><span class="av">RA</span>
+        </div>
+        <div class="ed">Hero must state the offer in one sentence.<span class="mine"></span> Nav collapses below 768px and the contact form validates inline<span class="car"></span></div>
+        <div class="lr">aria-live=polite &middot; &ldquo;2 people editing&rdquo;</div>
+      </div>
+    </div>
+  </div>
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>Beatriz &mdash; removed mid-sentence</span></div>
+    <div class="app">
+      <div class="panel">
+        <div class="ban d">
+          <span>Access ended.<span class="sub">The text below was not saved and did not reach this Space.</span></span>
+        </div>
+        <p class="pt">Draft homepage acceptance criteria</p>
+        <div class="ed inert">Hero must state the offer in one sentence. Nav collapses below 768px and the contact form validates inline &mdash; also worth checking the pricing table on mobile before we</div>
+        <div class="lr">aria-live=assertive &middot; focus moved to banner</div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="note"><b>Three things in that right-hand panel are deliberate, and two of them came out of the review.</b> First, her unsent text <b>stays visible and selectable</b> — she typed it, it is already on her screen, so showing it discloses nothing, and silently wiping it would be gratuitous. Second, <b>focus moves to the banner</b>, which is why it carries a focus ring: the editor was inerted <em>while holding focus</em>, and without a named destination focus drops to <code>&lt;body&gt;</code> and silently strands a keyboard user — on the one requirement the PRD says to judge the product on. <span class="tag">REVIEW FIX</span> Third, the announcement is <code>assertive</code> and is <b>never throttled</b>: there is at most one per Account per Space, and it is the single interruption that has earned the right to be one.</p>
+
+<h2 class="s">2 &middot; The two states that are not this one</h2>
+<p class="c">Both were missing from the first draft. They matter because a user cannot tell them apart from the inside, and the product must not conflate them.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>disconnected &mdash; still editing</span></div>
+    <div class="app">
+      <div class="panel">
+        <div class="ban n"><span>Disconnected. Your changes are held locally.<span class="sub">Keep typing. Nothing is lost.</span></span></div>
+        <p class="pt">Draft homepage acceptance criteria</p>
+        <div class="ed">Hero must state the offer in one sentence. Nav collapses below 768px<span class="mine"></span></div>
+        <div class="lr">not a modal &middot; must not block typing</div>
+      </div>
+    </div>
+  </div>
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>removed WHILE disconnected &mdash; on reconnect</span></div>
+    <div class="app">
+      <div class="panel">
+        <div class="ban d"><span>Access ended.<span class="sub">Your access ended while you were offline. Nothing you typed since then reached this Space.</span></span></div>
+        <p class="pt">Draft homepage acceptance criteria</p>
+        <div class="ed inert">Hero must state the offer in one sentence. Nav collapses below 768px and the contact form validates inline</div>
+        <div class="lr">resolves to access-ended, NOT to a sync failure</div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="note"><span class="tag">REVIEW FIX</span> <b>The right-hand case is the composition neither state covered alone.</b> AD-9 pushes the lease invalidation — so it <em>cannot reach her while she is offline</em>. She keeps editing against her replica, believing she still has access, and learns only on reconnection when the frames are discarded rather than queued. It must resolve to <b>&ldquo;Access ended.&rdquo;</b> and not to a reconciliation failure, because her text was never <em>admissible</em> — it was not lost to a fault. And it must never show a sync-succeeded state first and then revoke it.</p>
+
+<h2 class="s">3 &middot; Demoted rather than removed</h2>
+<p class="c">The same interruption, but read access continues uninterrupted. The editor is replaced by rendered text and the write affordance becomes <em>absent</em> — the Role chip is the only thing that changed, and it is the thing that explains it.</p>
+<div class="wrap">
+  <div class="frame" style="flex:1 1 100%">
+    <div class="chr"><i></i><i></i><i></i><span>Beatriz &mdash; demoted to Viewer mid-edit</span></div>
+    <div class="app">
+      <div class="panel">
+        <div class="ban n"><span>You&rsquo;re now a Viewer.<span class="sub">You can still read everything here. The text below was not saved.</span></span></div>
+        <p class="pt">Draft homepage acceptance criteria</p>
+        <div class="meta"><span class="pill">STATUS <b>IN PROGRESS</b></span><span class="lb">Content</span></div>
+        <div style="font:400 14px/1.55 var(--sans);color:var(--text);padding:9px 0">Hero must state the offer in one sentence. Nav collapses below 768px and the contact form validates inline</div>
+        <div class="lr">no editor, no border, no disabled control &mdash; the affordance is absent</div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="note"><b>Note there is no greyed-out editor.</b> Yello has no disabled state for Role reasons anywhere — a capability a Role lacks is removed, not dimmed. Focus lands on the rendered description at the same scroll position, because read access continued and the surface should not jump.</p>

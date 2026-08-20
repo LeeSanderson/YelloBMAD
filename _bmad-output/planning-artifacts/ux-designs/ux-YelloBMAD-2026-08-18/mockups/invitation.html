@@ -1,0 +1,159 @@
+<title>Yello — Key Screen: Invitation View</title>
+<style>
+/* ============================================================
+   KEY SCREEN — the Invitation view
+   Governed by:
+     DESIGN.md  Components (invitation-view - the most generous
+                padding in the product, and the one place the
+                engineered register is deliberately loosened)
+     EXPERIENCE.md  Information Architecture (Unauthenticated)
+                Component Patterns (Invitation view)
+                State Patterns (Invitation not actionable,
+                 Invitation wrong Account signed in,
+                 Submitting registration)
+                Isolation and Refusal -> Browser-owned surfaces
+                Key Flow UJ-3, and UJ-2 step 3
+   Why this surface earned a mock: it is the only page an
+   unauthenticated stranger ever sees, it is Beatriz's first and
+   possibly only impression of Yello, and three of its rules are
+   counter-intuitive:
+     1. AD-28 - presenting the Invitation is a SIDE-EFFECT-FREE
+        READ. Loading this page creates nothing.
+     2. All five terminal states share ONE response - identical
+        words, shape and duration - including a token that never
+        existed, or the acceptance route becomes an oracle.
+     3. The wrong-Account case must refuse WITHOUT echoing either
+        address, since a forwarded link puts a stranger here.
+   ============================================================ */
+:root{
+  --page:#0B1020; --col:#121A31; --card:#18213C; --border:#6478A8;
+  --text:#E6EAF5; --muted:#9AA6C4; --accent:#8B80F9; --accentOn:#14103A;
+  --focus:#ADA4FB; --danger:#FB7185;
+  --role:#241F52; --roleOn:#C3BCFC;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:#14141a;font:14px/1.5 var(--sans)}
+header{padding:26px 24px 18px;border-bottom:1px solid #e4e4e9;background:#fbfbfd}
+header h1{margin:0 0 5px;font-size:19px;letter-spacing:-.01em}
+header p{margin:0 0 7px;max-width:92ch;color:#55555f;font-size:13.5px}
+h2.s{margin:26px 24px 4px;font-size:15px}
+p.c{margin:0 24px 12px;font-size:13px;color:#6a6a74;max-width:92ch}
+.wrap{padding:0 24px 24px;display:flex;gap:14px;flex-wrap:wrap}
+.frame{border:1px solid #d9d9e0;border-radius:9px;overflow:hidden;box-shadow:0 2px 10px rgba(20,20,26,.07);flex:1 1 400px;min-width:360px}
+.chr{display:flex;align-items:center;gap:6px;padding:7px 11px;background:#ececed;border-bottom:1px solid #d9d9e0}
+.chr i{width:9px;height:9px;border-radius:50%;background:#c9c9cf}
+.chr span{margin-left:8px;font:10.5px var(--mono);color:#7a7a84}
+.chr .tt{margin-left:auto;font:10px var(--mono);color:#9a9aa4}
+.app{background:var(--page);color:var(--text);padding:14px;min-height:300px;display:grid;place-items:center}
+.card{background:var(--card);border:1.5px solid var(--border);border-radius:6px;padding:24px;width:100%;max-width:360px}
+.brand{font:700 .875rem/1.5 var(--sans);letter-spacing:-.01em;margin:0 0 20px;color:var(--muted)}
+h3{margin:0 0 10px;font:650 1rem/1.5 var(--sans);letter-spacing:-.008em}
+p{margin:0 0 12px;font:400 .875rem/1.6 var(--sans)}
+p.mu{color:var(--muted)}
+.meta{background:var(--page);border:1.5px solid var(--border);border-radius:3px;padding:11px 12px;margin:0 0 16px}
+.mr{display:flex;align-items:baseline;gap:9px;font-size:.8125rem}
+.mr + .mr{margin-top:7px}
+.mk{font:500 .6875rem/1.5 var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);min-width:52px}
+.mv{font:600 .8125rem/1.5 var(--sans)}
+.rchip{background:var(--role);color:var(--roleOn);border:1.5px solid var(--border);border-radius:2px;
+       font:700 .6875rem/1.5 var(--mono);letter-spacing:.07em;padding:2px 7px}
+label{display:block;font:500 .6875rem/1.5 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+      color:var(--muted);margin:12px 0 5px}
+.inp{width:100%;background:var(--page);border:1.5px solid var(--border);border-radius:3px;
+     padding:8px 9px;font:400 .875rem var(--sans);color:var(--text)}
+.inp.f{outline:2px solid var(--focus);outline-offset:2px}
+.btn{width:100%;margin-top:16px;background:var(--accent);color:var(--accentOn);border:0;border-radius:2px;
+     padding:.5rem;font:600 .8125rem/1 var(--sans);min-height:24px}
+.btn.s{background:transparent;color:var(--text);border:1.5px solid var(--border)}
+.btn.busy{opacity:.6}
+.foot{margin:14px 0 0;font:400 .8125rem/1.5 var(--sans);color:var(--muted);text-align:center}
+.foot a{color:var(--accent);text-decoration:underline}
+.note{margin:10px 24px 0;font-size:12.5px;color:#6a6a74;max-width:92ch}
+.note b{color:#14141a}
+.tag{display:inline-block;font:600 10px var(--mono);letter-spacing:.06em;background:#eef0f4;
+     border:1px solid #d9dde5;border-radius:3px;padding:2px 6px;color:#4a4e57;margin-left:6px}
+.meta2{padding:0 24px 6px;max-width:92ch}
+.meta2 code{font:11.5px var(--mono);background:#f4f4f7;border:1px solid #e4e4e9;border-radius:3px;padding:1px 5px}
+</style>
+
+<header>
+  <h1>Key screen — the Invitation view</h1>
+  <p>The only page an unauthenticated stranger ever sees, and Beatriz's first — possibly only — impression of Yello. It carries the most generous padding in the product; this is the one place the engineered register is deliberately loosened.</p>
+  <p>Three of its rules are counter-intuitive enough to be worth seeing rendered: presenting the Invitation is a <b>side-effect-free read</b> (AD-28), so loading this page creates nothing; <b>all five terminal states share one response</b>, including a token that never existed; and the wrong-Account case must refuse <b>without echoing either address</b>.</p>
+</header>
+
+<div class="meta2">
+  <p class="note" style="margin-left:0"><b>Page metadata is part of the spec here, not an afterthought.</b> This page legitimately renders a Space name — FR-11 requires the Space and Role be shown before acceptance — so the leak is not the page, it is what the page <em>emits</em>: <code>&lt;title&gt;Yello&lt;/title&gt;</code> with no Space name, no <code>og:</code> or <code>twitter:</code> metadata, and <code>noindex</code>. Paste this link into Slack without that and a link-preview service scrapes the Space name into the chat logs of people with no Membership.</p>
+</div>
+
+<h2 class="s">1 &middot; The offer, and accepting it</h2>
+<p class="c">Left: what Nadia sees on arrival. Right: she has no Account, so completing registration <em>is</em> her act of acceptance (FR-11), and AD-22 provisions her own Personal Space in the same transaction, independently of the Space she was invited to.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/i/8f3a…</span><span class="tt">title: Yello</span></div>
+    <div class="app">
+      <div class="card">
+        <p class="brand">Yello</p>
+        <h3>Ravi Anand invited you to a Space.</h3>
+        <div class="meta">
+          <div class="mr"><span class="mk">Space</span><span class="mv">Northwind Redesign</span></div>
+          <div class="mr"><span class="mk">Role</span><span class="rchip">MEMBER</span></div>
+          <div class="mr"><span class="mk">From</span><span class="mv">Ravi Anand</span></div>
+        </div>
+        <p class="mu">You'll be able to create and edit work in this Space. You won't see anything else in Yello.</p>
+        <button class="btn">Create an Account and join</button>
+        <p class="foot">Already have an Account? <a href="#">Sign in to accept</a></p>
+      </div>
+    </div>
+  </div>
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/i/8f3a… &mdash; accepting</span><span class="tt">title: Yello</span></div>
+    <div class="app">
+      <div class="card">
+        <p class="brand">Yello</p>
+        <h3>Join Northwind Redesign as a Member.</h3>
+        <label for="e">Email</label>
+        <input class="inp" id="e" value="nadia@studio.co" readonly>
+        <label for="p">Choose a password</label>
+        <input class="inp f" id="p" type="password" value="............">
+        <button class="btn busy">Creating your Account&hellip;</button>
+        <p class="foot">You'll also get a Space of your own.</p>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="note"><b>Nothing has happened yet on the left.</b> No Membership, no Account, no state change — a mail security scanner, a link prefetcher or a colleague the mail was forwarded to all produce exactly the same nothing. Acceptance is the separate, explicit act on the right. <span class="tag">AD-28 &middot; FR-11</span></p>
+<p class="note"><b>The in-flight state matters more here than anywhere else in Yello</b>, because this is one of only two submit-and-wait interactions in a product that otherwise has no save button — and AD-23 makes it <em>deliberately slow</em>, performing the password hash even for an address already on file so the response cannot be timed. Without a stated in-flight state, the slowest interaction in the product looks broken.</p>
+<p class="note">The footer line is the whole of UJ-3's resolution in eight words: she becomes Owner of a Personal Space she may never use, and it does not compete for her attention.</p>
+
+<h2 class="s">2 &middot; The two refusals</h2>
+<p class="c">Left: one response for <b>revoked, accepted, expired, lapsed and unrecognised</b> — identical words, shape and duration. Right: the case a forwarded link creates.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/i/8f3a… &mdash; not actionable</span><span class="tt">title: Yello</span></div>
+    <div class="app">
+      <div class="card" style="max-width:330px">
+        <p class="brand">Yello</p>
+        <h3>This invitation is no longer valid.</h3>
+        <p class="mu">Ask whoever invited you to send a new one.</p>
+        <button class="btn s">Go to Yello</button>
+      </div>
+    </div>
+  </div>
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>signed in as someone else</span><span class="tt">title: Yello</span></div>
+    <div class="app">
+      <div class="card" style="max-width:330px">
+        <p class="brand">Yello</p>
+        <h3>This invitation is for a different Account.</h3>
+        <p class="mu">Sign out and sign in as the Account it was sent to.</p>
+        <button class="btn">Sign out</button>
+        <button class="btn s" style="margin-top:8px">Cancel</button>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="note"><b>The left-hand card is the same for five different causes</b>, and that uniformity is the point. It names no Space, no contents, and nobody who revoked it. Critically it is also identical for a token that <em>never existed</em> — a distinct response there would make the acceptance route an existence oracle, which is AD-23's registration discipline applied one surface over. Guid entropy makes exploiting it impractical, which is why the rule is cheap rather than urgent — but it is nearly free to get right and expensive to retrofit.</p>
+<p class="note"><b>The right-hand card names neither address.</b> The helpful version — &ldquo;this is for nadia@studio.co, you're signed in as ravi@anand.dev&rdquo; — discloses the invited address to whoever holds the link, and on a forwarded link that is a stranger. §6.1 confines addresses to Owners and Admins of a Space the Account is already a Member of, so an unauthenticated page is the last place one may appear. <span class="tag">AD-28 &middot; &sect;6.1</span></p>

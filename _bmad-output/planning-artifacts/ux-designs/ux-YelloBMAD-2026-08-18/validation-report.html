@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>UX Design Validation: Yello</title>
+<style>
+  :root {
+    --bg: #fafaf9;
+    --surface: #ffffff;
+    --border: #e7e5e4;
+    --text: #1c1917;
+    --muted: #78716c;
+
+    --verdict-strong: #16a34a;
+    --verdict-adequate: #65a30d;
+    --verdict-thin: #d97706;
+    --verdict-broken: #dc2626;
+
+    --sev-low: #64748b;
+    --sev-medium: #ca8a04;
+    --sev-high: #ea580c;
+    --sev-critical: #dc2626;
+
+    --state-fixed: #15803d;
+    --state-open: #b45309;
+    --state-escalated: #7c3aed;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.6;
+    font-size: 15px;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 32px 24px 64px; }
+
+  header.report-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 24px;
+  }
+  .title h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -0.01em; }
+  .title .subtitle { color: var(--muted); font-size: 13px; margin-top: 4px; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+  .counts { text-align: right; font-size: 12px; color: var(--muted); font-family: ui-monospace, "SF Mono", Menlo, monospace; line-height: 1.8; white-space: nowrap; }
+
+  .synthesis {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--muted);
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin-bottom: 24px;
+    font-size: 15.5px;
+  }
+  .synthesis p { margin: 0 0 10px; }
+  .synthesis p:last-child { margin-bottom: 0; }
+
+  .dimension-summary {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+  .dim-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+  }
+  .dim-card .dim-name { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .dim-card .dim-verdict { font-size: 14px; font-weight: 600; }
+
+  section.dimension, section.reviewer-section { margin-bottom: 14px; }
+  section.dimension details, section.reviewer-section details {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  section summary {
+    padding: 14px 20px;
+    cursor: pointer;
+    user-select: none;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  section summary::-webkit-details-marker { display: none; }
+  section summary::before {
+    content: "▸";
+    display: inline-block;
+    color: var(--muted);
+    transition: transform 0.15s ease;
+  }
+  section details[open] summary::before { transform: rotate(90deg); }
+  section summary h2 {
+    display: inline;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    flex: 1;
+  }
+  .verdict-pill {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: white;
+  }
+  .verdict-strong { background: var(--verdict-strong); }
+  .verdict-adequate { background: var(--verdict-adequate); }
+  .verdict-thin { background: var(--verdict-thin); }
+  .verdict-broken { background: var(--verdict-broken); }
+
+  .dim-body { padding: 4px 20px 18px; }
+  .dim-judgment { color: var(--text); font-size: 14.5px; }
+  .dim-judgment p { margin: 0 0 10px; }
+
+  .findings-list { padding: 0 20px 4px; }
+  article.finding {
+    padding: 14px 0;
+    border-top: 1px solid var(--border);
+  }
+  article.finding:first-child { border-top: none; }
+  article.finding header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 6px;
+  }
+  .badge {
+    font-size: 10.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.4;
+  }
+  .badge-sev-low { background: rgba(100, 116, 139, 0.12); color: var(--sev-low); }
+  .badge-sev-medium { background: rgba(202, 138, 4, 0.14); color: var(--sev-medium); }
+  .badge-sev-high { background: rgba(234, 88, 12, 0.14); color: var(--sev-high); }
+  .badge-sev-critical { background: rgba(220, 38, 38, 0.14); color: var(--sev-critical); }
+  .badge-fixed { background: rgba(21, 128, 61, 0.12); color: var(--state-fixed); }
+  .badge-open { background: rgba(180, 83, 9, 0.12); color: var(--state-open); }
+  .badge-escalated { background: rgba(124, 58, 237, 0.12); color: var(--state-escalated); }
+  .finding-title { margin: 0; font-size: 15px; font-weight: 500; flex: 1; min-width: 200px; }
+  .finding-location { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; color: var(--muted); }
+  .finding-note, .finding-fix { margin-top: 6px; font-size: 14px; }
+  .finding-fix strong { color: var(--muted); font-weight: 500; }
+
+  .reviewer-source {
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+
+  .mechanical {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-top: 24px;
+    font-size: 14px;
+  }
+  .mechanical h3 { margin: 0 0 10px; font-size: 14px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+  .mechanical ul { margin: 0; padding-left: 20px; }
+  .mechanical li { margin-bottom: 6px; color: var(--text); }
+
+  footer.report-footer {
+    margin-top: 40px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  footer .meta { display: flex; gap: 24px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+  <div class="container">
+
+    <header class="report-header">
+      <div class="title">
+        <h1>Yello — UX Design Validation Report</h1>
+        <div class="subtitle">_bmad-output/planning-artifacts/ux-designs/ux-YelloBMAD-2026-08-18/</div>
+      </div>
+      <div class="counts">
+        3 lenses &middot; 111 findings<br>
+        8 critical &middot; 38 high<br>
+        34 medium &middot; 31 low<br>
+        <span style="color:var(--state-fixed)">resolved 106</span> &middot;
+        <span style="color:var(--state-escalated)">escalated 2</span> &middot;
+        <span style="color:var(--state-open)">open 3</span>
+      </div>
+    </header>
+
+    <div class="synthesis">
+      <p><strong>Three lenses ran in parallel against the first complete draft: the rubric walker, an accessibility audit, and an adversarial isolation audit.</strong> All three independently reached the same shape of conclusion — the pair is unusually disciplined for a first draft, and the places it fails are places where a stated principle did not survive arithmetic or implementation reality. Flow coverage and shape fit were <em>strong</em> on the rubric; the isolation audit found <strong>no specified leak</strong> and cleared 25 named surfaces; and the accessibility audit credited the focus-ring separation, Presence-as-dot-plus-text, the per-script uppercase fallback and the explicit refusal to let the long-press gesture discharge NFR-9 as decisions most design specs get wrong.</p>
+      <p><strong>The accessibility verdict was nonetheless</strong> <em>not gate-ready</em>, and it was right. Three failures were real and structural: no single-pointer alternative to the Board drag on a touch tablet at 768–1279px — a <strong>WCAG 2.5.1 Level A</strong> failure, not AA; a keyboard grammar bound to arrow keys that NVDA and JAWS consume in browse mode, so the accessible path was unreachable by exactly the population NFR-9 protects; and an FR-34 interruption that makes the focused node <code>readonly</code> or replaces it outright with no specified focus destination, on the requirement the PRD names as the criterion the product should be judged on. A single fix — an explicit non-gesture <strong>Move control</strong> at every breakpoint — closed the first two.</p>
+      <p><strong>The isolation audit's contribution was to show that the spines specified the server-facing half of isolation and were nearly silent on the client-facing half.</strong> AD-2 enforces scoping in the database; AD-11 puts a full replica in the client; SM-1's suite exercises requests. A leak rendered from client memory issues no request, so the release gate structurally cannot see it — and the replica's lifetime across a Space switch, a sign-out and a lease invalidation was never specified. Alongside it: <code>409, never 404</code> stated without AD-26's Membership qualifier turns the offer endpoint into a cross-Space existence oracle, and the email-address rule from §6.1 appeared nowhere in either spine.</p>
+      <p><strong>On the author's own contrast table: eight of twelve figures were arithmetically wrong.</strong> None flipped a pass into a fail — nine were understated — but the table was presented as verification against a release gate, and its one "little headroom" warning sat on the token with 10% clearance while the actual thinnest margin, at 2%, went unremarked. Two genuine AA failures were hiding in pairs the table never stated: the accent text link against body copy (2.66:1, below 1.4.1) and the Role chip fill against its own ground (1.05:1, invisible as a container). Both are now fixed, the table is recomputed, and the light theme is stated in full.</p>
+      <p><strong>106 of 111 findings are resolved.</strong> Two are escalated to <code>bmad-architecture</code> because the fix is not in the interface. Three remain open by deliberate decision and are marked as such.</p>
+    </div>
+
+    <div class="dimension-summary">
+      <div class="dim-card"><div class="dim-name">Flow coverage</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
+      <div class="dim-card"><div class="dim-name">Token completeness</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Component coverage</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
+      <div class="dim-card"><div class="dim-name">State coverage</div><div class="dim-verdict" style="color: var(--verdict-thin)">thin</div></div>
+      <div class="dim-card"><div class="dim-name">Visual reference coverage</div><div class="dim-verdict" style="color: var(--verdict-adequate)">expected at stage</div></div>
+      <div class="dim-card"><div class="dim-name">Bloat &amp; overspecification</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Inheritance discipline</div><div class="dim-verdict" style="color: var(--verdict-adequate)">adequate</div></div>
+      <div class="dim-card"><div class="dim-name">Shape fit</div><div class="dim-verdict" style="color: var(--verdict-strong)">strong</div></div>
+    </div>
+
+    <section class="dimension">
+      <details>
+        <summary><h2>1 &middot; Flow coverage</h2><span class="verdict-pill verdict-strong">strong</span></summary>
+        <div class="dim-body"><div class="dim-judgment">
+          <p>All eight PRD §3.3 journeys checked for a named protagonist, numbered steps, an explicit climax and a failure path. All present and structurally complete; UJ-9 net-new and intentional. Every PRD-stated edge case is carried — UJ-1's duplicate-address uniformity, UJ-3's scanner/prefetch/forward, UJ-4's deep link, UJ-5's forty-second drop, UJ-6's demotion variant, UJ-8's decline/lapse. No coverage misses.</p>
+        </div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Two UJ titles not verbatim while the header claimed they were</h3><span class="finding-location">EXPERIENCE.md § Key Flows</span></header>
+            <div class="finding-note">UJ-3 "an invitation" → "an Invitation" and UJ-5 "at the same time" → "at once". Both are improvements in glossary discipline, but the claim of verbatim inheritance was still false.</div>
+            <div class="finding-fix"><strong>Fix:</strong> claim softened to "mirror PRD §3.3", with the two adjustments named explicitly.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">UJ-4 climax quotation dropped a word while claiming to be exact</h3><span class="finding-location">EXPERIENCE.md § Space Context</span></header>
+            <div class="finding-note">The PRD repeats the word — "absent — not present-and-failing<em>, absent</em> —" — and the repetition is the rhetorical point of the original.</div>
+            <div class="finding-fix"><strong>Fix:</strong> restored.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">UJ-2 and UJ-7 waved through as "inherited, no delta"</h3><span class="finding-location">EXPERIENCE.md § Key Flows</span></header>
+            <div class="finding-note">Found and fixed in the author's own Pass 1 before the reviewers reported. Both now carry full numbered flows with climax and failure paths, so all nine journeys are written out.</div>
+            <div class="finding-fix"><strong>Fix:</strong> written in full.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details open>
+        <summary><h2>2 &middot; Token completeness</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
+        <div class="dim-body"><div class="dim-judgment">
+          <p>220 frontmatter token paths and every <code>{path.to.token}</code> reference extracted across both files — 67 distinct in DESIGN.md, 10 in EXPERIENCE.md. <strong>All resolve.</strong> All 14 colour roles carry a hex value and a light/dark pair, so there were no critical colour gaps. The failures were in the verification layer rather than the token layer.</p>
+        </div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Eight of twelve contrast figures were wrong, in a table presented as verified against a release gate</h3><span class="finding-location">DESIGN.md § Colors</span></header>
+            <div class="finding-note">Both reviewers recomputed independently and agreed. Nine figures understated, three overstated. No error flipped a pass into a fail — but no alternate luminance formula reproduces the pattern, so they had been estimated rather than computed. Worse than the arithmetic: the one "passes, with little headroom — do not darken" warning sat on <code>accent</code> at <strong>4.96</strong> (10% clear) while the genuine thinnest margin, <code>border-hairline-light</code> on <code>surface-column-light</code> at <strong>3.06</strong> (2% clear), was described as "clear".</div>
+            <div class="finding-fix"><strong>Fix:</strong> all figures recomputed from hex with the WCAG 2.x formula, the formula stated, both themes tabulated in full, and the light border raised to <code>#6B7794</code> for real margin. The warning now names the token that actually has none.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Accent text links fail WCAG 1.4.1 as specified</h3><span class="finding-location">DESIGN.md § Components</span></header>
+            <div class="finding-note"><code>accent</code> against <code>text-primary</code> is <strong>2.66:1</strong> dark and <strong>2.55:1</strong> light, below the 3:1 required when colour alone distinguishes a link from surrounding body text — and no non-colour cue was mandated anywhere. The accent passes handsomely against the <em>background</em> and fails against the <em>text beside it</em>, which is the pair that matters for a link.</div>
+            <div class="finding-fix"><strong>Fix:</strong> underline mandatory on inline links; new <code>text-link</code> component; both stated in Do's and Don'ts.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Every border pair drops below 3:1 under partial pixel coverage, and one component guarantees it</h3><span class="finding-location">DESIGN.md § Colors</span></header>
+            <div class="finding-note">A 1px border antialiases whenever its edge lands off a device-pixel boundary — which a 3px spacing grid does at the 1.25×/1.5×/1.75× display scales common on Windows and Android. At 80% coverage every pair fails. And <code>task-card-lifted</code>'s <code>rotate(-1deg)</code> antialiases its border along its entire length <em>unconditionally</em>, so the one object whose boundary matters most — the Task in your hand — was the one guaranteed to render under the gate.</div>
+            <div class="finding-fix"><strong>Fix:</strong> new <code>borders</code> token group; structural hairline raised to 1.5px with device-pixel snapping; 2px emphasis border on the lifted card.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The Label colour constraint was stated against one theme, and the same user-chosen colour renders in both</h3><span class="finding-location">DESIGN.md § Components</span></header>
+            <div class="finding-note">The constraint required 3:1 against the <em>dark</em> card ground only. The two card grounds are 17 stops apart, so a fill tuned to near-black routinely fails against white — a whole class of user-generatable 1.4.11 failures in a release-gated product. The <code>ΔE 10</code> rule also named no colour space (ΔE76 and ΔE2000 differ by roughly a factor of two at these chromas) and omitted <code>accent</code> and <code>presence</code>.</div>
+            <div class="finding-fix"><strong>Fix:</strong> 3:1 against both card grounds simultaneously; ΔE2000 named; accent and presence added to the exclusion set.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The light theme had hex values but no component-level resolution mechanism</h3><span class="finding-location">DESIGN.md frontmatter</span></header>
+            <div class="finding-note">Every <code>components.*</code> entry referenced dark tokens, and 11 of the 14 <code>-light</code> tokens were referenced nowhere. A consumer extracting the component map got a dark-only system whose light counterpart existed as a prose naming convention.</div>
+            <div class="finding-fix"><strong>Fix:</strong> the suffix pair is now stated as a theme-selection mechanism resolved once at the theme boundary, with components consuming semantic names only — and reaching for a <code>-light</code> token directly declared a defect.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The focus-ring rationale was arithmetically hollow</h3><span class="finding-location">DESIGN.md § Colors</span></header>
+            <div class="finding-note">The document justified separating focus-ring from accent on the grounds that it "would vanish against accented controls" — and <code>focus-ring</code> against <code>accent</code> is <strong>1.45:1</strong>, so it <em>would</em>. What actually protects it is <code>outline-offset: 2px</code> putting the ring on the ground behind. The Do/Don't table was guarding the wrong property.</div>
+            <div class="finding-fix"><strong>Fix:</strong> both tokens kept, rationale corrected to geometry, and the real rule stated — never inset the ring, never reduce the offset to 0.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Accent and danger are indistinguishable by luminance while the document made the border the sole signal</h3><span class="finding-location">DESIGN.md § Components</span></header>
+            <div class="finding-note"><code>accent</code> vs <code>danger</code> is <strong>1.19:1</strong> dark and <strong>1.08:1</strong> light — they differ by hue alone, so under deuteranopia the accent-bordered bulk-move bar and the danger-bordered destructive confirm converge. Yet the spec said "The border is the signal; there is no icon and no illustration." Compliance survived only because EXPERIENCE.md supplies the copy.</div>
+            <div class="finding-fix"><strong>Fix:</strong> the copy is now named as the signal and the border as reinforcement, in both places.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The danger token was used against the document's own rule for it</h3><span class="finding-location">DESIGN.md § Colors, Do's and Don'ts</span></header>
+            <div class="finding-note">Do's and Don'ts reserved danger for "the genuinely irreversible" and forbade it on "ordinary refusals" — while the FR-34 revoked-editor component used a danger border. Losing access <em>is</em> a refusal. An implementer following the table and one following the component would build different things.</div>
+            <div class="finding-fix"><strong>Fix:</strong> new <code>revoked-edge</code> token, distinct in name even where it resolves to the same value, so the component and the rule stop contradicting each other.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Absolute px type ignores a user's font-size preference; line-height 1 cannot absorb a 1.4.12 override</h3><span class="finding-location">DESIGN.md § Typography</span></header>
+            <div class="finding-note">Every size was absolute px, including <code>role-label</code> at 9px carrying the permanent Role indicator. Page zoom scales px so 1.4.4 is arguably met by that route, but text-only resize is not — and <code>lineHeight: '1'</code> is a line box exactly the glyph height, which clips the moment a user applies 1.4.12's 1.5× line-height override.</div>
+            <div class="finding-fix"><strong>Fix:</strong> whole scale moved to <code>rem</code>; every line-height ≥ 1.5; role-label and meta raised to 0.6875rem; px retained only on hairlines, radii and offsets.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Six components shipped with no foreground token</h3><span class="finding-location">DESIGN.md frontmatter</span></header>
+            <div class="finding-note">In a document whose stated method is that load-bearing combinations are "stated rather than assumed", <code>bulk-move-bar</code>, <code>column-count</code>, <code>label-chip</code>, <code>picker</code>, <code>space-switcher</code> and <code>avatar</code> specified background, border and typography and omitted text colour — each an unverified pair as written.</div>
+            <div class="finding-fix"><strong>Fix:</strong> explicit <code>foreground</code> added to each.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Off-scale pixel literals, two of them bypassing a token defined as exactly that value</h3><span class="finding-location">DESIGN.md frontmatter</span></header>
+            <div class="finding-note"><code>10px</code> appeared as a bare literal in <code>context-bar.padding</code> and <code>space-switcher.row-padding</code> while <code>spacing.card-pad-x</code> was defined as 10px.</div>
+            <div class="finding-fix"><strong>Fix:</strong> component-internal padding moved to named rem tokens (<code>card-pad-*</code>, <code>control-pad-*</code>) and referenced rather than restated — which also makes padding grow with text under zoom.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Role chip fill invisible against its own ground in both themes</h3><span class="finding-location">DESIGN.md § Components</span></header>
+            <div class="finding-note"><code>role-chip</code> on <code>surface-card</code> is <strong>1.05:1</strong> dark, <strong>1.29:1</strong> light, with no border. Not a WCAG failure — the chip is non-interactive and its text is fine at 8.56:1 — but "monospace, uppercase, 2px corners" described a chip nobody could see, and UJ-4's central bet is that the Role reads as a distinct permanent system fact.</div>
+            <div class="finding-fix"><strong>Fix:</strong> 1px <code>border-hairline</code> border, which reads at 3.44:1 against the chip fill.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details open>
+        <summary><h2>3 &middot; Component coverage</h2><span class="verdict-pill verdict-thin">thin</span></summary>
+        <div class="dim-body"><div class="dim-judgment">
+          <p>23 components extracted from DESIGN.md frontmatter, 20 body bullets, 22 EXPERIENCE.md rows. Every DESIGN.md component had a real visual spec with no one-word entries. The behavioural side did not hold up: duplicate rows with no precedence, name drift across the pair, and three requirements with no affordance at all.</p>
+        </div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Four duplicate Component Patterns rows with no precedence rule</h3><span class="finding-location">EXPERIENCE.md § Component Patterns</span></header>
+            <div class="finding-note"><code>Task detail</code> and <code>Description editor</code> each appeared twice with non-identical content — one adding focus return, the other adding AD-13 frame batching, each omitting what the other had. A consumer asking for the behavioural rule found two answers. This was the artifact of the author's own Pass 1 adding missing rows without deduplicating.</div>
+            <div class="finding-fix"><strong>Fix:</strong> merged to the union in each case, and the pickers and bulk-move rows consolidated at the same time.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">No affordance for changing a Role, removing a Membership, or issuing and revoking an Invitation</h3><span class="finding-location">EXPERIENCE.md § Component Patterns</span></header>
+            <div class="finding-note">FR-12, FR-13 and FR-14 had nothing to build against — and FR-14 is the causal trigger of UJ-6, which the PRD flags at FR-34 as "the acceptance criterion this product should be judged on". UJ-6 simply said "Ravi removes her Membership" with no surface behind it. FR-13's Role-scoped narrowing was also uncovered.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Membership list, Invitation list, Ownership panel and Status delta editor rows added, with FR-13's narrowing stated on the Role picker and email-address visibility confined to the Membership list.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Component names not identical across the pair</h3><span class="finding-location">both spines</span></header>
+            <div class="finding-note">DESIGN.md specified one <code>picker</code>; EXPERIENCE.md named four things. <code>bulk-move-bar</code> appeared as two rows. <code>Status control</code> had no DESIGN.md counterpart under that name.</div>
+            <div class="finding-fix"><strong>Fix:</strong> collapsed to the DESIGN.md names, with the five uses expressed inside one row.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The Task card metadata row had no overflow discipline and unbounded content</h3><span class="finding-location">DESIGN.md § Components</span></header>
+            <div class="finding-note">Label chips (user-defined per Space, uncapped by FR-22) plus the Presence indicator (10 concurrent editors, so "2 editing" becomes "10 editing") plus a right-pushed avatar, competing for roughly 282px at the 320px reflow width. Unbounded chips in a fixed row is horizontal overflow inside a card — a 1.4.10 failure in the exact layout an audit is conducted in.</div>
+            <div class="finding-fix"><strong>Fix:</strong> at most three Label chips then a <code>+N</code> affordance; wrap to a second line before ever scrolling horizontally.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Five components had visual specs but no Component Patterns row</h3><span class="finding-location">EXPERIENCE.md § Component Patterns</span></header>
+            <div class="finding-note">Their behaviour genuinely lived elsewhere — Interaction Primitives, Accessibility Floor, State Patterns — which is the right home. But a consumer walking the table as an index would conclude they were unspecified.</div>
+            <div class="finding-fix"><strong>Fix:</strong> a pointer line under the table naming where each lives.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details open>
+        <summary><h2>4 &middot; State coverage</h2><span class="verdict-pill verdict-thin">thin</span></summary>
+        <div class="dim-body"><div class="dim-judgment">
+          <p>All nine IA surfaces walked against the applicable state set. Task detail and the Board were genuinely exhaustive and every row traced to a specific FR or AD. The two settings surfaces and several cross-cutting states were where it thinned out — and one gap was a written contradiction rather than an omission.</p>
+        </div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Revocation-while-disconnected unhandled, and the two rows that would compose to cover it contradicted each other in committed copy</h3><span class="finding-location">EXPERIENCE.md § State Patterns</span></header>
+            <div class="finding-note">"Disconnected. Your changes are held locally." promises application. Access-ending requires that unsynchronised text is <em>not</em> applied — and its mechanism is a push (AD-9) that by definition cannot reach a disconnected client. So the User is told their changes are held, is removed while offline, reconnects, and the product must retract a promise it made in writing. This is the composition of FR-33 and FR-34 — the seam PRD §4.9 calls "the requirement most likely to be got wrong".</div>
+            <div class="finding-fix"><strong>Fix:</strong> a dedicated state added that resolves to "Access ended." rather than to a reconciliation failure (the text was never <em>admissible</em>, not lost to a fault), with an explicit ban on showing a sync-succeeded state first. Copy softened to "not yet sent".</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">A whole surface disappearing under someone was uncovered — only the Task editor had an interruption state</h3><span class="finding-location">EXPERIENCE.md § State Patterns</span></header>
+            <div class="finding-note">Foundation states the principle — "the interface has to be built to be interrupted" — and AD-9 pushes the change, but nothing covered an Admin demoted to Member while sitting in Space settings. It is the general case of FR-34.</div>
+            <div class="finding-fix"><strong>Fix:</strong> a "Role drops below a surface's requirement" state added, narrating before routing away; and Space Context now states that absence is a steady state, not a transition.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Membership removal absent from the destructive blast-radius ladder</h3><span class="finding-location">EXPERIENCE.md § State Patterns</span></header>
+            <div class="finding-note">The ladder enumerated "Task, Project, Space, Account". FR-14 — the operation that ends someone's access to everything in a Space, immediately, with a live editor possibly open — was not on it.</div>
+            <div class="finding-fix"><strong>Fix:</strong> inserted between Task and Project, and the confirm now states whether the target has a live session, so the remover knows they are interrupting someone mid-edit.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Session expiry had no state anywhere; <code>Session</code> appeared once, in the vocabulary list</h3><span class="finding-location">EXPERIENCE.md</span></header>
+            <div class="finding-note">FR-2 requires an expired Session to grant access to nothing. A Session expiring mid-Board is a guaranteed daily occurrence, and the spine said nothing about what the User sees, where they land, or whether the local replica survives — which AD-11 makes a real question.</div>
+            <div class="finding-fix"><strong>Fix:</strong> state added covering the landing surface, the purge of Space-scoped client state, and an explicit ban on silently submitting retained text after re-authentication.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Offline designed only inside the Task editor</h3><span class="finding-location">EXPERIENCE.md § State Patterns</span></header>
+            <div class="finding-note">§8 requires Yello to "degrade honestly" without connectivity, and the Board is a live surface — Presence, pushed permission changes, other Users' moves. A User on the Board with a severed <code>/sync</code> got no treatment.</div>
+            <div class="finding-fix"><strong>Fix:</strong> a disconnection state for non-editor surfaces, stating what stopped updating and what is consequently stale.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Status Configuration had no in-flight or refused state, while the structurally smaller bulk move had both</h3><span class="finding-location">EXPERIENCE.md § Status Configuration</span></header>
+            <div class="finding-note">FR-27's Space-level removal commits across up to 50 Projects × 5,000 Tasks as one transaction — strictly larger than the bulk move that earned "Moving 4,812 Tasks." on precisely this reasoning.</div>
+            <div class="finding-fix"><strong>Fix:</strong> in-flight and refused states added, matching the bulk-move treatment.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The List View had no scale state, and FR-30 explicitly requires one</h3><span class="finding-location">EXPERIENCE.md § State Patterns</span></header>
+            <div class="finding-note">FR-30 requires NFR-5 and NFR-9 to hold at 5,000 Tasks "on the same terms as FR-28", but only the Board had an at-scale row. "The List View pages" was the entire specification — no page size, no keyboard traversal, no filter or sort control.</div>
+            <div class="finding-fix"><strong>Fix:</strong> at-scale row added (paging sidesteps the focus-recycling problem entirely) plus a List View controls row.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The 403 was named but not designed, and the Voice table banned the only string that fits it</h3><span class="finding-location">EXPERIENCE.md § Isolation and Refusal, § Voice and Tone</span></header>
+            <div class="finding-note">The two 404 cases got eight hard rules; the 403 got six words. Meanwhile the Voice table listed "You don't have permission to view this Task." in the <strong>Don't</strong> column, unqualified — so an implementer hunting for 403 copy found only a banned string and would invent one.</div>
+            <div class="finding-fix"><strong>Fix:</strong> an approved capability-shaped exemplar added ("Viewers cannot edit Tasks."), the Don't row qualified, and the capability-not-object principle stated.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">No state for an Invitation opened while signed in as a different Account</h3><span class="finding-location">EXPERIENCE.md § State Patterns</span></header>
+            <div class="finding-note">The most common real-world invitation failure, sitting on NFR-9's gated invitation flow, and unhandled — with the helpful implementation ("this is for nadia@…, you are ravi@…") disclosing the invited address to whoever holds a forwarded link.</div>
+            <div class="finding-fix"><strong>Fix:</strong> state added that refuses <em>without echoing either address</em> and offers sign-out.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">No in-flight state for the only submit-and-wait interactions in the product</h3><span class="finding-location">EXPERIENCE.md § State Patterns</span></header>
+            <div class="finding-note">Registration and sign-in are the one place a User waits on a round trip in a product that states there is no save button — and AD-23 makes registration deliberately slow by hashing even for a known address.</div>
+            <div class="finding-fix"><strong>Fix:</strong> submit state added, with resubmission disabled and completion announced.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary><h2>5 &middot; Visual reference coverage</h2><span class="verdict-pill verdict-adequate">expected at stage</span></summary>
+        <div class="dim-body"><div class="dim-judgment">
+          <p><code>mockups/</code> did not exist when the lenses ran — key-screen mocks were the next Finalize step, so this was correct rather than a gap. Both spines were checked for dangling references to non-existent files: <strong>none</strong>. All cross-file section references resolved, all internal "see X" targets existed, and all three <code>sources</code> paths existed on disk. Four mockups have since been rendered and linked inline from both spines.</p>
+        </div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-open">open</span><h3 class="finding-title">The exploratory artifacts still render superseded token values</h3><span class="finding-location">.working/directions-1.html</span></header>
+            <div class="finding-note">The design-direction round renders <code>#33406B</code> and <code>#D7DEEC</code> — the border values that DESIGN.md now forbids in bold. Deliberately not retro-edited, because they are the record of <em>how</em> the direction was chosen; but a reader opening them sees a design that fails 1.4.11.</div>
+            <div class="finding-fix"><strong>Fix:</strong> open by decision. The four <code>mockups/</code> files now carry the corrected border and are the linked reference; the spine states that the <code>.working/</code> artifacts predate the correction. A banner inside the old files remains optional.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary><h2>6 &middot; Bloat &amp; overspecification</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
+        <div class="dim-body"><div class="dim-judgment">
+          <p>DESIGN.md's editorial voice is licensed and mostly earns its keep — the border rationale in particular prevents a specific, likely regression and belongs at the point of use. Nothing was decorative; the tables are tables and the prose is prose. The findings are trims rather than cuts.</p>
+        </div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-open">open</span><h3 class="finding-title">Internationalisation is roughly half duplication and pointers</h3><span class="finding-location">EXPERIENCE.md § Internationalisation</span></header>
+            <div class="finding-note">Of six bullets, two restate DESIGN.md, one is a build convention, and three do real work. The reviewer recommended folding the section and distributing the obligations.</div>
+            <div class="finding-fix"><strong>Fix:</strong> <strong>open by decision — kept standalone deliberately.</strong> i18n was adopted with no upstream requirement behind it, so nothing else in the project will remind anyone it exists, and obligations scattered across three sections are easier to quietly drop than a section someone must decide to delete. The duplication was trimmed to cross-references; the heading stays.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The border rule stated three times; ~500 words duplicating the memlog</h3><span class="finding-location">DESIGN.md</span></header>
+            <div class="finding-note">The rule appeared in Colors, in its own subsection, and in Do's and Don'ts. Separately the Beatriz risk-register paragraph was decision provenance whose consumer is a future reviewer, not an implementer, and was already in the memlog verbatim.</div>
+            <div class="finding-fix"><strong>Fix:</strong> Colors trimmed to a cross-reference; the Beatriz paragraph cut to one sentence pointing at the memlog; the density justification kept, because an implementer does need to know density is a requirement.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Frontmatter <code>description</code> was three sentences where the spec asks for one line</h3><span class="finding-location">DESIGN.md frontmatter</span></header>
+            <div class="finding-note">The rest was § Brand &amp; Style's job and was already said there.</div>
+            <div class="finding-fix"><strong>Fix:</strong> trimmed to one line.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary><h2>7 &middot; Inheritance discipline</h2><span class="verdict-pill verdict-adequate">adequate</span></summary>
+        <div class="dim-body"><div class="dim-judgment">
+          <p>All <code>sources</code> paths resolve and the two lists are identical. Every FR, NFR, AD and § citation checked resolves — 35 of 42 FRs, and all eleven § references. Direct quotations are faithful. <strong><code>Board</code> is used as a view in all 40 occurrences across both files</strong> — every one checked, no container misuse. No <code>tenant</code>, no <code>org</code>, no <code>workspace</code>-for-Space.</p>
+        </div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The glossary term <code>User</code> was downcased nine times and never used capitalised</h3><span class="finding-location">EXPERIENCE.md</span></header>
+            <div class="finding-note">Every one of the nine was in a Space-established context, which is exactly where §2 says "User" is the correct term. The document also declared "Vocabulary is PRD §2 verbatim" and then listed 14 of §2's 22 terms, omitting several it went on to use — including <code>User</code>.</div>
+            <div class="finding-fix"><strong>Fix:</strong> capitalised throughout, the full term list declared, and the Account-versus-User distinction stated explicitly.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">A banned synonym used once, in a sentence about Yello's own Role legibility</h3><span class="finding-location">EXPERIENCE.md § Inspiration &amp; Anti-patterns</span></header>
+            <div class="finding-note">"Trello buries workspace standing" — describing another product's noun is defensible, but §2 names "workspace" as one of three banned synonyms and a reader may not register the switch of referent.</div>
+            <div class="finding-fix"><strong>Fix:</strong> reworded to "buries a member's standing in the parent container's settings".</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">A PRD/architecture conflict resolved silently while a comparable one was recorded at length</h3><span class="finding-location">EXPERIENCE.md § Information Architecture</span></header>
+            <div class="finding-note">PRD §7 calls Account settings "the only surface" that spans Spaces; AD-24 says two do. The spine correctly followed AD-24 and said nothing, while recording the FR-8 email divergence loudly — an inconsistency of treatment.</div>
+            <div class="finding-fix"><strong>Fix:</strong> the supersession is now stated where it applies, with the reasoning.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">FR-6 (rename a Space) had no home at all</h3><span class="finding-location">EXPERIENCE.md § Information Architecture</span></header>
+            <div class="finding-note">Not in the Space settings purpose row, and not in PRD §7 either — so the gap is inherited rather than introduced. But a downstream epic for FR-6 had no surface to attach to.</div>
+            <div class="finding-fix"><strong>Fix:</strong> placed in Space settings and the inherited omission flagged as an assumption.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="dimension">
+      <details>
+        <summary><h2>8 &middot; Shape fit</h2><span class="verdict-pill verdict-strong">strong</span></summary>
+        <div class="dim-body"><div class="dim-judgment">
+          <p>DESIGN.md carries all eight canonical body sections in canonical order with subsections nested rather than interleaved. EXPERIENCE.md carries all eight required defaults and both triggered sections. <strong>The Motion extension was judged legitimate, not a violation</strong> — the order lock binds the eight canonical sections relative to each other, Motion is appended after all eight, the <code>motion</code> frontmatter group is the same shape as any other token group and is referenced from both files, and the product justification is real. <strong>Three of the four invented sections earn their place decisively:</strong> Space Context and Role Legibility holds the product thesis plus two hard rules no standard section owns and is cited by name from three others; Isolation and Refusal is neither copy nor per-surface behaviour and its security consequence justifies the prominence; Status Configuration holds an ordered multi-step procedure no table row could.</p>
+        </div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Motion was where the DESIGN/EXPERIENCE boundary leaked</h3><span class="finding-location">DESIGN.md § Motion</span></header>
+            <div class="finding-note">It carried behavioural rules EXPERIENCE.md already owns — the long-press scroll-versus-lift rule, and a <code>prefers-reduced-motion</code> clause appearing near-verbatim in both files. "Never animated: a permission change taking effect" is a constraint on FR-34, not a visual spec.</div>
+            <div class="finding-fix"><strong>Fix:</strong> durations and easings kept in DESIGN.md as a timing contract; the behavioural clauses now live in Interaction Primitives and Accessibility Floor, with the section stating the split.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="reviewer-section">
+      <details open>
+        <summary><h2>Accessibility review</h2><span class="verdict-pill verdict-broken">not gate-ready</span><span class="reviewer-source">review-accessibility.md</span></summary>
+        <div class="dim-body"><div class="dim-judgment">
+          <p><strong>6 critical, 29 high, 17 medium, 4 low.</strong> The reviewer credited the pair as "unusually accessibility-literate for a design document" and named five decisions most specs get wrong and this one got right on purpose. It then found that the compliance argument rested in three places on statements that do not survive arithmetic or implementation — and that one of the three is a <strong>Level A</strong> failure rather than AA. All six criticals are resolved.</p>
+        </div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header><span class="badge badge-sev-critical">critical</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">No single-pointer alternative to the Board drag at 768–1279px — WCAG 2.5.1, Level A</h3><span class="finding-location">EXPERIENCE.md § Interaction Primitives</span></header>
+            <div class="finding-note">2.5.1 requires all functionality using a path-based gesture to be operable with a single pointer without a path. The touch user got only "long-press to lift, then drag". The non-gesture alternative existed <em>only below 768px</em> — so a touch tablet in that band had no non-path route to a cross-column move, and the keyboard path is no alternative for a device with no keyboard. Inside the Board, one of NFR-9's five named flows.</div>
+            <div class="finding-fix"><strong>Fix:</strong> an explicit <strong>Move control</strong> made the canonical path at every breakpoint, with the gestures reframed as accelerators. FR-29 already defines Status-change-as-move, so only the affordance was missing. Also pre-satisfies WCAG 2.2's 2.5.7.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-critical">critical</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The entire keyboard grammar is unreachable in screen-reader browse mode</h3><span class="finding-location">EXPERIENCE.md § Interaction Primitives</span></header>
+            <div class="finding-note">In NVDA's and JAWS's default browse mode, arrow keys move the virtual cursor and the application never receives them. So a screen-reader user could not pick up a Task, move it, or cancel — and neither spine mentioned that the mode exists. NFR-9's "every Board operation available by pointer is available by keyboard" was met for a sighted keyboard user and not for the population the requirement is written for.</div>
+            <div class="finding-fix"><strong>Fix:</strong> the same Move control, which works in browse mode with no mode switching. <code>role="application"</code> deliberately rejected as a known trap. The arrow grammar is retained as an accelerator with its application-mode requirement stated.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-critical">critical</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title"><code>assertive</code> announces the FR-34 interruption and leaves the user stranded</h3><span class="finding-location">EXPERIENCE.md § Accessibility Floor</span></header>
+            <div class="finding-note"><code>aria-live="assertive"</code> interrupts the current utterance; it does <strong>not</strong> move focus. The FR-34 event makes the focused element inert or replaces it outright — and replacing a focused node resets focus to <code>document.body</code> in every browser. The user hears "Access ended", then finds themselves nowhere, in a surface whose write affordances have all just become absent, with the retained text having no place in the reading order. On the requirement the PRD says to judge the product on.</div>
+            <div class="finding-fix"><strong>Fix:</strong> the banner is focusable (<code>role="alert"</code>, <code>tabindex="-1"</code>), focus moves to it, it persists until dismissed, and the retained text is the next stop in the reading order.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-critical">critical</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">A recycled virtualised row can put focus on the wrong Task — and then <code>Space</code> moves the wrong Task</h3><span class="finding-location">EXPERIENCE.md § State Patterns</span></header>
+            <div class="finding-note">"Every rendered row keeps its keyboard stop" is a tautology and addresses the wrong risk. The real risk is the focused row scrolling out of the virtual window: either its node is destroyed (focus falls to <code>body</code>, position lost in a 4,812-row column) or — the common implementation — the node is <strong>recycled for a different Task</strong>. The arrow grammar makes this near-certain, since <code>↓</code> crosses the window boundary every screenful. A data-corruption path reachable only by keyboard.</div>
+            <div class="finding-fix"><strong>Fix:</strong> keyboard navigation drives the virtualiser rather than the reverse; row identity keyed to the Task id so recycling cannot re-point focus; focus restored by Task id after any window change.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-critical">critical</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">No focus destination for any remote event</h3><span class="finding-location">EXPERIENCE.md § Accessibility Floor</span></header>
+            <div class="finding-note">Four of six dynamic situations had no answer in either spine. Two could lose the user's unsaved text. One documented rule was silently invalid: "closing returns focus to the originating Task card" cannot apply when the Task has just been deleted.</div>
+            <div class="finding-fix"><strong>Fix:</strong> a focus-destination table covering seven remote and dynamic events, including the deleted-Task case and the recycled-row case.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-critical">critical</span><span class="badge badge-escalated">escalated</span><h3 class="finding-title">Nobody owns FR-28 × NFR-5 × NFR-9</h3><span class="finding-location">all three spines</span></header>
+            <div class="finding-note">The PRD says how the Board holds 5,000 Tasks "is the architecture's call; nothing in this document provides it, and the three requirements cannot all hold naively." The architecture's 28 ADs never decide it — no AD covers Board rendering, paging or virtualisation, and §4.8 maps only to AD-13/15/16. EXPERIENCE.md deferred back. A three-way deferral on a release-gated requirement.</div>
+            <div class="finding-fix"><strong>Fix:</strong> escalated to <code>bmad-architecture</code>. The UX obligation — stating the accessibility contract any mechanism must satisfy — is now discharged: keyboard drives the window, <code>aria-setsize</code>/<code>aria-posinset</code> carry the true total, focus restores by id. Whoever picks the mechanism must decide focus and announcement behaviour in the same pass.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title"><code>Space</code> globally rebound without scope, colliding with native activation and page scroll</h3><span class="finding-location">EXPERIENCE.md § Interaction Primitives</span></header>
+            <div class="finding-note"><code>Space</code> is the native activation key for every button and the native page-down for a scroll container — and Board columns <em>are</em> scroll containers by the spine's own rule. On a focused column-head control, no scope told the implementer which meaning applied.</div>
+            <div class="finding-fix"><strong>Fix:</strong> the pick-up binding applies only when a Task card holds focus; <code>Space</code> keeps its native meaning everywhere else.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Three unspecified keyboard behaviours that no test could be written against</h3><span class="finding-location">EXPERIENCE.md § Interaction Primitives</span></header>
+            <div class="finding-note">"Preserving position where possible" admits at least three divergent readings. The keyboard drop had <em>no</em> destination position at all — and AD-15 computes a fractional index between two concrete neighbours, so the implementation needed a neighbour pair the spec never supplied. And the live-region announcement, which for a blind user <em>replaces</em> the entire visual drop-zone system, was one unspecified sentence.</div>
+            <div class="finding-fix"><strong>Fix:</strong> sticky-origin-index with clamping; destination is the same ordinal clamped to column length; announcement string shape specified with destination, ordinal and total.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The long-press scroll-intent rule had no slop radius and covered one axis</h3><span class="finding-location">EXPERIENCE.md § Interaction Primitives</span></header>
+            <div class="finding-note">Read literally, 1px of finger jitter cancelled every lift. And the rule was single-axis while the spine's own 768–1279px breakpoint creates a <em>horizontal</em> Board scroll, where a pan is indistinguishable from the start of a cross-column drag.</div>
+            <div class="finding-fix"><strong>Fix:</strong> a 10px slop token, and the rule made axis-agnostic.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Presence announcement storms guaranteed at every NFR-8 bound</h3><span class="finding-location">EXPERIENCE.md § Accessibility Floor</span></header>
+            <div class="finding-note">10 concurrent editors cycling produces up to 20 transitions in seconds, and <code>polite</code> <em>queues</em> rather than coalescing — so the backlog outlives the events and talks over the user's own typing echo. Worse, Presence was placed on Task <em>cards</em> too, so Board-level churn scaling with 50 concurrent Sessions would route into the same region.</div>
+            <div class="finding-fix"><strong>Fix:</strong> settled-count announcements debounced to ~5s, scoped to the open Task only, suppressed while typing; card-level Presence renders visually without a live region; permission changes never throttled.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The virtualised Board tells assistive technology a different total from the one on screen</h3><span class="finding-location">EXPERIENCE.md § Component Patterns</span></header>
+            <div class="finding-note">The column count is mandated as the true total — correct, and well argued. But the accessibility tree reports only rendered rows, so the chip says 4,812 while the user navigates a list of 30, with nothing bridging them. The design created the mismatch deliberately and did not close it.</div>
+            <div class="finding-fix"><strong>Fix:</strong> <code>aria-setsize</code> and <code>aria-posinset</code> required on every rendered row — which is also what makes the drag announcement's "position 3 of 12" honest.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title"><code>inert</code> — the spine's own word — made the retained text unreachable, defeating its stated purpose</h3><span class="finding-location">EXPERIENCE.md § State Patterns</span></header>
+            <div class="finding-note"><code>inert</code> is a specified HTML attribute: content becomes non-focusable <strong>and is removed from the accessibility tree</strong>. Read literally, the spine made the retained text invisible to AT and unreachable by keyboard — exactly defeating "so she can copy it" — and left "selectable" true only by pointer.</div>
+            <div class="finding-fix"><strong>Fix:</strong> <code>readonly</code> throughout, in both spines and in the component token name, with a note explaining why <code>inert</code> and <code>disabled</code> are both wrong.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Absence is defensible as a steady state and hostile as a transition</h3><span class="finding-location">EXPERIENCE.md § Space Context</span></header>
+            <div class="finding-note">On an FR-34 demotion the spine deleted the focused editor with — by the rule's own design — no residual control left to explain why the thing being typed into vanished. The steady-state argument for absence does not transfer to the interruption case. <em>Notably the reviewer confirmed there is no 3.2 or 3.3 failure in the rule itself, and that absence is the safer choice against <code>disabled</code>.</em></div>
+            <div class="finding-fix"><strong>Fix:</strong> the transition carved out — removal is narrated first, focus lands on the banner, and only then does the surface settle into its absent steady state.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">No surface ever states in prose what the acting Role may not do</h3><span class="finding-location">EXPERIENCE.md § Space Context</span></header>
+            <div class="finding-note">The within-Space Role refusal is reachable only by a <em>write attempt</em> — and the interface has removed every write affordance for that Role. So the one surface that explains why was unreachable from the browser by exactly the user who would want it, existing in practice only for the API. The obvious route was closed by design, since the Role chip is deliberately non-interactive.</div>
+            <div class="finding-fix"><strong>Fix:</strong> the context bar's accessible name extended from the Role <em>name</em> to the Role plus a capability clause — "Viewer, read only in this Space". Discloses nothing cross-Space, keeps the chip non-interactive, and explains on arrival rather than on failure.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">WCAG 1.4.12 Text Spacing unmentioned, and the type scale built to fail it</h3><span class="finding-location">DESIGN.md § Typography</span></header>
+            <div class="finding-note"><code>role-label</code> set <code>lineHeight: '1'</code> — a line box exactly the glyph height, which cannot absorb any growth. At 1.4.12's mandated 1.5× override a 9px chip needs a 13.5px line box inside a chip designed for 9px, on a layout with a 3px unit.</div>
+            <div class="finding-fix"><strong>Fix:</strong> every line-height ≥ 1.5; chips and cards size to content with no fixed heights; the four 1.4.12 overrides named as a gate item.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">RTL mirrors the drag direction and says nothing about the arrow keys — so the two spines specify opposite behaviours</h3><span class="finding-location">EXPERIENCE.md §§ Internationalisation, Interaction Primitives</span></header>
+            <div class="finding-note">The mirroring mandate covered the gesture but not the keys. Under RTL, does <code>→</code> move to the next column in reading order or the visually-right one? Both defensible, opposite, and an RTL keyboard user would move Tasks the opposite way from what they see.</div>
+            <div class="finding-fix"><strong>Fix:</strong> keys bound to <em>logical</em> direction — <code>→</code> is inline-end — consistent with the logical-properties rule the same section already mandates.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The mandated non-colour carrier of Presence was the smallest text in the product</h3><span class="finding-location">DESIGN.md § Typography</span></header>
+            <div class="finding-note">The Presence count exists specifically to satisfy "not conveyed by colour or position alone" — and was set at 10px mono, whose non-Latin fallback the document itself notes is unpredictable and often not monospaced, with a smaller effective x-height than the sans stack.</div>
+            <div class="finding-fix"><strong>Fix:</strong> a dedicated <code>presence-count</code> token at 0.6875rem in <code>system-sans</code>. It is prose, not a system fact, so the monospace rationale genuinely does not apply.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Absolute px type and spacing, so a raised default font size changes nothing</h3><span class="finding-location">DESIGN.md §§ Typography, Layout</span></header>
+            <div class="finding-note">Full-page zoom still works, so 1.4.4 is arguably met by that route — but "we pass because Ctrl+= works" is a poor position at a release gate on a product whose smallest text was 9px. At 200% text-only the task-title line box doubles inside padding that does not grow.</div>
+            <div class="finding-fix"><strong>Fix:</strong> type in <code>rem</code>, component padding in <code>rem</code> so it tracks the text, px only on hairlines and radii; verification at 200% text-only named as a gate item.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The Status pager is the sole navigation route in the reflowed layout and was completely unspecified</h3><span class="finding-location">EXPERIENCE.md § Responsive &amp; Platform</span></header>
+            <div class="finding-note">400% zoom on a 1280px monitor yields a 320px CSS viewport, so the pager <em>is</em> the surface a 1.4.10 audit is conducted on — and its keyboard behaviour, accessible name, widget role, announcement and initial focus were all absent.</div>
+            <div class="finding-fix"><strong>Fix:</strong> specified as a tablist over the effective Status set with arrow-key navigation and a polite announcement of the new Status and its true count.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">"Touch targets ≥ 44px" asserted in one spine and contradicted by the other for every named button</h3><span class="finding-location">both spines</span></header>
+            <div class="finding-note">A self-consistency failure rather than a 2.1 AA failure — WCAG 2.1 AA has no target-size criterion at all, and 2.5.5's 44×44 is AAA. But a gate audited against the spine's own stated floor would fail it, and the density rationale meant nobody would notice until an auditor measured.</div>
+            <div class="finding-fix"><strong>Fix:</strong> the floor restated as <code>{spacing.target-min}</code> 24px per WCAG 2.2 AA's 2.5.8 — the real current AA criterion — applied as a minimum height on every interactive component, with the reasoning stated. The Task card clears 49px on its own arithmetic anyway.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The bulk move had no keyboard or focus story, and the only cancel route was a transient bar</h3><span class="finding-location">EXPERIENCE.md §§ Component Patterns, State Patterns</span></header>
+            <div class="finding-note">A bar appears somewhere on the Board and simultaneously the region that may hold focus is blocked. A keyboard user initiating a 4,812-Task move could lose the only route to cancelling it — and if blocking were implemented as <code>inert</code> or <code>aria-hidden</code>, the focused node is destroyed mid-operation.</div>
+            <div class="finding-fix"><strong>Fix:</strong> focus moves to the bar on appearance, it carries <code>role="status"</code>, and destinations are specified for both commit and cancel.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Uppercase not stated as presentational, in the worst possible place</h3><span class="finding-location">DESIGN.md § Typography</span></header>
+            <div class="finding-note">CSS <code>text-transform</code> leaves the DOM text alone, so nothing is spelled out — but if uppercase is baked into the <em>string</em>, it is. And Yello has exactly that risk on the Role chip, whose value is also placed in the accessible name of the context bar: a resource written <code>VIEWER</code> becomes "V-I-E-W-E-R" in JAWS and VoiceOver, degrading the single most important accessibility affordance in the product.</div>
+            <div class="finding-fix"><strong>Fix:</strong> all uppercase is <code>text-transform</code>; copy resources hold sentence case; stated in both spines.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The per-script fallback covered case-less scripts and missed the case-ful ones where uppercasing is lossy</h3><span class="finding-location">DESIGN.md § Typography</span></header>
+            <div class="finding-note">Arabic, Hebrew, CJK, Thai and Indic were handled correctly. But <code>text-transform: uppercase</code> is locale-sensitive and wrong in several cased scripts: Turkish dotless ı → I changes the word, German ß → SS changes length, Greek strips accents and alters final sigma. A Status named in Turkish can be uppercased into a different word.</div>
+            <div class="finding-fix"><strong>Fix:</strong> the treatment applies under a locale-aware <code>lang</code> attribute, with Turkish, Azeri and Greek excluded alongside the case-less scripts.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title"><code>Esc</code> carried three meanings and two collided on one surface</h3><span class="finding-location">EXPERIENCE.md § Interaction Primitives</span></header>
+            <div class="finding-note">The description editor lives inside the Task detail panel, which is a dialog. Pressing <code>Esc</code> in the editor — leave the editor, or close the panel? For an AT user that is the difference between exiting a textarea and losing the panel and its unsaved text.</div>
+            <div class="finding-fix"><strong>Fix:</strong> precedence stated — innermost meaning wins.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Deleting a Task from Task detail required a modal two levels deep, which the spine forbids</h3><span class="finding-location">EXPERIENCE.md §§ IA, State Patterns</span></header>
+            <div class="finding-note">Task detail is a dialog; the delete confirm was placed on Task detail. That confirm is level two.</div>
+            <div class="finding-fix"><strong>Fix:</strong> destructive confirms replace their invoking panel's content in place, stated in both IA and Component Patterns.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Whether Board mutations are announced at all was undecided, and both answers need stating</h3><span class="finding-location">EXPERIENCE.md § State Patterns</span></header>
+            <div class="finding-note">Remote edits push Tasks between columns, and DESIGN.md deliberately makes this silent <em>visually</em> — right for a sighted user. But NFR-9 mandates announcements only for Presence and permission changes, so the Board mutates under an AT user's virtual cursor with no policy. Announcing recreates the storm; not announcing leaves the buffer silently stale.</div>
+            <div class="finding-fix"><strong>Fix:</strong> decided — no per-Task announcement, a debounced summary, and a manual refresh affordance.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Cold-load skeletons had no AT treatment; the description editor's label was dropped on swap</h3><span class="finding-location">EXPERIENCE.md §§ State Patterns, Component Patterns</span></header>
+            <div class="finding-note">Without <code>aria-busy</code> the user reads a screenful of placeholders then the content silently replaces it. And swapping the editor for rendered text loses the "Description" label for free, which nobody would notice in review.</div>
+            <div class="finding-fix"><strong>Fix:</strong> skeletons marked <code>aria-busy="true"</code> with completion announced; the rendered replacement retains the labelled region and heading.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Space switching replaces the entire surface with no specified focus landing — on a gated flow</h3><span class="finding-location">EXPERIENCE.md § Accessibility Floor</span></header>
+            <div class="finding-note">The generic dialog rule returns focus to the invoking element, which is actually the right target. But returning focus to an element whose accessible name has <em>changed</em> does not reliably re-announce, so a user can land in a different Space at a different Role with nothing spoken.</div>
+            <div class="finding-fix"><strong>Fix:</strong> stated explicitly — focus the context bar, announce the new Space and Role politely on arrival.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-open">open</span><h3 class="finding-title">The density premise does not survive the zoom level the gate is tested at</h3><span class="finding-location">DESIGN.md § Layout &amp; Spacing</span></header>
+            <div class="finding-note">Density is justified as an FR-28 mitigation — twice the Tasks on screen, so fewer rows to virtualise. At 200% text a six-word title wraps from two lines to five, and the advantage evaporates at exactly the accessibility setting the gate exercises.</div>
+            <div class="finding-fix"><strong>Fix:</strong> <strong>open by decision.</strong> Not a failure, so nothing is changed — but recorded in DESIGN.md as an accepted cost, so the FR-28 argument is not read as holding at every zoom level. The related note that a density toggle is itself a low-vision accommodation is now in the assumption.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <section class="reviewer-section">
+      <details open>
+        <summary><h2>Isolation review</h2><span class="verdict-pill verdict-adequate">no specified leak</span><span class="reviewer-source">review-isolation.md</span></summary>
+        <div class="dim-body"><div class="dim-judgment">
+          <p><strong>2 critical, 7 high, 4 medium, 6 low</strong> — and every one in the "under-specified so an implementer could easily create a leak" category rather than "specified leak". The audit cleared 25 named surfaces, called the Space switcher "the strongest part of the review" (identity-only, stated four times across both spines with no contradiction, and the badge attack pre-empted by name), and credited "live regions carry no cross-Space information, ever" as the correct rule, rarely written down. Its central point: <strong>the spines specified the server-facing half of isolation and were almost silent on the client-facing half.</strong></p>
+        </div></div>
+        <div class="findings-list">
+          <article class="finding">
+            <header><span class="badge badge-sev-critical">critical</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The local replica's lifetime is never specified, so Space content survives every boundary event by default</h3><span class="finding-location">EXPERIENCE.md § Foundation</span></header>
+            <div class="finding-note">The mechanism is the <em>default</em> behaviour of every implementation of AD-11, not an exotic mistake. A Blazor WASM client keeps a replica in memory across a client-side route change so switching back is instant; FR-33's five-minute reconnect window and the "held locally" state push it further toward durable browser storage. Then: switch to Space B while a live replica of A remains resident; Membership in A is removed and the lease invalidated, with nothing telling the client to drop it; switch back and the cached Board renders <em>optimistically, before the 404 lands</em>. AD-7 forbids only <em>credentials</em> in <code>localStorage</code>, so A's Task text can survive sign-out on a shared machine. <strong>SM-1's suite runs request-level cases, so a purely client-side render would not fail it</strong> — which is what makes this the most likely route to a verified disclosure in a shipped build.</div>
+            <div class="finding-fix"><strong>Fix:</strong> a named, testable lifecycle rule — Space switch, sign-out, Account switch, lease invalidation and back/forward each purge every replica, projection, cached Board, queued frame and pending announcement for the departed Space, synchronously before any render; no Space content in <code>localStorage</code>/<code>sessionStorage</code>/IndexedDB; optimistic rendering never precedes authorisation on first read.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-critical">critical</span><span class="badge badge-escalated">escalated</span><h3 class="finding-title">The two 404 cases cannot have equal latency as implemented — a timing oracle</h3><span class="finding-location">EXPERIENCE.md § Isolation and Refusal</span></header>
+            <div class="finding-note">The spine asserted "same latency". AD-20 requires an <code>AccessRefusal</code> row for every <strong>Space-boundary</strong> 404 and not for an ordinary not-found, so the boundary case performs a database INSERT the other does not. Measurable, repeatable, and available to anyone holding a Membership in one Space: probe an id, time the refusal, learn whether it exists somewhere in Yello. AD-3 — unlike AD-23 — never makes duration part of its contract, so nothing upstream catches it, and asserting the property in a UX document reads to an implementer as satisfied-by-construction.</div>
+            <div class="finding-fix"><strong>Fix:</strong> escalated to <code>bmad-architecture</code>. The claim is softened to "every respect the interface controls" with the gap named. The architectural options are to write the refusal record off the response path, write an equivalent record for the ordinary case, or pad boundary refusals to a fixed floor — and SM-1 needs a <em>timing</em> case, since it currently measures disclosure rather than duration.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title"><code>409, never 404</code> stated twice without AD-26's Membership qualifier</h3><span class="finding-location">EXPERIENCE.md § State Patterns, UJ-8</span></header>
+            <div class="finding-note">AD-26 permits 409 <em>because</em> "the caller holds a Membership in the Space, so AD-3's boundary rule does not apply" — the qualifier is load-bearing. Both spine statements dropped it and read as absolutes, so an implementer building the endpoint returns 409 for any offer id that is not <code>Pending</code>, including one in a Space the caller has no Membership in. The endpoint becomes a cross-Space existence oracle: 409 means the row exists somewhere in Yello, 404 means it does not.</div>
+            <div class="finding-fix"><strong>Fix:</strong> both statements qualified, with the check order made explicit — resolve the Space context first, evaluate <code>State = Pending</code> second, never the reverse.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Multi-tab never considered, and FR-34 pushes the implementer straight into it</h3><span class="finding-location">EXPERIENCE.md § Accessibility Floor</span></header>
+            <div class="finding-note">One Account can hold two tabs on two different Spaces — not a cross-Space view, but a state neither spine named. An implementer chasing "observable without the participant acting" fans the notice out to every tab, then needs to disambiguate <em>which</em> Space ended, so the announcement becomes "Access to Northwind Redesign ended." — a Space name crossing a boundary through an assertive live region, spoken in a tab showing a different Space. Screen-reader users take the disclosure first and hardest, inverting the intent of the requirement.</div>
+            <div class="finding-fix"><strong>Fix:</strong> delivery restricted to the client context whose active Space matches the change; cross-tab fan-out is a per-tab filter, never a shared announcement; the copy stays "Access ended." with no Space name in any case; and each tab holds its own Space context sharing no state.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Inbound frames queued before lease invalidation had no specified disposal</h3><span class="finding-location">EXPERIENCE.md § State Patterns</span></header>
+            <div class="finding-note">FR-34 and AD-8 are thorough about the <em>outbound</em> direction. Nothing covered frames already delivered to the client and sitting in a render or announcement queue when the lease dies — so the polite Presence region announces "Ravi is editing", or a remote description edit renders, one tick after "Access ended.", for a Space the Account no longer belongs to. NFR-1's "a failure, timeout or partial response never discloses data or existence across a Space boundary" fails, on the requirement the PRD names as the criterion to judge the product on.</div>
+            <div class="finding-fix"><strong>Fix:</strong> on lease invalidation the client discards every queued inbound frame for that Space and clears both live regions — <strong>ordered before the banner is announced</strong>, not after.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The email-address rule from §6.1 appeared nowhere in either spine</h3><span class="finding-location">EXPERIENCE.md</span></header>
+            <div class="finding-note">§6.1 and AD-23 confine addresses to Owners and Admins of a Space the Account is a Member of. The mechanism that breaks it is mundane and near-certain: 20px monospace initials and a display name do not disambiguate two people, and the field every implementer reaches for is the address. The word "email" appeared in EXPERIENCE.md only as an Invitation input and in a sign-in error.</div>
+            <div class="finding-fix"><strong>Fix:</strong> a hard rule — no surface outside Space settings' Membership management renders an address; every other surface identifies a Membership by display name and initials; a Membership-scoped discriminator handles collisions; attribution renders the name captured at authoring time, never a live global lookup.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Browser-owned surfaces carry Space names outside the app's control</h3><span class="finding-location">EXPERIENCE.md § Isolation and Refusal</span></header>
+            <div class="finding-note">Four mechanisms, none mentioned: the delete-Space confirmation asks the user to <em>type a Space name</em>, feeding it into origin-scoped, Account-agnostic form autofill, so the next Account on that profile is offered another Account's Space name; <code>document.title</code> was unspecified, and an SPA setting "Northwind Redesign — Board" writes Space names into history, the OS window title, screen shares and synced history; the Invitation view is unauthenticated and renders a Space name, so its <code>og:</code> metadata is scraped by link-preview services into the chat logs of people with no Membership; and back/forward cache and scroll restoration are URL-keyed and browser-owned.</div>
+            <div class="finding-fix"><strong>Fix:</strong> all four addressed — <code>autocomplete="off"</code> with non-reusable field names, a fixed <code>document.title</code> of "Yello", no Space name in the Invitation view's title or social metadata plus <code>noindex</code>, and scroll restoration disabled on Space-scoped routes.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Three specified Account-scoped reads are richer than AD-24's "identity only"</h3><span class="finding-location">EXPERIENCE.md § State Patterns, UJ-7</span></header>
+            <div class="finding-note">Naming every Space still owned when Account deletion is refused reads a Membership attribute at Account scope; stating the Spaces-per-Account bound requires an Account-scoped count on a surface AD-24 does not enumerate; and UJ-7 invited the Token list to render a per-Space Role. In all three the data is the caller's own, so NFR-1 is not breached — but AD-24 exists precisely to stop an implementer who needs an unauthorised read from disabling RLS or inventing a bypass that then spreads. <strong>Silence is what produces the bypass.</strong></div>
+            <div class="finding-fix"><strong>Fix:</strong> each decided explicitly — the first two permitted as own-data with AD-24 amendments flagged, and the Token→Role display <strong>dropped</strong> as a genuine Membership read across a boundary that was decoration rather than function.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-high">high</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">The Ownership Offer email ships with no disclosure constraint anywhere</h3><span class="finding-location">EXPERIENCE.md UJ-8</span></header>
+            <div class="finding-note">It is the one genuinely new outbound artefact in the product, and NFR-1 explicitly binds notifications. UJ-2 does this correctly for the Invitation — "naming the Space, the Role, and who issued it — and nothing about the Space's contents". The offer email had no such clause, and because the PRD amendment is owed rather than made, no FR governs it either. An implementer writing "You've been offered ownership of Northwind Redesign (12 Projects, 340 Tasks, 8 Members)" would be adding helpful context with nothing telling them not to. Second-order: AD-5 lapses the offer when the recipient's Membership ends, but an email already sent cannot be recalled.</div>
+            <div class="finding-fix"><strong>Fix:</strong> the same explicit clause added to UJ-8 step 2, and the owed PRD amendment now carries the disclosure constraint rather than only the notification trigger.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Cold load renders the Space name before authorisation resolves</h3><span class="finding-location">EXPERIENCE.md § State Patterns</span></header>
+            <div class="finding-note">"The context bar can render before its contents" — but the name cannot come from a 404 (AD-3 strips it), so it can only come from cache. That makes the context bar distinguish "removed from" (name available locally) from "never existed" (no name), breaking the identical-in-every-respect rule; and on a shared browser profile it renders one Account's Space name to another. It also contradicts AD-1's "never inferred from a prior request".</div>
+            <div class="finding-fix"><strong>Fix:</strong> the bar may render its <em>shell</em>, never its Space name, which is gated on the current request's Membership resolution.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">A boundary 404 in response to an optimistic write had no specified state</h3><span class="finding-location">EXPERIENCE.md § Interaction Primitives</span></header>
+            <div class="finding-note">A correctness hole that pushes the implementer toward one of two rule violations: a silent revert, which breaches FR-34's observability and NFR-8's "degrade visibly, never silently", or a toast, which the Isolation section explicitly forbids.</div>
+            <div class="finding-fix"><strong>Fix:</strong> it collapses to the same terminal treatment as any other boundary refusal — revert the replica, then render the full refusal surface. A final answer, not a retryable fault.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Nothing forbade the client requesting a Space id it had not just been told it belongs to</h3><span class="finding-location">EXPERIENCE.md § Isolation and Refusal</span></header>
+            <div class="finding-note">No data leaks — this degrades the detection mechanism the release gate depends on. Warm-start prefetching of a remembered last-Space produces a boundary 404 and, per AD-20, an <code>AccessRefusal</code> classified <code>CrossSpace</code>. NFR-7 exists so cross-Space attempts are distinguishable from within-Space failures; a client routinely manufacturing them for its own ordinary users buries a real probing attack in its own noise.</div>
+            <div class="finding-fix"><strong>Fix:</strong> the client never issues a Space-scoped request for a Space id absent from the current switcher response — one rule closing the warm-start hole and the deep-link-after-removal hole together.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-medium">medium</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">No state for an unrecognised or forged Invitation token</h3><span class="finding-location">EXPERIENCE.md § State Patterns</span></header>
+            <div class="finding-note">Only "revoked" was specified, so an implementer renders something else — a generic 404, "Not available.", "Invalid link" — for a token that never existed, and any difference makes the acceptance route an existence oracle. Guid entropy makes exploitation impractical, which is why it is medium; but it is AD-23's uniformity discipline applied one surface over, and nearly free.</div>
+            <div class="finding-fix"><strong>Fix:</strong> one row covering revoked, accepted, expired, lapsed <em>and unrecognised</em> with a single response — identical words, shape and duration.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-fixed">fixed</span><h3 class="finding-title">Presence announcement content unspecified; FR-32's cross-Space clause not restated</h3><span class="finding-location">EXPERIENCE.md §§ Accessibility Floor, Component Patterns</span></header>
+            <div class="finding-note">The display-name case is fine — Presence shows only same-Space Memberships and roster names are already visible to every Role. But nothing said the announcement could not carry an address. And the Assignee picker got its FR-21 constraint restated while Presence did not, an asymmetry worth closing while cheap.</div>
+            <div class="finding-fix"><strong>Fix:</strong> announcement specified as display-name-or-count only, never an address; FR-32's clause restated on the Presence row.</div>
+          </article>
+          <article class="finding">
+            <header><span class="badge badge-sev-low">low</span><span class="badge badge-open">open</span><h3 class="finding-title">Browser spellcheck and cloud IME egress of description text</h3><span class="finding-location">EXPERIENCE.md § Isolation and Refusal</span></header>
+            <div class="finding-note">Several browsers' enhanced spellcheck and several mobile IMEs transmit typed text to a remote service, and the description editor is the product's largest free-text surface. Outside NFR-1's Space-to-Space framing but inside §6.1's spirit and NFR-6's "no content in any log".</div>
+            <div class="finding-fix"><strong>Fix:</strong> <strong>open by decision.</strong> Disabling spellcheck on a prose field is the wrong usability trade, so the egress is recorded as accepted and flagged against §6.4's data-protection gate, where it becomes a real obligation the moment a second data subject exists.</div>
+          </article>
+        </div>
+      </details>
+    </section>
+
+    <div class="mechanical">
+      <h3>Mechanical notes</h3>
+      <ul>
+        <li><strong>Race between the reviewers and the author's own fix pass.</strong> The three lenses read the spines while a first fix pass was in flight, so several of their findings — the duplicate Component Patterns rows, Session expiry, removed-while-disconnected, the contrast recompute, the role-chip border, the text-link underline, the light-theme resolution mechanism, and the Membership and Invitation lists — were already closed when the reports landed. Those were verified rather than re-fixed.</li>
+        <li><strong>Contrast arithmetic.</strong> Both reviewers recomputed independently and agreed to two decimal places. Eight of twelve stated figures were wrong; nine understated, three overstated. Also corrected: the memlog's pre-fix figure of "1.7:1" conflated two grounds — it was 1.58 on the card and 1.71 on the column.</li>
+        <li><strong>Cross-references.</strong> No broken references were found in either direction. All <code>{path.to.token}</code> references resolve, all <code>DESIGN.md § …</code> targets exist, all internal "see X" targets exist, all FR/NFR/AD/§ citations resolve, and all three <code>sources</code> paths exist on disk.</li>
+        <li><strong>Uncited requirements.</strong> FR-6, FR-12, FR-13, FR-14, FR-18, FR-19 and FR-30 appeared in neither spine. FR-18 and FR-19 were covered behaviourally without citation and needed nothing; the rest are now addressed. Eleven ADs remain uncited and all are build-side.</li>
+        <li><strong>Frontmatter.</strong> Both files carry the house <code>status</code>/<code>updated</code>/<code>sources</code> convention alongside the spec keys. DESIGN.md now adds two product-specific token groups, <code>motion</code> and <code>borders</code>; the rubric judged the <code>motion</code> extension legitimate on the same reasoning that applies to <code>borders</code>. <code>sources</code> entries are repo-root-relative literals rather than the examples' placeholder form — more resolvable, and consistent with the architecture spine's own style.</li>
+        <li><strong>Two findings escalated, not fixed:</strong> the 403/404 timing oracle and the unowned FR-28 × NFR-5 × NFR-9 collision. Both belong to <code>bmad-architecture</code>; both are recorded in the spines at the point of use and in <code>.memlog.md</code>.</li>
+      </ul>
+    </div>
+
+    <footer class="report-footer">
+      <div class="meta">
+        <span>DESIGN.md: ux-YelloBMAD-2026-08-18/DESIGN.md</span>
+        <span>EXPERIENCE.md: ux-YelloBMAD-2026-08-18/EXPERIENCE.md</span>
+      </div>
+      <div class="meta" style="margin-top:6px">
+        <span>Lenses: review-rubric.md &middot; review-accessibility.md &middot; review-isolation.md</span>
+        <span>Generated: 2026-08-20</span>
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,199 @@
+<title>Yello — Key Screen: Status Configuration and the FR-27 Cascade</title>
+<style>
+/* ============================================================
+   KEY SCREEN — Project settings, and FR-27's report-and-ask cascade
+   Governed by:
+     DESIGN.md  Components (picker, dialog, button-primary,
+                button-secondary, column-count, text-link)
+     EXPERIENCE.md  Information Architecture (Project settings)
+                Status Configuration  <- the whole section
+                Component Patterns (Status delta editor, Picker)
+                State Patterns (Status migration in flight / refused)
+                Key Flow UJ-9 step 2-3
+   The load-bearing rule: THE INTERFACE MUST NOT DECIDE ANYTHING.
+   PRD section 11 records that FR-27's original defect was that its
+   rename half ASKED while its removal half GUESSED. Both halves now
+   report and ask, and a default selection in any destination picker
+   would reintroduce the guess.
+   Corrected tokens applied throughout (border #6478A8 at 1.5px,
+   rem type, bordered role chip).
+   ============================================================ */
+:root{
+  --page:#0B1020; --col:#121A31; --card:#18213C; --border:#6478A8;
+  --text:#E6EAF5; --muted:#9AA6C4; --accent:#8B80F9; --accentOn:#14103A;
+  --focus:#ADA4FB; --danger:#FB7185;
+  --role:#241F52; --roleOn:#C3BCFC;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:#14141a;font:14px/1.5 var(--sans)}
+header{padding:26px 24px 18px;border-bottom:1px solid #e4e4e9;background:#fbfbfd}
+header h1{margin:0 0 5px;font-size:19px;letter-spacing:-.01em}
+header p{margin:0 0 7px;max-width:92ch;color:#55555f;font-size:13.5px}
+h2.s{margin:26px 24px 4px;font-size:15px}
+p.c{margin:0 24px 12px;font-size:13px;color:#6a6a74;max-width:92ch}
+.wrap{padding:0 24px 24px}
+.frame{border:1px solid #d9d9e0;border-radius:9px;overflow:hidden;box-shadow:0 2px 10px rgba(20,20,26,.07);max-width:860px}
+.chr{display:flex;align-items:center;gap:6px;padding:7px 11px;background:#ececed;border-bottom:1px solid #d9d9e0}
+.chr i{width:9px;height:9px;border-radius:50%;background:#c9c9cf}
+.chr span{margin-left:8px;font:10.5px var(--mono);color:#7a7a84}
+.app{background:var(--page);color:var(--text);padding:12px;position:relative}
+.ctx{display:flex;align-items:center;gap:9px;background:var(--card);border:1.5px solid var(--border);
+     border-radius:3px;padding:6px 10px;margin-bottom:9px}
+.ctx .nm{font:700 .875rem/1.5 var(--sans);letter-spacing:-.005em}
+.ctx .cv{color:var(--muted);font-size:10px}
+.ctx .pj{color:var(--muted);font:500 .6875rem/1.5 var(--mono)}
+.role{margin-left:auto;background:var(--role);color:var(--roleOn);border:1.5px solid var(--border);
+      border-radius:2px;font:700 .6875rem/1.5 var(--mono);letter-spacing:.07em;padding:3px 7px}
+.panel{background:var(--col);border:1.5px solid var(--border);border-radius:3px;padding:14px}
+.ph{font:700 .6875rem/1.5 var(--sans);letter-spacing:.12em;text-transform:uppercase;margin:0 0 4px}
+.psub{font:400 .875rem/1.6 var(--sans);color:var(--muted);margin:0 0 12px}
+.srow{display:flex;align-items:center;gap:9px;background:var(--card);border:1.5px solid var(--border);
+      border-radius:3px;padding:8px 10px;margin-bottom:6px}
+.srow .grip{color:var(--muted);font:500 .6875rem/1 var(--mono)}
+.srow .nm2{font:600 .8125rem/1.5 var(--sans)}
+.src{margin-left:auto;font:500 .6875rem/1.5 var(--mono);letter-spacing:.04em;padding:2px 7px;border-radius:2px}
+.src.def{background:#222C48;color:#9AA6C4}
+.src.delta{background:#241F52;color:#C3BCFC}
+.srow .cnt{font:500 .6875rem/1.5 var(--mono);color:var(--muted);background:var(--col);
+           border:1.5px solid var(--border);border-radius:9999px;padding:1px 7px}
+.srow .x{color:var(--muted);font-size:13px}
+.add{display:inline-block;margin-top:4px;color:var(--accent);text-decoration:underline;font:600 .8125rem var(--sans)}
+.scrim{position:absolute;inset:0;background:rgba(4,7,18,.68)}
+.dlg{position:absolute;left:50%;top:16px;transform:translateX(-50%);width:600px;background:var(--card);
+     border:1.5px solid var(--border);border-radius:6px;padding:18px}
+.dlg h3{margin:0 0 8px;font:650 1rem/1.5 var(--sans);letter-spacing:-.008em}
+.dlg p{margin:0 0 12px;font:400 .875rem/1.6 var(--sans)}
+.dlg p.m{color:var(--muted)}
+table{width:100%;border-collapse:collapse;margin:0 0 14px;font-size:.8125rem}
+th{text-align:left;font:700 .6875rem/1.5 var(--mono);letter-spacing:.08em;text-transform:uppercase;
+   color:var(--muted);padding:0 10px 7px 0;border-bottom:1.5px solid var(--border)}
+td{padding:9px 10px 9px 0;border-bottom:1px solid #2A3552;vertical-align:middle}
+td.p{font:600 .8125rem var(--sans)}
+td.n{font:500 .6875rem var(--mono);color:var(--muted)}
+.sel{background:var(--card);border:1.5px solid var(--border);border-radius:3px;padding:5px 8px;
+     font:400 .8125rem var(--sans);color:var(--text);min-width:130px;min-height:24px;display:inline-flex;align-items:center;gap:7px}
+.sel.need{border-color:var(--accent)}
+.sel .ph2{color:var(--muted)}
+.sel .cv2{margin-left:auto;color:var(--muted);font-size:9px}
+.acts{display:flex;gap:8px;align-items:center;margin-top:4px}
+.btn{border-radius:2px;padding:.5rem .8125rem;font:600 .8125rem/1 var(--sans);border:1.5px solid transparent;min-height:24px}
+.btn.p{background:var(--accent);color:var(--accentOn)}
+.btn.s{background:transparent;color:var(--text);border-color:var(--border)}
+.btn[disabled]{opacity:.45}
+.gate{margin-left:auto;font:500 .6875rem/1.5 var(--mono);color:var(--accent);letter-spacing:.04em}
+.bar{display:flex;align-items:center;gap:10px;background:var(--card);border:2px solid var(--accent);
+     border-radius:3px;padding:9px 11px;font:500 .6875rem/1.5 var(--mono);letter-spacing:.04em}
+.bar .sp{width:9px;height:9px;border:2px solid var(--accent);border-right-color:transparent;border-radius:50%}
+.warn{margin:10px 0 0;padding:9px 11px;border-left:3px solid var(--danger);background:#2B1220;
+      color:#FFD9DF;font:600 .8125rem/1.5 var(--sans);border-radius:0 3px 3px 0}
+.note{margin:10px 24px 0;font-size:12.5px;color:#6a6a74;max-width:92ch}
+.note b{color:#14141a}
+.tag{display:inline-block;font:600 10px var(--mono);letter-spacing:.06em;background:#eef0f4;
+     border:1px solid #d9dde5;border-radius:3px;padding:2px 6px;color:#4a4e57;margin-left:6px}
+</style>
+
+<header>
+  <h1>Key screen — Status configuration and the FR-27 cascade</h1>
+  <p><b>The rule this screen exists to enforce:</b> the interface must not decide anything. PRD §11 records that FR-27's original defect was that its rename half <em>asked</em> while its removal half <em>guessed</em> — affected Tasks fell to a Project's first Status. Both halves now report and ask, and <b>a default selection in any destination picker would reintroduce the guess.</b></p>
+  <p>Also visible: why the Status delta editor must show <em>which entries come from the Space defaults and which from this Project's delta</em>. Without that distinction, the cascade below is incomprehensible when it fires.</p>
+</header>
+
+<h2 class="s">1 &middot; The Status delta editor</h2>
+<p class="c">Project settings on &ldquo;Discovery&rdquo;, the Project Ravi is about to retire in UJ-9. Four Statuses: three from the Space defaults, one added by this Project's delta. <b>The count of Statuses is the count of bulk moves retiring it will take</b> &mdash; which is exactly why he opens this screen first.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/northwind/p/discovery/settings</span></div>
+    <div class="app">
+      <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pj">Discovery &middot; Settings</span><span class="role">ADMIN</span></div>
+      <div class="panel">
+        <p class="ph">Statuses in this Project</p>
+        <p class="psub">The Space defaults, with this Project's changes applied. Removing one moves its Tasks &mdash; it never deletes them.</p>
+        <div class="srow"><span class="grip">&#8942;&#8942;</span><span class="nm2">Todo</span><span class="src def">SPACE DEFAULT</span><span class="cnt">12</span><span class="x">&times;</span></div>
+        <div class="srow"><span class="grip">&#8942;&#8942;</span><span class="nm2">In Progress</span><span class="src def">SPACE DEFAULT</span><span class="cnt">5</span><span class="x">&times;</span></div>
+        <div class="srow"><span class="grip">&#8942;&#8942;</span><span class="nm2">Parked</span><span class="src delta">ADDED HERE</span><span class="cnt">3</span><span class="x">&times;</span></div>
+        <div class="srow"><span class="grip">&#8942;&#8942;</span><span class="nm2">Done</span><span class="src def">SPACE DEFAULT</span><span class="cnt">41</span><span class="x">&times;</span></div>
+        <a class="add" href="#">Add a Status</a>
+      </div>
+    </div>
+  </div>
+  <p class="note"><b>Four Statuses, so retiring this Project safely takes four bulk moves</b> &mdash; and &ldquo;Parked&rdquo; is the one that will need a destination, because it exists only here. That is UJ-9 steps 3 and 6, legible from this screen before he starts.</p>
+</div>
+
+<h2 class="s">2 &middot; Space-level rename that collides</h2>
+<p class="c">An Owner renames &ldquo;Done&rdquo; to &ldquo;Shipped&rdquo; at Space level. Two Projects had already renamed that same Status themselves &mdash; detectable only because a delta keys on Status <b>identity</b>, not name (AD-16). One choice, applied to all conflicts at once.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/northwind/settings &mdash; rename cascade</span></div>
+    <div class="app" style="min-height:330px">
+      <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pj">Space settings</span><span class="role">OWNER</span></div>
+      <div class="scrim"></div>
+      <div class="dlg">
+        <h3>Two Projects renamed this Status themselves.</h3>
+        <p class="m">You're renaming the Space default <b>Done</b> to <b>Shipped</b>. These Projects gave it their own name:</p>
+        <table>
+          <tr><th>Project</th><th>Its name for this Status</th><th>Tasks</th></tr>
+          <tr><td class="p">Website Rebuild</td><td class="n">Live</td><td class="n">128</td></tr>
+          <tr><td class="p">Brand Refresh</td><td class="n">Approved</td><td class="n">34</td></tr>
+        </table>
+        <p>Every other Project takes the new name either way.</p>
+        <div class="acts">
+          <button class="btn p">Rename these too</button>
+          <button class="btn s">Keep their names</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note"><b>One decision covering both Projects</b>, not one prompt per Project &mdash; consistent with the single Space-wide mapping decision on the removal path. Neither button is styled as the safe default, because the spec says the interface does not decide; the Owner does.</p>
+</div>
+
+<h2 class="s">3 &middot; Space-level removal &mdash; report and ask</h2>
+<p class="c">The hard half. Removing a Status at Space level takes <b>one</b> Space-wide destination, then reports every Project that cannot accept it and requires a destination drawn from <em>that Project's own post-removal set</em>. Nothing applies until every reported Project has one.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/northwind/settings &mdash; removal mapping</span></div>
+    <div class="app" style="min-height:430px">
+      <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pj">Space settings</span><span class="role">OWNER</span></div>
+      <div class="scrim"></div>
+      <div class="dlg" style="width:640px">
+        <h3>Removing &ldquo;Blocked&rdquo; moves 61 Tasks.</h3>
+        <p class="m">Choose where Tasks in <b>Blocked</b> go. This applies everywhere it can.</p>
+        <div style="margin:0 0 16px"><span class="sel">In Progress <span class="cv2">&#9662;</span></span></div>
+        <p class="m">Three Projects don't have <b>In Progress</b> after this change. Each needs its own destination:</p>
+        <table>
+          <tr><th>Project</th><th>Tasks affected</th><th>Destination</th></tr>
+          <tr><td class="p">Brand Refresh</td><td class="n">18</td><td><span class="sel">Review <span class="cv2">&#9662;</span></span></td></tr>
+          <tr><td class="p">Content Audit</td><td class="n">9</td><td><span class="sel need"><span class="ph2">Choose&hellip;</span> <span class="cv2">&#9662;</span></span></td></tr>
+          <tr><td class="p">Print Collateral</td><td class="n">4</td><td><span class="sel need"><span class="ph2">Choose&hellip;</span> <span class="cv2">&#9662;</span></span></td></tr>
+        </table>
+        <div class="acts">
+          <button class="btn p" disabled>Remove and move 61 Tasks</button>
+          <button class="btn s">Cancel</button>
+          <span class="gate">2 DESTINATIONS STILL NEEDED</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="note"><b>Five things here are requirements, not layout choices.</b> Every affected Project is <em>named</em> and carries <em>how many of its Tasks are affected</em>. The two unset pickers read &ldquo;Choose&hellip;&rdquo; and not a pre-filled value &mdash; there is no fallback and no silent placement. The commit is disabled and says <em>why</em>, because nothing applies until every reported Project has a destination. And the whole thing is one transaction: the removal, the Space-wide mapping and every per-Project exception apply together or not at all. <span class="tag">FR-26 &middot; FR-27 &middot; AD-17</span></p>
+  <p class="note">Always satisfiable, so this dialog can never trap the Owner: a Project's effective Status set can never be empty (FR-25), so a valid destination always exists in every affected Project.</p>
+</div>
+
+<h2 class="s">4 &middot; In flight, and refused</h2>
+<p class="c">A state added because review found the structurally <em>smaller</em> bulk move had one and this did not. FR-27's commit spans up to 50 Projects &times; 5,000 Tasks in a single transaction.</p>
+<div class="wrap" style="display:flex;gap:14px;flex-wrap:wrap">
+  <div class="frame" style="flex:1 1 380px">
+    <div class="chr"><i></i><i></i><i></i><span>in flight</span></div>
+    <div class="app">
+      <div class="bar"><span class="sp"></span>MOVING 61 TASKS ACROSS 4 PROJECTS</div>
+      <p class="note" style="margin:9px 0 0;color:var(--muted);font-size:12px">No percentage. The operation is atomic, so there is no partial progress to report and a progress bar would be untrue.</p>
+    </div>
+  </div>
+  <div class="frame" style="flex:1 1 380px">
+    <div class="chr"><i></i><i></i><i></i><span>refused</span></div>
+    <div class="app">
+      <div class="warn">Nothing was moved. Content Audit no longer has the Status you chose.</div>
+      <p class="note" style="margin:9px 0 0;color:var(--muted);font-size:12px">Visible, not silent &mdash; and it names which Project blocked it, so the Owner knows what to change.</p>
+    </div>
+  </div>
+</div>

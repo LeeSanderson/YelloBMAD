@@ -1,0 +1,191 @@
+<title>Yello — Key Screen: Registration to First Task</title>
+<style>
+/* ============================================================
+   KEY SCREEN — UJ-1, the ninety-second path
+   Governed by:
+     DESIGN.md  Components (invitation-view padding posture,
+                button-primary, text-link, context-bar, role-chip)
+                Brand & Style (nothing exists to be admired)
+     EXPERIENCE.md  Information Architecture (Unauthenticated,
+                Space home, Project - Board)
+                Voice and Tone (terse and factual; the empty-state
+                 strings are its first real test)
+                State Patterns (Empty Space, Empty Project,
+                 Belonging to no Space, Sign-in failed, Cold load)
+                Key Flow UJ-1
+   The load-bearing constraint here is a NEGATIVE one:
+     UJ-1 climax - "he never saw an empty state asking him to
+     configure something." So no Status setup, no onboarding
+     checklist, no tour, no sample data.
+   And SM-C2 makes time-in-application a COUNTER-metric: the
+   success condition for this flow is Ravi closing the tab.
+   ============================================================ */
+:root{
+  --page:#0B1020; --col:#121A31; --card:#18213C; --border:#6478A8;
+  --text:#E6EAF5; --muted:#9AA6C4; --accent:#8B80F9; --accentOn:#14103A;
+  --focus:#ADA4FB; --danger:#FB7185; --role:#241F52; --roleOn:#C3BCFC;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:#fff;color:#14141a;font:14px/1.5 var(--sans)}
+header{padding:26px 24px 18px;border-bottom:1px solid #e4e4e9;background:#fbfbfd}
+header h1{margin:0 0 5px;font-size:19px;letter-spacing:-.01em}
+header p{margin:0;max-width:90ch;color:#55555f;font-size:13.5px}
+h2.s{margin:24px 24px 4px;font-size:15px}
+h2.s .n{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:3px;background:#14141a;
+        color:#fff;font:700 11px var(--mono);margin-right:7px;vertical-align:2px}
+p.c{margin:0 24px 12px;font-size:13px;color:#6a6a74;max-width:90ch}
+.wrap{padding:0 24px 22px;display:flex;gap:14px;flex-wrap:wrap}
+.frame{border:1px solid #d9d9e0;border-radius:9px;overflow:hidden;box-shadow:0 2px 10px rgba(20,20,26,.07);flex:1 1 400px;min-width:360px}
+.chr{display:flex;align-items:center;gap:6px;padding:7px 11px;background:#ececed;border-bottom:1px solid #d9d9e0}
+.chr i{width:9px;height:9px;border-radius:50%;background:#c9c9cf}
+.chr span{margin-left:8px;font:10.5px var(--mono);color:#7a7a84}
+.app{background:var(--page);color:var(--text);padding:12px;min-height:230px}
+.mid{display:grid;place-items:center;min-height:250px}
+.form{background:var(--card);border:1px solid var(--border);border-radius:6px;padding:24px;width:330px}
+.form h3{margin:0 0 4px;font:650 16px/1.35 var(--sans);letter-spacing:-.008em}
+.form p.sub{margin:0 0 16px;font-size:13px;color:var(--muted)}
+label{display:block;font:500 10px var(--mono);letter-spacing:.08em;text-transform:uppercase;
+      color:var(--muted);margin:12px 0 5px}
+.inp{width:100%;background:var(--page);border:1px solid var(--border);border-radius:3px;
+     padding:8px 9px;font:400 14px var(--sans);color:var(--text)}
+.inp.f{outline:2px solid var(--focus);outline-offset:2px}
+.btn{width:100%;margin-top:16px;background:var(--accent);color:var(--accentOn);border:0;border-radius:2px;
+     padding:9px;font:600 13px/1 var(--sans)}
+.alt{margin:12px 0 0;text-align:center;font-size:12.5px;color:var(--muted)}
+.alt a{color:var(--accent);text-decoration:underline}
+.err{margin:12px 0 0;padding:8px 10px;border:1px solid var(--danger);border-radius:3px;
+     background:#2B1220;color:#FFD9DF;font:600 12.5px/1.45 var(--sans)}
+.ctx{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--border);
+     border-radius:3px;padding:6px 10px;margin-bottom:9px}
+.ctx .nm{font:700 13.5px/1.3 var(--sans);letter-spacing:-.005em}
+.ctx .cv{color:var(--muted);font-size:10px}
+.ctx .pj{color:var(--muted);font:500 10px var(--mono)}
+.role{margin-left:auto;background:var(--role);color:var(--roleOn);border:1px solid var(--border);
+      border-radius:2px;font:700 9px/1 var(--mono);letter-spacing:.07em;padding:4px 7px}
+.zone{background:var(--col);border:1px solid var(--border);border-radius:3px;padding:34px 16px;text-align:center}
+.zone .h{font:600 13px/1.4 var(--sans)}
+.zone .s{margin-top:5px;font:500 10px var(--mono);color:var(--muted);letter-spacing:.03em}
+.zone .b{display:inline-block;margin-top:14px;background:var(--accent);color:var(--accentOn);
+         border-radius:2px;padding:8px 14px;font:600 13px/1 var(--sans)}
+.cols{display:flex;gap:9px}
+.cw{flex:1;background:var(--col);border:1px solid var(--border);border-radius:3px;padding:9px;min-height:96px}
+.ch{display:flex;align-items:center;gap:7px;margin-bottom:6px}
+.ch .t{font:700 10.5px/1.2 var(--sans);letter-spacing:.12em;text-transform:uppercase}
+.ch .n{font:500 10px/1 var(--mono);color:var(--muted);background:var(--card);border:1px solid var(--border);
+       border-radius:9999px;padding:2px 6px}
+.ch .add{margin-left:auto;color:var(--muted);font-size:14px;line-height:1}
+.tk{background:var(--card);border:1px solid var(--border);border-radius:3px;padding:9px 10px}
+.tk .ti{font:600 13px/1.35 var(--sans)}
+.note{margin:8px 24px 0;font-size:12.5px;color:#6a6a74;max-width:90ch}
+.note b{color:#14141a}
+.bad{margin:16px 24px 22px;padding:12px 14px;border-left:3px solid #14141a;background:#f7f7fa;
+     max-width:90ch;font-size:13px;color:#3a3a44}
+.bad b{color:#14141a}
+.bad ul{margin:7px 0 0;padding-left:18px}
+.bad li{margin:3px 0}
+</style>
+
+<header>
+  <h1>Key screen — registration to first Task</h1>
+  <p>UJ-1&rsquo;s ninety-second path, and the first real test of the terse voice. The load-bearing constraint here is a <b>negative</b> one: the climax is that Ravi <em>&ldquo;never saw an empty state asking him to configure something.&rdquo;</em> And SM-C2 makes time-in-application a counter-metric — so the success condition for this whole flow is <b>Ravi closing the tab</b>.</p>
+</header>
+
+<h2 class="s"><span class="n">1</span>Register</h2>
+<p class="c">Two fields. No plan picker, no team-size question, no &ldquo;what will you use Yello for?&rdquo; &mdash; there is nothing to configure because a Space is created for him.</p>
+<div class="wrap">
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/register</span></div>
+    <div class="app mid">
+      <div class="form">
+        <h3>Create an Account</h3>
+        <p class="sub">You&rsquo;ll get a Space to put work in.</p>
+        <label for="e">Email</label>
+        <input class="inp" id="e" value="ravi@anand.dev">
+        <label for="p">Password</label>
+        <input class="inp f" id="p" type="password" value="............">
+        <button class="btn">Create Account</button>
+        <p class="alt">Already have one? <a href="#">Sign in</a></p>
+      </div>
+    </div>
+  </div>
+  <div class="frame">
+    <div class="chr"><i></i><i></i><i></i><span>sign-in failed</span></div>
+    <div class="app mid">
+      <div class="form">
+        <h3>Sign in</h3>
+        <p class="sub">&nbsp;</p>
+        <label for="e2">Email</label>
+        <input class="inp" id="e2" value="ravi@anand.dev">
+        <label for="p2">Password</label>
+        <input class="inp f" id="p2" type="password" value="......">
+        <div class="err">Email or password is incorrect.</div>
+        <button class="btn">Sign in</button>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="note"><b>One message for every cause</b>, and never &ldquo;no account found&rdquo; or &ldquo;wrong password&rdquo;. AD-23 goes further than copy: the response must be identical in <b>duration</b> too, so a registration attempt against an existing address still performs the password hash it would otherwise skip. The interface must not branch here, including on timing.</p>
+
+<h2 class="s"><span class="n">2</span>He lands in a Space he did not create</h2>
+<p class="c">&ldquo;Ravi&rsquo;s Space&rdquo; exists the moment registration completes (FR-4, AD-22 &mdash; one transaction). He never encounters a state in which he belongs to no Space, and he was never asked to make one.</p>
+<div class="wrap">
+  <div class="frame" style="flex:1 1 100%">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/ravis-space</span></div>
+    <div class="app">
+      <div class="ctx"><span class="nm">Ravi&rsquo;s Space</span><span class="cv">&#9662;</span><span class="role">OWNER</span></div>
+      <div class="zone">
+        <div class="h">No Projects yet.</div>
+        <div class="s">A Project is a place to keep Tasks.</div>
+        <span class="b">Create a Project</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 class="s"><span class="n">3</span>Empty Project &mdash; the state that must not ask him anything</h2>
+<p class="c">He creates &ldquo;Admin&rdquo;. The Board opens on the Space default Statuses &mdash; Todo / In Progress / Done (FR-24) &mdash; already there, not offered for configuration. The empty state has exactly one action, and it is the one he came for.</p>
+<div class="wrap">
+  <div class="frame" style="flex:1 1 100%">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/ravis-space/p/admin</span></div>
+    <div class="app">
+      <div class="ctx"><span class="nm">Ravi&rsquo;s Space</span><span class="cv">&#9662;</span><span class="pj">Admin</span><span class="role">OWNER</span></div>
+      <div class="zone" style="padding:28px 16px">
+        <div class="h">Nothing here yet.</div>
+        <div class="s">Add a Task and get on with it.</div>
+        <span class="b">Add a Task</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2 class="s"><span class="n">4</span>One Task, then he closes the tab</h2>
+<p class="c">Value landed before he made a single structural decision, and nothing on this surface suggests Yello is collaborative at all yet.</p>
+<div class="wrap">
+  <div class="frame" style="flex:1 1 100%">
+    <div class="chr"><i></i><i></i><i></i><span>yello.app/s/ravis-space/p/admin</span></div>
+    <div class="app">
+      <div class="ctx"><span class="nm">Ravi&rsquo;s Space</span><span class="cv">&#9662;</span><span class="pj">Admin</span><span class="role">OWNER</span></div>
+      <div class="cols">
+        <div class="cw"><div class="ch"><span class="t">Todo</span><span class="n">1</span><span class="add">+</span></div>
+          <div class="tk"><div class="ti">Chase the Q3 invoice</div></div>
+        </div>
+        <div class="cw"><div class="ch"><span class="t">In Progress</span><span class="n">0</span><span class="add">+</span></div></div>
+        <div class="cw"><div class="ch"><span class="t">Done</span><span class="n">0</span><span class="add">+</span></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="bad">
+  <b>What is deliberately missing from all four screens</b>, because UJ-1&rsquo;s climax and SM-C2 rule each of them out:
+  <ul>
+    <li>No Status or column setup step &mdash; the defaults are simply present.</li>
+    <li>No onboarding checklist, progress meter or &ldquo;3 of 5 steps complete&rdquo;.</li>
+    <li>No product tour, tooltips or coach marks.</li>
+    <li>No sample Project or demo Tasks to delete later.</li>
+    <li>No invite-your-team prompt. Ravi has no team, and UJ-1 ends with no notion that Yello is collaborative.</li>
+    <li>No celebration on first Task. Closing the tab is the win.</li>
+  </ul>
+</div>

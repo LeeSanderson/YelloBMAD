@@ -1,0 +1,366 @@
+<title>Yello — Design Directions on Dusk</title>
+<style>
+/* ==========================================================
+   Yello — design directions, round 1
+   Palette is FIXED to direction E (Dusk), dark-first.
+   These four vary the axes still open: density, type, shape,
+   elevation, weight. Same hero screen (the Board) throughout,
+   so the comparison is personality, not palette.
+
+   Dusk — dark (canonical)
+     page #0B1020  col #121A31  card #18213C  border #2A3552
+     text #E6EAF5  muted #9AA6C4  accent #8B80F9  accentOn #14103A
+     focus #ADA4FB  presence #38BDF8  danger #FB7185
+     role #241F52 on #C3BCFC
+   Dusk — light (adaptation)
+     page #F4F6FB  col #EAEEF7  card #FFFFFF  border #D7DEEC
+     text #131A2B  muted #4B5670  accent #5145CD  accentOn #FFFFFF
+     focus #6E62E6  presence #0E7490  danger #BE123C
+     role #E2E0FA on #332B96
+   ========================================================== */
+
+* { box-sizing: border-box; }
+body { margin:0; background:#fff; color:#14141a;
+  font:15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header.pg { padding:30px 26px 20px; border-bottom:1px solid #e4e4e9; background:#fbfbfd; }
+header.pg h1 { margin:0 0 6px; font-size:21px; letter-spacing:-.01em; }
+header.pg p { margin:0 0 4px; max-width:80ch; color:#55555f; font-size:14px; }
+.axes { margin:12px 0 0; font-size:13px; color:#45454f; max-width:96ch;
+  border:1px solid #e4e4e9; border-radius:8px; background:#fff; padding:11px 13px; }
+.axes b { color:#14141a; }
+.axes table { border-collapse:collapse; margin-top:8px; font-size:12.5px; width:100%; }
+.axes th,.axes td { text-align:left; padding:4px 10px 4px 0; border-bottom:1px solid #eeeef2; vertical-align:top; }
+.axes th { color:#6a6a74; font-weight:600; }
+
+section.d { padding:28px 26px; border-bottom:1px solid #e9e9ee; }
+section.d > h2 { margin:0 0 3px; font-size:18px; letter-spacing:-.01em; }
+section.d > .why { margin:0 0 16px; font-size:13.5px; color:#55555f; max-width:94ch; }
+.specs { font:11px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; color:#6a6a74;
+  background:#f7f7fa; border:1px solid #e9e9ee; border-radius:6px; padding:8px 10px; margin:0 0 14px; max-width:94ch; }
+
+/* browser frame */
+.frame { border:1px solid #d9d9e0; border-radius:10px; overflow:hidden; box-shadow:0 2px 10px rgba(20,20,26,.07); }
+.chrome { display:flex; align-items:center; gap:6px; padding:8px 11px; background:#ececed; border-bottom:1px solid #d9d9e0; }
+.chrome i { width:9px; height:9px; border-radius:50%; background:#c9c9cf; display:block; }
+.chrome span { margin-left:8px; font:10.5px ui-monospace,monospace; color:#7a7a84; }
+.row { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-start; }
+.row > .frame { flex:1 1 640px; min-width:420px; }
+.mini { flex:1 1 260px; min-width:240px; }
+.mini h4 { margin:0 0 6px; font-size:11.5px; text-transform:uppercase; letter-spacing:.08em; color:#6a6a74; }
+.mini p.n { margin:6px 0 0; font-size:11.5px; color:#7a7a84; line-height:1.45; }
+
+/* ---------- shared Dusk app shell; personality vars set per direction ---------- */
+.app { background:var(--page); color:var(--text); font-family:var(--font); padding:var(--pad); }
+.ctx { display:flex; align-items:center; gap:9px; background:var(--card); border:var(--bw) solid var(--border);
+  border-radius:var(--r); padding:var(--ctxpad); margin-bottom:var(--gap); box-shadow:var(--elev); }
+.ctx .nm { font-size:var(--fsCtx); font-weight:var(--fwCtx); letter-spacing:var(--lsCtx); }
+.ctx .cv { color:var(--muted); font-size:10px; }
+.ctx .pr { color:var(--muted); font-size:var(--fsMeta); font-family:var(--fontMeta); }
+.role { margin-left:auto; background:var(--role); color:var(--roleOn); border-radius:var(--rSm);
+  font:var(--fwRole) var(--fsRole)/1 var(--fontMeta); letter-spacing:.07em; text-transform:uppercase; padding:4px 7px; }
+.cols { display:flex; gap:var(--gap); align-items:flex-start; }
+.colw { flex:1 1 0; min-width:0; background:var(--col); border:var(--bw) solid var(--border);
+  border-radius:var(--r); padding:var(--colpad); }
+.ch { display:flex; align-items:center; gap:6px; margin-bottom:var(--gap); padding:0 2px; }
+.ch .t { font:var(--fwCol) var(--fsCol)/1.2 var(--font); letter-spacing:var(--lsCol); text-transform:var(--ttCol); }
+.ch .c { font:600 var(--fsMeta)/1 var(--fontMeta); color:var(--muted); background:var(--card);
+  border:var(--bw) solid var(--border); border-radius:999px; padding:2px 6px; }
+.ch .add { margin-left:auto; color:var(--muted); font-size:14px; line-height:1; }
+.tk { background:var(--card); border:var(--bw) solid var(--border); border-radius:var(--r);
+  padding:var(--cardpad); margin-bottom:var(--gapSm); box-shadow:var(--elev); }
+.tk:last-child { margin-bottom:0; }
+.tk.rule { border:0; border-bottom:1px solid var(--border); border-radius:0; box-shadow:none; background:transparent; }
+.tk .ti { font:var(--fwCard) var(--fsCard)/1.35 var(--fontCard); letter-spacing:var(--lsCard); }
+.tk .mt { display:flex; align-items:center; gap:6px; margin-top:var(--metaTop); }
+.lb { font:var(--fwLb) var(--fsLb)/1 var(--fontMeta); letter-spacing:.05em; text-transform:uppercase;
+  border-radius:var(--rSm); padding:2px 6px; background:#241F52; color:#C3BCFC; }
+.lb.n { background:#222C48; color:#9AA6C4; }
+.av { margin-left:auto; width:var(--avS); height:var(--avS); border-radius:var(--avR); display:grid; place-items:center;
+  font:700 var(--fsAv)/1 var(--fontMeta); background:#374363; color:#E6EAF5; }
+.ps { display:inline-flex; align-items:center; gap:4px; color:var(--presence);
+  font:600 var(--fsMeta)/1 var(--fontMeta); }
+.ps i { width:6px; height:6px; border-radius:50%; background:var(--presence); display:block; }
+.tk.fo { outline:2px solid var(--focus); outline-offset:2px; }
+.empty { text-align:center; padding:26px 14px; }
+.empty .h { font:var(--fwCard) var(--fsCard)/1.4 var(--fontCard); }
+.empty .s { margin-top:5px; color:var(--muted); font-size:var(--fsMeta); font-family:var(--fontMeta); }
+.empty .b { display:inline-block; margin-top:12px; background:var(--accent); color:var(--accentOn);
+  border-radius:var(--rSm); padding:7px 13px; font:600 var(--fsCard)/1 var(--font); }
+
+/* Dusk dark — canonical */
+.dusk-d { --page:#0B1020; --col:#121A31; --card:#18213C; --border:#2A3552; --text:#E6EAF5; --muted:#9AA6C4;
+  --accent:#8B80F9; --accentOn:#14103A; --focus:#ADA4FB; --presence:#38BDF8; --danger:#FB7185;
+  --role:#241F52; --roleOn:#C3BCFC; }
+/* Dusk light — adaptation */
+.dusk-l { --page:#F4F6FB; --col:#EAEEF7; --card:#FFFFFF; --border:#D7DEEC; --text:#131A2B; --muted:#4B5670;
+  --accent:#5145CD; --accentOn:#FFFFFF; --focus:#6E62E6; --presence:#0E7490; --danger:#BE123C;
+  --role:#E2E0FA; --roleOn:#332B96; }
+.dusk-l .lb { background:#E2E0FA; color:#332B96; }
+.dusk-l .lb.n { background:#E7EBF4; color:#4B5670; }
+.dusk-l .av { background:#4B5670; color:#fff; }
+
+/* ===== 1 · COMPACT — tight, systematic, density-first ===== */
+.p1 { --font:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif; --fontCard:var(--font); --fontMeta:var(--font);
+  --pad:10px; --gap:8px; --gapSm:5px; --colpad:8px; --ctxpad:7px 9px; --cardpad:7px 9px;
+  --r:6px; --rSm:4px; --bw:1px; --elev:0 1px 1px rgba(0,0,0,.4);
+  --fsCard:12.5px; --fwCard:500; --lsCard:0; --fsCol:11px; --fwCol:700; --lsCol:.06em; --ttCol:uppercase;
+  --fsCtx:13px; --fwCtx:650; --lsCtx:-.005em; --fsMeta:10px; --fsLb:9px; --fwLb:700;
+  --fsRole:9px; --fwRole:700; --avS:18px; --avR:50%; --fsAv:8.5px; --metaTop:6px; }
+/* ===== 2 · ROOMY — generous, humane, low-pressure ===== */
+.p2 { --font:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif; --fontCard:var(--font); --fontMeta:var(--font);
+  --pad:18px; --gap:14px; --gapSm:10px; --colpad:14px; --ctxpad:13px 15px; --cardpad:14px 15px;
+  --r:14px; --rSm:8px; --bw:1px; --elev:0 2px 8px rgba(0,0,0,.42);
+  --fsCard:15px; --fwCard:450; --lsCard:-.004em; --fsCol:12.5px; --fwCol:600; --lsCol:.01em; --ttCol:none;
+  --fsCtx:15.5px; --fwCtx:600; --lsCtx:-.012em; --fsMeta:11.5px; --fsLb:10px; --fwLb:600;
+  --fsRole:10px; --fwRole:650; --avS:26px; --avR:50%; --fsAv:10px; --metaTop:11px; }
+/* ===== 3 · EDITORIAL — type carries it, chrome recedes ===== */
+.p3 { --font:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif;
+  --fontCard:ui-serif,Georgia,"Times New Roman",serif; --fontMeta:var(--font);
+  --pad:16px; --gap:14px; --gapSm:0px; --colpad:12px 12px 2px; --ctxpad:11px 13px; --cardpad:11px 4px;
+  --r:5px; --rSm:3px; --bw:1px; --elev:none;
+  --fsCard:16px; --fwCard:400; --lsCard:-.006em; --fsCol:11px; --fwCol:700; --lsCol:.1em; --ttCol:uppercase;
+  --fsCtx:16px; --fwCtx:500; --lsCtx:-.014em; --fsMeta:10.5px; --fsLb:9.5px; --fwLb:600;
+  --fsRole:9.5px; --fwRole:650; --avS:21px; --avR:50%; --fsAv:9px; --metaTop:9px; }
+/* ===== 4 · ENGINEERED — mono metadata, hard edges, tool-like ===== */
+.p4 { --font:ui-sans-serif,system-ui,"Segoe UI",Roboto,sans-serif; --fontCard:var(--font);
+  --fontMeta:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --pad:12px; --gap:9px; --gapSm:6px; --colpad:9px; --ctxpad:8px 10px; --cardpad:9px 10px;
+  --r:3px; --rSm:2px; --bw:1px; --elev:none;
+  --fsCard:13px; --fwCard:600; --lsCard:-.003em; --fsCol:10.5px; --fwCol:700; --lsCol:.12em; --ttCol:uppercase;
+  --fsCtx:13.5px; --fwCtx:700; --lsCtx:-.005em; --fsMeta:10px; --fsLb:9px; --fwLb:700;
+  --fsRole:9px; --fwRole:700; --avS:20px; --avR:3px; --fsAv:8.5px; --metaTop:8px; }
+.p4 .colw, .p4 .tk, .p4 .ctx { border-color:#33406B; }
+</style>
+
+<header class="pg">
+  <h1>Yello — design directions on Dusk</h1>
+  <p>The palette is fixed: direction <b>E &mdash; Dusk</b>, shown dark because you chose the dark-first option. These four vary only what is still open, applied to the same hero screen so the comparison is <em>personality</em> rather than colour.</p>
+  <p>Hero is the <b>Board</b> &mdash; a view of the Project &ldquo;Website Rebuild&rdquo; in the Space &ldquo;Northwind Redesign&rdquo;, columns by Status. Each direction also shows the two states that constrain it hardest: the same Board as a <b>Viewer</b>, and an <b>empty Project</b>.</p>
+  <div class="axes">
+    <b>What varies, and why each axis is load-bearing rather than taste</b>
+    <table>
+      <tr><th>Density</th><td>FR-28 requires the Board usable at 5,000 Tasks in a Project while still meeting NFR-5 and NFR-9. The PRD says plainly the three cannot all hold naively. Roomier cards mean fewer visible per screen.</td></tr>
+      <tr><th>Type &amp; weight</th><td>Task titles are the only content on a card. Everything else is metadata. How much the title dominates decides whether the Board scans or reads.</td></tr>
+      <tr><th>Shape &amp; elevation</th><td>Dusk carries a tinted ground, so shadow separation is weaker than it would be on grey. Radius and border weight are what actually hold the card apart from the column.</td></tr>
+      <tr><th>Motion implication</th><td>You adopted motion as a concern. A dense systematic surface implies short, flat transitions; a roomy one implies longer, softer settle. The direction sets the timing budget, so it is chosen here rather than later.</td></tr>
+    </table>
+  </div>
+</header>
+
+<!-- ==================== 1 ==================== -->
+<section class="d">
+  <h2>1 &mdash; Compact</h2>
+  <p class="why">Tight and systematic: small uppercase column heads, 12.5px card titles, 5px between cards. Roughly twice the Tasks on screen as direction 2, which is the direct answer to FR-28&rsquo;s 5,000-Task bound &mdash; the fewer virtualised rows you need, the less of NFR-9&rsquo;s keyboard reachability problem you inherit. The cost is that it reads as a control panel; there is no warmth here and long Task titles get cramped.</p>
+  <p class="specs">radius 6 &middot; card pad 7/9 &middot; gap 5 &middot; title 12.5px/500 &middot; col head 11px/700 uppercase &middot; meta 10px &middot; elevation 1px hairline shadow &middot; motion implied: 100&ndash;140ms, flat easing</p>
+  <div class="row">
+    <div class="frame">
+      <div class="chrome"><i></i><i></i><i></i><span>yello.app/s/northwind/p/website-rebuild</span></div>
+      <div class="app dusk-d p1">
+        <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pr">Website Rebuild</span><span class="role">Admin</span></div>
+        <div class="cols">
+          <div class="colw"><div class="ch"><span class="t">Todo</span><span class="c">2</span><span class="add">+</span></div>
+            <div class="tk"><div class="ti">Wire up contact form validation</div><div class="mt"><span class="lb n">Build</span></div></div>
+            <div class="tk"><div class="ti">Audit alt text on gallery images</div><div class="mt"><span class="lb">Content</span><span class="av">NA</span></div></div>
+          </div>
+          <div class="colw"><div class="ch"><span class="t">In Progress</span><span class="c">2</span><span class="add">+</span></div>
+            <div class="tk fo"><div class="ti">Draft homepage acceptance criteria</div><div class="mt"><span class="lb">Content</span><span class="ps"><i></i>2 editing</span><span class="av">NA</span></div></div>
+            <div class="tk"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+          </div>
+          <div class="colw"><div class="ch"><span class="t">Done</span><span class="c">1</span><span class="add">+</span></div>
+            <div class="tk"><div class="ti">Migrate legacy blog posts</div><div class="mt"><span class="lb">Content</span><span class="av">RA</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mini">
+      <h4>As a Viewer</h4>
+      <div class="frame"><div class="app dusk-d p1">
+        <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="role">Viewer</span></div>
+        <div class="cols"><div class="colw"><div class="ch"><span class="t">In Progress</span><span class="c">2</span></div>
+          <div class="tk"><div class="ti">Draft homepage acceptance criteria</div><div class="mt"><span class="lb">Content</span><span class="av">NA</span></div></div>
+          <div class="tk"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+        </div></div>
+      </div></div>
+      <p class="n">The <b>+</b> is gone, not dimmed &mdash; UJ-4 requires absent, not present-and-failing.</p>
+      <h4 style="margin-top:14px">Empty Project</h4>
+      <div class="frame"><div class="app dusk-d p1">
+        <div class="ctx"><span class="nm">Ravi&rsquo;s Space</span><span class="cv">&#9662;</span><span class="role">Owner</span></div>
+        <div class="colw"><div class="empty"><div class="h">Nothing in Admin yet</div><div class="s">Add a Task and get on with it.</div><span class="b">Add a Task</span></div></div>
+      </div></div>
+      <p class="n">UJ-1: never asks him to configure anything.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 2 ==================== -->
+<section class="d">
+  <h2>2 &mdash; Roomy</h2>
+  <p class="why">Generous and humane: 15px titles at a light weight, 14px radius, real breathing room between cards. The most pleasant of the four to sit in for an hour and the one that best matches a product whose success condition is a calm exit rather than a long session. The cost is direct and measurable &mdash; roughly half the Tasks per screen, which makes FR-28&rsquo;s 5,000-Task Board a harder virtualisation problem and more scrolling for everyone.</p>
+  <p class="specs">radius 14 &middot; card pad 14/15 &middot; gap 10 &middot; title 15px/450 &middot; col head 12.5px/600 sentence case &middot; meta 11.5px &middot; elevation 2/8 soft &middot; motion implied: 180&ndash;240ms, eased settle</p>
+  <div class="row">
+    <div class="frame">
+      <div class="chrome"><i></i><i></i><i></i><span>yello.app/s/northwind/p/website-rebuild</span></div>
+      <div class="app dusk-d p2">
+        <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pr">Website Rebuild</span><span class="role">Admin</span></div>
+        <div class="cols">
+          <div class="colw"><div class="ch"><span class="t">Todo</span><span class="c">2</span><span class="add">+</span></div>
+            <div class="tk"><div class="ti">Wire up contact form validation</div><div class="mt"><span class="lb n">Build</span></div></div>
+            <div class="tk"><div class="ti">Audit alt text on gallery images</div><div class="mt"><span class="lb">Content</span><span class="av">NA</span></div></div>
+          </div>
+          <div class="colw"><div class="ch"><span class="t">In Progress</span><span class="c">2</span><span class="add">+</span></div>
+            <div class="tk fo"><div class="ti">Draft homepage acceptance criteria</div><div class="mt"><span class="lb">Content</span><span class="ps"><i></i>2 editing</span><span class="av">NA</span></div></div>
+            <div class="tk"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+          </div>
+          <div class="colw"><div class="ch"><span class="t">Done</span><span class="c">1</span><span class="add">+</span></div>
+            <div class="tk"><div class="ti">Migrate legacy blog posts</div><div class="mt"><span class="lb">Content</span><span class="av">RA</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mini">
+      <h4>As a Viewer</h4>
+      <div class="frame"><div class="app dusk-d p2">
+        <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="role">Viewer</span></div>
+        <div class="cols"><div class="colw"><div class="ch"><span class="t">In Progress</span><span class="c">2</span></div>
+          <div class="tk"><div class="ti">Draft homepage acceptance criteria</div><div class="mt"><span class="lb">Content</span><span class="av">NA</span></div></div>
+          <div class="tk"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+        </div></div>
+      </div></div>
+      <p class="n">Roomier cards make the missing affordance harder to notice &mdash; a real cost against UJ-4.</p>
+      <h4 style="margin-top:14px">Empty Project</h4>
+      <div class="frame"><div class="app dusk-d p2">
+        <div class="ctx"><span class="nm">Ravi&rsquo;s Space</span><span class="cv">&#9662;</span><span class="role">Owner</span></div>
+        <div class="colw"><div class="empty"><div class="h">Nothing in Admin yet</div><div class="s">Add a Task and get on with it.</div><span class="b">Add a Task</span></div></div>
+      </div></div>
+      <p class="n">The empty state is where this direction is strongest.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 3 ==================== -->
+<section class="d">
+  <h2>3 &mdash; Editorial</h2>
+  <p class="why">The chrome recedes and type does the work: Task titles set in a serif at 16px, cards reduced to rows separated by a hairline rule rather than boxed and floated. Sidesteps Dusk&rsquo;s weakest property &mdash; shadows separate poorly on a tinted ground, so this direction stops relying on them. The risk is that a Task stops reading as a draggable object; a rule-separated row invites a click, not a lift, which fights the long-press gesture you chose.</p>
+  <p class="specs">radius 5 &middot; card pad 11/4 &middot; rule separators, no shadow &middot; title 16px/400 serif &middot; col head 11px/700 wide uppercase &middot; meta 10.5px sans &middot; motion implied: 140&ndash;180ms, opacity-led</p>
+  <div class="row">
+    <div class="frame">
+      <div class="chrome"><i></i><i></i><i></i><span>yello.app/s/northwind/p/website-rebuild</span></div>
+      <div class="app dusk-d p3">
+        <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pr">Website Rebuild</span><span class="role">Admin</span></div>
+        <div class="cols">
+          <div class="colw"><div class="ch"><span class="t">Todo</span><span class="c">2</span><span class="add">+</span></div>
+            <div class="tk rule"><div class="ti">Wire up contact form validation</div><div class="mt"><span class="lb n">Build</span></div></div>
+            <div class="tk rule"><div class="ti">Audit alt text on gallery images</div><div class="mt"><span class="lb">Content</span><span class="av">NA</span></div></div>
+          </div>
+          <div class="colw"><div class="ch"><span class="t">In Progress</span><span class="c">2</span><span class="add">+</span></div>
+            <div class="tk rule fo"><div class="ti">Draft homepage acceptance criteria</div><div class="mt"><span class="lb">Content</span><span class="ps"><i></i>2 editing</span><span class="av">NA</span></div></div>
+            <div class="tk rule"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+          </div>
+          <div class="colw"><div class="ch"><span class="t">Done</span><span class="c">1</span><span class="add">+</span></div>
+            <div class="tk rule"><div class="ti">Migrate legacy blog posts</div><div class="mt"><span class="lb">Content</span><span class="av">RA</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mini">
+      <h4>As a Viewer</h4>
+      <div class="frame"><div class="app dusk-d p3">
+        <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="role">Viewer</span></div>
+        <div class="cols"><div class="colw"><div class="ch"><span class="t">In Progress</span><span class="c">2</span></div>
+          <div class="tk rule"><div class="ti">Draft homepage acceptance criteria</div><div class="mt"><span class="lb">Content</span><span class="av">NA</span></div></div>
+          <div class="tk rule"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+        </div></div>
+      </div></div>
+      <p class="n">Reads best of the four as a Viewer &mdash; a read-only list is what it already looks like.</p>
+      <h4 style="margin-top:14px">Empty Project</h4>
+      <div class="frame"><div class="app dusk-d p3">
+        <div class="ctx"><span class="nm">Ravi&rsquo;s Space</span><span class="cv">&#9662;</span><span class="role">Owner</span></div>
+        <div class="colw"><div class="empty"><div class="h">Nothing in Admin yet</div><div class="s">Add a Task and get on with it.</div><span class="b">Add a Task</span></div></div>
+      </div></div>
+      <p class="n">Serif gives the empty state a settled, unhurried tone.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 4 ==================== -->
+<section class="d">
+  <h2>4 &mdash; Engineered</h2>
+  <p class="why">Hard 3px corners, brighter borders, no shadow at all, and every piece of metadata &mdash; counts, Labels, initials, the Role chip &mdash; set in monospace. Structure is drawn rather than floated, which is the most robust choice at density and the one that survives Dusk&rsquo;s tinted ground best. It also speaks directly to who this is for: Ravi is a freelance developer and Tomás drives Yello from a deploy script. The risk is that it signals &ldquo;developer tool&rdquo; loudly enough to put off Beatriz, the client Viewer who never asked for one.</p>
+  <p class="specs">radius 3 &middot; card pad 9/10 &middot; gap 6 &middot; title 13px/600 sans &middot; all metadata monospace &middot; borders #33406B, no shadow &middot; square-ish avatars &middot; motion implied: 90&ndash;120ms, near-instant</p>
+  <div class="row">
+    <div class="frame">
+      <div class="chrome"><i></i><i></i><i></i><span>yello.app/s/northwind/p/website-rebuild</span></div>
+      <div class="app dusk-d p4">
+        <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pr">Website Rebuild</span><span class="role">Admin</span></div>
+        <div class="cols">
+          <div class="colw"><div class="ch"><span class="t">Todo</span><span class="c">2</span><span class="add">+</span></div>
+            <div class="tk"><div class="ti">Wire up contact form validation</div><div class="mt"><span class="lb n">Build</span></div></div>
+            <div class="tk"><div class="ti">Audit alt text on gallery images</div><div class="mt"><span class="lb">Content</span><span class="av">NA</span></div></div>
+          </div>
+          <div class="colw"><div class="ch"><span class="t">In Progress</span><span class="c">2</span><span class="add">+</span></div>
+            <div class="tk fo"><div class="ti">Draft homepage acceptance criteria</div><div class="mt"><span class="lb">Content</span><span class="ps"><i></i>2 editing</span><span class="av">NA</span></div></div>
+            <div class="tk"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+          </div>
+          <div class="colw"><div class="ch"><span class="t">Done</span><span class="c">1</span><span class="add">+</span></div>
+            <div class="tk"><div class="ti">Migrate legacy blog posts</div><div class="mt"><span class="lb">Content</span><span class="av">RA</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="mini">
+      <h4>As a Viewer</h4>
+      <div class="frame"><div class="app dusk-d p4">
+        <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="role">Viewer</span></div>
+        <div class="cols"><div class="colw"><div class="ch"><span class="t">In Progress</span><span class="c">2</span></div>
+          <div class="tk"><div class="ti">Draft homepage acceptance criteria</div><div class="mt"><span class="lb">Content</span><span class="av">NA</span></div></div>
+          <div class="tk"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+        </div></div>
+      </div></div>
+      <p class="n">Mono Role chip makes standing the most legible of the four &mdash; strongest on UJ-4.</p>
+      <h4 style="margin-top:14px">Empty Project</h4>
+      <div class="frame"><div class="app dusk-d p4">
+        <div class="ctx"><span class="nm">Ravi&rsquo;s Space</span><span class="cv">&#9662;</span><span class="role">Owner</span></div>
+        <div class="colw"><div class="empty"><div class="h">Nothing in Admin yet</div><div class="s">Add a Task and get on with it.</div><span class="b">Add a Task</span></div></div>
+      </div></div>
+      <p class="n">Terse tone suits it; risks reading cold to a client.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== light adaptation ==================== -->
+<section class="d">
+  <h2>Light, for whichever you pick</h2>
+  <p class="why">Dusk is dark-first, so light is the adaptation rather than the origin. Shown here in directions 1 and 4 &mdash; the two extremes of density and shape &mdash; to confirm the tinted-blue light ground holds up at both ends before it is committed to <code>DESIGN.md</code>.</p>
+  <div class="row">
+    <div class="frame" style="flex:1 1 420px">
+      <div class="chrome"><i></i><i></i><i></i><span>1 &mdash; Compact, light</span></div>
+      <div class="app dusk-l p1">
+        <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pr">Website Rebuild</span><span class="role">Admin</span></div>
+        <div class="cols">
+          <div class="colw"><div class="ch"><span class="t">In Progress</span><span class="c">2</span><span class="add">+</span></div>
+            <div class="tk fo"><div class="ti">Draft homepage acceptance criteria</div><div class="mt"><span class="lb">Content</span><span class="ps"><i></i>2 editing</span><span class="av">NA</span></div></div>
+            <div class="tk"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+          </div>
+          <div class="colw"><div class="ch"><span class="t">Done</span><span class="c">1</span><span class="add">+</span></div>
+            <div class="tk"><div class="ti">Migrate legacy blog posts</div><div class="mt"><span class="lb">Content</span><span class="av">RA</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="frame" style="flex:1 1 420px">
+      <div class="chrome"><i></i><i></i><i></i><span>4 &mdash; Engineered, light</span></div>
+      <div class="app dusk-l p4">
+        <div class="ctx"><span class="nm">Northwind Redesign</span><span class="cv">&#9662;</span><span class="pr">Website Rebuild</span><span class="role">Admin</span></div>
+        <div class="cols">
+          <div class="colw"><div class="ch"><span class="t">In Progress</span><span class="c">2</span><span class="add">+</span></div>
+            <div class="tk fo"><div class="ti">Draft homepage acceptance criteria</div><div class="mt"><span class="lb">Content</span><span class="ps"><i></i>2 editing</span><span class="av">NA</span></div></div>
+            <div class="tk"><div class="ti">Sign off colour direction</div><div class="mt"><span class="lb n">Design</span><span class="av">BR</span></div></div>
+          </div>
+          <div class="colw"><div class="ch"><span class="t">Done</span><span class="c">1</span><span class="add">+</span></div>
+            <div class="tk"><div class="ti">Migrate legacy blog posts</div><div class="mt"><span class="lb">Content</span><span class="av">RA</span></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

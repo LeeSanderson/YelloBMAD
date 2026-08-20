@@ -1,0 +1,528 @@
+<title>Yello — Colour Theme Candidates</title>
+<style>
+/* ============================================================
+   Yello — colour theme candidates, round 1
+   Five directions, deliberately differing in REGISTER not hue.
+   Light and dark are peers (both modes in scope per Lee).
+   Concrete hex per variation documented below each block.
+   ============================================================ */
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: #ffffff;
+  color: #14141a;
+}
+:root[data-theme="dark"] body, body { }
+header.pg {
+  padding: 32px 28px 22px;
+  border-bottom: 1px solid #e4e4e9;
+  background: #fbfbfd;
+}
+header.pg h1 { margin: 0 0 6px; font-size: 22px; letter-spacing: -0.01em; }
+header.pg p { margin: 0; max-width: 74ch; color: #55555f; font-size: 14px; }
+.legend {
+  margin: 14px 0 0; padding: 12px 14px; border: 1px solid #e4e4e9;
+  border-radius: 8px; background: #fff; font-size: 13px; color: #45454f;
+  max-width: 96ch;
+}
+.legend b { color: #14141a; }
+.legend ul { margin: 8px 0 0; padding-left: 18px; }
+.legend li { margin: 3px 0; }
+
+section.v { padding: 30px 28px; border-bottom: 1px solid #e9e9ee; }
+section.v > h2 { margin: 0 0 3px; font-size: 18px; letter-spacing: -0.01em; }
+section.v > .reg { margin: 0 0 4px; font-size: 14px; color: #55555f; font-style: italic; }
+section.v > .note { margin: 0 0 18px; font-size: 13px; color: #6a6a74; max-width: 92ch; }
+.pair { display: flex; gap: 18px; flex-wrap: wrap; }
+.panel { flex: 1 1 420px; min-width: 340px; border-radius: 12px; overflow: hidden; border: 1px solid rgba(0,0,0,.14); }
+.panel .mode {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .09em;
+  padding: 7px 12px; font-weight: 600;
+  background: var(--col); color: var(--text2); border-bottom: 1px solid var(--border);
+}
+
+/* ---- token chips ---- */
+.toks { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px; background: var(--page); }
+.tok { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--text2);
+       background: var(--card); border: 1px solid var(--border); border-radius: 999px; padding: 3px 9px 3px 4px; }
+.sw { width: 15px; height: 15px; border-radius: 50%; border: 1px solid rgba(0,0,0,.22); flex: 0 0 auto; }
+
+/* ---- board snippet ---- */
+.board { background: var(--page); padding: 12px; }
+.ctxbar {
+  display: flex; align-items: center; gap: 9px; padding: 8px 10px; margin-bottom: 11px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 9px;
+}
+.ctxbar .sname { font-weight: 650; color: var(--text); font-size: 14px; letter-spacing: -0.005em; }
+.ctxbar .chev { color: var(--text2); font-size: 11px; }
+.rolechip {
+  margin-left: auto; font-size: 10.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--roleOn); background: var(--role); border-radius: 5px; padding: 3px 7px;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.col { background: var(--col); border: 1px solid var(--border); border-radius: 10px; padding: 9px; }
+.colhead { display: flex; align-items: center; gap: 7px; margin-bottom: 8px; padding: 0 2px; }
+.colhead .t { font-size: 12.5px; font-weight: 700; color: var(--text); letter-spacing: .01em; }
+.colhead .n { font-size: 11px; color: var(--text2); background: var(--card); border: 1px solid var(--border);
+              border-radius: 999px; padding: 1px 7px; }
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  padding: 9px 10px; margin-bottom: 7px; box-shadow: var(--lift);
+}
+.card:last-child { margin-bottom: 0; }
+.card .ti { font-size: 13.5px; color: var(--text); line-height: 1.35; }
+.card .meta { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.lbl { font-size: 10px; font-weight: 650; letter-spacing: .04em; text-transform: uppercase;
+       border-radius: 4px; padding: 2px 6px; }
+.av { width: 20px; height: 20px; border-radius: 50%; font-size: 9.5px; font-weight: 700;
+      display: grid; place-items: center; margin-left: auto; letter-spacing: .02em; }
+.pres { display: inline-flex; align-items: center; gap: 4px; font-size: 10.5px; font-weight: 600; color: var(--presence); }
+.pres .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--presence); }
+.card.focused { outline: 2px solid var(--focus); outline-offset: 2px; }
+.card.lifted { box-shadow: var(--liftDrag); transform: rotate(-1.1deg); }
+.dz { border: 2px dashed var(--focus); border-radius: 8px; height: 30px; margin-bottom: 7px;
+      display: grid; place-items: center; font-size: 10.5px; color: var(--focus); font-weight: 600; letter-spacing: .03em; }
+.danger { margin-top: 9px; font-size: 11.5px; color: var(--danger); display: flex; align-items: center; gap: 5px; font-weight: 600; }
+.hexes { padding: 9px 12px 12px; background: var(--page); border-top: 1px solid var(--border);
+         font: 10.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--text2); }
+
+/* ============ A — STUDIO ============
+   light  page #F1F2F4  col #EBECF0  card #FFFFFF  border #DFE1E6
+          text #172B4D  text2 #44546F  accent #0C66E4  accentOn #FFFFFF
+          focus #1868DB  presence #6E5DC6  danger #C9372C  role #DDE5FA/#0C3B8C
+   dark   page #1F1F21  col #242528  card #2C2C2E  border #3B3D42
+          text #E3E4E8  text2 #A6A9B4  accent #4C9AFF  accentOn #0A1F44
+          focus #85B8FF  presence #9F8FEF  danger #F87168  role #1C3A66/#9EC5FF
+=================================================== */
+.a-light { --page:#F1F2F4; --col:#EBECF0; --card:#FFFFFF; --border:#DFE1E6; --text:#172B4D; --text2:#44546F;
+  --accent:#0C66E4; --accentOn:#FFFFFF; --focus:#1868DB; --presence:#6E5DC6; --danger:#C9372C;
+  --role:#DDE5FA; --roleOn:#0C3B8C; --lift:0 1px 1px rgba(9,30,66,.13); --liftDrag:0 8px 16px rgba(9,30,66,.22); }
+.a-dark { --page:#1F1F21; --col:#242528; --card:#2C2C2E; --border:#3B3D42; --text:#E3E4E8; --text2:#A6A9B4;
+  --accent:#4C9AFF; --accentOn:#0A1F44; --focus:#85B8FF; --presence:#9F8FEF; --danger:#F87168;
+  --role:#1C3A66; --roleOn:#9EC5FF; --lift:0 1px 1px rgba(0,0,0,.5); --liftDrag:0 8px 16px rgba(0,0,0,.6); }
+
+/* ============ B — SLATE ============
+   light  page #FAFAFA  col #F2F2F2  card #FFFFFF  border #E2E2E2
+          text #18181B  text2 #52525B  accent #18181B  accentOn #FFFFFF
+          focus #2563EB  presence #0F766E  danger #B91C1C  role #E7E7EA/#27272A
+   dark   page #0C0C0D  col #17171A  card #1F1F23  border #2E2E33
+          text #F4F4F5  text2 #A1A1AA  accent #F4F4F5  accentOn #18181B
+          focus #60A5FA  presence #2DD4BF  danger #F87171  role #2A2A30/#D4D4D8
+=================================================== */
+.b-light { --page:#FAFAFA; --col:#F2F2F2; --card:#FFFFFF; --border:#E2E2E2; --text:#18181B; --text2:#52525B;
+  --accent:#18181B; --accentOn:#FFFFFF; --focus:#2563EB; --presence:#0F766E; --danger:#B91C1C;
+  --role:#E7E7EA; --roleOn:#27272A; --lift:0 1px 2px rgba(0,0,0,.07); --liftDrag:0 10px 22px rgba(0,0,0,.16); }
+.b-dark { --page:#0C0C0D; --col:#17171A; --card:#1F1F23; --border:#2E2E33; --text:#F4F4F5; --text2:#A1A1AA;
+  --accent:#F4F4F5; --accentOn:#18181B; --focus:#60A5FA; --presence:#2DD4BF; --danger:#F87171;
+  --role:#2A2A30; --roleOn:#D4D4D8; --lift:0 1px 2px rgba(0,0,0,.6); --liftDrag:0 10px 22px rgba(0,0,0,.7); }
+
+/* ============ C — PAPER ============
+   light  page #F7F4EF  col #F1EDE5  card #FFFDFA  border #E4DDD1
+          text #2B2622  text2 #5C544B  accent #1F5E56  accentOn #FFFFFF
+          focus #1F5E56  presence #A9682B  danger #A33A2C  role #E6EADF/#2E4A3F
+   dark   page #1A1815  col #201D19  card #272320  border #38332C
+          text #EFE9E0  text2 #B0A79A  accent #6FBFAE  accentOn #10201C
+          focus #8FD6C6  presence #D9A05B  danger #E8776B  role #2C332C/#A8C2AE
+=================================================== */
+.c-light { --page:#F7F4EF; --col:#F1EDE5; --card:#FFFDFA; --border:#E4DDD1; --text:#2B2622; --text2:#5C544B;
+  --accent:#1F5E56; --accentOn:#FFFFFF; --focus:#1F5E56; --presence:#A9682B; --danger:#A33A2C;
+  --role:#E6EADF; --roleOn:#2E4A3F; --lift:0 1px 2px rgba(58,48,38,.10); --liftDrag:0 9px 20px rgba(58,48,38,.20); }
+.c-dark { --page:#1A1815; --col:#201D19; --card:#272320; --border:#38332C; --text:#EFE9E0; --text2:#B0A79A;
+  --accent:#6FBFAE; --accentOn:#10201C; --focus:#8FD6C6; --presence:#D9A05B; --danger:#E8776B;
+  --role:#2C332C; --roleOn:#A8C2AE; --lift:0 1px 2px rgba(0,0,0,.55); --liftDrag:0 9px 20px rgba(0,0,0,.66); }
+
+/* ============ D — SIGNAL ============
+   light  page #FFFFFF  col #F4F5F7  card #FFFFFF  border #C9CDD4
+          text #0A0A0A  text2 #4A4E57  accent #4338CA  accentOn #FFFFFF
+          focus #4338CA  presence #047857  danger #DC2626  role #E4E2FB/#312A9E
+   dark   page #08080A  col #121216  card #1A1A20  border #33333D
+          text #FAFAFA  text2 #9CA0AC  accent #A5B4FC  accentOn #1E1B4B
+          focus #C7D2FE  presence #34D399  danger #F87171  role #262246/#BFC6FE
+=================================================== */
+.d-light { --page:#FFFFFF; --col:#F4F5F7; --card:#FFFFFF; --border:#C9CDD4; --text:#0A0A0A; --text2:#4A4E57;
+  --accent:#4338CA; --accentOn:#FFFFFF; --focus:#4338CA; --presence:#047857; --danger:#DC2626;
+  --role:#E4E2FB; --roleOn:#312A9E; --lift:none; --liftDrag:0 6px 0 rgba(10,10,10,.18); }
+.d-dark { --page:#08080A; --col:#121216; --card:#1A1A20; --border:#33333D; --text:#FAFAFA; --text2:#9CA0AC;
+  --accent:#A5B4FC; --accentOn:#1E1B4B; --focus:#C7D2FE; --presence:#34D399; --danger:#F87171;
+  --role:#262246; --roleOn:#BFC6FE; --lift:none; --liftDrag:0 6px 0 rgba(0,0,0,.6); }
+
+/* ============ E — DUSK ============
+   light  page #F4F6FB  col #EAEEF7  card #FFFFFF  border #D7DEEC
+          text #131A2B  text2 #4B5670  accent #5145CD  accentOn #FFFFFF
+          focus #6E62E6  presence #0E7490  danger #BE123C  role #E2E0FA/#332B96
+   dark   page #0B1020  col #121A31  card #18213C  border #2A3552
+          text #E6EAF5  text2 #9AA6C4  accent #8B80F9  accentOn #14103A
+          focus #ADA4FB  presence #38BDF8  danger #FB7185  role #241F52/#C3BCFC
+=================================================== */
+.e-light { --page:#F4F6FB; --col:#EAEEF7; --card:#FFFFFF; --border:#D7DEEC; --text:#131A2B; --text2:#4B5670;
+  --accent:#5145CD; --accentOn:#FFFFFF; --focus:#6E62E6; --presence:#0E7490; --danger:#BE123C;
+  --role:#E2E0FA; --roleOn:#332B96; --lift:0 1px 2px rgba(19,26,43,.10); --liftDrag:0 10px 20px rgba(19,26,43,.20); }
+.e-dark { --page:#0B1020; --col:#121A31; --card:#18213C; --border:#2A3552; --text:#E6EAF5; --text2:#9AA6C4;
+  --accent:#8B80F9; --accentOn:#14103A; --focus:#ADA4FB; --presence:#38BDF8; --danger:#FB7185;
+  --role:#241F52; --roleOn:#C3BCFC; --lift:0 1px 2px rgba(0,0,0,.55); --liftDrag:0 10px 20px rgba(0,0,0,.66); }
+</style>
+
+<header class="pg">
+  <h1>Yello — colour theme candidates</h1>
+  <p>Five directions, chosen to differ in <em>register</em> rather than hue, so the decision is about what Yello should feel like rather than which blue. Light and dark shown as peers — both are in scope, so every token carries a pair. Nothing here is a recommendation; pick one, mix two, or reject all five and I&rsquo;ll render another round.</p>
+  <div class="legend">
+    <b>Every panel shows the same nine semantic roles</b>, each earning its place from a Yello requirement rather than from decoration:
+    <ul>
+      <li><b>page / column / card</b> — the three Board grounds (FR-28). Yello&rsquo;s Board is a <em>view</em> of a Project, columns are Statuses.</li>
+      <li><b>text / text-muted</b> — body and secondary. Both must clear WCAG 2.1 AA (NFR-9).</li>
+      <li><b>accent</b> — the one colour that means &ldquo;this acts&rdquo;.</li>
+      <li><b>focus</b> — separate from accent on purpose. NFR-9 requires every Board pointer move to have a keyboard equivalent, so the focus ring is load-bearing, not a default.</li>
+      <li><b>presence</b> — FR-32. Shown here paired with a text count, never colour alone, because NFR-9 forbids conveying it by colour or position alone.</li>
+      <li><b>role</b> — UJ-4 requires the acting Role legible at all times. It is a permanent chrome element, not a badge that appears sometimes.</li>
+      <li><b>danger</b> — deletion is irreversible with no trash (&sect;6.2), and you chose to keep it that way, so this token does real work.</li>
+    </ul>
+    Each snippet shows a card <b>focused</b> (keyboard path), a card <b>lifted</b> mid-drag with a drop zone (pointer and long-press touch path), and a destructive line — the three states the palette has to survive.
+  </div>
+</header>
+
+<!-- ============ A ============ -->
+<section class="v">
+  <h2>A &mdash; Studio</h2>
+  <p class="reg">Professional, unsurprising, immediately legible to anyone who has ever used a board tool.</p>
+  <p class="note">The closest of the five to the reference product&rsquo;s visual language: cool blue accent, white cards floating on a tinted column ground, soft one-pixel lift. Lowest learning cost and the most &ldquo;of course&rdquo; — which is also the argument against it, since Yello would read as a Trello clone rather than its own product.</p>
+  <div class="pair">
+    <div class="panel a-light">
+      <div class="mode">Light</div>
+      <div class="toks">
+        <span class="tok"><span class="sw" style="background:#F1F2F4"></span>page</span>
+        <span class="tok"><span class="sw" style="background:#EBECF0"></span>column</span>
+        <span class="tok"><span class="sw" style="background:#FFFFFF"></span>card</span>
+        <span class="tok"><span class="sw" style="background:#DFE1E6"></span>border</span>
+        <span class="tok"><span class="sw" style="background:#172B4D"></span>text</span>
+        <span class="tok"><span class="sw" style="background:#44546F"></span>muted</span>
+        <span class="tok"><span class="sw" style="background:#0C66E4"></span>accent</span>
+        <span class="tok"><span class="sw" style="background:#1868DB"></span>focus</span>
+        <span class="tok"><span class="sw" style="background:#6E5DC6"></span>presence</span>
+        <span class="tok"><span class="sw" style="background:#C9372C"></span>danger</span>
+      </div>
+      <div class="board">
+        <div class="ctxbar"><span class="sname">Northwind Redesign</span><span class="chev">&#9662;</span><span class="rolechip">Admin</span></div>
+        <div class="col">
+          <div class="colhead"><span class="t">In Progress</span><span class="n">3</span></div>
+          <div class="card focused"><div class="ti">Draft homepage acceptance criteria</div>
+            <div class="meta"><span class="lbl" style="background:#DDE5FA;color:#0C3B8C">Content</span><span class="pres"><span class="dot"></span>2 editing</span><span class="av" style="background:#6E5DC6;color:#fff">NA</span></div></div>
+          <div class="dz">Drop here</div>
+          <div class="card lifted"><div class="ti">Sign off colour direction</div>
+            <div class="meta"><span class="lbl" style="background:#EBECF0;color:#44546F">Design</span><span class="av" style="background:#44546F;color:#fff">BR</span></div></div>
+          <div class="card"><div class="ti">Migrate legacy blog posts</div>
+            <div class="meta"><span class="lbl" style="background:#DDE5FA;color:#0C3B8C">Content</span></div></div>
+        </div>
+        <div class="danger">&#9888; Deleting this Project destroys its Tasks. This cannot be undone.</div>
+      </div>
+      <div class="hexes">page #F1F2F4 &middot; col #EBECF0 &middot; card #FFFFFF &middot; border #DFE1E6 &middot; text #172B4D &middot; muted #44546F<br>accent #0C66E4 &middot; focus #1868DB &middot; presence #6E5DC6 &middot; danger #C9372C</div>
+    </div>
+    <div class="panel a-dark">
+      <div class="mode">Dark</div>
+      <div class="toks">
+        <span class="tok"><span class="sw" style="background:#1F1F21"></span>page</span>
+        <span class="tok"><span class="sw" style="background:#242528"></span>column</span>
+        <span class="tok"><span class="sw" style="background:#2C2C2E"></span>card</span>
+        <span class="tok"><span class="sw" style="background:#3B3D42"></span>border</span>
+        <span class="tok"><span class="sw" style="background:#E3E4E8"></span>text</span>
+        <span class="tok"><span class="sw" style="background:#A6A9B4"></span>muted</span>
+        <span class="tok"><span class="sw" style="background:#4C9AFF"></span>accent</span>
+        <span class="tok"><span class="sw" style="background:#85B8FF"></span>focus</span>
+        <span class="tok"><span class="sw" style="background:#9F8FEF"></span>presence</span>
+        <span class="tok"><span class="sw" style="background:#F87168"></span>danger</span>
+      </div>
+      <div class="board">
+        <div class="ctxbar"><span class="sname">Northwind Redesign</span><span class="chev">&#9662;</span><span class="rolechip">Admin</span></div>
+        <div class="col">
+          <div class="colhead"><span class="t">In Progress</span><span class="n">3</span></div>
+          <div class="card focused"><div class="ti">Draft homepage acceptance criteria</div>
+            <div class="meta"><span class="lbl" style="background:#1C3A66;color:#9EC5FF">Content</span><span class="pres"><span class="dot"></span>2 editing</span><span class="av" style="background:#9F8FEF;color:#1B1440">NA</span></div></div>
+          <div class="dz">Drop here</div>
+          <div class="card lifted"><div class="ti">Sign off colour direction</div>
+            <div class="meta"><span class="lbl" style="background:#33353B;color:#A6A9B4">Design</span><span class="av" style="background:#4A4D55;color:#E3E4E8">BR</span></div></div>
+          <div class="card"><div class="ti">Migrate legacy blog posts</div>
+            <div class="meta"><span class="lbl" style="background:#1C3A66;color:#9EC5FF">Content</span></div></div>
+        </div>
+        <div class="danger">&#9888; Deleting this Project destroys its Tasks. This cannot be undone.</div>
+      </div>
+      <div class="hexes">page #1F1F21 &middot; col #242528 &middot; card #2C2C2E &middot; border #3B3D42 &middot; text #E3E4E8 &middot; muted #A6A9B4<br>accent #4C9AFF &middot; focus #85B8FF &middot; presence #9F8FEF &middot; danger #F87168</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ B ============ -->
+<section class="v">
+  <h2>B &mdash; Slate</h2>
+  <p class="reg">Quiet, tool-like, gets out of the way. The palette that doesn&rsquo;t want your attention.</p>
+  <p class="note">Near-zero chroma: the interface is greys and ink, and the only saturated colours in the whole product are the ones carrying meaning — focus, presence, danger. The accent is near-black rather than a hue. Argument for it: SM-C2 makes time-in-application a counter-metric, and UJ-1&rsquo;s success condition is Ravi closing the tab. A palette with no personality to admire is a palette you leave. Argument against: it may read as unfinished rather than restrained.</p>
+  <div class="pair">
+    <div class="panel b-light">
+      <div class="mode">Light</div>
+      <div class="toks">
+        <span class="tok"><span class="sw" style="background:#FAFAFA"></span>page</span>
+        <span class="tok"><span class="sw" style="background:#F2F2F2"></span>column</span>
+        <span class="tok"><span class="sw" style="background:#FFFFFF"></span>card</span>
+        <span class="tok"><span class="sw" style="background:#E2E2E2"></span>border</span>
+        <span class="tok"><span class="sw" style="background:#18181B"></span>text</span>
+        <span class="tok"><span class="sw" style="background:#52525B"></span>muted</span>
+        <span class="tok"><span class="sw" style="background:#18181B"></span>accent</span>
+        <span class="tok"><span class="sw" style="background:#2563EB"></span>focus</span>
+        <span class="tok"><span class="sw" style="background:#0F766E"></span>presence</span>
+        <span class="tok"><span class="sw" style="background:#B91C1C"></span>danger</span>
+      </div>
+      <div class="board">
+        <div class="ctxbar"><span class="sname">Northwind Redesign</span><span class="chev">&#9662;</span><span class="rolechip">Admin</span></div>
+        <div class="col">
+          <div class="colhead"><span class="t">In Progress</span><span class="n">3</span></div>
+          <div class="card focused"><div class="ti">Draft homepage acceptance criteria</div>
+            <div class="meta"><span class="lbl" style="background:#F0F0F1;color:#3F3F46">Content</span><span class="pres"><span class="dot"></span>2 editing</span><span class="av" style="background:#0F766E;color:#fff">NA</span></div></div>
+          <div class="dz">Drop here</div>
+          <div class="card lifted"><div class="ti">Sign off colour direction</div>
+            <div class="meta"><span class="lbl" style="background:#F0F0F1;color:#3F3F46">Design</span><span class="av" style="background:#52525B;color:#fff">BR</span></div></div>
+          <div class="card"><div class="ti">Migrate legacy blog posts</div>
+            <div class="meta"><span class="lbl" style="background:#F0F0F1;color:#3F3F46">Content</span></div></div>
+        </div>
+        <div class="danger">&#9888; Deleting this Project destroys its Tasks. This cannot be undone.</div>
+      </div>
+      <div class="hexes">page #FAFAFA &middot; col #F2F2F2 &middot; card #FFFFFF &middot; border #E2E2E2 &middot; text #18181B &middot; muted #52525B<br>accent #18181B &middot; focus #2563EB &middot; presence #0F766E &middot; danger #B91C1C</div>
+    </div>
+    <div class="panel b-dark">
+      <div class="mode">Dark</div>
+      <div class="toks">
+        <span class="tok"><span class="sw" style="background:#0C0C0D"></span>page</span>
+        <span class="tok"><span class="sw" style="background:#17171A"></span>column</span>
+        <span class="tok"><span class="sw" style="background:#1F1F23"></span>card</span>
+        <span class="tok"><span class="sw" style="background:#2E2E33"></span>border</span>
+        <span class="tok"><span class="sw" style="background:#F4F4F5"></span>text</span>
+        <span class="tok"><span class="sw" style="background:#A1A1AA"></span>muted</span>
+        <span class="tok"><span class="sw" style="background:#F4F4F5"></span>accent</span>
+        <span class="tok"><span class="sw" style="background:#60A5FA"></span>focus</span>
+        <span class="tok"><span class="sw" style="background:#2DD4BF"></span>presence</span>
+        <span class="tok"><span class="sw" style="background:#F87171"></span>danger</span>
+      </div>
+      <div class="board">
+        <div class="ctxbar"><span class="sname">Northwind Redesign</span><span class="chev">&#9662;</span><span class="rolechip">Admin</span></div>
+        <div class="col">
+          <div class="colhead"><span class="t">In Progress</span><span class="n">3</span></div>
+          <div class="card focused"><div class="ti">Draft homepage acceptance criteria</div>
+            <div class="meta"><span class="lbl" style="background:#2A2A30;color:#D4D4D8">Content</span><span class="pres"><span class="dot"></span>2 editing</span><span class="av" style="background:#2DD4BF;color:#0B2B27">NA</span></div></div>
+          <div class="dz">Drop here</div>
+          <div class="card lifted"><div class="ti">Sign off colour direction</div>
+            <div class="meta"><span class="lbl" style="background:#2A2A30;color:#D4D4D8">Design</span><span class="av" style="background:#3F3F46;color:#F4F4F5">BR</span></div></div>
+          <div class="card"><div class="ti">Migrate legacy blog posts</div>
+            <div class="meta"><span class="lbl" style="background:#2A2A30;color:#D4D4D8">Content</span></div></div>
+        </div>
+        <div class="danger">&#9888; Deleting this Project destroys its Tasks. This cannot be undone.</div>
+      </div>
+      <div class="hexes">page #0C0C0D &middot; col #17171A &middot; card #1F1F23 &middot; border #2E2E33 &middot; text #F4F4F5 &middot; muted #A1A1AA<br>accent #F4F4F5 &middot; focus #60A5FA &middot; presence #2DD4BF &middot; danger #F87171</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ C ============ -->
+<section class="v">
+  <h2>C &mdash; Paper</h2>
+  <p class="reg">Calm, warm, unhurried. Low-stimulus by design.</p>
+  <p class="note">Warm neutral grounds and ink-dark text instead of the cool greys every task tool uses, with a deep green-teal doing accent duty. The register is closer to a notebook than a dashboard. Distinguishes Yello most sharply from the reference product without going loud. Argument against: warmth reads as &ldquo;personal&rdquo;, which may undersell the client-engagement and multi-Space half of the product.</p>
+  <div class="pair">
+    <div class="panel c-light">
+      <div class="mode">Light</div>
+      <div class="toks">
+        <span class="tok"><span class="sw" style="background:#F7F4EF"></span>page</span>
+        <span class="tok"><span class="sw" style="background:#F1EDE5"></span>column</span>
+        <span class="tok"><span class="sw" style="background:#FFFDFA"></span>card</span>
+        <span class="tok"><span class="sw" style="background:#E4DDD1"></span>border</span>
+        <span class="tok"><span class="sw" style="background:#2B2622"></span>text</span>
+        <span class="tok"><span class="sw" style="background:#5C544B"></span>muted</span>
+        <span class="tok"><span class="sw" style="background:#1F5E56"></span>accent</span>
+        <span class="tok"><span class="sw" style="background:#1F5E56"></span>focus</span>
+        <span class="tok"><span class="sw" style="background:#A9682B"></span>presence</span>
+        <span class="tok"><span class="sw" style="background:#A33A2C"></span>danger</span>
+      </div>
+      <div class="board">
+        <div class="ctxbar"><span class="sname">Northwind Redesign</span><span class="chev">&#9662;</span><span class="rolechip">Admin</span></div>
+        <div class="col">
+          <div class="colhead"><span class="t">In Progress</span><span class="n">3</span></div>
+          <div class="card focused"><div class="ti">Draft homepage acceptance criteria</div>
+            <div class="meta"><span class="lbl" style="background:#E6EADF;color:#2E4A3F">Content</span><span class="pres"><span class="dot"></span>2 editing</span><span class="av" style="background:#1F5E56;color:#fff">NA</span></div></div>
+          <div class="dz">Drop here</div>
+          <div class="card lifted"><div class="ti">Sign off colour direction</div>
+            <div class="meta"><span class="lbl" style="background:#EFE7DA;color:#5C544B">Design</span><span class="av" style="background:#5C544B;color:#FFFDFA">BR</span></div></div>
+          <div class="card"><div class="ti">Migrate legacy blog posts</div>
+            <div class="meta"><span class="lbl" style="background:#E6EADF;color:#2E4A3F">Content</span></div></div>
+        </div>
+        <div class="danger">&#9888; Deleting this Project destroys its Tasks. This cannot be undone.</div>
+      </div>
+      <div class="hexes">page #F7F4EF &middot; col #F1EDE5 &middot; card #FFFDFA &middot; border #E4DDD1 &middot; text #2B2622 &middot; muted #5C544B<br>accent #1F5E56 &middot; focus #1F5E56 &middot; presence #A9682B &middot; danger #A33A2C</div>
+    </div>
+    <div class="panel c-dark">
+      <div class="mode">Dark</div>
+      <div class="toks">
+        <span class="tok"><span class="sw" style="background:#1A1815"></span>page</span>
+        <span class="tok"><span class="sw" style="background:#201D19"></span>column</span>
+        <span class="tok"><span class="sw" style="background:#272320"></span>card</span>
+        <span class="tok"><span class="sw" style="background:#38332C"></span>border</span>
+        <span class="tok"><span class="sw" style="background:#EFE9E0"></span>text</span>
+        <span class="tok"><span class="sw" style="background:#B0A79A"></span>muted</span>
+        <span class="tok"><span class="sw" style="background:#6FBFAE"></span>accent</span>
+        <span class="tok"><span class="sw" style="background:#8FD6C6"></span>focus</span>
+        <span class="tok"><span class="sw" style="background:#D9A05B"></span>presence</span>
+        <span class="tok"><span class="sw" style="background:#E8776B"></span>danger</span>
+      </div>
+      <div class="board">
+        <div class="ctxbar"><span class="sname">Northwind Redesign</span><span class="chev">&#9662;</span><span class="rolechip">Admin</span></div>
+        <div class="col">
+          <div class="colhead"><span class="t">In Progress</span><span class="n">3</span></div>
+          <div class="card focused"><div class="ti">Draft homepage acceptance criteria</div>
+            <div class="meta"><span class="lbl" style="background:#2C332C;color:#A8C2AE">Content</span><span class="pres"><span class="dot"></span>2 editing</span><span class="av" style="background:#6FBFAE;color:#10201C">NA</span></div></div>
+          <div class="dz">Drop here</div>
+          <div class="card lifted"><div class="ti">Sign off colour direction</div>
+            <div class="meta"><span class="lbl" style="background:#332E27;color:#B0A79A">Design</span><span class="av" style="background:#4A443B;color:#EFE9E0">BR</span></div></div>
+          <div class="card"><div class="ti">Migrate legacy blog posts</div>
+            <div class="meta"><span class="lbl" style="background:#2C332C;color:#A8C2AE">Content</span></div></div>
+        </div>
+        <div class="danger">&#9888; Deleting this Project destroys its Tasks. This cannot be undone.</div>
+      </div>
+      <div class="hexes">page #1A1815 &middot; col #201D19 &middot; card #272320 &middot; border #38332C &middot; text #EFE9E0 &middot; muted #B0A79A<br>accent #6FBFAE &middot; focus #8FD6C6 &middot; presence #D9A05B &middot; danger #E8776B</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ D ============ -->
+<section class="v">
+  <h2>D &mdash; Signal</h2>
+  <p class="reg">Decisive and sharp. Structure drawn with borders, not shadows.</p>
+  <p class="note">No lift, no soft edges — cards are defined by a visible hairline against a plain ground, and the drag state uses a hard offset rather than a blur. Highest contrast of the five and the most density-tolerant, which is the direct argument for it: FR-28 requires the Board to stay usable at 5,000 Tasks in a Project, and shadow-based card separation is the first thing that collapses when rows get tight. Argument against: it is the least warm and can read as severe.</p>
+  <div class="pair">
+    <div class="panel d-light">
+      <div class="mode">Light</div>
+      <div class="toks">
+        <span class="tok"><span class="sw" style="background:#FFFFFF"></span>page</span>
+        <span class="tok"><span class="sw" style="background:#F4F5F7"></span>column</span>
+        <span class="tok"><span class="sw" style="background:#FFFFFF"></span>card</span>
+        <span class="tok"><span class="sw" style="background:#C9CDD4"></span>border</span>
+        <span class="tok"><span class="sw" style="background:#0A0A0A"></span>text</span>
+        <span class="tok"><span class="sw" style="background:#4A4E57"></span>muted</span>
+        <span class="tok"><span class="sw" style="background:#4338CA"></span>accent</span>
+        <span class="tok"><span class="sw" style="background:#4338CA"></span>focus</span>
+        <span class="tok"><span class="sw" style="background:#047857"></span>presence</span>
+        <span class="tok"><span class="sw" style="background:#DC2626"></span>danger</span>
+      </div>
+      <div class="board">
+        <div class="ctxbar"><span class="sname">Northwind Redesign</span><span class="chev">&#9662;</span><span class="rolechip">Admin</span></div>
+        <div class="col">
+          <div class="colhead"><span class="t">In Progress</span><span class="n">3</span></div>
+          <div class="card focused"><div class="ti">Draft homepage acceptance criteria</div>
+            <div class="meta"><span class="lbl" style="background:#E4E2FB;color:#312A9E">Content</span><span class="pres"><span class="dot"></span>2 editing</span><span class="av" style="background:#047857;color:#fff">NA</span></div></div>
+          <div class="dz">Drop here</div>
+          <div class="card lifted"><div class="ti">Sign off colour direction</div>
+            <div class="meta"><span class="lbl" style="background:#EDEFF2;color:#4A4E57">Design</span><span class="av" style="background:#4A4E57;color:#fff">BR</span></div></div>
+          <div class="card"><div class="ti">Migrate legacy blog posts</div>
+            <div class="meta"><span class="lbl" style="background:#E4E2FB;color:#312A9E">Content</span></div></div>
+        </div>
+        <div class="danger">&#9888; Deleting this Project destroys its Tasks. This cannot be undone.</div>
+      </div>
+      <div class="hexes">page #FFFFFF &middot; col #F4F5F7 &middot; card #FFFFFF &middot; border #C9CDD4 &middot; text #0A0A0A &middot; muted #4A4E57<br>accent #4338CA &middot; focus #4338CA &middot; presence #047857 &middot; danger #DC2626</div>
+    </div>
+    <div class="panel d-dark">
+      <div class="mode">Dark</div>
+      <div class="toks">
+        <span class="tok"><span class="sw" style="background:#08080A"></span>page</span>
+        <span class="tok"><span class="sw" style="background:#121216"></span>column</span>
+        <span class="tok"><span class="sw" style="background:#1A1A20"></span>card</span>
+        <span class="tok"><span class="sw" style="background:#33333D"></span>border</span>
+        <span class="tok"><span class="sw" style="background:#FAFAFA"></span>text</span>
+        <span class="tok"><span class="sw" style="background:#9CA0AC"></span>muted</span>
+        <span class="tok"><span class="sw" style="background:#A5B4FC"></span>accent</span>
+        <span class="tok"><span class="sw" style="background:#C7D2FE"></span>focus</span>
+        <span class="tok"><span class="sw" style="background:#34D399"></span>presence</span>
+        <span class="tok"><span class="sw" style="background:#F87171"></span>danger</span>
+      </div>
+      <div class="board">
+        <div class="ctxbar"><span class="sname">Northwind Redesign</span><span class="chev">&#9662;</span><span class="rolechip">Admin</span></div>
+        <div class="col">
+          <div class="colhead"><span class="t">In Progress</span><span class="n">3</span></div>
+          <div class="card focused"><div class="ti">Draft homepage acceptance criteria</div>
+            <div class="meta"><span class="lbl" style="background:#262246;color:#BFC6FE">Content</span><span class="pres"><span class="dot"></span>2 editing</span><span class="av" style="background:#34D399;color:#062E22">NA</span></div></div>
+          <div class="dz">Drop here</div>
+          <div class="card lifted"><div class="ti">Sign off colour direction</div>
+            <div class="meta"><span class="lbl" style="background:#26262E;color:#9CA0AC">Design</span><span class="av" style="background:#3C3C46;color:#FAFAFA">BR</span></div></div>
+          <div class="card"><div class="ti">Migrate legacy blog posts</div>
+            <div class="meta"><span class="lbl" style="background:#262246;color:#BFC6FE">Content</span></div></div>
+        </div>
+        <div class="danger">&#9888; Deleting this Project destroys its Tasks. This cannot be undone.</div>
+      </div>
+      <div class="hexes">page #08080A &middot; col #121216 &middot; card #1A1A20 &middot; border #33333D &middot; text #FAFAFA &middot; muted #9CA0AC<br>accent #A5B4FC &middot; focus #C7D2FE &middot; presence #34D399 &middot; danger #F87171</div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ E ============ -->
+<section class="v">
+  <h2>E &mdash; Dusk</h2>
+  <p class="reg">Focused and screen-native. Designed dark-first, with light as the derived peer.</p>
+  <p class="note">Deep blue-violet grounds rather than neutral greys, so dark mode is the design&rsquo;s home rather than an inversion of it. The one direction here where choosing dark costs nothing, because it was drawn dark and the light theme is the adaptation. Argument against: it is the most stylistically committed of the five, and a strongly tinted ground competes with user-chosen Label colours for attention.</p>
+  <div class="pair">
+    <div class="panel e-dark">
+      <div class="mode">Dark &mdash; the primary</div>
+      <div class="toks">
+        <span class="tok"><span class="sw" style="background:#0B1020"></span>page</span>
+        <span class="tok"><span class="sw" style="background:#121A31"></span>column</span>
+        <span class="tok"><span class="sw" style="background:#18213C"></span>card</span>
+        <span class="tok"><span class="sw" style="background:#2A3552"></span>border</span>
+        <span class="tok"><span class="sw" style="background:#E6EAF5"></span>text</span>
+        <span class="tok"><span class="sw" style="background:#9AA6C4"></span>muted</span>
+        <span class="tok"><span class="sw" style="background:#8B80F9"></span>accent</span>
+        <span class="tok"><span class="sw" style="background:#ADA4FB"></span>focus</span>
+        <span class="tok"><span class="sw" style="background:#38BDF8"></span>presence</span>
+        <span class="tok"><span class="sw" style="background:#FB7185"></span>danger</span>
+      </div>
+      <div class="board">
+        <div class="ctxbar"><span class="sname">Northwind Redesign</span><span class="chev">&#9662;</span><span class="rolechip">Admin</span></div>
+        <div class="col">
+          <div class="colhead"><span class="t">In Progress</span><span class="n">3</span></div>
+          <div class="card focused"><div class="ti">Draft homepage acceptance criteria</div>
+            <div class="meta"><span class="lbl" style="background:#241F52;color:#C3BCFC">Content</span><span class="pres"><span class="dot"></span>2 editing</span><span class="av" style="background:#38BDF8;color:#062338">NA</span></div></div>
+          <div class="dz">Drop here</div>
+          <div class="card lifted"><div class="ti">Sign off colour direction</div>
+            <div class="meta"><span class="lbl" style="background:#222C48;color:#9AA6C4">Design</span><span class="av" style="background:#374363;color:#E6EAF5">BR</span></div></div>
+          <div class="card"><div class="ti">Migrate legacy blog posts</div>
+            <div class="meta"><span class="lbl" style="background:#241F52;color:#C3BCFC">Content</span></div></div>
+        </div>
+        <div class="danger">&#9888; Deleting this Project destroys its Tasks. This cannot be undone.</div>
+      </div>
+      <div class="hexes">page #0B1020 &middot; col #121A31 &middot; card #18213C &middot; border #2A3552 &middot; text #E6EAF5 &middot; muted #9AA6C4<br>accent #8B80F9 &middot; focus #ADA4FB &middot; presence #38BDF8 &middot; danger #FB7185</div>
+    </div>
+    <div class="panel e-light">
+      <div class="mode">Light &mdash; the adaptation</div>
+      <div class="toks">
+        <span class="tok"><span class="sw" style="background:#F4F6FB"></span>page</span>
+        <span class="tok"><span class="sw" style="background:#EAEEF7"></span>column</span>
+        <span class="tok"><span class="sw" style="background:#FFFFFF"></span>card</span>
+        <span class="tok"><span class="sw" style="background:#D7DEEC"></span>border</span>
+        <span class="tok"><span class="sw" style="background:#131A2B"></span>text</span>
+        <span class="tok"><span class="sw" style="background:#4B5670"></span>muted</span>
+        <span class="tok"><span class="sw" style="background:#5145CD"></span>accent</span>
+        <span class="tok"><span class="sw" style="background:#6E62E6"></span>focus</span>
+        <span class="tok"><span class="sw" style="background:#0E7490"></span>presence</span>
+        <span class="tok"><span class="sw" style="background:#BE123C"></span>danger</span>
+      </div>
+      <div class="board">
+        <div class="ctxbar"><span class="sname">Northwind Redesign</span><span class="chev">&#9662;</span><span class="rolechip">Admin</span></div>
+        <div class="col">
+          <div class="colhead"><span class="t">In Progress</span><span class="n">3</span></div>
+          <div class="card focused"><div class="ti">Draft homepage acceptance criteria</div>
+            <div class="meta"><span class="lbl" style="background:#E2E0FA;color:#332B96">Content</span><span class="pres"><span class="dot"></span>2 editing</span><span class="av" style="background:#0E7490;color:#fff">NA</span></div></div>
+          <div class="dz">Drop here</div>
+          <div class="card lifted"><div class="ti">Sign off colour direction</div>
+            <div class="meta"><span class="lbl" style="background:#E7EBF4;color:#4B5670">Design</span><span class="av" style="background:#4B5670;color:#fff">BR</span></div></div>
+          <div class="card"><div class="ti">Migrate legacy blog posts</div>
+            <div class="meta"><span class="lbl" style="background:#E2E0FA;color:#332B96">Content</span></div></div>
+        </div>
+        <div class="danger">&#9888; Deleting this Project destroys its Tasks. This cannot be undone.</div>
+      </div>
+      <div class="hexes">page #F4F6FB &middot; col #EAEEF7 &middot; card #FFFFFF &middot; border #D7DEEC &middot; text #131A2B &middot; muted #4B5670<br>accent #5145CD &middot; focus #6E62E6 &middot; presence #0E7490 &middot; danger #BE123C</div>
+    </div>
+  </div>
+</section>
