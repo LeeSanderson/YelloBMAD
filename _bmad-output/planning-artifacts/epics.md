@@ -1,5 +1,13 @@
 ---
+title: Yello — Epic Breakdown
+status: final
+created: 2026-08-22
+updated: 2026-08-22
 stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics', 'step-03-create-stories']
+readinessCheck:
+  report: _bmad-output/planning-artifacts/implementation-readiness-report-2026-08-22.md
+  verdict: 'READY — 43/43 FR coverage, no critical violations'
+  remediationApplied: 2026-08-22
 inputDocuments:
   - _bmad-output/planning-artifacts/prds/prd-YelloBMAD-2026-08-15/prd.md
   - _bmad-output/planning-artifacts/prds/prd-YelloBMAD-2026-08-15/addendum.md
@@ -122,6 +130,13 @@ SM-2: Permission changes govern the affected Account's very next request with no
 
 **Behavioural measures with retention obligations** *(these three impose requirements on implementation even though no surface reads them)*: the Invitation record keeps its terminal state (FR-10) for SM-4; a notification send record is kept (FS-NFR-2) for SM-C4; compaction of the Task description change log must preserve per-author change counts and timestamps (AR-19) for SM-5.
 
+**PRD constraint blocks** *(§6 carries four blocks of binding constraints that hold no FR or NFR number; each is cited by the story that owns it so none is lost for want of an identifier)*
+
+- **§6.1 Privacy** — Account existence never disclosed (AR-28); Memberships not enumerable by anyone including a Space's Owner (AR-29); email addresses confined to Owners and Admins of a Space the Account is a Member of (UX-DR34); no behavioural analytics on Space contents; **no product surface aggregates across Spaces** — no in-product metrics dashboard, no admin analytics view, no endpoint returning a cross-Space count. Owned by Stories 1.3, 1.4, 1.7, 4.1, 4.4.
+- **§6.2 Data lifecycle** — deletion of Account, Space, Project or Task irreversible in v1, no trash and no restore; deleting an Account never deletes another Account's work; **deleting a Space states at the point of the action** that other Accounts lose access. Owned by Stories 2.5, 3.3, 5.4.
+- **§6.3 Cost** — under **£30/month** at NFR-8 scale; no always-on dedicated infrastructure per Space or per editing session; NFR-3 and NFR-4 satisfied within a single modest deployment. Owned by Story 1.10.
+- **§6.4 Data protection — a gate, not a backlog.** v1 is a **single-operator deployment** claiming no data-protection posture. **"The first Account created by anyone other than the operator makes this document non-compliant until amended."** Five prerequisites become live at that moment: a lawful basis for holding email addresses and authored content; a stated data region with no replication outside it; encryption at rest asserted (NFR-6 covers transit only); a breach-notification position; a subject-access or export route (FR-3 covers erasure only). The gate is a testable release condition rather than an aspiration, so it is **recorded as an operational condition in Story 1.10** alongside §6.3. Two obligations are parked against it and travel with it: the UX spine's accepted browser-spellcheck / cloud-IME egress of description text, and the deferred subject-access / data-export capability that the addendum holds *"behind the §6.4 gate"*.
+
 ### Additional Requirements
 
 *From the Architecture Spine (AD-1 … AD-29, Consistency Conventions, Stack, Structural Seed, Deferred). Numbered AR-n here so stories can cite them stably.*
@@ -175,13 +190,13 @@ SM-2: Permission changes govern the affected Account's very next request with no
 
 **Foundations**
 
-UX-DR1: Implement the token system with **dark as canonical** — the unsuffixed token is the dark value, `-light` is the derived adaptation, and the two resolve **once at the theme boundary**. Every component consumes the semantic name only; a component referencing a `-light` token directly is a defect because it pins that component to one theme. 26 colour tokens across both themes.
+UX-DR1: Implement the token system with **dark as canonical** — the unsuffixed token is the dark value, `-light` is the derived adaptation, and the two resolve **once at the theme boundary**. Every component consumes the semantic name only; a component referencing a `-light` token directly is a defect because it pins that component to one theme. **30 colour tokens** across both themes — 15 semantic names, each with an unsuffixed dark value and a `-light` sibling.
 UX-DR2: Implement the 8-role type scale — `task-title`, `column-head`, `space-name`, `body`, `dialog-title`, `meta`, `role-label`, `presence-count` — sized in **rem against a 16px root** with every line-height ≥ 1.5. Two system stacks (`system-sans`, `system-mono`), no webfont. `px` survives only on hairlines, radii and outline offsets. Metadata is monospace; `presence-count` is deliberately sans, because NFR-9 rests on that string.
 UX-DR3: Implement the 3px spacing scale (3/6/9/12/18/24/36) with **component-internal padding in rem** (`card-pad-y/x`, `control-pad-y/x`) so padding grows under zoom instead of clipping, and a **24px interactive target floor** (`target-min`) as minimum height on every interactive component — WCAG 2.2 AA 2.5.8, the real current floor.
 UX-DR4: Structural borders are **1.5px minimum** (`hairline-width`), snapped to device pixels where the platform allows, with `emphasis-width` 2px on the lifted card. This is an accessibility requirement, not a style: a 1px border antialiased at 1.25×/1.5×/1.75× display scales drops every border pair below the 3:1 gate, and the lifted card's `rotate(-1deg)` antialiases unconditionally.
 UX-DR5: **There is no elevation.** `task-card` sets `shadow: none` explicitly. The single exception is `task-card-lifted` during an active drag — hard offset shadow, 1° rotation, 2px border. Radii: 2px on Role chip / Label chips / Offer indicator, 3px on Tasks / columns / context bar / buttons, 6px on dialogs / Task detail / invitation view, and `rounded.full` on `column-count` only — the one pill in the product. Avatars are **squared to 3px, not circular.**
 UX-DR6: Implement the motion timing contract — `instant` 90ms, `quick` 120ms, `lift` 110ms, `settle` 120ms, `long-press-threshold` 320ms, `long-press-slop` 10px, with `easing-standard` on entry and `easing-exit` on exit. **Never animated:** a Task arriving from another User's edit, a permission change taking effect, or anything on the destructive path. `prefers-reduced-motion: reduce` removes every transition, and nothing depends on motion to convey state.
-UX-DR7: Contrast is a **release gate**, verified by computation not estimation, across both themes for all 20 stated pairs. Three rules fall out and must be implemented as such: `focus-ring` keeps its **2px `outline-offset`** and is never inset or set to 0 (the offset, not the token separation, is what makes it visible — the ring is only 1.45 against accent); `text-link` is **always underlined** (accent is 2.66 against body text); and **destructiveness is carried by copy, never colour** (accent and danger are 1.19 apart and converge under deuteranopia).
+UX-DR7: Contrast is a **release gate**, verified by computation not estimation, across both themes for the **18 gated pairs** (12 text pairs at 4.5:1, 6 non-text and structural pairs at 3.0:1). `DESIGN.md`'s table carries two further rows — `surface-card` on `surface-column` and `surface-column` on `surface-page` — which it names explicitly as **not contrast pairs**: they are deliberately-low adjacency ratios (~1.09 / ~1.10) separating grounds by hairline rather than luminance, and gating them would fail the build permanently. Three rules fall out and must be implemented as such: `focus-ring` keeps its **2px `outline-offset`** and is never inset or set to 0 (the offset, not the token separation, is what makes it visible — the ring is only 1.45 against accent); `text-link` is **always underlined** (accent is 2.66 against body text); and **destructiveness is carried by copy, never colour** (accent and danger are 1.19 apart and converge under deuteranopia).
 
 **Component library**
 
@@ -288,11 +303,11 @@ FR-43: Epic 5 - Deliver an Ownership Offer by email; exactly one per offer, carr
 | 1.3 Register an Account and receive a Personal Space | **FR-1, FR-4**, AR-27, AR-28, NFR-6, FS-NFR-1 |
 | 1.4 Authenticate and hold a Session across every Space | **FR-2**, AR-14, AR-28 |
 | 1.5 Resolve the active Space per request, enforced in the database | **FR-15**, AR-5 … AR-8, NFR-1 |
-| 1.6 Refuse at the Space boundary, and record every refusal | **FR-15, FR-16**, AR-9 … AR-11, AR-30, AR-34, NFR-7, UX-DR32 |
+| 1.6 Refuse at the Space boundary, and record every refusal | **FR-15, FR-16**, AR-9 … AR-11, AR-30 *(all six bounds declared)*, AR-34, NFR-7, NFR-8, UX-DR32, UX-DR35 |
 | 1.7 List and switch between the Spaces you belong to | **FR-9**, AR-29, UX-DR9, UX-DR28, UX-DR31, UX-DR33 |
 | 1.8 Issue an API Token scoped to one Space | **FR-36**, AR-6, NFR-6 |
 | 1.9 Prove isolation on both surfaces | AR-35, NFR-1, **SM-1 gate** |
-| 1.10 Ship it to Azure with migrations as an explicit step | AR-33, AR-36 … AR-40c, §6.3 |
+| 1.10 Ship it to Azure with migrations as an explicit step | AR-33, AR-36 … AR-40c, **§6.3, §6.4 gate** |
 | 2.1 Create a Project and see what is in your Space | **FR-17, FR-18**, AR-30, UX-DR35 |
 | 2.2 Add Tasks and see them on a Board | **FR-19, FR-28**, AR-30, UX-DR8, UX-DR26, UX-DR27 |
 | 2.3 Edit a Task's title, Status and due date | **FR-20**, AR-20, AR-34, UX-DR11, UX-DR26 |
@@ -310,7 +325,7 @@ FR-43: Epic 5 - Deliver an Ownership Offer by email; exactly one per offer, carr
 | 3.4 Prove that owning one Space grants nothing in another | AR-35, NFR-1, **SM-1 extension** |
 | 4.1 Invite an email address to a Space at a Role | **FR-10, FR-39**, AR-28, AR-31, AR-33 |
 | 4.2 See and revoke pending Invitations | **FR-12**, UX-DR14 |
-| 4.3 Accept an Invitation | **FR-11**, AR-27, AR-32, UX-DR18, UX-DR33 |
+| 4.3 Accept an Invitation | **FR-11**, AR-27, AR-30 *(Memberships per Space)*, AR-32, NFR-8, UX-DR18, UX-DR33, UX-DR35 |
 | 4.4 Manage Memberships and Roles | **FR-13**, AR-12, AR-16, UX-DR14, UX-DR34, NFR-2 |
 | 4.5 Remove a Membership, or leave a Space | **FR-14**, AR-16, UX-DR36 |
 | 4.6 Assign a Task, and be told | **FR-21, FR-40, FR-30** (Assignee dimension), AR-8, FS-NFR-2 |
@@ -327,7 +342,7 @@ FR-43: Epic 5 - Deliver an Ownership Offer by email; exactly one per offer, carr
 | 6.6 Move a whole Status of Tasks at once | **FR-41**, AR-24, UX-DR17, UX-DR39 |
 | 7.1 The merge port and its conformance suite | AR-18, AR-40a, NFR-4 |
 | 7.2 A Task has a description, stored as an append-only log | **FR-31**, AR-19, UX-DR10 |
-| 7.3 The sync channel that carries no authority | AR-15, AR-17, NFR-2 |
+| 7.3 The sync channel that carries no authority | AR-15, AR-17, AR-30 *(concurrent editors per Task)*, NFR-2, NFR-8, UX-DR35 |
 | 7.4 Edit a description at the same time as someone else | **FR-31, FR-23** (session termination), AR-20, NFR-3, NFR-4 |
 | 7.5 See who else is here | **FR-32**, NFR-3, UX-DR34, UX-DR38 |
 | 7.6 Reconcile after a disconnection | **FR-33**, NFR-4, UX-DR35, UX-DR38 |
@@ -490,6 +505,11 @@ So that the product reads as one thing and its accessibility floor is verified r
 **Then** every semantic name resolves to its unsuffixed value, and under the light theme the same name resolves to its `-light` sibling, resolved once at the theme boundary
 **And** no component references a `-light` token directly, because that would pin the component to one theme
 
+**Given** the colour tokens
+**When** they are counted against `DESIGN.md`
+**Then** there are **30** — 15 semantic names, each carrying an unsuffixed dark value and a `-light` sibling: `surface-page`, `surface-column`, `surface-card`, `border-hairline`, `text-primary`, `text-muted`, `accent`, `accent-on`, `focus-ring`, `presence`, `danger`, `danger-on`, `revoked-edge`, `role-chip`, `role-chip-on`
+**And** the count is stated so an incomplete token set is detectable rather than merely wrong
+
 **Given** the type scale
 **When** any text renders
 **Then** its size is expressed in `rem` against a 16px root with a line-height of at least 1.5
@@ -497,8 +517,13 @@ So that the product reads as one thing and its accessibility floor is verified r
 
 **Given** the contrast harness
 **When** it runs over both palettes
-**Then** all twenty stated pairs are computed by the WCAG 2.x formula rather than estimated, and each meets its stated threshold
-**And** the build fails if any pair drops below it, because NFR-9 makes WCAG 2.1 AA a release gate
+**Then** all **18 gated pairs** are computed by the WCAG 2.x formula rather than estimated, and each meets its stated threshold — 4.5:1 on the twelve text pairs, 3.0:1 on the six non-text and structural pairs
+**And** the build fails if any gated pair drops below its threshold, because NFR-9 makes WCAG 2.1 AA a release gate
+
+**Given** the two remaining rows in `DESIGN.md`'s contrast table — `surface-card` on `surface-column`, and `surface-column` on `surface-page`
+**When** the harness runs
+**Then** they are asserted as **deliberately low** surface-adjacency ratios (~1.09 and ~1.10) and are **not** gated against any threshold
+**And** the reason is stated: `DESIGN.md` names them explicitly as *"two combinations that are load-bearing and must not be mistaken for contrast pairs"* — they separate grounds by hairline rather than by luminance, so a harness gating all twenty rows would fail permanently on these two and invite an unstated exception
 
 **Given** the focus ring
 **When** any element receives focus
@@ -697,7 +722,23 @@ So that isolation holds under error as firmly as it holds under success.
 **Given** the NFR-8 bound registry, declared in one place and checked by the pipeline rather than by any slice
 **When** a bound is exceeded
 **Then** the refusal carries a machine-readable reason and is raised inside the same transaction as the creation it refuses
-**And** its first entry is the 50-concurrent-active-Sessions-per-Space bound, stated plainly to the User because a bound must degrade visibly, never silently
+**And** the copy states the bound plainly to the User, because a bound must degrade visibly, never silently
+
+**Given** the bound registry
+**When** its entries are enumerated
+**Then** it declares **all six** of NFR-8's bounds, each paired with the creation operation that must consult it, and a registry missing any of them fails the architecture suite:
+
+| Bound | Value | Creation operation that consults it | Enforced by |
+|---|:--:|---|---|
+| Concurrent active Sessions per Space | 50 | establishing a Session in a Space (FR-2, FR-9) | this story |
+| Projects per Space | 50 | creating a Project (FR-17) | Story 2.1 |
+| Tasks per Project | 5,000 | creating a Task (FR-19) | Story 2.2 |
+| Spaces per Account | 50 | creating a Space (FR-5) | Story 3.1 |
+| Memberships per Space | 100 | accepting an Invitation (FR-11) | Story 4.3 |
+| Concurrent editors per Task | 10 | establishing a sync lease on a Task (FR-31) | Story 7.3 |
+
+**And** the registry is enumerated here rather than accumulated story by story, because a registry whose completeness is incidental is one where a missing bound is invisible — and NFR-8 makes an unenforced bound a defect rather than a relaxation
+**And** this story implements the concurrent-active-Sessions-per-Space entry; the other five are implemented by the stories named, each of which consults this registry rather than declaring its own limit
 
 **Given** a refusal rendered in the browser
 **When** it appears
@@ -869,6 +910,17 @@ So that the £30/month ceiling stays a decidable question rather than a surprise
 **When** it is prepared
 **Then** Azure SQL Database's exposure to the `SESSION_CONTEXT` parallel-plan defect has been confirmed directly and the finding recorded
 **And** `MAXDOP = 1` is relaxed only if the pooled-connection isolation test remains green
+
+**Given** PRD §6.4's data-protection gate
+**When** the deployment is recorded
+**Then** it is asserted in writing that this is a **single-operator deployment** claiming no data-protection posture, and that **the first Account created by anyone other than the operator makes the PRD non-compliant until amended**
+**And** the five prerequisites that become live at that moment are named rather than left to be rediscovered: a lawful basis for holding email addresses and authored content; a stated data region with no replication outside it; encryption at rest asserted (NFR-6 covers transit only); a breach-notification position; and a subject-access or export route (FR-3 covers erasure only)
+**And** the gate is recorded as an operational condition alongside the §6.3 cost ceiling rather than as a backlog item, because the PRD wrote it as a testable release condition and nothing else in this plan detects it
+
+**Given** that gate
+**When** the obligations parked against it are collected
+**Then** the UX spine's accepted egress is carried here rather than left in `EXPERIENCE.md` alone: browser enhanced-spellcheck and cloud IME transmission of description text to third-party services is **accepted for v1** and becomes a real obligation at the gate
+**And** the reason it is recorded here is stated: it was deliberately parked *"against §6.4's data-protection gate"*, so a plan that carries the obligation without the gate loses both — and the description editor is the product's largest free-text surface
 
 ## Epic 2: Track your own work on a Board
 
@@ -1650,6 +1702,12 @@ So that I join exactly one Space at exactly one Role, and nothing joins me to an
 **When** they join
 **Then** no second Account is created, and their other Memberships are neither visible to nor affected by the inviter
 
+**Given** a Space already holding 100 Memberships
+**When** acceptance would create the 101st
+**Then** it is refused inside the same transaction with a machine-readable reason, from the Story 1.6 bound registry rather than from a check written here
+**And** the copy states the bound plainly — "This Space has 100 Memberships, the maximum." — because a bound must degrade visibly, never silently
+**And** the refusal lands on **acceptance** rather than on issue, because acceptance is the transaction that creates the Membership; an Invitation issued while the Space had room may be accepted after it filled, so refusing at issue would check the wrong moment and refusing nowhere would breach the bound
+
 ### Story 4.4: Manage Memberships and Roles
 
 As an Owner or Admin,
@@ -2413,6 +2471,12 @@ So that a permission change can take effect on an open session at all.
 **Given** the design
 **When** it is reviewed
 **Then** it requires no shared in-memory backplane and no sticky per-document routing, so horizontal scaling stays possible without being built
+
+**Given** a Task already carrying 10 concurrent editing leases
+**When** an 11th lease is sought
+**Then** it is refused from the Story 1.6 bound registry with a machine-readable reason, and the User is told the Task is at its editor limit
+**And** the refusal is visible rather than the connection silently degrading, because NFR-8 requires a bound to produce a refusal and never a wrong answer — and a silently-admitted 11th editor is exactly a wrong answer, since NFR-4 guarantees convergence only to 10
+**And** read access is unaffected: the Task remains viewable and its Presence remains visible; only the editing lease is refused
 
 **Given** an idle connection
 **When** it approaches the 240-second ingress timeout
