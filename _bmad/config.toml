@@ -22,7 +22,11 @@ project_knowledge = "{project-root}/docs"
 
 [modules.tea]
 test_artifacts = "{project-root}/_bmad-output/test-artifacts"
-tea_use_playwright_utils = true
+# false: the Playwright Utils fragments are TypeScript helpers for @playwright/test, and
+# this project is .NET 10 / xunit.v3 (see the architecture spine's pinned stack). Browser
+# automation itself stays available via tea_browser_automation below — it is only the TS
+# helper library that does not apply. Raised by the 2026-08-22 system-level test design.
+tea_use_playwright_utils = false
 tea_use_pactjs_utils = false
 tea_pact_mcp = "none"
 tea_browser_automation = "auto"

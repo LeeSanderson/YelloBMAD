@@ -4,7 +4,9 @@
 # Date: 2026-07-08T10:49:51.828Z
 
 test_artifacts: "{project-root}/_bmad-output/test-artifacts"
-tea_use_playwright_utils: true
+# false: Playwright Utils are TypeScript helpers for @playwright/test; this project is
+# .NET 10 / xunit.v3. Browser automation stays available via tea_browser_automation.
+tea_use_playwright_utils: false
 tea_use_pactjs_utils: false
 tea_pact_mcp: none
 tea_browser_automation: auto
