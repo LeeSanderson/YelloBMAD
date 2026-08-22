@@ -1,0 +1,157 @@
+# generated: 2026-08-22 13:10
+# last_updated: 2026-08-22 13:10
+# project: YelloBMAD
+# project_key: NOKEY
+# tracking_system: file-system
+# story_location: _bmad-output/implementation-artifacts
+
+# STATUS DEFINITIONS:
+# ==================
+# Epic Status:
+#   - backlog: Epic not yet started
+#   - in-progress: Epic actively being worked on
+#   - done: All stories in epic completed
+#
+# Epic Status Transitions:
+#   - backlog → in-progress: Automatically when first story is created (via create-story)
+#   - in-progress → done: Manually when all stories reach 'done' status
+#
+# Story Status:
+#   - backlog: Story only exists in epic file
+#   - ready-for-dev: Story file created in stories folder
+#   - in-progress: Developer actively working on implementation
+#   - review: Ready for code review (via Dev's code-review workflow)
+#   - done: Story completed
+#
+# Retrospective Status:
+#   - optional: Can be completed but not required
+#   - done: Retrospective has been completed
+#
+# Action Item Status:
+#   - open: Committed during a retrospective, not yet addressed
+#   - in-progress: Actively being worked on
+#   - done: Completed
+#
+# WORKFLOW NOTES:
+# ===============
+# - Epic transitions to 'in-progress' automatically when first story is created
+# - Stories can be worked in parallel if team capacity allows
+# - Developer typically creates next story after previous one is 'done' to incorporate learnings
+# - Dev moves story to 'review', then runs code-review (fresh context, different LLM recommended)
+# - Retrospective appends its action items to action_items; sprint-status surfaces open ones
+
+# SOURCE:
+# =======
+# Epics:    _bmad-output/planning-artifacts/epics.md (status: final, 8 epics, 53 stories)
+# Readiness: _bmad-output/planning-artifacts/implementation-readiness-report-2026-08-22.md
+#            (status: final, READY — 43/43 FR coverage, no critical violations, 5 open non-blocking issues)
+
+# STAGED FRs — DO NOT MARK GREEN WHEN THE MAPPED EPIC CLOSES:
+# ===========================================================
+# Readiness report issue 4 (MEDIUM) is assigned to sprint planning. Four FRs finish in a later
+# epic than the one they are mapped to. An epic reaching 'done' does NOT complete these:
+#   - FR-30 — Assignee filter/sort completes in story 4.6 (mapped epic 2)
+#   - FR-23 — "deleting a Task terminates any active editing session" completes in story 7.4 (mapped epic 2)
+#   - FR-13 — live-session clause completes in stories 7.7 / 7.8 (mapped epic 4; request-path clause done in epic 4)
+#   - FR-14 — live-session clause completes in stories 7.7 / 7.8 (mapped epic 4; request-path clause done in epic 4)
+# Treat FR-13/FR-14/FR-23/FR-30 as fully delivered only once epic 7 is done.
+#
+# OTHER OPEN READINESS ISSUES GATING LATER EPICS (not blocking epic 1):
+#   - issue 3: the AD-24 amendment the UX spine requires — due before epic 3
+#   - issue 5: 13 PRD §12 assumptions hardened into acceptance criteria, none confirmed
+#   - issue 6: AR-40a (merge algorithm, before epic 7), AR-40b (cold start vs NFR-5, story 2.9/1.10),
+#              AR-40c (MAXDOP/SESSION_CONTEXT, before first production deploy)
+#   - issues 8, 9: PRD §7's stale sentence; missing `status` fields
+
+generated: 2026-08-22 13:10
+last_updated: 2026-08-22 13:10
+project: YelloBMAD
+project_key: NOKEY
+tracking_system: file-system
+story_location: "_bmad-output/implementation-artifacts"
+
+development_status:
+  # Epic 1: An Account, a Space of your own, and a boundary that holds
+  epic-1: backlog
+  1-1-the-solution-skeleton-and-its-build-gates: backlog
+  1-2-the-design-foundations-every-surface-is-drawn-from: backlog
+  1-3-register-an-account-and-receive-a-personal-space: backlog
+  1-4-authenticate-and-hold-a-session-across-every-space: backlog
+  1-5-resolve-the-active-space-per-request-enforced-in-the-database: backlog
+  1-6-refuse-at-the-space-boundary-and-record-every-refusal: backlog
+  1-7-list-and-switch-between-the-spaces-you-belong-to: backlog
+  1-8-issue-an-api-token-scoped-to-one-space: backlog
+  1-9-prove-isolation-on-both-surfaces: backlog
+  1-10-ship-it-to-azure-with-migrations-as-an-explicit-step: backlog
+  epic-1-retrospective: optional
+
+  # Epic 2: Track your own work on a Board
+  epic-2: backlog
+  2-1-create-a-project-and-see-what-is-in-your-space: backlog
+  2-2-add-tasks-and-see-them-on-a-board: backlog
+  2-3-edit-a-tasks-title-status-and-due-date: backlog
+  2-4-define-and-apply-labels: backlog
+  2-5-delete-a-task-and-delete-a-project: backlog
+  2-6-move-and-reorder-a-task-by-explicit-control: backlog
+  2-7-the-accelerated-pointer-and-touch-paths: backlog
+  2-8-operate-the-whole-board-from-the-keyboard: backlog
+  2-9-the-board-at-five-thousand-tasks: backlog
+  2-10-view-a-project-as-a-filterable-sortable-list: backlog
+  2-11-the-board-on-a-small-viewport: backlog
+  epic-2-retrospective: optional
+
+  # Epic 3: Several Spaces, cleanly separated
+  epic-3: backlog
+  3-1-create-and-rename-a-space: backlog
+  3-2-switch-between-spaces-with-nothing-carrying-over: backlog
+  3-3-delete-a-space-and-belong-to-none: backlog
+  3-4-prove-that-owning-one-space-grants-nothing-in-another: backlog
+  epic-3-retrospective: optional
+
+  # Epic 4: Bring people into one piece of your work
+  epic-4: backlog
+  4-1-invite-an-email-address-to-a-space-at-a-role: backlog
+  4-2-see-and-revoke-pending-invitations: backlog
+  4-3-accept-an-invitation: backlog
+  4-4-manage-memberships-and-roles: backlog
+  4-5-remove-a-membership-or-leave-a-space: backlog
+  4-6-assign-a-task-and-be-told: backlog
+  4-7-a-viewers-space-and-a-role-that-drops-beneath-you: backlog
+  epic-4-retrospective: optional
+
+  # Epic 5: Hand a Space over and leave cleanly
+  epic-5: backlog
+  5-1-offer-ownership-of-a-space-and-tell-the-recipient: backlog
+  5-2-accept-an-ownership-offer: backlog
+  5-3-decline-revoke-lapse-and-the-states-that-are-no-longer-open: backlog
+  5-4-delete-your-account: backlog
+  epic-5-retrospective: optional
+
+  # Epic 6: Shape Statuses per Project and retire work safely
+  epic-6: backlog
+  6-1-shape-a-projects-statuses: backlog
+  6-2-remove-a-status-from-a-project-by-migrating-its-tasks: backlog
+  6-3-define-the-space-default-statuses-and-cascade-a-rename: backlog
+  6-4-remove-a-space-default-status-across-every-project: backlog
+  6-5-move-a-task-to-another-project: backlog
+  6-6-move-a-whole-status-of-tasks-at-once: backlog
+  epic-6-retrospective: optional
+
+  # Epic 7: Write the same Task at the same time — and lose access the moment access ends
+  epic-7: backlog
+  7-1-the-merge-port-and-its-conformance-suite: backlog
+  7-2-a-task-has-a-description-stored-as-an-append-only-log: backlog
+  7-3-the-sync-channel-that-carries-no-authority: backlog
+  7-4-edit-a-description-at-the-same-time-as-someone-else: backlog
+  7-5-see-who-else-is-here: backlog
+  7-6-reconcile-after-a-disconnection: backlog
+  7-7-access-ends-while-the-door-is-still-open: backlog
+  7-8-prove-revocation-on-a-live-session: backlog
+  epic-7-retrospective: optional
+
+  # Epic 8: Drive Yello from a script
+  epic-8: backlog
+  8-1-read-and-write-projects-and-tasks-over-the-api: backlog
+  8-2-version-the-api-and-deprecate-predictably: backlog
+  8-3-rate-limit-per-token-without-duplicating-writes: backlog
+  epic-8-retrospective: optional
