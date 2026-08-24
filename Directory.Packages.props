@@ -1,0 +1,134 @@
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!--
+    AR-1's pinned stack. This file is the single place "every dependency is pinned to the
+    AR-1 versions" (AC1) is expressed, and the single place the version-pin gate reads.
+
+    Changing a version here is an architecture edit, not a developer decision: the AR-1
+    table in epics.md changes first, then this file, then the expected-version table in
+    tests/Yello.Tests.Architecture/PackageVersionPinTests.cs.
+
+    Under central package management, projects declare <PackageReference Include="..." />
+    with no Version attribute. Several packages below are pinned but not yet referenced by
+    any project; the owning story adds the reference against the version pinned here.
+  -->
+
+  <!--
+    DELIBERATELY ABSENT, AND MUST STAY ABSENT (AC4):
+    Microsoft.EntityFrameworkCore.InMemory.
+
+    An in-memory provider cannot exercise row-level security, which is what NFR-1 rests
+    on. Leaving it un-pinned centrally is the cheapest enforcement available: a project
+    that references it fails to restore rather than failing a review. Gate A asserts both
+    halves of the ban - no central version, and no reference from any project under tests/.
+  -->
+
+  <ItemGroup Label="AR-1: EF Core 10 - pinned here, first referenced by story 1.3">
+    <PackageVersion Include="Microsoft.EntityFrameworkCore" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup Label="AR-1: ASP.NET Core Identity 10 - pinned here, first referenced by story 1.3">
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.11" />
+  </ItemGroup>
+
+  <ItemGroup Label="AR-1: Asp.Versioning.Http 10.0.0 - pinned here, first referenced by story 8.2">
+    <PackageVersion Include="Asp.Versioning.Http" Version="10.0.0" />
+  </ItemGroup>
+
+  <!--
+    The SQL driver, referenced directly by Yello.Host to satisfy AC4's "a working connection
+    from Host to container", and pulled in transitively by Aspire.Hosting.SqlServer. Not an
+    AR-1 stack choice and not an ORM.
+
+    7.0.2 is the lowest version that satisfies BOTH consumers of it in this solution, which
+    is why it is not simply EF Core's floor:
+      * Aspire.Hosting.SqlServer 13.4.6 requires >= 7.0.1
+      * Microsoft.EntityFrameworkCore.SqlServer 10.0.11 requires >= 6.1.6
+    Pinning EF Core's floor produced NU1109 ("detected package downgrade ... from 7.0.1 to
+    centrally defined 6.1.6") once transitive pinning was on - the two AR-1 pins disagree
+    about this driver, and 7.0.2 is where they meet. 7.0.2 is the newest 7.x stable; 7.1.0 is
+    still preview.
+
+    Deliberately NOT the Aspire client integration (Aspire.Microsoft.Data.SqlClient): that
+    package registers a database health check by default, and AR-33 requires liveness and
+    readiness probes to answer from process state with no database round trip. The plain
+    driver keeps the single connection this story opens fully explicit, with nothing on a
+    timer and nothing attached to a probe.
+  -->
+  <ItemGroup Label="AC4: SQL driver for the one-shot connectivity check">
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+  </ItemGroup>
+
+  <ItemGroup Label="AR-1: Aspire 13.4 - referenced by Yello.AppHost (story 1.1)">
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.4.6" />
+    <PackageVersion Include="Aspire.Hosting.SqlServer" Version="13.4.6" />
+  </ItemGroup>
+
+  <ItemGroup Label="AR-1: xunit.v3 4.0.0 - runs on Microsoft.Testing.Platform only">
+    <PackageVersion Include="xunit.v3" Version="4.0.0" />
+    <PackageVersion Include="xunit.runner.visualstudio" Version="4.0.0" />
+    <!--
+      The fixture-library half of xunit.v3, for Yello.Tests.Shared. The full `xunit.v3`
+      metapackage refuses to build in a project that is not OutputType=Exe, which is
+      correct: Shared holds fixtures, never test cases.
+
+      Declaring it here also pins it TRANSITIVELY. Testcontainers.XunitV3 4.6.0 - the AR-1
+      pin - was built against xunit.v3.extensibility.core 2.0.2, two major versions behind
+      AR-1's xunit.v3 4.0.0. Left alone, NuGet would unify at 4.0.0 silently; pinning it
+      explicitly makes the version the whole solution actually compiles against a stated
+      fact. SqlServerContainerFixture is what proves the pair holds at compile time.
+    -->
+    <PackageVersion Include="xunit.v3.extensibility.core" Version="4.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="AR-1: Testcontainers.XunitV3 4.6.0 - referenced by Yello.Tests.Shared">
+    <PackageVersion Include="Testcontainers.XunitV3" Version="4.6.0" />
+    <PackageVersion Include="Testcontainers.MsSql" Version="4.6.0" />
+  </ItemGroup>
+
+  <!--
+    TRANSITIVE SECURITY PIN, not a stack choice.
+
+    Testcontainers 4.6.0 (the AR-1 pin) depends on SSH.NET 2024.2.0, which carries
+    GHSA-q939-rpr3-3284 - a HIGH severity advisory: "ScpClient Recursive Download Allows
+    Arbitrary File Write via Server-Controlled SCP Filenames". Because warnings are errors,
+    NuGet's NU1903 fails the build, which is the gate working as intended.
+
+    The advisory covers everything up to and including SSH.NET 2025.1.0 and is first
+    patched in 2026.0.0, so bumping Testcontainers would NOT have cleared it - the AR-1
+    pin is not the cause and refreshing it is not the remedy. Transitive pinning is,
+    which is why CentralPackageTransitivePinningEnabled is on above.
+
+    Yello never calls ScpClient. Testcontainers loads SSH.NET only on its remote/SSH
+    port-forwarding path; the local Docker path used here never touches it. The pin is
+    therefore defence in depth, and it leaves the AR-1 table untouched: changing an AR-1
+    pin is an architecture edit, and this is not one.
+  -->
+  <ItemGroup Label="Transitive security pin: GHSA-q939-rpr3-3284">
+    <PackageVersion Include="SSH.NET" Version="2026.0.0" />
+  </ItemGroup>
+
+  <ItemGroup Label="AR-1: TngTech.ArchUnitNET 0.13.3 - referenced by Yello.Tests.Architecture">
+    <PackageVersion Include="TngTech.ArchUnitNET" Version="0.13.3" />
+    <PackageVersion Include="TngTech.ArchUnitNET.xUnitV3" Version="0.13.3" />
+  </ItemGroup>
+
+  <!--
+    Framework packages rather than AR-1 stack choices. These ship with the Blazor
+    WebAssembly SDK and must track the runtime patch pinned in Directory.Build.props
+    (RuntimeFrameworkVersion 10.0.11), so they are pinned to it rather than chosen. Gate A
+    asserts the AR-1 table; it does not police this group beyond the runtime match.
+  -->
+  <ItemGroup Label="Framework: tracks RuntimeFrameworkVersion 10.0.11">
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.11" />
+  </ItemGroup>
+
+</Project>

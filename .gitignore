@@ -1,3 +1,17 @@
+# .NET
+bin/
+obj/
+TestResults/
+artifacts/
+.vs/
+*.user
+*.suo
+project.lock.json
+*.nupkg
+*.snupkg
+msbuild.log
+msbuild.binlog
+
 # Python
 __pycache__/
 *.py[cod]

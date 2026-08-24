@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk"><!--
+    Shared properties come from Directory.Build.props; versions from
+    Directory.Packages.props. Project references are the ring rule made executable -
+    see the allowed-edge table in Yello.Tests.Architecture/AllowedReferenceEdges.cs.
+  -->
+
+
+  <ItemGroup>
+    <ProjectReference Include="..\Yello.Application\Yello.Application.csproj" />
+    <ProjectReference Include="..\Yello.Domain\Yello.Domain.csproj" />
+  </ItemGroup>
+</Project>

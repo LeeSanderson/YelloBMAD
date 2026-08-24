@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Ring 5. The outermost ring: Minimal API endpoints, the /sync WebSocket and the
+    composition root. Story 1.1 adds none of the first two.
+  -->
+
+  <!--
+    The SQL driver, for AC4's one-shot connectivity check only. See the rationale in
+    Directory.Packages.props: the plain driver rather than the Aspire client integration,
+    because that integration wires a database health check by default and AR-33 requires
+    probes to answer from process state with no database round trip.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Yello.Domain\Yello.Domain.csproj" />
+    <ProjectReference Include="..\Yello.Application\Yello.Application.csproj" />
+    <ProjectReference Include="..\Yello.Infrastructure\Yello.Infrastructure.csproj" />
+    <ProjectReference Include="..\Yello.Contracts\Yello.Contracts.csproj" />
+    <ProjectReference Include="..\Yello.Merge\Yello.Merge.csproj" />
+  </ItemGroup>
+
+</Project>

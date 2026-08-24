@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    SM-2 - FR-34. Release-gating. The live-session clause of FR-13 and FR-14 completes in stories 7.7 and 7.8.
+  -->
+
+  <!--
+    Runs on Microsoft.Testing.Platform only: xunit.v3 4.0.0 depends on
+    xunit.v3.mtp-v2 [4.0.0]. There is no VSTest path here, so Microsoft.NET.Test.Sdk is
+    deliberately absent.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <!--
+    AC5: this suite is EMPTY after story 1.1 and must report zero tests rather than fail.
+    Microsoft.Testing.Platform returns exit code 8 for "the test session ran zero tests"
+    and is strict by default, where VSTest tolerated an empty run. Note the precise
+    failure mode without this switch: the BUILD succeeds and `dotnet test` returns 8.
+    The `minimum-expected-tests` option is the wrong lever; it governs exit code 9.
+
+    REMOVE THIS THE MOMENT THIS SUITE GAINS ITS FIRST TEST. Left in place it also
+    swallows a genuinely empty run, so a filter typo or broken discovery would pass
+    silently as "zero tests" - which is exactly the signal being masked here on purpose.
+    Yello.Tests.Architecture deliberately does NOT carry it: that suite ships real
+    assertions in story 1.1 and stays strict.
+  -->
+  <PropertyGroup>
+    <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Yello.Host\Yello.Host.csproj" />
+    <ProjectReference Include="..\..\Yello.Contracts\Yello.Contracts.csproj" />
+    <ProjectReference Include="..\Yello.Tests.Shared\Yello.Tests.Shared.csproj" />
+  </ItemGroup>
+
+</Project>

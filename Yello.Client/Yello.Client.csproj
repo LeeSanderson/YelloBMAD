@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <PropertyGroup>
+    <OverrideHtmlAssetPlaceholders>true</OverrideHtmlAssetPlaceholders>
+  </PropertyGroup>
+
+  <!--
+    Framework packages, not AR-1 stack choices: these ship with the Blazor WebAssembly
+    SDK and track the runtime patch (10.0.11), so they are pinned centrally alongside it
+    rather than listed in the AR-1 table. No Version attribute here - central package
+    management forbids it.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Yello.Contracts\Yello.Contracts.csproj" />
+    <ProjectReference Include="..\Yello.Merge\Yello.Merge.csproj" />
+  </ItemGroup>
+
+</Project>

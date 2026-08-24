@@ -1,0 +1,44 @@
+<Project>
+
+  <!--
+    Applies to every project in the solution, production and test alike.
+
+    RuntimeFrameworkVersion is what turns AC1's ".NET 10.0.11" into a stated, testable
+    fact rather than an implication of whichever SDK happens to be installed. global.json
+    pins the SDK band; this pins the runtime the output binds to. Gate A asserts both.
+
+    Nullable, TreatWarningsAsErrors, EnforceCodeStyleInBuild and AnalysisLevel are ordinary
+    build hygiene rather than a budget: the project's stated bar is that invariants are
+    "enforced by construction (type system, single choke point, lint/test gates) rather than
+    by an agent remembering to read the spine". Note what is NOT here: no code-coverage
+    threshold. None appears in the PRD, the spine, the epics or the spec kernel, and the
+    80% figure in the test design is explicitly a proposal. Do not invent one.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RuntimeFrameworkVersion>10.0.11</RuntimeFrameworkVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+  </PropertyGroup>
+
+  <!--
+    IDE0005 (remove unnecessary usings) only runs at build when a documentation file is
+    generated - a long-standing Roslyn limitation (dotnet/roslyn#41640). IDE0005 is a
+    warning here, and therefore an error, because an unused using in this solution can hide
+    a ring violation: a stray `using Microsoft.EntityFrameworkCore;` in a Domain file is
+    exactly the signal Gate B exists to catch.
+
+    Generating the file turns CS1591 ("missing XML comment for publicly visible type") into
+    an error across every public type, which would be a documentation mandate nothing in the
+    corpus asks for. So the file is generated and CS1591 alone is suppressed: the gate is
+    kept, the mandate is not invented.
+  -->
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+</Project>

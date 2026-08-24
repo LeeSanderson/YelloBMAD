@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Infrastructure, NOT a suite.
+
+    This is a declared variance from the spine's Structural Seed, which names thirteen
+    projects; this is a fourteenth. The justification: a shared Testcontainers SQL Server
+    fixture running `mssql/server:2025-latest` is a stated entry criterion for ALL suites
+    and has no owning story, and every consumer of it arrives after story 1.1. AC1 says
+    the solution "contains" the thirteen named projects; it does not say "and nothing else".
+
+    Because it is infrastructure rather than a suite, it does not breach AC5's "later
+    stories add cases to existing suites rather than creating suites". It holds no tests
+    and is not release-gating. Gate A knows about it as the one declared variance.
+  -->
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+    <!--
+      CA1716 objects that the namespace segment "Shared" is a reserved word in VB, which
+      "makes it harder for consumers in other languages". The rule is about the design of a
+      published cross-language API surface; this assembly is internal test scaffolding that
+      is never packed (IsPackable=false) and never consumed outside this solution. The
+      project name is fixed by the story, so the rule is suppressed here rather than
+      obeyed - narrowly, in the one project it applies to.
+    -->
+    <NoWarn>$(NoWarn);CA1716</NoWarn>
+    <!--
+      Deliberately NOT OutputType=Exe and NOT IsTestProject: this project contains fixtures
+      for other suites to consume, never test cases of its own. Marking it a test project
+      would hand `dotnet test` a seventh suite that can only ever report zero tests.
+    -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      xunit.v3.extensibility.core, NOT the xunit.v3 metapackage: the metapackage hard-fails
+      the build in a project that is not OutputType=Exe ("xUnit.net v3 test projects must be
+      executable ... If this is not a test project, reference xunit.v3.extensibility.core
+      instead"), and this project is deliberately not one.
+    -->
+    <PackageReference Include="xunit.v3.extensibility.core" />
+    <PackageReference Include="Testcontainers.XunitV3" />
+    <PackageReference Include="Testcontainers.MsSql" />
+  </ItemGroup>
+
+</Project>

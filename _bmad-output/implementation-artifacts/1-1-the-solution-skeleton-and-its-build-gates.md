@@ -1,6 +1,10 @@
+---
+baseline_commit: c83450c63c8e68773349ec312eac286127f057cf
+---
+
 # Story 1.1: The solution skeleton and its build gates
 
-Status: ready-for-dev
+Status: review
 
 Epic: 1 — An Account, a Space of your own, and a boundary that holds
 Story key: `1-1-the-solution-skeleton-and-its-build-gates`
@@ -54,66 +58,66 @@ So that no later story can erode the structure NFR-1 depends on.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Repository build foundation** (AC: 1)
-  - [ ] Create `global.json` pinning the SDK: `{ "sdk": { "version": "10.0.303", "rollForward": "latestPatch" } }`. Two .NET 10 SDKs are installed on this machine (10.0.302 and 10.0.303); without this pin the build is non-deterministic across machines.
-  - [ ] Create `Directory.Packages.props` with `<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>` and one `<PackageVersion>` per pinned dependency (exact versions in Dev Notes → *Pinned versions*). This is the single place AC1's "every dependency is pinned" is expressed, and the single place the version-pin test reads.
-  - [ ] Under central package management, projects declare `<PackageReference Include="…" />` with **no** `Version` attribute. So pin all eight AR-1 versions centrally, but add an actual `PackageReference` only where this story needs one — `xunit.v3`, `xunit.runner.visualstudio`, `TngTech.ArchUnitNET`, `Testcontainers.XunitV3`, and the Aspire hosting packages. EF Core, Identity and `Asp.Versioning.Http` are **pinned but not yet referenced**; stories 1.3 and 1.5 add the references against the versions pinned here. This satisfies AC1 without dragging unused packages into a solution that has no schema.
-  - [ ] Create `Directory.Build.props` setting, for all projects: `TargetFramework=net10.0`, `RuntimeFrameworkVersion=10.0.11`, `Nullable=enable`, `TreatWarningsAsErrors=true`, `ImplicitUsings=enable`, `EnforceCodeStyleInBuild=true`, `AnalysisLevel=latest-recommended`. `RuntimeFrameworkVersion` is what makes AC1's ".NET 10.0.11" a stated, testable fact rather than an implication of the SDK.
-  - [ ] Create `.config/dotnet-tools.json` and pin the Aspire CLI as a **local** tool: `dotnet tool install --local Aspire.Cli --version 13.4.6`. `Aspire.Cli` 13.4.6 is a `DotnetTool` package (`tools/net10.0/any/`). `aspire` is **not** on PATH on this machine; a local tool manifest both installs it and pins it to AR-1's Aspire 13.4 line, which the shell-script install does not.
-  - [ ] Create `.editorconfig` with the C# conventions the analysers enforce.
-  - [ ] Extend `.gitignore` — it currently carries Python entries only and no .NET entries. Add at minimum `bin/`, `obj/`, `TestResults/`, `.vs/`, `artifacts/`, `*.user`.
-  - [ ] Create the solution as **`Yello.sln`** (classic format), not `Yello.slnx` — see Dev Notes → *Project Structure Notes* for why the file extension is load-bearing here.
+- [x] **Task 1 — Repository build foundation** (AC: 1)
+  - [x] Create `global.json` pinning the SDK: `{ "sdk": { "version": "10.0.303", "rollForward": "latestPatch" } }`. Two .NET 10 SDKs are installed on this machine (10.0.302 and 10.0.303); without this pin the build is non-deterministic across machines.
+  - [x] Create `Directory.Packages.props` with `<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>` and one `<PackageVersion>` per pinned dependency (exact versions in Dev Notes → *Pinned versions*). This is the single place AC1's "every dependency is pinned" is expressed, and the single place the version-pin test reads.
+  - [x] Under central package management, projects declare `<PackageReference Include="…" />` with **no** `Version` attribute. So pin all eight AR-1 versions centrally, but add an actual `PackageReference` only where this story needs one — `xunit.v3`, `xunit.runner.visualstudio`, `TngTech.ArchUnitNET`, `Testcontainers.XunitV3`, and the Aspire hosting packages. EF Core, Identity and `Asp.Versioning.Http` are **pinned but not yet referenced**; stories 1.3 and 1.5 add the references against the versions pinned here. This satisfies AC1 without dragging unused packages into a solution that has no schema.
+  - [x] Create `Directory.Build.props` setting, for all projects: `TargetFramework=net10.0`, `RuntimeFrameworkVersion=10.0.11`, `Nullable=enable`, `TreatWarningsAsErrors=true`, `ImplicitUsings=enable`, `EnforceCodeStyleInBuild=true`, `AnalysisLevel=latest-recommended`. `RuntimeFrameworkVersion` is what makes AC1's ".NET 10.0.11" a stated, testable fact rather than an implication of the SDK.
+  - [x] Create `.config/dotnet-tools.json` and pin the Aspire CLI as a **local** tool: `dotnet tool install --local Aspire.Cli --version 13.4.6`. `Aspire.Cli` 13.4.6 is a `DotnetTool` package (`tools/net10.0/any/`). `aspire` is **not** on PATH on this machine; a local tool manifest both installs it and pins it to AR-1's Aspire 13.4 line, which the shell-script install does not.
+  - [x] Create `.editorconfig` with the C# conventions the analysers enforce.
+  - [x] Extend `.gitignore` — it currently carries Python entries only and no .NET entries. Add at minimum `bin/`, `obj/`, `TestResults/`, `.vs/`, `artifacts/`, `*.user`.
+  - [x] Create the solution as **`Yello.sln`** (classic format), not `Yello.slnx` — see Dev Notes → *Project Structure Notes* for why the file extension is load-bearing here.
 
-- [ ] **Task 2 — The eight production projects** (AC: 1)
-  - [ ] Create `Yello.Domain`, `Yello.Application`, `Yello.Infrastructure`, `Yello.Host`, `Yello.Contracts`, `Yello.Merge`, `Yello.Client` (Blazor WebAssembly), `Yello.AppHost`, at the repository-root layout in Dev Notes → *The five rings*.
-  - [ ] Add a public `AssemblyMarker` type to each of the seven non-AppHost production projects, in the project's own namespace. The architecture suite needs a deterministic handle on each assembly (`typeof(Yello.Domain.AssemblyMarker).Assembly`); an empty project offers none.
-  - [ ] Create **no** entities, no `DbContext`, no migrations, no endpoints, no components, no pipeline behaviours, no merge implementation. See Dev Notes → *Scope boundary*.
+- [x] **Task 2 — The eight production projects** (AC: 1)
+  - [x] Create `Yello.Domain`, `Yello.Application`, `Yello.Infrastructure`, `Yello.Host`, `Yello.Contracts`, `Yello.Merge`, `Yello.Client` (Blazor WebAssembly), `Yello.AppHost`, at the repository-root layout in Dev Notes → *The five rings*.
+  - [x] Add a public `AssemblyMarker` type to each of the seven non-AppHost production projects, in the project's own namespace. The architecture suite needs a deterministic handle on each assembly (`typeof(Yello.Domain.AssemblyMarker).Assembly`); an empty project offers none.
+  - [x] Create **no** entities, no `DbContext`, no migrations, no endpoints, no components, no pipeline behaviours, no merge implementation. See Dev Notes → *Scope boundary*.
 
-- [ ] **Task 3 — The five test projects plus a shared fixture home** (AC: 1, 5)
-  - [ ] Create `tests/Yello.Tests.Isolation`, `tests/Yello.Tests.Revocation`, `tests/Yello.Tests.Merge`, `tests/Yello.Tests.Architecture`, `tests/Yello.Tests.Slices`.
-  - [ ] Create `tests/Yello.Tests.Shared` to hold the shared Testcontainers SQL Server fixture. This closes a test-design entry criterion that has no owning story ("All suites: shared Testcontainers SQL Server fixture running `mssql/server:2025-latest`"). It is *infrastructure, not a suite*, so it does not breach AC5's "later stories add cases to existing suites rather than creating suites". Flagged in *Questions* below.
-  - [ ] Set `OutputType=Exe` on every test project. `xunit.v3` 4.0.0 depends on `xunit.v3.mtp-v2 [4.0.0]` — it runs on Microsoft.Testing.Platform only. Do **not** add `Microsoft.NET.Test.Sdk`; there is no VSTest path here.
-  - [ ] Reference `xunit.v3` 4.0.0 and `xunit.runner.visualstudio` 4.0.0. Add `Testcontainers.XunitV3` 4.6.0 to `Yello.Tests.Shared`, and `TngTech.ArchUnitNET` 0.13.3 to `Yello.Tests.Architecture`.
-  - [ ] Reference **no** EF Core in-memory provider from any test project (AC4). Do not add `Microsoft.EntityFrameworkCore.InMemory` to `Directory.Packages.props` at all — the cheapest enforcement is that the version is not centrally available.
+- [x] **Task 3 — The five test projects plus a shared fixture home** (AC: 1, 5)
+  - [x] Create `tests/Yello.Tests.Isolation`, `tests/Yello.Tests.Revocation`, `tests/Yello.Tests.Merge`, `tests/Yello.Tests.Architecture`, `tests/Yello.Tests.Slices`.
+  - [x] Create `tests/Yello.Tests.Shared` to hold the shared Testcontainers SQL Server fixture. This closes a test-design entry criterion that has no owning story ("All suites: shared Testcontainers SQL Server fixture running `mssql/server:2025-latest`"). It is *infrastructure, not a suite*, so it does not breach AC5's "later stories add cases to existing suites rather than creating suites". Flagged in *Questions* below.
+  - [x] Set `OutputType=Exe` on every test project. `xunit.v3` 4.0.0 depends on `xunit.v3.mtp-v2 [4.0.0]` — it runs on Microsoft.Testing.Platform only. Do **not** add `Microsoft.NET.Test.Sdk`; there is no VSTest path here.
+  - [x] Reference `xunit.v3` 4.0.0 and `xunit.runner.visualstudio` 4.0.0. Add `Testcontainers.XunitV3` 4.6.0 to `Yello.Tests.Shared`, and `TngTech.ArchUnitNET` 0.13.3 to `Yello.Tests.Architecture`.
+  - [x] Reference **no** EF Core in-memory provider from any test project (AC4). Do not add `Microsoft.EntityFrameworkCore.InMemory` to `Directory.Packages.props` at all — the cheapest enforcement is that the version is not centrally available.
 
-- [ ] **Task 4 — Encode the ring rule in the project references** (AC: 2)
-  - [ ] Wire `<ProjectReference>` elements to exactly the allowed edges in Dev Notes → *Allowed reference edges*. `Yello.Domain` gets none.
+- [x] **Task 4 — Encode the ring rule in the project references** (AC: 2)
+  - [x] Wire `<ProjectReference>` elements to exactly the allowed edges in Dev Notes → *Allowed reference edges*. `Yello.Domain` gets none.
 
-- [ ] **Task 5 — Gate A: the project-file gate** (AC: 1, 2, 4)
-  - [ ] In `Yello.Tests.Architecture`, write a test that parses every `.csproj` in the repository, reads its `<ProjectReference>` elements, and asserts each edge against the allowed-edge table. The failure message must name the offending reference — AC2 requires the build to fail "naming the offending reference".
-  - [ ] Exclude test projects and `Yello.AppHost` from the ring assertions, and assert them against their own allowed edges instead. Without this the gate fails on itself: `Yello.Tests.Architecture` legitimately references all eight production projects, and `Yello.AppHost` legitimately references `Yello.Host` and `Yello.Client`.
-  - [ ] **Why this gate is not optional:** ArchUnitNET analyses compiled bytecode through Mono.Cecil. Roslyn emits no `AssemblyRef` for a referenced assembly whose types are never used, so a ring-violating `<ProjectReference>` that nobody has written code against yet is **invisible to ArchUnitNET**. AC2 says the build must fail when *a project reference is added* — that is a `.csproj` fact, and only a `.csproj` gate sees it.
-  - [ ] **Assert the project inventory** (AC1): the solution contains exactly the thirteen named projects — the eight production projects and the five test projects — plus the one declared variance, `tests/Yello.Tests.Shared`. A missing or renamed project fails the build.
-  - [ ] **Assert the version pins** (AC1): every `<PackageVersion>` in `Directory.Packages.props` matches the AR-1 table exactly, the `global.json` SDK band is the pinned one, and `RuntimeFrameworkVersion` is `10.0.11`. The story statement requires "the stack versions enforced by tests that fail the build", so a pin drifting silently must break the build, not a review.
-  - [ ] **Assert the in-memory-provider ban** (AC4): no `.csproj` under `tests/` references `Microsoft.EntityFrameworkCore.InMemory`, and no `<PackageVersion>` for it exists centrally. AC4 states the ban as a property of the solution, so it needs a gate rather than a convention — the reason is worth keeping in the failure message: an in-memory provider cannot exercise row-level security, which is what NFR-1 rests on.
+- [x] **Task 5 — Gate A: the project-file gate** (AC: 1, 2, 4)
+  - [x] In `Yello.Tests.Architecture`, write a test that parses every `.csproj` in the repository, reads its `<ProjectReference>` elements, and asserts each edge against the allowed-edge table. The failure message must name the offending reference — AC2 requires the build to fail "naming the offending reference".
+  - [x] Exclude test projects and `Yello.AppHost` from the ring assertions, and assert them against their own allowed edges instead. Without this the gate fails on itself: `Yello.Tests.Architecture` legitimately references all eight production projects, and `Yello.AppHost` legitimately references `Yello.Host` and `Yello.Client`.
+  - [x] **Why this gate is not optional:** ArchUnitNET analyses compiled bytecode through Mono.Cecil. Roslyn emits no `AssemblyRef` for a referenced assembly whose types are never used, so a ring-violating `<ProjectReference>` that nobody has written code against yet is **invisible to ArchUnitNET**. AC2 says the build must fail when *a project reference is added* — that is a `.csproj` fact, and only a `.csproj` gate sees it.
+  - [x] **Assert the project inventory** (AC1): the solution contains exactly the thirteen named projects — the eight production projects and the five test projects — plus the one declared variance, `tests/Yello.Tests.Shared`. A missing or renamed project fails the build.
+  - [x] **Assert the version pins** (AC1): every `<PackageVersion>` in `Directory.Packages.props` matches the AR-1 table exactly, the `global.json` SDK band is the pinned one, and `RuntimeFrameworkVersion` is `10.0.11`. The story statement requires "the stack versions enforced by tests that fail the build", so a pin drifting silently must break the build, not a review.
+  - [x] **Assert the in-memory-provider ban** (AC4): no `.csproj` under `tests/` references `Microsoft.EntityFrameworkCore.InMemory`, and no `<PackageVersion>` for it exists centrally. AC4 states the ban as a property of the solution, so it needs a gate rather than a convention — the reason is worth keeping in the failure message: an in-memory provider cannot exercise row-level security, which is what NFR-1 rests on.
 
-- [ ] **Task 6 — Gate B: the type-dependency gate** (AC: 2)
-  - [ ] In `Yello.Tests.Architecture`, load all eight production assemblies with `ArchLoader` and assert with ArchUnitNET:
+- [x] **Task 6 — Gate B: the type-dependency gate** (AC: 2)
+  - [x] In `Yello.Tests.Architecture`, load all eight production assemblies with `ArchLoader` and assert with ArchUnitNET:
     - `Yello.Domain` types depend on no other Yello assembly (4 assertions for the ring rule per the test design's A-1).
     - No EF Core type is referenced from `Yello.Domain`; no ASP.NET Core type is referenced from `Yello.Application` or `Yello.Domain` (A-2, 2 assertions).
-  - [ ] These assertions are **vacuously true** today because the production projects hold only an `AssemblyMarker`. That is expected and correct (AC5: the suites run against a solution with no feature code). It also means they are unproven — which Task 9 addresses.
+  - [x] These assertions are **vacuously true** today because the production projects hold only an `AssemblyMarker`. That is expected and correct (AC5: the suites run against a solution with no feature code). It also means they are unproven — which Task 9 addresses.
 
-- [ ] **Task 7 — Gate C: the Role-API ban** (AC: 3)
-  - [ ] Assert, across every production assembly, that nothing references `[Authorize(Roles = …)]`, `ClaimsPrincipal.IsInRole`, `IdentityRole`, or Identity's role store (`RoleManager<>`, `IRoleStore<>`) — 4 assertions per the test design's A-3.
-  - [ ] Record in the suite, as a comment or test name, that Identity remains permitted for authentication only: Account store, password hashing, cookie issuance. Nothing in this story wires Identity; the ban is what this story delivers.
+- [x] **Task 7 — Gate C: the Role-API ban** (AC: 3)
+  - [x] Assert, across every production assembly, that nothing references `[Authorize(Roles = …)]`, `ClaimsPrincipal.IsInRole`, `IdentityRole`, or Identity's role store (`RoleManager<>`, `IRoleStore<>`) — 4 assertions per the test design's A-3.
+  - [x] Record in the suite, as a comment or test name, that Identity remains permitted for authentication only: Account store, password hashing, cookie issuance. Nothing in this story wires Identity; the ban is what this story delivers.
 
-- [ ] **Task 8 — Aspire local orchestration** (AC: 4)
-  - [ ] `Yello.AppHost.csproj`: `<Project Sdk="Aspire.AppHost.Sdk/13.4.6">`, `OutputType=Exe`, `TargetFramework=net10.0`. Use a **project-based** AppHost, not a single-file `apphost.cs` — the 13.4.x CLI has a known recursion defect launching file-based AppHosts (`dotnet run --file apphost.cs`), fixed only from 13.5.
-  - [ ] Pin the SQL Server container image explicitly to `mcr.microsoft.com/mssql/server:2025-latest` via registry/image/tag rather than relying on the hosting integration's default tag.
-  - [ ] Add `Yello.Host` and `Yello.Client` as project resources; give the Host a reference to the database resource and have it wait for it.
-  - [ ] Verify `dotnet aspire run` brings up all three resources. **Docker Desktop is installed on this machine but its daemon is not running** — start it, in Linux container mode, before running.
-  - [ ] For "a working connection from Host to container": consume the Aspire-injected connection string and open it **once**, in Development only, logging the result. Do **not** implement this as a health check or a periodic task — AR-33 requires liveness and readiness probes to answer from process state with no database round trip, and forbids any component touching the database on an unconditional timer. Do **not** run migrations at startup (AR-36). Flagged in *Questions* below.
+- [x] **Task 8 — Aspire local orchestration** (AC: 4)
+  - [x] `Yello.AppHost.csproj`: `<Project Sdk="Aspire.AppHost.Sdk/13.4.6">`, `OutputType=Exe`, `TargetFramework=net10.0`. Use a **project-based** AppHost, not a single-file `apphost.cs` — the 13.4.x CLI has a known recursion defect launching file-based AppHosts (`dotnet run --file apphost.cs`), fixed only from 13.5.
+  - [x] Pin the SQL Server container image explicitly to `mcr.microsoft.com/mssql/server:2025-latest` via registry/image/tag rather than relying on the hosting integration's default tag.
+  - [x] Add `Yello.Host` and `Yello.Client` as project resources; give the Host a reference to the database resource and have it wait for it.
+  - [x] Verify `dotnet aspire run` brings up all three resources. **Docker Desktop is installed on this machine but its daemon is not running** — start it, in Linux container mode, before running.
+  - [x] For "a working connection from Host to container": consume the Aspire-injected connection string and open it **once**, in Development only, logging the result. Do **not** implement this as a health check or a periodic task — AR-33 requires liveness and readiness probes to answer from process state with no database round trip, and forbids any component touching the database on an unconditional timer. Do **not** run migrations at startup (AR-36). Flagged in *Questions* below.
 
-- [ ] **Task 9 — Prove the gates, then prove the suites run empty** (AC: 2, 3, 5)
-  - [ ] For each of the four gates (ring reference, ring type-dependency, EF/ASP.NET type leak, Role-API ban): temporarily introduce a real violation, confirm the build fails and that the message names the offence, then revert. Record each result in the Dev Agent Record. The test design's definition of done states that "a test asserting the absence of a signal must be validated against a planted signal, or it is not a test" — with empty production projects, every gate in this story is an absence assertion.
-  - [ ] Add `<TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>` to `Yello.Tests.Isolation`, `Yello.Tests.Revocation`, `Yello.Tests.Merge` and `Yello.Tests.Slices`. Microsoft.Testing.Platform returns **exit code 8** for "the test session ran zero tests" and is strict by default, so without this AC5 fails. Do **not** add it to `Yello.Tests.Architecture` — that suite ships ~10 real assertions in this story and must stay strict.
-  - [ ] Leave a comment at each `--ignore-exit-code 8` site instructing that it be removed from a suite as soon as that suite gains its first test, so a later filter typo cannot silently pass as "zero tests".
-  - [ ] Confirm `dotnet test` over the whole solution returns success: architecture green with real assertions, the other suites reporting zero tests.
+- [x] **Task 9 — Prove the gates, then prove the suites run empty** (AC: 2, 3, 5)
+  - [x] For each of the four gates (ring reference, ring type-dependency, EF/ASP.NET type leak, Role-API ban): temporarily introduce a real violation, confirm the build fails and that the message names the offence, then revert. Record each result in the Dev Agent Record. The test design's definition of done states that "a test asserting the absence of a signal must be validated against a planted signal, or it is not a test" — with empty production projects, every gate in this story is an absence assertion.
+  - [x] Add `<TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>` to `Yello.Tests.Isolation`, `Yello.Tests.Revocation`, `Yello.Tests.Merge` and `Yello.Tests.Slices`. Microsoft.Testing.Platform returns **exit code 8** for "the test session ran zero tests" and is strict by default, so without this AC5 fails. Do **not** add it to `Yello.Tests.Architecture` — that suite ships ~10 real assertions in this story and must stay strict.
+  - [x] Leave a comment at each `--ignore-exit-code 8` site instructing that it be removed from a suite as soon as that suite gains its first test, so a later filter typo cannot silently pass as "zero tests".
+  - [x] Confirm `dotnet test` over the whole solution returns success: architecture green with real assertions, the other suites reporting zero tests.
 
-- [ ] **Task 10 — Establish the test conventions later stories depend on** (AC: 5)
-  - [ ] Document and use the trait vocabulary: `[Trait("Priority", …)]`, `[Trait("Suite", …)]`, `[Trait("Requirement", …)]`, `[Trait("Assumption", …)]`. The CI tiering selects on these filters, so they must exist with the suites rather than be retrofitted.
-  - [ ] Record the `Task.Delay` prohibition as a project convention: no test may synchronise on `Task.Delay`. The test design calls it "cheaper to enforce as a convention from story 1.1 than to unpick later".
-  - [ ] Record the shared-container topology note for later stories: one Testcontainers instance amortised across collections, **except** the pooled-connection isolation case (story 1.9), which needs its own container with pool size pinned to 1 and parallelism disabled.
+- [x] **Task 10 — Establish the test conventions later stories depend on** (AC: 5)
+  - [x] Document and use the trait vocabulary: `[Trait("Priority", …)]`, `[Trait("Suite", …)]`, `[Trait("Requirement", …)]`, `[Trait("Assumption", …)]`. The CI tiering selects on these filters, so they must exist with the suites rather than be retrofitted.
+  - [x] Record the `Task.Delay` prohibition as a project convention: no test may synchronise on `Task.Delay`. The test design calls it "cheaper to enforce as a convention from story 1.1 than to unpick later".
+  - [x] Record the shared-container topology note for later stories: one Testcontainers instance amortised across collections, **except** the pooled-connection isolation case (story 1.9), which needs its own container with pool size pinned to 1 and parallelism disabled.
 
 ## Dev Notes
 
@@ -295,12 +299,280 @@ None. This is story 1 of 53 and the first story in the repository.
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 5 (1M context) — `claude-opus-5[1m]`
 
 ### Debug Log References
 
+Verified command chain, in order, all from the repository root:
+
+| Command | Result |
+|---|---|
+| `dotnet --version` | `10.0.303` — confirms the `global.json` SDK pin resolves |
+| `dotnet tool restore` | `Tool 'aspire.cli' (version '13.4.6') was restored` |
+| `dotnet aspire --version` | `13.4.6+87fe259e4fc244c599019a7b1304c85a1488f248` |
+| `dotnet build Yello.sln` | `0 Error(s) 0 Warning(s)` — with `TreatWarningsAsErrors=true` across all 14 projects |
+| `dotnet test Yello.sln` | `Passed!  total: 26  failed: 0` — exit 0 |
+
+**Assertion counts.** 26 in `Yello.Tests.Architecture`; the other four suites report zero tests
+and still exit 0. Of the 26, **10 are the A-series** this story owes — A-1 (ring rule, 4),
+A-2 (EF/ASP.NET leak, 2), A-3 (Role-API ban, 4). The other 16 are Gate A's project-file
+assertions, which sit outside the A-1…A-15 numbering because that series was scoped to
+bytecode and schema, and these read `.csproj`, `Directory.Packages.props` and `global.json`
+as text. They live in separate test classes so the counts stay legible when later stories add
+A-4 onward.
+
+**Trait selection verified** (Task 10), since CI tiering depends on it:
+
+| Command | Result |
+|---|---|
+| `Yello.Tests.Architecture.exe -list traits` | `Priority: [P0]`, `Requirement: [AR-1, AR-2, AR-4, NFR-1]`, `Suite: [Architecture]` |
+| `-trait "Requirement=AR-4"` | 4 tests — Gate C exactly |
+| `-trait "Requirement=AR-1"` | 11 tests |
+| `-trait "Priority=P0"` | 26 tests |
+
+The runner banner also prints `64-bit .NET 10.0.11`, which is independent confirmation that
+`RuntimeFrameworkVersion` binds the output to AR-1's patch rather than merely to the SDK.
+
+**AC4 verified at runtime.** `dotnet aspire run` from the repository root, against the live
+container runtime. All five Aspire resources reached ready:
+
+| Resource | Evidence |
+|---|---|
+| `sql` — the container | `sql-uhvzkaqh \| mcr.microsoft.com/mssql/server:2025-latest \| Up \| 127.0.0.1:32768->1433/tcp` |
+| `yello` — the database | `Resource 'yello' is ready` |
+| `host` — `Yello.Host` | `Resource 'host' is ready`, `changed state: Running`, `Yello.Host.exe` in the process list |
+| `client` — `Yello.Client` | `Resource 'client' is ready`, `changed state: Running`; Blazor devserver returned **HTTP 200** serving the stripped `index.html` |
+| `aspire-dashboard` | `https://localhost:54564` |
+
+**"A working connection from Host to container" — the actual log line**, from running
+`Yello.Host` against the container Aspire had brought up, with the Aspire-injected connection
+string:
+
+```
+info: Yello.Host.Startup[1001]
+      Connected to SQL Server 17.00.4075, database yello.
+info: Microsoft.Hosting.Lifetime[14]
+      Now listening on: http://127.0.0.1:5411
+```
+
+`17.00.4075` is the SQL Server 2025 engine, so the pinned tag is what actually ran. Exactly one
+connectivity line, at startup, before Kestrel binds — no health check, no timer, no migration,
+per AR-33 and AR-36.
+
+Worth recording because it demonstrates the orchestration graph rather than just its outcome:
+on an earlier attempt the container runtime was down, and `aspire run` started the AppHost and
+`Yello.Client` while **holding `Yello.Host` back entirely**. That is `WaitFor(database)` doing
+its job — the Host does not start until the database is healthy. The container runtime on this
+machine (Rancher Desktop) needed a `rdctl shutdown`, a `wsl --terminate rancher-desktop` and a
+relaunch before its Windows named-pipe bridge stopped crash-looping; that is environmental, not
+a property of the solution.
+
+**AC5's exit-code-8 mechanism, proven in both directions** on `Yello.Tests.Merge`:
+
+| State | `dotnet test` result |
+|---|---|
+| `--ignore-exit-code 8` removed | `Zero tests ran` … `Exit code: 8` — **fails** |
+| `--ignore-exit-code 8` restored | `Zero tests ran` … exit **0** |
+
+So the switch is load-bearing, not decorative, and the story's stated failure mode is exact:
+the *build* succeeds and `dotnet test` returns 8.
+
+One quirk found and worth carrying forward: running a suite's `.exe` **directly** invokes
+xunit's own console runner, which returns **0** for zero tests and rejects
+`--ignore-exit-code` as an unknown option. The exit-code-8 behaviour belongs to MTP mode under
+`dotnet test`. Exit codes must be verified the way CI will invoke them, not by running the
+binary by hand. This briefly looked like the story being wrong about MTP; it was not.
+
 ### Completion Notes List
 
-- Record the outcome of each planted-violation check from Task 9: which gate, what violation was introduced, whether the build failed, and whether the message named the offence.
+#### Task 9 — planted-violation results
+
+Every gate this story ships is an absence assertion against empty production projects, so each
+was failed on purpose before being trusted. All plants were reverted and the suite returned to
+26/26 green after each.
+
+| # | Gate | Violation planted | Build/test failed? | Did the message name the offence? |
+|---|---|---|---|---|
+| 1 | **Gate A** — ring reference (project file) | `Yello.Domain` → `Yello.Contracts` `ProjectReference`, **no code using it** | Yes — 2 of 26 failed | Yes: `Yello.Domain/Yello.Domain.csproj: 'Yello.Domain' -> 'Yello.Contracts' is NOT PERMITTED. 'Yello.Domain' may reference NOTHING.` |
+| 2 | **Gate B** — ring type dependency | added a `Yello.Domain` type using `Yello.Contracts.AssemblyMarker` | Yes — 3 of 26 failed | Yes: ArchUnitNET named the rule, the assemblies and the `Because` reason |
+| 3 | **Gate B** — EF Core type leak (A-2) | `Microsoft.EntityFrameworkCore` referenced from `Yello.Domain`, using `DbContext` | Yes — 1 of 26 failed | Yes: `Yello.Domain.PlantedEfCoreLeak does depend on "Microsoft.EntityFrameworkCore.DbContext"` |
+| 4 | **Gate C** — Role-API ban (A-3, all four) | `[Authorize(Roles = "Admin")]`, `principal.IsInRole(...)`, `typeof(IdentityRole)`, `typeof(RoleManager<IdentityRole>)` in `Yello.Host` | Yes — all 4 A-3 assertions failed **independently** | Yes, each naming its own site — e.g. `Yello.Host.PlantedRoleApiUse.CheckRole calls System.Security.Claims.ClaimsPrincipal.IsInRole` |
+
+**Plant 1 empirically confirmed the story's reason for having two gates.** With the forbidden
+`ProjectReference` present but unused, Gate A failed and **every Gate B ring assertion passed**.
+Roslyn emits no `AssemblyRef` for a referenced assembly whose types are never touched, so the
+violation was genuinely invisible to ArchUnitNET. AC2 requires the build to fail when *a
+project reference is added*; only a project-file gate sees that. This is now measured rather
+than argued.
+
+**Gate C specificity also checked**, because an over-broad ban would be its own defect. A file
+containing only the *permitted* shapes — `[Authorize(Policy = "SpaceMember")]` and a plain
+`ClaimsPrincipal` member access — left all 26 green. The ban is on the `Roles` argument and on
+`IsInRole`, not on `[Authorize]` or on `ClaimsPrincipal`, which is exactly AC3's "Identity
+remains wired for authentication only".
+
+#### Findings that changed the implementation
+
+1. **A subset-based ring gate does not gate.** Gate A first asserted only that each declared
+   edge was *permitted*. It reported green over a solution with **no project references at
+   all**, because the empty set is a subset of everything — `dotnet add reference --no-restore`
+   had failed silently for all 21 edges (`--no-restore` is not a valid flag for that command,
+   and it produced no error output). The gate now asserts **exact equality** in both
+   directions, so a missing edge fails too. Task 4's wording is "wire … to exactly the allowed
+   edges", so this is also the literal reading.
+2. **`Testcontainers` 4.6.0 drags in a HIGH-severity advisory.** It depends on `SSH.NET`
+   2024.2.0 — GHSA-q939-rpr3-3284, arbitrary file write via server-controlled SCP filenames.
+   `TreatWarningsAsErrors` promoted NuGet's NU1903 to an error, which is the gate working.
+   Refreshing the AR-1 pin would **not** have fixed it: the advisory covers everything up to
+   and including 2025.1.0 and is first patched in **2026.0.0**. Resolved by a transitive pin to
+   `SSH.NET` 2026.0.0 (`CentralPackageTransitivePinningEnabled`), leaving the AR-1 table
+   untouched. Yello never calls `ScpClient`; Testcontainers loads SSH.NET only on its
+   remote/SSH port-forwarding path.
+3. **Two AR-1 pins disagree about the SQL driver.** `Aspire.Hosting.SqlServer` 13.4.6 requires
+   `Microsoft.Data.SqlClient` >= 7.0.1, while `Microsoft.EntityFrameworkCore.SqlServer` 10.0.11
+   requires >= 6.1.6. Pinning EF Core's floor produced NU1109 (`detected package downgrade …
+   from 7.0.1 to centrally defined 6.1.6`). Pinned **7.0.2**, the newest 7.x stable, which is
+   where both floors are satisfied.
+4. **`dotnet test` needs an explicit MTP opt-in, and it lives in `global.json`.** On the .NET 10
+   SDK the VSTest target refuses outright: *"Testing with VSTest target is no longer supported
+   by Microsoft.Testing.Platform on .NET 10 SDK and later."* The opt-in is
+   `"test": { "runner": "Microsoft.Testing.Platform" }` in `global.json` — **not**
+   `dotnet.config`, which I tried first and which had no effect. Without it the story's stated
+   command chain cannot run at all.
+5. **`dotnet new sln` defaults to `.slnx` on .NET 10**, confirming the story's warning was
+   well-founded. Created with `-f sln`, and a gate now asserts both that `Yello.sln` exists and
+   that no `.slnx` does — this can regress by accident rather than by decision.
+6. **The container runtime is Rancher Desktop, not Docker Desktop.** The `-rd` suffix in the
+   story's preflight (`Docker 29.6.2-rd`) is the tell. There is no Docker Desktop on this
+   machine. Its engine is `moby`/dockerd, which is what Testcontainers needs. It was running
+   with its backend deliberately stopped; `rdctl shutdown` followed by a fresh launch brought
+   it up in Linux container mode (`OSType=linux`, server 29.5.3).
+7. **`Yello.Tests.Shared` cannot be `OutputType=Exe`.** Task 3 says to set that on every test
+   project, but the `xunit.v3` metapackage hard-fails a non-`Exe` project and its own error
+   points at the answer: *"If this is not a test project, reference
+   xunit.v3.extensibility.core instead."* Shared holds fixtures and no test cases — the story
+   itself calls it "infrastructure, not a suite" — so it references
+   `xunit.v3.extensibility.core` and is not marked a test project. Making it `Exe` would hand
+   `dotnet test` a seventh suite that can only ever report zero tests.
+8. **`Testcontainers.XunitV3` 4.6.0 was built against `xunit.v3.extensibility.core` 2.0.2**, two
+   major versions behind AR-1's xunit.v3 4.0.0. Pinned explicitly to 4.0.0 so the version the
+   solution compiles against is a stated fact rather than a silent NuGet unification.
+   `SqlServerContainerFixture` compiles clean against the pair, so the AR-1 combination holds
+   at compile time. Runtime behaviour is exercised by the first story that consumes the fixture.
+
+#### Scope decisions worth flagging
+
+- **The Blazor template was stripped.** `dotnet new blazorwasm` ships Bootstrap, `css/app.css`,
+  a scoped-CSS bundle, a styled error banner, and `Counter`/`Weather`/`NavMenu`/`MainLayout`
+  components. All were removed. Story 1.2 owns every design foundation and gates the token
+  count at **exactly 30** "so an incomplete token set is detectable rather than merely wrong" —
+  shipping a whole third-party design system here is precisely the failure that AC exists to
+  catch — and Task 2 says to create no components. `App.razor` is a bare shell with no
+  `<Router>` (there are no routable pages, and a Router cannot resolve an empty route table),
+  and `index.html` carries no stylesheet link, no `:root` block and no hex value.
+- **The Host's `MapGet("/", …)` was removed.** Task 2 creates no endpoints.
+- **`Microsoft.Data.SqlClient` was added to `Yello.Host`** — a package not in the AR-1 table,
+  needed because AC4 requires actually *opening* a connection and .NET ships no SQL driver.
+  Deliberately **not** `Aspire.Microsoft.Data.SqlClient`: that client integration registers a
+  database health check by default, and AR-33 requires probes to answer from process state with
+  no database round trip. Raised for Lee below.
+- **Logging is source-generated** (`[LoggerMessage]` in `Yello.Host/StartupLog.cs`). CA1848 and
+  CA1873 are errors here, and this is the first logging in the solution, so the shape it takes
+  is the shape later stories copy.
+- **`GenerateDocumentationFile=true` with `CS1591` suppressed.** IDE0005 (unused using) only
+  runs at build when a doc file is generated (dotnet/roslyn#41640), and IDE0005 matters here
+  because a stray `using Microsoft.EntityFrameworkCore;` in a Domain file is exactly what Gate
+  B hunts. Generating the file would otherwise turn CS1591 into a documentation mandate nothing
+  in the corpus asks for, so the gate is kept and the mandate is not invented.
+- **`CA1707`/`IDE1006` switched off under `tests/**`** so test names can be sentences, per the
+  test design's "one behaviour per test, named for the behaviour". Both rules police a public
+  API surface; a test method is not one.
+- **No coverage threshold anywhere**, per the scope boundary. The 80% figure in the test design
+  is explicitly a proposal.
+- **`xunit.runner.visualstudio` is referenced as Task 3 instructs**, but it is the VSTest
+  adapter and there is no VSTest path on this SDK, so it is inert. Left in place rather than
+  silently dropped — worth removing in a later story if Lee agrees.
+
+#### Answers to the story's own open questions
+
+Implemented as the story decided, all seven unchanged. Q1 version drift: AR-1 pins implemented
+as written — and finding 2 above adds a concrete security consequence to that conversation.
+Q2: local tool, so the invocation is `dotnet aspire run`. Q3: tag left floating; still the only
+unpinned input in the stack. Q4: `Yello.Tests.Shared` created, and it is the single declared
+variance the inventory gate knows about. Q5: slice tests live in `tests/Yello.Tests.Slices`.
+Q6: one-shot Development-only connectivity log, not a health check and not a timer. Q7: no
+coverage gate.
 
 ### File List
+
+Paths relative to the repository root. Baseline commit `c83450c`, which contained **zero
+source files** — every path below is new except the two marked *modified*.
+
+**Repository build foundation (Task 1)**
+
+- `global.json` — SDK pin `10.0.303` + the `dotnet test` MTP runner opt-in
+- `Directory.Build.props` — shared properties, incl. `RuntimeFrameworkVersion` 10.0.11
+- `Directory.Packages.props` — every version pin; the single place AC1's pins are expressed
+- `.editorconfig`
+- `.config/dotnet-tools.json` — `Aspire.Cli` 13.4.6 as a local tool
+- `aspire.config.json` — written by the Aspire CLI on first run; records the AppHost path so
+  `dotnet aspire run` resolves it from the repository root with no `--project` argument. Its
+  contents are repo-relative, not machine-specific, so it is kept rather than ignored.
+- `Yello.sln` — classic format, deliberately not `.slnx`
+- `.gitignore` — *modified*: added .NET entries (it carried Python entries only)
+
+**The eight production projects (Tasks 2, 4, 8)**
+
+- `Yello.Domain/Yello.Domain.csproj`, `Yello.Domain/AssemblyMarker.cs`
+- `Yello.Application/Yello.Application.csproj`, `Yello.Application/AssemblyMarker.cs`
+- `Yello.Infrastructure/Yello.Infrastructure.csproj`, `Yello.Infrastructure/AssemblyMarker.cs`
+- `Yello.Contracts/Yello.Contracts.csproj`, `Yello.Contracts/AssemblyMarker.cs`
+- `Yello.Merge/Yello.Merge.csproj`, `Yello.Merge/AssemblyMarker.cs`
+- `Yello.Host/Yello.Host.csproj`, `Yello.Host/AssemblyMarker.cs`, `Yello.Host/Program.cs`,
+  `Yello.Host/StartupLog.cs`, `Yello.Host/appsettings.json`,
+  `Yello.Host/appsettings.Development.json`, `Yello.Host/Properties/launchSettings.json`
+- `Yello.Client/Yello.Client.csproj`, `Yello.Client/AssemblyMarker.cs`,
+  `Yello.Client/Program.cs`, `Yello.Client/App.razor`, `Yello.Client/_Imports.razor`,
+  `Yello.Client/wwwroot/index.html`, `Yello.Client/wwwroot/favicon.png`,
+  `Yello.Client/Properties/launchSettings.json`
+- `Yello.AppHost/Yello.AppHost.csproj`, `Yello.AppHost/Program.cs`
+
+**The five suites plus the shared fixture home (Task 3)**
+
+- `tests/Yello.Tests.Isolation/Yello.Tests.Isolation.csproj`
+- `tests/Yello.Tests.Revocation/Yello.Tests.Revocation.csproj`
+- `tests/Yello.Tests.Merge/Yello.Tests.Merge.csproj`
+- `tests/Yello.Tests.Slices/Yello.Tests.Slices.csproj`
+- `tests/Yello.Tests.Architecture/Yello.Tests.Architecture.csproj`
+- `tests/Yello.Tests.Shared/Yello.Tests.Shared.csproj`
+- `tests/Yello.Tests.Shared/SqlServerContainerFixture.cs`
+
+**The four gates (Tasks 5, 6, 7)** — all in `tests/Yello.Tests.Architecture/`
+
+- `AllowedReferenceEdges.cs` — the dependency rule as data
+- `RepositoryLayout.cs` — locates and parses the repository's build files
+- `ProjectFileGateTests.cs` — Gate A: declared ring edges, `RuntimeFrameworkVersion`, `.sln` format
+- `SolutionInventoryTests.cs` — Gate A: project inventory and source-tree shape
+- `PackageVersionPinTests.cs` — Gate A: AR-1 pins, SDK band, in-memory ban, no VSTest SDK
+- `ProductionAssemblies.cs` — loads the eight production assemblies for the bytecode gates
+- `RingDependencyTests.cs` — Gate B: A-1 (4) and A-2 (2)
+- `RoleApiScan.cs` — Mono.Cecil IL scan behind Gate C
+- `RoleApiBanTests.cs` — Gate C: A-3 (4)
+
+**Conventions (Task 10)**
+
+- `tests/TESTING-CONVENTIONS.md` — trait vocabulary, the `Task.Delay` prohibition, container
+  topology, the exit-code-8 trap, and the commands
+
+**Story tracking**
+
+- `_bmad-output/implementation-artifacts/1-1-the-solution-skeleton-and-its-build-gates.md` — *modified*
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — *modified*
+
+### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-08-23 | Story 1.1 implemented. Created the fourteen-project solution in its five rings with the AR-1 versions pinned centrally; wired the ring rule into the project references; added the four gates (26 assertions, 10 of them the A-series A-1/A-2/A-3) in `Yello.Tests.Architecture`; stood up Aspire local orchestration with a SQL Server 2025 container and a one-shot Development-only connectivity check in `Yello.Host`; established the test conventions. All four gates validated against planted violations and reverted. `dotnet build` and `dotnet test` both clean with warnings as errors. |
+| 2026-08-23 | Hardened Gate A from a subset check to exact edge equality after it reported green over a solution with no project references at all. |
+| 2026-08-23 | Pinned `SSH.NET` forward to 2026.0.0 (GHSA-q939-rpr3-3284, high severity) reached transitively through AR-1's `Testcontainers` 4.6.0, and `Microsoft.Data.SqlClient` to 7.0.2 to reconcile the conflicting floors of two AR-1 pins. The AR-1 table itself is unchanged. |

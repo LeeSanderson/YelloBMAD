@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk"><!--
+    Ring 1. References NOTHING - no project, no package. This is the innermost ring and
+    the emptiest project file in the solution by design (AD-21 / AR-2). Gate A asserts
+    that this file declares zero ProjectReference elements; Gate B asserts that no type
+    here depends on another Yello assembly, on EF Core, or on ASP.NET Core.
+
+    All shared properties come from Directory.Build.props; all versions from
+    Directory.Packages.props. Nothing is restated locally.
+  -->
+</Project>

@@ -1,0 +1,13 @@
+@*
+    The application shell, and nothing more.
+
+    AC4 requires Yello.Client to be running under the AppHost, so the app needs a root
+    component to boot at all. It deliberately does not use <Router>: there are no routable
+    pages yet, and a Router with an empty route table cannot resolve its NotFound case.
+    Routing, the layout and the navigation surface arrive with the screens that need them.
+
+    No markup here carries a class, a style attribute or a colour - story 1.2 owns the
+    design foundations.
+*@
+
+<p>Yello</p>

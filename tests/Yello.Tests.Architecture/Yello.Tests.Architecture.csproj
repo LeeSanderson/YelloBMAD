@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    AD-21 / AR-2 / AR-4 / AR-35. Release-gating, and the ONLY suite that ships real
+    assertions in story 1.1 - roughly ten of them. It must therefore stay strict: no
+    `ignore-exit-code 8` here, unlike the four suites that are genuinely empty.
+
+    It runs FIRST in CI's PR stage (story 1.10 builds that pipeline) because it takes
+    seconds and should fail before anything slower starts.
+
+    Two gates live here and read different things, so they live in different test classes
+    to keep the assertion counts legible as later stories add A-4 onward:
+
+      Gate A  ProjectFileGateTests, PackageVersionPinTests, SolutionInventoryTests
+              Reads .csproj, Directory.Packages.props and global.json as TEXT. Assertions
+              outside the A-1..A-15 numbering, which the test design scoped to bytecode
+              and schema.
+      Gate B/C  RingDependencyTests, RoleApiBanTests
+              Reads compiled bytecode through ArchUnitNET / Mono.Cecil. A-1 (4), A-2 (2),
+              A-3 (4) = the 10 of 24 that this story delivers.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="TngTech.ArchUnitNET" />
+    <PackageReference Include="TngTech.ArchUnitNET.xUnitV3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Yello.Domain\Yello.Domain.csproj" />
+    <ProjectReference Include="..\..\Yello.Application\Yello.Application.csproj" />
+    <ProjectReference Include="..\..\Yello.Infrastructure\Yello.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\Yello.Host\Yello.Host.csproj" />
+    <ProjectReference Include="..\..\Yello.Contracts\Yello.Contracts.csproj" />
+    <ProjectReference Include="..\..\Yello.Merge\Yello.Merge.csproj" />
+    <ProjectReference Include="..\..\Yello.Client\Yello.Client.csproj" />
+    <ProjectReference Include="..\..\Yello.AppHost\Yello.AppHost.csproj" />
+  </ItemGroup>
+
+</Project>

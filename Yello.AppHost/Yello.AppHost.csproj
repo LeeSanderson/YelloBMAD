@@ -1,0 +1,28 @@
+<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsAspireHost>true</IsAspireHost>
+    <UserSecretsId>yello-apphost</UserSecretsId>
+  </PropertyGroup>
+
+  <!--
+    A PROJECT-based AppHost, not a single-file apphost.cs. The 13.4.x CLI has a known
+    recursion defect launching file-based AppHosts (`dotnet run` with a `file` argument),
+    fixed only from 13.5. AR-1 pins the 13.4 line, so the project form is the one that runs.
+
+    The AppHost is orchestration only and sits in no ring: it appears in the spine's source
+    tree and dependency graph but in no ring-table row. Gate A therefore asserts it against
+    its own allowed edges (Yello.Host and Yello.Client as project resources) rather than
+    against the ring rule, which it would otherwise appear to violate.
+  -->
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.SqlServer" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Yello.Host\Yello.Host.csproj" />
+    <ProjectReference Include="..\Yello.Client\Yello.Client.csproj" />
+  </ItemGroup>
+
+</Project>
