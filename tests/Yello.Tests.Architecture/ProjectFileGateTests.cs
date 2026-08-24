@@ -104,26 +104,40 @@ public sealed class ProjectFileGateTests
     }
 
     /// <summary>
-    /// The extension is load-bearing. <c>bmad-testarch-framework</c>'s preflight detects a
-    /// project by globbing for <c>package.json</c>, <c>*.csproj</c>, <c>*.sln</c> and
-    /// <c>playwright.config.*</c>; it has no <c>.slnx</c> branch. That run halted at
-    /// preflight on 2026-08-22 because the repository was empty, and story 1.1 exists partly
-    /// to unblock it - so the classic format avoids re-halting it on a file extension.
-    /// Note that .NET 10's `dotnet new sln` defaults to slnx, so this can regress by
+    /// One solution file, in XML format. Story 1.1 originally required the classic format on
+    /// the grounds that <c>bmad-testarch-framework</c>'s preflight globs for
+    /// <c>package.json</c>, <c>*.csproj</c>, <c>*.sln</c>, <c>playwright.config.*</c> and has
+    /// no <c>.slnx</c> branch. Re-read, that rationale does not hold: the backend indicator is
+    /// the alternation <c>*.csproj</c>/<c>*.sln</c>, and the skill's Validate Prerequisites
+    /// step lists <c>*.csproj</c> without <c>*.sln</c> at all. Fourteen <c>.csproj</c> files
+    /// satisfy backend detection on their own, so the solution's extension never reaches the
+    /// decision. The same alternation appears in the atdd, automate and ci preflights.
+    /// <para>
+    /// What the gate still protects is singularity: two solution files - a stale
+    /// <c>Yello.sln</c> left beside the <c>.slnx</c> - would let <c>dotnet build</c> and an
+    /// IDE disagree about the project inventory, which is the fact every other gate here
+    /// reads. <c>dotnet sln migrate</c> leaves the original in place, so this regresses by
     /// accident rather than by decision.
+    /// </para>
     /// </summary>
     [Fact]
-    public void The_solution_file_is_classic_sln_format_not_slnx()
+    public void The_solution_file_is_slnx_format_and_is_the_only_one()
     {
         Assert.True(RepositoryLayout.SolutionFile.Exists,
-            $"Expected a classic-format solution at " +
+            $"Expected an XML-format solution at " +
             $"{RepositoryLayout.RelativePath(RepositoryLayout.SolutionFile)}.");
 
-        var slnx = RepositoryLayout.Root.EnumerateFiles("*.slnx").ToList();
+        // The pattern has to be filtered, not trusted: on Windows a three-character extension
+        // in a search pattern also matches longer ones, so "*.sln" alone would match the .slnx.
+        var classic = RepositoryLayout.Root
+            .EnumerateFiles("*.sln")
+            .Where(f => f.Extension.Equals(".sln", StringComparison.OrdinalIgnoreCase))
+            .ToList();
 
-        Assert.True(slnx.Count == 0,
-            $"Found an XML-format solution file ({string.Join(", ", slnx.Select(f => f.Name))}). " +
-            $"bmad-testarch-framework's preflight has no .slnx branch and would halt on it.");
+        Assert.True(classic.Count == 0,
+            $"Found a classic-format solution file ({string.Join(", ", classic.Select(f => f.Name))}) " +
+            $"beside {RepositoryLayout.SolutionFile.Name}. Two solution files can disagree about " +
+            $"the project inventory, which is the fact Gate A reads - delete the .sln.");
     }
 
     private static void AssertDoesNotReference(string projectName, params string[] forbidden)

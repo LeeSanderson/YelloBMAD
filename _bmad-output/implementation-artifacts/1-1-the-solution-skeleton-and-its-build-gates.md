@@ -66,7 +66,7 @@ So that no later story can erode the structure NFR-1 depends on.
   - [x] Create `.config/dotnet-tools.json` and pin the Aspire CLI as a **local** tool: `dotnet tool install --local Aspire.Cli --version 13.4.6`. `Aspire.Cli` 13.4.6 is a `DotnetTool` package (`tools/net10.0/any/`). `aspire` is **not** on PATH on this machine; a local tool manifest both installs it and pins it to AR-1's Aspire 13.4 line, which the shell-script install does not.
   - [x] Create `.editorconfig` with the C# conventions the analysers enforce.
   - [x] Extend `.gitignore` — it currently carries Python entries only and no .NET entries. Add at minimum `bin/`, `obj/`, `TestResults/`, `.vs/`, `artifacts/`, `*.user`.
-  - [x] Create the solution as **`Yello.sln`** (classic format), not `Yello.slnx` — see Dev Notes → *Project Structure Notes* for why the file extension is load-bearing here.
+  - [x] Create the solution as **`Yello.slnx`** (XML format), and keep it the only solution file — see Dev Notes → *Project Structure Notes* for why the extension was once thought load-bearing and what the gate actually protects now.
 
 - [x] **Task 2 — The eight production projects** (AC: 1)
   - [x] Create `Yello.Domain`, `Yello.Application`, `Yello.Infrastructure`, `Yello.Host`, `Yello.Contracts`, `Yello.Merge`, `Yello.Client` (Blazor WebAssembly), `Yello.AppHost`, at the repository-root layout in Dev Notes → *The five rings*.
@@ -240,7 +240,7 @@ One forward-compatibility instruction that reaches this story's structure: OAuth
 
 ### Project Structure Notes
 
-**Use `Yello.sln`, not `Yello.slnx`.** `bmad-testarch-framework`'s preflight detects a project by globbing for `package.json`, `*.csproj`, `*.sln`, `playwright.config.*`. It has no `.slnx` branch. Since this story exists partly to unblock that re-run, the classic solution format avoids re-halting it on a file extension.
+**Use `Yello.slnx`, not `Yello.sln`.** *Superseded 2026-08-24. The original instruction was the reverse, on the grounds that `bmad-testarch-framework`'s preflight globs for `package.json`, `*.csproj`, `*.sln`, `playwright.config.*` and has no `.slnx` branch. Re-read against the skill, that rationale does not hold.* The backend indicator is the **alternation** `*.csproj`/`*.sln` (`step-01-preflight.md:47`), and the skill's *Validate Prerequisites* step lists `*.csproj` **without** `*.sln` at all (`:65`). Fourteen `.csproj` files satisfy backend detection on their own, so the solution's extension never reaches the decision. The same alternation, with the same `*.csproj` alternative, is what the `atdd`, `automate` and `ci` preflights use. No BMad skill in this install reads a solution file. **What the gate protects now is singularity, not format:** `dotnet sln migrate` writes the `.slnx` and *leaves the `.sln` in place*, and two solution files can disagree about the project inventory — which is the fact every other Gate A assertion reads.
 
 **Variance from the spine, stated deliberately:** `tests/Yello.Tests.Shared` is a fourteenth project not named in the Structural Seed. AC1 says the solution "contains" the thirteen named projects; it does not say "and nothing else". The justification is that the shared SQL Server fixture is a stated entry criterion for *all* suites with no owning story, and every consumer of it arrives after this one.
 
@@ -310,8 +310,8 @@ Verified command chain, in order, all from the repository root:
 | `dotnet --version` | `10.0.303` — confirms the `global.json` SDK pin resolves |
 | `dotnet tool restore` | `Tool 'aspire.cli' (version '13.4.6') was restored` |
 | `dotnet aspire --version` | `13.4.6+87fe259e4fc244c599019a7b1304c85a1488f248` |
-| `dotnet build Yello.sln` | `0 Error(s) 0 Warning(s)` — with `TreatWarningsAsErrors=true` across all 14 projects |
-| `dotnet test Yello.sln` | `Passed!  total: 26  failed: 0` — exit 0 |
+| `dotnet build Yello.slnx` | `0 Error(s) 0 Warning(s)` — with `TreatWarningsAsErrors=true` across all 14 projects |
+| `dotnet test Yello.slnx` | `Passed!  total: 26  failed: 0` — exit 0 |
 
 **Assertion counts.** 26 in `Yello.Tests.Architecture`; the other four suites report zero tests
 and still exit 0. Of the 26, **10 are the A-series** this story owes — A-1 (ring rule, 4),
@@ -439,9 +439,15 @@ remains wired for authentication only".
    `"test": { "runner": "Microsoft.Testing.Platform" }` in `global.json` — **not**
    `dotnet.config`, which I tried first and which had no effect. Without it the story's stated
    command chain cannot run at all.
-5. **`dotnet new sln` defaults to `.slnx` on .NET 10**, confirming the story's warning was
-   well-founded. Created with `-f sln`, and a gate now asserts both that `Yello.sln` exists and
-   that no `.slnx` does — this can regress by accident rather than by decision.
+5. **`dotnet new sln` defaults to `.slnx` on .NET 10.** *Revised 2026-08-24: this was first read
+   as confirming the story's warning, and the solution was created with `-f sln`. The warning
+   itself turned out not to hold (see Project Structure Notes), and the SDK default is now the
+   format the repository uses.* Migrated with `dotnet sln Yello.sln migrate`, which writes the
+   `.slnx` but **leaves the `.sln` behind** — so the gate now asserts that `Yello.slnx` exists
+   and that no `.sln` sits beside it. One trap in writing that gate: on Windows a
+   three-character extension in a search pattern also matches longer ones, so
+   `EnumerateFiles("*.sln")` matches `Yello.slnx` and the assertion must filter on
+   `Extension` rather than trust the pattern.
 6. **The container runtime is Rancher Desktop, not Docker Desktop.** The `-rd` suffix in the
    story's preflight (`Docker 29.6.2-rd`) is the tell. There is no Docker Desktop on this
    machine. Its engine is `moby`/dockerd, which is what Testcontainers needs. It was running
@@ -518,7 +524,7 @@ source files** — every path below is new except the two marked *modified*.
 - `aspire.config.json` — written by the Aspire CLI on first run; records the AppHost path so
   `dotnet aspire run` resolves it from the repository root with no `--project` argument. Its
   contents are repo-relative, not machine-specific, so it is kept rather than ignored.
-- `Yello.sln` — classic format, deliberately not `.slnx`
+- `Yello.slnx` — XML format, and the only solution file (a gate asserts no `.sln` beside it)
 - `.gitignore` — *modified*: added .NET entries (it carried Python entries only)
 
 **The eight production projects (Tasks 2, 4, 8)**
@@ -551,7 +557,7 @@ source files** — every path below is new except the two marked *modified*.
 
 - `AllowedReferenceEdges.cs` — the dependency rule as data
 - `RepositoryLayout.cs` — locates and parses the repository's build files
-- `ProjectFileGateTests.cs` — Gate A: declared ring edges, `RuntimeFrameworkVersion`, `.sln` format
+- `ProjectFileGateTests.cs` — Gate A: declared ring edges, `RuntimeFrameworkVersion`, solution-file format and singularity
 - `SolutionInventoryTests.cs` — Gate A: project inventory and source-tree shape
 - `PackageVersionPinTests.cs` — Gate A: AR-1 pins, SDK band, in-memory ban, no VSTest SDK
 - `ProductionAssemblies.cs` — loads the eight production assemblies for the bytecode gates
@@ -576,3 +582,4 @@ source files** — every path below is new except the two marked *modified*.
 | 2026-08-23 | Story 1.1 implemented. Created the fourteen-project solution in its five rings with the AR-1 versions pinned centrally; wired the ring rule into the project references; added the four gates (26 assertions, 10 of them the A-series A-1/A-2/A-3) in `Yello.Tests.Architecture`; stood up Aspire local orchestration with a SQL Server 2025 container and a one-shot Development-only connectivity check in `Yello.Host`; established the test conventions. All four gates validated against planted violations and reverted. `dotnet build` and `dotnet test` both clean with warnings as errors. |
 | 2026-08-23 | Hardened Gate A from a subset check to exact edge equality after it reported green over a solution with no project references at all. |
 | 2026-08-23 | Pinned `SSH.NET` forward to 2026.0.0 (GHSA-q939-rpr3-3284, high severity) reached transitively through AR-1's `Testcontainers` 4.6.0, and `Microsoft.Data.SqlClient` to 7.0.2 to reconcile the conflicting floors of two AR-1 pins. The AR-1 table itself is unchanged. |
+| 2026-08-24 | Switched the solution to `Yello.slnx` (via `dotnet sln migrate`, `.sln` deleted) and inverted the format gate to assert the `.slnx` is the only solution file. The story's original "use `.sln`" instruction rested on `bmad-testarch-framework`'s preflight having no `.slnx` branch; re-reading the skill, its backend indicator is the alternation `*.csproj`/`*.sln` and its prerequisite check names only `*.csproj`, so the fourteen project files satisfy detection either way. Gate validated against a planted stray `.sln` and reverted; `dotnet build` and `dotnet test` clean, 26 assertions, unchanged. |

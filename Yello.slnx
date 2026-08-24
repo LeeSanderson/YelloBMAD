@@ -1,0 +1,23 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Folder Name="/tests/">
+    <Project Path="tests/Yello.Tests.Architecture/Yello.Tests.Architecture.csproj" />
+    <Project Path="tests/Yello.Tests.Isolation/Yello.Tests.Isolation.csproj" />
+    <Project Path="tests/Yello.Tests.Merge/Yello.Tests.Merge.csproj" />
+    <Project Path="tests/Yello.Tests.Revocation/Yello.Tests.Revocation.csproj" />
+    <Project Path="tests/Yello.Tests.Shared/Yello.Tests.Shared.csproj" />
+    <Project Path="tests/Yello.Tests.Slices/Yello.Tests.Slices.csproj" />
+  </Folder>
+  <Project Path="Yello.AppHost/Yello.AppHost.csproj" />
+  <Project Path="Yello.Application/Yello.Application.csproj" />
+  <Project Path="Yello.Client/Yello.Client.csproj" />
+  <Project Path="Yello.Contracts/Yello.Contracts.csproj" />
+  <Project Path="Yello.Domain/Yello.Domain.csproj" />
+  <Project Path="Yello.Host/Yello.Host.csproj" />
+  <Project Path="Yello.Infrastructure/Yello.Infrastructure.csproj" />
+  <Project Path="Yello.Merge/Yello.Merge.csproj" />
+</Solution>

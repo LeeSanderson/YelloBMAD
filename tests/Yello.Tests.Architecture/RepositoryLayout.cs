@@ -16,11 +16,11 @@ namespace Yello.Tests.Architecture;
 /// </remarks>
 internal static class RepositoryLayout
 {
-    /// <summary>The repository root, found by walking up to the directory holding Yello.sln.</summary>
+    /// <summary>The repository root, found by walking up to the directory holding Yello.slnx.</summary>
     public static DirectoryInfo Root { get; } = FindRoot();
 
-    /// <summary>The classic-format solution file. See below for why the extension matters.</summary>
-    public static FileInfo SolutionFile { get; } = new(Path.Combine(Root.FullName, "Yello.sln"));
+    /// <summary>The XML-format solution file. See below for why the extension matters.</summary>
+    public static FileInfo SolutionFile { get; } = new(Path.Combine(Root.FullName, "Yello.slnx"));
 
     public static FileInfo DirectoryPackagesProps { get; } =
         new(Path.Combine(Root.FullName, "Directory.Packages.props"));
@@ -97,7 +97,7 @@ internal static class RepositoryLayout
 
         while (candidate is not null)
         {
-            if (candidate.EnumerateFiles("Yello.sln").Any())
+            if (candidate.EnumerateFiles("Yello.slnx").Any())
             {
                 return candidate;
             }
@@ -106,7 +106,7 @@ internal static class RepositoryLayout
         }
 
         throw new InvalidOperationException(
-            $"Could not locate the repository root: no Yello.sln found walking up from " +
+            $"Could not locate the repository root: no Yello.slnx found walking up from " +
             $"'{AppContext.BaseDirectory}'. Gate A reads the repository's build files from " +
             $"disk, so it cannot run without knowing where the repository is.");
     }

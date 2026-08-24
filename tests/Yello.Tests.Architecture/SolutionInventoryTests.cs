@@ -48,7 +48,7 @@ public sealed class SolutionInventoryTests
             .ToList();
 
         Assert.True(missingFromSolution.Count == 0,
-            $"These project files exist on disk but are not in Yello.sln, so `dotnet build` " +
+            $"These project files exist on disk but are not in Yello.slnx, so `dotnet build` " +
             $"and `dotnet test` over the solution would silently skip them - including any gate " +
             $"they contain:{Environment.NewLine}" +
             string.Join(Environment.NewLine, missingFromSolution.Select(p => $"  - {p}")));
