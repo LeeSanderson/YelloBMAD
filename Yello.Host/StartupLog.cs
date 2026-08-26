@@ -16,17 +16,17 @@ internal static partial class StartupLog
         EventId = 1000,
         Level = LogLevel.Warning,
         Message = "No 'yello' connection string was injected. Run the solution through Yello.AppHost (`dotnet aspire run`) so Aspire supplies it.")]
-    public static partial void ConnectionStringMissing(ILogger logger);
+    internal static partial void ConnectionStringMissing(ILogger logger);
 
     [LoggerMessage(
         EventId = 1001,
         Level = LogLevel.Information,
         Message = "Connected to SQL Server {ServerVersion}, database {Database}.")]
-    public static partial void ConnectivityConfirmed(ILogger logger, string serverVersion, string database);
+    internal static partial void ConnectivityConfirmed(ILogger logger, string serverVersion, string database);
 
     [LoggerMessage(
         EventId = 1002,
         Level = LogLevel.Error,
         Message = "Could not open the injected 'yello' connection. Is the SQL Server container running?")]
-    public static partial void ConnectivityFailed(ILogger logger, Exception exception);
+    internal static partial void ConnectivityFailed(ILogger logger, Exception exception);
 }

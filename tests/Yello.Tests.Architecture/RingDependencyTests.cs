@@ -28,7 +28,9 @@ namespace Yello.Tests.Architecture;
 [Trait("Priority", "P0")]
 public sealed class RingDependencyTests
 {
-    /// <summary>A-1.1 - Domain is the innermost ring and depends on no other Yello assembly.</summary>
+    /// <summary>
+    /// A-1.1 - Domain is the innermost ring and depends on no other Yello assembly.
+    /// </summary>
     [Fact]
     [Trait("Requirement", "AR-2")]
     public void Domain_types_depend_on_no_other_Yello_assembly()
@@ -47,7 +49,9 @@ public sealed class RingDependencyTests
             .Check(ProductionAssemblies.Architecture);
     }
 
-    /// <summary>A-1.2 - Application may reach inward to Domain, never outward to Infrastructure.</summary>
+    /// <summary>
+    /// A-1.2 - Application may reach inward to Domain, never outward to Infrastructure.
+    /// </summary>
     [Fact]
     [Trait("Requirement", "AR-2")]
     public void Application_types_do_not_depend_on_Infrastructure()
@@ -58,7 +62,9 @@ public sealed class RingDependencyTests
             .Check(ProductionAssemblies.Architecture);
     }
 
-    /// <summary>A-1.3 - Application never reaches the outermost ring.</summary>
+    /// <summary>
+    /// A-1.3 - Application never reaches the outermost ring.
+    /// </summary>
     [Fact]
     [Trait("Requirement", "AR-2")]
     public void Application_types_do_not_depend_on_Host()
@@ -69,7 +75,9 @@ public sealed class RingDependencyTests
             .Check(ProductionAssemblies.Architecture);
     }
 
-    /// <summary>A-1.4 - Infrastructure implements ports; it does not depend on the Host that composes it.</summary>
+    /// <summary>
+    /// A-1.4 - Infrastructure implements ports; it does not depend on the Host that composes it.
+    /// </summary>
     [Fact]
     [Trait("Requirement", "AR-2")]
     public void Infrastructure_types_do_not_depend_on_Host()

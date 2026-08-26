@@ -7,38 +7,40 @@
     fact rather than an implication of whichever SDK happens to be installed. global.json
     pins the SDK band; this pins the runtime the output binds to. Gate A asserts both.
 
-    Nullable, TreatWarningsAsErrors, EnforceCodeStyleInBuild and AnalysisLevel are ordinary
-    build hygiene rather than a budget: the project's stated bar is that invariants are
-    "enforced by construction (type system, single choke point, lint/test gates) rather than
-    by an agent remembering to read the spine". Note what is NOT here: no code-coverage
-    threshold. None appears in the PRD, the spine, the epics or the spec kernel, and the
-    80% figure in the test design is explicitly a proposal. Do not invent one.
+    What is NOT here any more: the coding-standard properties. Nullable,
+    TreatWarningsAsErrors, ImplicitUsings, EnforceCodeStyleInBuild, AnalysisLevel,
+    GenerateDocumentationFile and the CS1591 suppression all moved into
+    Opinionated.DotNet.CodingStandards, declared as a GlobalPackageReference in
+    Directory.Packages.props. The package sets each of them under a
+    `Condition="'$(X)' == ''"` guard and Directory.Build.props is imported first, so
+    anything restated here would silently win over the package - which defeats the point
+    of having one. Restate a property here only to deliberately override the standard,
+    and say why.
+
+    Still true, and now the package's doing rather than this file's: invariants are
+    "enforced by construction (type system, single choke point, lint/test gates) rather
+    than by an agent remembering to read the spine". Note what is still absent: no
+    code-coverage threshold. None appears in the PRD, the spine, the epics or the spec
+    kernel, and the 80% figure in the test design is explicitly a proposal. Do not
+    invent one.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RuntimeFrameworkVersion>10.0.11</RuntimeFrameworkVersion>
-    <Nullable>enable</Nullable>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
-    <AnalysisLevel>latest-recommended</AnalysisLevel>
   </PropertyGroup>
 
   <!--
-    IDE0005 (remove unnecessary usings) only runs at build when a documentation file is
-    generated - a long-standing Roslyn limitation (dotnet/roslyn#41640). IDE0005 is a
-    warning here, and therefore an error, because an unused using in this solution can hide
-    a ring violation: a stray `using Microsoft.EntityFrameworkCore;` in a Domain file is
-    exactly the signal Gate B exists to catch.
+    Nothing else belongs here. Two ordering facts, both verified against
+    `dotnet msbuild -preprocess`, decide where an override has to go:
 
-    Generating the file turns CS1591 ("missing XML comment for publicly visible type") into
-    an error across every public type, which would be a documentation mandate nothing in the
-    corpus asks for. So the file is generated and CS1591 alone is suppressed: the gate is
-    kept, the mandate is not invented.
+      * This file is imported BEFORE the package's props, so a property set here wins over
+        the package's `Condition="'$(X)' == ''"` default. That is how you override the
+        standard - and why restating one of its values here is not a no-op but a silent
+        fork of it.
+      * The package's own properties are therefore NOT readable here. In particular
+        ContinuousIntegrationBuild is set by the package, so a condition on it evaluates
+        false in this file no matter the environment. An override that needs to read a
+        package property belongs in Directory.Build.targets, which is imported after.
   -->
-  <PropertyGroup>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <NoWarn>$(NoWarn);CS1591</NoWarn>
-  </PropertyGroup>
 
 </Project>

@@ -6,6 +6,33 @@
   </PropertyGroup>
 
   <!--
+    THE CODING STANDARD.
+
+    A GlobalPackageReference, so it applies to every project in the solution without any
+    project restating it - which is the only form that makes "the same bar everywhere" a
+    property of the build rather than of whoever remembered to add the reference. It is
+    implicitly PrivateAssets="all" (a development dependency), so it reaches no published
+    assembly and no transitive consumer.
+
+    It replaces what used to be a hand-maintained .editorconfig plus a block of
+    coding-standard properties in Directory.Build.props: analyzer severities, C# style,
+    naming, the banned-API sets, and the MSBuild switches that make them fail a build
+    (TreatWarningsAsErrors, EnforceCodeStyleInBuild, AnalysisLevel=latest-all,
+    Nullable=enable, NuGetAudit at level `low` treated as errors). Five analyzer packages
+    ride along: Meziantou.Analyzer, BannedApiAnalyzers, NetAnalyzers, SonarAnalyzer.CSharp
+    and StyleCop.Analyzers.
+
+    It is deliberately NOT in the AR-1 table below and NOT asserted by
+    PackageVersionPinTests. AR-1 pins the stack the product is built FROM; this is build-time
+    tooling that never ships, so bumping it is a developer decision rather than an
+    architecture edit. The gate that guards it is the build itself: a version bump that
+    introduces a rule the codebase violates fails immediately and loudly.
+  -->
+  <ItemGroup Label="Coding standard: applies to every project, ships in none of them">
+    <GlobalPackageReference Include="Opinionated.DotNet.CodingStandards" Version="0.0.11" />
+  </ItemGroup>
+
+  <!--
     AR-1's pinned stack. This file is the single place "every dependency is pinned to the
     AR-1 versions" (AC1) is expressed, and the single place the version-pin gate reads.
 

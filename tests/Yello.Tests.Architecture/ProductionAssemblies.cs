@@ -15,10 +15,10 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Seven are reached through their <c>AssemblyMarker</c>. That type exists for exactly this
-/// reason: an empty project offers no deterministic handle on its assembly, and
-/// <c>typeof(Yello.Domain.AssemblyMarker).Assembly</c> is also a real compile-time
-/// reference, which is what guarantees the DLL is copied next to the test binary.
+/// Seven are reached through their <c>AssemblyMarker.Assembly</c>. That type exists for
+/// exactly this reason: an empty project offers no deterministic handle on its assembly, and
+/// reading the marker's own <c>Assembly</c> property is a real compile-time reference, which
+/// is what guarantees the DLL is copied next to the test binary.
 /// </para>
 /// <para>
 /// <c>Yello.AppHost</c> has no marker - it holds only top-level statements - so it is
@@ -27,21 +27,23 @@ namespace Yello.Tests.Architecture;
 /// </remarks>
 internal static class ProductionAssemblies
 {
-    public static ReflectedAssembly Domain { get; } = typeof(global::Yello.Domain.AssemblyMarker).Assembly;
+    public static ReflectedAssembly Domain { get; } = global::Yello.Domain.AssemblyMarker.Assembly;
 
-    public static ReflectedAssembly Application { get; } = typeof(global::Yello.Application.AssemblyMarker).Assembly;
+    public static ReflectedAssembly Application { get; } = global::Yello.Application.AssemblyMarker.Assembly;
 
-    public static ReflectedAssembly Infrastructure { get; } = typeof(global::Yello.Infrastructure.AssemblyMarker).Assembly;
+    public static ReflectedAssembly Infrastructure { get; } = global::Yello.Infrastructure.AssemblyMarker.Assembly;
 
-    public static ReflectedAssembly Host { get; } = typeof(global::Yello.Host.AssemblyMarker).Assembly;
+    public static ReflectedAssembly Host { get; } = global::Yello.Host.AssemblyMarker.Assembly;
 
-    public static ReflectedAssembly Contracts { get; } = typeof(global::Yello.Contracts.AssemblyMarker).Assembly;
+    public static ReflectedAssembly Contracts { get; } = global::Yello.Contracts.AssemblyMarker.Assembly;
 
-    public static ReflectedAssembly Merge { get; } = typeof(global::Yello.Merge.AssemblyMarker).Assembly;
+    public static ReflectedAssembly Merge { get; } = global::Yello.Merge.AssemblyMarker.Assembly;
 
-    public static ReflectedAssembly Client { get; } = typeof(global::Yello.Client.AssemblyMarker).Assembly;
+    public static ReflectedAssembly Client { get; } = global::Yello.Client.AssemblyMarker.Assembly;
 
-    /// <summary>The AppHost, loaded by name because it carries no AssemblyMarker.</summary>
+    /// <summary>
+    /// The AppHost, loaded by name because it carries no AssemblyMarker.
+    /// </summary>
     public static ReflectedAssembly AppHost { get; } = ReflectedAssembly.Load(new AssemblyName("Yello.AppHost"));
 
     public static IReadOnlyList<ReflectedAssembly> All { get; } =

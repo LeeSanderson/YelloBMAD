@@ -61,8 +61,12 @@ Simple, query and VSTest filtering **cannot be mixed** in one invocation.
 ## Rules
 
 **One behaviour per test, named for the behaviour.** Test names are sentences with
-underscores. `CA1707` and `IDE1006` are switched off under `tests/**` in `.editorconfig` for
-exactly this reason — those rules police a public API surface, and a test method is not one.
+underscores. The coding standard permits this without a local exemption:
+`Opinionated.DotNet.CodingStandards` sets `CA1707` to `none` solution-wide, and its naming
+rules report `IDE1006` at `suggestion`, so neither fails a build. Both rules police a public
+API surface, and a test method is not one — it is never called by anything but the runner.
+The repository no longer carries an `.editorconfig`; the standard is the
+`GlobalPackageReference` in `Directory.Packages.props`.
 
 **No `Task.Delay` as a synchronisation mechanism.** Ever. Wait on the condition, not on the
 clock — a Testcontainers wait strategy, a completion signal, a polled predicate with a

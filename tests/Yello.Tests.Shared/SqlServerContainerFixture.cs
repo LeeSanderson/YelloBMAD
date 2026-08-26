@@ -53,7 +53,13 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
     /// oversight: it is the only container image in the stack, so builds are not
     /// reproducible across time until a digest is chosen.
     /// </summary>
-    public const string Image = "mcr.microsoft.com/mssql/server:2025-latest";
+    /// <remarks>
+    /// A static property rather than a <c>const</c>, per S2339: a public constant is copied
+    /// into every consumer at compile time, so changing the tag here would not reach a suite
+    /// that had not been rebuilt. For a value whose whole job is to be the one place the tag
+    /// is stated, a compile-time copy is exactly the wrong semantics.
+    /// </remarks>
+    public static string Image => "mcr.microsoft.com/mssql/server:2025-latest";
 
     private readonly MsSqlContainer _container = new MsSqlBuilder()
         .WithImage(Image)
@@ -66,7 +72,9 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
     /// </summary>
     public string ConnectionString => _container.GetConnectionString();
 
-    /// <summary>Starts the container and waits for the engine to accept connections.</summary>
+    /// <summary>
+    /// Starts the container and waits for the engine to accept connections.
+    /// </summary>
     public ValueTask InitializeAsync() => new(_container.StartAsync());
 
     /// <summary>

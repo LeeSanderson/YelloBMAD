@@ -31,7 +31,9 @@ namespace Yello.Tests.Architecture;
 [Trait("Requirement", "AR-4")]
 public sealed class RoleApiBanTests
 {
-    /// <summary>A-3.1</summary>
+    /// <summary>
+    /// A-3.1
+    /// </summary>
     [Fact]
     public void No_code_applies_Authorize_with_a_Roles_argument()
     {
@@ -43,7 +45,9 @@ public sealed class RoleApiBanTests
             "Space instead. [Authorize] with a policy is not banned; the Roles argument is.");
     }
 
-    /// <summary>A-3.2</summary>
+    /// <summary>
+    /// A-3.2
+    /// </summary>
     [Fact]
     public void No_code_calls_IsInRole_on_a_principal()
     {
@@ -55,7 +59,9 @@ public sealed class RoleApiBanTests
             "this ban is on the method, not the type.");
     }
 
-    /// <summary>A-3.3</summary>
+    /// <summary>
+    /// A-3.3
+    /// </summary>
     [Fact]
     public void No_code_references_IdentityRole()
     {
@@ -65,7 +71,9 @@ public sealed class RoleApiBanTests
             "between an Account and a Space - and never a row in an Identity role table.");
     }
 
-    /// <summary>A-3.4</summary>
+    /// <summary>
+    /// A-3.4
+    /// </summary>
     [Fact]
     public void No_code_references_Identitys_role_store_or_role_manager()
     {
@@ -76,7 +84,7 @@ public sealed class RoleApiBanTests
             "the role store would introduce a second, competing model of who may do what.");
     }
 
-    private static void AssertNoUsages(IReadOnlyList<string> usages, string why)
+    private static void AssertNoUsages(IReadOnlyCollection<string> usages, string why)
     {
         Assert.True(usages.Count == 0,
             $"{why}{Environment.NewLine}{Environment.NewLine}Found at:{Environment.NewLine}" +

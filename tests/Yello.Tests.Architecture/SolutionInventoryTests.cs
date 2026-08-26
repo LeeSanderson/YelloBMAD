@@ -24,16 +24,16 @@ public sealed class SolutionInventoryTests
         var unexpected = actual.Except(expected, StringComparer.Ordinal).OrderBy(n => n, StringComparer.Ordinal).ToList();
 
         Assert.True(missing.Count == 0 && unexpected.Count == 0,
-            $"The solution's project inventory does not match the Structural Seed." +
+            "The solution's project inventory does not match the Structural Seed." +
             $"{Environment.NewLine}  missing:    " +
             $"{(missing.Count == 0 ? "(none)" : string.Join(", ", missing))}" +
             $"{Environment.NewLine}  unexpected: " +
             $"{(unexpected.Count == 0 ? "(none)" : string.Join(", ", unexpected))}" +
             $"{Environment.NewLine}{Environment.NewLine}" +
-            $"The expected set is the eight production projects, the five test projects, and " +
+            "The expected set is the eight production projects, the five test projects, and " +
             $"exactly one declared variance ({AllowedReferenceEdges.DeclaredVariance}, which " +
-            $"hosts the shared SQL Server fixture). Adding a project means adding a row to " +
-            $"AllowedReferenceEdges.Table and justifying it against AC1.");
+            "hosts the shared SQL Server fixture). Adding a project means adding a row to " +
+            "AllowedReferenceEdges.Table and justifying it against AC1.");
     }
 
     [Fact]
@@ -48,8 +48,8 @@ public sealed class SolutionInventoryTests
             .ToList();
 
         Assert.True(missingFromSolution.Count == 0,
-            $"These project files exist on disk but are not in Yello.slnx, so `dotnet build` " +
-            $"and `dotnet test` over the solution would silently skip them - including any gate " +
+            "These project files exist on disk but are not in Yello.slnx, so `dotnet build` " +
+            "and `dotnet test` over the solution would silently skip them - including any gate " +
             $"they contain:{Environment.NewLine}" +
             string.Join(Environment.NewLine, missingFromSolution.Select(p => $"  - {p}")));
     }
@@ -79,7 +79,7 @@ public sealed class SolutionInventoryTests
         }
 
         Assert.True(misplaced.Count == 0,
-            $"The source tree does not match the Structural Seed (production projects at the " +
+            "The source tree does not match the Structural Seed (production projects at the " +
             $"root, test projects under tests/, no src/):{Environment.NewLine}" +
             string.Join(Environment.NewLine, misplaced.Select(m => $"  - {m}")));
     }

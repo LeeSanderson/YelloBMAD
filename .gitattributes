@@ -1,0 +1,50 @@
+# Line endings.
+#
+# There is no .editorconfig any more - the coding standard is
+# Opinionated.DotNet.CodingStandards, a GlobalPackageReference in Directory.Packages.props -
+# and its `end_of_line = crlf` governs editors only. This file governs git, which is the half
+# that decides what actually lands in a commit. The two are complementary, not alternatives.
+#
+# Without this file, line endings are a property of each contributor's core.autocrlf rather
+# than of the repository: a clone with autocrlf=false commits CRLF verbatim, and the next
+# checkout elsewhere produces a whole-file diff against it. That is not hypothetical here -
+# seven .csproj files in this tree already carry MIXED endings, which is what the problem
+# looks like before anyone notices it.
+
+# Normalise every text file to LF in the repository, whatever core.autocrlf is set to. This
+# is the rule that actually closes the hole; everything below is refinement. Git keeps
+# auto-detecting binaries under `auto`, which is why Yello.Client/wwwroot/favicon.png and
+# _bmad/_config/bmad-help.csv - both of which git already reads as binary - are safe.
+* text=auto
+
+# The coding standard states end_of_line = crlf, so pin the WORKING TREE to CRLF for the file
+# types it governs, on every platform rather than only where core.autocrlf happens to be true.
+# The stored copy is still LF: `eol` affects checkout, not the repository.
+#
+# The concrete failure this prevents: CI (story 1.10) running on a Linux image would check out
+# LF, then check that tree against a standard that says CRLF. `dotnet format` reads
+# end_of_line, so the tree and the rule it is measured by must not disagree by platform.
+#
+# Note what is deliberately NOT listed: *.json, *.md, *.py, *.toml and the rest of the
+# .claude/skills tree. Those are vendored tool output or documentation, no build gate reads
+# their line endings, and `text=auto` above already gives them native endings per platform.
+*.cs        text eol=crlf
+*.razor     text eol=crlf
+*.csproj    text eol=crlf
+*.props     text eol=crlf
+*.targets   text eol=crlf
+*.slnx      text eol=crlf
+
+# The inverse: files that break if they arrive with CRLF, whatever the host runs. None of
+# these exist yet. CI arrives in story 1.10, and a shell script committed from Windows and
+# then run in a Linux container is the textbook way this bites - `$'\r': command not found`,
+# from a file that looks correct in every editor. Cheaper to state now than to debug later.
+*.sh         text eol=lf
+*.bash       text eol=lf
+Dockerfile   text eol=lf
+*.dockerfile text eol=lf
+
+# Explicit rather than inferred. Git guesses both of these correctly today, but a guess is
+# not a gate, and a corrupted binary is a worse failure than a noisy diff.
+*.png binary
+*.ico binary

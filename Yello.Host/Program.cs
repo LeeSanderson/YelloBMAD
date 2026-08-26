@@ -58,4 +58,7 @@ if (app.Environment.IsDevelopment())
     }
 }
 
-app.Run();
+// RunAsync, not Run: this file is already an async entry point (the connectivity check above
+// awaits), and the blocking overload would park the entry-point thread for the process
+// lifetime while the async machinery it was started on sits idle. CA1849 and S6966 both say so.
+await app.RunAsync();

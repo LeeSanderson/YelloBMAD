@@ -14,12 +14,24 @@ namespace Yello.Tests.Architecture;
 /// invisible to Gate B. AC2 requires the build to fail when <i>a project reference is
 /// added</i> - that is a project-file fact, and only a project-file gate sees it.
 /// </remarks>
+// Every helper below takes FileInfo where FileSystemInfo would compile: each reads only Name
+// or FullName, both of which the base type carries. An IDE will suggest widening them - S3242,
+// which the coding standard reports at `suggestion` and which therefore no longer fails the
+// build. Do not take the suggestion. FileSystemInfo means "a file or a directory", and a
+// DirectoryInfo reaching ProjectName or DeclaredProjectReferences does not fail - it returns a
+// plausible wrong answer, silently, inside the gate the whole solution's structure is asserted
+// by. The parameter type is carrying an invariant here, which is the one job S3242 does not
+// weigh. This note is the only thing standing between that invariant and a tidy-up commit.
 internal static class RepositoryLayout
 {
-    /// <summary>The repository root, found by walking up to the directory holding Yello.slnx.</summary>
+    /// <summary>
+    /// The repository root, found by walking up to the directory holding Yello.slnx.
+    /// </summary>
     public static DirectoryInfo Root { get; } = FindRoot();
 
-    /// <summary>The XML-format solution file. See below for why the extension matters.</summary>
+    /// <summary>
+    /// The XML-format solution file. See below for why the extension matters.
+    /// </summary>
     public static FileInfo SolutionFile { get; } = new(Path.Combine(Root.FullName, "Yello.slnx"));
 
     public static FileInfo DirectoryPackagesProps { get; } =
@@ -40,7 +52,9 @@ internal static class RepositoryLayout
         .OrderBy(f => f.Name, StringComparer.Ordinal)
         .ToList();
 
-    /// <summary>The project name, which by convention equals the file name without its extension.</summary>
+    /// <summary>
+    /// The project name, which by convention equals the file name without its extension.
+    /// </summary>
     public static string ProjectName(FileInfo project) =>
         Path.GetFileNameWithoutExtension(project.Name);
 
@@ -71,14 +85,18 @@ internal static class RepositoryLayout
             .OrderBy(n => n, StringComparer.Ordinal)
             .ToList();
 
-    /// <summary>True when the project lives under the <c>tests/</c> directory.</summary>
+    /// <summary>
+    /// True when the project lives under the <c>tests/</c> directory.
+    /// </summary>
     public static bool IsUnderTestsDirectory(FileInfo project)
     {
         var relative = Path.GetRelativePath(Root.FullName, project.FullName).Replace('\\', '/');
         return relative.StartsWith("tests/", StringComparison.Ordinal);
     }
 
-    /// <summary>The repository-relative path, for failure messages a human has to act on.</summary>
+    /// <summary>
+    /// The repository-relative path, for failure messages a human has to act on.
+    /// </summary>
     public static string RelativePath(FileInfo file) =>
         Path.GetRelativePath(Root.FullName, file.FullName).Replace('\\', '/');
 
@@ -106,8 +124,8 @@ internal static class RepositoryLayout
         }
 
         throw new InvalidOperationException(
-            $"Could not locate the repository root: no Yello.slnx found walking up from " +
+            "Could not locate the repository root: no Yello.slnx found walking up from " +
             $"'{AppContext.BaseDirectory}'. Gate A reads the repository's build files from " +
-            $"disk, so it cannot run without knowing where the repository is.");
+            "disk, so it cannot run without knowing where the repository is.");
     }
 }

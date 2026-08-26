@@ -52,7 +52,11 @@ public sealed class PackageVersionPinTests
         ["TngTech.ArchUnitNET"] = "0.13.3",
     };
 
-    /// <summary>The SDK band pinned in global.json. Two .NET 10 SDKs are installed on the dev machine (10.0.302 and 10.0.303); without this pin the build is non-deterministic across machines.</summary>
+    /// <summary>
+    /// The SDK band pinned in global.json. Two .NET 10 SDKs are installed on the dev machine
+    /// (10.0.302 and 10.0.303); without this pin the build is non-deterministic across
+    /// machines.
+    /// </summary>
     private const string ExpectedSdkVersion = "10.0.303";
 
     private const string InMemoryProvider = "Microsoft.EntityFrameworkCore.InMemory";
@@ -68,20 +72,22 @@ public sealed class PackageVersionPinTests
             if (!actual.TryGetValue(package, out var found))
             {
                 problems.Add($"'{package}' has no <PackageVersion> in Directory.Packages.props. AR-1 pins it to {expected}.");
+                continue;
             }
-            else if (!found.Equals(expected, StringComparison.Ordinal))
+
+            if (!found.Equals(expected, StringComparison.Ordinal))
             {
                 problems.Add($"'{package}' is pinned to {found}, but AR-1 specifies {expected}.");
             }
         }
 
         Assert.True(problems.Count == 0,
-            $"Directory.Packages.props has drifted from the AR-1 stack table." +
+            "Directory.Packages.props has drifted from the AR-1 stack table." +
             $"{Environment.NewLine}{Environment.NewLine}" +
             string.Join(Environment.NewLine, problems.Select(p => $"  - {p}")) +
             $"{Environment.NewLine}{Environment.NewLine}" +
-            $"Changing a pin is an architecture edit, not a developer decision: amend the AR-1 " +
-            $"table in epics.md first.");
+            "Changing a pin is an architecture edit, not a developer decision: amend the AR-1 " +
+            "table in epics.md first.");
     }
 
     [Fact]
@@ -103,9 +109,9 @@ public sealed class PackageVersionPinTests
         }
 
         Assert.True(offenders.Count == 0,
-            $"Under central package management, a project declares " +
-            $"<PackageReference Include=\"...\" /> with NO Version attribute. An inline version " +
-            $"silently escapes Directory.Packages.props, which is the single place AC1's pins are " +
+            "Under central package management, a project declares " +
+            "<PackageReference Include=\"...\" /> with NO Version attribute. An inline version " +
+            "silently escapes Directory.Packages.props, which is the single place AC1's pins are " +
             $"expressed and the single place this gate reads:{Environment.NewLine}" +
             string.Join(Environment.NewLine, offenders.Select(o => $"  - {o}")));
     }
@@ -141,8 +147,8 @@ public sealed class PackageVersionPinTests
 
         Assert.True(expected.Equals(sdk, StringComparison.Ordinal),
             $"{RepositoryLayout.RelativePath(appHost)} declares Sdk='{sdk}', expected '{expected}'. " +
-            $"Central package management cannot govern an Sdk attribute, so this copy of the " +
-            $"Aspire version has to be asserted directly.");
+            "Central package management cannot govern an Sdk attribute, so this copy of the " +
+            "Aspire version has to be asserted directly.");
     }
 
     /// <summary>
@@ -156,9 +162,9 @@ public sealed class PackageVersionPinTests
     {
         Assert.False(CentralPackageVersions().ContainsKey(InMemoryProvider),
             $"Directory.Packages.props declares a <PackageVersion> for {InMemoryProvider}. " +
-            $"It must not: an in-memory provider cannot exercise row-level security, which is " +
-            $"what NFR-1 rests on. Leaving the version centrally unavailable is the cheapest " +
-            $"enforcement of AC4's ban - a project that references it then fails to restore.");
+            "It must not: an in-memory provider cannot exercise row-level security, which is " +
+            "what NFR-1 rests on. Leaving the version centrally unavailable is the cheapest " +
+            "enforcement of AC4's ban - a project that references it then fails to restore.");
     }
 
     [Fact]
@@ -174,9 +180,9 @@ public sealed class PackageVersionPinTests
             .ToList();
 
         Assert.True(offenders.Count == 0,
-            $"These test projects reference an EF Core in-memory provider, which AC4 forbids. " +
-            $"An in-memory provider cannot exercise row-level security, which is what NFR-1 " +
-            $"rests on - suites run against the real SQL Server container in " +
+            "These test projects reference an EF Core in-memory provider, which AC4 forbids. " +
+            "An in-memory provider cannot exercise row-level security, which is what NFR-1 " +
+            "rests on - suites run against the real SQL Server container in " +
             $"{AllowedReferenceEdges.DeclaredVariance} instead:{Environment.NewLine}" +
             string.Join(Environment.NewLine, offenders.Select(o => $"  - {o}")));
     }
@@ -198,7 +204,7 @@ public sealed class PackageVersionPinTests
 
         Assert.True(offenders.Count == 0,
             $"Microsoft.NET.Test.Sdk is referenced by: {string.Join(", ", offenders)}. " +
-            $"xunit.v3 4.0.0 runs on Microsoft.Testing.Platform only; there is no VSTest path here.");
+            "xunit.v3 4.0.0 runs on Microsoft.Testing.Platform only; there is no VSTest path here.");
     }
 
     private static Dictionary<string, string> CentralPackageVersions() =>

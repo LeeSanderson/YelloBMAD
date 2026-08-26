@@ -37,8 +37,8 @@ public sealed class ProjectFileGateTests
             {
                 violations.Add(
                     $"{path}: project '{name}' has no row in the allowed-edge table, so it has " +
-                    $"no agreed ring position. Add a row to AllowedReferenceEdges.Table, or " +
-                    $"remove the project.");
+                    "no agreed ring position. Add a row to AllowedReferenceEdges.Table, or " +
+                    "remove the project.");
                 continue;
             }
 
@@ -57,7 +57,7 @@ public sealed class ProjectFileGateTests
             {
                 violations.Add(
                     $"{path}: '{name}' -> '{missing}' is MISSING. The table requires this edge, " +
-                    $"so either restore the ProjectReference or change the table.");
+                    "so either restore the ProjectReference or change the table.");
             }
         }
 
@@ -73,7 +73,7 @@ public sealed class ProjectFileGateTests
         var references = RepositoryLayout.DeclaredProjectReferences(domain);
 
         Assert.True(references.Count == 0,
-            $"Yello.Domain is the innermost ring and must reference NOTHING, but " +
+            "Yello.Domain is the innermost ring and must reference NOTHING, but " +
             $"{RepositoryLayout.RelativePath(domain)} declares: {string.Join(", ", references)}.");
     }
 
@@ -124,7 +124,7 @@ public sealed class ProjectFileGateTests
     public void The_solution_file_is_slnx_format_and_is_the_only_one()
     {
         Assert.True(RepositoryLayout.SolutionFile.Exists,
-            $"Expected an XML-format solution at " +
+            "Expected an XML-format solution at " +
             $"{RepositoryLayout.RelativePath(RepositoryLayout.SolutionFile)}.");
 
         // The pattern has to be filtered, not trusted: on Windows a three-character extension
@@ -137,7 +137,7 @@ public sealed class ProjectFileGateTests
         Assert.True(classic.Count == 0,
             $"Found a classic-format solution file ({string.Join(", ", classic.Select(f => f.Name))}) " +
             $"beside {RepositoryLayout.SolutionFile.Name}. Two solution files can disagree about " +
-            $"the project inventory, which is the fact Gate A reads - delete the .sln.");
+            "the project inventory, which is the fact Gate A reads - delete the .sln.");
     }
 
     private static void AssertDoesNotReference(string projectName, params string[] forbidden)

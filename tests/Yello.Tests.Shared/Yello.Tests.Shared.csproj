@@ -16,14 +16,15 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <!--
-      CA1716 objects that the namespace segment "Shared" is a reserved word in VB, which
-      "makes it harder for consumers in other languages". The rule is about the design of a
-      published cross-language API surface; this assembly is internal test scaffolding that
-      is never packed (IsPackable=false) and never consumed outside this solution. The
-      project name is fixed by the story, so the rule is suppressed here rather than
-      obeyed - narrowly, in the one project it applies to.
+      No NoWarn for CA1716 any more. It used to be suppressed here: the rule objects that the
+      namespace segment "Shared" is a reserved word in VB, which "makes it harder for
+      consumers in other languages" - a claim about a published cross-language API surface,
+      and this assembly is internal test scaffolding that is never packed and never consumed
+      outside this solution. Opinionated.DotNet.CodingStandards sets CA1716 to `none`
+      solution-wide, so the suppression suppressed nothing; a dead NoWarn reads as a live
+      constraint, which is worse than no comment. Restore it only if the standard ever
+      re-enables the rule.
     -->
-    <NoWarn>$(NoWarn);CA1716</NoWarn>
     <!--
       Deliberately NOT OutputType=Exe and NOT IsTestProject: this project contains fixtures
       for other suites to consume, never test cases of its own. Marking it a test project

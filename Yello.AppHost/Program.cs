@@ -33,4 +33,7 @@ builder.AddProject<Projects.Yello_Host>("host")
 
 builder.AddProject<Projects.Yello_Client>("client");
 
-builder.Build().Run();
+// RunAsync rather than Run (S6966): the blocking overload parks the entry-point thread for
+// the whole orchestration session. Awaiting it turns this file into an async entry point,
+// which costs nothing here and is the shape Yello.Host already uses.
+await builder.Build().RunAsync();

@@ -35,7 +35,9 @@ namespace Yello.Tests.Architecture;
 /// </remarks>
 internal static class AllowedReferenceEdges
 {
-    /// <summary>The eight production projects, in ring order.</summary>
+    /// <summary>
+    /// The eight production projects, in ring order.
+    /// </summary>
     public static readonly string[] ProductionProjects =
     [
         "Yello.Domain",
@@ -126,7 +128,9 @@ internal static class AllowedReferenceEdges
             [DeclaredVariance] = [],
         };
 
-    /// <summary>Every project the solution is expected to contain: the thirteen named, plus the variance.</summary>
+    /// <summary>
+    /// Every project the solution is expected to contain: the thirteen named, plus the variance.
+    /// </summary>
     public static IEnumerable<string> ExpectedProjects =>
         ProductionProjects.Concat(TestProjects).Append(DeclaredVariance);
 }
