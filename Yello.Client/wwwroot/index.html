@@ -18,11 +18,32 @@
         the token count at exactly 30 so an incomplete token set is detectable rather than
         merely wrong. A partial token set written here is precisely the failure that AC
         exists to catch, so this story ships no stylesheet link, no :root block and no hex
-        value. The Blazor template's Bootstrap bundle, css/app.css, scoped-CSS bundle and
-        styled error banner were removed for the same reason; story 1.2 reintroduces an
-        error surface built from the tokens.
+        value. The Blazor template's Bootstrap bundle, css/app.css and scoped-CSS bundle
+        were removed for the same reason.
     -->
     <div id="app">Loading Yello&hellip;</div>
+
+    <!--
+        The element blazor.webassembly.js unhides when an unhandled exception reaches it or a
+        reconnection fails. Its ID and the `reload`/`dismiss` classes are contractual - the
+        framework looks for exactly these - so the element has to exist even though this story
+        writes no CSS.
+
+        It was removed with the rest of the template's styled banner, which left every
+        unhandled client error console-only: the page would sit on "Loading Yello..." or hold a
+        stale render with nothing shown to the user. That is a silent failure mode by
+        construction, and this story has no other error surface to fall back on.
+
+        Restored WITHOUT styling, deliberately. `display:none` is the framework's own
+        precondition rather than a design decision, and unhidden it renders as plain
+        unstyled text - visible, which is the whole point, and obviously unfinished. Story
+        1.2 owns making it look like anything, from the tokens it defines.
+    -->
+    <div id="blazor-error-ui" style="display:none">
+        An unhandled error has occurred.
+        <a href="." class="reload">Reload</a>
+        <span class="dismiss">&times;</span>
+    </div>
 
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>

@@ -25,12 +25,37 @@ namespace Yello.Tests.Architecture;
 /// story 1.1's empty projects. Each was validated against a planted violation in Task 9; the
 /// results are recorded in the story's Dev Agent Record.
 /// </para>
+/// <para>
+/// <b>Scope is the whole solution</b> - AC3's words - which includes <c>tests/**</c>. See
+/// <see cref="SolutionAssemblies"/> for how the suites are reached without referencing them,
+/// and <see cref="RoleApiScan"/> for which forms of role authorisation each assertion covers.
+/// </para>
 /// </remarks>
 [Trait("Suite", "Architecture")]
 [Trait("Priority", "P0")]
 [Trait("Requirement", "AR-4")]
 public sealed class RoleApiBanTests
 {
+    /// <summary>
+    /// The gate's own precondition: it can only ban what it can read.
+    /// </summary>
+    /// <remarks>
+    /// AC3 says "anywhere in the solution", so a scan that silently covered eight of fourteen
+    /// assemblies would satisfy its four assertions while leaving six unexamined. Failing here
+    /// makes that visible instead.
+    /// </remarks>
+    [Fact]
+    public void The_scan_can_read_every_assembly_in_the_solution()
+    {
+        Assert.True(SolutionAssemblies.Unreadable.Count == 0,
+            "Gate C could not find these compiled assemblies, so it did NOT scan them - and " +
+            "AC3 bans the Role API anywhere in the solution, not anywhere the gate happened to " +
+            $"look:{Environment.NewLine}" +
+            string.Join(Environment.NewLine, SolutionAssemblies.Unreadable.Select(a => $"  - {a}")) +
+            $"{Environment.NewLine}{Environment.NewLine}" +
+            "Build the whole solution (`dotnet build Yello.slnx`) before running this suite.");
+    }
+
     /// <summary>
     /// A-3.1
     /// </summary>
@@ -39,10 +64,13 @@ public sealed class RoleApiBanTests
     {
         AssertNoUsages(
             RoleApiScan.AuthorizeRolesUsages,
-            "[Authorize(Roles = ...)] is banned. Authorisation is a function of (Account, Space) " +
-            "through a Membership, so a role carried on the principal cannot express it - the same " +
-            "Account holds different Roles in different Spaces. Authorise against the resolved " +
-            "Space instead. [Authorize] with a policy is not banned; the Roles argument is.");
+            "Role-based authorisation is banned in every form: [Authorize(Roles = ...)] and any " +
+            "subclass of it, `new AuthorizeAttribute { Roles = ... }` as an object initialiser, " +
+            "AuthorizationPolicyBuilder.RequireRole, and RolesAuthorizationRequirement. " +
+            "Authorisation is a function of (Account, Space) through a Membership, so a role " +
+            "carried on the principal cannot express it - the same Account holds different Roles " +
+            "in different Spaces. Authorise against the resolved Space instead. [Authorize] with " +
+            "a policy is not banned; roles are - including a policy built out of RequireRole.");
     }
 
     /// <summary>
@@ -67,8 +95,10 @@ public sealed class RoleApiBanTests
     {
         AssertNoUsages(
             RoleApiScan.IdentityRoleReferences,
-            "IdentityRole is banned. Yello's Role is an attribute of a Membership - the join " +
-            "between an Account and a Space - and never a row in an Identity role table.");
+            "Identity's role entity family is banned - IdentityRole, IdentityUserRole (the " +
+            "account-to-role join, i.e. exactly the table this architecture rejects) and " +
+            "IdentityRoleClaim, in any arity. Yello's Role is an attribute of a Membership - the " +
+            "join between an Account and a Space - and never a row in an Identity role table.");
     }
 
     /// <summary>
@@ -79,7 +109,9 @@ public sealed class RoleApiBanTests
     {
         AssertNoUsages(
             RoleApiScan.RoleStoreReferences,
-            "Identity's role store (RoleManager<>, IRoleStore<>) is banned. Identity is wired for " +
+            "Identity's role store is banned in every form - RoleManager<>, IRoleStore<>, " +
+            "IRoleClaimStore<>, IRoleValidator<>, RoleStore<>, and the IdentityBuilder calls that " +
+            "wire them (AddRoles<TRole>(), AddRoleManager<T>()). Identity is wired for " +
             "authentication ONLY: the Account store, password hashing and cookie issuance. Adding " +
             "the role store would introduce a second, competing model of who may do what.");
     }

@@ -6,6 +6,7 @@ namespace Yello.Tests.Architecture;
 /// Locates the repository on disk and reads its build files as text.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Gate A reads <c>.csproj</c>, <c>Directory.Packages.props</c> and <c>global.json</c> as
 /// files rather than as compiled metadata, and that is the whole point of it. ArchUnitNET
 /// analyses compiled bytecode through Mono.Cecil, and Roslyn emits no <c>AssemblyRef</c>
@@ -13,6 +14,16 @@ namespace Yello.Tests.Architecture;
 /// <c>&lt;ProjectReference&gt;</c> that nobody has written code against yet is therefore
 /// invisible to Gate B. AC2 requires the build to fail when <i>a project reference is
 /// added</i> - that is a project-file fact, and only a project-file gate sees it.
+/// </para>
+/// <para>
+/// <b>What this class reads is what a build file DECLARES, not what MSBuild evaluates.</b>
+/// The distinction matters and is asserted rather than assumed: <see cref="MsBuildImportFiles"/>
+/// exists so a gate can require that the repository has exactly one of each import file, which
+/// is what makes "the root Directory.Build.props says X" equivalent to "every project gets X".
+/// Without that, a nested <c>tests/Directory.Build.props</c> would shadow the root file
+/// entirely - MSBuild imports only the nearest - while a gate reading the root file stayed
+/// green.
+/// </para>
 /// </remarks>
 // Every helper below takes FileInfo where FileSystemInfo would compile: each reads only Name
 // or FullName, both of which the base type carries. An IDE will suggest widening them - S3242,
@@ -25,12 +36,21 @@ namespace Yello.Tests.Architecture;
 internal static class RepositoryLayout
 {
     /// <summary>
+    /// Directories that are never part of the source tree. Enumerating them is not merely
+    /// wasted work: a vendored <c>.csproj</c> arriving under <c>.claude</c> with a skill
+    /// update, or a restored package under <c>artifacts</c>, would present to the inventory
+    /// gate as an unexplained production project and fail a build nobody had changed.
+    /// </summary>
+    private static readonly string[] ExcludedDirectories =
+        ["bin", "obj", "artifacts", "node_modules", ".git", ".vs", ".claude", "_bmad", "_bmad-output"];
+
+    /// <summary>
     /// The repository root, found by walking up to the directory holding Yello.slnx.
     /// </summary>
     public static DirectoryInfo Root { get; } = FindRoot();
 
     /// <summary>
-    /// The XML-format solution file. See below for why the extension matters.
+    /// The XML-format solution file. See ProjectFileGateTests for why the extension matters.
     /// </summary>
     public static FileInfo SolutionFile { get; } = new(Path.Combine(Root.FullName, "Yello.slnx"));
 
@@ -42,15 +62,31 @@ internal static class RepositoryLayout
 
     public static FileInfo GlobalJson { get; } = new(Path.Combine(Root.FullName, "global.json"));
 
+    public static FileInfo DotnetToolsManifest { get; } =
+        new(Path.Combine(Root.FullName, ".config", "dotnet-tools.json"));
+
     /// <summary>
-    /// Every project file in the repository, excluding build output. Ordered so failure
-    /// messages are stable between runs.
+    /// Every project file in the repository, excluding build output and non-source trees.
+    /// Ordered so failure messages are stable between runs.
     /// </summary>
-    public static IReadOnlyList<FileInfo> AllProjectFiles { get; } = Root
-        .EnumerateFiles("*.csproj", SearchOption.AllDirectories)
-        .Where(f => !IsBuildOutput(f))
-        .OrderBy(f => f.Name, StringComparer.Ordinal)
-        .ToList();
+    public static IReadOnlyList<FileInfo> AllProjectFiles { get; } =
+        EnumerateSourceFiles("*.csproj")
+            .OrderBy(f => f.Name, StringComparer.Ordinal)
+            .ToList();
+
+    /// <summary>
+    /// Every MSBuild file that applies to projects implicitly by directory position, anywhere
+    /// in the source tree. A gate asserts there is exactly one of each: MSBuild imports only
+    /// the nearest <c>Directory.Build.props</c>, so a second one is not an addition to the
+    /// root file but a replacement of it.
+    /// </summary>
+    public static IReadOnlyList<FileInfo> MsBuildImportFiles { get; } =
+    [
+        .. EnumerateSourceFiles("Directory.Build.props")
+            .Concat(EnumerateSourceFiles("Directory.Build.targets"))
+            .Concat(EnumerateSourceFiles("Directory.Packages.props"))
+            .OrderBy(f => RelativePath(f), StringComparer.Ordinal),
+    ];
 
     /// <summary>
     /// The project name, which by convention equals the file name without its extension.
@@ -59,40 +95,113 @@ internal static class RepositoryLayout
         Path.GetFileNameWithoutExtension(project.Name);
 
     /// <summary>
+    /// Parses an XML build file, turning a malformed or unreadable one into a failure that
+    /// names the file.
+    /// </summary>
+    /// <remarks>
+    /// Unguarded, <c>XDocument.Load</c> aborts the enclosing iteration on the first bad file,
+    /// so partial coverage becomes indistinguishable from full coverage - the gate reports
+    /// green over the projects it happened to reach before throwing, or reports an exception
+    /// that names no file. Both are worse than a named failure.
+    /// </remarks>
+    public static XDocument LoadXml(FileInfo file)
+    {
+        try
+        {
+            return XDocument.Load(file.FullName);
+        }
+        catch (Exception exception) when (exception is System.Xml.XmlException or IOException or UnauthorizedAccessException)
+        {
+            throw new InvalidOperationException(
+                $"Could not parse '{RelativePath(file)}' as XML: {exception.Message}. Gate A " +
+                "reads the repository's build files from disk, so an unreadable one is a gate " +
+                "that cannot answer rather than a gate that passes.",
+                exception);
+        }
+    }
+
+    /// <summary>
     /// The names of the projects a given project file declares a
-    /// <c>&lt;ProjectReference&gt;</c> to.
+    /// <c>&lt;ProjectReference&gt;</c> to. Duplicates are preserved: a doubly-declared
+    /// reference is a defect the caller should be able to see, and de-duplicating here would
+    /// hide it.
     /// </summary>
     public static IReadOnlyList<string> DeclaredProjectReferences(FileInfo project) =>
-        XDocument.Load(project.FullName)
-            .Descendants()
-            .Where(e => e.Name.LocalName.Equals("ProjectReference", StringComparison.Ordinal))
-            .Select(e => e.Attribute("Include")?.Value)
-            .Where(v => !string.IsNullOrWhiteSpace(v))
-            .Select(v => Path.GetFileNameWithoutExtension(v!.Replace('\\', '/')))
+        ItemIncludes(project, "ProjectReference")
+            .Select(v => Path.GetFileNameWithoutExtension(v.Replace('\\', '/')))
             .OrderBy(n => n, StringComparer.Ordinal)
             .ToList();
 
     /// <summary>
-    /// The package ids a given project file declares a <c>&lt;PackageReference&gt;</c> to.
+    /// The package ids a given project file declares a <c>&lt;PackageReference&gt;</c> or a
+    /// <c>&lt;GlobalPackageReference&gt;</c> to.
     /// </summary>
+    /// <remarks>
+    /// <c>GlobalPackageReference</c> is included deliberately. It is already the established
+    /// idiom in this repository (the coding standard is declared that way), and it applies a
+    /// package to <i>every</i> project in the solution - so a ban that read only
+    /// <c>PackageReference</c> would be bypassed by the one form that has the widest reach.
+    /// </remarks>
     public static IReadOnlyList<string> DeclaredPackageReferences(FileInfo project) =>
-        XDocument.Load(project.FullName)
-            .Descendants()
-            .Where(e => e.Name.LocalName.Equals("PackageReference", StringComparison.Ordinal))
-            .Select(e => e.Attribute("Include")?.Value)
-            .Where(v => !string.IsNullOrWhiteSpace(v))
-            .Select(v => v!)
+        ItemIncludes(project, "PackageReference")
+            .Concat(ItemIncludes(project, "GlobalPackageReference"))
             .OrderBy(n => n, StringComparer.Ordinal)
             .ToList();
+
+    /// <summary>
+    /// The <c>Include</c> values of a given item type, split on semicolons and trimmed.
+    /// </summary>
+    /// <remarks>
+    /// MSBuild accepts <c>Include="..\A\A.csproj;..\B\B.csproj"</c> as two items. Reading the
+    /// raw attribute yields one string, and any per-item transform applied to it then
+    /// describes only the last entry - which is a silent bypass of every gate downstream:
+    /// <c>Include="..\Yello.Infrastructure\...csproj;..\Yello.Domain\Yello.Domain.csproj"</c>
+    /// would present as a lone permitted edge to Domain while genuinely referencing
+    /// Infrastructure.
+    /// </remarks>
+    public static IEnumerable<string> ItemIncludes(FileInfo project, string itemName) =>
+        LoadXml(project)
+            .Descendants()
+            .Where(e => e.Name.LocalName.Equals(itemName, StringComparison.Ordinal))
+            .Select(e => e.Attribute("Include")?.Value ?? e.Attribute("Update")?.Value)
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .SelectMany(v => v!.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+    /// <summary>
+    /// The absolute path of every project the <c>.slnx</c> declares.
+    /// </summary>
+    /// <remarks>
+    /// The <c>.slnx</c> schema uses a <c>Path</c> attribute rather than MSBuild's
+    /// <c>Include</c>, and nests entries inside <c>&lt;Folder&gt;</c> elements, so it is read
+    /// here rather than through <see cref="ItemIncludes"/>. Parsed as XML deliberately:
+    /// a substring search over the raw text matches an entry that has been commented out,
+    /// which is a release-gating suite silently dropped from the build.
+    /// </remarks>
+    public static IEnumerable<string> SolutionProjectPaths() =>
+        LoadXml(SolutionFile)
+            .Descendants()
+            .Where(e => e.Name.LocalName.Equals("Project", StringComparison.Ordinal))
+            .Select(e => e.Attribute("Path")?.Value)
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => Path.GetFullPath(Path.Combine(Root.FullName, v!.Replace('\\', '/'))));
 
     /// <summary>
     /// True when the project lives under the <c>tests/</c> directory.
     /// </summary>
-    public static bool IsUnderTestsDirectory(FileInfo project)
-    {
-        var relative = Path.GetRelativePath(Root.FullName, project.FullName).Replace('\\', '/');
-        return relative.StartsWith("tests/", StringComparison.Ordinal);
-    }
+    /// <remarks>
+    /// Case-insensitive. On Windows a rename of <c>tests</c> to <c>Tests</c> changes nothing
+    /// about where the files are, and an Ordinal comparison would quietly report every suite
+    /// as production code - which makes the test-project checks that read this vacuous.
+    /// </remarks>
+    public static bool IsUnderTestsDirectory(FileInfo project) =>
+        RelativePath(project).StartsWith("tests/", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The number of directory levels between the repository root and the given file.
+    /// A project at <c>Yello.Domain/Yello.Domain.csproj</c> is at depth 1.
+    /// </summary>
+    public static int DepthBelowRoot(FileInfo file) =>
+        RelativePath(file).Count(c => c == '/');
 
     /// <summary>
     /// The repository-relative path, for failure messages a human has to act on.
@@ -100,13 +209,30 @@ internal static class RepositoryLayout
     public static string RelativePath(FileInfo file) =>
         Path.GetRelativePath(Root.FullName, file.FullName).Replace('\\', '/');
 
-    private static bool IsBuildOutput(FileInfo file)
+    /// <summary>
+    /// Every <c>.cs</c> file belonging to a project, by directory containment.
+    /// </summary>
+    public static IReadOnlyList<FileInfo> SourceFilesOf(FileInfo project) =>
+        project.Directory is null
+            ? []
+            : [.. project.Directory
+                .EnumerateFiles("*.cs", SearchOption.AllDirectories)
+                .Where(f => !IsExcluded(f))
+                .OrderBy(f => f.FullName, StringComparer.Ordinal)];
+
+    private static IEnumerable<FileInfo> EnumerateSourceFiles(string pattern) =>
+        Root.EnumerateFiles(pattern, SearchOption.AllDirectories).Where(f => !IsExcluded(f));
+
+    private static bool IsExcluded(FileInfo file)
     {
-        var relative = Path.GetRelativePath(Root.FullName, file.FullName).Replace('\\', '/');
-        return relative.Contains("/bin/", StringComparison.Ordinal)
-            || relative.Contains("/obj/", StringComparison.Ordinal)
-            || relative.StartsWith("bin/", StringComparison.Ordinal)
-            || relative.StartsWith("obj/", StringComparison.Ordinal);
+        var segments = Path.GetRelativePath(Root.FullName, file.FullName)
+            .Replace('\\', '/')
+            .Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        // The file name itself is the last segment and is never a directory.
+        return segments
+            .Take(segments.Length - 1)
+            .Any(segment => ExcludedDirectories.Contains(segment, StringComparer.OrdinalIgnoreCase));
     }
 
     private static DirectoryInfo FindRoot()
@@ -123,9 +249,24 @@ internal static class RepositoryLayout
             candidate = candidate.Parent;
         }
 
+        // AppContext.BaseDirectory is CWD-independent, so an IDE launch or a `cd tests` does
+        // not reach here. What does: a custom ArtifactsPath, a published test project, or CI
+        // downloading only the test artifact - cases where the binary genuinely sits outside
+        // the repository. Throwing from a static initialiser surfaces as
+        // TypeInitializationException across every test in the suite, which names neither the
+        // cause nor the remedy, so the environment variable below is the documented way to
+        // run the gate from outside the tree it asserts.
+        var configured = Environment.GetEnvironmentVariable("YELLO_REPOSITORY_ROOT");
+
+        if (!string.IsNullOrWhiteSpace(configured) && Directory.Exists(configured))
+        {
+            return new DirectoryInfo(configured);
+        }
+
         throw new InvalidOperationException(
             "Could not locate the repository root: no Yello.slnx found walking up from " +
-            $"'{AppContext.BaseDirectory}'. Gate A reads the repository's build files from " +
-            "disk, so it cannot run without knowing where the repository is.");
+            $"'{AppContext.BaseDirectory}', and YELLO_REPOSITORY_ROOT is unset or does not " +
+            "point at a directory. Gate A reads the repository's build files from disk, so it " +
+            "cannot run without knowing where the repository is.");
     }
 }

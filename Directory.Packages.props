@@ -79,9 +79,10 @@
       * Aspire.Hosting.SqlServer 13.4.6 requires >= 7.0.1
       * Microsoft.EntityFrameworkCore.SqlServer 10.0.11 requires >= 6.1.6
     Pinning EF Core's floor produced NU1109 ("detected package downgrade ... from 7.0.1 to
-    centrally defined 6.1.6") once transitive pinning was on - the two AR-1 pins disagree
-    about this driver, and 7.0.2 is where they meet. 7.0.2 is the newest 7.x stable; 7.1.0 is
-    still preview.
+    centrally defined 6.1.6") once transitive pinning was on. Note precisely what disagrees:
+    neither AR-1 pin names Microsoft.Data.SqlClient at all - it is their transitive FLOORS
+    that conflict, and 7.0.2 is where both are satisfied. 7.0.2 is the newest 7.x stable;
+    7.1.0 is still preview.
 
     Deliberately NOT the Aspire client integration (Aspire.Microsoft.Data.SqlClient): that
     package registers a database health check by default, and AR-33 requires liveness and
@@ -148,12 +149,19 @@
   </ItemGroup>
 
   <!--
-    Framework packages rather than AR-1 stack choices. These ship with the Blazor
-    WebAssembly SDK and must track the runtime patch pinned in Directory.Build.props
-    (RuntimeFrameworkVersion 10.0.11), so they are pinned to it rather than chosen. Gate A
-    asserts the AR-1 table; it does not police this group beyond the runtime match.
+    AR-1's "ASP.NET Core / Blazor WASM 10" row, and gated as one.
+
+    These were previously labelled framework packages rather than stack choices and left out
+    of the version-pin gate's expected table entirely. That was a misreading of the source:
+    epics.md lists the row under "Pinned versions" and ARCHITECTURE-SPINE.md gives it its own
+    line in the Stack table, so it is an AR-1 pin like any other. AC1's own enumeration drops
+    the row while AR-1 keeps it, and the implementation had followed the paraphrase.
+
+    The chosen value was right for the wrong reason: these ship with the Blazor WebAssembly
+    SDK and must track the runtime patch pinned in Directory.Build.props, which is 10.0.11 -
+    the same value AR-1 states. They are now in ExpectedPins and asserted like the rest.
   -->
-  <ItemGroup Label="Framework: tracks RuntimeFrameworkVersion 10.0.11">
+  <ItemGroup Label="AR-1: ASP.NET Core / Blazor WASM 10 - referenced by Yello.Client">
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.11" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.11" />
   </ItemGroup>

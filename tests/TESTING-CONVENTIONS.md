@@ -35,11 +35,18 @@ retrofitted. Four names, and only these four:
 | `Suite` | `Architecture`, `Isolation`, `Revocation`, `Merge`, `Slices` | which suite the case belongs to |
 | `Priority` | `P0`, `P1`, `P2` | selection tier. `P0` is release-gating |
 | `Requirement` | e.g. `AR-1`, `AR-2`, `AR-4`, `NFR-1`, `FR-34` | the requirement the case traces to |
-| `Assumption` | e.g. `A-3` from PRD §12 | the assumption the case hardens into an assertion |
+| `Assumption` | e.g. `PRD-12-2` — source document, then location within it | the assumption the case hardens into an assertion |
 
 `Assumption` is declared here but **unused so far**: no story-1.1 assertion hardens a PRD §12
 assumption. Thirteen of those assumptions are open (readiness issue 5); the story that
 confirms one tags its test with this trait.
+
+**The value must name its source document.** The test design documents the selective run
+`dotnet test --filter "Assumption~PRD-12"` to find "every test resting on an unconfirmed
+assumption", and a trait valued `A-3` never matches it — the tests would be unfindable by the
+one command written to find them. This convention previously gave `A-3` as its example, which
+was the divergence. `TestingConventionTests` asserts the format now, so a copied-and-adapted
+trait cannot drift back.
 
 Cite the `AR` id **and** the `AD` id where one exists. `AR-1 … AR-40` and `UX-DR1 … UX-DR42`
 exist only in `epics.md`; the architecture spine numbers `AD-1 … AD-29` and the mapping is not
@@ -94,16 +101,38 @@ accept or drop", and is called "the weakest gate on this list". Do not invent on
 
 ## The shared container
 
-One Testcontainers SQL Server instance, amortised across collections, running
-`mcr.microsoft.com/mssql/server:2025-latest`. Never an EF Core in-memory provider: it cannot
-exercise row-level security, which is what NFR-1 rests on. The ban is enforced by a gate, not
-a convention — `Microsoft.EntityFrameworkCore.InMemory` has no central version, so a project
-referencing it fails to restore.
+`Yello.Tests.Shared` holds one Testcontainers SQL Server fixture. Never an EF Core in-memory
+provider: it cannot exercise row-level security, which is what NFR-1 rests on. Never SQLite
+either, including `:memory:` — no `CREATE SECURITY POLICY`, no `SESSION_CONTEXT`, so it fails
+the ban's *reason* while passing its letter. The ban is enforced by a gate rather than a
+convention: neither has a central version, so a project referencing one fails to restore.
 
-**One exception to the shared topology:** the pooled-connection isolation case in story 1.9
+The image comes from `Directory.Build.props` (`YelloSqlServerImage`), stamped into every
+assembly as metadata and read by both the fixture and `Yello.AppHost`. It used to be a literal
+in each, which let the suites and local orchestration run different engine builds with nothing
+in the repository changing. A gate asserts no source file states it literally.
+
+**Topology is NOT settled.** The intent recorded in story 1.1 was "one instance amortised
+across collections", and as built that cannot hold: the fixture has no `[CollectionDefinition]`,
+no assembly-level registration and no container reuse, and the suites run as separate
+Microsoft.Testing.Platform *processes* — which puts cross-suite sharing out of reach without
+reuse or an external orchestrator. Each consumer gets its own SQL Server today. **Story 1.9**
+owns the decision, being the first story that has to make the sharing model real. Until then,
+read "shared" as intent rather than as description.
+
+**One exception that holds regardless:** the pooled-connection isolation case in story 1.9
 needs its own container, with pool size pinned to 1 and parallelism disabled. A pooled
 connection carrying a stale session context is the thing that case exists to catch, and it
 cannot be observed on a shared pool.
+
+**Startup is bounded.** The fixture fails after five minutes rather than hanging
+(`YELLO_CONTAINER_STARTUP_TIMEOUT_SECONDS` raises it for a cold image pull), captures the
+container log on failure, and exposes `IsContainerRuntimeAvailable()` so a suite can skip with
+a reason instead of erroring when no container runtime is up. Its wait strategy is
+`MsSqlBuilder`'s own `sqlcmd` probe, deliberately not overridden: `WithWaitStrategy` *replaces*
+the strategy list, so substituting a port check trades engine readiness for "1433 is bound",
+and SQL Server binds the port well before it accepts logins. Measured on this repository's
+image, the gap between the two is roughly 16 seconds.
 
 `Yello.Tests.Shared` is also the mechanism for asserting a **migrated schema**. Story 2.6 owns
 risk R7 — AD-15's `Latin1_General_100_BIN2` collation is irreversible, because
@@ -131,8 +160,8 @@ MTP exit codes: `0` success, `2` at least one test failed, **`8` the test sessio
 tests**, `9` minimum execution policy violated. MTP is strict by default where VSTest tolerated
 an empty run.
 
-Note the failure mode precisely: the **build succeeds** and `dotnet test` returns 8. The four
-empty suites therefore carry:
+Note the failure mode precisely: the **build succeeds** and `dotnet test` returns 8. The suites that are still
+genuinely empty therefore carry:
 
 ```xml
 <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
@@ -144,6 +173,13 @@ empty suites therefore carry:
 also swallows a genuinely empty run — so a filter typo or broken discovery would pass silently
 as "zero tests", which is exactly the signal it is masking on purpose.
 `Yello.Tests.Architecture` does not carry it and must stay strict.
+
+That is a gate, not a request: `TestingConventionTests` asserts that a project carrying the
+switch contains no test methods, and that a test project without it has some. It used to be a
+comment in each project file — one which named this exact risk and then did not prevent it,
+in a repository whose stated bar is that "a rule that relies on discipline is not a rule here".
+`Yello.Tests.Slices` has already come off the switch, having gained the shared-fixture smoke
+test.
 
 One quirk worth knowing: running a suite's `.exe` **directly** uses xunit's own console runner,
 which returns 0 for zero tests and does not understand `--ignore-exit-code`. The exit-code-8

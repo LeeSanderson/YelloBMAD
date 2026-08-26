@@ -30,6 +30,42 @@
   </PropertyGroup>
 
   <!--
+    VALUES MORE THAN ONE PROJECT HAS TO AGREE ON.
+
+    Both of these were previously hard-coded independently in two places with nothing keeping
+    the copies equal, and in both cases a divergence was silent rather than loud:
+
+      * The SQL Server image was stated in Yello.AppHost/Program.cs and in
+        SqlServerContainerFixture. The suites and local orchestration could therefore run
+        different engine builds while every test passed - and AD-15's Latin1_General_100_BIN2
+        collation and the row-level security NFR-1 rests on are both engine behaviour.
+      * The database resource name was `AddDatabase("yello")` in the AppHost and
+        `GetConnectionString("yello")` in the Host. Renaming the resource sent the Host down
+        its IsNullOrWhiteSpace branch: it logs a warning, starts normally, and AC4's only
+        evidence is gone with the process exit code unchanged.
+
+    They live here because this is the one file every project imports, and reach code as
+    assembly metadata rather than as a C# constant. A const would be copied into each consumer
+    at compile time - fine within one build, wrong for a value whose entire job is to be the
+    single place the fact is stated. Emitted for every project rather than conditioned onto the
+    three that read them: the condition would be a second thing to keep in step, which is the
+    problem being solved.
+
+    The tag still floats by cumulative update - `2025-latest` is not a digest. That is
+    deliberate and remains an open question, revisited when stories 1.5 and 2.6 give a reason
+    to freeze the engine. What is settled is that it floats in ONE place.
+  -->
+  <PropertyGroup Label="Shared values">
+    <YelloSqlServerImage>mcr.microsoft.com/mssql/server:2025-latest</YelloSqlServerImage>
+    <YelloDatabaseResourceName>yello</YelloDatabaseResourceName>
+  </PropertyGroup>
+
+  <ItemGroup Label="Shared values, readable at runtime">
+    <AssemblyMetadata Include="Yello.SqlServerImage" Value="$(YelloSqlServerImage)" />
+    <AssemblyMetadata Include="Yello.DatabaseResourceName" Value="$(YelloDatabaseResourceName)" />
+  </ItemGroup>
+
+  <!--
     Nothing else belongs here. Two ordering facts, both verified against
     `dotnet msbuild -preprocess`, decide where an override has to go:
 

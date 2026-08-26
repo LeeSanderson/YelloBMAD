@@ -17,6 +17,13 @@ var builder = WebApplication.CreateBuilder(args);
 
 var app = builder.Build();
 
+await CheckDatabaseConnectivityAsync(app);
+
+// RunAsync, not Run: this file is already an async entry point (the connectivity check above
+// awaits), and the blocking overload would park the entry-point thread for the process
+// lifetime while the async machinery it was started on sits idle. CA1849 and S6966 both say so.
+await app.RunAsync();
+
 // AC4: "a working connection from Host to container".
 //
 // Shape matters here, and three shapes were available. This is the one that is NOT a health
@@ -33,32 +40,72 @@ var app = builder.Build();
 // It therefore runs exactly once, at startup, in Development only, and logs the outcome. A
 // failure is logged rather than thrown: the check exists to tell a developer whether Aspire
 // wired the container, and a Host that refuses to start would report that badly.
-if (app.Environment.IsDevelopment())
+static async Task CheckDatabaseConnectivityAsync(WebApplication app)
 {
     var logger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Yello.Host.Startup");
-    var connectionString = app.Configuration.GetConnectionString("yello");
+    var resource = BuildConstants.DatabaseResourceName;
+
+    if (!app.Environment.IsDevelopment())
+    {
+        // Said out loud rather than left implicit. Without this branch "the check passed",
+        // "the check failed" and "the check never ran" are indistinguishable outside
+        // Development - and the third is the one a reader is most likely to mistake for the
+        // first.
+        StartupLog.ConnectivityCheckSkipped(logger, app.Environment.EnvironmentName);
+        return;
+    }
+
+    var connectionString = app.Configuration.GetConnectionString(resource);
 
     if (string.IsNullOrWhiteSpace(connectionString))
     {
-        StartupLog.ConnectionStringMissing(logger);
+        StartupLog.ConnectionStringMissing(logger, resource);
+        return;
     }
-    else
-    {
-        try
-        {
-            await using var connection = new SqlConnection(connectionString);
-            await connection.OpenAsync();
 
-            StartupLog.ConnectivityConfirmed(logger, connection.ServerVersion, connection.Database);
-        }
-        catch (SqlException exception)
+    // A deadline, and a token that Ctrl+C reaches. Without both, a reachable-but-unready
+    // endpoint delays Kestrel binding for the driver's full retry budget on every Development
+    // start, and the wait is not interruptible.
+    const int timeoutSeconds = 15;
+
+    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(app.Lifetime.ApplicationStopping);
+    timeout.CancelAfter(TimeSpan.FromSeconds(timeoutSeconds));
+
+    try
+    {
+        // Pooling off, and a connect timeout that matches the deadline above. This connection
+        // is opened once and discarded; leaving it pooled would put a connection carrying this
+        // startup session's context back into the pool for the application to draw on later,
+        // which is precisely the shape story 1.9's pooled-connection isolation case exists to
+        // catch.
+        var settings = new SqlConnectionStringBuilder(connectionString)
         {
-            StartupLog.ConnectivityFailed(logger, exception);
-        }
+            Pooling = false,
+            ConnectTimeout = timeoutSeconds,
+        };
+
+        await using var connection = new SqlConnection(settings.ConnectionString);
+        await connection.OpenAsync(timeout.Token);
+
+        StartupLog.ConnectivityConfirmed(logger, connection.ServerVersion, connection.Database);
+    }
+    catch (OperationCanceledException)
+    {
+        StartupLog.ConnectivityTimedOut(logger, timeoutSeconds);
+    }
+    catch (SqlException exception)
+    {
+        StartupLog.ConnectivityFailed(logger, resource, exception);
+    }
+    catch (Exception exception) when (exception is ArgumentException or InvalidOperationException or FormatException or NotSupportedException)
+    {
+        // Not a SqlException, and previously not caught at all - so it killed the process at
+        // startup, which is exactly the outcome the comment above says was designed out.
+        // Verified against Microsoft.Data.SqlClient 7.0.2: an unrecognised keyword in the
+        // connection string, or a non-boolean value for the integrated security keyword,
+        // throws ArgumentException from the builder rather than from Open, and reading
+        // ServerVersion on a connection that never opened throws InvalidOperationException.
+        // Neither is a SqlException, so both escaped the only handler there was.
+        StartupLog.ConnectionStringUnusable(logger, resource, exception.Message, exception);
     }
 }
-
-// RunAsync, not Run: this file is already an async entry point (the connectivity check above
-// awaits), and the blocking overload would park the entry-point thread for the process
-// lifetime while the async machinery it was started on sits idle. CA1849 and S6966 both say so.
-await app.RunAsync();

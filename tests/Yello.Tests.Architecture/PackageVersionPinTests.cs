@@ -6,13 +6,23 @@ namespace Yello.Tests.Architecture;
 
 /// <summary>
 /// Gate A - AC1's "every dependency is pinned to the AR-1 versions", and AC4's ban on any
-/// EF Core in-memory provider.
+/// database provider that cannot exercise row-level security.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The story statement requires "the stack versions enforced by tests that fail the build",
 /// so a pin drifting silently must break the build rather than be caught in review.
 /// Changing a version means editing the AR-1 table in epics.md first, then
 /// Directory.Packages.props, then the expected table below - in that order.
+/// </para>
+/// <para>
+/// <b>The pin assertions are exact in both directions.</b> Iterating only the expected table
+/// does not gate: it says nothing about a pin the file has and the table does not, so a
+/// package could be added, removed, re-versioned or set to a floating range with every
+/// assertion green. That is the same defect Gate A's ring rule was hardened out of when a
+/// subset check reported green over a solution with no project references at all, and it is
+/// closed here the same way.
+/// </para>
 /// </remarks>
 [Trait("Suite", "Architecture")]
 [Trait("Priority", "P0")]
@@ -26,7 +36,7 @@ public sealed class PackageVersionPinTests
     /// 0.13.4). That drift is deliberate and raised as a question for Lee, not resolved
     /// here: AC1 asserts the pins as specified, and refreshing one is an architecture edit.
     /// </summary>
-    private static readonly Dictionary<string, string> ExpectedPins = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, string> ExpectedPins = new(StringComparer.OrdinalIgnoreCase)
     {
         // EF Core 10 - pinned to the runtime patch. Not yet referenced anywhere; story 1.3
         // adds the first reference against the version pinned here.
@@ -41,8 +51,9 @@ public sealed class PackageVersionPinTests
         ["Asp.Versioning.Http"] = "10.0.0",
 
         // AR-1 gives Aspire no patch, so 13.4.6 is the last of the pinned minor line.
-        // Yello.AppHost.csproj repeats 13.4.6 in its Sdk attribute, which central package
-        // management cannot govern - that copy is asserted separately below.
+        // Yello.AppHost.csproj repeats 13.4.6 in its Sdk attribute and .config/dotnet-tools.json
+        // repeats it a third time; central package management can govern neither, so both
+        // copies are asserted separately below.
         ["Aspire.Hosting.AppHost"] = "13.4.6",
         ["Aspire.Hosting.SqlServer"] = "13.4.6",
 
@@ -50,6 +61,45 @@ public sealed class PackageVersionPinTests
         ["xunit.runner.visualstudio"] = "4.0.0",
         ["Testcontainers.XunitV3"] = "4.6.0",
         ["TngTech.ArchUnitNET"] = "0.13.3",
+
+        // AR-1's "ASP.NET Core / Blazor WASM 10" row. These were previously classified as
+        // framework packages rather than stack choices and left out of this table entirely -
+        // a misreading: epics.md lists the row under "Pinned versions" and the architecture
+        // spine gives it its own line in the stack table, so it is an AR-1 pin like any other.
+        // AC1's own enumeration omits it while AR-1 keeps it, and the implementation had
+        // followed the paraphrase rather than the source.
+        ["Microsoft.AspNetCore.Components.WebAssembly"] = "10.0.11",
+        ["Microsoft.AspNetCore.Components.WebAssembly.DevServer"] = "10.0.11",
+    };
+
+    /// <summary>
+    /// Pins that are genuinely not AR-1 stack choices, each with the reason it exists.
+    /// </summary>
+    /// <remarks>
+    /// This table is not a lower bar than the one above - both are asserted exactly. It is a
+    /// separate table so that "which pins does the architecture own" stays answerable, and so
+    /// that adding one of these does not read as an architecture edit.
+    /// </remarks>
+    private static readonly Dictionary<string, string> ExpectedNonAr1Pins = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // AC4's one-shot connectivity check needs a SQL driver and .NET ships none. 7.0.2 is
+        // where the transitive floors of Aspire.Hosting.SqlServer (>= 7.0.1) and
+        // Microsoft.EntityFrameworkCore.SqlServer (>= 6.1.6) both hold.
+        ["Microsoft.Data.SqlClient"] = "7.0.2",
+
+        // The fixture-library half of xunit.v3, for Yello.Tests.Shared, pinned transitively
+        // so Testcontainers.XunitV3 4.6.0 cannot silently unify it at its own 2.0.2.
+        ["xunit.v3.extensibility.core"] = "4.0.0",
+
+        // The MsSql module of the AR-1 Testcontainers pin, at the same version.
+        ["Testcontainers.MsSql"] = "4.6.0",
+
+        // The xunit v3 assertion adapter of the AR-1 ArchUnitNET pin, at the same version.
+        ["TngTech.ArchUnitNET.xUnitV3"] = "0.13.3",
+
+        // Transitive security pin, not a stack choice: GHSA-q939-rpr3-3284, first patched in
+        // 2026.0.0. See the comment in Directory.Packages.props.
+        ["SSH.NET"] = "2026.0.0",
     };
 
     /// <summary>
@@ -59,132 +109,430 @@ public sealed class PackageVersionPinTests
     /// </summary>
     private const string ExpectedSdkVersion = "10.0.303";
 
-    private const string InMemoryProvider = "Microsoft.EntityFrameworkCore.InMemory";
+    /// <summary>
+    /// Providers that cannot exercise row-level security, which is what NFR-1 rests on.
+    /// </summary>
+    /// <remarks>
+    /// The ban named only <c>Microsoft.EntityFrameworkCore.InMemory</c>, which is the letter
+    /// of AC4 and less than its reason. SQLite - including <c>:memory:</c> - supports no
+    /// <c>CREATE SECURITY POLICY</c> and no <c>SESSION_CONTEXT</c>, so a suite that swapped
+    /// to it would satisfy the old ban and still prove nothing about isolation. The reason
+    /// the ban exists is the thing to enforce.
+    /// </remarks>
+    /// <summary>
+    /// The two switches that make central package management real.
+    /// </summary>
+    private static readonly string[] CentralManagementSwitches =
+        ["ManagePackageVersionsCentrally", "CentralPackageTransitivePinningEnabled"];
 
+    private static readonly string[] BannedProviders =
+    [
+        "Microsoft.EntityFrameworkCore.InMemory",
+        "Microsoft.EntityFrameworkCore.Sqlite",
+        "Microsoft.EntityFrameworkCore.Sqlite.Core",
+        "Microsoft.Data.Sqlite",
+        "Microsoft.Data.Sqlite.Core",
+    ];
+
+    /// <summary>
+    /// Central package management has to be ON for any of the pins to mean anything, and the
+    /// two switches that turn it on are themselves never read by a pin assertion.
+    /// </summary>
+    /// <remarks>
+    /// Every other assertion in this class reads <c>PackageVersion</c> <i>elements</i>, which
+    /// remain present in the file regardless. Set <c>ManagePackageVersionsCentrally</c> to
+    /// false and all eighteen pins become inert - every version-less
+    /// <c>PackageReference</c> resolves to latest-available - while all six pin assertions
+    /// stay green. Set <c>CentralPackageTransitivePinningEnabled</c> to false and the SSH.NET
+    /// forward-pin stops applying, silently reinstating a HIGH-severity advisory. One
+    /// assertion covers both.
+    /// </remarks>
     [Fact]
-    public void Every_AR1_dependency_is_pinned_to_the_specified_version()
+    public void Central_package_management_and_transitive_pinning_are_enabled()
     {
-        var actual = CentralPackageVersions();
-        var problems = new List<string>();
+        var properties = RepositoryLayout.LoadXml(RepositoryLayout.DirectoryPackagesProps)
+            .Descendants()
+            .Where(e => e.Parent?.Name.LocalName.Equals("PropertyGroup", StringComparison.Ordinal) == true)
+            .ToLookup(e => e.Name.LocalName, e => e.Value.Trim(), StringComparer.Ordinal);
 
-        foreach (var (package, expected) in ExpectedPins.OrderBy(p => p.Key, StringComparer.Ordinal))
-        {
-            if (!actual.TryGetValue(package, out var found))
-            {
-                problems.Add($"'{package}' has no <PackageVersion> in Directory.Packages.props. AR-1 pins it to {expected}.");
-                continue;
-            }
-
-            if (!found.Equals(expected, StringComparison.Ordinal))
-            {
-                problems.Add($"'{package}' is pinned to {found}, but AR-1 specifies {expected}.");
-            }
-        }
+        var problems = CentralManagementSwitches
+            .Where(name => !properties[name].Any(v => v.Equals("true", StringComparison.OrdinalIgnoreCase)))
+            .Select(name => $"'{name}' is not set to true in Directory.Packages.props.")
+            .ToList();
 
         Assert.True(problems.Count == 0,
-            "Directory.Packages.props has drifted from the AR-1 stack table." +
+            "Central package management is what makes every pin in this file load-bearing, and " +
+            "the switches that enable it are not themselves pinned by anything." +
             $"{Environment.NewLine}{Environment.NewLine}" +
             string.Join(Environment.NewLine, problems.Select(p => $"  - {p}")) +
             $"{Environment.NewLine}{Environment.NewLine}" +
-            "Changing a pin is an architecture edit, not a developer decision: amend the AR-1 " +
-            "table in epics.md first.");
+            "Without ManagePackageVersionsCentrally every version-less PackageReference " +
+            "resolves to latest-available; without CentralPackageTransitivePinningEnabled the " +
+            "SSH.NET forward-pin for GHSA-q939-rpr3-3284 stops applying.");
     }
 
     [Fact]
-    public void No_project_declares_an_inline_package_version()
+    public void Directory_Packages_props_pins_exactly_the_expected_set_at_the_expected_versions()
+    {
+        var actual = CentralPackageVersions();
+        var expected = ExpectedPins
+            .Concat(ExpectedNonAr1Pins)
+            .ToDictionary(p => p.Key, p => p.Value, StringComparer.OrdinalIgnoreCase);
+
+        var problems = new List<string>();
+
+        foreach (var (package, want) in expected.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            if (!actual.TryGetValue(package, out var found))
+            {
+                problems.Add($"'{package}' has no <PackageVersion> in Directory.Packages.props. Expected {want}.");
+            }
+            else if (!found.Equals(want, StringComparison.Ordinal))
+            {
+                problems.Add($"'{package}' is pinned to {found}, but {want} is expected.");
+            }
+            else
+            {
+                // Pinned, and pinned to the expected version. The unexpected-pin pass below
+                // is the other half of the equality.
+            }
+        }
+
+        foreach (var package in actual.Keys.Except(expected.Keys, StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+        {
+            problems.Add(
+                $"'{package}' is pinned in Directory.Packages.props but appears in neither " +
+                "expected table. Add it - to ExpectedPins if the AR-1 stack table names it, to " +
+                "ExpectedNonAr1Pins with the reason it exists otherwise.");
+        }
+
+        Assert.True(problems.Count == 0,
+            "Directory.Packages.props does not match the expected pin set exactly." +
+            $"{Environment.NewLine}{Environment.NewLine}" +
+            string.Join(Environment.NewLine, problems.Select(p => $"  - {p}")) +
+            $"{Environment.NewLine}{Environment.NewLine}" +
+            "Changing an AR-1 pin is an architecture edit, not a developer decision: amend the " +
+            "AR-1 table in epics.md first.");
+    }
+
+    [Fact]
+    public void No_project_declares_a_package_version_of_its_own()
     {
         var offenders = new List<string>();
 
         foreach (var project in RepositoryLayout.AllProjectFiles)
         {
-            var inline = XDocument.Load(project.FullName)
-                .Descendants()
-                .Where(e => e.Name.LocalName.Equals("PackageReference", StringComparison.Ordinal))
-                .Where(e => e.Attribute("Version") is not null)
-                .Select(e => e.Attribute("Include")?.Value ?? "(no Include)")
-                .ToList();
-
-            offenders.AddRange(inline.Select(pkg =>
-                $"{RepositoryLayout.RelativePath(project)}: '{pkg}' carries a Version attribute."));
+            offenders.AddRange(InlineVersionOffenders(project));
         }
 
         Assert.True(offenders.Count == 0,
             "Under central package management, a project declares " +
-            "<PackageReference Include=\"...\" /> with NO Version attribute. An inline version " +
-            "silently escapes Directory.Packages.props, which is the single place AC1's pins are " +
+            "<PackageReference Include=\"...\" /> with NO version of its own. Every form below " +
+            "escapes Directory.Packages.props, which is the single place AC1's pins are " +
             $"expressed and the single place this gate reads:{Environment.NewLine}" +
             string.Join(Environment.NewLine, offenders.Select(o => $"  - {o}")));
     }
 
+    /// <summary>
+    /// The three ways a project can carry its own version: the <c>Version</c> attribute, a
+    /// child <c>&lt;Version&gt;</c> element, and <c>VersionOverride</c>.
+    /// </summary>
+    /// <remarks>
+    /// Only the attribute used to be read. <c>VersionOverride</c> is central package
+    /// management's own sanctioned escape hatch and resolves normally, so a project could
+    /// leave the AR-1 pins entirely with the gate green; and the child-element form is the
+    /// same value written the other way round, which NuGet honours identically.
+    /// </remarks>
+    private static IEnumerable<string> InlineVersionOffenders(FileInfo project)
+    {
+        var path = RepositoryLayout.RelativePath(project);
+
+        foreach (var element in RepositoryLayout.LoadXml(project)
+                     .Descendants()
+                     .Where(e => e.Name.LocalName.Equals("PackageReference", StringComparison.Ordinal)))
+        {
+            var package = element.Attribute("Include")?.Value ?? element.Attribute("Update")?.Value ?? "(no Include)";
+
+            if (element.Attribute("Version") is not null)
+            {
+                yield return $"{path}: '{package}' carries a Version attribute.";
+            }
+
+            if (element.Attribute("VersionOverride") is not null)
+            {
+                yield return $"{path}: '{package}' carries a VersionOverride attribute.";
+            }
+
+            if (element.Elements().Any(c => c.Name.LocalName.Equals("Version", StringComparison.Ordinal)))
+            {
+                yield return $"{path}: '{package}' carries a child <Version> element.";
+            }
+        }
+    }
+
     [Fact]
-    public void The_global_json_sdk_band_is_the_pinned_one()
+    public void The_global_json_pins_the_sdk_band_and_opts_into_the_test_platform()
     {
         Assert.True(RepositoryLayout.GlobalJson.Exists,
             "global.json is missing. Without it the build picks whichever .NET 10 SDK the " +
             "machine happens to resolve first, and two are installed here.");
 
         using var document = JsonDocument.Parse(File.ReadAllText(RepositoryLayout.GlobalJson.FullName));
+        var root = document.RootElement;
 
-        var version = document.RootElement.GetProperty("sdk").GetProperty("version").GetString();
+        var problems = new List<string>();
 
-        Assert.True(ExpectedSdkVersion.Equals(version, StringComparison.Ordinal),
-            $"global.json pins SDK '{version}', expected '{ExpectedSdkVersion}'.");
+        AddIfNotEqual(problems, root, ["sdk", "version"], ExpectedSdkVersion,
+            "the SDK band is what makes the build deterministic across machines");
+
+        // rollForward is half of what the pin means: without it the `version` above is a
+        // floor rather than a band, which is not what "pinned" claims.
+        AddIfNotEqual(problems, root, ["sdk", "rollForward"], "latestPatch",
+            "without it the pinned version is a floor, not a band");
+
+        // On the .NET 10 SDK the VSTest target refuses outright, so this opt-in is what makes
+        // `dotnet test` able to run at all. It was tried in dotnet.config first, where it has
+        // no effect - so its absence here is silent and total.
+        AddIfNotEqual(problems, root, ["test", "runner"], "Microsoft.Testing.Platform",
+            "xunit.v3 4.0.0 runs on Microsoft.Testing.Platform only, and `dotnet test` needs telling");
+
+        Assert.True(problems.Count == 0,
+            $"global.json has drifted:{Environment.NewLine}" +
+            string.Join(Environment.NewLine, problems.Select(p => $"  - {p}")));
+    }
+
+    private static void AddIfNotEqual(
+        List<string> problems,
+        JsonElement root,
+        string[] path,
+        string expected,
+        string why)
+    {
+        var current = root;
+
+        foreach (var segment in path)
+        {
+            if (current.ValueKind != JsonValueKind.Object || !current.TryGetProperty(segment, out current))
+            {
+                problems.Add($"'{string.Join('.', path)}' is missing - {why}.");
+                return;
+            }
+        }
+
+        var actual = current.ValueKind == JsonValueKind.String ? current.GetString() : current.ToString();
+
+        if (!expected.Equals(actual, StringComparison.Ordinal))
+        {
+            problems.Add($"'{string.Join('.', path)}' is '{actual}', expected '{expected}' - {why}.");
+        }
     }
 
     /// <summary>
-    /// The AppHost's Aspire version lives in its <c>Sdk</c> attribute, which central package
-    /// management cannot reach. That makes it the one version in the solution able to drift
-    /// away from the rest of the Aspire pin unnoticed, so it is asserted directly.
+    /// The AppHost's Aspire version lives in its <c>Sdk</c> attribute, and the CLI's lives in
+    /// the local tool manifest. Central package management can reach neither, which makes them
+    /// the two copies able to drift away from the rest of the Aspire pin unnoticed.
     /// </summary>
+    /// <remarks>
+    /// The Sdk attribute was gated from the start; the tool manifest is the same hazard and
+    /// was not. <c>dotnet aspire run</c> is the invocation AC4 is verified through, so a CLI
+    /// on a different Aspire line is orchestrating the solution with tooling the solution does
+    /// not pin.
+    /// </remarks>
     [Fact]
-    public void The_AppHost_Sdk_attribute_matches_the_pinned_Aspire_version()
+    public void Every_ungoverned_copy_of_the_Aspire_version_matches_the_pin()
     {
-        var appHost = RepositoryLayout.AllProjectFiles
-            .Single(p => RepositoryLayout.ProjectName(p).Equals("Yello.AppHost", StringComparison.Ordinal));
+        var expected = ExpectedPins["Aspire.Hosting.AppHost"];
+        var problems = new List<string>();
 
-        var sdk = XDocument.Load(appHost.FullName).Root?.Attribute("Sdk")?.Value;
-        var expected = $"Aspire.AppHost.Sdk/{ExpectedPins["Aspire.Hosting.AppHost"]}";
+        // Not Single(): with two project files named Yello.AppHost it throws "Sequence contains
+        // more than one matching element", which names neither the project nor the files, and
+        // with none it throws a different exception that names nothing at all.
+        var appHosts = RepositoryLayout.AllProjectFiles
+            .Where(p => RepositoryLayout.ProjectName(p).Equals("Yello.AppHost", StringComparison.Ordinal))
+            .ToList();
 
-        Assert.True(expected.Equals(sdk, StringComparison.Ordinal),
-            $"{RepositoryLayout.RelativePath(appHost)} declares Sdk='{sdk}', expected '{expected}'. " +
-            "Central package management cannot govern an Sdk attribute, so this copy of the " +
-            "Aspire version has to be asserted directly.");
+        if (appHosts.Count != 1)
+        {
+            problems.Add(
+                $"Expected exactly one Yello.AppHost.csproj, found {appHosts.Count}" +
+                $"{(appHosts.Count == 0 ? "." : $": {string.Join(", ", appHosts.Select(RepositoryLayout.RelativePath))}.")}");
+        }
+        else
+        {
+            var sdk = RepositoryLayout.LoadXml(appHosts[0]).Root?.Attribute("Sdk")?.Value;
+
+            if (!$"Aspire.AppHost.Sdk/{expected}".Equals(sdk, StringComparison.Ordinal))
+            {
+                problems.Add(
+                    $"{RepositoryLayout.RelativePath(appHosts[0])} declares Sdk='{sdk}', expected " +
+                    $"'Aspire.AppHost.Sdk/{expected}'.");
+            }
+        }
+
+        problems.AddRange(AspireCliProblems(expected));
+
+        Assert.True(problems.Count == 0,
+            "An Aspire version outside central package management has drifted from the AR-1 " +
+            $"pin ({expected}):{Environment.NewLine}" +
+            string.Join(Environment.NewLine, problems.Select(p => $"  - {p}")));
+    }
+
+    private static IEnumerable<string> AspireCliProblems(string expected)
+    {
+        if (!RepositoryLayout.DotnetToolsManifest.Exists)
+        {
+            yield return
+                ".config/dotnet-tools.json is missing. `aspire` is not on PATH on a developer " +
+                "machine; the local tool manifest is both how it is installed and how it is pinned.";
+            yield break;
+        }
+
+        using var document = JsonDocument.Parse(File.ReadAllText(RepositoryLayout.DotnetToolsManifest.FullName));
+
+        if (!document.RootElement.TryGetProperty("tools", out var tools)
+            || !tools.TryGetProperty("aspire.cli", out var cli)
+            || !cli.TryGetProperty("version", out var version))
+        {
+            yield return ".config/dotnet-tools.json declares no version for 'aspire.cli'.";
+            yield break;
+        }
+
+        if (!expected.Equals(version.GetString(), StringComparison.Ordinal))
+        {
+            yield return
+                $".config/dotnet-tools.json pins aspire.cli to '{version.GetString()}', expected " +
+                $"'{expected}'.";
+        }
     }
 
     /// <summary>
-    /// AC4 states the in-memory ban as a property of the solution, so it needs a gate rather
-    /// than a convention. The reason belongs in the failure message: an in-memory provider
-    /// cannot exercise row-level security, which is what NFR-1 rests on.
+    /// AC4 states the ban as a property of the solution, so it needs a gate rather than a
+    /// convention. The reason belongs in the failure message: these providers cannot exercise
+    /// row-level security, which is what NFR-1 rests on.
     /// </summary>
     [Fact]
     [Trait("Requirement", "NFR-1")]
-    public void No_EF_Core_in_memory_provider_is_centrally_available()
+    public void No_provider_that_cannot_enforce_row_level_security_is_centrally_available()
     {
-        Assert.False(CentralPackageVersions().ContainsKey(InMemoryProvider),
-            $"Directory.Packages.props declares a <PackageVersion> for {InMemoryProvider}. " +
-            "It must not: an in-memory provider cannot exercise row-level security, which is " +
-            "what NFR-1 rests on. Leaving the version centrally unavailable is the cheapest " +
-            "enforcement of AC4's ban - a project that references it then fails to restore.");
+        var central = CentralPackageVersions();
+
+        var offenders = BannedProviders
+            .Where(central.ContainsKey)
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        Assert.True(offenders.Count == 0,
+            "Directory.Packages.props declares a <PackageVersion> for a provider that cannot " +
+            "enforce row-level security, which is what NFR-1 rests on - neither an in-memory " +
+            "provider nor SQLite supports CREATE SECURITY POLICY or SESSION_CONTEXT. Leaving " +
+            "the version centrally unavailable is the cheapest enforcement of AC4's ban: a " +
+            $"project that references it then fails to restore.{Environment.NewLine}" +
+            string.Join(Environment.NewLine, offenders.Select(o => $"  - {o}")));
     }
 
     [Fact]
     [Trait("Requirement", "NFR-1")]
-    public void No_test_project_references_an_EF_Core_in_memory_provider()
+    public void No_test_project_references_a_provider_that_cannot_enforce_row_level_security()
     {
         var offenders = RepositoryLayout.AllProjectFiles
             .Where(RepositoryLayout.IsUnderTestsDirectory)
-            .Where(p => RepositoryLayout.DeclaredPackageReferences(p)
-                .Any(r => r.Contains("InMemory", StringComparison.OrdinalIgnoreCase)))
-            .Select(RepositoryLayout.RelativePath)
+            .SelectMany(p => RepositoryLayout.DeclaredPackageReferences(p)
+                .Where(r => BannedProviders.Contains(r, StringComparer.OrdinalIgnoreCase))
+                .Select(r => $"{RepositoryLayout.RelativePath(p)} references {r}"))
             .OrderBy(p => p, StringComparer.Ordinal)
             .ToList();
 
         Assert.True(offenders.Count == 0,
-            "These test projects reference an EF Core in-memory provider, which AC4 forbids. " +
-            "An in-memory provider cannot exercise row-level security, which is what NFR-1 " +
-            "rests on - suites run against the real SQL Server container in " +
-            $"{AllowedReferenceEdges.DeclaredVariance} instead:{Environment.NewLine}" +
+            "These test projects reference a database provider that cannot enforce row-level " +
+            "security, which AC4 forbids and NFR-1 rests on - suites run against the real SQL " +
+            $"Server container in {AllowedReferenceEdges.DeclaredVariance} instead:" +
+            $"{Environment.NewLine}" +
             string.Join(Environment.NewLine, offenders.Select(o => $"  - {o}")));
+    }
+
+    /// <summary>
+    /// The ring rule for packages. See
+    /// <see cref="AllowedReferenceEdges.ForbiddenPackagePrefixes"/> for why a ban rather than
+    /// an allow-list, and why this is not covered by Gate B.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "AR-2")]
+    public void No_project_references_a_package_its_ring_forbids()
+    {
+        var violations = new List<string>();
+
+        foreach (var project in RepositoryLayout.AllProjectFiles)
+        {
+            var name = RepositoryLayout.ProjectName(project);
+
+            if (!AllowedReferenceEdges.ForbiddenPackagePrefixes.TryGetValue(name, out var forbidden))
+            {
+                continue;
+            }
+
+            violations.AddRange(
+                from package in RepositoryLayout.DeclaredPackageReferences(project)
+                from prefix in forbidden
+                where package.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                select $"{RepositoryLayout.RelativePath(project)}: '{name}' references '{package}', " +
+                       $"which matches the forbidden prefix '{prefix}'.");
+        }
+
+        Assert.True(violations.Count == 0,
+            "A project references a package its ring forbids (AD-21 / AR-2). A package " +
+            "reference crosses a ring boundary exactly as a project reference does, and Gate B " +
+            "cannot see it until a type is actually touched - which is why this is asserted " +
+            $"here, from the project file:{Environment.NewLine}" +
+            string.Join(Environment.NewLine, violations.Select(v => $"  - {v}")));
+    }
+
+    /// <summary>
+    /// <c>GlobalPackageReference</c> applies a package to every project in the solution
+    /// without any project mentioning it, so the set of them is asserted exactly.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This one assertion closes a bypass that ran under every other gate in this class at
+    /// once. <c>CentralPackageVersions</c> reads <c>PackageVersion</c> elements and
+    /// <c>DeclaredPackageReferences</c> reads project files, so a single line in
+    /// <c>Directory.Packages.props</c> -
+    /// <c>&lt;GlobalPackageReference Include="Microsoft.EntityFrameworkCore.InMemory"
+    /// Version="10.0.11" /&gt;</c> - added the banned provider to all fourteen projects and
+    /// was invisible to the three assertions that exist to stop it. The same line could carry
+    /// <c>Microsoft.NET.Test.Sdk</c> past the VSTest ban, or EF Core past the ring's package
+    /// ban, for the same reason.
+    /// </para>
+    /// <para>
+    /// It is already the established idiom in that file, which is what makes it the natural
+    /// way a later story would write exactly this by accident.
+    /// </para>
+    /// <para>
+    /// The version is deliberately not asserted. The coding standard's version is a developer
+    /// decision rather than an architecture edit - the file says so, and that stance is
+    /// settled. What is asserted is that nothing <i>else</i> arrives by this route.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "AR-35")]
+    public void The_only_solution_wide_package_is_the_coding_standard()
+    {
+        var actual = RepositoryLayout
+            .ItemIncludes(RepositoryLayout.DirectoryPackagesProps, "GlobalPackageReference")
+            .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var unexpected = actual
+            .Where(p => !p.Equals("Opinionated.DotNet.CodingStandards", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        Assert.True(unexpected.Count == 0 && actual.Count == 1,
+            "Directory.Packages.props declares a GlobalPackageReference other than the coding " +
+            "standard, or has lost the coding standard. A GlobalPackageReference reaches all " +
+            "fourteen projects while appearing in none of them, so it bypasses every " +
+            "per-project gate here - the row-level-security provider ban, the VSTest ban and " +
+            $"the ring's package ban alike.{Environment.NewLine}" +
+            $"  found: {(actual.Count == 0 ? "(none)" : string.Join(", ", actual))}");
     }
 
     /// <summary>
@@ -207,13 +555,62 @@ public sealed class PackageVersionPinTests
             "xunit.v3 4.0.0 runs on Microsoft.Testing.Platform only; there is no VSTest path here.");
     }
 
-    private static Dictionary<string, string> CentralPackageVersions() =>
-        XDocument.Load(RepositoryLayout.DirectoryPackagesProps.FullName)
-            .Descendants()
-            .Where(e => e.Name.LocalName.Equals("PackageVersion", StringComparison.Ordinal))
-            .Where(e => e.Attribute("Include") is not null && e.Attribute("Version") is not null)
-            .ToDictionary(
-                e => e.Attribute("Include")!.Value,
-                e => e.Attribute("Version")!.Value,
-                StringComparer.Ordinal);
+    /// <summary>
+    /// Reads <c>Directory.Packages.props</c>, honouring both spellings of a version and NuGet's
+    /// own case-insensitivity.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Package ids are case-insensitive to NuGet, so an Ordinal dictionary let
+    /// <c>microsoft.entityframeworkcore.inmemory</c> restore correctly while the ban that
+    /// reads this missed it - AC4 bypassed by letter case alone. Values are trimmed for the
+    /// same reason: <c>Include=" xunit.v3 "</c> resolves and would not have matched.
+    /// </para>
+    /// <para>
+    /// A version written as a child element rather than an attribute is honoured too. Filtered
+    /// out, it made the banned package look absent while NuGet honoured the version and the
+    /// project restored.
+    /// </para>
+    /// </remarks>
+    private static Dictionary<string, string> CentralPackageVersions()
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var duplicates = new List<string>();
+
+        foreach (var element in RepositoryLayout.LoadXml(RepositoryLayout.DirectoryPackagesProps)
+                     .Descendants()
+                     .Where(e => e.Name.LocalName.Equals("PackageVersion", StringComparison.Ordinal)))
+        {
+            var include = element.Attribute("Include")?.Value.Trim();
+            var version = VersionOf(element);
+
+            if (string.IsNullOrEmpty(include) || version is null)
+            {
+                continue;
+            }
+
+            // Not ToDictionary: a duplicate Include throws there, and the exception names the
+            // key without naming the file or saying what to do about it.
+            if (!result.TryAdd(include, version))
+            {
+                duplicates.Add(include);
+            }
+        }
+
+        if (duplicates.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "Directory.Packages.props declares more than one <PackageVersion> for: " +
+                $"{string.Join(", ", duplicates)}. NuGet takes the last, so the file says one " +
+                "thing and the restore does another. Remove the duplicate.");
+        }
+
+        return result;
+    }
+
+    private static string? VersionOf(XElement element) =>
+        element.Attribute("Version")?.Value.Trim()
+        ?? element.Elements()
+            .FirstOrDefault(c => c.Name.LocalName.Equals("Version", StringComparison.Ordinal))
+            ?.Value.Trim();
 }

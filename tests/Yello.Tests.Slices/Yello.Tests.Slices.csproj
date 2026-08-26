@@ -16,25 +16,23 @@
   </PropertyGroup>
 
   <!--
-    AC5: this suite is EMPTY after story 1.1 and must report zero tests rather than fail.
-    Microsoft.Testing.Platform returns exit code 8 for "the test session ran zero tests"
-    and is strict by default, where VSTest tolerated an empty run. Note the precise
-    failure mode without this switch: the BUILD succeeds and `dotnet test` returns 8.
-    The `minimum-expected-tests` option is the wrong lever; it governs exit code 9.
+    NO `ignore-exit-code 8` SWITCH HERE ANY MORE. This suite gained its first test - the shared
+    fixture smoke test - so the switch came off, exactly as the comment that used to sit here
+    instructed. Left in place it would swallow a genuinely empty run, so a filter typo or
+    broken discovery would pass silently as "zero tests".
 
-    REMOVE THIS THE MOMENT THIS SUITE GAINS ITS FIRST TEST. Left in place it also
-    swallows a genuinely empty run, so a filter typo or broken discovery would pass
-    silently as "zero tests" - which is exactly the signal being masked here on purpose.
-    Yello.Tests.Architecture deliberately does NOT carry it: that suite ships real
-    assertions in story 1.1 and stays strict.
+    A gate enforces that now rather than a comment: Yello.Tests.Architecture asserts that no
+    project carrying the switch contains a [Fact] or a [Theory]. The four suites that are still
+    genuinely empty after story 1.1 keep it; this one cannot.
   -->
-  <PropertyGroup>
-    <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
-  </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" />
+    <!--
+      For the fixture smoke test, which opens one connection to assert that the engine behind
+      the pinned tag really is SQL Server 2025. .NET ships no SQL driver.
+    -->
+    <PackageReference Include="Microsoft.Data.SqlClient" />
   </ItemGroup>
 
   <ItemGroup>

@@ -2,7 +2,21 @@
 title: Yello — Epic Breakdown
 status: final
 created: 2026-08-22
-updated: 2026-08-22
+updated: 2026-08-26
+amendments:
+  - date: 2026-08-26
+    section: 'Epic 1 › Story 1.1 › Acceptance Criteria, fifth block (AC5)'
+    raisedBy: 'Code review of story 1.1, 2026-08-26 — decision resolved by Lee'
+    change: >-
+      AC5 required the four gating suites, architecture INCLUDED, to report zero tests, while
+      the second and third AC blocks require that same architecture suite to fail the build on
+      a ring or Role-API violation. The two cannot both hold: a suite that fails the build has
+      run assertions. The implementation read AC5's operative contrast as "rather than failing
+      to build" and gave the exit-code-8 tolerance to the four genuinely-empty suites while
+      deliberately withholding it from architecture, which is the only coherent reading.
+      Reworded so the operative test is "builds and executes", with the zero-tests clause
+      scoped to the suites that actually hold no cases. Amended deliberately against a final
+      artifact rather than re-litigated once per story.
 stepsCompleted: ['step-01-validate-prerequisites', 'step-02-design-epics', 'step-03-create-stories']
 readinessCheck:
   report: _bmad-output/planning-artifacts/implementation-readiness-report-2026-08-22.md
@@ -489,7 +503,8 @@ So that no later story can erode the structure NFR-1 depends on.
 
 **Given** the four gating suites — isolation, revocation, merge conformance, architecture
 **When** they run against a solution with no feature code
-**Then** each builds and executes, reporting zero tests rather than failing to build
+**Then** each builds and executes rather than failing to build
+**And** the three that hold no cases yet — isolation, revocation, merge conformance — report zero tests without that being treated as a failure
 **And** later stories add cases to existing suites rather than creating suites
 
 ### Story 1.2: The design foundations every surface is drawn from

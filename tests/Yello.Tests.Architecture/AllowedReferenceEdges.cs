@@ -133,4 +133,63 @@ internal static class AllowedReferenceEdges
     /// </summary>
     public static IEnumerable<string> ExpectedProjects =>
         ProductionProjects.Concat(TestProjects).Append(DeclaredVariance);
+
+    /// <summary>
+    /// Package prefixes a given project may not reference, by project.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The ring rule above governs <c>ProjectReference</c> only, which leaves a hole the same
+    /// shape as the one Gate A exists to close for project references.
+    /// <c>&lt;PackageReference Include="Microsoft.EntityFrameworkCore" /&gt;</c> in
+    /// <c>Yello.Application</c> breaks AD-21 exactly as an Infrastructure project reference
+    /// would, and neither gate sees it: the ring table has no package column, and Gate B is a
+    /// <i>type</i>-dependency rule that fires only once a type is actually touched. Declared
+    /// but unused is invisible to bytecode - which is the whole reason Gate A exists.
+    /// </para>
+    /// <para>
+    /// These are prefixes rather than exact ids, and bans rather than an allow-list. An
+    /// allow-list would force a table edit for every ordinary package a later story adds,
+    /// which buys nothing: the architectural fact is not "which packages" but "which
+    /// <i>kinds</i> of package may cross this ring boundary". A ban states that directly and
+    /// only changes when the architecture does.
+    /// </para>
+    /// <para>
+    /// <c>Yello.Client</c> is deliberately absent. It legitimately references
+    /// <c>Microsoft.AspNetCore.Components.WebAssembly</c> - Blazor WASM is ASP.NET Core
+    /// surface, and the client is where it belongs.
+    /// </para>
+    /// </remarks>
+    // Declared before the table that reads it: static field initialisers run in textual
+    // order, so the other way round hands the table an array that is still null (MA0195).
+    private static readonly string[] PersistenceAndTransport =
+    [
+        "Microsoft.EntityFrameworkCore",
+        "Microsoft.AspNetCore.",
+        "Microsoft.Data.SqlClient",
+        "Microsoft.Data.Sqlite",
+        "Aspire.",
+        "Testcontainers",
+        "Dapper",
+        "System.Data.SqlClient",
+    ];
+
+    /// <summary>
+    /// Package prefixes a given project may not reference, by project. See
+    /// <see cref="PersistenceAndTransport"/> for the shared list.
+    /// </summary>
+    public static readonly IReadOnlyDictionary<string, string[]> ForbiddenPackagePrefixes =
+        new Dictionary<string, string[]>(StringComparer.Ordinal)
+        {
+            // The innermost ring holds entities, invariants and ports. It reaches nothing at
+            // all - so the ban is every prefix that could put a framework inside an invariant.
+            ["Yello.Domain"] = [.. PersistenceAndTransport],
+            ["Yello.Application"] = [.. PersistenceAndTransport],
+
+            // Contracts and Merge are compiled into the WebAssembly client as well as the
+            // server. Either one gaining EF Core or ASP.NET Core would drag a server-side ring
+            // across the wire boundary and into the browser payload.
+            ["Yello.Contracts"] = [.. PersistenceAndTransport],
+            ["Yello.Merge"] = [.. PersistenceAndTransport],
+        };
 }
