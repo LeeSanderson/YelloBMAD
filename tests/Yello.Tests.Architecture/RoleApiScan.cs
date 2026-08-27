@@ -75,7 +75,7 @@ internal static class RoleApiScan
     private const string AuthorizationNamespaceRoot = "Microsoft.AspNetCore.Authorization";
     private const string IdentityBuilderFullName = "Microsoft.AspNetCore.Identity.IdentityBuilder";
     private const string PolicyBuilderFullName = "Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder";
-    private const string ClaimTypesFullName = "System.Security.Claims.ClaimTypes";
+    private const string AuthorizeDataFullName = "Microsoft.AspNetCore.Authorization.IAuthorizeData";
 
     /// <summary>
     /// <c>UserManager&lt;TUser&gt;</c> is a permitted type - it is the Account store, which is
@@ -89,15 +89,22 @@ internal static class RoleApiScan
     /// stepped around by writing out the URI the constant expands to.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// The <i>suffix</i> rather than the whole URI, so the ban does not depend on the exact
+    /// prefix a caller happened to write. <c>ClaimTypes.Role</c> compiles to a literal ending in
+    /// this, and so does anyone spelling it out.
+    /// </para>
+    /// <para>
     /// Assembled rather than written, because this scan reads every assembly in the solution
-    /// including its own: as a single <c>const</c> the URI is one <c>ldstr</c> in
-    /// <c>Yello.Tests.Architecture</c> and the gate reported itself as a violation the first
-    /// time it ran. The same trick, for the same reason, as
-    /// <c>TestingConventionTests.SqlServerImageLiteral</c>. Splitting it means no single literal
-    /// in IL equals the value being matched.
+    /// including its own: as a single <c>const</c> the value is one <c>ldstr</c> in
+    /// <c>Yello.Tests.Architecture</c> and the gate reported itself as a violation the first time
+    /// it ran. Splitting it means no single literal in IL equals what is being matched - which is
+    /// also, honestly, the evasion route: a caller assembling the URI from pieces at runtime is
+    /// out of reach here, exactly as reflection is. Both are declared in the known limits above
+    /// rather than implied away.
+    /// </para>
     /// </remarks>
-    private static readonly string RoleClaimTypeUri = string.Concat(
-        "http://schemas.microsoft.com/ws/2008/06/identity/claims", "/", "role");
+    private static readonly string RoleClaimTypeSuffix = string.Concat("/claims", "/", "role");
 
     /// <summary>
     /// <c>UserManager&lt;&gt;</c> methods that read or write Identity roles.
@@ -368,25 +375,25 @@ internal static class RoleApiScan
     /// </remarks>
     private static void ClassifyRoleClaim(Instruction instruction, string location, ScanResult result)
     {
-        if (instruction.Operand is FieldReference field
-            && field.Name.Equals("Role", StringComparison.Ordinal)
-            && field.DeclaringType.FullName.Equals(ClaimTypesFullName, StringComparison.Ordinal))
-        {
-            result.AuthorizeRoles.Add($"{location} reads ClaimTypes.Role");
-        }
-        else if (instruction.Operand is string text
-            && text.Equals(RoleClaimTypeUri, StringComparison.OrdinalIgnoreCase))
+        // One branch, not two. The first version also tested for a FieldReference to
+        // ClaimTypes.Role, on the stated grounds that "ClaimTypes.Role is a field load" - it is
+        // not. Verified: ClaimTypes.Role is a `const`, so `IsLiteral` is true and the C# compiler
+        // emits `ldstr <uri>` with no `ldsfld` anywhere. That branch was unreachable from any C#
+        // source, which means it was also unvalidated: the plants that "caught ClaimTypes.Role"
+        // were in fact caught here, by the literal.
+        if (instruction.Operand is string text
+            && text.EndsWith(RoleClaimTypeSuffix, StringComparison.OrdinalIgnoreCase))
         {
             result.AuthorizeRoles.Add(
-                $"{location} states the role claim type as a literal URI, which is " +
-                "ClaimTypes.Role spelled out");
+                $"{location} states the role claim type '{text}'. Whether it was written as " +
+                "ClaimTypes.Role or spelled out, the compiler emits the same literal.");
         }
         else
         {
-            // Every other field load and string literal in the solution. Only the role claim
-            // type is banned here; ClaimTypes itself and every other claim are permitted,
-            // because Identity stays wired for authentication and claims are how it carries
-            // identity. The ban is on the one claim that would express authorisation.
+            // Every other string literal in the solution. Only the role claim type is banned
+            // here; ClaimTypes itself and every other claim are permitted, because Identity stays
+            // wired for authentication and claims are how it carries identity. The ban is on the
+            // one claim that would express authorisation.
         }
     }
 
@@ -420,7 +427,7 @@ internal static class RoleApiScan
             result.RoleStoreTypes.Add($"{location} calls IdentityBuilder.{name}");
         }
         else if (UserManagerRoleMethods.Contains(name, StringComparer.Ordinal)
-            && declaring.StartsWith(UserManagerFullNamePrefix, StringComparison.Ordinal))
+            && DerivesFromUserManager(called.DeclaringType))
         {
             // UserManager<> reaches Identity's roles without naming RoleManager, IRoleStore or
             // IdentityRole anywhere - so all four A-3 assertions passed while roles were being
@@ -497,6 +504,39 @@ internal static class RoleApiScan
     /// the natural way a codebase with a domain concept called Space would wrap the attribute
     /// in the first place.
     /// </remarks>
+    /// <summary>
+    /// True when the declaring type is <c>UserManager&lt;T&gt;</c> or derives from it.
+    /// </summary>
+    /// <remarks>
+    /// Resolved through Mono.Cecil's base-type chain rather than through this solution's
+    /// base-type map, because the map is not complete until every module has been read and this
+    /// classification happens while reading. A subclass overriding <c>IsInRoleAsync</c> escaped
+    /// a prefix match on the declaring type's own name, and a subclass is the natural shape for
+    /// "our own user manager".
+    /// </remarks>
+    private static bool DerivesFromUserManager(TypeReference declaringType)
+    {
+        if (declaringType.FullName.StartsWith(UserManagerFullNamePrefix, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        var definition = TryResolve(declaringType);
+
+        // Bounded, because the chain is built from metadata this class does not control.
+        for (var depth = 0; depth < 32 && definition?.BaseType is not null; depth++)
+        {
+            if (definition.BaseType.FullName.StartsWith(UserManagerFullNamePrefix, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            definition = TryResolve(definition.BaseType);
+        }
+
+        return false;
+    }
+
     private static bool IsAuthorizeAttributeType(TypeReference attributeType)
     {
         if (attributeType.FullName.Equals(AuthorizeAttributeFullName, StringComparison.Ordinal))
@@ -522,8 +562,26 @@ internal static class RoleApiScan
     /// <summary>
     /// Walks the collected base-type map, which covers every type this solution compiles.
     /// </summary>
+    /// <summary>
+    /// True when a <c>set_Roles</c> call site is setting <c>AuthorizeAttribute.Roles</c>,
+    /// including through the interface that declares it.
+    /// </summary>
+    /// <remarks>
+    /// <c>AuthorizeAttribute.Roles</c> implements <c>IAuthorizeData.Roles</c>, so
+    /// <c>IAuthorizeData data = new AuthorizeAttribute(); data.Roles = "Admin";</c> emits a
+    /// <c>callvirt</c> whose declaring type is the interface. That is neither
+    /// <c>AuthorizeAttribute</c> nor in this solution's base-type map, and <c>IAuthorizeData</c>
+    /// is not named <c>*Role*</c> so the type scan misses it too - while
+    /// <c>RequireAuthorization(params IAuthorizeData[])</c> is the Minimal-API overload and
+    /// <c>Yello.Host</c> is a Minimal-API host. One accepted declaring type closes it.
+    /// </remarks>
     private static bool IsAuthorizeAttribute(string typeFullName, Dictionary<string, string> baseTypes)
     {
+        if (typeFullName.Equals(AuthorizeDataFullName, StringComparison.Ordinal))
+        {
+            return true;
+        }
+
         var current = typeFullName;
 
         // The map is finite and the guard bounds the walk, so a cyclic map (which the CLR

@@ -30,6 +30,21 @@ namespace Yello.Tests.Architecture;
 public sealed class PackageVersionPinTests
 {
     /// <summary>
+    /// The runtime patch, read from the file that owns it rather than restated here.
+    /// </summary>
+    private static readonly string PinnedRuntimeVersion =
+        RepositoryLayout.LoadXml(RepositoryLayout.DirectoryBuildProps)
+            .Descendants()
+            .Where(e => e.Name.LocalName.Equals("RuntimeFrameworkVersion", StringComparison.Ordinal))
+            .Where(RepositoryLayout.IsUnconditional)
+            .Select(e => e.Value.Trim())
+            .LastOrDefault()
+        ?? throw new InvalidOperationException(
+            "Directory.Build.props declares no unconditional <RuntimeFrameworkVersion>, so the " +
+            "Blazor WASM pins have nothing to track. ProjectFileGateTests asserts that pin " +
+            "directly and will say so too.");
+
+    /// <summary>
     /// The AR-1 pins, as written. Four of these are behind the current latest
     /// (<c>Asp.Versioning.Http</c> 10.0.0 vs 10.2.x, Aspire 13.4 vs 13.5.x,
     /// <c>Testcontainers.XunitV3</c> 4.6.0 vs 4.14.0, <c>TngTech.ArchUnitNET</c> 0.13.3 vs
@@ -68,8 +83,15 @@ public sealed class PackageVersionPinTests
         // spine gives it its own line in the stack table, so it is an AR-1 pin like any other.
         // AC1's own enumeration omits it while AR-1 keeps it, and the implementation had
         // followed the paraphrase rather than the source.
-        ["Microsoft.AspNetCore.Components.WebAssembly"] = "10.0.11",
-        ["Microsoft.AspNetCore.Components.WebAssembly.DevServer"] = "10.0.11",
+        //
+        // DERIVED from the runtime pin, not restated. Directory.Packages.props says these "must
+        // track the runtime patch pinned in Directory.Build.props", and nothing asserted that:
+        // both this table and the framework gate hard-coded 10.0.11 independently, so bumping the
+        // runtime would have left the WASM pins behind with every assertion green. That is the
+        // same unasserted-coupling defect this suite already closes for the Aspire SDK attribute
+        // and the tool manifest, and the fix is to have one source rather than three copies.
+        ["Microsoft.AspNetCore.Components.WebAssembly"] = PinnedRuntimeVersion,
+        ["Microsoft.AspNetCore.Components.WebAssembly.DevServer"] = PinnedRuntimeVersion,
     };
 
     /// <summary>
@@ -157,29 +179,54 @@ public sealed class PackageVersionPinTests
     /// GHSA-q939-rpr3-3284 (HIGH), with no NuGet backstop at all.
     /// </para>
     /// <para>
-    /// <b>Last, and unconditional.</b> Reading "any occurrence equals true" passed on a
-    /// <c>true</c> followed later by <c>false</c>, and on a <c>true</c> inside a
-    /// <c>Condition</c>-guarded <c>PropertyGroup</c> - verified with
-    /// <c>dotnet msbuild -getProperty:</c>, which returned false where the text the gate read
-    /// still said true. MSBuild takes the last unconditional value, so that is what this reads.
+    /// <b>Asserted from evaluated state, per project.</b> Two text-reading versions of this
+    /// assertion were both defeated. "Any occurrence equals true" passed on a <c>true</c>
+    /// followed by a <c>false</c>. Reading the last <i>unconditional</i> declaration then passed
+    /// on a <c>Condition</c>-guarded <c>false</c> whose condition fires - and separately, the
+    /// switch is settable from a root <c>Directory.Build.targets</c>, which this file's own
+    /// guidance points future stories towards and which a gate scoped to
+    /// <c>Directory.Packages.props</c> cannot see. Both were demonstrated with
+    /// <c>dotnet msbuild -getProperty:</c> returning <c>false</c> where the text said
+    /// <c>true</c>. Asking MSBuild per project answers the only question that matters: does
+    /// central package management apply to this project as it is actually built.
+    /// </para>
+    /// <para>
+    /// One correction to a claim this assertion used to make: turning
+    /// <c>CentralPackageTransitivePinningEnabled</c> off does <b>not</b> reinstate
+    /// GHSA-q939-rpr3-3284 unnoticed. Measured: <c>dotnet build Yello.slnx</c> then fails with
+    /// <c>error NU1903</c> four times over. NuGet is a real backstop here; this assertion is the
+    /// one that names the cause rather than leaving a developer to infer it from an advisory.
     /// </para>
     /// </remarks>
     [Fact]
     public void Central_package_management_and_transitive_pinning_are_enabled()
     {
-        var properties = RepositoryLayout.LoadXml(RepositoryLayout.DirectoryPackagesProps)
+        var problems = new List<string>();
+
+        foreach (var project in RepositoryLayout.AllProjectFiles)
+        {
+            problems.AddRange(
+                from name in CentralManagementSwitches
+                let value = MsBuildEvaluation.Property(project, name)
+                where !value.Equals("true", StringComparison.OrdinalIgnoreCase)
+                select $"{RepositoryLayout.RelativePath(project)} evaluates '{name}' to " +
+                       $"'{(value.Length == 0 ? "(unset)" : value)}', not true.");
+        }
+
+        // The declared side as well, because "it is switched on for every project" and "it is
+        // stated in the one file that owns package versions" are different invariants and both
+        // matter: the second is what makes the file worth reading.
+        var declared = RepositoryLayout.LoadXml(RepositoryLayout.DirectoryPackagesProps)
             .Descendants()
             .Where(e => e.Parent?.Name.LocalName.Equals("PropertyGroup", StringComparison.Ordinal) == true)
             .Where(RepositoryLayout.IsUnconditional)
-            .ToLookup(e => e.Name.LocalName, e => e.Value.Trim(), StringComparer.Ordinal);
-
-        var problems = CentralManagementSwitches
-            .Where(name => !string.Equals(
-                properties[name].LastOrDefault(), "true", StringComparison.OrdinalIgnoreCase))
-            .Select(name => properties[name].Any()
-                ? $"'{name}' is last set to '{properties[name].Last()}' in Directory.Packages.props, not true."
-                : $"'{name}' is not set to true in Directory.Packages.props by any unconditional declaration.")
+            .Select(e => e.Name.LocalName)
             .ToList();
+
+        problems.AddRange(CentralManagementSwitches
+            .Where(name => !declared.Contains(name, StringComparer.Ordinal))
+            .Select(name => $"'{name}' is not stated unconditionally in Directory.Packages.props, " +
+                            "which is the file that owns it."));
 
         Assert.True(problems.Count == 0,
             "Central package management is what makes every pin in this file load-bearing, and " +
@@ -187,9 +234,14 @@ public sealed class PackageVersionPinTests
             $"{Environment.NewLine}{Environment.NewLine}" +
             string.Join(Environment.NewLine, problems.Select(p => $"  - {p}")) +
             $"{Environment.NewLine}{Environment.NewLine}" +
-            "Without ManagePackageVersionsCentrally every version-less PackageReference " +
-            "resolves to latest-available; without CentralPackageTransitivePinningEnabled the " +
-            "SSH.NET forward-pin for GHSA-q939-rpr3-3284 stops applying.");
+            "Without ManagePackageVersionsCentrally every version-less PackageReference would " +
+            "resolve freely - though NuGet fails restore with NU1015 first, since no project " +
+            "here carries an inline version. Without CentralPackageTransitivePinningEnabled the " +
+            "SSH.NET forward-pin for GHSA-q939-rpr3-3284 stops applying, and NuGet then fails " +
+            "the build with NU1903 rather than passing silently. This assertion exists to name " +
+            "the cause instead of leaving someone to work back from an advisory - and because " +
+            "these switches are settable from files other than the one that owns them, which " +
+            "is why it reads evaluated state per project rather than this file's text.");
     }
 
     [Fact]
@@ -408,6 +460,36 @@ public sealed class PackageVersionPinTests
             string.Join(Environment.NewLine, problems.Select(p => $"  - {p}")));
     }
 
+
+    /// <summary>
+    /// The <c>tools.aspire.cli.version</c> element, if the manifest has the shape that implies.
+    /// </summary>
+    /// <remarks>
+    /// Every level's <c>ValueKind</c> is checked because <c>TryGetProperty</c> throws
+    /// <c>InvalidOperationException</c> on a non-object - so <c>{"tools": []}</c>, or a manifest
+    /// where <c>aspire.cli</c> maps straight to a string, produced a bare exception naming
+    /// neither the file nor the remedy. That is exactly what <c>RepositoryLayout.LoadJson</c> was
+    /// added to prevent, and this gate was reaching past it.
+    /// </remarks>
+    private static bool TryReadAspireCliVersion(JsonDocument document, out JsonElement version)
+    {
+        version = default;
+
+        if (document.RootElement.ValueKind != JsonValueKind.Object
+            || !document.RootElement.TryGetProperty("tools", out var tools)
+            || tools.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        if (!tools.TryGetProperty("aspire.cli", out var cli) || cli.ValueKind != JsonValueKind.Object)
+        {
+            return false;
+        }
+
+        return cli.TryGetProperty("version", out version);
+    }
+
     private static IEnumerable<string> AspireCliProblems(string expected)
     {
         if (!RepositoryLayout.DotnetToolsManifest.Exists)
@@ -429,11 +511,11 @@ public sealed class PackageVersionPinTests
 
         using var document = RepositoryLayout.LoadJson(RepositoryLayout.DotnetToolsManifest);
 
-        if (!document.RootElement.TryGetProperty("tools", out var tools)
-            || !tools.TryGetProperty("aspire.cli", out var cli)
-            || !cli.TryGetProperty("version", out var version))
+        if (!TryReadAspireCliVersion(document, out var version))
         {
-            yield return ".config/dotnet-tools.json declares no version for 'aspire.cli'.";
+            yield return
+                ".config/dotnet-tools.json does not declare a version for 'aspire.cli' in the " +
+                "expected shape ({ \"tools\": { \"aspire.cli\": { \"version\": ... } } }).";
             yield break;
         }
 
@@ -477,9 +559,12 @@ public sealed class PackageVersionPinTests
     [Trait("Requirement", "NFR-1")]
     public void No_test_project_references_a_provider_that_cannot_enforce_row_level_security()
     {
+        // Evaluated, for the same reason as the two bans above: NFR-1 rests on row-level
+        // security, and a provider that cannot exercise it must not reach a suite by any route
+        // the build honours - property indirection and GlobalPackageReference included.
         var offenders = RepositoryLayout.AllProjectFiles
             .Where(RepositoryLayout.IsUnderTestsDirectory)
-            .SelectMany(p => RepositoryLayout.DeclaredPackageReferences(p)
+            .SelectMany(p => MsBuildEvaluation.PackageIds(p)
                 .Where(r => BannedProviders.Contains(r, StringComparer.OrdinalIgnoreCase))
                 .Select(r => $"{RepositoryLayout.RelativePath(p)} references {r}"))
             .OrderBy(p => p, StringComparer.Ordinal)
@@ -513,8 +598,14 @@ public sealed class PackageVersionPinTests
                 continue;
             }
 
+            // Evaluated, not declared. Reading the XML attribute compared the literal text, so
+            // <PackageReference Include="$(Orm)" /> and Include="@(Orm)" both restored EF Core
+            // while this ban matched neither - demonstrated during the third review pass by
+            // planting EF Core into Yello.Domain, the ring that may reference nothing, with all
+            // 47 assertions green. Evaluation also folds in GlobalPackageReference, which
+            // reached every project from a file this gate never read.
             violations.AddRange(
-                from package in RepositoryLayout.DeclaredPackageReferences(project)
+                from package in MsBuildEvaluation.PackageIds(project)
                 from prefix in forbidden
                 where package.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
                 select $"{RepositoryLayout.RelativePath(project)}: '{name}' references '{package}', " +
@@ -612,8 +703,12 @@ public sealed class PackageVersionPinTests
     [Fact]
     public void No_project_references_the_VSTest_SDK()
     {
+        // Evaluated: the same property- and item-indirection that defeated the ring package ban
+        // defeated this one, and a GlobalPackageReference in Directory.Build.props applied the
+        // VSTest SDK's build assets to every project (IsTestProject and GenerateProgramFile both
+        // evaluated true in projects declaring neither).
         var offenders = RepositoryLayout.AllProjectFiles
-            .Where(p => RepositoryLayout.DeclaredPackageReferences(p)
+            .Where(p => MsBuildEvaluation.PackageIds(p)
                 .Contains("Microsoft.NET.Test.Sdk", StringComparer.OrdinalIgnoreCase))
             .Select(RepositoryLayout.RelativePath)
             .ToList();

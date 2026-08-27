@@ -38,8 +38,8 @@ var database = sqlServer.AddDatabase(BuildConstant("Yello.DatabaseResourceName")
 //
 // Note what WaitFor does and does not guarantee: it waits on the Aspire *resource*, not on the
 // `yello` catalog existing inside it. "Container up, database missing" therefore still reaches
-// the Host, which logs it as a connectivity failure - see Yello.Host/Program.cs, which
-// distinguishes that case in its log rather than leaving it to look like "container down".
+// the Host, which logs it as a connectivity failure - see Yello.Host/StartupConnectivityCheck.cs,
+// which distinguishes that case in its log rather than leaving it to look like "container down".
 builder.AddProject<Projects.Yello_Host>("host")
     .WithReference(database)
     .WaitFor(database);
@@ -113,8 +113,12 @@ static (string Registry, string Image, string Tag) SplitImageReference(string re
     if (remainder.Contains('@', StringComparison.Ordinal))
     {
         throw InvalidImageReference(reference,
-            "it pins a digest, which Aspire takes separately from a tag. Update this file and " +
-            "tests/Yello.Tests.Shared/SqlServerContainerFixture.cs together, deliberately");
+            "it pins a digest, which Aspire takes separately from a tag. THREE places change " +
+            "together, deliberately: Directory.Build.props (the value itself), this file (Aspire " +
+            "needs the digest passed apart from the tag), and " +
+            "tests/Yello.Tests.Architecture/TestingConventionTests.ExpectedSqlServerImage (which " +
+            "asserts the value AC4 names). The fixture needs no change - Testcontainers parses a " +
+            "digest reference correctly as it stands");
     }
 
     var lastColon = remainder.LastIndexOf(':');
@@ -122,6 +126,15 @@ static (string Registry, string Image, string Tag) SplitImageReference(string re
     if (lastColon < 0)
     {
         throw InvalidImageReference(reference, "it names no tag");
+    }
+
+    // Neither component may be empty. `registry/img:` and `registry/:tag` both split cleanly
+    // here while Testcontainers rejects them outright - verified - so accepting them would put
+    // the AppHost and the suites back to disagreeing about which engine runs, from one shared
+    // value, which is the whole thing this parsing exists to prevent.
+    if (lastColon == 0 || lastColon == remainder.Length - 1)
+    {
+        throw InvalidImageReference(reference, "its image name or its tag is empty");
     }
 
     return (registry, remainder[..lastColon], remainder[(lastColon + 1)..]);

@@ -182,7 +182,18 @@ internal static class RepositoryLayout
     {
         try
         {
-            return JsonDocument.Parse(File.ReadAllText(file.FullName));
+            // The SDK accepts comments and trailing commas in global.json, and this gate must not
+            // fail a file the toolchain honours: verified that a global.json carrying a `//`
+            // comment resolves SDK 10.0.303 perfectly well while a default JsonDocument.Parse
+            // throws on it. A gate that rejects valid input is as broken as one that accepts
+            // invalid input - it just fails in the direction people notice sooner.
+            return JsonDocument.Parse(
+                File.ReadAllText(file.FullName),
+                new JsonDocumentOptions
+                {
+                    CommentHandling = JsonCommentHandling.Skip,
+                    AllowTrailingCommas = true,
+                });
         }
         catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
         {
@@ -250,17 +261,29 @@ internal static class RepositoryLayout
     /// directory name and so never climbs out of the project directory.
     /// </para>
     /// <para>
-    /// Reported, not expanded. Expanding means evaluating each project through MSBuild, which
-    /// is a materially larger gate than this file is; refusing to gate what cannot be read
-    /// keeps the guarantee honest, and nothing in this repository needs the indirection today.
-    /// If a later story has a real use for it, that is the point to build the evaluating gate -
-    /// not the point to widen the blind spot.
+    /// <b>Still load-bearing after <see cref="MsBuildEvaluation"/> arrived.</b> The package,
+    /// <c>Compile</c> and <c>Reference</c> bans now read evaluated state and are immune to
+    /// indirection. But the ring <i>edge</i> gate deliberately still reads declared XML, because
+    /// the edge table is keyed by project name and "exactly these edges are declared" is a
+    /// statement about the file rather than about the build. An indirected
+    /// <c>ProjectReference</c> <c>Include</c> would make that statement unreadable, so it is
+    /// reported rather than guessed at.
+    /// </para>
+    /// <para>
+    /// <b>All three indirection syntaxes, not one.</b> The first version of this check tested
+    /// for <c>$(</c> alone, and <c>@(item)</c> was demonstrated to slip past it and put EF Core
+    /// inside <c>Yello.Domain</c> with the whole suite green. <c>%(metadata)</c> and MSBuild's
+    /// <c>%XX</c> escapes (<c>%2E%2E%2F</c> is <c>../</c>) are the same class. A gate that names
+    /// one spelling of a mechanism has not gated the mechanism.
     /// </para>
     /// </remarks>
     public static IEnumerable<string> UnresolvableIncludes(FileInfo file, params string[] itemNames) =>
         from itemName in itemNames
         from include in ItemIncludes(file, itemName)
         where include.Contains("$(", StringComparison.Ordinal)
+            || include.Contains("@(", StringComparison.Ordinal)
+            || include.Contains("%(", StringComparison.Ordinal)
+            || include.Contains('%', StringComparison.Ordinal)
         select $"<{itemName} Include=\"{include}\" />";
 
     /// <summary>
@@ -291,6 +314,37 @@ internal static class RepositoryLayout
     /// property into a project from a file no gate reads, which makes every "declared fact"
     /// this class returns something less than the facts the build actually uses.
     /// </remarks>
+    /// <summary>
+    /// The SDKs a build file imports, whether by the <c>Sdk</c> attribute on <c>&lt;Project&gt;</c>
+    /// or by an <c>&lt;Sdk&gt;</c> element.
+    /// </summary>
+    /// <remarks>
+    /// An SDK import brings in props and targets exactly as an <c>&lt;Import&gt;</c> does, and is
+    /// subject to neither the import-file singularity check nor the explicit-import ban. It can
+    /// therefore carry a <c>GlobalPackageReference</c> or a framework property in from a file no
+    /// gate reads. This is established idiom here rather than hypothetical:
+    /// <c>Yello.AppHost.csproj</c> already imports <c>Aspire.AppHost.Sdk</c> that way, which is
+    /// also why the sanctioned set is asserted rather than the item being banned outright.
+    /// </remarks>
+    public static IEnumerable<string> DeclaredSdks(FileInfo file)
+    {
+        var root = LoadXml(file).Root;
+
+        if (root is null)
+        {
+            return [];
+        }
+
+        var attribute = root.Attribute("Sdk")?.Value;
+
+        return (attribute is null ? Enumerable.Empty<string>() : [attribute])
+            .Concat(root.Descendants()
+                .Where(e => e.Name.LocalName.Equals("Sdk", StringComparison.Ordinal))
+                .Select(e => e.Attribute("Name")?.Value)
+                .Where(v => !string.IsNullOrWhiteSpace(v))
+                .Select(v => v!));
+    }
+
     public static IEnumerable<string> DeclaredImports(FileInfo file) =>
         LoadXml(file)
             .Descendants()

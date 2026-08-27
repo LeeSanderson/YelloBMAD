@@ -24,6 +24,32 @@ public sealed class ProjectFileGateTests
     private static readonly string[] FrameworkProperties =
         ["TargetFramework", "TargetFrameworks", "RuntimeFrameworkVersion"];
 
+    private const string ExpectedTargetFramework = "net10.0";
+    private const string ExpectedRuntimeVersion = "10.0.11";
+
+    /// <summary>
+    /// Every SDK this solution is allowed to import, and why each is here.
+    /// </summary>
+    /// <remarks>
+    /// <c>Microsoft.NET.Sdk</c> for libraries and suites, <c>.Web</c> for the Host, and
+    /// <c>.BlazorWebAssembly</c> for the client. <c>Aspire.AppHost.Sdk</c> for the AppHost.
+    /// <para>
+    /// Names only, with any <c>/version</c> suffix stripped before comparison. Listing
+    /// <c>Aspire.AppHost.Sdk/13.4.6</c> here would put a FOURTH copy of the Aspire version in the
+    /// solution, and "an ungoverned copy of a version drifting unnoticed" is a defect this suite
+    /// already has an assertion for. That assertion
+    /// (<c>Every_ungoverned_copy_of_the_Aspire_version_matches_the_pin</c>) owns the version; this
+    /// one owns which SDKs may be imported at all.
+    /// </para>
+    /// </remarks>
+    private static readonly string[] SanctionedSdks =
+    [
+        "Microsoft.NET.Sdk",
+        "Microsoft.NET.Sdk.Web",
+        "Microsoft.NET.Sdk.BlazorWebAssembly",
+        "Aspire.AppHost.Sdk",
+    ];
+
     /// <summary>
     /// Reference item types that must never appear in a file every project imports.
     /// </summary>
@@ -180,8 +206,8 @@ public sealed class ProjectFileGateTests
     {
         var problems = new List<string>();
 
-        AssertPinnedOnce(problems, "TargetFramework", "net10.0");
-        AssertPinnedOnce(problems, "RuntimeFrameworkVersion", "10.0.11");
+        AssertPinnedOnce(problems, "TargetFramework", ExpectedTargetFramework);
+        AssertPinnedOnce(problems, "RuntimeFrameworkVersion", ExpectedRuntimeVersion);
 
         foreach (var file in RepositoryLayout.AllProjectFiles.Concat(OtherImportFiles()))
         {
@@ -196,6 +222,39 @@ public sealed class ProjectFileGateTests
         // `dotnet msbuild -getProperty:TargetFramework`, which returned net9.0 while the gate
         // reported one unconditional net10.0.
         problems.AddRange(ConditionalFrameworkDeclarations(RepositoryLayout.DirectoryBuildProps));
+
+        // And the question that finally settles it: what does each project actually build? Every
+        // text-reading version of this assertion was defeated by a different indirection - a
+        // value inside a Condition that fires, a project-level restatement, an unconditional
+        // <TargetFrameworks> nothing read. Asking MSBuild costs about two seconds for the whole
+        // solution and is immune to the next spelling as well as to these three.
+        foreach (var project in RepositoryLayout.AllProjectFiles)
+        {
+            var path = RepositoryLayout.RelativePath(project);
+
+            var framework = MsBuildEvaluation.Property(project, "TargetFramework");
+            var runtime = MsBuildEvaluation.Property(project, "RuntimeFrameworkVersion");
+            var multiple = MsBuildEvaluation.Property(project, "TargetFrameworks");
+
+            if (!framework.Equals(ExpectedTargetFramework, StringComparison.Ordinal))
+            {
+                problems.Add(
+                    $"{path} evaluates TargetFramework to '{framework}', expected '{ExpectedTargetFramework}'.");
+            }
+
+            if (!runtime.Equals(ExpectedRuntimeVersion, StringComparison.Ordinal))
+            {
+                problems.Add(
+                    $"{path} evaluates RuntimeFrameworkVersion to '{runtime}', expected '{ExpectedRuntimeVersion}'.");
+            }
+
+            if (multiple.Length > 0)
+            {
+                problems.Add(
+                    $"{path} evaluates TargetFrameworks to '{multiple}'. AC1 pins ONE framework; " +
+                    "multi-targeting makes \".NET 10.0.11\" a statement about only part of the output.");
+            }
+        }
 
         Assert.True(problems.Count == 0,
             "The framework pin is not a single unconditional fact about the whole solution." +
@@ -382,17 +441,23 @@ public sealed class ProjectFileGateTests
         var projectDirectory = Path.GetFullPath(project.Directory.FullName)
             .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
 
-        foreach (var include in RepositoryLayout.ItemIncludes(project, "Compile"))
+        // MSBuild's own resolved FullPath, not Path.Combine over the attribute text. Reading the
+        // text was defeated three ways, each demonstrated: '$(Shared)/X.cs' and '@(SharedSrc)'
+        // are treated by Path.Combine as ordinary directory names, so the path resolved INSIDE
+        // the project and the check affirmatively passed; and '%2E%2E%2F' is an MSBuild escape
+        // for '../' that only MSBuild expands. Asking MSBuild makes all three simply correct.
+        foreach (var item in MsBuildEvaluation.Items(project, "Compile"))
         {
-            // Wildcards are resolved by MSBuild against the project directory, so a glob that
-            // does not itself climb out cannot reach past it.
-            var resolved = Path.GetFullPath(Path.Combine(projectDirectory, include.Replace('\\', '/')));
+            if (item.FullPath.Length == 0)
+            {
+                continue;
+            }
 
-            if (!resolved.StartsWith(projectDirectory, StringComparison.OrdinalIgnoreCase))
+            if (!item.FullPath.StartsWith(projectDirectory, StringComparison.OrdinalIgnoreCase))
             {
                 yield return
-                    $"{RepositoryLayout.RelativePath(project)} compiles '{include}', which " +
-                    "resolves outside its own directory.";
+                    $"{RepositoryLayout.RelativePath(project)} compiles '{item.Identity}', which " +
+                    $"resolves to '{item.FullPath}' - outside its own directory.";
             }
         }
     }
@@ -471,9 +536,34 @@ public sealed class ProjectFileGateTests
                 .Select(r => $"{path} declares a raw <Reference> to '{r}'. Use a " +
                              "ProjectReference, which the ring gate reads, or a PackageReference."));
 
+            // Evaluated as well as declared. Verified on this stack: a web project evaluates
+            // ZERO Reference items, so the framework's implicit references do not appear here
+            // and the ban can be absolute - which means it also catches one arriving through a
+            // property, an item, or an SDK import that declares it somewhere no gate reads.
+            if (RepositoryLayout.AllProjectFiles.Contains(file))
+            {
+                problems.AddRange(MsBuildEvaluation.Items(file, "Reference")
+                    .Select(r => $"{path} evaluates a raw <Reference> to '{r.Identity}', even " +
+                                 "though its own files declare none - so it arrives from an " +
+                                 "import, a property or an item that no gate here reads."));
+            }
+
             problems.AddRange(RepositoryLayout.DeclaredImports(file)
                 .Select(i => $"{path} explicitly imports '{i}', which no gate in this suite " +
                              "reads. Anything that file declares is invisible to Gate A."));
+
+            // The SDK route is the same mechanism with different syntax, and it is already the
+            // established idiom here (Yello.AppHost imports Aspire.AppHost.Sdk), so the
+            // sanctioned set is asserted rather than the import banned. An unsanctioned SDK can
+            // bring in props carrying a GlobalPackageReference or a framework property from a
+            // file nothing reads.
+            problems.AddRange(RepositoryLayout.DeclaredSdks(file)
+                .Select(s => s.Split('/', 2)[0])
+                .Where(s => !SanctionedSdks.Contains(s, StringComparer.Ordinal))
+                .Select(s => $"{path} imports SDK '{s}', which is not in the sanctioned set. An " +
+                             "SDK supplies props and targets that no gate here reads, so adding " +
+                             "one is a deliberate decision: add it to SanctionedSdks with a " +
+                             "reason, or use a PackageReference."));
         }
 
         Assert.True(problems.Count == 0, BuildFailureMessage(

@@ -18,10 +18,12 @@
     Two gates live here and read different things, so they live in different test classes
     to keep the assertion counts legible as later stories add A-4 onward:
 
-      Gate A  ProjectFileGateTests, PackageVersionPinTests, SolutionInventoryTests
-              Reads .csproj, Directory.Packages.props and global.json as TEXT. Assertions
-              outside the A-1..A-15 numbering, which the test design scoped to bytecode
-              and schema.
+      Gate A  ProjectFileGateTests, PackageVersionPinTests, SolutionInventoryTests,
+              TestingConventionTests
+              Reads the repository's build files, and — for the five questions where a text
+              comparison was demonstrably bypassable — asks MSBuild what it actually evaluates
+              (see MsBuildEvaluation). Assertions outside the A-1..A-15 numbering, which the
+              test design scoped to bytecode and schema.
       Gate B/C  RingDependencyTests, RoleApiBanTests
               Reads compiled bytecode through ArchUnitNET / Mono.Cecil. A-1 (4), A-2 (2),
               A-3 (4) = the 10 of 24 that this story delivers.

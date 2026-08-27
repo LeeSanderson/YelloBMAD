@@ -42,6 +42,15 @@ namespace Yello.Tests.Shared;
 /// isolation case will need its own container regardless, with pool size pinned to 1 and
 /// parallelism disabled: a pooled connection carrying a stale session context is the thing
 /// that case exists to catch, and it cannot be observed on a shared pool.
+/// <para>
+/// <b>The current cost, measured rather than estimated.</b> Three test classes in
+/// <c>Yello.Tests.Slices</c> each construct this fixture directly, so a full run starts three
+/// separate engines sequentially. A collection fixture would make it one - but it would also
+/// couple the cases that deliberately need <i>no</i> container (the inverted-guard regressions)
+/// to a container start, which is the opposite of what those cases are for. Resolving that
+/// properly means deciding the sharing model, which is story 1.9's, and this note is here so
+/// that story inherits a number rather than an impression.
+/// </para>
 /// </para>
 /// <para>
 /// <b>No <c>Task.Delay</c>.</b> Readiness is a wait strategy, never a sleep. The test
@@ -115,6 +124,12 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
     private bool _ready;
 
     /// <summary>
+    /// 1 once <see cref="InitializeAsync"/> has been entered. Reset by a failed start so a retry
+    /// can report the cause instead of the guard.
+    /// </summary>
+    private int _starting;
+
+    /// <summary>
     /// The ADO.NET connection string for the running container.
     /// </summary>
     /// <remarks>
@@ -132,11 +147,12 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
         _ready && _container is not null
             ? _container.GetConnectionString()
             : throw new InvalidOperationException(
-                "The container is not running. Consume this fixture through xunit's " +
-                "IClassFixture or ICollectionFixture so InitializeAsync completes before any " +
-                "test reads this. (If InitializeAsync threw, that exception is the one to fix; " +
-                "this property stays closed rather than handing out a string for an engine that " +
-                "never became ready.)");
+                "The container is not running. Await InitializeAsync before reading this - " +
+                "either by constructing the fixture directly in an `await using` and calling it, " +
+                "which is what every consumer in this repository does today, or through xunit's " +
+                "IClassFixture / ICollectionFixture. (If InitializeAsync threw, that exception is " +
+                "the one to fix; this property stays closed rather than handing out a string for " +
+                "an engine that never became ready.)");
 
     /// <summary>
     /// Starts the container and waits for the engine to accept connections.
@@ -157,10 +173,11 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
     /// </remarks>
     public async ValueTask InitializeAsync()
     {
-        // A second call would abandon the first container undisposed, leaving a stray 2 GB SQL
-        // Server for the rest of the run - and on a retry after a failed start, the stray is the
-        // one nobody is looking for.
-        if (_container is not null)
+        // Atomic, because a read-then-write guard lets two concurrent callers both past it and
+        // one container is then started and abandoned. A FAILED start resets this, so a retry is
+        // allowed and reports the real cause rather than "already run" - which was the previous
+        // behaviour and hid the very failure a developer was retrying to understand.
+        if (Interlocked.Exchange(ref _starting, 1) == 1)
         {
             throw new InvalidOperationException(
                 "InitializeAsync has already run on this fixture instance. xunit calls it once " +
@@ -190,9 +207,11 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
             // failure on a developer machine arrived with no container diagnostics attached,
             // which is the opposite of what the diagnostics exist for. Re-wrapping our own
             // exception is avoided by the flag above rather than by filtering on type.
+            var diagnostics = await DiagnosticsAsync().ConfigureAwait(false);
+            await AbandonAsync().ConfigureAwait(false);
+
             throw new InvalidOperationException(
-                $"The SQL Server container failed to start (image {Image})." +
-                await DiagnosticsAsync().ConfigureAwait(false),
+                $"The SQL Server container failed to start (image {Image}).{diagnostics}",
                 exception);
         }
 
@@ -200,12 +219,46 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
         // a catch block whose exception must survive is how the original failure gets lost.
         if (timedOut)
         {
+            var diagnostics = await DiagnosticsAsync().ConfigureAwait(false);
+            await AbandonAsync().ConfigureAwait(false);
+
             throw new InvalidOperationException(
                 $"SQL Server did not become ready within {StartupTimeout.TotalSeconds:F0}s " +
                 $"(image {Image}). Set YELLO_CONTAINER_STARTUP_TIMEOUT_SECONDS to raise the " +
-                "deadline if a cold image pull is the cause." +
-                await DiagnosticsAsync().ConfigureAwait(false));
+                $"deadline if a cold image pull is the cause.{diagnostics}");
         }
+    }
+
+    /// <summary>
+    /// Tears down a container that was created but never became ready, and reopens the door to a
+    /// retry.
+    /// </summary>
+    /// <remarks>
+    /// Without this, a failed start left the container running and undisposed - a stray ~2 GB SQL
+    /// Server for the rest of the run, which nobody is looking for because the visible symptom is
+    /// a test failure rather than a leak. The new tests happened to mask it by constructing the
+    /// fixture in an <c>await using</c>; an <c>IClassFixture</c> consumer would not. Diagnostics
+    /// are always gathered before this runs, so tearing down costs no information.
+    /// </remarks>
+    private async ValueTask AbandonAsync()
+    {
+        if (_container is not null)
+        {
+            try
+            {
+                await _container.DisposeAsync().ConfigureAwait(false);
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                // Best effort. The start failure is the one worth reporting, and a teardown that
+                // itself fails must not replace it - the same rule DiagnosticsAsync follows.
+            }
+
+            _container = null;
+        }
+
+        _ready = false;
+        Interlocked.Exchange(ref _starting, 0);
     }
 
     /// <summary>
@@ -251,9 +304,19 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
     /// </remarks>
     public static bool IsContainerRuntimeAvailable()
     {
+        // OUTSIDE the try, on purpose. Reading the image touches assembly metadata and throws
+        // InvalidOperationException when the build did not stamp it - and with that read inside
+        // a catch that swallows InvalidOperationException, a build-stamp defect reported itself
+        // as "no container runtime is reachable". Demonstrated with a runtime confirmed up:
+        // renaming the metadata key flipped this method to false, so every container-backed case
+        // skipped and the whole container half of AC4's evidence disappeared while nothing went
+        // red. A missing shared value is not a local Docker problem and must not be reported as
+        // one.
+        var image = Image;
+
         try
         {
-            _ = BuildContainer();
+            _ = new MsSqlBuilder().WithImage(image).Build();
             return true;
         }
         catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)

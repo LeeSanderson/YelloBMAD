@@ -1,4 +1,3 @@
-using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
@@ -98,21 +97,21 @@ public sealed class StartupConnectivityCheckTests
     /// this test - not a reviewer - is what says so.
     /// </remarks>
     [Fact]
-    public async Task The_check_does_not_run_outside_Development_even_when_a_database_is_reachable()
+    public async Task The_check_does_not_run_outside_Development_even_when_a_connection_string_is_present()
     {
-        Assert.SkipUnless(
-            SqlServerContainerFixture.IsContainerRuntimeAvailable(),
-            "No container runtime is reachable. This case needs a database that WOULD answer, so " +
-            "that a passing result means the guard held rather than that nothing was listening.");
-
-        await using var fixture = new SqlServerContainerFixture();
-        await fixture.InitializeAsync();
+        // No container, deliberately. RunAsync returns at the environment test BEFORE it reads
+        // configuration, so a connection string that is present but unreachable proves the guard
+        // held just as well as a working one: were the guard inverted, the check would try this
+        // value and log a connectivity failure or a timeout. Gating this case on a container
+        // runtime made the one regression AC4's coverage exists to catch invisible on any machine
+        // or CI leg without one - in a suite that is not release-gating either.
+        const string unreachable = "Server=127.0.0.1,1;Database=yello;User ID=sa;Password=Not$Used1;TrustServerCertificate=true";
 
         var logger = new CapturingLogger();
 
         await StartupConnectivityCheck.RunAsync(
             new StubEnvironment("Production"),
-            ConfigurationWithConnectionString(fixture.ConnectionString),
+            ConfigurationWithConnectionString(unreachable),
             logger,
             TestContext.Current.CancellationToken);
 
@@ -153,15 +152,9 @@ public sealed class StartupConnectivityCheckTests
         new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                [$"ConnectionStrings:{DatabaseResourceName()}"] = connectionString,
+                [$"ConnectionStrings:{HostMetadata.DatabaseResourceName}"] = connectionString,
             })
             .Build();
-
-    private static string DatabaseResourceName() =>
-        typeof(AssemblyMarker).Assembly
-            .GetCustomAttributes<AssemblyMetadataAttribute>()
-            .Single(a => a.Key.Equals("Yello.DatabaseResourceName", StringComparison.Ordinal))
-            .Value!;
 
     /// <summary>
     /// An <see cref="IHostEnvironment"/> whose only interesting property is its name.
