@@ -41,12 +41,31 @@ namespace Yello.Tests.Architecture;
 /// write next.</item>
 /// <item><c>IdentityBuilder.AddRoles&lt;TRole&gt;()</c> and <c>AddRoleManager&lt;T&gt;()</c>,
 /// which is how the role store gets wired in the first place.</item>
+/// <item><c>UserManager&lt;&gt;.AddToRoleAsync</c>, <c>IsInRoleAsync</c>, <c>GetRolesAsync</c>
+/// and their siblings. <c>UserManager&lt;&gt;</c> is a <i>permitted</i> type - it is the Account
+/// store, which is Identity wired for authentication - so its role surface reaches Identity's
+/// roles while naming nothing this ban previously matched.</item>
+/// <item><c>ClaimTypes.Role</c>, and the URI it expands to. A policy built from
+/// <c>RequireClaim(ClaimTypes.Role, "Admin")</c> is role-based authorisation that touches no
+/// banned namespace, method or type - the claim type is banned rather than
+/// <c>RequireClaim</c>/<c>HasClaim</c>/<c>FindFirst</c>, because it is the role that cannot
+/// express Yello's authorisation, not the act of reading a claim. See
+/// <see cref="ClassifyRoleClaim"/>.</item>
 /// </list>
 /// <para>
 /// <b>Known limits, stated rather than implied.</b> Reflective invocation
 /// (<c>GetMethod("IsInRole").Invoke(...)</c>) is invisible to an IL scan, as is a role check
-/// inside a third-party assembly this solution merely calls. The ban is on the shapes this
-/// codebase can write, which is what AC3 governs.
+/// inside a third-party assembly this solution merely calls. A role modelled under a name this
+/// scan cannot recognise - a bespoke <c>"role"</c> string claim of your own, say - is also out
+/// of reach, and deliberately so: at that point it is not Identity's role API, it is a design
+/// decision for review rather than a build gate. The ban is on the shapes this codebase can
+/// write against the framework, which is what AC3 governs.
+/// </para>
+/// <para>
+/// The last two bullets above were added in the second review pass, and the reason is worth
+/// keeping: the first pass widened this ban from four named shapes to the idiomatic ones, and
+/// the plants validated exactly the shapes the finding had listed. Both routes below were
+/// reachable with all four A-3 assertions green, which is the same defect one level along.
 /// </para>
 /// </remarks>
 internal static class RoleApiScan
@@ -56,6 +75,43 @@ internal static class RoleApiScan
     private const string AuthorizationNamespaceRoot = "Microsoft.AspNetCore.Authorization";
     private const string IdentityBuilderFullName = "Microsoft.AspNetCore.Identity.IdentityBuilder";
     private const string PolicyBuilderFullName = "Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder";
+    private const string ClaimTypesFullName = "System.Security.Claims.ClaimTypes";
+
+    /// <summary>
+    /// <c>UserManager&lt;TUser&gt;</c> is a permitted type - it is the Account store, which is
+    /// Identity wired for authentication - but its role surface is not. The generic arity is
+    /// part of the emitted name, so this is matched as a prefix.
+    /// </summary>
+    private const string UserManagerFullNamePrefix = "Microsoft.AspNetCore.Identity.UserManager";
+
+    /// <summary>
+    /// The value of <c>ClaimTypes.Role</c>. Banned as a literal too, so the ban cannot be
+    /// stepped around by writing out the URI the constant expands to.
+    /// </summary>
+    /// <remarks>
+    /// Assembled rather than written, because this scan reads every assembly in the solution
+    /// including its own: as a single <c>const</c> the URI is one <c>ldstr</c> in
+    /// <c>Yello.Tests.Architecture</c> and the gate reported itself as a violation the first
+    /// time it ran. The same trick, for the same reason, as
+    /// <c>TestingConventionTests.SqlServerImageLiteral</c>. Splitting it means no single literal
+    /// in IL equals the value being matched.
+    /// </remarks>
+    private static readonly string RoleClaimTypeUri = string.Concat(
+        "http://schemas.microsoft.com/ws/2008/06/identity/claims", "/", "role");
+
+    /// <summary>
+    /// <c>UserManager&lt;&gt;</c> methods that read or write Identity roles.
+    /// </summary>
+    private static readonly string[] UserManagerRoleMethods =
+    [
+        "AddToRoleAsync",
+        "AddToRolesAsync",
+        "RemoveFromRoleAsync",
+        "RemoveFromRolesAsync",
+        "GetRolesAsync",
+        "IsInRoleAsync",
+        "GetUsersInRoleAsync",
+    ];
 
     /// <summary>
     /// The principal types whose <c>IsInRole</c> is the banned one. Checking the declaring
@@ -284,6 +340,53 @@ internal static class RoleApiScan
         foreach (var instruction in method.Body.Instructions)
         {
             ClassifyCall(instruction, location, result, pendingSetters);
+            ClassifyRoleClaim(instruction, location, result);
+        }
+    }
+
+    /// <summary>
+    /// The role <i>claim</i> - the route to role-based authorisation that touches no banned
+    /// namespace, method or type.
+    /// </summary>
+    /// <remarks>
+    /// <c>RequireClaim(ClaimTypes.Role, "Admin")</c>, <c>principal.HasClaim(ClaimTypes.Role, …)</c>
+    /// and <c>FindFirst(ClaimTypes.Role)</c> are invisible to <see cref="ClassifyCall"/>:
+    /// <c>RequireClaim</c>, <c>HasClaim</c> and <c>FindFirst</c> are general-purpose methods
+    /// that cannot be banned wholesale, and <c>ClaimTypes.Role</c> is a field load - so
+    /// <c>ClassifyCall</c> returns at its <c>is not MethodReference</c> guard before seeing it.
+    /// <c>System.Security.Claims.ClaimTypes</c> is neither under a banned namespace nor named
+    /// <c>*Role*</c>, so the type scan misses it too.
+    /// <para>
+    /// Banning the claim type rather than the methods is what makes this precise: it is the
+    /// <i>role</i> that cannot express Yello's authorisation, not the act of reading a claim.
+    /// Nothing legitimate in this codebase needs it - a Role here is an attribute of a
+    /// Membership, so the same Account holds different Roles in different Spaces and a single
+    /// claim on the principal cannot say which. This is the first thing a developer told "use a
+    /// policy, not RequireRole" writes next, which is the same reasoning that put
+    /// <c>RequireRole</c> in the ban.
+    /// </para>
+    /// </remarks>
+    private static void ClassifyRoleClaim(Instruction instruction, string location, ScanResult result)
+    {
+        if (instruction.Operand is FieldReference field
+            && field.Name.Equals("Role", StringComparison.Ordinal)
+            && field.DeclaringType.FullName.Equals(ClaimTypesFullName, StringComparison.Ordinal))
+        {
+            result.AuthorizeRoles.Add($"{location} reads ClaimTypes.Role");
+        }
+        else if (instruction.Operand is string text
+            && text.Equals(RoleClaimTypeUri, StringComparison.OrdinalIgnoreCase))
+        {
+            result.AuthorizeRoles.Add(
+                $"{location} states the role claim type as a literal URI, which is " +
+                "ClaimTypes.Role spelled out");
+        }
+        else
+        {
+            // Every other field load and string literal in the solution. Only the role claim
+            // type is banned here; ClaimTypes itself and every other claim are permitted,
+            // because Identity stays wired for authentication and claims are how it carries
+            // identity. The ban is on the one claim that would express authorisation.
         }
     }
 
@@ -315,6 +418,15 @@ internal static class RoleApiScan
             && declaring.Equals(IdentityBuilderFullName, StringComparison.Ordinal))
         {
             result.RoleStoreTypes.Add($"{location} calls IdentityBuilder.{name}");
+        }
+        else if (UserManagerRoleMethods.Contains(name, StringComparer.Ordinal)
+            && declaring.StartsWith(UserManagerFullNamePrefix, StringComparison.Ordinal))
+        {
+            // UserManager<> reaches Identity's roles without naming RoleManager, IRoleStore or
+            // IdentityRole anywhere - so all four A-3 assertions passed while roles were being
+            // assigned and read through a type the ban permits, because Identity-for-
+            // authentication is exactly what UserManager<> is for.
+            result.RoleStoreTypes.Add($"{location} calls UserManager<>.{name}");
         }
         else if (name.Equals("set_Roles", StringComparison.Ordinal))
         {

@@ -66,7 +66,9 @@ public sealed class RoleApiBanTests
             RoleApiScan.AuthorizeRolesUsages,
             "Role-based authorisation is banned in every form: [Authorize(Roles = ...)] and any " +
             "subclass of it, `new AuthorizeAttribute { Roles = ... }` as an object initialiser, " +
-            "AuthorizationPolicyBuilder.RequireRole, and RolesAuthorizationRequirement. " +
+            "AuthorizationPolicyBuilder.RequireRole, RolesAuthorizationRequirement, and the role " +
+            "CLAIM - ClaimTypes.Role or the URI it expands to, however it is read " +
+            "(RequireClaim, HasClaim, FindFirst). " +
             "Authorisation is a function of (Account, Space) through a Membership, so a role " +
             "carried on the principal cannot express it - the same Account holds different Roles " +
             "in different Spaces. Authorise against the resolved Space instead. [Authorize] with " +
@@ -110,8 +112,10 @@ public sealed class RoleApiBanTests
         AssertNoUsages(
             RoleApiScan.RoleStoreReferences,
             "Identity's role store is banned in every form - RoleManager<>, IRoleStore<>, " +
-            "IRoleClaimStore<>, IRoleValidator<>, RoleStore<>, and the IdentityBuilder calls that " +
-            "wire them (AddRoles<TRole>(), AddRoleManager<T>()). Identity is wired for " +
+            "IRoleClaimStore<>, IRoleValidator<>, RoleStore<>, the IdentityBuilder calls that " +
+            "wire them (AddRoles<TRole>(), AddRoleManager<T>()), and UserManager<>'s role " +
+            "surface (AddToRoleAsync, IsInRoleAsync, GetRolesAsync and siblings) - which reaches " +
+            "the same roles through a type that is otherwise permitted. Identity is wired for " +
             "authentication ONLY: the Account store, password hashing and cookie issuance. Adding " +
             "the role store would introduce a second, competing model of who may do what.");
     }

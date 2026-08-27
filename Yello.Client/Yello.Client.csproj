@@ -5,10 +5,16 @@
   </PropertyGroup>
 
   <!--
-    Framework packages, not AR-1 stack choices: these ship with the Blazor WebAssembly
-    SDK and track the runtime patch (10.0.11), so they are pinned centrally alongside it
-    rather than listed in the AR-1 table. No Version attribute here - central package
-    management forbids it.
+    AR-1 stack choices, pinned centrally at 10.0.11. No Version attribute here - central
+    package management forbids it.
+
+    Corrected 2026-08-27: this comment previously read "Framework packages, not AR-1 stack
+    choices ... rather than listed in the AR-1 table". That classification was a misreading of
+    the source and was retracted in Directory.Packages.props and PackageVersionPinTests, which
+    moved both packages into the asserted AR-1 pin set - epics.md lists "ASP.NET Core / Blazor
+    WASM 10" under Pinned versions and the architecture spine gives it its own stack-table row.
+    This file was the third of the three places and the only one left arguing the reversed
+    reading. The chosen value was always right; the classification was not.
   -->
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />

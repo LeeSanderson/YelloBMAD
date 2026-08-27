@@ -75,21 +75,59 @@ static string BuildConstant(string key)
 
 // Aspire wants the three parts separately, and the one place the image is stated states it as
 // one reference. Splitting here keeps the shared value in the form a human reads and writes.
+//
+// Two forms are rejected rather than parsed, because in both cases the naive arithmetic produced
+// a plausible wrong answer instead of an error - which is the one outcome stating the value in a
+// single place was meant to make impossible:
+//
+//   * A DIGEST reference. `<registry>/mssql/server@sha256:<hex>` has its last colon inside the
+//     digest, so the split yielded image "mssql/server@sha256" and tag "<hex>" with no throw.
+//     The fixture hands the whole reference to Testcontainers, which parses digests correctly -
+//     so the AppHost and the suites would have pulled different images, silently, from one
+//     shared value. Pinning a digest is an open question for stories 1.5 / 2.6; when it is
+//     settled, this file and SqlServerContainerFixture must be changed together, and this
+//     failure is what says so.
+//   * A reference with NO registry host. `library/postgres:17` split cleanly and used "library"
+//     as the registry.
 static (string Registry, string Image, string Tag) SplitImageReference(string reference)
 {
-    var lastColon = reference.LastIndexOf(':');
     var firstSlash = reference.IndexOf('/', StringComparison.Ordinal);
 
-    if (lastColon <= firstSlash || firstSlash < 0)
+    if (firstSlash <= 0)
     {
-        throw new InvalidOperationException(
-            $"'{reference}' is not a registry/image:tag reference. Directory.Build.props states " +
-            "it as one string so that the fixture and this file cannot disagree; it has to be " +
-            "splittable into the three parts Aspire asks for.");
+        throw InvalidImageReference(reference, "it names no registry");
     }
 
-    return (
-        reference[..firstSlash],
-        reference[(firstSlash + 1)..lastColon],
-        reference[(lastColon + 1)..]);
+    var registry = reference[..firstSlash];
+
+    // A registry is a host: it carries a dot, or a port, or is literally localhost.
+    if (!registry.Contains('.', StringComparison.Ordinal)
+        && !registry.Contains(':', StringComparison.Ordinal)
+        && !registry.Equals("localhost", StringComparison.Ordinal))
+    {
+        throw InvalidImageReference(reference, $"'{registry}' is not a registry host");
+    }
+
+    var remainder = reference[(firstSlash + 1)..];
+
+    if (remainder.Contains('@', StringComparison.Ordinal))
+    {
+        throw InvalidImageReference(reference,
+            "it pins a digest, which Aspire takes separately from a tag. Update this file and " +
+            "tests/Yello.Tests.Shared/SqlServerContainerFixture.cs together, deliberately");
+    }
+
+    var lastColon = remainder.LastIndexOf(':');
+
+    if (lastColon < 0)
+    {
+        throw InvalidImageReference(reference, "it names no tag");
+    }
+
+    return (registry, remainder[..lastColon], remainder[(lastColon + 1)..]);
 }
+
+static InvalidOperationException InvalidImageReference(string reference, string why) =>
+    new($"'{reference}' cannot be used as a registry/image:tag reference: {why}. " +
+        "Directory.Build.props states the image as one string so that the fixture and this file " +
+        "cannot disagree about which engine runs.");

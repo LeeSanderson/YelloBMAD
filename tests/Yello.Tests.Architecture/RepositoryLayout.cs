@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Xml.Linq;
 
 namespace Yello.Tests.Architecture;
@@ -168,6 +169,137 @@ internal static class RepositoryLayout
             .SelectMany(v => v!.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
     /// <summary>
+    /// Parses a JSON build file, turning a malformed or unreadable one into a failure that
+    /// names the file. The same contract as <see cref="LoadXml"/>, for the same reason.
+    /// </summary>
+    /// <remarks>
+    /// Unguarded, <c>JsonDocument.Parse</c> throws a <c>JsonException</c> naming a line and a
+    /// column but neither the file nor the remedy - which makes the carefully-worded failure
+    /// message of whichever assertion called it unreachable for every malformation. A gate that
+    /// cannot read its input has to say which input.
+    /// </remarks>
+    public static JsonDocument LoadJson(FileInfo file)
+    {
+        try
+        {
+            return JsonDocument.Parse(File.ReadAllText(file.FullName));
+        }
+        catch (Exception exception) when (exception is JsonException or IOException or UnauthorizedAccessException)
+        {
+            throw new InvalidOperationException(
+                $"Could not parse '{RelativePath(file)}' as JSON: {exception.Message}. Gate A " +
+                "reads the repository's build files from disk, so an unreadable one is a gate " +
+                "that cannot answer rather than a gate that passes.",
+                exception);
+        }
+    }
+
+    /// <summary>
+    /// A JSON property's value as text, whether it was written as a string or as a bare literal.
+    /// </summary>
+    /// <remarks>
+    /// <c>"version": 13.4</c> is legal JSON and throws <c>InvalidOperationException</c> from
+    /// <c>GetString()</c> - an exception that reads like a bug in the gate rather than a
+    /// malformed pin.
+    /// </remarks>
+    public static string? JsonValueText(JsonElement element) =>
+        element.ValueKind switch
+        {
+            JsonValueKind.String => element.GetString(),
+            JsonValueKind.Null or JsonValueKind.Undefined => null,
+            _ => element.GetRawText(),
+        };
+
+    /// <summary>
+    /// True when neither the element nor any ancestor carries a <c>Condition</c>.
+    /// </summary>
+    /// <remarks>
+    /// No gate here evaluates MSBuild conditions, so a conditional declaration is neither
+    /// safely "declared" nor safely "absent": treating it as declared lets a condition that
+    /// never fires satisfy a pin, and treating it as absent lets a condition that does fire
+    /// override one unseen. Gates therefore read <i>unconditional</i> declarations to learn
+    /// what the build takes, and report conditional ones separately as their own problem.
+    /// Lives here rather than in one test class because both Gate A files need the same rule -
+    /// having it in only one of them is how the pin gate came to accept a conditional switch.
+    /// </remarks>
+    public static bool IsUnconditional(XElement element)
+    {
+        for (var current = element; current is not null; current = current.Parent)
+        {
+            if (current.Attribute("Condition") is not null)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// <c>Include</c> values of the given item types that MSBuild expands and this class
+    /// cannot, because they contain a property reference.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Every ban in Gate A compares the literal attribute text, so
+    /// <c>&lt;PackageReference Include="$(Orm)" /&gt;</c> restores
+    /// <c>Microsoft.EntityFrameworkCore</c> while the gate matches the string <c>$(Orm)</c>
+    /// against the banned list and finds nothing. The same indirection defeats the VSTest ban,
+    /// the row-level-security provider ban, the per-ring package ban, and the cross-ring
+    /// <c>Compile</c> check - where <c>Path.Combine</c> treats <c>$(Shared)</c> as an ordinary
+    /// directory name and so never climbs out of the project directory.
+    /// </para>
+    /// <para>
+    /// Reported, not expanded. Expanding means evaluating each project through MSBuild, which
+    /// is a materially larger gate than this file is; refusing to gate what cannot be read
+    /// keeps the guarantee honest, and nothing in this repository needs the indirection today.
+    /// If a later story has a real use for it, that is the point to build the evaluating gate -
+    /// not the point to widen the blind spot.
+    /// </para>
+    /// </remarks>
+    public static IEnumerable<string> UnresolvableIncludes(FileInfo file, params string[] itemNames) =>
+        from itemName in itemNames
+        from include in ItemIncludes(file, itemName)
+        where include.Contains("$(", StringComparison.Ordinal)
+        select $"<{itemName} Include=\"{include}\" />";
+
+    /// <summary>
+    /// The absolute path each <c>&lt;ProjectReference&gt;</c> resolves to, with the
+    /// <c>Include</c> it came from.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="DeclaredProjectReferences"/> reduces an <c>Include</c> to its file name, so
+    /// <c>..\..\vendored\Yello.Domain\Yello.Domain.csproj</c> reads as the permitted
+    /// <c>Yello.Domain</c> edge. That reduction is right for comparing an edge against the
+    /// table, which is keyed by name, and wrong for deciding whether the edge points at a
+    /// project in this repository at all.
+    /// </remarks>
+    public static IEnumerable<(string Include, string ResolvedPath)> ResolvedProjectReferences(FileInfo project) =>
+        project.Directory is null
+            ? []
+            : ItemIncludes(project, "ProjectReference")
+                .Select(v => (v, Path.GetFullPath(Path.Combine(project.Directory.FullName, v.Replace('\\', '/')))));
+
+    /// <summary>
+    /// The <c>Project</c> attribute of every explicit <c>&lt;Import&gt;</c> in a build file.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="MsBuildImportFiles"/> covers the files MSBuild imports by directory
+    /// position, and a gate asserts there is exactly one of each. An explicit
+    /// <c>&lt;Import&gt;</c> is the ordinary way to share MSBuild logic and is subject to
+    /// neither: it can carry a reference, a <c>GlobalPackageReference</c> or a framework
+    /// property into a project from a file no gate reads, which makes every "declared fact"
+    /// this class returns something less than the facts the build actually uses.
+    /// </remarks>
+    public static IEnumerable<string> DeclaredImports(FileInfo file) =>
+        LoadXml(file)
+            .Descendants()
+            .Where(e => e.Name.LocalName.Equals("Import", StringComparison.Ordinal))
+            .Select(e => e.Attribute("Project")?.Value)
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .Select(v => v!);
+
+    /// <summary>
     /// The absolute path of every project the <c>.slnx</c> declares.
     /// </summary>
     /// <remarks>
@@ -220,7 +352,16 @@ internal static class RepositoryLayout
                 .Where(f => !IsExcluded(f))
                 .OrderBy(f => f.FullName, StringComparer.Ordinal)];
 
-    private static IEnumerable<FileInfo> EnumerateSourceFiles(string pattern) =>
+    /// <summary>
+    /// Every file in the source tree matching a pattern, with build output and the non-source
+    /// trees in <see cref="ExcludedDirectories"/> left out.
+    /// </summary>
+    /// <remarks>
+    /// Public because a gate doing its own <c>EnumerateFiles</c> re-introduces the hazard the
+    /// exclusion list exists to prevent: a vendored file arriving under <c>.claude</c> with a
+    /// skill update fails a build nobody had changed. Route every tree walk through here.
+    /// </remarks>
+    public static IEnumerable<FileInfo> EnumerateSourceFiles(string pattern) =>
         Root.EnumerateFiles(pattern, SearchOption.AllDirectories).Where(f => !IsExcluded(f));
 
     private static bool IsExcluded(FileInfo file)

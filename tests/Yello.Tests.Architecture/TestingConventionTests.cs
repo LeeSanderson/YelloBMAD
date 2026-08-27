@@ -17,17 +17,48 @@ namespace Yello.Tests.Architecture;
 public sealed partial class TestingConventionTests
 {
     private const string IgnoreZeroTestExitCode = "--ignore-exit-code 8";
+    private const string IgnoreExitCodeFlag = "--ignore-exit-code";
+    private const string ZeroTestExitCode = "8";
 
     /// <summary>
     /// The image reference this gate hunts for, assembled at runtime.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Written in two pieces so that the gate does not match its own source. The alternative -
     /// excluding this file from the scan - would carve out the one file most likely to acquire
     /// a copy of the value while nobody was looking. Better that the gate reads everything,
     /// including itself.
+    /// </para>
+    /// <para>
+    /// The scan deliberately covers comments and XML docs as well as code, so writing the
+    /// registry-qualified reference in prose fails the build. That was considered as a defect
+    /// and kept as a rule: stripping comments first means respecting string literals, and
+    /// getting that wrong hides a real second source of truth rather than merely annoying
+    /// someone. Name the MSBuild property in prose - the existing comments in the fixture and
+    /// the AppHost do exactly that, which is why they pass.
+    /// </para>
     /// </remarks>
     private static readonly string SqlServerImageLiteral = string.Concat("mcr.microsoft", ".com/mssql/server");
+
+    /// <summary>
+    /// The image AC4 names, assembled for the same reason as
+    /// <see cref="SqlServerImageLiteral"/>.
+    /// </summary>
+    /// <remarks>
+    /// AC4 requires a container on the registry-qualified <c>2025-latest</c> reference this
+    /// field assembles, and after the shared value was centralised nothing asserted it: the
+    /// gate below checked that the property and the assembly metadata <i>existed</i>, never
+    /// what they said. (The reference is not written out here for the same reason it is
+    /// assembled - this file is scanned too.) So the tag
+    /// could be changed to any other image with all assertions green - the centralisation
+    /// removed the two duplicate literals and, with them, the only thing capable of comparing
+    /// them. The one remaining backstop was <c>Assert.StartsWith("17.", …)</c> in
+    /// <c>Yello.Tests.Slices</c>, which is not release-gating and skips without a container
+    /// runtime.
+    /// </remarks>
+    private static readonly string ExpectedSqlServerImage =
+        string.Concat("mcr.microsoft", ".com/mssql/server", ":2025-latest");
 
     /// <summary>
     /// The switch that makes an empty suite pass, and the tests that make it a lie.
@@ -115,18 +146,70 @@ public sealed partial class TestingConventionTests
                      ("YelloDatabaseResourceName", "Yello.DatabaseResourceName"),
                  })
         {
-            if (!props.Descendants().Any(e => e.Name.LocalName.Equals(property, StringComparison.Ordinal)))
+            var declarations = props.Descendants()
+                .Where(e => e.Name.LocalName.Equals(property, StringComparison.Ordinal))
+                .ToList();
+
+            // Unconditional, because a Condition-guarded declaration leaves this gate green
+            // while nothing is stamped - and the consumers then fail at startup rather than the
+            // build failing here. Verified: `-getItem:AssemblyMetadata` returns empty for a
+            // guarded declaration.
+            if (!declarations.Exists(RepositoryLayout.IsUnconditional))
             {
-                problems.Add($"Directory.Build.props declares no <{property}>.");
+                problems.Add(declarations.Count == 0
+                    ? $"Directory.Build.props declares no <{property}>."
+                    : $"Directory.Build.props declares <{property}> only inside a Condition, so " +
+                      "whether any consumer receives a value depends on a condition no gate here " +
+                      "evaluates.");
             }
 
-            if (!RepositoryLayout.ItemIncludes(RepositoryLayout.DirectoryBuildProps, "AssemblyMetadata")
-                    .Contains(key, StringComparer.Ordinal))
+            var metadata = props.Descendants()
+                .Where(e => e.Name.LocalName.Equals("AssemblyMetadata", StringComparison.Ordinal))
+                .Where(e => string.Equals(e.Attribute("Include")?.Value.Trim(), key, StringComparison.Ordinal))
+                .ToList();
+
+            if (metadata.Count == 0)
             {
                 problems.Add(
                     $"Directory.Build.props emits no AssemblyMetadata '{key}', so nothing can " +
                     "read the value at runtime.");
             }
+            else if (!metadata.Exists(RepositoryLayout.IsUnconditional))
+            {
+                problems.Add(
+                    $"AssemblyMetadata '{key}' is emitted only inside a Condition, so whether it " +
+                    "reaches an assembly depends on a condition no gate here evaluates.");
+            }
+            else if (!metadata.Exists(e => string.Equals(
+                         e.Attribute("Value")?.Value.Trim(), $"$({property})", StringComparison.Ordinal)))
+            {
+                // Include without Value is the failure that matters: the metadata exists, the
+                // gate was satisfied, and the value stamped is empty.
+                problems.Add(
+                    $"AssemblyMetadata '{key}' does not carry Value=\"$({property})\", so what is " +
+                    $"stamped into every assembly is not what <{property}> says.");
+            }
+            else
+            {
+                // Declared unconditionally, stamped unconditionally, and stamped from the
+                // property rather than from a second copy of the value.
+            }
+        }
+
+        // AC4 names the image, so the value is asserted and not merely its presence.
+        var image = props.Descendants()
+            .Where(e => e.Name.LocalName.Equals("YelloSqlServerImage", StringComparison.Ordinal))
+            .Where(RepositoryLayout.IsUnconditional)
+            .Select(e => e.Value.Trim())
+            .LastOrDefault();
+
+        if (image is not null && !image.Equals(ExpectedSqlServerImage, StringComparison.Ordinal))
+        {
+            problems.Add(
+                $"<YelloSqlServerImage> is '{image}'. AC4 names " +
+                $"'{ExpectedSqlServerImage}' - the engine AD-15's Latin1_General_100_BIN2 " +
+                "collation and the row-level security NFR-1 rests on were verified against. " +
+                "Changing the engine is an architecture edit, not a developer decision.");
         }
 
         problems.AddRange(HardCodedSharedValues());
@@ -184,6 +267,20 @@ public sealed partial class TestingConventionTests
             .SelectMany(RepositoryLayout.SourceFilesOf)
             .Distinct();
 
+        // The resource name's value, quoted, built at runtime rather than written: this file is
+        // itself scanned, so a literal here would report itself. Same reason as
+        // SqlServerImageLiteral.
+        var resourceName = RepositoryLayout.LoadXml(RepositoryLayout.DirectoryBuildProps)
+            .Descendants()
+            .Where(e => e.Name.LocalName.Equals("YelloDatabaseResourceName", StringComparison.Ordinal))
+            .Where(RepositoryLayout.IsUnconditional)
+            .Select(e => e.Value.Trim())
+            .LastOrDefault();
+
+        var quotedResourceName = string.IsNullOrEmpty(resourceName)
+            ? null
+            : string.Concat("\"", resourceName, "\"");
+
         foreach (var file in sourceFiles)
         {
             var text = File.ReadAllText(file.FullName);
@@ -200,20 +297,90 @@ public sealed partial class TestingConventionTests
                     $"{path} passes a literal to {match.Groups[1].Value}(), which duplicates the " +
                     "Aspire resource name.";
             }
+
+            // The pattern above requires a quote immediately after the parenthesis, so an
+            // interpolated argument, a const passed by name, and the name held in a local all
+            // slipped past it - each reinstating the second source of truth this gate exists to
+            // prevent. Matching the VALUE closes all three at once, wherever it is written.
+            // (The value is not spelled out anywhere in this file, because this file is scanned.)
+            if (quotedResourceName is not null
+                && text.Contains(quotedResourceName, StringComparison.Ordinal))
+            {
+                yield return
+                    $"{path} states the Aspire database resource name as a literal. Read it from " +
+                    "assembly metadata instead - it is stated once in Directory.Build.props.";
+            }
         }
     }
 
-    private static bool IsTestProject(FileInfo project) =>
-        RepositoryLayout.LoadXml(project)
-            .Descendants()
+    /// <summary>
+    /// Whether a project is one of the suites the zero-test policy governs.
+    /// </summary>
+    /// <remarks>
+    /// The declared property is authoritative when present, and all five suites declare it. The
+    /// fallback matters for the suite that does not: reading only the literal element meant a
+    /// future suite letting the xunit props infer <c>IsTestProject</c> would drop out of this
+    /// gate entirely, taking its <c>--ignore-exit-code</c> switch with it - which is the one
+    /// outcome this gate exists to prevent. Under <c>tests/</c> with <c>OutputType=Exe</c> is
+    /// what a Microsoft.Testing.Platform suite looks like regardless of who set the property.
+    /// <c>Yello.Tests.Shared</c> is deliberately neither, being a fixture library rather than a
+    /// suite, so it stays out on both tests.
+    /// </remarks>
+    private static bool IsTestProject(FileInfo project)
+    {
+        var document = RepositoryLayout.LoadXml(project);
+
+        var declared = document.Descendants()
             .Any(e => e.Name.LocalName.Equals("IsTestProject", StringComparison.Ordinal)
                 && e.Value.Trim().Equals("true", StringComparison.OrdinalIgnoreCase));
+
+        if (declared)
+        {
+            return true;
+        }
+
+        return RepositoryLayout.IsUnderTestsDirectory(project)
+            && document.Descendants()
+                .Any(e => e.Name.LocalName.Equals("OutputType", StringComparison.Ordinal)
+                    && e.Value.Trim().Equals("Exe", StringComparison.OrdinalIgnoreCase));
+    }
 
     private static bool IgnoresZeroTestExitCode(FileInfo project) =>
         RepositoryLayout.LoadXml(project)
             .Descendants()
             .Where(e => e.Name.LocalName.Equals("TestingPlatformCommandLineArguments", StringComparison.Ordinal))
-            .Any(e => e.Value.Contains(IgnoreZeroTestExitCode, StringComparison.Ordinal));
+            .Any(e => IgnoredExitCodes(e.Value).Contains(ZeroTestExitCode, StringComparer.Ordinal));
+
+    /// <summary>
+    /// The exit codes an argument string tells Microsoft.Testing.Platform to ignore.
+    /// </summary>
+    /// <remarks>
+    /// Substring-matching the whole <c>--ignore-exit-code 8</c> phrase was wrong in both
+    /// directions. The multi-code form <c>--ignore-exit-code 2;8</c> does carry 8 and did not
+    /// match, so a populated release-gating suite would go on swallowing zero-test runs with
+    /// this gate reporting green; and <c>--ignore-exit-code 80</c> does not carry 8 but did
+    /// match, so a suite would be told to remove a switch it never had.
+    /// </remarks>
+    private static IEnumerable<string> IgnoredExitCodes(string arguments)
+    {
+        var tokens = arguments.Split(
+            [' ', '\t', '\r', '\n'],
+            StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+        for (var i = 0; i < tokens.Length - 1; i++)
+        {
+            if (!tokens[i].Equals(IgnoreExitCodeFlag, StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            foreach (var code in tokens[i + 1].Split(
+                         ';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                yield return code;
+            }
+        }
+    }
 
     private static bool ContainsTestMethods(FileInfo project) =>
         RepositoryLayout.SourceFilesOf(project)
@@ -221,7 +388,15 @@ public sealed partial class TestingConventionTests
 
     // An opening bracket immediately before the attribute name, so the words appearing in prose
     // or in a failure message do not register as a test.
-    [GeneratedRegex(@"\[\s*(Xunit\.)?(Fact|Theory)\s*[\](]", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
+    //
+    // The trailing class accepts a COMMA, and the optional Attribute suffix is not decoration.
+    // Without them this pattern missed [Theory, InlineData(1)], [Theory, MemberData(...)],
+    // [Fact, Trait("a","b")] and the fully-suffixed [FactAttribute] - so a populated suite read
+    // as empty and kept --ignore-exit-code 8. Story 1.9 writes SM-1's isolation cases as "the
+    // same case on both surfaces", which is [Theory, InlineData] shaped, into a release-gating
+    // suite. The story's own plant used a solo [Fact], which is why the hole survived a pass
+    // that believed it had closed exactly this.
+    [GeneratedRegex(@"\[\s*(Xunit\.)?(Fact|Theory)(Attribute)?\s*[\](,]", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
     private static partial Regex TestAttributePattern { get; }
 
     [GeneratedRegex(@"Trait\s*\(\s*""Assumption""\s*,\s*""([^""]*)""", RegexOptions.None, matchTimeoutMilliseconds: 5000)]

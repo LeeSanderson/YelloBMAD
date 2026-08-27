@@ -1,4 +1,3 @@
-using System.Xml.Linq;
 using Xunit;
 
 namespace Yello.Tests.Architecture;
@@ -28,7 +27,31 @@ public sealed class ProjectFileGateTests
     /// <summary>
     /// Reference item types that must never appear in a file every project imports.
     /// </summary>
-    private static readonly string[] ReferenceItemTypes = ["ProjectReference", "PackageReference"];
+    /// <remarks>
+    /// <c>GlobalPackageReference</c> belongs here, and its omission was a live bypass:
+    /// declared in <c>Directory.Build.props</c> it reaches every project in the solution, and
+    /// it was read by neither this gate nor
+    /// <c>PackageVersionPinTests.The_only_solution_wide_package_is_the_coding_standard</c>,
+    /// which scoped itself to <c>Directory.Packages.props</c>. Demonstrated during review:
+    /// <c>Microsoft.NET.Test.Sdk</c> placed that way applies its build assets to every project
+    /// (<c>IsTestProject</c> and <c>GenerateProgramFile</c> both evaluate true in a project
+    /// declaring neither), and the in-memory provider placed that way restores. The story's own
+    /// plant used <c>Directory.Packages.props</c> - the one file that <i>was</i> read - which is
+    /// why the route survived a pass that believed it had closed it.
+    /// <para>
+    /// <c>Directory.Packages.props</c> is exempted for <c>GlobalPackageReference</c> only: it
+    /// is that item's sanctioned home, and the set declared there is asserted exactly.
+    /// </para>
+    /// </remarks>
+    private static readonly string[] ReferenceItemTypes =
+        ["ProjectReference", "PackageReference", "GlobalPackageReference"];
+
+    /// <summary>
+    /// Item types whose <c>Include</c> a gate in this repository reads literally, and which
+    /// must therefore not hide behind an MSBuild property.
+    /// </summary>
+    private static readonly string[] GatedItemTypes =
+        ["ProjectReference", "PackageReference", "GlobalPackageReference", "Compile"];
 
     /// <summary>
     /// The two file shapes that claim to describe the solution's project inventory.
@@ -165,6 +188,15 @@ public sealed class ProjectFileGateTests
             problems.AddRange(FrameworkRedeclarations(file));
         }
 
+        // The root Directory.Build.props is excluded from the sweep above because it is the
+        // pin's legitimate home - but that exclusion also covered its CONDITIONAL
+        // declarations, which was a live bypass: AssertPinnedOnce counts only unconditional
+        // ones, so a Condition-guarded <TargetFramework>net9.0</TargetFramework> in this file
+        // was invisible to both halves. Verified during review with
+        // `dotnet msbuild -getProperty:TargetFramework`, which returned net9.0 while the gate
+        // reported one unconditional net10.0.
+        problems.AddRange(ConditionalFrameworkDeclarations(RepositoryLayout.DirectoryBuildProps));
+
         Assert.True(problems.Count == 0,
             "The framework pin is not a single unconditional fact about the whole solution." +
             $"{Environment.NewLine}{Environment.NewLine}" +
@@ -182,8 +214,10 @@ public sealed class ProjectFileGateTests
         {
             problems.Add(
                 $"Directory.Build.props declares no unconditional <{property}>. (A value inside " +
-                "an XML comment or a Condition-guarded PropertyGroup does not count - it does " +
-                "not reach the build.)");
+                "an XML comment does not count, because it does not reach the build. A " +
+                "Condition-guarded value is not counted here either - but it is NOT harmless, " +
+                "because a condition that evaluates true does reach the build and wins, so it " +
+                "is reported separately by this same assertion.)");
         }
         else if (declarations.Count > 1)
         {
@@ -208,6 +242,22 @@ public sealed class ProjectFileGateTests
             .Any(e => e.Name.LocalName.Equals(property, StringComparison.Ordinal))
         select $"{RepositoryLayout.RelativePath(file)} restates <{property}>, which " +
                "Directory.Build.props owns for the whole solution.";
+
+    /// <summary>
+    /// Framework properties declared inside a <c>Condition</c> in the one file permitted to
+    /// state them. A condition that evaluates true reaches the build and overrides the
+    /// unconditional value, so "declared exactly once, unconditionally" is only a pin if
+    /// nothing conditional sits alongside it.
+    /// </summary>
+    private static IEnumerable<string> ConditionalFrameworkDeclarations(FileInfo file) =>
+        from property in FrameworkProperties
+        from element in RepositoryLayout.LoadXml(file).Descendants()
+            .Where(e => e.Name.LocalName.Equals(property, StringComparison.Ordinal))
+        where !RepositoryLayout.IsUnconditional(element)
+        select $"{RepositoryLayout.RelativePath(file)} declares <{property}> inside a " +
+               $"Condition, set to '{element.Value.Trim()}'. If that condition evaluates true " +
+               "the build takes this value, not the unconditional one - so the file states two " +
+               "framework pins and the gate would only see the other.";
 
     /// <summary>
     /// MSBuild imports the <i>nearest</i> <c>Directory.Build.props</c> and stops, so a second
@@ -263,8 +313,14 @@ public sealed class ProjectFileGateTests
         // reference went undetected until that was fixed.
         foreach (var file in RepositoryLayout.MsBuildImportFiles)
         {
+            // Directory.Packages.props is GlobalPackageReference's sanctioned home; every
+            // other import file, and every other item type, is a violation.
+            var isPackagesProps = file.FullName.Equals(
+                RepositoryLayout.DirectoryPackagesProps.FullName, StringComparison.OrdinalIgnoreCase);
+
             problems.AddRange(
                 from item in ReferenceItemTypes
+                where !(isPackagesProps && item.Equals("GlobalPackageReference", StringComparison.Ordinal))
                 let includes = RepositoryLayout.ItemIncludes(file, item).ToList()
                 where includes.Count > 0
                 select $"{RepositoryLayout.RelativePath(file)} declares <{item}> for: " +
@@ -277,9 +333,11 @@ public sealed class ProjectFileGateTests
             $"files, sees nothing:{Environment.NewLine}" +
             string.Join(Environment.NewLine, problems.Select(p => $"  - {p}")) +
             $"{Environment.NewLine}{Environment.NewLine}" +
-            "References belong in the project that needs them. (GlobalPackageReference in " +
-            "Directory.Packages.props is the one sanctioned solution-wide form, and " +
-            "PackageVersionPinTests asserts that set exactly.)");
+            "References belong in the project that needs them. GlobalPackageReference is " +
+            "included here and is checked in EVERY import file except Directory.Packages.props, " +
+            "which is its one sanctioned home and whose set PackageVersionPinTests asserts " +
+            "exactly. Scoping that check to the sanctioned file alone is what previously left " +
+            "Directory.Build.props and Directory.Build.targets open.");
     }
 
     /// <summary>
@@ -315,7 +373,14 @@ public sealed class ProjectFileGateTests
             yield break;
         }
 
-        var projectDirectory = Path.GetFullPath(project.Directory.FullName);
+        // The trailing separator is load-bearing. Path.GetFullPath returns no trailing
+        // separator, so a bare prefix comparison treats a SIBLING directory whose name extends
+        // this one as being inside it: '..\Yello.Domain.Extras\Thing.cs' StartsWith
+        // '...\Yello.Domain' is true. Verified during review. Yello.Application.Slices and
+        // Yello.Host.Endpoints are the same shape, and each would move source across a ring
+        // with no reference for Gate A and no cross-assembly dependency for Gate B.
+        var projectDirectory = Path.GetFullPath(project.Directory.FullName)
+            .TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
 
         foreach (var include in RepositoryLayout.ItemIncludes(project, "Compile"))
         {
@@ -330,6 +395,127 @@ public sealed class ProjectFileGateTests
                     "resolves outside its own directory.";
             }
         }
+    }
+
+    /// <summary>
+    /// Every ban in this suite compares the literal <c>Include</c> text, so an item hidden
+    /// behind an MSBuild property is a ban that silently does not apply.
+    /// </summary>
+    /// <remarks>
+    /// Demonstrated during review: <c>&lt;Orm&gt;Microsoft.EntityFrameworkCore&lt;/Orm&gt;</c>
+    /// with <c>&lt;PackageReference Include="$(Orm)" /&gt;</c> restores EF Core while every
+    /// gate here sees the string <c>$(Orm)</c>. That defeats the per-ring package ban, the
+    /// VSTest ban and the row-level-security provider ban at once, and puts EF Core into
+    /// <c>Yello.Application</c> declared-but-unused - the exact asymmetry Gate B cannot see and
+    /// the reason the package ban exists. For <c>Compile</c> it is worse than a miss:
+    /// <c>Path.Combine</c> treats <c>$(Shared)</c> as an ordinary directory name, so the path
+    /// resolves <i>inside</i> the project and the escape check affirmatively passes.
+    /// <para>
+    /// The ring <b>edge</b> gate is unaffected either way - an unexpanded <c>$(X)</c> presents
+    /// as an unauthorised edge, so it errs strict. This assertion covers the ones that err
+    /// permissive.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "AR-1")]
+    public void No_gated_item_hides_behind_an_MSBuild_property()
+    {
+        var problems = new List<string>();
+
+        foreach (var file in RepositoryLayout.AllProjectFiles.Concat(RepositoryLayout.MsBuildImportFiles))
+        {
+            problems.AddRange(RepositoryLayout.UnresolvableIncludes(file, GatedItemTypes)
+                .Select(i => $"{RepositoryLayout.RelativePath(file)} declares {i}"));
+        }
+
+        Assert.True(problems.Count == 0, BuildFailureMessage(
+            "An item this suite gates is declared through an MSBuild property, so the gate " +
+            "compares the unexpanded text and the ban does not apply to what actually restores " +
+            "or compiles.",
+            problems));
+    }
+
+    /// <summary>
+    /// Two further routes across a ring boundary that no gate here reads: a raw assembly
+    /// reference, and an explicit <c>&lt;Import&gt;</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>&lt;Reference Include="Yello.Domain" HintPath="..\Yello.Domain\bin\...\Yello.Domain.dll" /&gt;</c>
+    /// crosses a ring with no <c>ProjectReference</c> for Gate A to read, and if the types are
+    /// never touched, no <c>AssemblyRef</c> for Gate B either - the same declared-but-unused
+    /// asymmetry this story closed for project references and left open here. Framework and SDK
+    /// assemblies arrive implicitly on this stack, so a raw <c>&lt;Reference&gt;</c> has no
+    /// legitimate use in this repository and is banned outright rather than validated.
+    /// </para>
+    /// <para>
+    /// <c>&lt;Import&gt;</c> is subject to neither
+    /// <see cref="Exactly_one_of_each_MSBuild_import_file_governs_the_solution"/> nor
+    /// <see cref="No_MSBuild_import_file_declares_a_project_or_package_reference"/>, both of
+    /// which reason about the files MSBuild imports by directory position. It can carry a
+    /// reference, a <c>GlobalPackageReference</c> or a framework property in from a file
+    /// nothing reads, which would make every "declared fact" this suite asserts less than the
+    /// facts the build uses.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void No_project_declares_a_raw_assembly_reference_or_an_explicit_import()
+    {
+        var problems = new List<string>();
+
+        foreach (var file in RepositoryLayout.AllProjectFiles.Concat(RepositoryLayout.MsBuildImportFiles))
+        {
+            var path = RepositoryLayout.RelativePath(file);
+
+            problems.AddRange(RepositoryLayout.ItemIncludes(file, "Reference")
+                .Select(r => $"{path} declares a raw <Reference> to '{r}'. Use a " +
+                             "ProjectReference, which the ring gate reads, or a PackageReference."));
+
+            problems.AddRange(RepositoryLayout.DeclaredImports(file)
+                .Select(i => $"{path} explicitly imports '{i}', which no gate in this suite " +
+                             "reads. Anything that file declares is invisible to Gate A."));
+        }
+
+        Assert.True(problems.Count == 0, BuildFailureMessage(
+            "A build file reaches outside what this suite can read.",
+            problems));
+    }
+
+    /// <summary>
+    /// A <c>ProjectReference</c> has to point at a project in this repository, because the
+    /// edge table is keyed by project <i>name</i> and a name is not a location.
+    /// </summary>
+    /// <remarks>
+    /// <c>RepositoryLayout.DeclaredProjectReferences</c> reduces an <c>Include</c> to its file
+    /// name, which is right for comparing an edge against the table and wrong for establishing
+    /// that the edge points anywhere in particular:
+    /// <c>..\..\vendored\Yello.Domain\Yello.Domain.csproj</c>, or a path under any of the
+    /// excluded non-source trees, satisfies the permitted <c>Yello.Domain</c> edge while
+    /// compiling against something nothing in this suite has examined.
+    /// </remarks>
+    [Fact]
+    public void Every_declared_project_reference_resolves_to_a_project_in_this_repository()
+    {
+        var known = RepositoryLayout.AllProjectFiles
+            .Select(p => p.FullName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var problems = new List<string>();
+
+        foreach (var project in RepositoryLayout.AllProjectFiles)
+        {
+            problems.AddRange(
+                from reference in RepositoryLayout.ResolvedProjectReferences(project)
+                where !known.Contains(reference.ResolvedPath)
+                select $"{RepositoryLayout.RelativePath(project)} references '{reference.Include}', " +
+                       $"which resolves to '{reference.ResolvedPath}' - not a project in this " +
+                       "repository's source tree.");
+        }
+
+        Assert.True(problems.Count == 0, BuildFailureMessage(
+            "A ProjectReference points outside the source tree, so its name satisfies the edge " +
+            "table while the code it compiles against is unexamined.",
+            problems));
     }
 
     /// <summary>
@@ -357,16 +543,29 @@ public sealed class ProjectFileGateTests
     [Fact]
     public void The_slnx_is_the_only_solution_file_in_the_repository()
     {
-        // RepositoryLayout.Root is DEFINED as the directory containing Yello.slnx, so asserting
-        // its existence here would be a tautology that reads like a check. What is worth
-        // asserting is that nothing else claims to describe the project inventory.
+        // Not a tautology, though it looks like one. Root is defined as the directory holding
+        // Yello.slnx ONLY on the upward-walk path; the YELLO_REPOSITORY_ROOT escape hatch sets
+        // it from an environment variable with no such guarantee, and on that path this check
+        // is the only thing standing between "no solution file" and a gate reporting green
+        // over a directory that is not this repository.
+        Assert.True(RepositoryLayout.SolutionFile.Exists,
+            $"{RepositoryLayout.SolutionFile.Name} does not exist at " +
+            $"'{RepositoryLayout.Root.FullName}'. Gate A reads the solution to learn which " +
+            "projects exist, so without it the inventory assertions have nothing to compare " +
+            "against. If the root came from YELLO_REPOSITORY_ROOT, it is pointing at the wrong " +
+            "directory.");
+
+        // Routed through EnumerateSourceFiles so ExcludedDirectories applies. Doing its own
+        // walk here bypassed that list - whose own documentation warns that a file arriving
+        // under .claude with a skill update "would fail a build nobody had changed" - and the
+        // ad-hoc /bin/ and /obj/ filter it used instead covered two of the nine entries.
+        // The Extension filter stays: on Windows a three-character extension in a search
+        // pattern also matches longer ones, so "*.sln" matches Yello.slnx.
         var strays = SolutionFilePatterns
-            .SelectMany(pattern => RepositoryLayout.Root.EnumerateFiles(pattern, SearchOption.AllDirectories))
+            .SelectMany(RepositoryLayout.EnumerateSourceFiles)
             .Where(f => f.Extension.Equals(".sln", StringComparison.OrdinalIgnoreCase)
                 || f.Extension.Equals(".slnf", StringComparison.OrdinalIgnoreCase))
             .Select(RepositoryLayout.RelativePath)
-            .Where(p => !p.Contains("/bin/", StringComparison.Ordinal)
-                && !p.Contains("/obj/", StringComparison.Ordinal))
             .OrderBy(p => p, StringComparer.Ordinal)
             .ToList();
 
@@ -384,24 +583,8 @@ public sealed class ProjectFileGateTests
         RepositoryLayout.LoadXml(file)
             .Descendants()
             .Where(e => e.Name.LocalName.Equals(property, StringComparison.Ordinal))
-            .Where(IsUnconditional)
+            .Where(RepositoryLayout.IsUnconditional)
             .Select(e => e.Value.Trim());
-
-    /// <summary>
-    /// True when neither the property nor any ancestor carries a <c>Condition</c>.
-    /// </summary>
-    private static bool IsUnconditional(XElement element)
-    {
-        for (var current = element; current is not null; current = current.Parent)
-        {
-            if (current.Attribute("Condition") is not null)
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
 
     /// <summary>
     /// The import files other than the root <c>Directory.Build.props</c>, which is the one

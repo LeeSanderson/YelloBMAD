@@ -2,8 +2,19 @@
 title: Yello — Epic Breakdown
 status: final
 created: 2026-08-22
-updated: 2026-08-26
+updated: 2026-08-27
 amendments:
+  - date: 2026-08-27
+    section: 'Epic 1 › Story 1.1 › Acceptance Criteria, fifth block (AC5)'
+    raisedBy: 'Second code review of story 1.1, 2026-08-27'
+    change: >-
+      Follow-up to the 2026-08-26 amendment below, which is otherwise sound. That rewording
+      named the three suites holding no cases — isolation, revocation, merge conformance —
+      which writes today's inventory into a final artifact and becomes false the moment story
+      1.9 lands its first isolation case, requiring a third amendment. Replaced with "any suite
+      that holds no cases yet", which carries the same meaning durably. The mechanism is
+      already proven: Yello.Tests.Slices left that list during story 1.1 itself by gaining the
+      shared-fixture smoke test.
   - date: 2026-08-26
     section: 'Epic 1 › Story 1.1 › Acceptance Criteria, fifth block (AC5)'
     raisedBy: 'Code review of story 1.1, 2026-08-26 — decision resolved by Lee'
@@ -504,7 +515,7 @@ So that no later story can erode the structure NFR-1 depends on.
 **Given** the four gating suites — isolation, revocation, merge conformance, architecture
 **When** they run against a solution with no feature code
 **Then** each builds and executes rather than failing to build
-**And** the three that hold no cases yet — isolation, revocation, merge conformance — report zero tests without that being treated as a failure
+**And** any suite that holds no cases yet reports zero tests without that being treated as a failure
 **And** later stories add cases to existing suites rather than creating suites
 
 ### Story 1.2: The design foundations every surface is drawn from

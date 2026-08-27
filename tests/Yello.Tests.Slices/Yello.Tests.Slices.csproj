@@ -22,8 +22,15 @@
     broken discovery would pass silently as "zero tests".
 
     A gate enforces that now rather than a comment: Yello.Tests.Architecture asserts that no
-    project carrying the switch contains a [Fact] or a [Theory]. The four suites that are still
-    genuinely empty after story 1.1 keep it; this one cannot.
+    project carrying the switch contains a [Fact] or a [Theory]. The suites that hold no cases
+    yet keep it; this one cannot.
+
+    Two things about that gate are worth knowing before relying on it. It recognises the
+    combined attribute form - [Theory, InlineData(1)] - which it did not until the second
+    review pass, and which is the shape story 1.9's isolation cases will take. And it parses
+    the switch's value rather than substring-matching it, so the multi-code form
+    `ignore-exit-code 2;8` is recognised as carrying 8. Both were holes that let a POPULATED
+    release-gating suite keep the switch with the gate reporting green.
   -->
   <ItemGroup>
     <PackageReference Include="xunit.v3" />

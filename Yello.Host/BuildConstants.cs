@@ -34,7 +34,18 @@ internal static class BuildConstants
     /// of them used to leave the Host starting normally with AC4's check silently skipped -
     /// same log, same exit code, no evidence.
     /// </summary>
-    internal static string DatabaseResourceName { get; } =
+    /// <remarks>
+    /// A method, not a static property with an initialiser. <see cref="AssemblyMetadata.Read"/>
+    /// throws when the value is absent, and from a static initialiser that surfaces as
+    /// <c>TypeInitializationException</c> - which names neither the cause nor the remedy, and
+    /// which killed the Host at startup before any handler could report it. The test suite's
+    /// <c>RepositoryLayout.FindRoot</c> documents this hazard at length and this file had
+    /// reintroduced it. As a method the throw happens at the call site, where the caller can
+    /// catch it, log the reason and carry on - which is what the surrounding comment in
+    /// <c>Program.cs</c> promises ("a failure is logged rather than thrown").
+    /// <c>Yello.AppHost</c> already had the right shape, using a local function called inline.
+    /// </remarks>
+    internal static string DatabaseResourceName() =>
         AssemblyMetadata.Read(typeof(BuildConstants).Assembly, "Yello.DatabaseResourceName");
 }
 

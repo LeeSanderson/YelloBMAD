@@ -110,6 +110,12 @@ public sealed class PackageVersionPinTests
     private const string ExpectedSdkVersion = "10.0.303";
 
     /// <summary>
+    /// The two switches that make central package management real.
+    /// </summary>
+    private static readonly string[] CentralManagementSwitches =
+        ["ManagePackageVersionsCentrally", "CentralPackageTransitivePinningEnabled"];
+
+    /// <summary>
     /// Providers that cannot exercise row-level security, which is what NFR-1 rests on.
     /// </summary>
     /// <remarks>
@@ -119,12 +125,6 @@ public sealed class PackageVersionPinTests
     /// to it would satisfy the old ban and still prove nothing about isolation. The reason
     /// the ban exists is the thing to enforce.
     /// </remarks>
-    /// <summary>
-    /// The two switches that make central package management real.
-    /// </summary>
-    private static readonly string[] CentralManagementSwitches =
-        ["ManagePackageVersionsCentrally", "CentralPackageTransitivePinningEnabled"];
-
     private static readonly string[] BannedProviders =
     [
         "Microsoft.EntityFrameworkCore.InMemory",
@@ -139,13 +139,30 @@ public sealed class PackageVersionPinTests
     /// two switches that turn it on are themselves never read by a pin assertion.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Every other assertion in this class reads <c>PackageVersion</c> <i>elements</i>, which
-    /// remain present in the file regardless. Set <c>ManagePackageVersionsCentrally</c> to
-    /// false and all eighteen pins become inert - every version-less
-    /// <c>PackageReference</c> resolves to latest-available - while all six pin assertions
-    /// stay green. Set <c>CentralPackageTransitivePinningEnabled</c> to false and the SSH.NET
-    /// forward-pin stops applying, silently reinstating a HIGH-severity advisory. One
-    /// assertion covers both.
+    /// remain present in the file regardless of whether central package management is on.
+    /// </para>
+    /// <para>
+    /// <b>What each switch actually costs, measured rather than assumed.</b> Turning
+    /// <c>ManagePackageVersionsCentrally</c> off does <i>not</i> silently loosen the pins: from
+    /// a <c>.csproj</c> it fails restore outright with NU1015, because no project here carries
+    /// an inline version - which <see cref="No_project_declares_a_package_version_of_its_own"/>
+    /// independently enforces - and from a root <c>Directory.Build.targets</c> the property
+    /// evaluates false while restore still honours the central pins. So the "pins inert,
+    /// assertions green" exposure does not exist while that holds, and this assertion states
+    /// the invariant directly rather than inferring it from NuGet's error behaviour.
+    /// <c>CentralPackageTransitivePinningEnabled</c> is the consequential one: turn it off and
+    /// the <c>SSH.NET</c> 2026.0.0 forward-pin stops applying, silently reinstating
+    /// GHSA-q939-rpr3-3284 (HIGH), with no NuGet backstop at all.
+    /// </para>
+    /// <para>
+    /// <b>Last, and unconditional.</b> Reading "any occurrence equals true" passed on a
+    /// <c>true</c> followed later by <c>false</c>, and on a <c>true</c> inside a
+    /// <c>Condition</c>-guarded <c>PropertyGroup</c> - verified with
+    /// <c>dotnet msbuild -getProperty:</c>, which returned false where the text the gate read
+    /// still said true. MSBuild takes the last unconditional value, so that is what this reads.
+    /// </para>
     /// </remarks>
     [Fact]
     public void Central_package_management_and_transitive_pinning_are_enabled()
@@ -153,11 +170,15 @@ public sealed class PackageVersionPinTests
         var properties = RepositoryLayout.LoadXml(RepositoryLayout.DirectoryPackagesProps)
             .Descendants()
             .Where(e => e.Parent?.Name.LocalName.Equals("PropertyGroup", StringComparison.Ordinal) == true)
+            .Where(RepositoryLayout.IsUnconditional)
             .ToLookup(e => e.Name.LocalName, e => e.Value.Trim(), StringComparer.Ordinal);
 
         var problems = CentralManagementSwitches
-            .Where(name => !properties[name].Any(v => v.Equals("true", StringComparison.OrdinalIgnoreCase)))
-            .Select(name => $"'{name}' is not set to true in Directory.Packages.props.")
+            .Where(name => !string.Equals(
+                properties[name].LastOrDefault(), "true", StringComparison.OrdinalIgnoreCase))
+            .Select(name => properties[name].Any()
+                ? $"'{name}' is last set to '{properties[name].Last()}' in Directory.Packages.props, not true."
+                : $"'{name}' is not set to true in Directory.Packages.props by any unconditional declaration.")
             .ToList();
 
         Assert.True(problems.Count == 0,
@@ -278,10 +299,19 @@ public sealed class PackageVersionPinTests
             "global.json is missing. Without it the build picks whichever .NET 10 SDK the " +
             "machine happens to resolve first, and two are installed here.");
 
-        using var document = JsonDocument.Parse(File.ReadAllText(RepositoryLayout.GlobalJson.FullName));
+        using var document = RepositoryLayout.LoadJson(RepositoryLayout.GlobalJson);
         var root = document.RootElement;
 
         var problems = new List<string>();
+
+        // Singularity, for the same reason MsBuildImportFiles asserts it for the props files:
+        // the SDK band is only "pinned for the solution" if there is one file stating it. A
+        // second global.json deeper in the tree governs everything beneath it, and this gate
+        // would go on reading the root copy and reporting green.
+        problems.AddRange(RepositoryLayout.EnumerateSourceFiles("global.json")
+            .Where(f => !f.FullName.Equals(RepositoryLayout.GlobalJson.FullName, StringComparison.OrdinalIgnoreCase))
+            .Select(f => $"a second global.json exists at '{RepositoryLayout.RelativePath(f)}', " +
+                         "which selects a different SDK for everything beneath it"));
 
         AddIfNotEqual(problems, root, ["sdk", "version"], ExpectedSdkVersion,
             "the SDK band is what makes the build deterministic across machines");
@@ -388,7 +418,16 @@ public sealed class PackageVersionPinTests
             yield break;
         }
 
-        using var document = JsonDocument.Parse(File.ReadAllText(RepositoryLayout.DotnetToolsManifest.FullName));
+        foreach (var stray in RepositoryLayout.EnumerateSourceFiles("dotnet-tools.json")
+                     .Where(f => !f.FullName.Equals(
+                         RepositoryLayout.DotnetToolsManifest.FullName, StringComparison.OrdinalIgnoreCase)))
+        {
+            yield return
+                $"a second tool manifest exists at '{RepositoryLayout.RelativePath(stray)}', " +
+                "which supplies a different aspire.cli to anything run from beneath it";
+        }
+
+        using var document = RepositoryLayout.LoadJson(RepositoryLayout.DotnetToolsManifest);
 
         if (!document.RootElement.TryGetProperty("tools", out var tools)
             || !tools.TryGetProperty("aspire.cli", out var cli)
@@ -398,11 +437,14 @@ public sealed class PackageVersionPinTests
             yield break;
         }
 
-        if (!expected.Equals(version.GetString(), StringComparison.Ordinal))
+        // Not GetString(): `"version": 13.4` is legal JSON and throws there, which would
+        // present as a defect in the gate rather than as a malformed pin.
+        var pinned = RepositoryLayout.JsonValueText(version);
+
+        if (!expected.Equals(pinned, StringComparison.Ordinal))
         {
             yield return
-                $".config/dotnet-tools.json pins aspire.cli to '{version.GetString()}', expected " +
-                $"'{expected}'.";
+                $".config/dotnet-tools.json pins aspire.cli to '{pinned}', expected '{expected}'.";
         }
     }
 
@@ -517,22 +559,48 @@ public sealed class PackageVersionPinTests
     [Trait("Requirement", "AR-35")]
     public void The_only_solution_wide_package_is_the_coding_standard()
     {
-        var actual = RepositoryLayout
+        var sanctioned = RepositoryLayout
             .ItemIncludes(RepositoryLayout.DirectoryPackagesProps, "GlobalPackageReference")
             .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
-        var unexpected = actual
+        var problems = sanctioned
             .Where(p => !p.Equals("Opinionated.DotNet.CodingStandards", StringComparison.OrdinalIgnoreCase))
+            .Select(p => $"Directory.Packages.props declares GlobalPackageReference '{p}', which is " +
+                         "not the coding standard.")
             .ToList();
 
-        Assert.True(unexpected.Count == 0 && actual.Count == 1,
-            "Directory.Packages.props declares a GlobalPackageReference other than the coding " +
-            "standard, or has lost the coding standard. A GlobalPackageReference reaches all " +
-            "fourteen projects while appearing in none of them, so it bypasses every " +
-            "per-project gate here - the row-level-security provider ban, the VSTest ban and " +
-            $"the ring's package ban alike.{Environment.NewLine}" +
-            $"  found: {(actual.Count == 0 ? "(none)" : string.Join(", ", actual))}");
+        if (sanctioned.Count == 0)
+        {
+            problems.Add(
+                "Directory.Packages.props declares no GlobalPackageReference at all, so the " +
+                "coding standard - the single source of TreatWarningsAsErrors, the analysers " +
+                "and the NuGet audit settings - has been removed.");
+        }
+
+        // EVERY other file, project files included. Scoping this assertion to the sanctioned
+        // home was itself the bypass: the identical line in Directory.Build.props reaches every
+        // project and was read by nothing here and nothing in ProjectFileGateTests. Verified
+        // end-to-end during review - Microsoft.NET.Test.Sdk placed that way applied its build
+        // assets solution-wide. The story's plant used this file, which is the one that was
+        // already covered.
+        foreach (var file in RepositoryLayout.AllProjectFiles
+                     .Concat(RepositoryLayout.MsBuildImportFiles)
+                     .Where(f => !f.FullName.Equals(
+                         RepositoryLayout.DirectoryPackagesProps.FullName, StringComparison.OrdinalIgnoreCase)))
+        {
+            problems.AddRange(RepositoryLayout.ItemIncludes(file, "GlobalPackageReference")
+                .Select(p => $"{RepositoryLayout.RelativePath(file)} declares " +
+                             $"GlobalPackageReference '{p}'. Directory.Packages.props is the one " +
+                             "sanctioned home for it; from anywhere else it is a solution-wide " +
+                             "package that no per-project gate can see."));
+        }
+
+        Assert.True(problems.Count == 0,
+            "A GlobalPackageReference reaches all fourteen projects while appearing in none of " +
+            "them, so it bypasses every per-project gate here - the row-level-security provider " +
+            $"ban, the VSTest ban and the ring's package ban alike:{Environment.NewLine}" +
+            string.Join(Environment.NewLine, problems.Select(p => $"  - {p}")));
     }
 
     /// <summary>
@@ -571,11 +639,24 @@ public sealed class PackageVersionPinTests
     /// out, it made the banned package look absent while NuGet honoured the version and the
     /// project restored.
     /// </para>
+    /// <para>
+    /// <b>Two ways an element used to disappear from this dictionary entirely</b>, each of
+    /// which hid a package from the provider ban and from the exact-set assertion at once.
+    /// A <c>PackageVersion</c> carrying <i>no</i> version was skipped, and it restores - to the
+    /// lowest available version, with only NU1604 - so
+    /// <c>&lt;PackageVersion Include="Microsoft.EntityFrameworkCore.InMemory" /&gt;</c> was a
+    /// present, banned provider that read as absent. And a <c>Condition</c> on the element or
+    /// its <c>ItemGroup</c> was ignored, so a pin could be green here and never reach restore
+    /// (verified: <c>-getItem:PackageVersion</c> returns empty for a guarded declaration).
+    /// Both are now reported rather than skipped, which is also why this method throws instead
+    /// of returning a quietly smaller dictionary.
+    /// </para>
     /// </remarks>
     private static Dictionary<string, string> CentralPackageVersions()
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var duplicates = new List<string>();
+        var malformed = new List<string>();
 
         foreach (var element in RepositoryLayout.LoadXml(RepositoryLayout.DirectoryPackagesProps)
                      .Descendants()
@@ -584,8 +665,26 @@ public sealed class PackageVersionPinTests
             var include = element.Attribute("Include")?.Value.Trim();
             var version = VersionOf(element);
 
-            if (string.IsNullOrEmpty(include) || version is null)
+            if (!RepositoryLayout.IsUnconditional(element))
             {
+                malformed.Add(
+                    $"'{include ?? "(no Include)"}' is declared inside a Condition, so whether " +
+                    "this pin reaches restore depends on a condition no gate here evaluates");
+                continue;
+            }
+
+            if (string.IsNullOrEmpty(include))
+            {
+                malformed.Add("a <PackageVersion> carries no Include attribute");
+                continue;
+            }
+
+            if (version is null)
+            {
+                malformed.Add(
+                    $"'{include}' has a <PackageVersion> with no version, which restores to the " +
+                    "LOWEST available version rather than not restoring - so the package is " +
+                    "present while reading as absent to the provider ban");
                 continue;
             }
 
@@ -603,6 +702,19 @@ public sealed class PackageVersionPinTests
                 "Directory.Packages.props declares more than one <PackageVersion> for: " +
                 $"{string.Join(", ", duplicates)}. NuGet takes the last, so the file says one " +
                 "thing and the restore does another. Remove the duplicate.");
+        }
+
+        if (malformed.Count > 0)
+        {
+            throw new InvalidOperationException(
+                "Directory.Packages.props declares a <PackageVersion> this gate cannot read as " +
+                $"a pin:{Environment.NewLine}" +
+                string.Join(Environment.NewLine, malformed.Select(m => $"  - {m}")) +
+                $"{Environment.NewLine}{Environment.NewLine}" +
+                "Every pin has to be one unconditional statement with a version, because both " +
+                "the AR-1 pin set and the row-level-security provider ban are asserted from " +
+                "this dictionary. An element that cannot be read is a package the bans cannot " +
+                "see, not a package that is absent.");
         }
 
         return result;

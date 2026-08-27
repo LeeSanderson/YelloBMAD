@@ -10,10 +10,19 @@ namespace Yello.Host;
 /// stories will copy. The generated methods perform their own <c>IsEnabled</c> check and
 /// allocate nothing when the level is off.
 /// <para>
-/// The four outcomes below are deliberately distinct. The check previously had three states
-/// that a reader could not tell apart from the log or from the exit code: "ran and passed",
-/// "ran and failed", and "never ran because this is not Development". Distinguishing them is
-/// the whole value of a check whose only output is a log line.
+/// The outcomes below are deliberately distinct. The check previously had three states that a
+/// reader could not tell apart from the log or from the exit code: "ran and passed", "ran and
+/// failed", and "never ran because this is not Development". Distinguishing them is the whole
+/// value of a check whose only output is a log line.
+/// </para>
+/// <para>
+/// <b>Every level here has to be one the shipped configuration actually emits.</b>
+/// <c>ConnectivityCheckSkipped</c> was written at <c>Debug</c> while both
+/// <c>appsettings.json</c> and <c>appsettings.Development.json</c> set
+/// <c>Logging:LogLevel:Default</c> to <c>Information</c> - so the branch added specifically to
+/// make "never ran" distinguishable produced no output in any environment, leaving the three
+/// states exactly as indistinguishable as before. A log line is the entire observable behaviour
+/// of this check; a level the configuration filters out is the same as not writing it.
 /// </para>
 /// </remarks>
 internal static partial class StartupLog
@@ -50,7 +59,19 @@ internal static partial class StartupLog
 
     [LoggerMessage(
         EventId = 1005,
-        Level = LogLevel.Debug,
+        Level = LogLevel.Information,
         Message = "Startup connectivity check skipped: it runs in Development only, and the environment is {Environment}.")]
     internal static partial void ConnectivityCheckSkipped(ILogger logger, string environment);
+
+    [LoggerMessage(
+        EventId = 1006,
+        Level = LogLevel.Information,
+        Message = "Startup connectivity check abandoned: the Host is shutting down. This is not a connectivity failure.")]
+    internal static partial void ConnectivityAbandoned(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 1007,
+        Level = LogLevel.Error,
+        Message = "A value Directory.Build.props stamps into every assembly could not be read, so the startup connectivity check cannot run: {Reason}")]
+    internal static partial void BuildMetadataUnreadable(ILogger logger, string reason, Exception exception);
 }

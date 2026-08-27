@@ -1,9 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    AD-21 / AR-2 / AR-4 / AR-35. Release-gating, and the ONLY suite that ships real
-    assertions in story 1.1 - roughly ten of them. It must therefore stay strict: no
-    `ignore-exit-code 8` here, unlike the four suites that are genuinely empty.
+    AD-21 / AR-2 / AR-4 / AR-35. Release-gating, and the suite that ships nearly all of the
+    real assertions in story 1.1 - 47 of them after two review passes, up from the ten the
+    story originally scoped. It must therefore stay strict: no `ignore-exit-code 8` here,
+    unlike the three suites that are still genuinely empty (isolation, revocation, merge
+    conformance). Yello.Tests.Slices came off that switch when it gained the shared-fixture
+    smoke test and AC4's connectivity tests.
+
+    Do not restate the assertion count in prose anywhere else. It has been wrong in this
+    comment twice, because a number in a comment is a second source of truth for something
+    the runner reports exactly: `Yello.Tests.Architecture.exe -trait "Priority=P0"`.
 
     It runs FIRST in CI's PR stage (story 1.10 builds that pipeline) because it takes
     seconds and should fail before anything slower starts.

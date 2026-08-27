@@ -69,7 +69,13 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
     /// so the run <i>hung</i> rather than failing, which is the worst of the available
     /// outcomes in CI.
     /// </remarks>
-    public static TimeSpan StartupTimeout { get; } = ReadTimeout();
+    /// <remarks>
+    /// Lazy rather than a field initialiser for the same reason as <see cref="Image"/>: both
+    /// throw on bad input, and from a static initialiser that arrives as
+    /// <c>TypeInitializationException</c> across every test in the consuming suite, naming
+    /// neither the cause nor the remedy.
+    /// </remarks>
+    public static TimeSpan StartupTimeout => StartupTimeoutValue.Value;
 
     /// <summary>
     /// The SQL Server image, from the one place the solution states it.
@@ -83,12 +89,30 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
     /// <para>
     /// The tag still floats by cumulative update rather than being pinned by digest. That is a
     /// stated open question for Lee rather than an oversight, revisited when stories 1.5 and
-    /// 2.6 give a reason to freeze the engine - but it now floats in one place.
+    /// 2.6 give a reason to freeze the engine - but it now floats in one place. Note that
+    /// <c>Yello.AppHost</c> rejects a digest reference outright rather than mis-splitting it,
+    /// so pinning one is a deliberate change to both files.
+    /// </para>
+    /// <para>
+    /// Read through a <c>Lazy</c> so that a missing value surfaces as an
+    /// <c>InvalidOperationException</c> from this property, at the point of use, rather than as
+    /// a <c>TypeInitializationException</c> from the class's static constructor.
     /// </para>
     /// </remarks>
-    public static string Image { get; } = ReadMetadata("Yello.SqlServerImage");
+    public static string Image => ImageValue.Value;
+
+    private static readonly Lazy<TimeSpan> StartupTimeoutValue = new(ReadTimeout, isThreadSafe: true);
+
+    private static readonly Lazy<string> ImageValue =
+        new(() => ReadMetadata("Yello.SqlServerImage"), isThreadSafe: true);
 
     private MsSqlContainer? _container;
+
+    /// <summary>
+    /// Set only once <c>StartAsync</c> has returned, so readiness is distinguishable from
+    /// "a container object exists".
+    /// </summary>
+    private bool _ready;
 
     /// <summary>
     /// The ADO.NET connection string for the running container.
@@ -96,12 +120,23 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
     /// <remarks>
     /// The precondition used to be stated only in a comment. Throwing says the same thing at
     /// the moment it matters, and names the remedy.
+    /// <para>
+    /// Gated on <see cref="_ready"/> rather than on the container being non-null. A container
+    /// whose wait strategy timed out is a live object with a published port, so the null check
+    /// handed out a plausible connection string for an engine that never became ready - and the
+    /// failure then arrived as a login error from whichever test used it first, rather than as
+    /// the precondition this property exists to state.
+    /// </para>
     /// </remarks>
     public string ConnectionString =>
-        _container?.GetConnectionString()
-        ?? throw new InvalidOperationException(
-            "The container is not running. Consume this fixture through xunit's IClassFixture " +
-            "or ICollectionFixture so InitializeAsync completes before any test reads this.");
+        _ready && _container is not null
+            ? _container.GetConnectionString()
+            : throw new InvalidOperationException(
+                "The container is not running. Consume this fixture through xunit's " +
+                "IClassFixture or ICollectionFixture so InitializeAsync completes before any " +
+                "test reads this. (If InitializeAsync threw, that exception is the one to fix; " +
+                "this property stays closed rather than handing out a string for an engine that " +
+                "never became ready.)");
 
     /// <summary>
     /// Starts the container and waits for the engine to accept connections.
@@ -122,28 +157,54 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
     /// </remarks>
     public async ValueTask InitializeAsync()
     {
+        // A second call would abandon the first container undisposed, leaving a stray 2 GB SQL
+        // Server for the rest of the run - and on a retry after a failed start, the stray is the
+        // one nobody is looking for.
+        if (_container is not null)
+        {
+            throw new InvalidOperationException(
+                "InitializeAsync has already run on this fixture instance. xunit calls it once " +
+                "per fixture; if you need a second container, construct a second fixture.");
+        }
+
         _container = BuildContainer();
 
         using var deadline = new CancellationTokenSource(StartupTimeout);
 
+        var timedOut = false;
+
         try
         {
             await _container.StartAsync(deadline.Token).ConfigureAwait(false);
+            _ready = true;
         }
-        catch (OperationCanceledException exception)
+        catch (OperationCanceledException)
         {
-            throw new InvalidOperationException(
-                $"SQL Server did not become ready within {StartupTimeout.TotalSeconds:F0}s " +
-                $"(image {Image}). Set YELLO_CONTAINER_STARTUP_TIMEOUT_SECONDS to raise the " +
-                $"deadline if a cold image pull is the cause.{await DiagnosticsAsync().ConfigureAwait(false)}",
-                exception);
+            timedOut = true;
         }
-        catch (Exception exception) when (exception is not InvalidOperationException)
+        catch (Exception exception)
         {
+            // Catches everything on purpose. The previous filter was
+            // `when (exception is not InvalidOperationException)`, which excluded Testcontainers'
+            // own "the Docker endpoint is not reachable" shape - so the single most likely
+            // failure on a developer machine arrived with no container diagnostics attached,
+            // which is the opposite of what the diagnostics exist for. Re-wrapping our own
+            // exception is avoided by the flag above rather than by filtering on type.
             throw new InvalidOperationException(
                 $"The SQL Server container failed to start (image {Image})." +
                 await DiagnosticsAsync().ConfigureAwait(false),
                 exception);
+        }
+
+        // Outside the catch: gathering diagnostics is itself awaitable work, and doing it inside
+        // a catch block whose exception must survive is how the original failure gets lost.
+        if (timedOut)
+        {
+            throw new InvalidOperationException(
+                $"SQL Server did not become ready within {StartupTimeout.TotalSeconds:F0}s " +
+                $"(image {Image}). Set YELLO_CONTAINER_STARTUP_TIMEOUT_SECONDS to raise the " +
+                "deadline if a cold image pull is the cause." +
+                await DiagnosticsAsync().ConfigureAwait(false));
         }
     }
 
@@ -161,6 +222,7 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
         {
             await _container.DisposeAsync().ConfigureAwait(false);
             _container = null;
+            _ready = false;
         }
     }
 
@@ -168,10 +230,24 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
     /// True when a container runtime is reachable.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// With no runtime present, <c>Build()</c> throws and every consuming suite becomes
     /// unrunnable rather than skippable. This machine runs Rancher Desktop with a backend that
     /// is routinely stopped, so that is a live local concern rather than a theoretical one - a
     /// suite can consult this and skip with a reason instead of failing with a stack trace.
+    /// </para>
+    /// <para>
+    /// <b>What this does not detect, stated rather than implied.</b> It answers "is a runtime
+    /// configured and reachable enough to build a container definition", which is a
+    /// configuration question answered without I/O. A socket that exists while the daemon behind
+    /// it is dead or unhealthy passes here, and the failure then surfaces from
+    /// <see cref="InitializeAsync"/> - bounded by <see cref="StartupTimeout"/> and reported with
+    /// container diagnostics, which is the reason that deadline is not optional. Distinguishing
+    /// the two properly needs a daemon ping, and the only client available for one arrives
+    /// transitively through Testcontainers; referencing it directly would add an unpinned
+    /// package, which Gate A correctly forbids. So the honest split is: configuration problems
+    /// skip, daemon problems fail with a diagnosis.
+    /// </para>
     /// </remarks>
     public static bool IsContainerRuntimeAvailable()
     {
@@ -180,10 +256,12 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
             _ = BuildContainer();
             return true;
         }
-        catch (ArgumentException)
+        catch (Exception exception) when (exception is ArgumentException or InvalidOperationException)
         {
-            // Testcontainers reports an absent or misconfigured runtime as an ArgumentException
-            // from the builder, before any I/O is attempted.
+            // Testcontainers reports an absent or misconfigured runtime from the builder, before
+            // any I/O is attempted. Both types are observed: ArgumentException for a missing
+            // endpoint, InvalidOperationException for one it cannot interpret. Catching only the
+            // first turned the second into an error in every consuming suite rather than a skip.
             return false;
         }
     }
@@ -216,21 +294,54 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
                 ? $"{Environment.NewLine}The container produced no output at all."
                 : $"{Environment.NewLine}Container output:{Environment.NewLine}{logs}";
         }
-        catch (Exception exception) when (exception is InvalidOperationException or TimeoutException or IOException)
+        catch (Exception exception)
         {
-            // A container that never reached a state where logs exist. The original failure is
-            // the one worth reporting, so this must not replace it.
+            // Catches everything on purpose. This runs while an original failure is on its way
+            // out, and the Docker client's own exception types (DockerApiException,
+            // DockerContainerNotFoundException) are not among the three that used to be listed -
+            // so a throw here REPLACED the failure being diagnosed, losing the very thing this
+            // method exists to preserve. Best-effort diagnostics must never be able to do that.
             return $"{Environment.NewLine}(Container logs were unavailable: {exception.Message})";
         }
     }
 
+    /// <summary>
+    /// The startup deadline, from the environment or the default.
+    /// </summary>
+    /// <remarks>
+    /// A malformed value is rejected rather than ignored. Falling back silently meant the
+    /// documented remedy - "set YELLO_CONTAINER_STARTUP_TIMEOUT_SECONDS to raise the deadline" -
+    /// could be followed exactly and do nothing, after which the same failure recurs at the same
+    /// default and the message says to do the thing that was already done.
+    /// <c>int.TryParse</c> rejects <c>600s</c>, <c>10m</c> and <c>1e3</c>, so all three were
+    /// silent no-ops. The upper bound is <c>CancellationTokenSource</c>'s: it accepts up to
+    /// 4,294,967 seconds and throws <c>ArgumentOutOfRangeException</c> above that - verified -
+    /// which would previously have escaped from a static initialiser with no diagnosis at all.
+    /// </remarks>
     private static TimeSpan ReadTimeout()
     {
-        var configured = Environment.GetEnvironmentVariable("YELLO_CONTAINER_STARTUP_TIMEOUT_SECONDS");
+        const string variable = "YELLO_CONTAINER_STARTUP_TIMEOUT_SECONDS";
+        const int maximumSeconds = 4_294_967;
 
-        return int.TryParse(configured, NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds) && seconds > 0
-            ? TimeSpan.FromSeconds(seconds)
-            : TimeSpan.FromMinutes(5);
+        var configured = Environment.GetEnvironmentVariable(variable);
+
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return TimeSpan.FromMinutes(5);
+        }
+
+        if (!int.TryParse(configured, NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds)
+            || seconds <= 0
+            || seconds > maximumSeconds)
+        {
+            throw new InvalidOperationException(
+                $"{variable} is set to '{configured}', which is not a whole number of seconds " +
+                $"between 1 and {maximumSeconds}. It is read as a plain integer - '600s' and " +
+                "'10m' are not accepted. Unset it to use the five-minute default rather than " +
+                "leaving a value that does nothing.");
+        }
+
+        return TimeSpan.FromSeconds(seconds);
     }
 
     private static string ReadMetadata(string key)

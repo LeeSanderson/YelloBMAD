@@ -49,8 +49,18 @@ internal static class SolutionAssemblies
         {
             var candidate = ExpectedOutputPath(project);
 
+            // NOT `continue`. Reporting nothing here is what let this gate pass over zero test
+            // assemblies: `Unreadable` stayed empty, the precondition assertion was satisfied,
+            // and Gate C's four bans quietly covered the eight production assemblies only.
+            // Demonstrated during review by building with -p:ArtifactsPath - 44/44 green with
+            // nothing under tests/ scanned. An unknown output layout is the gate being unable
+            // to answer, which is a failure, not an absence of violations.
             if (candidate is null)
             {
+                missing.Add(
+                    $"{RepositoryLayout.ProjectName(project)} (its assembly could not be located: " +
+                    "the build output layout is not the one this convention assumes, so the " +
+                    "path cannot be derived from this assembly's own location)");
                 continue;
             }
 
@@ -84,7 +94,9 @@ internal static class SolutionAssemblies
 
         // A tail that climbs out of the project directory means the output layout is not the
         // one this convention assumes (a custom ArtifactsPath, say). Report nothing rather
-        // than guess - the caller turns an empty result into a named failure.
+        // than guess - the caller turns a null into a named failure, which it must, because
+        // the alternative is a scan whose scope silently shrank to the assemblies it could
+        // find. Do not make this `continue` at the call site.
         if (tail.StartsWith("..", StringComparison.Ordinal) || project.Directory is null)
         {
             return null;
