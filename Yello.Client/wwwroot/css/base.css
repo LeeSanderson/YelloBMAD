@@ -1,0 +1,294 @@
+/*
+    The base layer the tokens are drawn on.
+
+    `tokens.css` DECLARES the design; this file APPLIES the parts of it that must hold for every
+    surface in the product rather than being re-decided per component: the type roles, the focus
+    ring, the text link, the interactive target floor, the reduced-motion contract, and the
+    locale-aware casing rules.
+
+    It builds no component. Task cards, columns, the context bar, dialogs, pickers and buttons
+    are epic 2 onward; a speculative component stylesheet here is the mirror image of an
+    incomplete token set, and just as wrong.
+
+    LOGICAL PROPERTIES ONLY. `inline-start`/`inline-end`, `padding-inline`, `margin-block`,
+    `inset-block-end`, `border-block-start` - never `left`/`right`. UX-DR42 makes RTL tolerance
+    structural, and this is the layer that decides it for every later story: a physical property
+    written here or in any component is a gate failure, not a style preference.
+
+    NO SHADOW ANYWHERE. Shadow is not a hierarchy device here - the grounds are tinted and close
+    in luminance, so a shadow on them reads as a smudge rather than a lift. The single sanctioned
+    exception is the lifted card under an active drag, which story 2.7 builds.
+*/
+
+/*
+    The root stays at the user's own 16px (or whatever they have set). Stated as a percentage
+    rather than left absent so the intent is legible and so nothing later "helpfully" adds a px
+    value here: an absolute px root ignores a user's browser font-size preference entirely,
+    which is the WCAG 1.4.4 failure the type scale exists to prevent.
+*/
+html {
+    font-size: 100%;
+}
+
+body {
+    margin: 0;
+    background-color: var(--surface-page);
+    color: var(--text-primary);
+    font-family: var(--type-body-family);
+    font-size: var(--type-body-size);
+    font-weight: var(--type-body-weight);
+    line-height: var(--type-body-line-height);
+    letter-spacing: var(--type-body-letter-spacing);
+}
+
+/*
+    The 8 type roles. A surface picks a role; it does not pick a size. Every role binds all five
+    axes so none of them can be inherited by accident from an ancestor.
+
+    No role sets a height. Chips and cards size to content, so a WCAG 1.4.12 text-spacing
+    override grows the box instead of clipping the glyphs - which is the constructive half of
+    AC13 and the reason `height` with a fixed length is gated out of the whole corpus.
+*/
+.type-task-title {
+    font-family: var(--type-task-title-family);
+    font-size: var(--type-task-title-size);
+    font-weight: var(--type-task-title-weight);
+    line-height: var(--type-task-title-line-height);
+    letter-spacing: var(--type-task-title-letter-spacing);
+}
+
+.type-column-head {
+    font-family: var(--type-column-head-family);
+    font-size: var(--type-column-head-size);
+    font-weight: var(--type-column-head-weight);
+    line-height: var(--type-column-head-line-height);
+    letter-spacing: var(--type-column-head-letter-spacing);
+}
+
+.type-space-name {
+    font-family: var(--type-space-name-family);
+    font-size: var(--type-space-name-size);
+    font-weight: var(--type-space-name-weight);
+    line-height: var(--type-space-name-line-height);
+    letter-spacing: var(--type-space-name-letter-spacing);
+}
+
+.type-body {
+    font-family: var(--type-body-family);
+    font-size: var(--type-body-size);
+    font-weight: var(--type-body-weight);
+    line-height: var(--type-body-line-height);
+    letter-spacing: var(--type-body-letter-spacing);
+}
+
+.type-dialog-title {
+    font-family: var(--type-dialog-title-family);
+    font-size: var(--type-dialog-title-size);
+    font-weight: var(--type-dialog-title-weight);
+    line-height: var(--type-dialog-title-line-height);
+    letter-spacing: var(--type-dialog-title-letter-spacing);
+}
+
+.type-meta {
+    font-family: var(--type-meta-family);
+    font-size: var(--type-meta-size);
+    font-weight: var(--type-meta-weight);
+    line-height: var(--type-meta-line-height);
+    letter-spacing: var(--type-meta-letter-spacing);
+}
+
+.type-role-label {
+    font-family: var(--type-role-label-family);
+    font-size: var(--type-role-label-size);
+    font-weight: var(--type-role-label-weight);
+    line-height: var(--type-role-label-line-height);
+    letter-spacing: var(--type-role-label-letter-spacing);
+}
+
+.type-presence-count {
+    font-family: var(--type-presence-count-family);
+    font-size: var(--type-presence-count-size);
+    font-weight: var(--type-presence-count-weight);
+    line-height: var(--type-presence-count-line-height);
+    letter-spacing: var(--type-presence-count-letter-spacing);
+}
+
+/*
+    UPPERCASE IS PRESENTATIONAL, AND LOCALE-AWARE. UX-DR42.
+
+    The casing of the column head and the Role chip comes from `text-transform` and NEVER from
+    the copy resource. This is not a stylistic preference: the acting Role is in the accessible
+    name of the context bar, and a resource holding `VIEWER` makes that accessible name
+    "V-I-E-W-E-R", spelled out letter by letter by JAWS and VoiceOver - degrading the single most
+    important accessibility affordance in the product. `text-transform` leaves the DOM text
+    alone, so AT reads the original sentence case and nothing is spelled out.
+
+    Two exclusions, for different reasons:
+
+      LOSSY CASED SCRIPTS - Turkish and Azeri (dotless i -> I changes the word) and Greek
+      (uppercasing strips accents and alters final sigma). These scripts HAVE case, so tracking
+      is fine; only the transform is lossy, so only the transform is withheld.
+
+      CASE-LESS SCRIPTS - Arabic, Hebrew, CJK, Thai, the South-East Asian and Indic scripts, and
+      Georgian. Case does not exist there, so the transform is meaningless, and letter-spacing
+      severs the joins of connected scripts. Both are withheld, and column heads fall back to
+      the task-title weight at column-head size, per `DESIGN.md`.
+
+    The exclusion list is written once, inside `:not(:is(...))`, so it cannot drift between the
+    two roles. A later component adding its own unscoped `text-transform: uppercase` is a gate
+    failure - which is how this exclusion survives contact with epic 2.
+*/
+:is(.type-column-head, .type-role-label):not(:is(
+    :lang(tr), :lang(az), :lang(el),
+    :lang(ar), :lang(he), :lang(fa), :lang(ur),
+    :lang(zh), :lang(ja), :lang(ko),
+    :lang(th), :lang(lo), :lang(km), :lang(my),
+    :lang(hi), :lang(bn), :lang(ta), :lang(te), :lang(mr), :lang(gu),
+    :lang(kn), :lang(ml), :lang(pa), :lang(or), :lang(as), :lang(ne), :lang(si),
+    :lang(ka))) {
+    text-transform: uppercase;
+}
+
+/* Zero tracking for both roles under the case-less scripts. `normal` IS zero tracking. */
+:is(.type-column-head, .type-role-label):is(
+    :lang(ar), :lang(he), :lang(fa), :lang(ur),
+    :lang(zh), :lang(ja), :lang(ko),
+    :lang(th), :lang(lo), :lang(km), :lang(my),
+    :lang(hi), :lang(bn), :lang(ta), :lang(te), :lang(mr), :lang(gu),
+    :lang(kn), :lang(ml), :lang(pa), :lang(or), :lang(as), :lang(ne), :lang(si),
+    :lang(ka)) {
+    letter-spacing: normal;
+}
+
+/* Column heads additionally take the task-title weight, keeping the column-head size. */
+.type-column-head:is(
+    :lang(ar), :lang(he), :lang(fa), :lang(ur),
+    :lang(zh), :lang(ja), :lang(ko),
+    :lang(th), :lang(lo), :lang(km), :lang(my),
+    :lang(hi), :lang(bn), :lang(ta), :lang(te), :lang(mr), :lang(gu),
+    :lang(kn), :lang(ml), :lang(pa), :lang(or), :lang(as), :lang(ne), :lang(si),
+    :lang(ka)) {
+    font-weight: var(--type-task-title-weight);
+}
+
+/*
+    THE FOCUS RING. One rule, and the offset is the load-bearing part.
+
+    The intuitive rationale for `focus-ring` being a separate token from `accent` - "so it does
+    not vanish against an accented control" - does not survive arithmetic: the two sit at 1.45
+    dark and 1.48 light. The ring WOULD vanish. What protects it is `outline-offset: 2px`, which
+    puts the ring on the ground BEHIND the control, where it reads at 7.17 on the card and 4.61
+    on the light card.
+
+    So: never inset, never at offset 0, and never replaced by a colour change or a border swap.
+    The offset, not the token separation, is what makes it visible. `outline` removal is gated
+    out of the entire corpus rather than discouraged.
+*/
+:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+}
+
+/*
+    THE TEXT LINK, UNDERLINED, ALWAYS.
+
+    The accent passes handsomely against the background - 4.96 on the dark card, 6.81 on the
+    light - and sits at only 2.66 against the body text beside it. For a link inside a sentence,
+    the text beside it is the pair that matters, and 2.66 is below the 3:1 WCAG 1.4.1 requires
+    when colour alone distinguishes a link. The underline is what carries it.
+*/
+.text-link {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+/*
+    THE INTERACTIVE TARGET FLOOR, acquired by default rather than by each component remembering.
+
+    24px is WCAG 2.2 AA's 2.5.8 and the real current floor. WCAG 2.1 AA - the version NFR-9
+    names - has no target-size criterion at all, so this is a deliberate commitment above the
+    PRD's stated floor.
+
+    `a` is deliberately absent: 2.5.8 exempts a target in a sentence, and a text link inside
+    prose sized to 24px would break the line rhythm it sits in. Standalone link-shaped controls
+    carry `role="button"` or a class of their own and are covered by the rule above them.
+*/
+button,
+[role="button"],
+input:not([type="hidden"]),
+select,
+textarea,
+summary {
+    min-height: var(--target-min);
+}
+
+/*
+    REDUCED MOTION, enforced structurally rather than by enumeration.
+
+    A universal `!important` reset means no transition or animation can escape the preference by
+    being declared later, more specifically, or in a file written after this one. That is the
+    only form of this rule that stays true as components arrive, and the gate asserts both halves
+    - that this block exists, and that nothing outside it uses `!important` on a transition or an
+    animation to outrank it.
+
+    Honouring the preference costs no information: nothing in Yello conveys state by motion
+    alone. Motion only ever reports a change that is also conveyed structurally.
+*/
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        transition: none !important;
+        animation: none !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/*
+    The framework's unhandled-error banner. Story 1.1 restored the element unstyled and recorded
+    that story 1.2 owns making it look like anything, from the tokens it defines.
+
+    Its `#blazor-error-ui` id and its `reload`/`dismiss` class names are CONTRACTUAL - Blazor
+    looks for exactly these - so they are selected here and never renamed. The inline
+    `display:none` in `index.html` stays: that is the framework's own precondition for unhiding
+    the element, not a style choice.
+
+    `danger` rather than `border-hairline`, deliberately. Do's and Don'ts reserves danger for the
+    genuinely irreversible and forbids it on validation errors and ordinary refusals; an
+    unhandled client exception is neither. It is a fault that has already cost the user whatever
+    was unsaved and requires a reload to leave, which is the irreversible case the token is for.
+    The copy carries the signal and the border reinforces it - never the reverse.
+
+    The banner's own text is the framework's English, emitted by `index.html` rather than by a
+    Blazor component, and so sits outside localisation. Recorded as a known variance, not
+    exempted silently.
+*/
+#blazor-error-ui {
+    position: fixed;
+    inset-inline: 0;
+    inset-block-end: 0;
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border-block-start: var(--border-hairline-width) solid var(--danger);
+    padding-block: var(--space-control-pad-y);
+    padding-inline: var(--space-control-pad-x);
+    font-family: var(--type-body-family);
+    font-size: var(--type-body-size);
+    line-height: var(--type-body-line-height);
+}
+
+#blazor-error-ui .reload {
+    color: var(--accent);
+    text-decoration: underline;
+}
+
+#blazor-error-ui .dismiss {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--target-min);
+    min-inline-size: var(--target-min);
+    margin-inline-start: var(--space-3);
+    color: var(--text-muted);
+    cursor: pointer;
+}

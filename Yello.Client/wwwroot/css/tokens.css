@@ -1,0 +1,313 @@
+/*
+    Yello design tokens. The single source of every colour, size, space, radius and duration
+    the product draws with.
+
+    THE ONLY TOKEN SOURCE IS `DESIGN.md`'s frontmatter (:10-125). Every value below is verbatim
+    from it. The seven `:root` blocks under `ux-designs/.../mockups/` are NOT a token source:
+    they declare 13 abbreviated non-semantic names, dark only, with no `-light` siblings and no
+    `revoked-edge` - precisely the incomplete token set the 30-token gate exists to catch, in
+    precisely the shape an implementer would copy. Both design spines win on conflict with any
+    mock.
+
+    Hand-written CSS custom properties, deliberately. There is no npm, no bundler, no
+    preprocessor and no token-build step anywhere in this repository, and story 1.1's
+    environment preflight records Node as present and explicitly not needed. Do not introduce
+    one: a generated token file makes this file's provenance a build artifact rather than a
+    reviewable statement of the design.
+
+    DARK IS CANONICAL (UX-DR1). The unsuffixed token carries the dark value; `-light` is the
+    derived adaptation. This inverts the usual convention on purpose - the tinted grounds and
+    border weights were chosen against a dark canvas, so an implementation that builds light
+    first and inverts it gets a different product.
+
+    Gated by `ColorTokenContrastTests` and `DesignFoundationGateTests` in
+    `tests/Yello.Tests.Architecture`, which parse THIS FILE rather than a table restated in C#.
+    A hardcoded copy could not fail when the CSS changed, which is the only thing the harness is
+    for.
+*/
+
+:root {
+    /*
+        The 15 semantic colour names, bound to their dark values.
+
+        Exactly 30 colour tokens exist: these 15 and their 15 `-light` siblings below. The count
+        is gated so an incomplete token set is DETECTABLE rather than merely wrong.
+
+        Note that 30 names resolve to only 26 distinct hex values, because three collisions are
+        deliberate: `danger`/`revoked-edge` (#FB7185), `danger-light`/`revoked-edge-light`
+        (#BE123C), and `surface-card-light`/`accent-on-light`/`danger-on-light` (#FFFFFF).
+        `DESIGN.md:313` states why `revoked-edge` is a separate name anyway - danger is reserved
+        for the genuinely irreversible and losing access is a refusal, so without a distinct
+        name the component and the rule contradict each other. A count over VALUES yields 26 and
+        is wrong; the pre-remediation epics said "26 colour tokens", which is exactly that
+        mistake. The gate counts NAMES.
+    */
+    --surface-page: #0B1020;
+    --surface-column: #121A31;
+    --surface-card: #18213C;
+    --border-hairline: #6478A8;
+    --text-primary: #E6EAF5;
+    --text-muted: #9AA6C4;
+    --accent: #8B80F9;
+    --accent-on: #14103A;
+    --focus-ring: #ADA4FB;
+    --presence: #38BDF8;
+    --danger: #FB7185;
+    --danger-on: #3B0A15;
+    --revoked-edge: #FB7185;
+    --role-chip: #241F52;
+    --role-chip-on: #C3BCFC;
+
+    /*
+        The 15 `-light` siblings. Read in exactly one place - the theme boundary below - and
+        never by a component. A component reaching for a `-light` token pins itself to one
+        theme, which is why that is gated rather than merely discouraged.
+    */
+    --surface-page-light: #F4F6FB;
+    --surface-column-light: #EAEEF7;
+    --surface-card-light: #FFFFFF;
+    --border-hairline-light: #6B7794;
+    --text-primary-light: #131A2B;
+    --text-muted-light: #4B5670;
+    --accent-light: #5145CD;
+    --accent-on-light: #FFFFFF;
+    --focus-ring-light: #6E62E6;
+    --presence-light: #0E7490;
+    --danger-light: #BE123C;
+    --danger-on-light: #FFFFFF;
+    --revoked-edge-light: #BE123C;
+    --role-chip-light: #E2E0FA;
+    --role-chip-on-light: #332B96;
+
+    /* Dark is the authored default, so UA widgets - scrollbars, form controls - match it. */
+    color-scheme: dark;
+}
+
+/* THEME BOUNDARY BEGIN - the only place in this repository where a `-light` token may be read.
+ *
+ * AC1's mechanism: each of the 15 semantic names resolves to its unsuffixed (dark) value by
+ * default and to its `-light` sibling under the light theme, resolved HERE and nowhere else.
+ * Every component thereafter consumes `var(--surface-card)` and never
+ * `var(--surface-card-light)`.
+ *
+ * WHAT SELECTS THE THEME IS NOT DECIDED UPSTREAM. No PRD requirement, architecture decision,
+ * epic or UX spine names `prefers-color-scheme`, a theme toggle, a stored preference or a
+ * browser matrix. Raised for Lee in the story's Questions. The boundary is therefore built so
+ * the trigger is a one-line change: it answers BOTH the OS preference and an explicit
+ * `data-theme` on the root, so a stored preference can win over the OS later without
+ * restructuring anything.
+ *
+ * Two rules, one boundary. A media condition and an attribute selector cannot be unioned into
+ * a single CSS rule, and the alternatives that would fake it - the empty-custom-property "space
+ * toggle" hack, or a JS-set class - are respectively unreadable and a new dependency in a
+ * repository with zero JS. Both rules set identical values, so when both match the result is
+ * the same; the gate holds the region to exactly these two and requires all 15 rebindings.
+ */
+
+@media (prefers-color-scheme: light) {
+    :root:not([data-theme="dark"]) {
+        --surface-page: var(--surface-page-light);
+        --surface-column: var(--surface-column-light);
+        --surface-card: var(--surface-card-light);
+        --border-hairline: var(--border-hairline-light);
+        --text-primary: var(--text-primary-light);
+        --text-muted: var(--text-muted-light);
+        --accent: var(--accent-light);
+        --accent-on: var(--accent-on-light);
+        --focus-ring: var(--focus-ring-light);
+        --presence: var(--presence-light);
+        --danger: var(--danger-light);
+        --danger-on: var(--danger-on-light);
+        --revoked-edge: var(--revoked-edge-light);
+        --role-chip: var(--role-chip-light);
+        --role-chip-on: var(--role-chip-on-light);
+
+        color-scheme: light;
+    }
+}
+
+:root[data-theme="light"] {
+    --surface-page: var(--surface-page-light);
+    --surface-column: var(--surface-column-light);
+    --surface-card: var(--surface-card-light);
+    --border-hairline: var(--border-hairline-light);
+    --text-primary: var(--text-primary-light);
+    --text-muted: var(--text-muted-light);
+    --accent: var(--accent-light);
+    --accent-on: var(--accent-on-light);
+    --focus-ring: var(--focus-ring-light);
+    --presence: var(--presence-light);
+    --danger: var(--danger-light);
+    --danger-on: var(--danger-on-light);
+    --revoked-edge: var(--revoked-edge-light);
+    --role-chip: var(--role-chip-light);
+    --role-chip-on: var(--role-chip-on-light);
+
+    color-scheme: light;
+}
+
+/* THEME BOUNDARY END */
+
+:root {
+    /*
+        Two system stacks, no webfont. Nothing upstream named a typeface; system stacks add no
+        render-blocking request to an already-large Blazor WebAssembly payload and cover far
+        more scripts than any single webfont, which matters because i18n is in scope. There is
+        no `@font-face` and no external font request in this repository.
+    */
+    --font-system-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-system-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+    /*
+        The type scale: 8 named roles, sizes in `rem` against a 16px root, every line-height
+        >= 1.5.
+
+        Both are gate requirements rather than preferences. Absolute px type ignores a user's
+        browser font-size preference entirely - the most common low-vision accommodation, and
+        what WCAG 1.4.4 is really about. A line-height of 1 leaves a line box exactly the glyph
+        height, which cannot absorb the 1.5x override WCAG 1.4.12 lets a user apply.
+
+        The root is 16px by NOT being overridden. See `base.css`, which states `font-size: 100%`
+        rather than a px value.
+
+        `letter-spacing: normal` is stated explicitly on the roles that have no tracking, so a
+        role class can always bind all five axes and never inherit tracking from an ancestor.
+    */
+    --type-task-title-family: var(--font-system-sans);
+    --type-task-title-size: 0.8125rem;
+    --type-task-title-weight: 600;
+    --type-task-title-line-height: 1.5;
+    --type-task-title-letter-spacing: -0.003em;
+
+    --type-column-head-family: var(--font-system-sans);
+    --type-column-head-size: 0.6875rem;
+    --type-column-head-weight: 700;
+    --type-column-head-line-height: 1.5;
+    --type-column-head-letter-spacing: 0.12em;
+
+    --type-space-name-family: var(--font-system-sans);
+    --type-space-name-size: 0.875rem;
+    --type-space-name-weight: 700;
+    --type-space-name-line-height: 1.5;
+    --type-space-name-letter-spacing: -0.005em;
+
+    --type-body-family: var(--font-system-sans);
+    --type-body-size: 0.875rem;
+    --type-body-weight: 400;
+    --type-body-line-height: 1.6;
+    --type-body-letter-spacing: normal;
+
+    --type-dialog-title-family: var(--font-system-sans);
+    --type-dialog-title-size: 1rem;
+    --type-dialog-title-weight: 650;
+    --type-dialog-title-line-height: 1.5;
+    --type-dialog-title-letter-spacing: -0.008em;
+
+    --type-meta-family: var(--font-system-mono);
+    --type-meta-size: 0.6875rem;
+    --type-meta-weight: 500;
+    --type-meta-line-height: 1.5;
+    --type-meta-letter-spacing: normal;
+
+    --type-role-label-family: var(--font-system-mono);
+    --type-role-label-size: 0.6875rem;
+    --type-role-label-weight: 700;
+    --type-role-label-line-height: 1.5;
+    --type-role-label-letter-spacing: 0.07em;
+
+    /*
+        The one deliberate exception to "all metadata is monospace": the Presence count is prose
+        rather than a system fact, and NFR-9 makes that string the mandated non-colour carrier
+        of Presence - so it must not inherit mono's unpredictable non-Latin fallback or its
+        smaller effective x-height. The smallest text in the product should not be the text a
+        release gate rests on.
+    */
+    --type-presence-count-family: var(--font-system-sans);
+    --type-presence-count-size: 0.6875rem;
+    --type-presence-count-weight: 600;
+    --type-presence-count-line-height: 1.5;
+    --type-presence-count-letter-spacing: normal;
+
+    /*
+        Spacing. Base unit 3px giving 3/6/9/12/18/24/36 - finer than a conventional 4- or
+        8-based scale because this is a dense design and 4px steps are too coarse at this card
+        size.
+
+        px here is deliberate and is NOT the px the type gate bans: these are structural steps
+        that should not scale with text. Component-internal padding is the opposite case and is
+        expressed in `rem` on purpose, so padding grows with text under a zoom or font-size
+        override instead of clipping it.
+    */
+    --space-unit: 3px;
+    --space-1: 3px;
+    --space-2: 6px;
+    --space-3: 9px;
+    --space-4: 12px;
+    --space-5: 18px;
+    --space-6: 24px;
+    --space-7: 36px;
+    --space-gutter: var(--space-3);
+    --space-card-stack-gap: var(--space-2);
+    --space-card-pad-y: 0.5625rem;
+    --space-card-pad-x: 0.625rem;
+    --space-control-pad-y: 0.5rem;
+    --space-control-pad-x: 0.8125rem;
+
+    /*
+        The interactive target floor, applied as a minimum height on every interactive
+        component.
+
+        Stated precisely because it is easy to get wrong in both directions. WCAG 2.1 AA - the
+        gate NFR-9 names - has NO target-size criterion at all; 2.5.5's 44x44 is AAA. WCAG 2.2
+        AA's 2.5.8 sets 24x24. So 24px is the real current AA floor and the one this design
+        commits to: a deliberate commitment ABOVE the PRD's stated version, not an error, and
+        not to be "corrected" down.
+    */
+    --target-min: 24px;
+
+    /*
+        Radii. Four values across five names: `sm` 2px on the Role chip, Label chips and the
+        Offer indicator; `default`/`md` 3px on Tasks, columns, the context bar, buttons and
+        avatars; `lg` 6px on dialogs, the Task detail panel and the invitation view - the only
+        radius that soft, marking those surfaces as out of plane.
+
+        `full` exists for exactly ONE component, the column count chip, which is the only pill
+        in the product. This declaration is the only place `9999px` may appear; a component
+        wanting a pill references the token, and the gate counts the references.
+    */
+    --radius-sm: 2px;
+    --radius-default: 3px;
+    --radius-md: 3px;
+    --radius-lg: 6px;
+    --radius-full: 9999px;
+
+    /*
+        Border widths. 1.5px is an accessibility requirement rather than a stylistic one: a 1px
+        border is antialiased whenever its edge lands off a device-pixel boundary, which a 3px
+        spacing grid does at the 1.25x, 1.5x and 1.75x display scales common on Windows and
+        Android. Composited at 80% coverage, every border pair in both themes drops below the
+        3:1 gate.
+
+        `emphasis-width` 2px carries the focus ring, and the lifted card for the duration of a
+        drag - which story 2.7 builds, not this one.
+    */
+    --border-hairline-width: 1.5px;
+    --border-emphasis-width: 2px;
+
+    /*
+        Motion. Near-instant by budget: short enough to feel like direct manipulation rather
+        than animation. Motion here reports what already happened; it never covers a wait.
+
+        Nothing in Yello conveys state by motion alone, which is what makes honouring
+        `prefers-reduced-motion` cost no information. `base.css` neutralises every transition
+        and animation under that preference.
+    */
+    --motion-instant: 90ms;
+    --motion-quick: 120ms;
+    --motion-lift: 110ms;
+    --motion-settle: 120ms;
+    --motion-easing-standard: cubic-bezier(0.2, 0, 0.3, 1);
+    --motion-easing-exit: cubic-bezier(0.4, 0, 1, 1);
+    --motion-long-press-threshold: 320ms;
+    --motion-long-press-slop: 10px;
+}

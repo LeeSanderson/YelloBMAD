@@ -4,7 +4,7 @@ baseline_commit: 33526767b95af2838eb2bf53c3f5794f2e436b82
 
 # Story 1.2: The design foundations every surface is drawn from
 
-Status: ready-for-dev
+Status: review
 
 Epic: 1 — An Account, a Space of your own, and a boundary that holds
 Story key: `1-2-the-design-foundations-every-surface-is-drawn-from`
@@ -132,59 +132,59 @@ recorded below the criterion and is a documentation fix, not a change to what is
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — The token layer** (AC: 1, 2, 3, 7, 9)
-  - [ ] Create `Yello.Client/wwwroot/css/tokens.css`. Hand-written CSS custom properties. **Do not introduce npm, a bundler, a preprocessor or a token-build step** — story 1.1's environment preflight records Node v22.20.0 as present and explicitly **not needed**: *"No npm, bundler, preprocessor or token-build step appears anywhere in the corpus. Do not introduce one."*
-  - [ ] Declare the **15 semantic names** on `:root` bound to their **unsuffixed (dark) values**, and the 15 `-light` values as separate custom properties. Values verbatim from `DESIGN.md:13-42`. Dark is canonical (UX-DR1): the unsuffixed token is the dark value and `-light` is the derived adaptation.
-  - [ ] Implement the **theme boundary**: exactly one place where the 15 semantic names are rebound to their `-light` siblings. Every component thereafter consumes `var(--surface-card)` and never `var(--surface-card-light)`. See Dev Notes → *The theme boundary, and the one decision this story cannot inherit*.
-  - [ ] Add the type scale as 8 named roles — `task-title`, `column-head`, `space-name`, `body`, `dialog-title`, `meta`, `role-label`, `presence-count` — with sizes in `rem` and the exact values at `DESIGN.md:47-91`. Set the root to 16px by **not** overriding it (`html { font-size: 100% }` or nothing at all; never a px value, which is the WCAG 1.4.4 failure the AC exists to prevent).
-  - [ ] Add the two system stacks `system-sans` and `system-mono` verbatim from `DESIGN.md:372-373`. **No webfont**, no `@font-face`, no external font request.
-  - [ ] Add the spacing scale (3/6/9/12/18/24/36), the four `rem` internal-padding values, `target-min: 24px`, the radius scale, `hairline-width: 1.5px`, `emphasis-width: 2px`, and the motion tokens — all verbatim from `DESIGN.md:92-125`.
-  - [ ] Link the stylesheet from `Yello.Client/wwwroot/index.html`. Use the fingerprint form consistent with `index.html:48` (`OverrideHtmlAssetPlaceholders` is `true` — `Yello.Client.csproj:4`).
-  - [ ] Update the hand-off comment at `index.html:15-23`, which currently states this story ships no stylesheet. Leaving it would make it false the moment Task 1 lands — the exact record-drift class that produced six of story 1.1's review findings.
+- [x] **Task 1 — The token layer** (AC: 1, 2, 3, 7, 9)
+  - [x] Create `Yello.Client/wwwroot/css/tokens.css`. Hand-written CSS custom properties. **Do not introduce npm, a bundler, a preprocessor or a token-build step** — story 1.1's environment preflight records Node v22.20.0 as present and explicitly **not needed**: *"No npm, bundler, preprocessor or token-build step appears anywhere in the corpus. Do not introduce one."*
+  - [x] Declare the **15 semantic names** on `:root` bound to their **unsuffixed (dark) values**, and the 15 `-light` values as separate custom properties. Values verbatim from `DESIGN.md:13-42`. Dark is canonical (UX-DR1): the unsuffixed token is the dark value and `-light` is the derived adaptation.
+  - [x] Implement the **theme boundary**: exactly one place where the 15 semantic names are rebound to their `-light` siblings. Every component thereafter consumes `var(--surface-card)` and never `var(--surface-card-light)`. See Dev Notes → *The theme boundary, and the one decision this story cannot inherit*.
+  - [x] Add the type scale as 8 named roles — `task-title`, `column-head`, `space-name`, `body`, `dialog-title`, `meta`, `role-label`, `presence-count` — with sizes in `rem` and the exact values at `DESIGN.md:47-91`. Set the root to 16px by **not** overriding it (`html { font-size: 100% }` or nothing at all; never a px value, which is the WCAG 1.4.4 failure the AC exists to prevent).
+  - [x] Add the two system stacks `system-sans` and `system-mono` verbatim from `DESIGN.md:372-373`. **No webfont**, no `@font-face`, no external font request.
+  - [x] Add the spacing scale (3/6/9/12/18/24/36), the four `rem` internal-padding values, `target-min: 24px`, the radius scale, `hairline-width: 1.5px`, `emphasis-width: 2px`, and the motion tokens — all verbatim from `DESIGN.md:92-125`.
+  - [x] Link the stylesheet from `Yello.Client/wwwroot/index.html`. Use the fingerprint form consistent with `index.html:48` (`OverrideHtmlAssetPlaceholders` is `true` — `Yello.Client.csproj:4`).
+  - [x] Update the hand-off comment at `index.html:15-23`, which currently states this story ships no stylesheet. Leaving it would make it false the moment Task 1 lands — the exact record-drift class that produced six of story 1.1's review findings.
 
-- [ ] **Task 2 — The base layer the tokens are drawn on** (AC: 3, 6, 7, 9, 10, 12)
-  - [ ] Focus ring: one rule, `outline: 2px solid var(--focus-ring); outline-offset: 2px`. Never inset, never `outline: none` with a substitute, never offset 0. Apply on `:focus-visible`.
-  - [ ] Text link: `var(--accent)` **with `text-decoration: underline`, always**.
-  - [ ] `prefers-reduced-motion: reduce` block removing every transition and animation.
-  - [ ] Interactive base: `min-height: var(--target-min)` on the interactive element base rule, so a component acquires the floor by default rather than by each component remembering.
-  - [ ] No `box-shadow` anywhere. `DESIGN.md:421` sets `shadow: none` explicitly on the task card "so nobody adds one back"; the single sanctioned exception is `task-card-lifted`, which **is not built in this story**.
-  - [ ] **Logical properties only** — `inline-start`/`inline-end`, `padding-inline`, `margin-block`. Never `left`/`right`. UX-DR42 makes RTL tolerance structural, and this is the layer that decides it for every later story.
-  - [ ] **Uppercase is presentational, and locale-aware.** `column-head` and `role-label` render uppercase via `text-transform` — never from the copy resource. Scope the rule under a locale-aware `lang` attribute and **exclude Turkish, Azeri and Greek**, where `text-transform: uppercase` is lossy (Turkish dotless ı → I changes the word; Greek strips accents and alters final sigma). For case-less scripts — Arabic, Hebrew, CJK, Thai, Indic — fall back to `task-title` weight at `column-head` size with **zero** letter-spacing, because letter-spacing severs the joins of connected scripts. This is UX-DR42 and it belongs in this layer: baking uppercase into a resource makes the Role's accessible name get spelled out letter by letter by JAWS and VoiceOver, degrading the single most important accessibility affordance in the product.
-  - [ ] Style `#blazor-error-ui` from the tokens. Story 1.1 restored the element unstyled and recorded that "Story 1.2 owns making it look like anything, from the tokens it defines" (`index.html:26-41`). Its `#blazor-error-ui` id and `reload`/`dismiss` classes are **contractual** — the framework looks for exactly these. Keep the inline `display:none`; it is the framework's precondition, not a style choice.
+- [x] **Task 2 — The base layer the tokens are drawn on** (AC: 3, 6, 7, 9, 10, 12)
+  - [x] Focus ring: one rule, `outline: 2px solid var(--focus-ring); outline-offset: 2px`. Never inset, never `outline: none` with a substitute, never offset 0. Apply on `:focus-visible`.
+  - [x] Text link: `var(--accent)` **with `text-decoration: underline`, always**.
+  - [x] `prefers-reduced-motion: reduce` block removing every transition and animation.
+  - [x] Interactive base: `min-height: var(--target-min)` on the interactive element base rule, so a component acquires the floor by default rather than by each component remembering.
+  - [x] No `box-shadow` anywhere. `DESIGN.md:421` sets `shadow: none` explicitly on the task card "so nobody adds one back"; the single sanctioned exception is `task-card-lifted`, which **is not built in this story**.
+  - [x] **Logical properties only** — `inline-start`/`inline-end`, `padding-inline`, `margin-block`. Never `left`/`right`. UX-DR42 makes RTL tolerance structural, and this is the layer that decides it for every later story.
+  - [x] **Uppercase is presentational, and locale-aware.** `column-head` and `role-label` render uppercase via `text-transform` — never from the copy resource. Scope the rule under a locale-aware `lang` attribute and **exclude Turkish, Azeri and Greek**, where `text-transform: uppercase` is lossy (Turkish dotless ı → I changes the word; Greek strips accents and alters final sigma). For case-less scripts — Arabic, Hebrew, CJK, Thai, Indic — fall back to `task-title` weight at `column-head` size with **zero** letter-spacing, because letter-spacing severs the joins of connected scripts. This is UX-DR42 and it belongs in this layer: baking uppercase into a resource makes the Role's accessible name get spelled out letter by letter by JAWS and VoiceOver, degrading the single most important accessibility affordance in the product.
+  - [x] Style `#blazor-error-ui` from the tokens. Story 1.1 restored the element unstyled and recorded that "Story 1.2 owns making it look like anything, from the tokens it defines" (`index.html:26-41`). Its `#blazor-error-ui` id and `reload`/`dismiss` classes are **contractual** — the framework looks for exactly these. Keep the inline `display:none`; it is the framework's precondition, not a style choice.
 
-- [ ] **Task 3 — The contrast harness** (AC: 4, 5)
-  - [ ] Add a new test class to **`tests/Yello.Tests.Architecture`**. **Do not create a test project.** See Dev Notes → *Where the harness lives, and why nothing else is a candidate*.
-  - [ ] Implement WCAG 2.x relative luminance and contrast ratio in-repo: sRGB linearisation at the 0.03928 threshold, `(L₁+0.05)/(L₂+0.05)`. ~20 lines of `double` arithmetic. **Add no NuGet package** — see Dev Notes → *Why no package*.
-  - [ ] **Parse the token values out of `tokens.css`**, never from a table restated in C#. The harness must fail when the CSS changes, which a hardcoded copy cannot do. Read the file through `RepositoryLayout.Root` (`RepositoryLayout.cs:51`), the established pattern for reading repository files from this suite.
-  - [ ] Compute **36 ratios** — 18 gated pairs × 2 palettes — and assert each against its threshold: 4.5 on the twelve text pairs, 3.0 on the six non-text pairs. The authoritative expected values are in Dev Notes → *The contrast table, computed and verified*.
-  - [ ] Assert the two adjacency ratios are **low** (`surface-card` on `surface-column` ≈ 1.09/1.16; `surface-column` on `surface-page` ≈ 1.10/1.07) and are **not** gated against 3.0 or 4.5. Cite `DESIGN.md:345`, **not** `:347` — see the note under AC5.
-  - [ ] Assert the token **count is exactly 30 declared custom-property names**, over names and never over resolved values. See Dev Notes → *The 30-names / 26-values trap*.
-  - [ ] Assert the 15 semantic names are present by name, so a renamed or missing token fails rather than silently reducing the count.
-  - [ ] Traits: `[Trait("Suite","Architecture")]`, `[Trait("Priority","P0")]`, `[Trait("Requirement","UX-DR7")]` and `[Trait("Requirement","NFR-9")]`. The `Assumption` trait does not apply — this story hardens no PRD §12 assumption.
+- [x] **Task 3 — The contrast harness** (AC: 4, 5)
+  - [x] Add a new test class to **`tests/Yello.Tests.Architecture`**. **Do not create a test project.** See Dev Notes → *Where the harness lives, and why nothing else is a candidate*.
+  - [x] Implement WCAG 2.x relative luminance and contrast ratio in-repo: sRGB linearisation at the 0.03928 threshold, `(L₁+0.05)/(L₂+0.05)`. ~20 lines of `double` arithmetic. **Add no NuGet package** — see Dev Notes → *Why no package*.
+  - [x] **Parse the token values out of `tokens.css`**, never from a table restated in C#. The harness must fail when the CSS changes, which a hardcoded copy cannot do. Read the file through `RepositoryLayout.Root` (`RepositoryLayout.cs:51`), the established pattern for reading repository files from this suite.
+  - [x] Compute **36 ratios** — 18 gated pairs × 2 palettes — and assert each against its threshold: 4.5 on the twelve text pairs, 3.0 on the six non-text pairs. The authoritative expected values are in Dev Notes → *The contrast table, computed and verified*.
+  - [x] Assert the two adjacency ratios are **low** (`surface-card` on `surface-column` ≈ 1.09/1.16; `surface-column` on `surface-page` ≈ 1.10/1.07) and are **not** gated against 3.0 or 4.5. Cite `DESIGN.md:345`, **not** `:347` — see the note under AC5.
+  - [x] Assert the token **count is exactly 30 declared custom-property names**, over names and never over resolved values. See Dev Notes → *The 30-names / 26-values trap*.
+  - [x] Assert the 15 semantic names are present by name, so a renamed or missing token fails rather than silently reducing the count.
+  - [x] Traits: `[Trait("Suite","Architecture")]`, `[Trait("Priority","P0")]`, `[Trait("Requirement","UX-DR7")]` and `[Trait("Requirement","NFR-9")]`. The `Assumption` trait does not apply — this story hardens no PRD §12 assumption.
 
-- [ ] **Task 4 — The gates that stay true as components arrive** (AC: 1, 3, 6, 7, 9, 10, 11, 12)
-  - [ ] **This is the task that decides whether story 1.2 is real.** Most ACs are conditioned on components that do not exist yet, so a gate written against today's tree passes vacuously and keeps passing while a later story breaks it. Every gate below must therefore **scan the repository** — all `**/*.css` and all `**/*.razor` — rather than assert a property of a specific component. See Dev Notes → *The vacuous-gate problem, and what story 1.1 learned about it*.
-  - [ ] AC1 gate: no `-light` custom property is referenced outside the single theme-boundary block in `tokens.css`.
-  - [ ] AC3 gate: no `font-size` in `px` anywhere; `px` permitted only on border widths, radii and `outline-offset`. Assert the root font-size is not overridden in `px`.
-  - [ ] AC6 gate: no `outline: none` / `outline: 0` without an accompanying `:focus-visible` treatment; no `outline-offset` of `0`; no negative `outline-offset` (the inset case).
-  - [ ] AC7 gate: no `box-shadow` declaration outside the sanctioned lifted-card rule (which does not exist yet — so today the gate asserts none at all); no border width below 1.5px on a structural border.
-  - [ ] AC9 gate: the four radius values are the only ones used; `border-radius: 9999px` appears exactly once.
-  - [ ] AC10 gate: the text-link rule carries `text-decoration: underline` and no rule removes it.
-  - [ ] AC11 gate: no user-visible string literal in a `.razor` file. Today there are no components, so plant one to prove the gate. Note the known variance: `index.html` carries the framework's English error strings, which sit outside Blazor localisation — record it rather than exempting it silently.
-  - [ ] AC11, the other two clauses — *"no label sized to its English string"* and *"metadata never aligned by character count"* — are **not statically gateable** and have no component to measure. Discharge them constructively in Task 2 (content-sized boxes, no fixed widths, no character-cell alignment) and say plainly in the Dev Agent Record that they are asserted by construction rather than by a gate. Do **not** write a gate that appears to cover them and does not.
-  - [ ] UX-DR42 gate: no `text-transform: uppercase` outside a locale-scoped rule, so the exclusion of Turkish, Azeri and Greek cannot be lost by a later component adding its own uppercase.
-  - [ ] AC12 gate: a `prefers-reduced-motion: reduce` block exists and no `transition`/`animation` declaration escapes it.
-  - [ ] UX-DR42 gate: no physical `left`/`right` in any CSS property where a logical equivalent exists.
+- [x] **Task 4 — The gates that stay true as components arrive** (AC: 1, 3, 6, 7, 9, 10, 11, 12)
+  - [x] **This is the task that decides whether story 1.2 is real.** Most ACs are conditioned on components that do not exist yet, so a gate written against today's tree passes vacuously and keeps passing while a later story breaks it. Every gate below must therefore **scan the repository** — all `**/*.css` and all `**/*.razor` — rather than assert a property of a specific component. See Dev Notes → *The vacuous-gate problem, and what story 1.1 learned about it*.
+  - [x] AC1 gate: no `-light` custom property is referenced outside the single theme-boundary block in `tokens.css`.
+  - [x] AC3 gate: no `font-size` in `px` anywhere; `px` permitted only on border widths, radii and `outline-offset`. Assert the root font-size is not overridden in `px`. **Split into two gates and one clause narrowed — see Completion Note 6.**
+  - [x] AC6 gate: no `outline: none` / `outline: 0` without an accompanying `:focus-visible` treatment; no `outline-offset` of `0`; no negative `outline-offset` (the inset case).
+  - [x] AC7 gate: no `box-shadow` declaration outside the sanctioned lifted-card rule (which does not exist yet — so today the gate asserts none at all); no border width below 1.5px on a structural border.
+  - [x] AC9 gate: the four radius values are the only ones used; `border-radius: 9999px` appears exactly once. **The reference count is gated at *at most* one — see Completion Note 7.**
+  - [x] AC10 gate: the text-link rule carries `text-decoration: underline` and no rule removes it.
+  - [x] AC11 gate: no user-visible string literal in a `.razor` file. Today there are no components, so plant one to prove the gate. Note the known variance: `index.html` carries the framework's English error strings, which sit outside Blazor localisation — record it rather than exempting it silently. **Recorded, plus one further variance — see Completion Note 8.**
+  - [x] AC11, the other two clauses — *"no label sized to its English string"* and *"metadata never aligned by character count"* — are **not statically gateable** and have no component to measure. Discharge them constructively in Task 2 (content-sized boxes, no fixed widths, no character-cell alignment) and say plainly in the Dev Agent Record that they are asserted by construction rather than by a gate. Do **not** write a gate that appears to cover them and does not.
+  - [x] UX-DR42 gate: no `text-transform: uppercase` outside a locale-scoped rule, so the exclusion of Turkish, Azeri and Greek cannot be lost by a later component adding its own uppercase.
+  - [x] AC12 gate: a `prefers-reduced-motion: reduce` block exists and no `transition`/`animation` declaration escapes it.
+  - [x] UX-DR42 gate: no physical `left`/`right` in any CSS property where a logical equivalent exists.
 
-- [ ] **Task 5 — Prove every gate against a planted violation** (AC: all)
-  - [ ] For each gate in Tasks 3 and 4: introduce a real violation, confirm the build fails and that the message names the offence, then revert. Record every result in the Dev Agent Record.
-  - [ ] This is not optional. `tests/TESTING-CONVENTIONS.md:93-96`: *"An absence assertion must be validated against a planted signal, or it is not a test."* Every gate this story ships is an absence assertion against a tree with no components, which is exactly the condition under which a vacuous gate is indistinguishable from a working one.
-  - [ ] Plant at least one violation that a **later** story would plausibly write — a `.razor` file using `var(--surface-card-light)` directly, and a component with a hardcoded English string — because those are the regressions these gates exist to catch and today's empty tree cannot exercise them.
-  - [ ] Confirm `dotnet test` over the solution returns success afterwards, with `Yello.Tests.Architecture` green and the other four suites still reporting zero tests and exiting 0.
+- [x] **Task 5 — Prove every gate against a planted violation** (AC: all)
+  - [x] For each gate in Tasks 3 and 4: introduce a real violation, confirm the build fails and that the message names the offence, then revert. Record every result in the Dev Agent Record.
+  - [x] This is not optional. `tests/TESTING-CONVENTIONS.md:93-96`: *"An absence assertion must be validated against a planted signal, or it is not a test."* Every gate this story ships is an absence assertion against a tree with no components, which is exactly the condition under which a vacuous gate is indistinguishable from a working one.
+  - [x] Plant at least one violation that a **later** story would plausibly write — a `.razor` file using `var(--surface-card-light)` directly, and a component with a hardcoded English string — because those are the regressions these gates exist to catch and today's empty tree cannot exercise them.
+  - [x] Confirm `dotnet test` over the solution returns success afterwards, with `Yello.Tests.Architecture` green and the other four suites still reporting zero tests and exiting 0.
 
-- [ ] **Task 6 — Record what this story does not discharge** (AC: 13)
-  - [ ] Append AC13's E2E half to `_bmad-output/implementation-artifacts/deferred-work.md` with its owner, following the format of the two existing entries.
-  - [ ] Record the two ungated-but-used structural pairs (Dev Notes → *Two pairs the gate does not cover*) in the same place, so a later story can close them with the reasoning intact.
+- [x] **Task 6 — Record what this story does not discharge** (AC: 13)
+  - [x] Append AC13's E2E half to `_bmad-output/implementation-artifacts/deferred-work.md` with its owner, following the format of the two existing entries.
+  - [x] Record the two ungated-but-used structural pairs (Dev Notes → *Two pairs the gate does not cover*) in the same place, so a later story can close them with the reasoning intact.
 
 ## Dev Notes
 
@@ -553,14 +553,274 @@ architecture suite heavily — `9459d4b` (33 findings), `65c3e50` (second pass),
 
 ### Agent Model Used
 
+Claude Opus 5 (`claude-opus-5[1m]`), via the `bmad-dev-story` workflow.
+
 ### Debug Log References
+
+**Baseline before any change** (commit `d5b8f92`, working tree clean): `dotnet build` succeeded with 0
+warnings; `dotnet test` returned **exit 0 with 54 tests passing**, `Yello.Tests.Architecture`
+contributing 47.
+
+**Final state:** `dotnet build` succeeds with **0 warnings, 0 errors**; `dotnet test` over the
+solution returns **exit 0 with 77 tests passing, 0 failed, 0 skipped**.
+`Yello.Tests.Architecture` now contributes **70** — the 47 it inherited plus the 23 this story
+adds. The other three genuinely-empty suites (Isolation, Revocation, Merge) still report zero
+tests and exit 0; `Yello.Tests.Slices` still runs its own cases.
+
+**Independent arithmetic verification, before writing the harness.** All 36 gated ratios plus the
+two adjacency rows and the four rule-bearing combinations were recomputed from the hex values by an
+independent script. **All 36 reproduce `DESIGN.md`'s figures to two decimals; 0 mismatches; 0 gated
+pairs below threshold.** The distinct-value count came out at **26 against 30 names**, confirming
+the trap in Dev Notes is real rather than theoretical. The missing light cell at `DESIGN.md:341`
+(`border-hairline` on `role-chip`) computes to **3.4693**, i.e. the 3.47 the story predicted, and
+passes 3.0.
+
+**Token transcription verified mechanically, not by eye.** Two scripted checks compared
+`tokens.css` against `DESIGN.md`'s frontmatter: all **30 colour names present with every value
+matching exactly**, and every type, spacing, radius, border and motion value matching, with all 8
+type roles binding all 5 axes, every line-height ≥ 1.5 and every type size in `rem`. The first
+check caught a real transcription error I had introduced — `--revoked-edge-light` written as
+`#FFFFFF` instead of `#BE123C`. The contrast harness would **not** have caught it: white on
+`surface-page-light` clears 3:1 comfortably, so the gate would have been green over the wrong
+colour. Recorded because it is the exact argument for having the check.
+
+**Asset link verified in both build and publish.** The `#[.{fingerprint}]` placeholders resolve to
+`css/tokens.css` and `css/base.css` in the Debug build and in a Release publish, and the published
+`wwwroot/css/` contains files of exactly those names — so neither link 404s. No literal
+`#[.{fingerprint}]` text survives into the generated `index.html`.
+
+#### Task 5 — every gate failed on purpose first
+
+`tests/TESTING-CONVENTIONS.md:93-96` makes this a rule: *"An absence assertion must be validated
+against a planted signal, or it is not a test."* Every one of the 23 assertions below is an absence
+assertion against a tree with no components, so each was proved against a real violation and the
+violation then reverted. Every failure message named the file, the line, the property, the value
+and the selector.
+
+| Assertion | Planted violation | Result |
+|---|---|---|
+| `The_colour_token_layer_declares_exactly_the_thirty_names...` | deleted `--presence` | fails: *"'--presence' is missing"*, *"29 colour tokens are declared; the design states exactly 30"* |
+| `Every_gated_pair_meets_its_threshold_in_both_palettes` | `--text-muted-light` → `#C9CFDD`; `--surface-card` → `#FFFFFF` | fails: 8 pairs named with computed ratios, e.g. *"light: 'text-muted' (#C9CFDD) on 'surface-card' (#FFFFFF) is 1.56:1, below the required 4.50:1"* |
+| …same, resolution half | deleted `--presence` | fails: *"34 of 36 ratios were computed … a pair that resolves in one theme and not the other is half a gate"* |
+| `The_two_surface_adjacency_ratios_are_deliberately_low...` | `--surface-card` → `#FFFFFF` | fails: *"'surface-card' on 'surface-column' is 17.24:1, at or above 1.50:1"* |
+| `The_gated_set_is_exactly_the_eighteen_pairs...` | removed the `border-hairline`/`role-chip` row | fails: *"17 pairs; AC4 names 18"*, *"5 pairs are gated at 3.00:1; AC4 names 6"* |
+| `Both_palettes_resolve_every_semantic_name_to_a_hex_colour` | deleted `--presence` | fails: *"dark: '--presence' does not resolve to a hex colour"* |
+| `CssCorpus.ThemeBoundaryRange` guard | duplicated the `THEME BOUNDARY BEGIN` marker | **all 23 design assertions error rather than pass**, exit code 2: *"must contain exactly one … found 2 and 1"* |
+| `No_component_references_a_light_theme_token` | `.razor` with `style="…var(--surface-card-light)…"`; and a `.css` rule using it | fails on both: *"Planted.razor:3 references '--surface-card-light'"*, *"planted2.css:4 references '--surface-card-light'"* |
+| `Every_theme_boundary_rule_rebinds_all_fifteen_semantic_names` | removed `--role-chip` from the `[data-theme="light"]` rule only | fails: *"tokens.css:129 (':root[data-theme=\"light\"]') does not rebind '--role-chip', so that one token stays at its dark value under the light theme"* |
+| `No_colour_is_stated_as_a_literal_outside_the_token_layer` | `background-color: #18213C`; `color: rgba(…)` | fails on both |
+| `Type_is_never_sized_in_absolute_pixels` | `font-size: 13px`; `line-height: 18px` | fails on both |
+| `Pixel_lengths_outside_the_token_layer_come_from_a_token` | `margin-block: 12px`, `padding-inline: 9px`, and 5 more | fails, 7 offences named |
+| `The_focus_ring_is_never_removed_or_drawn_at_offset_zero` | `outline: none`; separately `outline-offset: -2px` | fails on both |
+| `A_visible_focus_treatment_is_declared_for_focus_visible` | removed `outline-offset`; separately removed the whole rule | fails on both: *"sets no 'outline-offset'"*, *"No rule in the repository draws an outline on ':focus-visible'"* |
+| `No_surface_carries_a_shadow` | `box-shadow: 0 2px 4px var(--danger)` | fails |
+| `No_structural_border_is_thinner_than_the_hairline_width` | `border-block-start: 1px solid …` | fails: *"sets 'border-block-start' to 1px"* |
+| `The_interactive_target_floor_is_declared_and_never_lowered` | `--target-min: 20px`; `min-height: 16px` | fails on both, and names both real consumers that the token change dragged below the floor |
+| `Only_the_four_radius_values_are_used` | `border-radius: 8px`; separately `border-radius: 50%` | fails on both |
+| `The_fully_round_radius_is_declared_once_and_used_by_at_most_one_component` | a second `9999px` literal; two rules using `var(--radius-full)` | fails on both clauses |
+| `The_text_link_is_underlined_and_no_rule_removes_it` | `a.x { text-decoration: none }`; separately removed the underline from `.text-link` | fails on both |
+| `No_user_visible_string_literal_appears_in_a_component` | `.razor` with `<p>Loading your Spaces, please wait.</p>`, `<button title="Delete this Task">Delete</button>`, `@Count overdue` | fails, 4 offences: three text nodes and the `title` attribute. The `@code` block and the `@Count` expression were correctly excluded; `overdue` was still caught |
+| `Uppercase_is_applied_only_inside_a_locale_scoped_rule` | unscoped `text-transform: uppercase` | fails: *"which is not locale-scoped"* |
+| `Reduced_motion_neutralises_every_transition_and_animation` | removed `!important` from the reset; separately an `!important` transition outside the block | fails on both clauses |
+| `No_physical_left_or_right_property_is_used_where_a_logical_one_exists` | `margin-left: 9px`; `text-align: left` | fails on both — property and value |
+| `No_box_is_given_a_fixed_height` | `height: 32px` | fails |
+
+**The planting found two real defects in the gates, which is the entire reason the story mandates
+it.** Both are fixed, and both were re-proved against the same plants afterwards:
+
+1. **`A_visible_focus_treatment_is_declared_for_focus_visible` accepted a rule that drew no ring.**
+   It selected rules by any `outline*` declaration, so a planted
+   `.x:focus-visible { outline-offset: -2px }` satisfied it — the gate found a "treatment", found
+   no width to measure, and reported green **while `base.css` had no focus rule at all**. Now
+   filtered on `outline`/`outline-width` (`IsRingDeclaration`), so a rule that only positions a
+   ring no longer counts as declaring one.
+2. **`Only_the_four_radius_values_are_used` could not see a percentage at all.** The non-px length
+   pattern ended `(?:%|em|…)\b`, and `%` is not a word character — so there is no word boundary
+   between it and the end of the value, and `border-radius: 50%` matched nothing. That is precisely
+   how a circular avatar arrives, which `DESIGN.md:431` forbids by name. The `\b` now applies to
+   the alphabetic units only.
 
 ### Completion Notes List
 
+1. **The token layer is complete and mechanically verified against its only source.** 30 colour
+   tokens (15 semantic names bound to dark values, 15 `-light` siblings), 8 type roles × 5 axes,
+   two system font stacks, the 3/6/9/12/18/24/36 spacing scale, the four `rem` internal-padding
+   values, `--target-min: 24px`, the five radius names over four values, the two border widths and
+   the eight motion tokens — every value verbatim from `DESIGN.md:10-125`, checked by script rather
+   than by eye. No npm, no bundler, no preprocessor, no token-build step, no webfont, no
+   `@font-face`, no external request. Nothing was taken from `mockups/`.
+
+2. **Two files, one job each.** `tokens.css` *declares*; `base.css` *applies* the parts that must
+   hold for every surface — the 8 type-role classes, the focus ring, the text link, the target
+   floor, the reduced-motion contract, the locale-aware casing, and `#blazor-error-ui`. It builds
+   no component. The story named only `tokens.css`; the split is mine, and it keeps the AC2 count
+   and the palette as statements about one file while everything else globs.
+
+3. **The theme boundary is one delimited region containing two rules, and this is a deliberate
+   reading of AC1 rather than a shortcut.** AC1 requires the theme to resolve "once, at the theme
+   boundary". A CSS rule cannot union a media condition with an attribute selector, so answering
+   both the OS preference (`prefers-color-scheme: light`, scoped `:not([data-theme="dark"])`) and
+   an explicit `[data-theme="light"]` needs two rules. The alternatives that would collapse it to
+   one — the empty-custom-property "space toggle" hack, or a JS-set class — are respectively
+   unreadable in a foundation layer and a new dependency in a repository with zero JS. The region
+   is marked by `THEME BOUNDARY BEGIN`/`END` comments; a gate requires exactly one well-formed
+   pair, requires **every** rule inside to rebind **all 15** names to their own `-light` siblings,
+   and refuses every `-light` reference outside it in any `.css`, `.razor` or `.html`. The
+   partial-rule failure mode this closes is real and subtle: 14 of 15 rebindings would give a user
+   with a stored light preference one dark token on a light ground, and the contrast harness reads
+   only the first boundary rule, so it would not notice.
+
+4. **`color-scheme` is the one addition beyond the story's list.** `:root` sets
+   `color-scheme: dark` and the boundary flips it to `light`. It is one line, it belongs to the
+   theme decision rather than to any component, and without it every scrollbar and form control in
+   the product renders light on a dark ground. Flagged because it is an addition, small as it is.
+
+5. **The harness computes; it does not restate.** `tokens.css` is parsed, and the **light palette
+   is resolved through the theme boundary's own rebindings** — `--accent: var(--accent-light)`
+   followed to a hex — rather than by appending `-light` to each name. That distinction is the
+   point: the naming convention is not what renders, so a boundary that rebound `--accent` to the
+   wrong sibling, or failed to rebind it, would otherwise leave the harness verifying colours the
+   light theme never shows. A bug of exactly this shape occurred during implementation and is worth
+   recording: the `var()` capture group included the leading `--` while the token map was keyed
+   without it, so **every** light lookup missed and the light palette resolved to nothing. The
+   harness did not report a contrast failure — it reported *"18 of 36 ratios were computed"*, which
+   is why that count is asserted rather than assumed.
+
+6. **AC3's gate is split in two, and one clause is deliberately narrower than Task 4's wording.**
+   Task 4 asks for "no `font-size` in `px` anywhere; `px` permitted only on border widths, radii
+   and `outline-offset`". Taken literally the second clause fails the token layer itself:
+   `DESIGN.md:99-113` states the spacing scale, the 24px target floor and the 10px long-press slop
+   in px **on purpose**, because those are structural steps that must not scale with text. AC3's
+   own text confines the restriction to type — *"never on type"*. So: the **type** ban is absolute
+   and applies inside `tokens.css` too, covering `font-size`, `line-height`, `letter-spacing`,
+   `word-spacing` and the `font` shorthand, plus a separate check that the root font-size is a
+   percentage rather than a px value. The **confinement** gate exempts the token layer and requires
+   every other file to take its lengths from a token, permitting px literals only on radii and
+   outlines. Border widths are not exempted there — they are held to the 1.5px hairline floor by
+   their own gate, which is stricter than the AC's wording, not looser.
+
+7. **The pill radius is gated at *at most* one consumer, not exactly one, and this is stated rather
+   than hidden.** AC9 says the fully-round radius is used for exactly one component — the column
+   count chip — which **epic 2 builds**. Today there are no components, so "exactly one" is
+   unsatisfiable and gating it at 1 would mean shipping a red build or quietly disabling the check.
+   The gate therefore asserts the `9999px` literal appears **exactly once** (its declaration, so no
+   component can spell out a pill radius) and that `var(--radius-full)` has **at most one**
+   consumer. Tightening it to exactly one belongs to the story that builds the chip.
+
+8. **AC11: what is gated, what is asserted by construction, and two declared variances.** The gate
+   scans every `.razor` for literal text nodes and literal localisable attributes, after removing
+   Razor comments, directives, `@code`/`@functions`/`@{}` blocks, Razor expressions and HTML
+   entities.
+   - *Variance 1, the one the story named:* `index.html` carries English strings — "Loading
+     Yello", "An unhandled error has occurred.", "Reload". They are emitted by a static file
+     **before the WebAssembly runtime exists**, so no resource lookup could serve them. The gate
+     scans `.razor`, where localisation is actually available. Recorded in `index.html` itself and
+     in the gate's own remarks, not exempted silently.
+   - *Variance 2, which the story did not anticipate:* `App.razor:13` is `<p>Yello</p>`, so the
+     tree is **not** free of `.razor` literals as the story assumed ("Today there are no
+     components"). Rather than exempt a category or leave the gate carrying a silent hole, the
+     permitted set is exactly the **PRD §2 Glossary proper nouns** — currently the single word
+     `Yello`. A brand name is not translated in any locale, and a resource entry for it would
+     externalise a string with one value in every language. Every other literal fails, as the
+     planted violations demonstrate. This is a narrow rule with a checkable reason, not a
+     heuristic like "short strings are fine".
+   - *Asserted by construction, not gated, and not claimed to be:* AC11's other two clauses — *"no
+     label sized to its English string"* and *"metadata never aligned by character count"*. Neither
+     is statically detectable and there is no component to measure. `base.css` discharges them
+     constructively: no rule sets a width, no rule sets a `height`, internal padding is in `rem` so
+     it grows with text, and nothing aligns by character cell. Writing a gate that appeared to
+     cover them would be the defect class this story exists to avoid.
+
+9. **AC8 gained a gate although no task asked for one.** AC8 appears in no task's AC list — Tasks 1
+   and 2 cover 1/2/3/6/7/9/10/12 and Task 3 covers 4/5 — so it would have been discharged only
+   constructively. It is cheaply and genuinely gateable, so it is: `--target-min` must be 24px, some
+   rule must apply `min-height: var(--target-min)`, and no minimum-height declaration anywhere may
+   fall below 24px. AC13's statically-detectable half got the same treatment (`height` with a fixed
+   length is refused corpus-wide).
+
+10. **AC5's citation is corrected in the harness, as the story instructs.** `epics.md:552` quotes
+    `DESIGN.md:347` for the two adjacency rows, but that sentence introduces two *different*
+    combinations at `:349`/`:350` — `accent` against `text-primary`, and `accent` against `danger`
+    — which are not table rows at all. The rows are governed by `DESIGN.md:345`: *"The last two
+    rows are stated for information, not as targets."* The harness cites `:345`. The figures were
+    always right; only the citation was wrong. **`epics.md` is `status: final` and has not been
+    amended — that remains question 2 for Lee.**
+
+11. **The adjacency rows are asserted *low*, which is the only direction that means anything.**
+    They are checked to sit below 1.5:1 and above 1.0:1, and separately the gated-pair table is
+    asserted **not** to contain them. If one ever climbed past 1.5 it would have stopped being an
+    adjacency step, and the design decision that the hairline — not luminance — separates grounds
+    would no longer be true of the palette.
+
+12. **The gated set is held at exactly 18, so widening it stays a deliberate act.** Twelve text
+    pairs at 4.5:1, six non-text at 3.0:1, no duplicates, and every name in the table required to
+    be one of the 15. The class carries the threshold as an enum rather than a bare `double` so the
+    12/6 split is counted by enum comparison rather than floating-point equality. The two
+    structural pairs knowingly outside the 18 — `revoked-edge` on `surface-page` (7.03/5.81) and
+    `focus-ring` on `surface-page` (8.55/4.27) — are named in the harness and recorded in
+    `deferred-work.md` with story 7.2/7.4 as owner. Both pass today.
+
+13. **No new project, no new package, no new dependency.** 23 assertions added to
+    `Yello.Tests.Architecture` in two new classes, outside the A-1…A-15 ArchUnitNET numbering for
+    the same reason the project-file gates are — they read text files, not bytecode. The suite
+    carries no `--ignore-exit-code 8` and needed no csproj edit. WCAG luminance and contrast are
+    ~20 lines of `double` arithmetic; the CSS parser is hand-written. `Math.Round` is not used at
+    all (nothing rounds except message formatting, and the assertion is "≥ 4.5", not "= 4.61"), and
+    every string comparison is `Ordinal`/`OrdinalIgnoreCase`.
+
+14. **Three stale hand-off records updated, which is what story 1.1's review history asks for.**
+    Six of story 1.1's findings were record drift. `index.html:15-23` claimed this story ships no
+    stylesheet; `index.html:26-41` said story 1.2 owns styling the error banner; and
+    `AssemblyMarker.cs:11-14` said the tree has no CSS. All three now describe the tree as it is,
+    each marked as a correction rather than silently rewritten.
+
+15. **Not built, deliberately.** No component of any kind. No lifted-card treatment (story 2.7). No
+    Label chip colours (story 2.4). No theme toggle or stored preference — the boundary answers
+    both triggers, but nothing *selects* a theme and no upstream document decides what should
+    (question 1, and recorded in `deferred-work.md`). No E2E/browser project (blocker B5). No
+    coverage threshold. No scoped `.razor.css`, so the `Yello.Client.styles.css` link story 1.1
+    removed stays removed.
+
+16. **The six questions in the story remain open and none of them blocked implementation.**
+    Question 1 (what selects the theme) is recorded in `deferred-work.md`. Question 2 (AC5's
+    citation) is corrected in code but `epics.md` is untouched. Question 3 (the missing light cell)
+    is computed as **3.47** and passes, but `DESIGN.md` still shows an em-dash. Question 4 (widening
+    to 20 gated pairs) is recorded with an owner. Question 5 (AC13's E2E half) is recorded with an
+    owner. Question 6 (the glossary round-trip for `token`, `theme`, `focus ring`, `role chip`,
+    `revoked edge`) is untouched — `glossary.md` was not edited.
+
 ### File List
+
+**Added**
+
+- `Yello.Client/wwwroot/css/tokens.css`
+- `Yello.Client/wwwroot/css/base.css`
+- `tests/Yello.Tests.Architecture/WcagContrast.cs`
+- `tests/Yello.Tests.Architecture/CssCorpus.cs`
+- `tests/Yello.Tests.Architecture/ColorTokenContrastTests.cs`
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.cs`
+
+**Modified**
+
+- `Yello.Client/wwwroot/index.html` — linked both stylesheets with the `#[.{fingerprint}]` form; replaced the two stale hand-off comments; recorded the pre-boot copy variance.
+- `Yello.Client/AssemblyMarker.cs` — replaced the stale "adds no components and no CSS" hand-off remark.
+- `_bmad-output/implementation-artifacts/deferred-work.md` — added the story 1.2 section: AC13's E2E half, the two ungated structural pairs, and the undecided theme trigger.
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — `1-2-…` `ready-for-dev` → `in-progress` → `review`.
+- `_bmad-output/implementation-artifacts/1-2-the-design-foundations-every-surface-is-drawn-from.md` — this file: task checkboxes, Dev Agent Record, File List, Change Log, Status.
+
+**Deleted**
+
+- None.
 
 ### Change Log
 
 | Date | Change |
 |---|---|
 | 2026-08-27 | Story created. Status → `ready-for-dev`. |
+| 2026-08-27 | Task 1: added `tokens.css` — 30 colour tokens, the theme boundary, 8 type roles, the spacing, radius, border and motion scales. Every value verified against `DESIGN.md` by script; one transcription error (`--revoked-edge-light`) caught and fixed that way. |
+| 2026-08-27 | Task 2: added `base.css` — type-role classes, focus ring, text link, target floor, reduced-motion contract, locale-aware casing, `#blazor-error-ui`. Linked both sheets from `index.html` and corrected three stale hand-off records. |
+| 2026-08-27 | Task 3: added the contrast harness — WCAG 2.x arithmetic in-repo, `tokens.css` parsed, the light palette resolved through the theme boundary. 36 ratios computed; all 18 pairs pass in both palettes. No new project, no new package. |
+| 2026-08-27 | Task 4: added 18 repository-scanning gates for AC1, 3, 6, 7, 8, 9, 10, 11, 12, 13 and UX-DR42. |
+| 2026-08-27 | Task 5: proved all 23 assertions against planted violations. Two real gate defects found and fixed — a focus rule that drew no ring was accepted, and `border-radius: 50%` was invisible to the radius gate. |
+| 2026-08-27 | Task 6: recorded AC13's E2E half, the two ungated structural pairs, and the undecided theme trigger in `deferred-work.md`. |
+| 2026-08-27 | Full solution green: `dotnet build` 0 warnings, `dotnet test` exit 0 with 77 passing (was 54). Status → `review`. |
