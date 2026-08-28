@@ -43,7 +43,8 @@ colors:
 typography:
   # Sizes in rem against a 16px root so a user font-size preference is honoured
   # (WCAG 1.4.4). Line-heights are >= 1.5 so a 1.4.12 text-spacing override has
-  # room to grow. px appears only on hairlines and radii, never on type.
+  # room to grow. px never sizes or spaces type; it carries the structural
+  # lengths below (spacing, target floor, hairlines, radii, offsets, slop).
   task-title:
     fontFamily: system-sans
     fontSize: 0.8125rem
@@ -374,7 +375,7 @@ Two families, both **system stacks**:
 
 `[ASSUMPTION: no webfont. Nothing upstream named a typeface. System stacks cost nothing against the £30/month ceiling (§6.3), add no render-blocking request to an already-large Blazor WebAssembly payload, and cover far more scripts than any single webfont — which matters because internationalisation is in scope.]`
 
-**Sizes are in `rem` against a 16px root, and every line-height is ≥ 1.5.** Both are gate requirements rather than preferences. Absolute px type ignores a user's browser font-size preference entirely, which is the most common low-vision accommodation and what WCAG 1.4.4 is really about; and a line-height of 1 leaves a line box exactly the glyph height, which cannot absorb the 1.5× override WCAG 1.4.12 lets a user apply. `px` survives only on hairlines, radii and outline offsets — values that should *not* scale with text.
+**Sizes are in `rem` against a 16px root, and every line-height is ≥ 1.5.** Both are gate requirements rather than preferences. Absolute px type ignores a user's browser font-size preference entirely, which is the most common low-vision accommodation and what WCAG 1.4.4 is really about; and a line-height of 1 leaves a line box exactly the glyph height, which cannot absorb the 1.5× override WCAG 1.4.12 lets a user apply. `px` never sizes or spaces **type**, in any file. It survives on the structural lengths that should *not* scale with text — the spacing scale, the target floor, hairlines, radii, outline offsets and the long-press slop — and those are stated in the token layer, so every other file takes its lengths from a token. *(Clarified 2026-08-27 at story 1.2's code review: the original sentence, "`px` survives only on hairlines, radii and outline offsets", contradicted the token values fixed at :99-113 of this document.)*
 
 **Task titles are the only content on a card**; everything else is metadata. `{typography.task-title}` at 0.8125rem/600 is heavier than a conventional body weight so a title holds against the mono metadata below it without being larger.
 

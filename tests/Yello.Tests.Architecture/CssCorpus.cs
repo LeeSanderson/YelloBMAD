@@ -84,6 +84,46 @@ internal static partial class CssCorpus
     ];
 
     /// <summary>
+    /// CSS written inside markup - <c>style</c> attributes and <c>&lt;style&gt;</c> element bodies
+    /// - presented as a stylesheet per markup file so every gate sees it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Without this, every CSS gate in the suite was bypassable by one attribute.</b> A single
+    /// <c>style="box-shadow: 0 2px 4px #000; height: 32px; border-radius: 50%; margin-left: 9px;
+    /// text-transform: uppercase; font-size: 13px; outline: none"</c> on one element defeated the
+    /// shadow, fixed-height, radius, physical-property, type-px and outline gates simultaneously
+    /// and the suite reported every assertion green. Markup was read by exactly one gate, and only
+    /// for the two <c>-light</c> regexes, while the class docblock claimed the gates covered
+    /// "all <c>*.css</c>, all <c>*.razor</c>, all <c>*.html</c>". Blazor components routinely
+    /// carry <c>style</c> attributes, so this was the most probable regression path in epic 2.
+    /// </para>
+    /// <para>
+    /// Offsets are REAL offsets into the markup file, not into a synthesised stylesheet, so a
+    /// failure message names a line a human can open. For <c>&lt;style&gt;</c> bodies that is
+    /// achieved by blanking everything outside the body and parsing the result - the same
+    /// length-preserving trick the comment blanker uses.
+    /// </para>
+    /// <para>
+    /// A value that begins with <c>@</c> is a Razor expression rather than CSS and is skipped:
+    /// <c>style="@BarWidth"</c> is a binding whose text this parser cannot evaluate, and reporting
+    /// its identifier as a declaration would fail correct code.
+    /// </para>
+    /// </remarks>
+    public static IReadOnlyList<Sheet> MarkupStyleSheets { get; } =
+    [
+        .. MarkupFiles.Select(ReadMarkupStyles),
+    ];
+
+    /// <summary>
+    /// Every stylesheet and every markup file's inline CSS, which is what the gates iterate.
+    /// </summary>
+    public static IReadOnlyList<Sheet> AllSheets { get; } =
+    [
+        .. StyleSheets.Concat(MarkupStyleSheets),
+    ];
+
+    /// <summary>
     /// The offsets of the theme-boundary markers in the token layer.
     /// </summary>
     public static (int Begin, int End) ThemeBoundaryRange { get; } = FindThemeBoundary();
@@ -98,6 +138,20 @@ internal static partial class CssCorpus
     /// <see cref="ThemeBoundaryBindings"/>.
     /// </remarks>
     public static IReadOnlyDictionary<string, string> TokenValues { get; } = ReadTokenValues();
+
+    /// <summary>
+    /// Every custom property declared anywhere in the corpus outside the theme boundary, which is
+    /// what <see cref="Resolve"/> substitutes from.
+    /// </summary>
+    /// <remarks>
+    /// Wider than <see cref="TokenValues"/> on purpose. Resolution has to see every declaration
+    /// the browser sees, or a <c>var()</c> naming a property declared in <c>base.css</c> - or in
+    /// any stylesheet a later story adds - resolves to nothing, and then every length gate
+    /// downstream measures no number and reports green. <c>TokenValues</c> stays confined to the
+    /// token layer because the AC2 count and the palette are statements about THAT file.
+    /// </remarks>
+    public static IReadOnlyDictionary<string, string> AllCustomProperties { get; } =
+        ReadAllCustomProperties();
 
     /// <summary>
     /// The rules inside the theme boundary that rebind custom properties, in file order.
@@ -118,13 +172,29 @@ internal static partial class CssCorpus
     /// <summary>
     /// The token layer, or a failure that says which file is missing.
     /// </summary>
-    public static Sheet Tokens =>
-        StyleSheets.SingleOrDefault(IsTokensFile)
-        ?? throw new InvalidOperationException(
-            $"Expected exactly one '{TokensFileName}' in the source tree; found " +
-            $"{StyleSheets.Count(IsTokensFile)}. Every design gate in this suite reads the token " +
-            "layer, so it cannot run without knowing which file that is - and two of them would " +
-            "mean two competing token sets.");
+    /// <remarks>
+    /// Counted before it is taken, not via <c>SingleOrDefault</c>. That threw
+    /// <c>"Sequence contains more than one matching element"</c> on the duplicate case - before the
+    /// <c>?? throw</c> could run - so the crafted message below was reachable only for ZERO
+    /// matches and its count interpolation was dead code for the branch it was written for. An
+    /// unnamed framework exception inside a release gate is the outcome
+    /// <c>RepositoryLayout.LoadXml</c>/<c>LoadJson</c> exist to avoid.
+    /// </remarks>
+    public static Sheet Tokens
+    {
+        get
+        {
+            var found = StyleSheets.Where(IsTokensFile).ToList();
+
+            return found.Count == 1
+                ? found[0]
+                : throw new InvalidOperationException(
+                    $"Expected exactly one '{TokensFileName}' in the source tree; found " +
+                    $"{found.Count}. Every design gate in this suite reads the token layer, so it " +
+                    "cannot run without knowing which file that is - and two of them would mean " +
+                    "two competing token sets.");
+        }
+    }
 
     /// <summary>
     /// True when an offset in the token layer falls inside the theme boundary.
@@ -142,7 +212,7 @@ internal static partial class CssCorpus
     /// Every rule in every stylesheet.
     /// </summary>
     public static IEnumerable<(Sheet Sheet, Rule Rule)> AllRules() =>
-        from sheet in StyleSheets
+        from sheet in AllSheets
         from rule in sheet.Rules
         select (sheet, rule);
 
@@ -204,10 +274,158 @@ internal static partial class CssCorpus
         select double.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
 
     /// <summary>
+    /// The root font size the <c>rem</c> scale is measured against. <c>base.css</c> pins
+    /// <c>html { font-size: 100% }</c> and a gate refuses any px override, so 16 is the browser
+    /// default this resolves to.
+    /// </summary>
+    public const double RootFontSizePx = 16;
+
+    /// <summary>
+    /// Every length in a value that can be converted to px, in px, after token substitution.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why the px-only reading was not enough.</b> A floor stated in px and measured in px is
+    /// defeated by writing the same length in another unit. <c>border-block-start: 0.0625rem</c>
+    /// is 1px and passed the 1.5px hairline floor; <c>min-height: 1rem</c> is 16px and passed the
+    /// 24px target floor; <c>font-size: 13pt</c> is absolute type and passed the px type ban.
+    /// Every one of those is the requirement defeated by a unit change rather than by a value
+    /// change.
+    /// </para>
+    /// <para>
+    /// <c>em</c> is converted against the root as an approximation - its real basis is the
+    /// element's own font size, which static analysis cannot know. The approximation is
+    /// deliberately on the permissive side for the *unit* and still catches every case where the
+    /// NUMBER is small enough to breach a floor, which is the shape these gates check.
+    /// <c>ex</c>, <c>ch</c>, percentages and the viewport units are NOT converted: they are
+    /// font- or container-relative in ways no fixed factor represents, and a wrong number in a
+    /// failure message is worse than an honest omission.
+    /// </para>
+    /// </remarks>
+    public static IEnumerable<double> AbsoluteLengthsPx(string value)
+    {
+        var resolved = Resolve(value);
+
+        foreach (var match in AbsoluteLengthPattern.Matches(resolved).Cast<Match>())
+        {
+            var number = double.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture);
+            var unit = match.Groups[2].Value.ToUpperInvariant();
+
+            yield return number * UnitFactorPx(unit);
+        }
+    }
+
+    /// <summary>
+    /// The px widths of any border-width keywords in a value.
+    /// </summary>
+    /// <remarks>
+    /// Kept separate from <see cref="AbsoluteLengthsPx"/> deliberately. <c>medium</c> and
+    /// <c>thin</c> are lengths only in a border-width context; folding them into the general
+    /// length reader would make them into lengths everywhere, and a gate would then report a
+    /// font stack or a keyword value as a 3px length.
+    /// </remarks>
+    public static IEnumerable<double> BorderWidthKeywordsPx(string value)
+    {
+        foreach (var match in BorderWidthKeywordPattern.Matches(Resolve(value)).Cast<Match>())
+        {
+            yield return KeywordWidthPx(match.Value.ToUpperInvariant());
+        }
+    }
+
+    /// <summary>
+    /// px per unit, for the units a fixed factor genuinely represents.
+    /// </summary>
+    private static double UnitFactorPx(string unit) => unit switch
+    {
+        "PX" => 1,
+        "REM" or "EM" => RootFontSizePx,
+        "PT" => 96.0 / 72.0,
+        "PC" => 16,
+        "IN" => 96,
+        "CM" => 96.0 / 2.54,
+        "MM" => 96.0 / 25.4,
+        "Q" => 96.0 / 101.6,
+        _ => 1,
+    };
+
+    /// <summary>
+    /// The px width of a border-width keyword, per CSS 2.1's usual UA values.
+    /// </summary>
+    private static double KeywordWidthPx(string keyword) => keyword switch
+    {
+        "THIN" => 1,
+        "MEDIUM" => 3,
+        "THICK" => 5,
+        _ => 0,
+    };
+
+    /// <summary>
     /// Text with every CSS comment replaced by spaces of the same length, so offsets survive.
     /// </summary>
-    public static string BlankCssComments(string text) =>
-        CssCommentPattern.Replace(text, m => Blank(m.Value));
+    /// <remarks>
+    /// Walked rather than regex-replaced, because a comment marker can appear inside a quoted
+    /// value - <c>content: "/*"</c> is legal CSS - and a regex has no way to know it is inside a
+    /// string. Blanking from that <c>/*</c> to the next <c>*&#47;</c> anywhere later in the file
+    /// would blank REAL declarations, and the gates would then never see the code they were
+    /// written to check. Quoted runs are therefore skipped before comments are recognised.
+    /// </remarks>
+    public static string BlankCssComments(string text)
+    {
+        var characters = text.ToCharArray();
+        var index = 0;
+
+        while (index < text.Length)
+        {
+            var current = text[index];
+
+            if (current is '"' or '\'')
+            {
+                index = SkipQuoted(text, index);
+                continue;
+            }
+
+            if (current == '/' && index + 1 < text.Length && text[index + 1] == '*')
+            {
+                var close = text.IndexOf("*/", index + 2, StringComparison.Ordinal);
+                var end = close < 0 ? text.Length - 1 : close + 1;
+
+                BlankSpan(characters, index, end);
+                index = end + 1;
+                continue;
+            }
+
+            index++;
+        }
+
+        return new string(characters);
+    }
+
+    /// <summary>
+    /// The index just past a quoted run starting at <paramref name="start"/>.
+    /// </summary>
+    private static int SkipQuoted(string text, int start)
+    {
+        var quote = text[start];
+        var index = start + 1;
+
+        while (index < text.Length && text[index] != quote)
+        {
+            index += text[index] == '\\' ? 2 : 1;
+        }
+
+        return index + 1;
+    }
+
+    private static void BlankSpan(char[] characters, int from, int to)
+    {
+        for (var index = Math.Max(from, 0); index <= to && index < characters.Length; index++)
+        {
+            if (characters[index] is not ('\r' or '\n'))
+            {
+                characters[index] = ' ';
+            }
+        }
+    }
 
     /// <summary>
     /// The same, for markup: Razor comments, HTML comments and the C# block comments that appear
@@ -255,8 +473,23 @@ internal static partial class CssCorpus
         }
     }
 
+    /// <summary>
+    /// True when a value still names a <c>var()</c> reference after resolution, so a gate can
+    /// report the unresolved reference rather than silently measuring nothing.
+    /// </summary>
+    public static bool HasUnresolvedReference(string value) =>
+        VarReferencePattern.IsMatch(Resolve(value));
+
+    /// <summary>
+    /// Every custom-property name referenced in a value that resolution could not substitute.
+    /// </summary>
+    public static IEnumerable<string> UnresolvedReferences(string value) =>
+        ReferencedTokens(Resolve(value));
+
     private static string Substitute(Match match) =>
-        TokenValues.TryGetValue(match.Groups[1].Value, out var resolved) ? resolved : match.Value;
+        AllCustomProperties.TryGetValue(match.Groups[1].Value, out var resolved)
+            ? resolved
+            : match.Value;
 
     private static bool IsTokensFile(Sheet sheet) =>
         sheet.File.Name.Equals(TokensFileName, StringComparison.OrdinalIgnoreCase);
@@ -285,7 +518,9 @@ internal static partial class CssCorpus
         var raw = File.ReadAllText(file.FullName);
         var blanked = BlankCssComments(raw);
 
-        return new Sheet(file, RepositoryLayout.RelativePath(file), raw, blanked, Parse(blanked));
+        var path = RepositoryLayout.RelativePath(file);
+
+        return new Sheet(file, path, raw, blanked, Parse(blanked, path));
     }
 
     private static Markup ReadMarkupFile(FileInfo file)
@@ -293,6 +528,121 @@ internal static partial class CssCorpus
         var raw = File.ReadAllText(file.FullName);
 
         return new Markup(file, RepositoryLayout.RelativePath(file), raw, BlankMarkupComments(raw));
+    }
+
+    /// <summary>
+    /// Turns one markup file's inline CSS into a stylesheet: its <c>&lt;style&gt;</c> bodies and
+    /// one rule per <c>style</c> attribute.
+    /// </summary>
+    private static Sheet ReadMarkupStyles(Markup markup)
+    {
+        var rules = new List<Rule>();
+
+        rules.AddRange(Parse(StyleElementBodiesOnly(markup.Blanked), markup.Path));
+
+        foreach (var match in StyleAttributePattern.Matches(markup.Blanked).Cast<Match>())
+        {
+            var value = match.Groups[2].Value;
+
+            if (value.TrimStart().StartsWith('@'))
+            {
+                continue;
+            }
+
+            var declarations = new List<Declaration>();
+
+            foreach (var (statement, offset) in SplitStatements(value, match.Groups[2].Index))
+            {
+                AddDeclaration(statement, offset, declarations);
+            }
+
+            if (declarations.Count > 0)
+            {
+                rules.Add(new Rule("[style]", string.Empty, match.Index, declarations));
+            }
+        }
+
+        return new Sheet(
+            markup.File,
+            markup.Path,
+            markup.Raw,
+            markup.Blanked,
+            [.. rules.OrderBy(r => r.Offset)]);
+    }
+
+    /// <summary>
+    /// The text with everything outside a <c>&lt;style&gt;</c> element's body blanked, so parsing
+    /// it yields rules at their real offsets in the file.
+    /// </summary>
+    private static string StyleElementBodiesOnly(string text)
+    {
+        var characters = new char[text.Length];
+
+        for (var index = 0; index < text.Length; index++)
+        {
+            characters[index] = text[index] is '\r' or '\n' ? text[index] : ' ';
+        }
+
+        foreach (var match in StyleElementPattern.Matches(text).Cast<Match>())
+        {
+            var body = match.Groups[1];
+
+            for (var index = body.Index; index < body.Index + body.Length; index++)
+            {
+                characters[index] = text[index];
+            }
+        }
+
+        return new string(characters);
+    }
+
+    /// <summary>
+    /// Splits a declaration list on semicolons that are not inside parentheses or quotes, keeping
+    /// each statement's real offset.
+    /// </summary>
+    private static IEnumerable<(string Statement, int Offset)> SplitStatements(string value, int start)
+    {
+        var depth = 0;
+        var from = 0;
+        var index = 0;
+
+        // A while loop rather than a for: a quoted run advances the position by more than one, and
+        // the coding standard forbids writing the stop-condition variable inside a for body.
+        while (index < value.Length)
+        {
+            var current = value[index];
+
+            if (current is '"' or '\'')
+            {
+                index = SkipQuoted(value, index);
+                continue;
+            }
+
+            if (current == '(')
+            {
+                depth++;
+            }
+            else if (current == ')')
+            {
+                depth = Math.Max(depth - 1, 0);
+            }
+            else if (current == ';' && depth == 0)
+            {
+                yield return (value[from..index], start + from);
+                from = index + 1;
+            }
+            else
+            {
+                // Any other character neither terminates a statement nor changes depth.
+            }
+
+            index++;
+        }
+
+        if (from < value.Length)
+        {
+            yield return (value[from..], start + from);
+        }
     }
 
     private static IReadOnlyDictionary<string, string> ReadTokenValues()
@@ -305,6 +655,41 @@ internal static partial class CssCorpus
             {
                 // Last wins, as the cascade does within one origin.
                 values[declaration.Property[2..]] = declaration.Value.Trim();
+            }
+        }
+
+        return values;
+    }
+
+    /// <summary>
+    /// Reads every custom property from every stylesheet, excluding the token layer's theme
+    /// boundary.
+    /// </summary>
+    /// <remarks>
+    /// The boundary exclusion is applied to the TOKEN LAYER ONLY. Offsets are per-file, so
+    /// testing another sheet's offset against the token layer's boundary range would exclude
+    /// whichever of its rules happened to sit between the same two byte positions.
+    /// </remarks>
+    private static IReadOnlyDictionary<string, string> ReadAllCustomProperties()
+    {
+        var values = new Dictionary<string, string>(StringComparer.Ordinal);
+
+        foreach (var sheet in StyleSheets)
+        {
+            var isTokenLayer = IsTokensFile(sheet);
+
+            foreach (var rule in sheet.Rules)
+            {
+                if (isTokenLayer && IsInsideThemeBoundary(rule.Offset))
+                {
+                    continue;
+                }
+
+                foreach (var declaration in rule.Declarations.Where(IsCustomProperty))
+                {
+                    // Last wins, as the cascade does within one origin.
+                    values[declaration.Property[2..]] = declaration.Value.Trim();
+                }
             }
         }
 
@@ -374,10 +759,10 @@ internal static partial class CssCorpus
     /// and CSS nesting is the single most likely such construct.
     /// </para>
     /// </remarks>
-    private static IReadOnlyList<Rule> Parse(string blanked)
+    private static IReadOnlyList<Rule> Parse(string blanked, string path)
     {
         var rules = new List<Rule>();
-        var cursor = new Cursor(blanked);
+        var cursor = new Cursor(blanked, path);
 
         ParseBlock(cursor, [], string.Empty, rules);
 
@@ -395,6 +780,16 @@ internal static partial class CssCorpus
         while (!cursor.AtEnd)
         {
             var current = cursor.Current;
+
+            // Inside a parenthesised run, `;`, `{` and `}` are ordinary characters. A data URI -
+            // `url(data:image/svg+xml;base64,AAA)` - carries a semicolon that is NOT a statement
+            // terminator, and splitting there turned one declaration into a property no gate
+            // matches plus a dropped fragment: a silent pass rather than a parse error.
+            if (cursor.InParens && current is ';' or '{' or '}')
+            {
+                cursor.Append();
+                continue;
+            }
 
             if (current == '}')
             {
@@ -420,13 +815,34 @@ internal static partial class CssCorpus
             }
             else
             {
-                cursor.Append();
+                AppendTrackingParens(cursor, current);
             }
         }
 
         Flush(cursor, declarations);
 
         return declarations;
+    }
+
+    /// <summary>
+    /// Appends one ordinary character, keeping the cursor's parenthesis depth current.
+    /// </summary>
+    private static void AppendTrackingParens(Cursor cursor, char current)
+    {
+        if (current == '(')
+        {
+            cursor.EnterParen();
+        }
+        else if (current == ')')
+        {
+            cursor.ExitParen();
+        }
+        else
+        {
+            // Any other character leaves the parenthesis depth unchanged.
+        }
+
+        cursor.Append();
     }
 
     private static void OpenBlock(Cursor cursor, List<string> atRules, string selector, List<Rule> rules)
@@ -506,9 +922,6 @@ internal static partial class CssCorpus
     private static string CollapseWhitespace(string text) =>
         WhitespaceRunPattern.Replace(text, " ").Trim();
 
-    [GeneratedRegex(@"/\*[\s\S]*?\*/", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
-    private static partial Regex CssCommentPattern { get; }
-
     [GeneratedRegex(@"@\*[\s\S]*?\*@|<!--[\s\S]*?-->|/\*[\s\S]*?\*/", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
     private static partial Regex MarkupCommentPattern { get; }
 
@@ -525,11 +938,50 @@ internal static partial class CssCorpus
 
     // A px length, signed and optionally fractional, with a boundary in front so the `2px` inside
     // an identifier or a longer number is not read as a length.
-    [GeneratedRegex(@"(?<![\w.])(-?\d+(?:\.\d+)?)px\b", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
+    //
+    // `IgnoreCase` and the leading-dot alternative are both load-bearing. CSS units are
+    // case-insensitive, so `13PX` and `1Px` are lengths the browser honours and the original
+    // case-sensitive pattern saw no number at all - every length gate passed. And `.5px` is a
+    // legal length written without a leading zero, which the original `-?\d+` could not capture,
+    // so a sub-hairline border written that way was invisible. The lookbehind still blocks the
+    // `.5px` inside `1.5px` from matching on its own, because the character before the dot is a
+    // word character.
+    [GeneratedRegex(
+        @"(?<![\w.])(-?(?:\d+(?:\.\d+)?|\.\d+))px\b",
+        RegexOptions.IgnoreCase,
+        matchTimeoutMilliseconds: 5000)]
     private static partial Regex PixelLengthPattern { get; }
 
     [GeneratedRegex(@"\s+", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
     private static partial Regex WhitespaceRunPattern { get; }
+
+    // A length in any unit a fixed factor converts to px. `ex`, `ch`, `%` and the viewport units
+    // are deliberately absent - see AbsoluteLengthsPx.
+    [GeneratedRegex(
+        @"(?<![\w.])(-?(?:\d+(?:\.\d+)?|\.\d+))(px|rem|em|pt|pc|in|cm|mm|q)\b",
+        RegexOptions.IgnoreCase,
+        matchTimeoutMilliseconds: 5000)]
+    private static partial Regex AbsoluteLengthPattern { get; }
+
+    // The three border-width keywords, which are lengths without being numbers.
+    [GeneratedRegex(@"\b(?:thin|medium|thick)\b", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 5000)]
+    private static partial Regex BorderWidthKeywordPattern { get; }
+
+    // A `style` attribute and its value. The quote character is captured and back-referenced so
+    // both quoting styles are read with one pattern and the OTHER quote may appear inside the
+    // value. The lookbehind stops `data-style=` and any other `-style` suffix from matching.
+    [GeneratedRegex(
+        @"(?<![\w-])style\s*=\s*([""'])((?:(?!\1)[\s\S])*)\1",
+        RegexOptions.IgnoreCase,
+        matchTimeoutMilliseconds: 5000)]
+    private static partial Regex StyleAttributePattern { get; }
+
+    // A `<style>` element and its body.
+    [GeneratedRegex(
+        @"<style\b[^>]*>([\s\S]*?)</style\s*>",
+        RegexOptions.IgnoreCase,
+        matchTimeoutMilliseconds: 5000)]
+    private static partial Regex StyleElementPattern { get; }
 
     /// <summary>
     /// One declaration inside a rule, with its offset in the file.
@@ -571,7 +1023,7 @@ internal static partial class CssCorpus
     /// the parent's, silently, and every gate downstream would be reading rules that do not exist
     /// in the file.
     /// </remarks>
-    private sealed class Cursor(string text)
+    private sealed class Cursor(string text, string path)
     {
         public StringBuilder Buffer { get; } = new();
 
@@ -583,7 +1035,18 @@ internal static partial class CssCorpus
 
         public char Current => text[Index];
 
+        /// <summary>
+        /// How many unclosed <c>(</c> the cursor sits inside.
+        /// </summary>
+        public int ParenDepth { get; private set; }
+
+        public bool InParens => ParenDepth > 0;
+
         public void Advance() => Index++;
+
+        public void EnterParen() => ParenDepth++;
+
+        public void ExitParen() => ParenDepth = Math.Max(ParenDepth - 1, 0);
 
         public void Append()
         {
@@ -596,11 +1059,18 @@ internal static partial class CssCorpus
         /// Consumes a quoted string into the buffer, so a <c>;</c> or <c>{</c> inside it does not
         /// terminate a declaration that has not ended.
         /// </summary>
+        /// <remarks>
+        /// An unterminated quote THROWS rather than running to end of file. Consuming to the end
+        /// silently meant every rule after the quote was never parsed at all, and every gate in
+        /// this suite then reported green over a stylesheet it had not read - the worst available
+        /// outcome, and indistinguishable from a clean run.
+        /// </remarks>
         public void ConsumeString()
         {
             MarkContent();
 
             var quote = Current;
+            var start = Index;
             Buffer.Append(quote);
             Index++;
 
@@ -616,11 +1086,16 @@ internal static partial class CssCorpus
                 Index++;
             }
 
-            if (!AtEnd)
+            if (AtEnd)
             {
-                Buffer.Append(Current);
-                Index++;
+                throw new InvalidOperationException(
+                    $"'{path}' has an unterminated {quote} string starting at line " +
+                    $"{LineAt(text, start)}. Every rule after it would be unparsed, so every " +
+                    "design gate would report green over a stylesheet it never read.");
             }
+
+            Buffer.Append(Current);
+            Index++;
         }
 
         /// <summary>

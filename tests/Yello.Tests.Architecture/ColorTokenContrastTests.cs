@@ -301,21 +301,35 @@ public sealed class ColorTokenContrastTests
     }
 
     /// <summary>
-    /// The two surface-adjacency ratios are deliberately low, and are gated against nothing.
+    /// The two surface-adjacency ratios are bounded as deliberately low, and are held to no
+    /// contrast threshold.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// At roughly 1.09 and 1.10 the tonal steps are effectively invisible as boundaries, which is
     /// exactly why the border carries component identity alone. They are asserted LOW rather than
     /// asserted high: if one ever climbed past <see cref="AdjacencyCeiling"/> it would have
     /// stopped being an adjacency step, and the design decision that the hairline separates
     /// grounds - not luminance - would no longer be true of the palette.
+    /// </para>
+    /// <para>
+    /// <b>"Bounded", not "not gated" - the name and message were corrected at code review on
+    /// 2026-08-27.</b> AC5's words are that the rows are "not gated against any threshold", and
+    /// this test asserted <c>1.0 &lt; ratio &lt; 1.5</c> while its name said the opposite. Those
+    /// are bounds, and <see cref="AdjacencyCeiling"/> appeared in no upstream document. Lee's
+    /// decision was to keep the bounds and amend <b>UX-DR7</b> (<c>epics.md:224</c>) to sanction
+    /// them, on the grounds that asserting low is stronger than asserting nothing - so the
+    /// requirement now says what the code does, and the code says what it checks. What remains
+    /// true of AC5 is the part that matters: no CONTRAST threshold is applied to these rows, and
+    /// they are excluded from the gated 18.
+    /// </para>
     /// <para>
     /// Note the light ladder is flatter than the dark one at 1.07, so the light border matters
     /// more, not less.
     /// </para>
     /// </remarks>
     [Fact]
-    public void The_two_surface_adjacency_ratios_are_deliberately_low_and_are_not_gated()
+    public void The_two_surface_adjacency_ratios_are_bounded_low_and_held_to_no_contrast_threshold()
     {
         var problems = new List<string>();
 
@@ -368,7 +382,9 @@ public sealed class ColorTokenContrastTests
             string.Join(Environment.NewLine, problems.Select(p => $"  - {p}")) +
             $"{Environment.NewLine}{Environment.NewLine}" +
             "DESIGN.md:345 names these two rows explicitly as stated for information rather than " +
-            "as targets - they separate grounds by hairline, not by luminance.");
+            "as targets - they separate grounds by hairline, not by luminance. No CONTRAST " +
+            $"threshold applies to them; they are bounded to 1.0 < ratio < {WcagContrast.Format(AdjacencyCeiling)} " +
+            "so that a redrawn tonal ladder is detected, which UX-DR7 sanctions.");
     }
 
     /// <summary>

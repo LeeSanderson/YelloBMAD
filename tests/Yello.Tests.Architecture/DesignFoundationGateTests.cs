@@ -84,7 +84,33 @@ public sealed partial class DesignFoundationGateTests
 
     private const double LengthTolerance = 1e-9;
 
+    /// <summary>
+    /// The line-height floor. AC3, and the figure WCAG 1.4.12's 1.5x text-spacing override needs a
+    /// line box to be able to absorb.
+    /// </summary>
+    private const double MinimumLineHeight = 1.5;
+
+    /// <summary>
+    /// Custom-property name endings that carry a typographic value, so the type ban reaches the
+    /// token layer where the scale is actually declared.
+    /// </summary>
+    private static readonly string[] TypographicTokenSuffixes =
+        ["-size", "-line-height", "-letter-spacing", "-word-spacing"];
+
     private static readonly double[] AllowedRadiiPx = [0, 2, 3, 6, 9999];
+
+    /// <summary>
+    /// The number of semantic colour names AC2 fixes. Asserted rather than assumed, because every
+    /// completeness check in this class derives its expectation from the token layer.
+    /// </summary>
+    private const int ExpectedSemanticNameCount = 15;
+
+    /// <summary>
+    /// How far off a whole device pixel a snapped width may land. Loose enough for the repeating
+    /// decimals exact snapping produces - 3/1.75 is 1.7142857px - and far tighter than the half
+    /// pixel that causes the antialiasing in the first place.
+    /// </summary>
+    private const double SnapTolerance = 1e-3;
 
     /// <summary>
     /// Values that switch a property off rather than set it.
@@ -160,7 +186,109 @@ public sealed partial class DesignFoundationGateTests
             "float",
             "clear",
             "text-align",
+            "text-align-last",
+            "background-position",
+            "background-position-x",
+            "object-position",
+            "transform-origin",
+            "perspective-origin",
+            "caption-side",
+            "resize",
+            "direction",
         };
+
+    /// <summary>
+    /// Shorthands whose multi-value form is physical: the 4-value order is
+    /// top-<b>right</b>-bottom-<b>left</b>, which does not flip under RTL.
+    /// </summary>
+    /// <remarks>
+    /// <c>margin: 0 0 0 var(--space-3)</c> is a physical left margin and passed the gate entirely,
+    /// because the enumeration above lists only longhands. Two values are the block/inline pair and
+    /// are direction-neutral, so only three and four components are refused.
+    /// </remarks>
+    private static readonly HashSet<string> PhysicalShorthandProperties =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "margin",
+            "padding",
+            "inset",
+            "border-width",
+            "border-style",
+            "border-color",
+            "scroll-margin",
+            "scroll-padding",
+        };
+
+    /// <summary>
+    /// The locales <c>text-transform</c> is lossy in, which a casing rule must exclude.
+    /// </summary>
+    /// <remarks>
+    /// Turkish and Azeri: dotless i uppercases to I and changes the word. Greek: uppercasing
+    /// strips accents and alters final sigma. These scripts HAVE case, so tracking is fine and
+    /// only the transform is withheld - which is why they are a separate list from the case-less
+    /// scripts <c>base.css</c> also excludes.
+    /// </remarks>
+    private static readonly string[] LossyCasingLocales = ["tr", "az", "el"];
+
+    /// <summary>
+    /// The 8 type roles <c>DESIGN.md</c> names. A surface picks a role; it does not pick a size.
+    /// </summary>
+    private static readonly string[] TypeRoles =
+    [
+        "task-title",
+        "column-head",
+        "space-name",
+        "body",
+        "dialog-title",
+        "meta",
+        "role-label",
+        "presence-count",
+    ];
+
+    /// <summary>
+    /// The five axes every role binds, so none of them is ever inherited by accident.
+    /// </summary>
+    private static readonly string[] TypeAxes =
+        ["family", "size", "weight", "line-height", "letter-spacing"];
+
+    /// <summary>
+    /// Every non-type token the design's vocabulary depends on, by name.
+    /// </summary>
+    private static readonly string[] RequiredStructuralTokens =
+    [
+        "font-system-sans",
+        "font-system-mono",
+        "space-unit",
+        "space-1",
+        "space-2",
+        "space-3",
+        "space-4",
+        "space-5",
+        "space-6",
+        "space-7",
+        "space-gutter",
+        "space-card-stack-gap",
+        "space-card-pad-y",
+        "space-card-pad-x",
+        "space-control-pad-y",
+        "space-control-pad-x",
+        "target-min",
+        "radius-sm",
+        "radius-default",
+        "radius-md",
+        "radius-lg",
+        "radius-full",
+        "border-hairline-width",
+        "border-emphasis-width",
+        "motion-instant",
+        "motion-quick",
+        "motion-lift",
+        "motion-settle",
+        "motion-easing-standard",
+        "motion-easing-exit",
+        "motion-long-press-threshold",
+        "motion-long-press-slop",
+    ];
 
     /// <summary>
     /// Attributes whose literal value reaches a person's eyes or a screen reader.
@@ -177,13 +305,39 @@ public sealed partial class DesignFoundationGateTests
             "aria-placeholder",
             "aria-roledescription",
             "aria-valuetext",
+            "abbr",
+            "download",
         };
 
     /// <summary>
-    /// The only words permitted as a literal in a component: proper nouns PRD section 2's Glossary
-    /// fixes, which are not translated in any locale.
+    /// Input types whose <c>value</c> attribute is the button's visible label.
     /// </summary>
     /// <remarks>
+    /// <c>value</c> is NOT in the list above, deliberately. On
+    /// <c>&lt;option value="active"&gt;</c> and on most inputs it is a form value that no one
+    /// reads, so a context-free rule would fail correct code. It is user-visible on exactly these
+    /// three input types, which is why they get their own element-aware check.
+    /// </remarks>
+    private static readonly HashSet<string> LabelledInputTypes =
+        new(StringComparer.OrdinalIgnoreCase) { "submit", "button", "reset" };
+
+    /// <summary>
+    /// The only word permitted as a literal in a component: the product name, which is a brand and
+    /// is not translated in any locale.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The stated basis was wrong in both directions, and was corrected at code review on
+    /// 2026-08-27.</b> This comment previously said the permitted set was "exactly the PRD section
+    /// 2 Glossary proper nouns". It is not: <c>Yello</c> is not a Glossary entry at all, and the
+    /// Glossary fixes Account, User, Space, Membership, Role, Owner, Admin, Member, Viewer,
+    /// Invitation, Ownership Offer, Project, Task, Status, Assignee, Label, Board, List View,
+    /// Presence, API Token and Session. Had the stated rule been the implemented one,
+    /// <c>&lt;h2&gt;Board&lt;/h2&gt;</c>, <c>&lt;p&gt;Owner&lt;/p&gt;</c> and
+    /// <c>&lt;span&gt;Viewer&lt;/span&gt;</c> would all have been permitted literals - which would
+    /// gut this gate, since those are precisely the words the product's own copy is made of. The
+    /// implemented rule is the defensible one; only its description was wrong.
+    /// </para>
     /// <para>
     /// This is a narrow rule with a stated reason, not an escape hatch. <c>App.razor</c> renders
     /// the product name, and the product name is a brand: localising it would be wrong, and a
@@ -290,6 +444,20 @@ public sealed partial class DesignFoundationGateTests
                 "theme resolves to nothing.");
         }
 
+        // The fifteen in this test's name is now ASSERTED, not merely implied. The expectation is
+        // derived from the token layer - which keeps a second copy of the list out of this class -
+        // but a derived expectation of nothing is satisfied by rebinding nothing: if the semantic
+        // declarations were emptied or moved, the loop below would iterate zero names, find no
+        // problems, and the name would still claim fifteen.
+        if (semanticNames.Count != ExpectedSemanticNameCount)
+        {
+            problems.Add(
+                $"{semanticNames.Count} semantic colour names were found in the token layer " +
+                $"outside the theme boundary; AC2 states exactly {ExpectedSemanticNameCount}. " +
+                "Every assertion below is derived from this list, so a short list is this gate " +
+                "checking less than its name claims rather than a palette that is merely wrong.");
+        }
+
         for (var index = 0; index < CssCorpus.ThemeBoundaryRules.Count; index++)
         {
             var rule = CssCorpus.ThemeBoundaryRules[index];
@@ -308,6 +476,18 @@ public sealed partial class DesignFoundationGateTests
                 .Select(name =>
                     $"{where} ('{rule.Selector}') rebinds '--{name}' to '{bindings[name]}' rather " +
                     $"than to 'var(--{name}-light)'."));
+
+            // Every trigger must also switch the UA's own widgets. Both rules set this today and
+            // nothing required it, so a third trigger could rebind all fifteen colours and leave
+            // scrollbars, form controls and the caret rendering dark on a light ground.
+            if (!rule.Declarations.Any(d =>
+                    d.Property.Equals("color-scheme", StringComparison.OrdinalIgnoreCase)
+                    && d.Value.Contains("light", StringComparison.OrdinalIgnoreCase)))
+            {
+                problems.Add(
+                    $"{where} ('{rule.Selector}') does not declare 'color-scheme: light', so the " +
+                    "UA-drawn widgets stay dark while the palette goes light.");
+            }
         }
 
         AssertNoProblems(problems,
@@ -374,7 +554,10 @@ public sealed partial class DesignFoundationGateTests
 
         foreach (var (sheet, rule, declaration) in CssCorpus.AllDeclarations())
         {
-            if (!TypographicProperties.Contains(declaration.Property))
+            // Custom properties count too. The type scale's sizes and line-heights are declared as
+            // `--type-*-size` and `--type-*-line-height`, so a check written only against the CSS
+            // property names never looked at the file where the values actually live.
+            if (!IsTypographicDeclaration(declaration))
             {
                 continue;
             }
@@ -383,6 +566,29 @@ public sealed partial class DesignFoundationGateTests
                 .Select(length =>
                     $"{Where(sheet, declaration)} sets '{declaration.Property}' to a px length " +
                     $"({length}px) in '{rule.Selector}'."));
+
+            // Every ABSOLUTE unit, not px alone. `font-size: 13pt` ignores the user's root size
+            // exactly as `13px` does - WCAG 1.4.4 is about the user's font-size preference, not
+            // about one spelling of one unit - and a px-only ban passed it, along with pc, mm, cm,
+            // in and Q.
+            problems.AddRange(AbsoluteNonPixelLengths(declaration.Value)
+                .Select(length =>
+                    $"{Where(sheet, declaration)} sets '{declaration.Property}' to the absolute " +
+                    $"length '{length}' in '{rule.Selector}'. Absolute type ignores the user's " +
+                    "browser font-size preference in whatever unit it is written."));
+
+            // AC3's line-height floor, which nothing asserted. The remedy message below has always
+            // claimed "line-heights are >= 1.5"; until now no gate read a line-height value at all,
+            // and `line-height: 1.1` passed. A line box exactly the glyph height cannot absorb the
+            // 1.5x override WCAG 1.4.12 lets a user apply.
+            if (IsLineHeightDeclaration(declaration.Property)
+                && UnitlessRatio(CssCorpus.Resolve(declaration.Value)) is { } ratio
+                && ratio < MinimumLineHeight - LengthTolerance)
+            {
+                problems.Add(
+                    $"{Where(sheet, declaration)} sets 'line-height' to {ratio} on " +
+                    $"'{rule.Selector}', below the {MinimumLineHeight} floor.");
+            }
 
             if (IsRootSelector(rule.Selector)
                 && declaration.Property.Equals("font-size", StringComparison.OrdinalIgnoreCase)
@@ -396,9 +602,10 @@ public sealed partial class DesignFoundationGateTests
         }
 
         AssertNoProblems(problems,
-            "Type is sized in absolute pixels.",
-            "Sizes are in `rem` against a 16px root and line-heights are >= 1.5. px survives only " +
-            "on hairlines, radii and outline offsets - values that should not scale with text.");
+            "Type is sized in an absolute unit, or a line-height is below the floor.",
+            $"Sizes are in `rem` against a 16px root and line-heights are >= {MinimumLineHeight}. " +
+            "Absolute units - px, pt, pc, mm, cm, in, Q - are banned on type in every file, the " +
+            "token layer included, because they ignore the user's own font-size preference.");
     }
 
     /// <summary>
@@ -492,7 +699,15 @@ public sealed partial class DesignFoundationGateTests
                 continue;
             }
 
-            problems.AddRange(CssCorpus.PixelLengths(declaration.Value)
+            // Measured through AbsoluteLengthsPx, and zero is treated as a stated offset even
+            // when it carries no unit. `outline-offset: 0` is legal CSS, is the case AC6 and
+            // DESIGN.md:358 name in words, and is the case this test is NAMED after - and the
+            // px-only reading saw no number in it at all, so it was never compared. `0em` and
+            // `0rem` escaped the same way. Task 5 planted `-2px`, which was caught, so the
+            // planting never reached the case the requirement actually calls out.
+            var offsets = StatedLengthsPx(declaration.Value).ToList();
+
+            problems.AddRange(offsets
                 .Where(offset => offset < FocusRingFloorPx - LengthTolerance)
                 .Select(offset =>
                     $"{Where(sheet, declaration)} sets 'outline-offset' to {offset}px on " +
@@ -527,12 +742,12 @@ public sealed partial class DesignFoundationGateTests
         // `outline*` did, and a planted `.x:focus-visible { outline-offset: -2px }` was enough to
         // satisfy this gate while `base.css` had no focus rule at all - the gate found a
         // "treatment", found no ring to measure, and reported green. Caught by Task 5's planting.
-        var focusRules = CssCorpus.AllRules()
+        var visibleFocusRules = CssCorpus.AllRules()
             .Where(p => p.Rule.Selector.Contains(":focus-visible", StringComparison.OrdinalIgnoreCase))
             .Where(p => p.Rule.Declarations.Any(IsRingDeclaration))
             .ToList();
 
-        if (focusRules.Count == 0)
+        if (visibleFocusRules.Count == 0)
         {
             problems.Add(
                 "No rule in the repository draws an outline on ':focus-visible'. Keyboard parity " +
@@ -540,7 +755,15 @@ public sealed partial class DesignFoundationGateTests
                 "load-bearing rather than decorative.");
         }
 
-        foreach (var (sheet, rule) in focusRules)
+        // EVERY focus ring is held to the specification, not only the `:focus-visible` ones. The
+        // narrower filter meant `.x:focus { outline: 1px solid var(--focus-ring); outline-offset: 0 }`
+        // was ungated entirely - a sub-2px ring drawn on the control, which is both halves of AC6
+        // broken on a selector the gate never looked at.
+        var everyFocusRule = CssCorpus.AllRules()
+            .Where(p => p.Rule.Selector.Contains(":focus", StringComparison.OrdinalIgnoreCase))
+            .Where(p => p.Rule.Declarations.Any(IsRingDeclaration));
+
+        foreach (var (sheet, rule) in everyFocusRule)
         {
             problems.AddRange(DescribeFocusTreatment(sheet, rule));
         }
@@ -622,16 +845,20 @@ public sealed partial class DesignFoundationGateTests
 
         foreach (var (sheet, rule, declaration) in CssCorpus.AllDeclarations())
         {
-            if (!IsBorderWidthProperty(declaration.Property))
+            if (!IsStructuralEdgeProperty(declaration.Property, rule.Selector))
             {
                 continue;
             }
 
-            problems.AddRange(CssCorpus.PixelLengths(declaration.Value)
+            // Measured in every convertible unit and in the keywords, not px alone.
+            // `border-block-start: 0.0625rem` is 1px and passed; so did `border: thin`, and
+            // `border-width: 0.1em`. A floor defeated by a unit change is not a floor.
+            problems.AddRange(CssCorpus.AbsoluteLengthsPx(declaration.Value)
+                .Concat(CssCorpus.BorderWidthKeywordsPx(declaration.Value))
                 .Where(width => width > LengthTolerance && width < HairlineFloorPx - LengthTolerance)
                 .Select(width =>
-                    $"{Where(sheet, declaration)} sets '{declaration.Property}' to {width}px on " +
-                    $"'{rule.Selector}'."));
+                    $"{Where(sheet, declaration)} sets '{declaration.Property}' to " +
+                    $"'{declaration.Value}' ({width}px) on '{rule.Selector}'."));
         }
 
         AssertNoProblems(problems,
@@ -684,16 +911,21 @@ public sealed partial class DesignFoundationGateTests
 
         foreach (var (sheet, rule, declaration) in CssCorpus.AllDeclarations())
         {
-            if (!IsMinimumHeightProperty(declaration.Property))
+            if (!IsMinimumSizeProperty(declaration.Property))
             {
                 continue;
             }
 
-            problems.AddRange(CssCorpus.PixelLengths(declaration.Value)
+            // Both axes, and every convertible unit. 2.5.8 is 24x24, which every comment in this
+            // file and in tokens.css argues from - but only the block axis was checked, so
+            // `min-inline-size: 8px` was unpoliced, and `min-height: 1rem` (16px) passed because
+            // only px lengths were read.
+            problems.AddRange(CssCorpus.AbsoluteLengthsPx(declaration.Value)
                 .Where(px => px > LengthTolerance && px < TargetFloorPx - LengthTolerance)
                 .Select(px =>
-                    $"{Where(sheet, declaration)} sets '{declaration.Property}' to {px}px on " +
-                    $"'{rule.Selector}', below the {TargetFloorPx}px floor."));
+                    $"{Where(sheet, declaration)} sets '{declaration.Property}' to " +
+                    $"'{declaration.Value}' ({px}px) on '{rule.Selector}', below the " +
+                    $"{TargetFloorPx}px floor."));
         }
 
         AssertNoProblems(problems,
@@ -818,8 +1050,12 @@ public sealed partial class DesignFoundationGateTests
     {
         var problems = new List<string>();
 
+        // The `.text-link` class itself, not any selector whose text happens to contain
+        // "text-link". A `.text-link-quiet` keeping its underline while `.text-link` lost one
+        // satisfied the substring reading, so the class AC10 is actually about could be left
+        // un-underlined with the gate green.
         var underlined = CssCorpus.AllRules()
-            .Where(p => p.Rule.Selector.Contains("text-link", StringComparison.OrdinalIgnoreCase))
+            .Where(p => TextLinkClassPattern.IsMatch(p.Rule.Selector))
             .Any(p => p.Rule.Declarations.Any(d =>
                 IsTextDecorationProperty(d.Property)
                 && d.Value.Contains("underline", StringComparison.OrdinalIgnoreCase)));
@@ -895,6 +1131,7 @@ public sealed partial class DesignFoundationGateTests
 
             problems.AddRange(
                 from attribute in LocalisableAttributeValues(scannable)
+                    .Concat(LabelledInputValues(scannable))
                 let literal = TranslatableText(attribute.Value)
                 where literal.Length > 0
                 select $"{markup.Path}:{CssCorpus.LineAt(markup.Raw, attribute.Offset)} sets " +
@@ -907,6 +1144,70 @@ public sealed partial class DesignFoundationGateTests
             "English, and casing must come from `text-transform` rather than from the string - a " +
             "resource holding `VIEWER` makes the Role's accessible name get spelled out letter by " +
             "letter by JAWS and VoiceOver.");
+    }
+
+    /// <summary>
+    /// No user-visible copy is written as a C# string literal in a component. AC11.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The markup gate above blanks <c>@code</c> and <c>@functions</c> before scanning, and reads
+    /// no <c>.cs</c> file at all - so the most idiomatic place a Blazor developer writes copy was
+    /// out of scope entirely. A planted
+    /// <c>@code { private const string Label = "Loading your Spaces, please wait"; }</c> rendered
+    /// through <c>&lt;span&gt;@Label&lt;/span&gt;</c> reported green, and the story's own planting
+    /// table recorded the <c>@code</c> exclusion as correct behaviour.
+    /// </para>
+    /// <para>
+    /// <b>The heuristic is deliberately conservative, and the direction of its error is chosen.</b>
+    /// C# strings in a component are mostly not copy - CSS class names, route templates, element
+    /// ids, format specifiers - so a rule that flagged every literal would fail correct code on
+    /// the first component and be switched off. What is flagged is a literal that looks like a
+    /// SENTENCE: two or more words, initial capital, and none of the punctuation that marks a
+    /// value up as machine-facing. That catches copy as it is actually written and leaves
+    /// <c>"btn btn-primary"</c>, <c>"/board/{id}"</c> and <c>"yyyy-MM-dd"</c> alone. It therefore
+    /// under-reports - all-lowercase copy passes - which is the right way round: a false negative
+    /// here leaves a string for a human to notice, while a false positive blocks a correct build.
+    /// </para>
+    /// <para>
+    /// Scope is the component surface only: <c>@code</c>/<c>@functions</c> blocks in
+    /// <c>*.razor</c>, plus <c>*.razor.cs</c> code-behind. Ordinary <c>.cs</c> files are not
+    /// components and carry log and exception messages that are not localised.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void No_user_visible_copy_is_written_as_a_csharp_string_literal()
+    {
+        var problems = new List<string>();
+
+        foreach (var markup in CssCorpus.MarkupFiles)
+        {
+            if (!markup.File.Extension.Equals(".razor", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            problems.AddRange(SentenceLiterals(RazorCodeBlocksOnly(markup.Blanked))
+                .Select(literal =>
+                    $"{markup.Path}:{CssCorpus.LineAt(markup.Raw, literal.Offset)} declares the " +
+                    $"copy literal \"{literal.Text}\" in C#."));
+        }
+
+        foreach (var file in RepositoryLayout.EnumerateSourceFiles("*.razor.cs"))
+        {
+            var text = File.ReadAllText(file.FullName);
+
+            problems.AddRange(SentenceLiterals(text)
+                .Select(literal =>
+                    $"{RepositoryLayout.RelativePath(file)}:{CssCorpus.LineAt(text, literal.Offset)} " +
+                    $"declares the copy literal \"{literal.Text}\" in C#."));
+        }
+
+        AssertNoProblems(problems,
+            "User-visible copy is written as a C# string literal in a component.",
+            "All copy is externalised into resources, wherever it is written - markup, an `@code` " +
+            "block, or a `.razor.cs` code-behind. Inject `IStringLocalizer` and use " +
+            "`@Localizer[\"Key\"]`, which this suite's markup gate now accepts as the idiom it is.");
     }
 
     /// <summary>
@@ -937,18 +1238,28 @@ public sealed partial class DesignFoundationGateTests
                 continue;
             }
 
-            if (rule.Selector.Contains(":lang(", StringComparison.OrdinalIgnoreCase))
+            // WHICH locales are excluded, not merely that some `:lang()` appears. The substring
+            // test passed `.x:lang(tr), .y { text-transform: uppercase }` - one half uppercasing
+            // Turkish, the exact lossy case the exclusion exists for, and the other half scoped to
+            // nothing at all. A gate that checks only for the presence of a locale scope does not
+            // verify the exclusion it claims to make survive epic 2.
+            var missing = LossyCasingLocales
+                .Where(locale => !ExcludesLocale(rule.Selector, locale))
+                .ToList();
+
+            if (missing.Count == 0)
             {
                 continue;
             }
 
             problems.Add(
                 $"{Where(sheet, declaration)} declares '{declaration.Property}: " +
-                $"{declaration.Value}' on '{rule.Selector}', which is not locale-scoped.");
+                $"{declaration.Value}' on '{rule.Selector}', which does not exclude " +
+                $"{string.Join(", ", missing.Select(l => $":lang({l})"))}.");
         }
 
         AssertNoProblems(problems,
-            "A casing transform is applied without a locale scope.",
+            "A casing transform is applied without excluding the locales it is lossy in.",
             "Scope it under `:lang()` and exclude Turkish, Azeri and Greek, where uppercasing is " +
             "lossy, along with the case-less scripts. See the casing rules in base.css - the " +
             "exclusion list is written once so it cannot drift between roles.");
@@ -980,8 +1291,8 @@ public sealed partial class DesignFoundationGateTests
         var problems = new List<string>();
 
         var resetRules = CssCorpus.AllRules()
-            .Where(p => IsReducedMotionContext(p.Rule.AtRulePath))
-            .Where(p => p.Rule.Selector.Contains('*', StringComparison.Ordinal))
+            .Where(p => IsUnconditionalReducedMotionContext(p.Rule.AtRulePath))
+            .Where(p => IsUniversalSelector(p.Rule.Selector))
             .ToList();
 
         foreach (var property in new[] { "transition", "animation" })
@@ -1000,17 +1311,31 @@ public sealed partial class DesignFoundationGateTests
 
         foreach (var (sheet, rule, declaration) in CssCorpus.AllDeclarations())
         {
-            if (!declaration.IsImportant
-                || !IsMotionProperty(declaration.Property)
-                || IsReducedMotionContext(rule.AtRulePath))
+            if (!declaration.IsImportant || !IsMotionProperty(declaration.Property))
             {
                 continue;
             }
 
+            // The exemption is for the universal RESET, not for the whole block. Exempting every
+            // rule whose at-rule path mentioned reduced motion let the preference be defeated from
+            // INSIDE the block it is declared in: a planted
+            // `@media (prefers-reduced-motion: reduce) { .x { transition: … !important } }`
+            // reported green, and a class selector with !important beats `*, *::before, *::after`
+            // on specificity and then on source order - so the transition genuinely ran for a
+            // reduced-motion user while the gate written to prevent exactly that passed.
+            if (IsReducedMotionContext(rule.AtRulePath) && IsUniversalSelector(rule.Selector))
+            {
+                continue;
+            }
+
+            var where = IsReducedMotionContext(rule.AtRulePath)
+                ? "inside the reduced-motion block but on a selector narrower than the universal " +
+                  "reset, so it outranks the reset on specificity"
+                : "outside the reduced-motion block, so it outranks the reset on source order";
+
             problems.Add(
                 $"{Where(sheet, declaration)} declares '{declaration.Property}' !important " +
-                $"outside the reduced-motion block, on '{rule.Selector}'. It would outrank the " +
-                "reset on source order.");
+                $"{where}, on '{rule.Selector}'.");
         }
 
         AssertNoProblems(problems,
@@ -1050,6 +1375,16 @@ public sealed partial class DesignFoundationGateTests
                 problems.Add(
                     $"{Where(sheet, declaration)} sets '{declaration.Property}' to the physical " +
                     $"value '{declaration.Value}' on '{rule.Selector}'.");
+            }
+
+            if (PhysicalShorthandProperties.Contains(declaration.Property)
+                && ValueComponentCount(declaration.Value) >= 3)
+            {
+                problems.Add(
+                    $"{Where(sheet, declaration)} uses the physical 4-value form of " +
+                    $"'{declaration.Property}' ('{declaration.Value}') on '{rule.Selector}'. The " +
+                    "3- and 4-value order is top-right-bottom-left, which does not flip under " +
+                    "RTL.");
             }
         }
 
@@ -1114,6 +1449,242 @@ public sealed partial class DesignFoundationGateTests
             "setting the release gate exercises. Use min-height, or let the content size the box.");
     }
 
+    /// <summary>
+    /// The non-colour token families are complete: every name exists, and every type role binds
+    /// all five axes. AC2, AC3, AC9.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// AC2's exact-count discipline was applied to one family out of six. The 30 colour names were
+    /// gated in both directions; the type scale, the spacing scale, the radii, the border widths
+    /// and the motion tokens were gated by nothing at all - so deleting
+    /// <c>--type-meta-letter-spacing</c>, or dropping <c>--motion-easing-exit</c>, left every
+    /// assertion in the suite green. A deleted type axis is worse than a wrong one, because
+    /// <c>base.css</c> binds all five on all eight roles: the declaration silently resolves to
+    /// nothing and the role inherits whatever an ancestor had, which is exactly the accidental
+    /// inheritance the five-axis binding exists to prevent.
+    /// </para>
+    /// <para>
+    /// <b>Names and axes only - values are deliberately NOT asserted.</b> That is Lee's decision of
+    /// 2026-08-27, taken at code review: a value gate needs a second source to compare against, and
+    /// both candidates were rejected - parsing <c>DESIGN.md</c> would make a release gate depend on
+    /// a planning artifact, and restating the values in C# would only move the transcription. The
+    /// consequence is accepted and recorded in the story: a MISTYPED value is caught only if it
+    /// crosses a contrast threshold, while a MISSING or renamed one is caught here.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_non_colour_token_families_are_complete()
+    {
+        var problems = new List<string>();
+
+        problems.AddRange(
+            from role in TypeRoles
+            from axis in TypeAxes
+            let name = $"type-{role}-{axis}"
+            where !CssCorpus.TokenValues.ContainsKey(name)
+            select $"The token layer declares no '--{name}'. Every role binds all five axes so " +
+                   "none can be inherited by accident from an ancestor.");
+
+        problems.AddRange(RequiredStructuralTokens
+            .Where(name => !CssCorpus.TokenValues.ContainsKey(name))
+            .Select(name => $"The token layer declares no '--{name}'."));
+
+        AssertNoProblems(problems,
+            "A non-colour token is missing from the token layer.",
+            "The token layer declares the design's whole vocabulary: 8 type roles x 5 axes, the " +
+            "spacing scale, the target floor, the radii, the border widths and the motion " +
+            "timings. A missing token resolves to nothing and the property silently falls back to " +
+            "an inherited value.");
+    }
+
+    /// <summary>
+    /// Every stylesheet in the corpus is actually linked by the host page. AC1, AC2, AC3.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Without this, the entire story is ungated.</b> Every other assertion in this class and in
+    /// <see cref="ColorTokenContrastTests"/> reads the CSS files and says nothing about whether a
+    /// browser ever receives them. Deleting the two <c>&lt;link&gt;</c> elements from
+    /// <c>index.html</c> left all of them green while no token reached a page: no focus ring, no
+    /// target floor, no reduced-motion reset, no locale-aware casing, no palette.
+    /// </para>
+    /// <para>
+    /// This is not a hypothetical. Story 1.1 deliberately removed the template's stylesheet link,
+    /// and <c>index.html</c>'s own comment warns about restoring one - so a removed link is the
+    /// single most likely edit in this file's history. The Debug Log verified the links resolved
+    /// once, by hand, in a story whose whole thesis is that hand verification does not survive
+    /// later stories.
+    /// </para>
+    /// <para>
+    /// Derived from the corpus rather than from a hardcoded pair of filenames: a stylesheet added
+    /// by a later story is held to the same requirement without anyone remembering to extend this
+    /// gate. The link is matched on the fingerprint placeholder form the build rewrites, because
+    /// that is the form the file must carry for <c>OverrideHtmlAssetPlaceholders</c> to produce a
+    /// cache-busting URL.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Every_stylesheet_is_linked_by_the_host_page()
+    {
+        var problems = new List<string>();
+
+        var hosts = CssCorpus.MarkupFiles
+            .Where(m => m.File.Name.Equals("index.html", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        if (hosts.Count == 0)
+        {
+            problems.Add(
+                "No 'index.html' was found in the source tree, so nothing links the stylesheets " +
+                "and no gate in this suite describes what a browser actually loads.");
+        }
+
+        foreach (var host in hosts)
+        {
+            foreach (var sheet in CssCorpus.StyleSheets)
+            {
+                var stem = Path.GetFileNameWithoutExtension(sheet.File.Name);
+                var expected = $"css/{stem}#[.{{fingerprint}}].css";
+
+                if (!host.Blanked.Contains(expected, StringComparison.Ordinal))
+                {
+                    problems.Add(
+                        $"{host.Path} does not link '{sheet.Path}'. Expected a stylesheet link to " +
+                        $"'{expected}'.");
+                }
+            }
+        }
+
+        AssertNoProblems(problems,
+            "A stylesheet in the corpus is not linked by the host page.",
+            "Every *.css file this suite asserts on has to reach the browser, or the assertion " +
+            "describes a file with no effect. Link it from index.html through the " +
+            "`#[.{fingerprint}]` placeholder the build rewrites.");
+    }
+
+    /// <summary>
+    /// Every <c>var()</c> reference in the corpus resolves to a declared custom property.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// This is the gate that stops every length gate in this class from passing vacuously.
+    /// <c>CssCorpus.Resolve</c> substitutes <c>var()</c> references so a width gate measures what
+    /// the browser renders rather than the text an author typed - but an unresolvable reference
+    /// leaves <c>var(--typo)</c> as literal text, and text carries no number, so the hairline
+    /// floor, the target floor, the radius scale and the fixed-height ban all find nothing to
+    /// measure and report green.
+    /// </para>
+    /// <para>
+    /// Resolution gave up silently by design - it is bounded at eight passes so a token cycle
+    /// cannot hang the suite, and returning partially-substituted text was preferred to never
+    /// returning. That reasoning is right and this is the third option it did not take: let
+    /// resolution return, and assert separately that it finished.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Every_token_reference_resolves_to_a_declared_property()
+    {
+        var problems = new List<string>();
+
+        foreach (var (sheet, rule, declaration) in CssCorpus.AllDeclarations())
+        {
+            problems.AddRange(CssCorpus.UnresolvedReferences(declaration.Value)
+                .Distinct(StringComparer.Ordinal)
+                .Select(name =>
+                    $"{Where(sheet, declaration)} references '--{name}' in " +
+                    $"'{declaration.Property}' on '{rule.Selector}', which no stylesheet " +
+                    "declares."));
+        }
+
+        AssertNoProblems(problems,
+            "A var() reference does not resolve to any declared custom property.",
+            "An unresolved reference is worse than a wrong value: it leaves text where a length " +
+            "should be, and every gate that measures a length then finds no number and passes. " +
+            "Declare the property in tokens.css, or correct the name.");
+    }
+
+    /// <summary>
+    /// The hairline is snapped to a device pixel at every common display scale. AC7.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <c>DESIGN.md:366</c> requires structural borders "snapped to device pixels where the
+    /// platform allows" in the same sentence as the 1.5px floor. The floor was implemented and
+    /// gated; the snapping half was neither implemented, gated, nor recorded as deferred, so half
+    /// a <c>status: final</c> requirement was simply silent.
+    /// </para>
+    /// <para>
+    /// The snapping is expressed as <c>resolution</c> media queries rebinding
+    /// <c>--border-hairline-width</c> to <c>ceil(1.5 x dppx) / dppx</c>, so the rendered edge is
+    /// always a whole number of device pixels and never below the 1.5px floor. This gate holds
+    /// three things: the block exists, every rebinding clears the floor, and every rebinding
+    /// actually lands on an integer device pixel at the scale it serves - the last being the point,
+    /// since a rebinding that cleared the floor but sat mid-pixel would antialias exactly as the
+    /// unsnapped 1.5px does.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_hairline_is_snapped_to_a_device_pixel_at_every_declared_scale()
+    {
+        var problems = new List<string>();
+
+        var snapped = CssCorpus.Tokens.Rules
+            .Where(r => ResolutionConditionPattern.IsMatch(r.AtRulePath))
+            .Select(r => (Rule: r, Scale: DeclaredScale(r.AtRulePath)))
+            .ToList();
+
+        if (snapped.Count == 0)
+        {
+            problems.Add(
+                "No 'resolution' media query rebinds '--border-hairline-width'. AC7 requires " +
+                "structural borders snapped to device pixels where the platform allows, and at " +
+                "1.5px the edge lands mid-pixel at every scale except 2dppx.");
+        }
+
+        foreach (var (rule, scale) in snapped)
+        {
+            var where = $"{CssCorpus.Tokens.Path}:{CssCorpus.LineAt(CssCorpus.Tokens.Raw, rule.Offset)}";
+            var width = rule.Declarations
+                .Where(d => d.Property.Equals("--border-hairline-width", StringComparison.Ordinal))
+                .Select(d => CssCorpus.AbsoluteLengthsPx(d.Value).FirstOrDefault(double.NaN))
+                .FirstOrDefault(double.NaN);
+
+            if (double.IsNaN(width))
+            {
+                problems.Add($"{where} ('{rule.AtRulePath}') declares no '--border-hairline-width'.");
+                continue;
+            }
+
+            if (width < HairlineFloorPx - LengthTolerance)
+            {
+                problems.Add(
+                    $"{where} ('{rule.AtRulePath}') snaps the hairline to {width}px, below the " +
+                    $"{HairlineFloorPx}px floor. Snapping may only ever round UP.");
+            }
+
+            if (scale is { } dppx)
+            {
+                var devicePixels = width * dppx;
+
+                if (Math.Abs(devicePixels - Math.Round(devicePixels, MidpointRounding.AwayFromZero)) > SnapTolerance)
+                {
+                    problems.Add(
+                        $"{where} ('{rule.AtRulePath}') snaps the hairline to {width}px, which is " +
+                        $"{devicePixels} device pixels at {dppx}dppx rather than a whole number - " +
+                        "so it antialiases exactly as the unsnapped width does.");
+                }
+            }
+        }
+
+        AssertNoProblems(problems,
+            "The hairline is not snapped to a device pixel at every declared scale.",
+            "Each 'resolution' branch sets --border-hairline-width to ceil(1.5 * dppx) / dppx, " +
+            "which is at or above the 1.5px floor AND a whole number of device pixels at that " +
+            "scale. Rounding down is never correct: it breaks the accessibility floor to fix " +
+            "antialiasing.");
+    }
+
     private static void AssertNoProblems(List<string> problems, string headline, string remedy) =>
         Assert.True(problems.Count == 0,
             $"{headline}{Environment.NewLine}{Environment.NewLine}" +
@@ -1148,7 +1719,12 @@ public sealed partial class DesignFoundationGateTests
     private static IEnumerable<string> DescribeFocusTreatment(CssCorpus.Sheet sheet, CssCorpus.Rule rule)
     {
         var where = $"{sheet.Path}:{CssCorpus.LineAt(sheet.Raw, rule.Offset)}";
-        var outline = rule.Declarations.FirstOrDefault(IsRingDeclaration);
+
+        // LAST, not first. Within one rule the later declaration wins, so a rule that draws a
+        // compliant ring and then overrides it - `outline: 2px solid var(--focus-ring)` followed by
+        // `outline-width: 0` - renders no ring at all while a first-declaration reading reported
+        // the compliant one and passed.
+        var outline = rule.Declarations.LastOrDefault(IsRingDeclaration);
 
         if (outline is null)
         {
@@ -1165,7 +1741,7 @@ public sealed partial class DesignFoundationGateTests
                 "has its own token so it can be tuned independently of the accent.";
         }
 
-        var widths = CssCorpus.PixelLengths(outline.Value).ToList();
+        var widths = StatedLengthsPx(outline.Value).ToList();
 
         if (widths.Count == 0 || widths.TrueForAll(w => w < FocusRingFloorPx - LengthTolerance))
         {
@@ -1174,18 +1750,105 @@ public sealed partial class DesignFoundationGateTests
                 $"than at least {FocusRingFloorPx}px.";
         }
 
-        if (!rule.Declarations.Any(d =>
-                d.Property.Equals("outline-offset", StringComparison.OrdinalIgnoreCase)))
+        var offset = rule.Declarations.LastOrDefault(d =>
+            d.Property.Equals("outline-offset", StringComparison.OrdinalIgnoreCase));
+
+        if (offset is null)
         {
             yield return
                 $"{where} ('{rule.Selector}') sets no 'outline-offset'. The default is 0, which " +
                 "draws the ring on the control - and at 1.45 against the accent it vanishes " +
                 "there. The offset is what makes the ring visible.";
+
+            yield break;
+        }
+
+        // The offset is MEASURED here, not merely required to be present. Presence alone was
+        // satisfied by `outline-offset: 0`, which is the exact value AC6 forbids.
+        var offsets = StatedLengthsPx(offset.Value).ToList();
+
+        if (offsets.Count == 0 || offsets.TrueForAll(o => o < FocusRingFloorPx - LengthTolerance))
+        {
+            yield return
+                $"{where} ('{rule.Selector}') sets 'outline-offset' to " +
+                $"'{offset.Value}' rather than at least {FocusRingFloorPx}px. At 0 the ring is " +
+                "drawn on the control, where it sits at 1.45 against the accent and vanishes.";
         }
     }
 
     private static string DescribeWidths(IReadOnlyList<double> widths) =>
         widths.Count == 0 ? "no stated width" : $"{widths[0]}px";
+
+    /// <summary>
+    /// True when a declaration sizes or spaces type, whether as a CSS property or as one of the
+    /// type scale's own custom properties.
+    /// </summary>
+    private static bool IsTypographicDeclaration(CssCorpus.Declaration declaration) =>
+        TypographicProperties.Contains(declaration.Property)
+        || (CssCorpus.IsCustomProperty(declaration)
+            && Array.Exists(TypographicTokenSuffixes,
+                suffix => declaration.Property.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)));
+
+    private static bool IsLineHeightDeclaration(string property) =>
+        property.Equals("line-height", StringComparison.OrdinalIgnoreCase)
+        || property.EndsWith("-line-height", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// A value that is a bare number, which is how a line-height ratio is written, or null when it
+    /// is anything else - <c>normal</c>, a length, a percentage.
+    /// </summary>
+    private static double? UnitlessRatio(string value) =>
+        double.TryParse(
+            value.Trim(),
+            System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var parsed)
+            ? parsed
+            : null;
+
+    /// <summary>
+    /// Lengths in an absolute unit other than px, exactly as written.
+    /// </summary>
+    private static IEnumerable<string> AbsoluteNonPixelLengths(string value) =>
+        from match in AbsoluteNonPixelPattern.Matches(CssCorpus.Resolve(value)).Cast<Match>()
+        select match.Value;
+
+    /// <summary>
+    /// True when a selector excludes a locale, by naming it inside a negation.
+    /// </summary>
+    /// <remarks>
+    /// Requires both the negation and the locale, so naming a locale INSIDE the scope - which is
+    /// the opposite of excluding it - does not satisfy the check.
+    /// </remarks>
+    private static bool ExcludesLocale(string selector, string locale)
+    {
+        var negation = selector.IndexOf(":not(", StringComparison.OrdinalIgnoreCase);
+
+        return negation >= 0
+            && selector[negation..].Contains($":lang({locale})", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// The display scale in dppx a resolution media query serves, taken from its lower bound.
+    /// </summary>
+    /// <remarks>
+    /// A band's lower bound is the scale that has to snap: within
+    /// <c>[1.25dppx, 1.5dppx)</c> the worst case for a width chosen at 1.25 is 1.25 itself. A band
+    /// with only an upper bound is the 1dppx floor.
+    /// </remarks>
+    private static double? DeclaredScale(string atRulePath)
+    {
+        var minimum = MinResolutionPattern.Match(atRulePath);
+
+        if (minimum.Success)
+        {
+            return double.Parse(
+                minimum.Groups[1].Value,
+                System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        return MaxResolutionPattern.IsMatch(atRulePath) ? 1 : null;
+    }
 
     private static bool IsRootSelector(string selector) =>
         selector.Equals("html", StringComparison.OrdinalIgnoreCase)
@@ -1214,6 +1877,26 @@ public sealed partial class DesignFoundationGateTests
     }
 
     /// <summary>
+    /// True when a declaration draws a structural edge that the hairline floor governs.
+    /// </summary>
+    /// <remarks>
+    /// An <c>outline</c> on a non-focus selector is a structural edge by another name.
+    /// <c>.card.selected { outline: 1px solid var(--border-hairline) }</c> was a 1px edge no gate
+    /// measured - <c>IsBorderWidthProperty</c> requires the property to start with <c>border</c>,
+    /// and the px-confinement gate exempts everything containing <c>outline</c> - while the
+    /// identical <c>border-inline-start: 1px</c> failed. Focus selectors are excluded because the
+    /// ring is held to its own, higher floor by the focus gates.
+    /// </remarks>
+    private static bool IsStructuralEdgeProperty(string property, string selector) =>
+        IsBorderWidthProperty(property)
+        || (IsRingWidthProperty(property)
+            && !selector.Contains(":focus", StringComparison.OrdinalIgnoreCase));
+
+    private static bool IsRingWidthProperty(string property) =>
+        property.Equals("outline", StringComparison.OrdinalIgnoreCase)
+        || property.Equals("outline-width", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
     /// True when a declaration actually draws the ring, rather than merely positioning it.
     /// </summary>
     private static bool IsRingDeclaration(CssCorpus.Declaration declaration) =>
@@ -1223,6 +1906,14 @@ public sealed partial class DesignFoundationGateTests
     private static bool IsMinimumHeightProperty(string property) =>
         property.Equals("min-height", StringComparison.OrdinalIgnoreCase)
         || property.Equals("min-block-size", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Minimum-size properties on either axis. WCAG 2.2 AA's 2.5.8 is 24<b>x</b>24.
+    /// </summary>
+    private static bool IsMinimumSizeProperty(string property) =>
+        IsMinimumHeightProperty(property)
+        || property.Equals("min-width", StringComparison.OrdinalIgnoreCase)
+        || property.Equals("min-inline-size", StringComparison.OrdinalIgnoreCase);
 
     private static bool IsTextDecorationProperty(string property) =>
         property.Equals("text-decoration", StringComparison.OrdinalIgnoreCase)
@@ -1237,6 +1928,59 @@ public sealed partial class DesignFoundationGateTests
         && atRulePath.Contains("reduce", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
+    /// True when the reduced-motion context is unconditional, so the reset inside it always
+    /// applies.
+    /// </summary>
+    /// <remarks>
+    /// A block written <c>@media (prefers-reduced-motion: reduce) and (min-width: 40em)</c>
+    /// satisfied the substring test above while applying only on wide viewports - so the reset
+    /// counted as present and the preference went unhonoured everywhere else.
+    /// </remarks>
+    private static bool IsUnconditionalReducedMotionContext(string atRulePath) =>
+        IsReducedMotionContext(atRulePath)
+        && !atRulePath.Contains(" and ", StringComparison.OrdinalIgnoreCase)
+        && atRulePath.Count(c => c == '@') == 1;
+
+    /// <summary>
+    /// True when a selector is the universal one, which is what the reduced-motion reset must be
+    /// written on so nothing can outrank it on specificity.
+    /// </summary>
+    private static bool IsUniversalSelector(string selector)
+    {
+        var parts = selector.Split(
+            ',',
+            StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+        // An empty selector is not universal. At-rule contexts carry one, and treating it as `*`
+        // would make every declaration inside them answer for the universal reset's rules.
+        return parts.Length > 0
+            && Array.TrueForAll(parts, part => part is "*" || part.StartsWith("*:", StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Every length a value states, in px, counting a unitless zero as the zero it is.
+    /// </summary>
+    /// <remarks>
+    /// <c>outline-offset: 0</c>, <c>outline-width: 0</c> and <c>min-height: 0</c> are all lengths
+    /// the browser honours, and a unit-suffixed reading saw no number in any of them - so the
+    /// floors they breach were never compared. This is the reading a floor check needs: units
+    /// converted where a fixed factor exists, and a bare zero treated as zero rather than as
+    /// silence.
+    /// </remarks>
+    private static IEnumerable<double> StatedLengthsPx(string value)
+    {
+        var resolved = CssCorpus.Resolve(value);
+        var lengths = CssCorpus.AbsoluteLengthsPx(value).ToList();
+
+        if (lengths.Count > 0)
+        {
+            return lengths;
+        }
+
+        return UnitlessZeroPattern.IsMatch(resolved) ? [0d] : [];
+    }
+
+    /// <summary>
     /// True when a value is the absence of the thing rather than a setting of it.
     /// </summary>
     private static bool IsNoneValue(string value) => AbsenceValues.Contains(value.Trim());
@@ -1246,8 +1990,21 @@ public sealed partial class DesignFoundationGateTests
     /// </summary>
     private static bool RemovesOutline(CssCorpus.Declaration declaration)
     {
-        if (declaration.Property.Equals("outline-offset", StringComparison.OrdinalIgnoreCase)
-            || declaration.Property.Equals("outline-color", StringComparison.OrdinalIgnoreCase))
+        if (declaration.Property.Equals("outline-offset", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        // `transparent` is a removal by another route: the ring is still drawn, still measured by
+        // every width check, and completely invisible. On `outline-color` it was previously exempt
+        // outright, so it was the one way to delete the focus ring that no gate objected to.
+        if (CssCorpus.Resolve(declaration.Value)
+            .Contains("transparent", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (declaration.Property.Equals("outline-color", StringComparison.OrdinalIgnoreCase))
         {
             return false;
         }
@@ -1272,9 +2029,58 @@ public sealed partial class DesignFoundationGateTests
     /// <summary>
     /// True when a selector targets a link, so removing its underline is a defect.
     /// </summary>
+    /// <remarks>
+    /// <c>Contains("link")</c> was both too loose and too tight. Too loose: <c>.blinking</c>
+    /// contains "link" and was treated as a link. Too tight: <c>*</c>, <c>:is(a, button)</c> and
+    /// <c>:where(a)</c> all remove an underline from every link in the product and matched none of
+    /// the old conditions, so the AC10 removal ban never fired on the selectors most likely to
+    /// carry a global reset.
+    /// </remarks>
     private static bool SelectorTargetsLink(string selector) =>
-        selector.Contains("link", StringComparison.OrdinalIgnoreCase)
+        IsUniversalSelector(selector)
+        || LinkClassSelectorPattern.IsMatch(selector)
         || AnchorElementSelectorPattern.IsMatch(selector);
+
+    /// <summary>
+    /// How many top-level components a shorthand value has, counting a parenthesised run such as
+    /// <c>var(--x)</c> or <c>calc(1px + 2px)</c> as one.
+    /// </summary>
+    private static int ValueComponentCount(string value)
+    {
+        var components = 0;
+        var depth = 0;
+        var inComponent = false;
+
+        foreach (var current in value.Trim())
+        {
+            if (current == '(')
+            {
+                depth++;
+            }
+            else if (current == ')')
+            {
+                depth = Math.Max(depth - 1, 0);
+            }
+            else
+            {
+                // Neither bracket; the depth is unchanged and the whitespace test below decides.
+            }
+
+            if (depth == 0 && char.IsWhiteSpace(current))
+            {
+                inComponent = false;
+                continue;
+            }
+
+            if (!inComponent)
+            {
+                inComponent = true;
+                components++;
+            }
+        }
+
+        return components;
+    }
 
     /// <summary>
     /// px lengths exactly as written, before token substitution.
@@ -1304,12 +2110,116 @@ public sealed partial class DesignFoundationGateTests
     {
         var blanked = RazorDirectivePattern.Replace(source, m => new string(' ', m.Length));
 
+        // Control-flow HEADERS only - the keyword and its condition - never the block body. The
+        // body of an `@if` or `@foreach` is rendered markup and must stay scannable, so
+        // brace-matched blanking would be a false negative for every literal inside a conditional.
+        // Leaving the header in place was a false positive instead: `@if (ShowRevoked)` matched
+        // `@if` alone, because the expression pattern's optional parenthesis group needs `(`
+        // immediately after the identifier and there is a space - so ` (ShowRevoked)` survived and
+        // was reported as user-visible copy. The braces themselves are harmless: `{` and `}` carry
+        // no letters, so the word scan ignores them.
+        blanked = RazorControlFlowPattern.Replace(blanked, m => new string(' ', m.Length));
+
+        // `<script>` and `<style>` bodies are not copy. Left in place, a component carrying either
+        // had its identifiers reported as literal text and failed the gate for being written
+        // correctly. (`<style>` bodies are still read as CSS - by CssCorpus.MarkupStyleSheets - so
+        // blanking them here loses no coverage.)
+        blanked = NonCopyElementPattern.Replace(blanked, m => new string(' ', m.Length));
+
         foreach (var opener in new[] { "@code", "@functions", "@{" })
         {
             blanked = BlankBracedBlocks(blanked, opener);
         }
 
         return blanked;
+    }
+
+    /// <summary>
+    /// The inverse of <see cref="BlankRazorNonMarkup"/>: only the C# inside <c>@code</c> and
+    /// <c>@functions</c> blocks, everything else blanked, offsets preserved.
+    /// </summary>
+    private static string RazorCodeBlocksOnly(string source)
+    {
+        var characters = BlankedCanvas(source);
+
+        foreach (var opener in new[] { "@code", "@functions" })
+        {
+            CopyBracedBlocks(source, characters, opener);
+        }
+
+        return new string(characters);
+    }
+
+    /// <summary>
+    /// A buffer the same length as the source, all spaces, with newlines kept so reported line
+    /// numbers still mean something.
+    /// </summary>
+    private static char[] BlankedCanvas(string source)
+    {
+        var characters = new char[source.Length];
+
+        for (var index = 0; index < source.Length; index++)
+        {
+            characters[index] = source[index] is '\r' or '\n' ? source[index] : ' ';
+        }
+
+        return characters;
+    }
+
+    /// <summary>
+    /// Copies every brace-balanced block introduced by an opener from the source into the target,
+    /// at the same offsets.
+    /// </summary>
+    private static void CopyBracedBlocks(string source, char[] target, string opener)
+    {
+        var index = source.IndexOf(opener, StringComparison.Ordinal);
+
+        while (index >= 0)
+        {
+            var brace = source.IndexOf('{', index);
+            var end = brace < 0 ? source.Length - 1 : MatchingBrace(source, brace);
+
+            for (var position = index; position <= end && position < source.Length; position++)
+            {
+                target[position] = source[position];
+            }
+
+            index = end + 1 < source.Length
+                ? source.IndexOf(opener, end + 1, StringComparison.Ordinal)
+                : -1;
+        }
+    }
+
+    /// <summary>
+    /// C# string literals that read as a sentence of copy rather than as a machine-facing value.
+    /// </summary>
+    private static IEnumerable<(int Offset, string Text)> SentenceLiterals(string source) =>
+        from match in CSharpStringLiteralPattern.Matches(source).Cast<Match>()
+        let text = match.Groups[1].Value
+        where IsSentenceLike(text)
+        select (match.Index, text);
+
+    /// <summary>
+    /// True when a string literal looks like copy a translator would have to translate.
+    /// </summary>
+    private static bool IsSentenceLike(string text)
+    {
+        if (text.IndexOfAny(['<', '>', '{', '}', '=', ';', '/', '\\', '_', '#', '|']) >= 0)
+        {
+            return false;
+        }
+
+        var words = WordPattern.Matches(text).Select(m => m.Value).ToList();
+
+        if (words.Count < 2 || words.TrueForAll(w => w.All(char.IsUpper)))
+        {
+            return false;
+        }
+
+        var firstLetter = text.FirstOrDefault(char.IsLetter);
+
+        return char.IsUpper(firstLetter)
+            && !words.TrueForAll(w => GlossaryProperNouns.Contains(w));
     }
 
     /// <summary>
@@ -1350,17 +2260,41 @@ public sealed partial class DesignFoundationGateTests
         }
     }
 
+    /// <summary>
+    /// The position of the brace closing the one at <paramref name="open"/>.
+    /// </summary>
+    /// <remarks>
+    /// Braces inside a string literal, a char literal or a comment are skipped. Counting them
+    /// meant a single <c>'{'</c> or a <c>"{0}"</c> format string inside an <c>@code</c> block left
+    /// the depth permanently unbalanced, the scan ran to end of file, and every piece of markup
+    /// after that block was blanked - silently unscanned by the gate that exists to read it.
+    /// </remarks>
     private static int MatchingBrace(string source, int open)
     {
         var depth = 0;
+        var index = open;
 
-        for (var index = open; index < source.Length; index++)
+        while (index < source.Length)
         {
-            if (source[index] == '{')
+            var current = source[index];
+
+            if (current is '"' or '\'')
+            {
+                index = SkipCSharpLiteral(source, index);
+                continue;
+            }
+
+            if (current == '/' && index + 1 < source.Length && source[index + 1] is '/' or '*')
+            {
+                index = SkipCSharpComment(source, index);
+                continue;
+            }
+
+            if (current == '{')
             {
                 depth++;
             }
-            else if (source[index] == '}')
+            else if (current == '}')
             {
                 depth--;
 
@@ -1373,9 +2307,44 @@ public sealed partial class DesignFoundationGateTests
             {
                 // Any other character leaves the brace depth unchanged.
             }
+
+            index++;
         }
 
         return source.Length - 1;
+    }
+
+    /// <summary>
+    /// The index just past a C# string or char literal, escapes honoured.
+    /// </summary>
+    private static int SkipCSharpLiteral(string source, int start)
+    {
+        var quote = source[start];
+        var index = start + 1;
+
+        while (index < source.Length && source[index] != quote)
+        {
+            index += source[index] == '\\' ? 2 : 1;
+        }
+
+        return index + 1;
+    }
+
+    /// <summary>
+    /// The index just past a C# line or block comment.
+    /// </summary>
+    private static int SkipCSharpComment(string source, int start)
+    {
+        if (source[start + 1] == '/')
+        {
+            var newline = source.IndexOf('\n', start);
+
+            return newline < 0 ? source.Length : newline;
+        }
+
+        var close = source.IndexOf("*/", start + 2, StringComparison.Ordinal);
+
+        return close < 0 ? source.Length : close + 2;
     }
 
     /// <summary>
@@ -1414,9 +2383,37 @@ public sealed partial class DesignFoundationGateTests
     private static IEnumerable<(int Offset, string Name, string Value)> LocalisableAttributeValues(string source) =>
         from match in AttributePattern.Matches(source).Cast<Match>()
         where LocalisableAttributes.Contains(match.Groups[1].Value)
-        let value = match.Groups[2].Value
+        let value = AttributeValueOf(match)
         where !value.TrimStart().StartsWith('@')
         select (match.Index, match.Groups[1].Value, value);
+
+    /// <summary>
+    /// The quoted value of an attribute match, from whichever quoting style matched.
+    /// </summary>
+    private static string AttributeValueOf(Match match) =>
+        match.Groups[2].Success ? match.Groups[2].Value : match.Groups[3].Value;
+
+    /// <summary>
+    /// The <c>value</c> attributes that are a button's visible label rather than a form value.
+    /// </summary>
+    private static IEnumerable<(int Offset, string Name, string Value)> LabelledInputValues(string source)
+    {
+        foreach (var element in InputElementPattern.Matches(source).Cast<Match>())
+        {
+            var attributes = element.Groups[1].Value;
+            var pairs = AttributePattern.Matches(attributes)
+                .Cast<Match>()
+                .ToDictionary(m => m.Groups[1].Value, AttributeValueOf, StringComparer.OrdinalIgnoreCase);
+
+            if (pairs.TryGetValue("type", out var type)
+                && LabelledInputTypes.Contains(type)
+                && pairs.TryGetValue("value", out var value)
+                && !value.TrimStart().StartsWith('@'))
+            {
+                yield return (element.Index, "value", value);
+            }
+        }
+    }
 
     /// <summary>
     /// What is left of a text run once Razor expressions, entities and Glossary proper nouns are
@@ -1444,15 +2441,70 @@ public sealed partial class DesignFoundationGateTests
     [GeneratedRegex(@"--([A-Za-z0-9_-]+-light)\b", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
     private static partial Regex LightTokenNamePattern { get; }
 
-    // A hex colour, or any of the colour functions that produce one.
+    // A hex colour, any of the colour functions that produce one, or a named colour keyword.
+    //
+    // The named colours are here because `color: red` bypasses the theme boundary, the 30-token
+    // count and the contrast harness identically to `color: #FF0000` - all three of the reasons
+    // this gate's own message gives - and the original pattern let every one of them through.
+    // `WcagContrast.Channels` already refuses a named colour as unverifiable, so leaving them out
+    // had the two files disagreeing about whether they were a problem. The list is the CSS Color 4
+    // basic and extended keywords. The cascade keywords are deliberately absent - `inherit`,
+    // `initial`, `unset`, `revert` and `currentColor` all take a colour from somewhere else rather
+    // than stating one, so they are not literals.
     [GeneratedRegex(
-        @"#[0-9A-Fa-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\s*\(",
-        RegexOptions.None,
+        @"#[0-9A-Fa-f]{3,8}\b|\b(?:rgba?|hsla?|hwb|lab|lch|oklab|oklch|color|color-mix)\s*\(|" +
+        @"\b(?:transparent|aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|black|" +
+        @"blanchedalmond|blue|blueviolet|brown|burlywood|cadetblue|chartreuse|chocolate|coral|" +
+        @"cornflowerblue|cornsilk|crimson|cyan|darkblue|darkcyan|darkgoldenrod|darkgray|" +
+        @"darkgreen|darkgrey|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|darkred|" +
+        @"darksalmon|darkseagreen|darkslateblue|darkslategray|darkslategrey|darkturquoise|" +
+        @"darkviolet|deeppink|deepskyblue|dimgray|dimgrey|dodgerblue|firebrick|floralwhite|" +
+        @"forestgreen|fuchsia|gainsboro|ghostwhite|gold|goldenrod|gray|green|greenyellow|grey|" +
+        @"honeydew|hotpink|indianred|indigo|ivory|khaki|lavender|lavenderblush|lawngreen|" +
+        @"lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|lightgray|lightgreen|" +
+        @"lightgrey|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategray|" +
+        @"lightslategrey|lightsteelblue|lightyellow|lime|limegreen|linen|magenta|maroon|" +
+        @"mediumaquamarine|mediumblue|mediumorchid|mediumpurple|mediumseagreen|mediumslateblue|" +
+        @"mediumspringgreen|mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|" +
+        @"moccasin|navajowhite|navy|oldlace|olive|olivedrab|orange|orangered|orchid|" +
+        @"palegoldenrod|palegreen|paleturquoise|palevioletred|papayawhip|peachpuff|peru|pink|" +
+        @"plum|powderblue|purple|rebeccapurple|red|rosybrown|royalblue|saddlebrown|salmon|" +
+        @"sandybrown|seagreen|seashell|sienna|silver|skyblue|slateblue|slategray|slategrey|snow|" +
+        @"springgreen|steelblue|tan|teal|thistle|tomato|turquoise|violet|wheat|white|whitesmoke|" +
+        @"yellow|yellowgreen)\b",
+        RegexOptions.IgnoreCase,
         matchTimeoutMilliseconds: 5000)]
     private static partial Regex ColourLiteralPattern { get; }
 
-    [GeneratedRegex(@"(?<![\w.])(-?\d+(?:\.\d+)?)px\b", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
+    // px exactly as written. Case-insensitive and leading-dot-tolerant for the same reason
+    // CssCorpus.PixelLengthPattern is: `13PX` and `.5px` are lengths the browser honours.
+    [GeneratedRegex(
+        @"(?<![\w.])(-?(?:\d+(?:\.\d+)?|\.\d+))px\b",
+        RegexOptions.IgnoreCase,
+        matchTimeoutMilliseconds: 5000)]
     private static partial Regex RawPixelPattern { get; }
+
+    // An absolute length in a unit other than px. rem and em are deliberately absent: they scale
+    // with the user's root size, which is the whole point of the type scale.
+    [GeneratedRegex(
+        @"(?<![\w.])-?(?:\d+(?:\.\d+)?|\.\d+)(?:pt|pc|in|cm|mm|q)\b",
+        RegexOptions.IgnoreCase,
+        matchTimeoutMilliseconds: 5000)]
+    private static partial Regex AbsoluteNonPixelPattern { get; }
+
+    // A `resolution` media condition in an at-rule path, in either bound.
+    [GeneratedRegex(@"(?:min-|max-)?resolution\s*:", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 5000)]
+    private static partial Regex ResolutionConditionPattern { get; }
+
+    [GeneratedRegex(@"min-resolution\s*:\s*([\d.]+)dppx", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 5000)]
+    private static partial Regex MinResolutionPattern { get; }
+
+    [GeneratedRegex(@"max-resolution\s*:\s*([\d.]+)dppx", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 5000)]
+    private static partial Regex MaxResolutionPattern { get; }
+
+    // A bare `0` used as a whole value, with no unit.
+    [GeneratedRegex(@"^\s*-?0(?:\.0+)?\s*$", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
+    private static partial Regex UnitlessZeroPattern { get; }
 
     // A length or percentage in any unit other than px. `0` alone is excluded because it is
     // unitless and means "no radius" rather than a radius in some other unit.
@@ -1480,10 +2532,24 @@ public sealed partial class DesignFoundationGateTests
     [GeneratedRegex(@"\b(left|right)\b", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 5000)]
     private static partial Regex PhysicalDirectionValuePattern { get; }
 
-    // An `a` element selector: at the start or after a combinator, and not part of a longer
-    // identifier. `.accent` and `[data-a]` must not match.
-    [GeneratedRegex(@"(^|[\s,>+~])a(?=[\s,>+~:.\[#]|$)", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
+    // An `a` element selector: at the start, after a combinator, or inside a `:is()`/`:where()`
+    // argument list, and not part of a longer identifier. `.accent` and `[data-a]` must not match.
+    // The `(` and `)` in the character classes are what make `:is(a, button)` match - a global
+    // underline reset written that way was previously invisible to the AC10 removal ban.
+    [GeneratedRegex(@"(^|[\s,>+~(])a(?=[\s,>+~:.\[#)]|$)", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
     private static partial Regex AnchorElementSelectorPattern { get; }
+
+    // The `.text-link` class exactly, not `.text-link-quiet` or any other longer identifier.
+    [GeneratedRegex(@"\.text-link(?![\w-])", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 5000)]
+    private static partial Regex TextLinkClassPattern { get; }
+
+    // A class whose final hyphen-separated segment is `link`, or one of the link pseudo-classes.
+    // `.blinking` does not match; `.text-link`, `.reload-link` and `:any-link` do.
+    [GeneratedRegex(
+        @"\.(?:[\w-]+-)?link(?![\w-])|:(?:any-link|link|visited)\b",
+        RegexOptions.IgnoreCase,
+        matchTimeoutMilliseconds: 5000)]
+    private static partial Regex LinkClassSelectorPattern { get; }
 
     // A Razor directive line. These are compiler instructions, not markup.
     [GeneratedRegex(
@@ -1492,12 +2558,39 @@ public sealed partial class DesignFoundationGateTests
         matchTimeoutMilliseconds: 5000)]
     private static partial Regex RazorDirectivePattern { get; }
 
-    // A Razor expression in markup: an explicit @(...), or an implicit @Member.Chain(args).
+    // A Razor expression in markup: an explicit @(...), or an implicit @Member.Chain with any
+    // number of call and INDEXER suffixes.
+    //
+    // The indexer suffix is what makes the standard localisation idiom pass. `@Localizer["Delete"]`
+    // stripped to `["Delete"]` under the old pattern and was reported as the literal text
+    // "Delete" - so the `IStringLocalizer` indexer form, which is how AC11 is actually satisfied in
+    // Blazor, failed the gate that exists to require it. Only the parenthesised
+    // `@(Loc["Delete"])` survived.
     [GeneratedRegex(
-        @"@\([^()]*(?:\([^()]*\)[^()]*)*\)|@[A-Za-z_][A-Za-z0-9_.]*(?:\([^()]*\))?",
+        @"@\([^()]*(?:\([^()]*\)[^()]*)*\)|@[A-Za-z_][A-Za-z0-9_.]*(?:\([^()]*\)|\[[^\]]*\])*",
         RegexOptions.None,
         matchTimeoutMilliseconds: 5000)]
     private static partial Regex RazorExpressionPattern { get; }
+
+    // A Razor control-flow header: the keyword plus its parenthesised condition, if any.
+    [GeneratedRegex(
+        @"@(?:else\s+if|if|foreach|for|while|switch|do|try|catch|finally|lock|else)\b" +
+        @"\s*(?:\([^()]*(?:\([^()]*\)[^()]*)*\))?",
+        RegexOptions.None,
+        matchTimeoutMilliseconds: 5000)]
+    private static partial Regex RazorControlFlowPattern { get; }
+
+    // A `<script>` or `<style>` element and its body. Neither carries user-visible copy, and both
+    // are full of identifiers the word scan would report as literal text.
+    [GeneratedRegex(
+        @"<(script|style)\b[^>]*>[\s\S]*?</\1\s*>",
+        RegexOptions.IgnoreCase,
+        matchTimeoutMilliseconds: 5000)]
+    private static partial Regex NonCopyElementPattern { get; }
+
+    // A C# string literal, verbatim and interpolated forms included.
+    [GeneratedRegex(@"""((?:[^""\\\r\n]|\\.)*)""", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
+    private static partial Regex CSharpStringLiteralPattern { get; }
 
     [GeneratedRegex(@"&(?:[A-Za-z][A-Za-z0-9]*|#\d+|#[xX][0-9A-Fa-f]+);", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
     private static partial Regex HtmlEntityPattern { get; }
@@ -1507,6 +2600,16 @@ public sealed partial class DesignFoundationGateTests
     [GeneratedRegex(@"\p{L}{2,}", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
     private static partial Regex WordPattern { get; }
 
-    [GeneratedRegex(@"([A-Za-z-]+)\s*=\s*""([^""]*)""", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
+    // An attribute and its value, in EITHER quoting style. The double-quote-only reading made
+    // `title='Delete'` invisible - single quotes are legal in both HTML and Razor, and a gate that
+    // sees only one of them is a gate a developer's editor settings can switch off.
+    [GeneratedRegex(
+        @"([A-Za-z-]+)\s*=\s*(?:""([^""]*)""|'([^']*)')",
+        RegexOptions.None,
+        matchTimeoutMilliseconds: 5000)]
     private static partial Regex AttributePattern { get; }
+
+    // An `<input>` element, captured so its `type` and `value` can be read together.
+    [GeneratedRegex(@"<input\b([^>]*)>", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 5000)]
+    private static partial Regex InputElementPattern { get; }
 }

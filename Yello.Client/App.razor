@@ -6,8 +6,18 @@
     pages yet, and a Router with an empty route table cannot resolve its NotFound case.
     Routing, the layout and the navigation surface arrive with the screens that need them.
 
-    No markup here carries a class, a style attribute or a colour - story 1.2 owns the
-    design foundations.
+    Superseded 2026-08-27 by story 1.2, which shipped the design foundations. This previously
+    read "No markup here carries a class, a style attribute or a colour - story 1.2 owns the
+    design foundations", which described story 1.1's tree and became false the moment
+    css/tokens.css and css/base.css landed. Recorded as a correction rather than deleted,
+    because stale hand-off prose in these files produced six of story 1.1's review findings and
+    a seventh at story 1.2's review, which is where this one was caught.
+
+    The shell still carries no class, style attribute or colour of its own, and it does not need
+    to: `base.css` styles the document from the tokens, so the shell inherits the body ground,
+    the body type role and the focus treatment without naming any of them. The product name
+    below is the one literal the externalised-copy gate permits, because a brand is not
+    translated.
 *@
 
 <p>Yello</p>
