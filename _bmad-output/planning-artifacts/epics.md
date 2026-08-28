@@ -548,7 +548,7 @@ So that the product reads as one thing and its accessibility floor is verified r
 
 **Given** the two remaining rows in `DESIGN.md`'s contrast table — `surface-card` on `surface-column`, and `surface-column` on `surface-page`
 **When** the harness runs
-**Then** they are asserted as **deliberately low** surface-adjacency ratios (~1.09 and ~1.10) and are **not** gated against any threshold
+**Then** they are asserted as **bounded low** surface-adjacency ratios (~1.09 and ~1.10) — held strictly between 1.0 and 1.5 — and are **not** gated against any *contrast* threshold *(Amended 2026-08-28 at story 1.2's second code review, to agree with UX-DR7. The 2026-08-27 review sanctioned the 1.0–1.5 bound in UX-DR7 and left this criterion reading "not gated against any threshold", so the requirement and its acceptance criterion contradicted each other. The bound is not a contrast threshold: it detects a palette edit that redrew the three-ground tonal ladder into a real luminance step, or collapsed it to one ground.)*
 **And** the reason is stated: `DESIGN.md` names them explicitly as *"two combinations that are load-bearing and must not be mistaken for contrast pairs"* — they separate grounds by hairline rather than by luminance, so a harness gating all twenty rows would fail permanently on these two and invite an unstated exception
 
 **Given** the focus ring

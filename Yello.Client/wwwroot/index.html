@@ -63,16 +63,26 @@
         `display:none` stays inline. It is the framework's own precondition for unhiding the
         element rather than a design decision, so it does not move into the stylesheet.
 
-        The dismiss control carries `role="button"` and `tabindex="0"`, added at code review
-        2026-08-27. `base.css` styles it as a 24px target with `cursor: pointer`, and as a bare
-        `<span>` it was an affordance no keyboard user could operate and on which the focus ring
-        could never render. The class name stays exactly `dismiss` - that is the framework's
-        contract - and the role and tabindex are additive to it.
+        The dismiss control is a native `<button type="button">`. As a bare `<span>` it was an
+        affordance no keyboard user could operate and on which the focus ring could never render.
+        Code review 2026-08-27 added `role="button"` and `tabindex="0"`, which made it worse: the
+        framework's shipped `blazor.webassembly.js` binds `.dismiss` with `onclick` only and no key
+        handler, and a `<span role="button">` does not synthesise a click from Enter or Space - so
+        it was announced as a button that no key could activate. Corrected 2026-08-28 to a real
+        button, which needs no JavaScript to be operable and takes an accessible name that `&times;`
+        alone could never provide.
+
+        The class name stays exactly `dismiss` - that is the framework's contract - and its
+        selector is element-agnostic, so changing the element does not break it.
+
+        `aria-label` is English here for the same reason the banner's text is: this file is served
+        before the WebAssembly runtime exists, so no Blazor resource can reach it. A declared
+        variance, recorded with the others above rather than exempted silently.
     -->
     <div id="blazor-error-ui" style="display:none">
         An unhandled error has occurred.
         <a href="." class="reload">Reload</a>
-        <span class="dismiss" role="button" tabindex="0">&times;</span>
+        <button type="button" class="dismiss" aria-label="Dismiss this error">&times;</button>
     </div>
 
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>

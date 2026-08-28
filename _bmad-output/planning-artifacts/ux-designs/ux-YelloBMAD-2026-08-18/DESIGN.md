@@ -44,7 +44,16 @@ typography:
   # Sizes in rem against a 16px root so a user font-size preference is honoured
   # (WCAG 1.4.4). Line-heights are >= 1.5 so a 1.4.12 text-spacing override has
   # room to grow. px never sizes or spaces type; it carries the structural
-  # lengths below (spacing, target floor, hairlines, radii, offsets, slop).
+  # lengths below (spacing, target floor, hairlines, radii, slop) and the
+  # focus ring's 2px offset, which UX-DR7 fixes and the `components:` section
+  # below states rather than the token blocks.
+  #
+  # Amended 2026-08-28 at story 1.2's second code review. The 2026-08-27
+  # review added "offsets" to the parenthesised list of token-block lengths,
+  # where no offset key exists in `rounded:`, `spacing:`, `borders:` or
+  # `motion:` - a dangling reference. The offset is real and required, and the
+  # implementation now carries it as `--focus-ring-offset`, drawn from
+  # UX-DR7's stated 2px rather than from a token row invented here.
   task-title:
     fontFamily: system-sans
     fontSize: 0.8125rem

@@ -176,17 +176,24 @@ body {
 
     The intuitive rationale for `focus-ring` being a separate token from `accent` - "so it does
     not vanish against an accented control" - does not survive arithmetic: the two sit at 1.45
-    dark and 1.48 light. The ring WOULD vanish. What protects it is `outline-offset: 2px`, which
-    puts the ring on the ground BEHIND the control, where it reads at 7.17 on the card and 4.61
-    on the light card.
+    dark and 1.48 light. The ring WOULD vanish. What protects it is the 2px offset, which puts
+    the ring on the ground BEHIND the control, where it reads at 7.17 on the card and 4.61 on the
+    light card.
 
     So: never inset, never at offset 0, and never replaced by a colour change or a border swap.
     The offset, not the token separation, is what makes it visible. `outline` removal is gated
     out of the entire corpus rather than discouraged.
+
+    The offset comes from `--focus-ring-offset` rather than a literal `2px`. It was a literal
+    until 2026-08-28: the first code review amended UX-DR2, AC3 and `DESIGN.md` to state that
+    outside the token layer every length comes from a token, without noticing that this
+    declaration was the one px literal in the product contradicting them - and that
+    `IsPixelPermitted` exempts every property whose name contains "outline", so no gate objected
+    either. The token now exists and the requirement is true.
 */
 :focus-visible {
     outline: var(--border-emphasis-width) solid var(--focus-ring);
-    outline-offset: 2px;
+    outline-offset: var(--focus-ring-offset);
 }
 
 /*
@@ -222,7 +229,19 @@ body {
 
     The ARIA roles are here because a Blazor component reaches for them constantly and none of
     them is a native element: the Picker, the Role chip and the context bar are all built from
-    them. `[tabindex]` catches anything else made focusable by hand.
+    them.
+
+    `[tabindex]:not([tabindex="-1"])` catches anything else made focusable by hand, and excludes
+    what is not. `tabindex="-1"` does the opposite of making something keyboard-focusable: it
+    marks a programmatic focus target - a scroll region, a dialog root, a skip-link anchor - which
+    2.5.8 does not cover, because 2.5.8 is about the size of a POINTER target. A bare `[tabindex]`
+    forced a 24px floor in both axes onto focus-management containers that are not controls at
+    all. Corrected at code review 2026-08-28; the comment claiming `[tabindex]` "catches anything
+    else made focusable by hand" was wrong about half of what it matched.
+
+    `[contenteditable]:not([contenteditable="false"])` for the same reason in the other
+    direction: a bare `contenteditable` attribute with no value IS editable - the empty string is
+    the same as "true" - and `[contenteditable="true"]` missed it.
 */
 button,
 [role="button"],
@@ -236,8 +255,8 @@ button,
 [role="option"],
 [role="slider"],
 [role="spinbutton"],
-[tabindex],
-[contenteditable="true"],
+[tabindex]:not([tabindex="-1"]),
+[contenteditable]:not([contenteditable="false"]),
 input:not([type="hidden"]),
 select,
 textarea,
@@ -310,18 +329,35 @@ summary {
 }
 
 /*
-    The dismiss control. It carries `role="button"` and `tabindex="0"` in `index.html` so it is
-    focusable and operable from the keyboard - it was a bare `<span>` given `cursor: pointer` and a
-    24px target, which presented an affordance no keyboard user could reach and on which
-    `:focus-visible` could never render. Its floor now comes from the `[role="button"]` rule above
-    rather than being restated here, which is the "acquired by default" principle that rule exists
-    to establish.
+    The dismiss control, a native `<button>` in `index.html`.
+
+    It was a bare `<span>` with `cursor: pointer` and a 24px target - an affordance no keyboard
+    user could reach, and on which `:focus-visible` could never render. The first code review
+    "fixed" that on 2026-08-27 by adding `role="button"` and `tabindex="0"`, which was worse: it
+    ANNOUNCED the span as a button while the framework's shipped `blazor.webassembly.js` binds
+    `.dismiss` with `onclick` alone and no key handler, and a `<span role="button">` does not
+    synthesise a click from Enter or Space the way a real button does. Screen-reader users were
+    told they had a button that no key operated, and `&times;` gave it no accessible name either.
+
+    A native `<button type="button">` keeps the framework's contract - its selector is `.dismiss`,
+    which is element-agnostic - activates on Enter and Space with no JavaScript, and carries an
+    accessible name from `aria-label`. Corrected at code review 2026-08-28.
+
+    `appearance: none` and the colour/border resets are needed because this is now a real button
+    and inherits the UA's chrome. Its 24px floor comes from the `button` rule above rather than
+    being restated here, which is the "acquired by default" principle that rule exists for.
 */
 #blazor-error-ui .dismiss {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    appearance: none;
     margin-inline-start: var(--space-3);
+    border: 0;
+    background: none;
     color: var(--text-muted);
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
     cursor: pointer;
 }

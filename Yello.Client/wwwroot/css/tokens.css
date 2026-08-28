@@ -290,75 +290,36 @@
 
         `emphasis-width` 2px carries the focus ring, and the lifted card for the duration of a
         drag - which story 2.7 builds, not this one.
+
+        DEVICE-PIXEL SNAPPING - the second half of `DESIGN.md:366`, "borders snapped to device
+        pixels where the platform allows" - is DEFERRED to UX, not implemented here. 1.5px is a
+        whole number of device pixels at exactly one scale (2dppx = 3 device pixels) and lands
+        mid-pixel everywhere else, so the requirement is real. It is recorded in
+        `deferred-work.md` with UX as owner.
+
+        Story 1.2's first code review implemented it as six `resolution` bands rebinding this
+        width to `ceil(1.5 x dppx) / dppx`. That was reverted at the second review on 2026-08-28:
+        the display-scale table had no upstream authority, and the round-up rule gave 2px at both
+        1dppx and 1.5dppx - identical to `emphasis-width`, collapsing the lifted card's border
+        into an ordinary hairline at the commonest desktop scale. At 1dppx a 1px border is also
+        exactly one device pixel and does not antialias at all, so the reason for exceeding 1px
+        does not apply there. A correct implementation needs a real device matrix from UX, or a
+        rendered measurement in a browser.
     */
     --border-hairline-width: 1.5px;
     --border-emphasis-width: 2px;
-}
 
-/*
-    DEVICE-PIXEL SNAPPING for the hairline. The second half of `DESIGN.md:366` - "1.5px minimum on
-    every structural border, borders snapped to device pixels where the platform allows".
+    /*
+        The focus ring's offset. UX-DR7 requires 2px specifically and says why: "the offset, not
+        the token separation, is what makes it visible - the ring is only 1.45 against accent".
 
-    1.5px is a whole number of device pixels at exactly one scale, 2dppx (3 device pixels). At every
-    other common scale it lands mid-pixel and antialiases, which is the failure the 1.5px floor was
-    chosen to avoid in the first place: composited at partial coverage, every border pair in both
-    themes drops below the 3:1 gate.
-
-    Each band therefore rebinds the width to `ceil(1.5 x dppx) / dppx` - the smallest whole number
-    of device pixels that is still at or above the floor. Rounding UP only: rounding down would
-    trade an accessibility requirement for a rendering one.
-
-        1dppx     ceil(1.5)   = 2  ->  2 / 1      = 2px
-        1.25dppx  ceil(1.875) = 2  ->  2 / 1.25   = 1.6px
-        1.5dppx   ceil(2.25)  = 3  ->  3 / 1.5    = 2px
-        1.75dppx  ceil(2.625) = 3  ->  3 / 1.75   = 1.7142857px
-        2dppx     ceil(3)     = 3  ->  3 / 2      = 1.5px
-        3dppx     ceil(4.5)   = 5  ->  5 / 3      = 1.6666667px
-
-    The `:root` declaration above stays 1.5px: it is the design's canonical figure, cited as such by
-    `DESIGN.md`, and it is what a browser without `resolution` support falls back to. The bands are
-    an adaptation of it, never a replacement.
-
-    Bands are keyed on their LOWER bound, which is the scale that has to snap - within
-    [1.25, 1.5) the worst case for a width chosen at 1.25 is 1.25 itself. Gated by
-    `The_hairline_is_snapped_to_a_device_pixel_at_every_declared_scale`, which recomputes the
-    arithmetic rather than trusting this table.
-*/
-
-@media (max-resolution: 1.24dppx) {
-    :root {
-        --border-hairline-width: 2px;
-    }
-}
-
-@media (min-resolution: 1.25dppx) and (max-resolution: 1.49dppx) {
-    :root {
-        --border-hairline-width: 1.6px;
-    }
-}
-
-@media (min-resolution: 1.5dppx) and (max-resolution: 1.74dppx) {
-    :root {
-        --border-hairline-width: 2px;
-    }
-}
-
-@media (min-resolution: 1.75dppx) and (max-resolution: 1.99dppx) {
-    :root {
-        --border-hairline-width: 1.7142857px;
-    }
-}
-
-@media (min-resolution: 2dppx) and (max-resolution: 2.99dppx) {
-    :root {
-        --border-hairline-width: 1.5px;
-    }
-}
-
-@media (min-resolution: 3dppx) {
-    :root {
-        --border-hairline-width: 1.6666667px;
-    }
+        It is a token rather than the literal `base.css` used to carry, because UX-DR2 and AC3
+        both state that outside the token layer every length comes from a token, and `outline-
+        offset: 2px` was the one px literal in the product that contradicted them. Added
+        2026-08-28 at the second code review; the first review amended those requirements to
+        claim this token existed, which it did not.
+    */
+    --focus-ring-offset: 2px;
 }
 
 :root {

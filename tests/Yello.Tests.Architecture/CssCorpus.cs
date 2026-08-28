@@ -58,6 +58,28 @@ internal static partial class CssCorpus
     public const string ThemeBoundaryEndMarker = "THEME BOUNDARY END";
 
     /// <summary>
+    /// Files this corpus could not parse, each with the reason.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A malformed stylesheet is a genuine defect - an unterminated quote, an unclosed comment, an
+    /// unbalanced paren or an unclosed <c>&lt;style&gt;</c> each make some later part of the file
+    /// unreadable, and a gate that reads nothing passes. But throwing out of a static initialiser
+    /// turned one bad file into a <c>TypeInitializationException</c> on all 75 tests at once, with
+    /// the crafted message buried under two unrelated exception names.
+    /// </para>
+    /// <para>
+    /// So the defect is COLLECTED rather than thrown, the offending file contributes no rules, and
+    /// <c>The_corpus_parsed_every_file_it_is_asked_to_gate</c> fails with the reason. One red test
+    /// that names the file, instead of 75 errors that do not. The suite is red either way, which is
+    /// what stops it shipping; this only decides whether a human can read why.
+    /// </para>
+    /// </remarks>
+    public static IReadOnlyList<string> Defects => LoadDefects;
+
+    private static readonly List<string> LoadDefects = [];
+
+    /// <summary>
     /// Every stylesheet in the source tree, ordered so failure messages are stable between runs.
     /// </summary>
     public static IReadOnlyList<Sheet> StyleSheets { get; } =
@@ -206,7 +228,13 @@ internal static partial class CssCorpus
     /// True when a declaration declares a custom property rather than a CSS property.
     /// </summary>
     public static bool IsCustomProperty(Declaration declaration) =>
-        declaration.Property.StartsWith("--", StringComparison.Ordinal);
+        IsCustomPropertyName(declaration.Property);
+
+    /// <summary>
+    /// True when a property name is a custom property's.
+    /// </summary>
+    public static bool IsCustomPropertyName(string property) =>
+        property.StartsWith("--", StringComparison.Ordinal);
 
     /// <summary>
     /// Every rule in every stylesheet.
@@ -293,13 +321,18 @@ internal static partial class CssCorpus
     /// change.
     /// </para>
     /// <para>
-    /// <c>em</c> is converted against the root as an approximation - its real basis is the
-    /// element's own font size, which static analysis cannot know. The approximation is
-    /// deliberately on the permissive side for the *unit* and still catches every case where the
-    /// NUMBER is small enough to breach a floor, which is the shape these gates check.
-    /// <c>ex</c>, <c>ch</c>, percentages and the viewport units are NOT converted: they are
-    /// font- or container-relative in ways no fixed factor represents, and a wrong number in a
-    /// failure message is worse than an honest omission.
+    /// <c>em</c>, <c>ex</c>, <c>ch</c>, percentages and the viewport units are NOT converted:
+    /// they are font- or container-relative in ways no fixed factor represents, and a wrong
+    /// number in a failure message is worse than an honest omission.
+    /// </para>
+    /// <para>
+    /// <c>em</c> was converted at the root size until 2026-08-28, on the argument that the
+    /// approximation was "on the permissive side". It was wrong in both directions, because
+    /// <c>em</c> resolves against the ELEMENT's font size and the type scale runs from
+    /// 0.6875rem to 1.5rem: <c>min-height: 1.6em</c> on 13px metadata is 20.8px and passed the
+    /// 24px target floor, while <c>border-inline-start: 0.09em</c> on 20px type is 1.8px and
+    /// failed the 1.5px hairline floor although it clears it. Use <see cref="FontRelativeLengths"/>
+    /// to report such a value as unmeasurable instead of guessing at it.
     /// </para>
     /// </remarks>
     public static IEnumerable<double> AbsoluteLengthsPx(string value)
@@ -314,6 +347,14 @@ internal static partial class CssCorpus
             yield return number * UnitFactorPx(unit);
         }
     }
+
+    /// <summary>
+    /// The font-relative lengths in a value, exactly as written, for gates that must say
+    /// "unmeasurable" rather than guess a px figure.
+    /// </summary>
+    public static IEnumerable<string> FontRelativeLengths(string value) =>
+        from match in FontRelativeLengthPattern.Matches(Resolve(value)).Cast<Match>()
+        select match.Value;
 
     /// <summary>
     /// The px widths of any border-width keywords in a value.
@@ -338,7 +379,7 @@ internal static partial class CssCorpus
     private static double UnitFactorPx(string unit) => unit switch
     {
         "PX" => 1,
-        "REM" or "EM" => RootFontSizePx,
+        "REM" => RootFontSizePx,
         "PT" => 96.0 / 72.0,
         "PC" => 16,
         "IN" => 96,
@@ -369,7 +410,7 @@ internal static partial class CssCorpus
     /// would blank REAL declarations, and the gates would then never see the code they were
     /// written to check. Quoted runs are therefore skipped before comments are recognised.
     /// </remarks>
-    public static string BlankCssComments(string text)
+    public static string BlankCssComments(string text, string path)
     {
         var characters = text.ToCharArray();
         var index = 0;
@@ -387,7 +428,19 @@ internal static partial class CssCorpus
             if (current == '/' && index + 1 < text.Length && text[index + 1] == '*')
             {
                 var close = text.IndexOf("*/", index + 2, StringComparison.Ordinal);
-                var end = close < 0 ? text.Length - 1 : close + 1;
+
+                // An unterminated comment blanks everything after it, which silently deletes every
+                // later rule from the corpus and passes every gate that would have read them. The
+                // unterminated-QUOTE case throws for exactly this reason; this is the same defect
+                // and gets the same treatment rather than a quiet truncation.
+                if (close < 0)
+                {
+                    throw new InvalidOperationException(
+                        $"'{path}' has an unterminated '/*' comment at line {LineAt(text, index)}. " +
+                        "Every rule after it would be blanked, so no gate would read it.");
+                }
+
+                var end = close + 1;
 
                 BlankSpan(characters, index, end);
                 index = end + 1;
@@ -474,17 +527,25 @@ internal static partial class CssCorpus
     }
 
     /// <summary>
-    /// True when a value still names a <c>var()</c> reference after resolution, so a gate can
-    /// report the unresolved reference rather than silently measuring nothing.
-    /// </summary>
-    public static bool HasUnresolvedReference(string value) =>
-        VarReferencePattern.IsMatch(Resolve(value));
-
-    /// <summary>
     /// Every custom-property name referenced in a value that resolution could not substitute.
     /// </summary>
+    /// <remarks>
+    /// A reference carrying a FALLBACK is never unresolved. <c>var(--x, var(--space-3))</c> is the
+    /// standard optional-override hook, and its whole purpose is that <c>--x</c> may be undeclared
+    /// - the fallback is what the author intends to render. Reporting it asked for a declaration
+    /// that must not exist, with a remedy ("declare it in tokens.css, or correct the name") that
+    /// applied to neither case.
+    /// </remarks>
     public static IEnumerable<string> UnresolvedReferences(string value) =>
-        ReferencedTokens(Resolve(value));
+        from match in VarReferencePattern.Matches(Resolve(value)).Cast<Match>()
+        where !HasFallback(match.Value)
+        select match.Groups[1].Value;
+
+    /// <summary>
+    /// True when a <c>var()</c> reference supplies a fallback after its property name.
+    /// </summary>
+    private static bool HasFallback(string reference) =>
+        reference.Contains(',', StringComparison.Ordinal);
 
     private static string Substitute(Match match) =>
         AllCustomProperties.TryGetValue(match.Groups[1].Value, out var resolved)
@@ -516,11 +577,20 @@ internal static partial class CssCorpus
     private static Sheet ReadStyleSheet(FileInfo file)
     {
         var raw = File.ReadAllText(file.FullName);
-        var blanked = BlankCssComments(raw);
-
         var path = RepositoryLayout.RelativePath(file);
 
-        return new Sheet(file, path, raw, blanked, Parse(blanked, path));
+        try
+        {
+            var blanked = BlankCssComments(raw, path);
+
+            return new Sheet(file, path, raw, blanked, Parse(blanked, path));
+        }
+        catch (InvalidOperationException failure)
+        {
+            LoadDefects.Add(failure.Message);
+
+            return new Sheet(file, path, raw, raw, []);
+        }
     }
 
     private static Markup ReadMarkupFile(FileInfo file)
@@ -536,13 +606,44 @@ internal static partial class CssCorpus
     /// </summary>
     private static Sheet ReadMarkupStyles(Markup markup)
     {
+        try
+        {
+            return ReadMarkupStylesOrThrow(markup);
+        }
+        catch (InvalidOperationException failure)
+        {
+            LoadDefects.Add($"'{markup.Path}': {failure.Message}");
+
+            return new Sheet(markup.File, markup.Path, markup.Raw, markup.Blanked, []);
+        }
+    }
+
+    private static Sheet ReadMarkupStylesOrThrow(Markup markup)
+    {
         var rules = new List<Rule>();
+
+        // An unclosed `<style>` hides its whole body: StyleElementPattern needs the closing tag,
+        // so a missing one leaves the CSS invisible to every gate while the copy gate reads the
+        // same text as prose and reports CSS identifiers as literals. Counting openers against
+        // matched pairs catches it.
+        var openers = StyleOpenTagPattern.Matches(markup.Blanked).Count;
+        var pairs = StyleElementPattern.Matches(markup.Blanked).Count;
+
+        if (openers != pairs)
+        {
+            throw new InvalidOperationException(
+                $"'{markup.Path}' has {openers} '<style>' opening tag(s) but {pairs} closed " +
+                "element(s). The unclosed one's CSS is invisible to every gate.");
+        }
 
         rules.AddRange(Parse(StyleElementBodiesOnly(markup.Blanked), markup.Path));
 
         foreach (var match in StyleAttributePattern.Matches(markup.Blanked).Cast<Match>())
         {
-            var value = match.Groups[2].Value;
+            // Group 2 is the quoted form's value, group 3 the unquoted form's. Exactly one of the
+            // two participates in any match.
+            var captured = match.Groups[2].Success ? match.Groups[2] : match.Groups[3];
+            var value = captured.Value;
 
             if (value.TrimStart().StartsWith('@'))
             {
@@ -551,14 +652,18 @@ internal static partial class CssCorpus
 
             var declarations = new List<Declaration>();
 
-            foreach (var (statement, offset) in SplitStatements(value, match.Groups[2].Index))
+            foreach (var (statement, offset) in SplitStatements(value, captured.Index))
             {
                 AddDeclaration(statement, offset, declarations);
             }
 
             if (declarations.Count > 0)
             {
-                rules.Add(new Rule("[style]", string.Empty, match.Index, declarations));
+                rules.Add(new Rule(
+                    InlineStyleSelector(markup.Blanked, match.Index),
+                    string.Empty,
+                    match.Index,
+                    declarations));
             }
         }
 
@@ -568,6 +673,38 @@ internal static partial class CssCorpus
             markup.Raw,
             markup.Blanked,
             [.. rules.OrderBy(r => r.Offset)]);
+    }
+
+    /// <summary>
+    /// The selector to record for an inline <c>style</c> attribute: the host element's tag name
+    /// plus <c>[style]</c>, e.g. <c>a[style]</c>.
+    /// </summary>
+    /// <remarks>
+    /// A bare <c>[style]</c> loses which element the declarations land on, and several gates ask
+    /// exactly that of a selector. <c>SelectorTargetsLink</c> is the one that matters most:
+    /// <c>&lt;a style="text-decoration: none"&gt;</c> removes a link's underline, which AC10 bans
+    /// outright, and a selector of <c>[style]</c> matched none of its conditions. The focus-ring
+    /// checks read the selector the same way.
+    /// </remarks>
+    private static string InlineStyleSelector(string markup, int attributeOffset)
+    {
+        var open = markup.LastIndexOf('<', attributeOffset);
+
+        if (open < 0)
+        {
+            return "[style]";
+        }
+
+        var index = open + 1;
+
+        while (index < markup.Length && (char.IsLetterOrDigit(markup[index]) || markup[index] is '-' or '_' or ':'))
+        {
+            index++;
+        }
+
+        var tag = markup[(open + 1)..index];
+
+        return tag.Length == 0 ? "[style]" : $"{tag}[style]";
     }
 
     /// <summary>
@@ -614,7 +751,19 @@ internal static partial class CssCorpus
 
             if (current is '"' or '\'')
             {
-                index = SkipQuoted(value, index);
+                var past = SkipQuoted(value, index);
+
+                // An unterminated quote runs off the end, so every later `;` is inside a string and
+                // the whole attribute becomes one declaration - the same silent truncation the
+                // stylesheet path throws for.
+                if (past > value.Length)
+                {
+                    throw new InvalidOperationException(
+                        $"An inline style attribute has an unterminated {current} quote: " +
+                        $"'{value}'. Every declaration after it would be swallowed.");
+                }
+
+                index = past;
                 continue;
             }
 
@@ -666,15 +815,24 @@ internal static partial class CssCorpus
     /// boundary.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// The boundary exclusion is applied to the TOKEN LAYER ONLY. Offsets are per-file, so
     /// testing another sheet's offset against the token layer's boundary range would exclude
     /// whichever of its rules happened to sit between the same two byte positions.
+    /// </para>
+    /// <para>
+    /// Reads <see cref="AllSheets"/>, so markup counts as a declaring source and not only as a
+    /// consuming one. It read <see cref="StyleSheets"/> until 2026-08-28, which made the commit
+    /// that taught this corpus to see markup self-inconsistent: a custom property declared in a
+    /// <c>&lt;style&gt;</c> body and used two lines below it was reported as declared by no
+    /// stylesheet, failing correct code.
+    /// </para>
     /// </remarks>
     private static IReadOnlyDictionary<string, string> ReadAllCustomProperties()
     {
         var values = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        foreach (var sheet in StyleSheets)
+        foreach (var sheet in AllSheets)
         {
             var isTokenLayer = IsTokensFile(sheet);
 
@@ -765,6 +923,17 @@ internal static partial class CssCorpus
         var cursor = new Cursor(blanked, path);
 
         ParseBlock(cursor, [], string.Empty, rules);
+
+        // An unbalanced `(` makes every later `;`, `{` and `}` an ordinary character, so the whole
+        // remainder of the file folds into one unrecognisable declaration and every gate that
+        // would have read those rules passes on nothing. Same silent-vacuity class as the
+        // unterminated comment and the unterminated quote, and it gets the same named failure.
+        if (cursor.ParenDepth != 0)
+        {
+            throw new InvalidOperationException(
+                $"'{path}' has {cursor.ParenDepth} unclosed '(' at end of file. Every rule after " +
+                "it is folded into one declaration, so no gate reads it.");
+        }
 
         return [.. rules.OrderBy(r => r.Offset)];
     }
@@ -932,8 +1101,14 @@ internal static partial class CssCorpus
     // than as a contrast failure.
     //
     // The optional fallback is consumed so `var(--a, 4px)` resolves rather than being left as
-    // unparsed text.
-    [GeneratedRegex(@"var\(\s*--([A-Za-z0-9_-]+)\s*(?:,[^()]*)?\)", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
+    // unparsed text. The fallback alternative allows ONE level of nested parens, because
+    // `var(--a, var(--b))` and `var(--a, calc(1px + 2px))` are the two idiomatic fallback shapes
+    // and `[^()]*` matched neither - so the whole reference was left as text, the value read as
+    // having no length, and every gate that measures a length passed on it.
+    [GeneratedRegex(
+        @"var\(\s*--([A-Za-z0-9_-]+)\s*(?:,\s*(?:[^()]|\([^()]*\))*)?\)",
+        RegexOptions.None,
+        matchTimeoutMilliseconds: 5000)]
     private static partial Regex VarReferencePattern { get; }
 
     // A px length, signed and optionally fractional, with a boundary in front so the `2px` inside
@@ -955,13 +1130,21 @@ internal static partial class CssCorpus
     [GeneratedRegex(@"\s+", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
     private static partial Regex WhitespaceRunPattern { get; }
 
-    // A length in any unit a fixed factor converts to px. `ex`, `ch`, `%` and the viewport units
-    // are deliberately absent - see AbsoluteLengthsPx.
+    // A length in any unit a fixed factor converts to px. `em`, `ex`, `ch`, `%` and the viewport
+    // units are deliberately absent - see AbsoluteLengthsPx.
     [GeneratedRegex(
-        @"(?<![\w.])(-?(?:\d+(?:\.\d+)?|\.\d+))(px|rem|em|pt|pc|in|cm|mm|q)\b",
+        @"(?<![\w.])(-?(?:\d+(?:\.\d+)?|\.\d+))(px|rem|pt|pc|in|cm|mm|q)\b",
         RegexOptions.IgnoreCase,
         matchTimeoutMilliseconds: 5000)]
     private static partial Regex AbsoluteLengthPattern { get; }
+
+    // A font-relative length, which no fixed factor converts. Reported rather than converted -
+    // see AbsoluteLengthsPx and FontRelativeLengths.
+    [GeneratedRegex(
+        @"(?<![\w.])(-?(?:\d+(?:\.\d+)?|\.\d+))(em|ex|ch)\b",
+        RegexOptions.IgnoreCase,
+        matchTimeoutMilliseconds: 5000)]
+    private static partial Regex FontRelativeLengthPattern { get; }
 
     // The three border-width keywords, which are lengths without being numbers.
     [GeneratedRegex(@"\b(?:thin|medium|thick)\b", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 5000)]
@@ -970,8 +1153,15 @@ internal static partial class CssCorpus
     // A `style` attribute and its value. The quote character is captured and back-referenced so
     // both quoting styles are read with one pattern and the OTHER quote may appear inside the
     // value. The lookbehind stops `data-style=` and any other `-style` suffix from matching.
+    //
+    // The third alternative is the UNQUOTED form. HTML permits an attribute value with no quotes
+    // when it contains no whitespace or the delimiters, and `<span style=border-radius:50%>` and
+    // `<span style=height:32px>` are both legal, both compile with 0 warnings, and were invisible
+    // to a quote-only pattern - so the circular avatar and the fixed height that AC9 and AC13
+    // forbid could be written in markup and bypass every CSS gate. Group 3 carries it, so
+    // ReadMarkupStyles must read groups 2 AND 3.
     [GeneratedRegex(
-        @"(?<![\w-])style\s*=\s*([""'])((?:(?!\1)[\s\S])*)\1",
+        @"(?<![\w-])style\s*=\s*(?:([""'])((?:(?!\1)[\s\S])*)\1|([^\s""'=<>`]+))",
         RegexOptions.IgnoreCase,
         matchTimeoutMilliseconds: 5000)]
     private static partial Regex StyleAttributePattern { get; }
@@ -982,6 +1172,11 @@ internal static partial class CssCorpus
         RegexOptions.IgnoreCase,
         matchTimeoutMilliseconds: 5000)]
     private static partial Regex StyleElementPattern { get; }
+
+    // A `<style>` opening tag alone, counted against the closed pairs so an unclosed element is a
+    // named failure rather than silently invisible CSS.
+    [GeneratedRegex(@"<style\b", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 5000)]
+    private static partial Regex StyleOpenTagPattern { get; }
 
     /// <summary>
     /// One declaration inside a rule, with its offset in the file.
