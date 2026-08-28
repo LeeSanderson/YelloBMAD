@@ -75,7 +75,7 @@ development_status:
   epic-1: in-progress
   1-1-the-solution-skeleton-and-its-build-gates: done
   1-2-the-design-foundations-every-surface-is-drawn-from: done
-  1-3-register-an-account-and-receive-a-personal-space: backlog
+  1-3-register-an-account-and-receive-a-personal-space: ready-for-dev
   1-4-authenticate-and-hold-a-session-across-every-space: backlog
   1-5-resolve-the-active-space-per-request-enforced-in-the-database: backlog
   1-6-refuse-at-the-space-boundary-and-record-every-refusal: backlog
