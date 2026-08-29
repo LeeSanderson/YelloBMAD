@@ -4,7 +4,7 @@ baseline_commit: 73805cb699b4d3c1868ddc4d9fb41cf4b377f21d
 
 # Story 1.3: Register an Account and receive a Personal Space
 
-Status: ready-for-dev
+Status: review
 
 Epic: 1 — An Account, a Space of your own, and a boundary that holds
 Story key: `1-3-register-an-account-and-receive-a-personal-space`
@@ -75,91 +75,91 @@ convention `epics.md:8` establishes ("Acceptance Criteria, fifth block (AC5)").
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — The schema: first entities, first DbContext, first migration** (AC: 1, 3, 4)
-  - [ ] Add `Account`, `Space`, `Membership`, `StatusDefinition` and the `Role` enum to `Yello.Domain`. No EF Core attribute, no EF Core type, no ASP.NET Core type — Gate B scans bytecode and fails the build on either.
-  - [ ] `Guid` ids generated application-side via EF Core's `SequentialGuidValueGenerator`. **Not** `Guid.CreateVersion7()`, never sequential integers (AR-34, `epics.md:204`; `ARCHITECTURE-SPINE.md:268`).
-  - [ ] All timestamps `DateTimeOffset` in UTC. `DateTime` is banned; `DateTimeOffset.Now` is a banned API at build (use `UtcNow`).
-  - [ ] Add the `DbContext`, all EF configuration and the migration to `Yello.Infrastructure`. Add `PackageReference` (no `Version` attribute) for `Microsoft.EntityFrameworkCore`, `.SqlServer`, `.Design` and `Microsoft.AspNetCore.Identity.EntityFrameworkCore` — **already pinned at 10.0.11 in `Directory.Packages.props`; no `PackageVersionPinTests` edit is needed.**
-  - [ ] `Membership` and `StatusDefinition` carry a **non-nullable `SpaceId`** (AD-2, `ARCHITECTURE-SPINE.md:81`).
-  - [ ] Filtered unique index `Membership(SpaceId) WHERE Role = Owner` (AD-5, `:106`). Invariant test: no Space ever holds zero or two Owner Memberships (AR-12, `epics.md:182`).
-  - [ ] Email uniqueness enforced by index, but **never surfaced as a distinguishing response** — see Task 4.
-  - [ ] Write the RLS policies for the Space-scoped tables this story creates, in the same migration, plus the schema test asserting them. Rationale and the alternative are in *The isolation seam* below.
-  - [ ] Add `dotnet-ef` to `.config/dotnet-tools.json` (the tool-manifest gate checks only `aspire.cli`, so this is safe).
-  - [ ] **No migration is applied at startup** (AR-36, `epics.md:206`). Story 1.10 applies them as an explicit deploy step.
+- [x] **Task 1 — The schema: first entities, first DbContext, first migration** (AC: 1, 3, 4)
+  - [x] Add `Account`, `Space`, `Membership`, `StatusDefinition` and the `Role` enum to `Yello.Domain`. No EF Core attribute, no EF Core type, no ASP.NET Core type — Gate B scans bytecode and fails the build on either.
+  - [x] `Guid` ids generated application-side via EF Core's `SequentialGuidValueGenerator`. **Not** `Guid.CreateVersion7()`, never sequential integers (AR-34, `epics.md:204`; `ARCHITECTURE-SPINE.md:268`).
+  - [x] All timestamps `DateTimeOffset` in UTC. `DateTime` is banned; `DateTimeOffset.Now` is a banned API at build (use `UtcNow`).
+  - [x] Add the `DbContext`, all EF configuration and the migration to `Yello.Infrastructure`. Add `PackageReference` (no `Version` attribute) for `Microsoft.EntityFrameworkCore`, `.SqlServer`, `.Design` and `Microsoft.AspNetCore.Identity.EntityFrameworkCore` — **already pinned at 10.0.11 in `Directory.Packages.props`; no `PackageVersionPinTests` edit is needed.**
+  - [x] `Membership` and `StatusDefinition` carry a **non-nullable `SpaceId`** (AD-2, `ARCHITECTURE-SPINE.md:81`).
+  - [x] Filtered unique index `Membership(SpaceId) WHERE Role = Owner` (AD-5, `:106`). Invariant test: no Space ever holds zero or two Owner Memberships (AR-12, `epics.md:182`).
+  - [x] Email uniqueness enforced by index, but **never surfaced as a distinguishing response** — see Task 4.
+  - [x] Write the RLS policies for the Space-scoped tables this story creates, in the same migration, plus the schema test asserting them. Rationale and the alternative are in *The isolation seam* below.
+  - [x] Add `dotnet-ef` to `.config/dotnet-tools.json` (the tool-manifest gate checks only `aspire.cli`, so this is safe).
+  - [x] **No migration is applied at startup** (AR-36, `epics.md:206`). Story 1.10 applies them as an explicit deploy step.
 
-- [ ] **Task 2 — The `RegisterAccount` slice: one implementation, one transaction** (AC: 1, 3, 4)
-  - [ ] `Yello.Application/Accounts/RegisterAccount/` — command, handler, validator and its tests in one folder (AR-3, `epics.md:173`).
-  - [ ] The handler writes `Account` + `Space` + `Membership(Owner)` + three `StatusDefinition` rows **in one transaction**. Registration completing with anything other than exactly one owned Space is a failed transaction, not a repairable state (AD-22, `ARCHITECTURE-SPINE.md:210`).
-  - [ ] **Build it to be called.** Story 4.3 delegates to this exact slice for registration-while-accepting-an-Invitation and adds the invited-Space Membership as a *separate, additional* Membership (`epics.md:1703-1706`). It must not provision twice, and 4.3 must not need a second provisioning path.
-  - [ ] `Yello.Application` may not reference ASP.NET Core types. Identity's hasher reaches the slice through a port declared in `Yello.Domain` and implemented in `Yello.Infrastructure`.
-  - [ ] Seed exactly Todo / In Progress / Done as identity-bearing `StatusDefinition` rows with stable ids that survive rename (AR-23, `epics.md:193`). Do **not** materialise any per-Project effective Status set; no table stores one.
-  - [ ] Re-implementing authorisation, Space resolution, refusal recording, idempotency or a bound check **inside the slice is a defect** (AR-3). No NFR-8 bound applies to this story — the registry is built in 1.6 and assigns Spaces-per-Account to 3.1.
+- [x] **Task 2 — The `RegisterAccount` slice: one implementation, one transaction** (AC: 1, 3, 4)
+  - [x] `Yello.Application/Accounts/RegisterAccount/` — command, handler, validator and its tests in one folder (AR-3, `epics.md:173`).
+  - [x] The handler writes `Account` + `Space` + `Membership(Owner)` + three `StatusDefinition` rows **in one transaction**. Registration completing with anything other than exactly one owned Space is a failed transaction, not a repairable state (AD-22, `ARCHITECTURE-SPINE.md:210`).
+  - [x] **Build it to be called.** Story 4.3 delegates to this exact slice for registration-while-accepting-an-Invitation and adds the invited-Space Membership as a *separate, additional* Membership (`epics.md:1703-1706`). It must not provision twice, and 4.3 must not need a second provisioning path.
+  - [x] `Yello.Application` may not reference ASP.NET Core types. Identity's hasher reaches the slice through a port declared in `Yello.Domain` and implemented in `Yello.Infrastructure`.
+  - [x] Seed exactly Todo / In Progress / Done as identity-bearing `StatusDefinition` rows with stable ids that survive rename (AR-23, `epics.md:193`). Do **not** materialise any per-Project effective Status set; no table stores one.
+  - [x] Re-implementing authorisation, Space resolution, refusal recording, idempotency or a bound check **inside the slice is a defect** (AR-3). No NFR-8 bound applies to this story — the registry is built in 1.6 and assigns Spaces-per-Account to 3.1.
 
-- [ ] **Task 3 — Identity, wired for authentication only** (AC: 5, 7)
-  - [ ] Configure ASP.NET Core Identity for the Account store, password hashing and nothing else (AD-1, `ARCHITECTURE-SPINE.md:75`).
-  - [ ] **Gate C is a live IL scan over all 14 assemblies and will fail the build on:** `IdentityRole` (any arity), `IdentityUserRole`, `IdentityRoleClaim`, `RoleManager<>`, `IRoleStore<>`, `RoleStore<>`, `AddRoles<>()`, `AddRoleManager<>()`, `[Authorize(Roles=…)]`, `AuthorizationPolicyBuilder.RequireRole`, `ClaimsPrincipal.IsInRole`, `ClaimTypes.Role` however read, and `UserManager<>`'s role surface (`AddToRoleAsync`, `GetRolesAsync`, `IsInRoleAsync`, …). `ClaimsPrincipal` and `UserManager<>` are permitted *types*; the bans are on members.
-  - [ ] Yello's `Role` is a column on `Membership`. It is never an Identity role, never a claim, never a cookie value.
-  - [ ] Choose and record the NFR-6 work factor — see Task 8.
-  - [ ] Nothing may assume a password exists on every Account (AC7; `harness-constraints.md:64`). The password is a nullable credential on the Account, not a required field of identity.
+- [x] **Task 3 — Identity, wired for authentication only** (AC: 5, 7)
+  - [x] Configure ASP.NET Core Identity for the Account store, password hashing and nothing else (AD-1, `ARCHITECTURE-SPINE.md:75`).
+  - [x] **Gate C is a live IL scan over all 14 assemblies and will fail the build on:** `IdentityRole` (any arity), `IdentityUserRole`, `IdentityRoleClaim`, `RoleManager<>`, `IRoleStore<>`, `RoleStore<>`, `AddRoles<>()`, `AddRoleManager<>()`, `[Authorize(Roles=…)]`, `AuthorizationPolicyBuilder.RequireRole`, `ClaimsPrincipal.IsInRole`, `ClaimTypes.Role` however read, and `UserManager<>`'s role surface (`AddToRoleAsync`, `GetRolesAsync`, `IsInRoleAsync`, …). `ClaimsPrincipal` and `UserManager<>` are permitted *types*; the bans are on members.
+  - [x] Yello's `Role` is a column on `Membership`. It is never an Identity role, never a claim, never a cookie value.
+  - [x] Choose and record the NFR-6 work factor — see Task 8.
+  - [x] Nothing may assume a password exists on every Account (AC7; `harness-constraints.md:64`). The password is a nullable credential on the Account, not a required field of identity.
 
-- [ ] **Task 4 — The uniform response, and the endpoint** (AC: 2)
-  - [ ] `POST` a registration endpoint from `Yello.Host` as a **Minimal API** (not MVC). It is not Space-scoped, so it carries no `{spaceId}` segment; AR-9's gate lists Task/Project/Label/StatusDefinition and does not reach it.
-  - [ ] The duplicate path performs the password hash it would otherwise skip, then returns without creating anything (AD-23, `ARCHITECTURE-SPINE.md:216`).
-  - [ ] Identical **status, body, shape and duration** for a known and an unknown address. **A `409 Conflict` on duplicate email is the exact defect AD-23 exists to prevent** (`:215`).
-  - [ ] Errors are RFC 9457 `application/problem+json` with a stable machine-readable `type`; prose is never the contract (AR-34).
-  - [ ] Do not log the address in a way that distinguishes the two paths. Structured logs to stdout, never carrying a password (AR-34; FS-NFR-1).
-  - [ ] `[LoggerMessage]` source-generated partials only — CA1848/CA1873 are errors. `Yello.Host/StartupLog.cs` is the template; EventIds 1000–1007 are taken.
+- [x] **Task 4 — The uniform response, and the endpoint** (AC: 2)
+  - [x] `POST` a registration endpoint from `Yello.Host` as a **Minimal API** (not MVC). It is not Space-scoped, so it carries no `{spaceId}` segment; AR-9's gate lists Task/Project/Label/StatusDefinition and does not reach it.
+  - [x] The duplicate path performs the password hash it would otherwise skip, then returns without creating anything (AD-23, `ARCHITECTURE-SPINE.md:216`).
+  - [x] Identical **status, body, shape and duration** for a known and an unknown address. **A `409 Conflict` on duplicate email is the exact defect AD-23 exists to prevent** (`:215`).
+  - [x] Errors are RFC 9457 `application/problem+json` with a stable machine-readable `type`; prose is never the contract (AR-34).
+  - [x] Do not log the address in a way that distinguishes the two paths. Structured logs to stdout, never carrying a password (AR-34; FS-NFR-1).
+  - [x] `[LoggerMessage]` source-generated partials only — CA1848/CA1873 are errors. `Yello.Host/StartupLog.cs` is the template; EventIds 1000–1007 are taken.
 
-- [ ] **Task 5 — The registration surface** (AC: 6)
-  - [ ] `Yello.Client` has no `<Router>`, no layout, no pages and no components. This story introduces them, plus the `@using` entries in `_Imports.razor`.
-  - [ ] Build the first components from the token layer: a form field, a primary button and an inline error region. Story 1.2 shipped tokens only — `base.css` states "It builds no component."
-  - [ ] Two fields: email and password. No plan picker, no team-size question, no confirm-password, no terms checkbox, no CAPTCHA, no onboarding — every one of these is ruled out by UJ-1's climax (`EXPERIENCE.md:477`) and the mockup's negative-constraints block.
-  - [ ] **On submit: state the in-flight condition, disable resubmission, announce completion** (`EXPERIENCE.md:273`). Never a spinner over the whole surface; no progress percentage; no celebration.
-  - [ ] The wait is deliberately long by design. Motion must not cover it (`DESIGN.md:508`).
-  - [ ] Repoint `Yello.Client/Program.cs`'s `HttpClient` BaseAddress at the Aspire-injected Host address and update its now-stale comment. `Yello.Client` **cannot** reference `Yello.Host` — the ring table forbids the edge.
-  - [ ] If any `*.razor.css` is added, `index.html` must gain a `<link>` whose href contains `.styles.css`, or `Every_stylesheet_is_linked_by_the_host_page` fails.
-  - [ ] Validation errors use `--border-hairline`, **never `--danger`** — danger is reserved for the genuinely irreversible (`DESIGN.md:501`). Precedent already shipped at `base.css:300-306`.
+- [x] **Task 5 — The registration surface** (AC: 6)
+  - [x] `Yello.Client` has no `<Router>`, no layout, no pages and no components. This story introduces them, plus the `@using` entries in `_Imports.razor`.
+  - [x] Build the first components from the token layer: a form field, a primary button and an inline error region. Story 1.2 shipped tokens only — `base.css` states "It builds no component."
+  - [x] Two fields: email and password. No plan picker, no team-size question, no confirm-password, no terms checkbox, no CAPTCHA, no onboarding — every one of these is ruled out by UJ-1's climax (`EXPERIENCE.md:477`) and the mockup's negative-constraints block.
+  - [x] **On submit: state the in-flight condition, disable resubmission, announce completion** (`EXPERIENCE.md:273`). Never a spinner over the whole surface; no progress percentage; no celebration.
+  - [x] The wait is deliberately long by design. Motion must not cover it (`DESIGN.md:508`).
+  - [x] Repoint `Yello.Client/Program.cs`'s `HttpClient` BaseAddress at the Aspire-injected Host address and update its now-stale comment. `Yello.Client` **cannot** reference `Yello.Host` — the ring table forbids the edge.
+  - [x] If any `*.razor.css` is added, `index.html` must gain a `<link>` whose href contains `.styles.css`, or `Every_stylesheet_is_linked_by_the_host_page` fails.
+  - [x] Validation errors use `--border-hairline`, **never `--danger`** — danger is reserved for the genuinely irreversible (`DESIGN.md:501`). Precedent already shipped at `base.css:300-306`.
 
-- [ ] **Task 6 — Localisation, because the copy gate leaves no alternative** (AC: 6)
-  - [ ] `No_user_visible_string_literal_appears_in_a_component` fails the build on **any word of 2+ letters that is not `Yello`** in a `.razor` text node or in `title`/`alt`/`placeholder`/`label`/`aria-label`/`aria-description`/`aria-placeholder`/`aria-roledescription`/`aria-valuetext`/`abbr`. A single word — `Email`, `Password` — is a build failure.
-  - [ ] The recognised idiom is `@Localizer["Key"]` via an injected `IStringLocalizer`. Build the resource system: `.resx`, registration, and a culture provider.
-  - [ ] Copy resources hold **sentence case**. Uppercase comes from `text-transform`, never from the string — a resource holding `VIEWER` makes the accessible name "V-I-E-W-E-R" under JAWS (`DESIGN.md:396-400`).
-  - [ ] `deferred-work.md:32` names "the first story that introduces localisation resources and a culture provider" as the owner of the hard-coded `<html lang="en">` and the inert 26-locale casing exclusion in `base.css`. **This story is that story.** Add the assertion that the exclusion is no longer inert, and update or close the ledger entry.
+- [x] **Task 6 — Localisation, because the copy gate leaves no alternative** (AC: 6)
+  - [x] `No_user_visible_string_literal_appears_in_a_component` fails the build on **any word of 2+ letters that is not `Yello`** in a `.razor` text node or in `title`/`alt`/`placeholder`/`label`/`aria-label`/`aria-description`/`aria-placeholder`/`aria-roledescription`/`aria-valuetext`/`abbr`. A single word — `Email`, `Password` — is a build failure.
+  - [x] The recognised idiom is `@Localizer["Key"]` via an injected `IStringLocalizer`. Build the resource system: `.resx`, registration, and a culture provider.
+  - [x] Copy resources hold **sentence case**. Uppercase comes from `text-transform`, never from the string — a resource holding `VIEWER` makes the accessible name "V-I-E-W-E-R" under JAWS (`DESIGN.md:396-400`).
+  - [x] `deferred-work.md:32` names "the first story that introduces localisation resources and a culture provider" as the owner of the hard-coded `<html lang="en">` and the inert 26-locale casing exclusion in `base.css`. **This story is that story.** Add the assertion that the exclusion is no longer inert, and update or close the ledger entry.
 
-- [ ] **Task 7 — Accessibility: registration is a named NFR-9 gated flow** (AC: 6)
-  - [ ] WCAG 2.1 AA. Registration is named **first** among the five gated flows (`quality-budgets.md:84`).
-  - [ ] Real `<label for>` association. Focus order follows reading order. `:focus-visible` already draws the ring globally from `base.css:194-197` — never remove it, never set `outline-offset: 0`, never draw it inset.
-  - [ ] The error region is `role="alert"` **and focusable (`tabindex="-1"`) with focus moved to it**. A bare `aria-live` region with no focus move is the exact failure a critical review finding rejected (`review-accessibility.md:62`).
-  - [ ] Must work at a **320px CSS viewport** — that is the 1.4.10 audit condition (`EXPERIENCE.md:421`). No layout sized to an English string; German and Finnish run 30–40% longer. The mockup's fixed `330px` form violates this and is superseded.
-  - [ ] Survive the 1.4.12 text-spacing overrides and 200% **text-only** zoom. `deferred-work.md:14` and `:28` and `:46` name "the first story with a rendered surface" as owner of the measurement half — all three are blocked on **B5** (the browser-test binding), which is still undecided. Record that this story makes them reachable rather than letting them pass silently to 1.4.
-  - [ ] Interactive target floor of 24px is already applied to `input`, `button`, `select`, `textarea` in both axes by `base.css:246-266`. Do not restate it.
+- [x] **Task 7 — Accessibility: registration is a named NFR-9 gated flow** (AC: 6)
+  - [x] WCAG 2.1 AA. Registration is named **first** among the five gated flows (`quality-budgets.md:84`).
+  - [x] Real `<label for>` association. Focus order follows reading order. `:focus-visible` already draws the ring globally from `base.css:194-197` — never remove it, never set `outline-offset: 0`, never draw it inset.
+  - [x] The error region is `role="alert"` **and focusable (`tabindex="-1"`) with focus moved to it**. A bare `aria-live` region with no focus move is the exact failure a critical review finding rejected (`review-accessibility.md:62`).
+  - [x] Must work at a **320px CSS viewport** — that is the 1.4.10 audit condition (`EXPERIENCE.md:421`). No layout sized to an English string; German and Finnish run 30–40% longer. The mockup's fixed `330px` form violates this and is superseded.
+  - [x] Survive the 1.4.12 text-spacing overrides and 200% **text-only** zoom. `deferred-work.md:14` and `:28` and `:46` name "the first story with a rendered surface" as owner of the measurement half — all three are blocked on **B5** (the browser-test binding), which is still undecided. Record that this story makes them reachable rather than letting them pass silently to 1.4.
+  - [x] Interactive target floor of 24px is already applied to `input`, `button`, `select`, `textarea` in both axes by `base.css:246-266`. Do not restate it.
 
-- [ ] **Task 8 — Choose, measure and record the password work factor** (AC: 5)
-  - [ ] Keep IdentityV3: PBKDF2, HMAC-SHA512, 128-bit salt, 256-bit subkey. Set `PasswordHasherOptions.IterationCount` explicitly rather than inheriting the default.
-  - [ ] **Measure before choosing.** Registration is a write under NFR-5's 500 ms p95 budget *and* is required to be deliberately slow. Pick the highest work factor whose server-side p95 leaves headroom under 500 ms on the deploy target, with the framework default of 100,000 as the floor and OWASP's current SHA512 figure of 220,000 as the target.
-  - [ ] Record the chosen number, the measurement, and the hardware it was measured on, in the Dev Agent Record.
-  - [ ] Prove tunability without re-registering: the iteration count is embedded in each stored hash, and `VerifyHashedPassword` returns `SuccessRehashNeeded` when `embeddedIterCount < _iterCount`. Raising the number never invalidates an existing hash. Assert this directly.
+- [x] **Task 8 — Choose, measure and record the password work factor** (AC: 5)
+  - [x] Keep IdentityV3: PBKDF2, HMAC-SHA512, 128-bit salt, 256-bit subkey. Set `PasswordHasherOptions.IterationCount` explicitly rather than inheriting the default.
+  - [x] **Measure before choosing.** Registration is a write under NFR-5's 500 ms p95 budget *and* is required to be deliberately slow. Pick the highest work factor whose server-side p95 leaves headroom under 500 ms on the deploy target, with the framework default of 100,000 as the floor and OWASP's current SHA512 figure of 220,000 as the target.
+  - [x] Record the chosen number, the measurement, and the hardware it was measured on, in the Dev Agent Record.
+  - [x] Prove tunability without re-registering: the iteration count is embedded in each stored hash, and `VerifyHashedPassword` returns `SuccessRehashNeeded` when `embeddedIterCount < _iterCount`. Raising the number never invalidates an existing hash. Assert this directly.
 
-- [ ] **Task 9 — The B3 duration-indistinguishability method** (AC: 2)
-  - [ ] `test-design-architecture.md:113` assigns this to **stories 1.3 and 1.6**. Write the method once, covering both AD-3 and AD-23, and put it where 1.6 and 1.9 can reuse it.
-  - [ ] It needs: sample size, statistic, tolerance and measurement point. A single-sample assertion is one draw from two distributions and detects nothing.
-  - [ ] **Validate it by planting the oracle**: skip the hash for an unknown address and confirm the test fails by name. An absence assertion not validated against a planted signal is not a test (`TESTING-CONVENTIONS.md:93`).
-  - [ ] `MAXDOP = 1` plus a single replica make variance unusually low here, so this is more tractable than most places — but only if written down once instead of improvised twice (`test-design-architecture.md:312`).
+- [x] **Task 9 — The B3 duration-indistinguishability method** (AC: 2)
+  - [x] `test-design-architecture.md:113` assigns this to **stories 1.3 and 1.6**. Write the method once, covering both AD-3 and AD-23, and put it where 1.6 and 1.9 can reuse it.
+  - [x] It needs: sample size, statistic, tolerance and measurement point. A single-sample assertion is one draw from two distributions and detects nothing.
+  - [x] **Validate it by planting the oracle**: skip the hash for an unknown address and confirm the test fails by name. An absence assertion not validated against a planted signal is not a test (`TESTING-CONVENTIONS.md:93`).
+  - [x] `MAXDOP = 1` plus a single replica make variance unusually low here, so this is more tractable than most places — but only if written down once instead of improvised twice (`test-design-architecture.md:312`).
 
-- [ ] **Task 10 — Tests** (AC: all)
-  - [ ] Slice and integration tests in `tests/Yello.Tests.Slices`, mirroring `Yello.Application`'s `{Area}/{UseCase}/` structure. **Do not create a new test project** — it breaks six gates and requires two visible architecture edits.
-  - [ ] Testcontainers SQL Server via `SqlServerContainerFixture`. **Never an in-memory provider, never SQLite** — neither can exercise RLS, and neither is centrally pinned, so a referencing project fails to restore.
-  - [ ] **Randomise the email address in every test.** FR-1's uniqueness makes a shared literal a cross-suite flake (`TESTING-CONVENTIONS.md:85`).
-  - [ ] Cleanup by transaction rollback or container disposal, never by delete statements — those would need an RLS session context to see the rows they are removing, so a cleanup that "works" may be evidence isolation is broken.
-  - [ ] Every absence assertion in this story (password absent from datastore/logs/errors/responses; no second Account; no distinguishing attribute) must be proved against a planted violation, with the result recorded.
-  - [ ] Traits: `Suite`, `Priority`, `Requirement` (cite the `AR` id **and** the `AD` id), and `Assumption` naming the source document (`PRD-12-1`, `PRD-12-6`).
-  - [ ] If a test is added to `Yello.Tests.Isolation`, `--ignore-exit-code 8` **must** come out of that csproj in the same change — `Only_suites_with_no_tests_may_ignore_the_zero_test_exit_code` is gated both ways. Recommended: keep this story's cases in `Slices` and leave the both-surfaces isolation suite to 1.9.
-  - [ ] No coverage threshold. Do not invent one.
+- [x] **Task 10 — Tests** (AC: all)
+  - [x] Slice and integration tests in `tests/Yello.Tests.Slices`, mirroring `Yello.Application`'s `{Area}/{UseCase}/` structure. **Do not create a new test project** — it breaks six gates and requires two visible architecture edits.
+  - [x] Testcontainers SQL Server via `SqlServerContainerFixture`. **Never an in-memory provider, never SQLite** — neither can exercise RLS, and neither is centrally pinned, so a referencing project fails to restore.
+  - [x] **Randomise the email address in every test.** FR-1's uniqueness makes a shared literal a cross-suite flake (`TESTING-CONVENTIONS.md:85`).
+  - [x] Cleanup by transaction rollback or container disposal, never by delete statements — those would need an RLS session context to see the rows they are removing, so a cleanup that "works" may be evidence isolation is broken.
+  - [x] Every absence assertion in this story (password absent from datastore/logs/errors/responses; no second Account; no distinguishing attribute) must be proved against a planted violation, with the result recorded.
+  - [x] Traits: `Suite`, `Priority`, `Requirement` (cite the `AR` id **and** the `AD` id), and `Assumption` naming the source document (`PRD-12-1`, `PRD-12-6`).
+  - [x] If a test is added to `Yello.Tests.Isolation`, `--ignore-exit-code 8` **must** come out of that csproj in the same change — `Only_suites_with_no_tests_may_ignore_the_zero_test_exit_code` is gated both ways. Recommended: keep this story's cases in `Slices` and leave the both-surfaces isolation suite to 1.9.
+  - [x] No coverage threshold. Do not invent one.
 
-- [ ] **Task 11 — Housekeeping the prior stories left**
-  - [ ] Update the now-stale comments in `Yello.Client/App.razor`, `wwwroot/index.html`, `Yello.Client/Program.cs`, `Yello.Infrastructure/AssemblyMarker.cs` (which says in so many words that story 1.3 creates the first three tables) and `Yello.Client/AssemblyMarker.cs`.
-  - [ ] Do **not** add review narration to source files. `deferred-work.md:44` records that as an open finding owned by **Lee, once, for the project** — not by the next story to touch those files.
-  - [ ] `git diff --stat` against `73805cb` before calling the File List complete.
+- [x] **Task 11 — Housekeeping the prior stories left**
+  - [x] Update the now-stale comments in `Yello.Client/App.razor`, `wwwroot/index.html`, `Yello.Client/Program.cs`, `Yello.Infrastructure/AssemblyMarker.cs` (which says in so many words that story 1.3 creates the first three tables) and `Yello.Client/AssemblyMarker.cs`.
+  - [x] Do **not** add review narration to source files. `deferred-work.md:44` records that as an open finding owned by **Lee, once, for the project** — not by the next story to touch those files.
+  - [x] `git diff --stat` against `73805cb` before calling the File List complete.
 
 ## Dev Notes
 
@@ -658,10 +658,335 @@ that amends `epics.md` first, then the spine, then `PackageVersionPinTests`.
 
 ### Agent Model Used
 
+Claude Opus 5 (`claude-opus-5`), via the `bmad-dev-story` workflow, 2026-08-28 / 2026-08-29.
+
+### Lee's decisions during implementation
+
+Seven questions were raised by the story. Four were put to Lee; three were resolved from the
+story's own tasks and are recorded here so a reviewer can see they were decided rather than
+overlooked.
+
+| # | Question | Decision | Taken by |
+|---|---|---|---|
+| 1 | What is the Personal Space called? | **Collect a display name.** Three fields at registration; `Account.DisplayName`; the Space named from it. Confirms PRD §12 assumption 1 rather than revising it. | Lee, 2026-08-28 |
+| 2 | Work factor, and is registration bound by NFR-5? | **Measure first, then decide** → **220,000** (OWASP). Registration is *bounded* by NFR-5 and meets it; no exemption needed. | Lee, 2026-08-28, after the measurement below |
+| 3 | Does registration sign the new Account in? | **No.** 1.4 owns authentication, 1.7 the context bar. AC6 ends at "completion is announced". | From the story's scope table |
+| 4 | Do `Account` and `Space` carry RLS policies? | **Space-scoped tables now** (`Membership`, `StatusDefinition`); `Account`/`Space` recorded as an open shape for the AD-24 amendment already due before Epic 3. | Lee, 2026-08-28 |
+| 5 | Route and success status | **`POST /api/v1/accounts` → `204 No Content`.** No body, so nothing can differ between the two paths and no identifier leaks. | Lee, 2026-08-28 |
+| 6 | Idempotency (AR-25) | **Not built here.** AR-3 forbids a slice implementing it; no Epic 1 row owns the pipeline. Recorded in `deferred-work.md` as unassigned. | From Task 2 + AR-3 |
+| 7 | Blocker B5 | **Carried forward, with this story recorded as the point it became live.** | From Task 7 |
+
+### The NFR-6 measurement
+
+Task 8 required measuring before choosing. **Hardware:** 12th Gen Intel Core i7-12700H (14 cores /
+20 logical), Windows 11, Debug build, Rancher Desktop running. **Method:** 20-second burn-in, then
+60 interleaved samples per candidate.
+
+| Iterations | p50 | p95 | p99 |
+|---|---|---|---|
+| 100,000 (framework default) | 120.1 ms | **145.9 ms** | 161.1 ms |
+| 220,000 (OWASP HMAC-SHA512) | 272.9 ms | **297.7 ms** | 325.4 ms |
+
+Cost is linear in the iteration count (2.2× iterations → 2.04× p95). The surrounding database work
+— one transaction, the session-context call, six row inserts — is single-digit milliseconds, so the
+hash is effectively the whole request.
+
+**The finding that resolved the story's central tension:** at 220,000 the server-side p95 is about
+300 ms, inside NFR-5's 500 ms write budget with roughly 200 ms to spare. Registration can be both
+"deliberately slow" for AD-23 and inside the budget, so it is recorded as **bounded by NFR-5 and
+meeting it** rather than exempt from it. The story anticipated having to choose between the two.
+
+**A measurement artefact worth recording, because it would mislead anyone repeating this.**
+Whichever candidate ran first read about 2.5× too fast: 220,000 measured first gave a p50 of
+102 ms against 273 ms for the same count later in the same process. That is CPU turbo before
+sustained load pulls the clock down, not a property of the algorithm. An early run without a
+burn-in produced 45 ms for 100,000, which is not a usable figure and was discarded. The same
+artefact is why `DurationIndistinguishability` interleaves its samples.
+
+**Open caveat, with an owner.** This is a fast laptop P-core; an Azure vCPU is typically slower. If
+the deploy target runs more than about 1.7× slower, 220,000 crosses the 500 ms budget. **Story 1.10
+owns the deploy target and re-measures there** — and because the count is embedded in every stored
+hash, lowering it is a configuration change that invalidates nothing.
+
+### Planted-violation results
+
+`TESTING-CONVENTIONS.md:93` — "an absence assertion must be validated against a planted signal, or
+it is not a test". Every absence assertion this story adds was failed on purpose. Each plant was
+applied, the solution built, the named test run, and the plant reverted.
+
+| # | Planted defect | Assertion | Result |
+|---|---|---|---|
+| A | The document-language call deleted from `Client/Program.cs` | `The_document_language_is_set_from_the_active_culture` | **Caught** |
+| B | A failure code's entry removed from `ClientCopy.resx` | `Every_registration_failure_code_has_a_message_and_a_field` | **Caught** |
+| C | A failure code renamed off its field prefix | same | **Caught** |
+| D | A configuration written but never applied | *(the build)* — MA0182 | **Caught by the compiler** |
+| D′ | A configuration applied but its table name left to EF convention | `Every_entity_configuration_reaches_the_model` | **Caught** |
+| E | `Membership.SpaceId` made nullable | `Every_Space_scoped_entity_has_a_non_nullable_SpaceId` | **Caught** |
+| F | A key left store-generated | `No_key_is_generated_by_the_database` | **Caught** |
+| G | A locale listed with no resources behind it | `Every_supported_culture_has_resources_behind_it` | **Caught** |
+| H | A literal rendered in a component | `No_user_visible_string_literal_appears_in_a_component` | **Caught** |
+| I | The raw password written into the datastore | `The_password_appears_nowhere_in_the_datastore` | **Caught** |
+| J | The security policy created `WITH (STATE = OFF)` | `Space_scoped_rows_are_invisible_without_a_session_context` | **Caught** |
+| K | The endpoint logging the email address | `No_log_line_carries_the_password_or_distinguishes_the_two_paths` | **Caught** |
+
+**Plant D is the most useful result and is not a gate success.** Removing an `ApplyConfiguration`
+line does not reach any test: the build fails first, because MA0182 reports the configuration class
+as unreferenced. That is a better outcome than a gate, and it also exposed a real defect in the
+gate I had written — the first version asserted only that the entity was *in the model*, which the
+`DbSet<T>` property satisfies on its own. Plant D′ is the case the compiler cannot see, and it
+failed until the gate was rewritten to assert the configuration's **effect** (an explicit singular
+table name, which EF's conventions would pluralise).
+
+**One plant is a permanent test rather than a table row.**
+`RegistrationDurationTests.The_method_detects_a_registration_that_skips_the_hash` plants the
+skipped hash and requires `DurationIndistinguishability` to tell the paths apart. Keeping it as a
+test is what stops a later story widening the tolerance to quiet a flake and silently disarming the
+real assertion beside it.
+
 ### Debug Log References
+
+**The container runtime needed the recorded remedy.** Rancher Desktop was stopped, and starting it
+gave `failed to connect to the backend: timed out dialing Hyper-V socket` — the exact failure story
+1.1's record predicted "would have failed on this machine with a pre-login handshake timeout".
+`rdctl shutdown`, `wsl --terminate rancher-desktop`, relaunch fixed it, as recorded.
+
+**Three SQL Server claims were verified empirically rather than taken from documentation**, per the
+story's standing caveat that two plausible-but-wrong claims have already been caught in this
+project, "both in *index behaviour* specifically":
+
+1. **Row-level security applies to `sa`.** The Testcontainers fixture connects as a sysadmin, so if
+   RLS had exempted it the isolation assertions would have been vacuous.
+   `Space_scoped_rows_are_invisible_without_a_session_context` observes the rows disappearing on
+   that very connection.
+2. **EF Core 10's `SequentialGuidValueGenerator` really is sequential under SQL Server's ordering.**
+   `uniqueidentifier` compares its last six bytes first, so a left-to-right monotonic value (UUIDv7,
+   which AR-34 excludes by name) is *not* monotonic in the index.
+   `Successive_identifiers_ascend_under_SQL_Servers_own_ordering` compares 500 generated ids under
+   `System.Data.SqlTypes.SqlGuid`, which is the BCL's implementation of the engine's own comparison.
+3. **The filtered unique index refuses a second Owner and permits a second member.** Asserted by
+   inserting an `Admin` Membership successfully and then an `Owner` one, and requiring the second to
+   throw with the index named.
+
+**A false positive in a story-1.2 gate, found and fixed.** `No_user_visible_string_literal_appears_in_a_component`
+ended a tag at the first `>` anywhere, so `ValueChanged="@(value => _name = value)"` closed the tag
+at the lambda arrow and the rest of the attribute was reported as rendered copy — the build failed
+saying `Register.razor` "renders the literal text 'displayName value'", which is two identifiers
+inside a C# expression. `TextNodes` is now quote-aware, which is strictly *stricter* (it can only
+move a tag's end later). The same break would have hit epic 2's first templated component through
+its generic type arguments. The markup uses `@bind-Value` regardless, which is better Razor.
+
+**Two build traps later stories will meet.** The word `Todo` cannot appear in any comment —
+SonarAnalyzer's S1135 treats it as a task marker and `TreatWarningsAsErrors` makes it an error — so
+FR-24's first default Status is named only in `DefaultStatusSet.Names` and never in prose. And every
+EF migration needs a hand-editing pass to satisfy the coding standard; both are recorded in
+`deferred-work.md` and `TESTING-CONVENTIONS.md`.
 
 ### Completion Notes List
 
+1. **AC1 — one Account, one Space, one Owner Membership, one transaction.** `RegisterAccountHandler`
+   assembles all four sets of rows and `AccountRegistrationStore` commits them in one transaction,
+   with the RLS session context set inside it. Asserted at the unit level
+   (`RegisterAccountHandlerTests`) and against a real migrated SQL Server
+   (`Registration_commits_an_Account_a_Space_an_Owner_Membership_and_its_Statuses`). The Space
+   carries FR-24's three Statuses in order. **The "no Projects" clause is deliberately unasserted**
+   — no Project entity exists until Epic 2, so a test for it would be vacuous.
+
+2. **AC2 — the duplicate path is indistinguishable, including in duration.** The hash runs first and
+   unconditionally; `RegisterAccountHandler.HandleAsync` returns `Task`, not `Task<bool>`, so no
+   caller has anything to branch on. Status, body, content type and header names are compared
+   *between the two responses* rather than each against an expectation
+   (`A_duplicate_registration_answers_exactly_as_a_new_one_does`), and duration is compared with the
+   B3 method. Logs are uniform too, which is the half a response-only test would miss.
+
+3. **AC3 — a failure is a failed transaction.** Forced at the *last* write rather than the first
+   (`A_registration_that_cannot_complete_leaves_no_Account_behind`), so the Account and Space
+   inserts are already on the wire when it fails. An assertion that failed at the first row would
+   prove nothing.
+
+4. **AC4 — the provisioned Space is an ordinary Space.** `Space` has exactly three members, asserted
+   by name, so an `IsPersonal` flag or a `ProvisionedAtRegistration` timestamp fails. The comparison
+   target FR-5 will produce does not exist until Epic 3, so the assertion is against the *shape*
+   that comparison will use, stated as such rather than pretending to make it.
+
+5. **AC5 — the password is never observable, and the work factor is tunable.** The datastore
+   assertion reads **every character column of every user table from the catalogue**, not just
+   `PasswordHash` — so a password copied somewhere nobody was looking is caught, and tables later
+   stories add are covered without extending the test. Response bodies and logs are asserted
+   separately. Tunability is asserted as the mechanism: a hash written at 100,000 verifies
+   `Success` at 100,000 and `SuccessRehashNeeded` at 220,000, from a hash read back out of the
+   database.
+
+6. **AC6 — the surface states its wait.** In-flight condition stated in words, resubmission disabled
+   by a real `disabled` attribute, completion announced through `role="status"` and focused. No
+   spinner, no progress percentage, no celebration, and nothing that moves.
+
+7. **AC7 — nothing hardens what OAuth will break.** `PasswordHash` is nullable; the Account's
+   identity is `Id` and not the address; `EmailAddressNormalisation` states the uniqueness rule in
+   one function; there is no soft-delete tombstone that would keep a deleted address occupied
+   (FR-3). AD-22's "one slice, two paths" already accommodates a third.
+
+8. **Email verification is deliberately absent, and that is not an oversight.** No FR, CAP, NFR,
+   acceptance criterion, journey, surface or architecture decision mentions it. Two reasons it must
+   stay absent: `acceptance-criteria.md:47` requires the Space to be usable "at the moment
+   registration completes", and a verification mail sent only for genuinely-new addresses is an
+   **out-of-band enumeration oracle** that defeats AD-23's in-band uniformity.
+
+9. **PRD §6.4's data-protection gate fires on the row this story writes**, and is **not** implemented
+   here. The readiness remediation assigned it to **story 1.10** as two acceptance criteria; it is
+   cross-referenced at the point the `Account` row is created so the connection is not lost.
+
+10. **One deviation from the story text, from Lee's decision.** Task 5 says "Two fields: email and
+    password"; registration collects **three**, the third being the display name. That is Lee's
+    answer to question 1 and amends FR-1, `harness-constraints.md:64` and the mockup. Every other
+    negative constraint in that bullet holds: no plan picker, no team-size question, no
+    confirm-password, no terms checkbox, no CAPTCHA, no onboarding.
+
+11. **One deviation from the story's structure note, for a stated reason.** It places "the schema
+    test" in `Yello.Tests.Architecture`. It cannot go there: asserting a *migrated* schema needs a
+    real SQL Server, that suite's ring row excludes `Yello.Tests.Shared`, and adding it would make
+    the one suite that "takes seconds and should fail before anything slower starts" depend on a
+    container. `SpaceIsolationSchemaTests` is in `Slices`; the purely structural gates
+    (`PersistenceModelGateTests`, `LocalisationGateTests`) are in `Architecture`.
+
+12. **Two visible architecture edits, both deliberate.** `Yello.Tests.Slices` gained a
+    `Yello.Contracts` edge in `AllowedReferenceEdges` and its csproj — the endpoint tests POST a
+    Contracts DTO and read a Contracts problem type, and reaching those transitively through Host is
+    the exposure `deferred-work.md:10` records. And `Microsoft.Extensions.Localization` 10.0.11 was
+    added as a **non-AR-1** central pin: neither `Yello.Client` (a Blazor WASM app resolves against
+    `Microsoft.NETCore.App`) nor `Yello.Infrastructure` (a plain library) inherits it, verified
+    against the restored asset graph. **No AR-1 pin was changed.**
+
+13. **What is NOT gated, stated plainly rather than implied.** The 320px viewport, the WCAG 1.4.12
+    text-spacing override and 200% text-only zoom are discharged **constructively** — no fixed
+    widths or heights, a maximum in `rem`, internal padding in `rem` — and **not measured**. That
+    needs a browser and is blocker B5's. Writing a gate that appeared to cover them would be the
+    vacuous-gate defect this suite exists to avoid. Story 1.3 is the first story with a rendered
+    surface, so the three `deferred-work.md` entries waiting on that condition are now live.
+
+14. **The end-to-end browser flow does not work yet, by design.** The client and Host are separate
+    origins, so a browser POST is refused until CORS exists — and CORS is story 1.4's, by the
+    story's own scope table. Recorded in `deferred-work.md`. Every server-side criterion is asserted
+    against a Host running as a real process.
+
 ### File List
 
+**Added — `Yello.Domain`**
+- `Yello.Domain/Accounts/Account.cs`
+- `Yello.Domain/Accounts/EmailAddressNormalisation.cs`
+- `Yello.Domain/Accounts/IAccountRegistrationStore.cs`
+- `Yello.Domain/Accounts/IPasswordHasher.cs`
+- `Yello.Domain/IIdentifierGenerator.cs`
+- `Yello.Domain/Memberships/Membership.cs`
+- `Yello.Domain/Memberships/Role.cs`
+- `Yello.Domain/Spaces/PersonalSpaceName.cs`
+- `Yello.Domain/Spaces/Space.cs`
+- `Yello.Domain/Statuses/DefaultStatusSet.cs`
+- `Yello.Domain/Statuses/StatusDefinition.cs`
+
+**Added — `Yello.Application`**
+- `Yello.Application/Accounts/RegisterAccount/RegisterAccountCommand.cs`
+- `Yello.Application/Accounts/RegisterAccount/RegisterAccountHandler.cs`
+- `Yello.Application/Accounts/RegisterAccount/RegisterAccountValidator.cs`
+
+**Added — `Yello.Infrastructure`**
+- `Yello.Infrastructure/InfrastructureServices.cs`
+- `Yello.Infrastructure/Identity/IdentityPasswordHasher.cs`
+- `Yello.Infrastructure/Identity/PasswordWorkFactor.cs`
+- `Yello.Infrastructure/Localisation/RegistrationCopy.cs`
+- `Yello.Infrastructure/Localisation/RegistrationCopy.resx`
+- `Yello.Infrastructure/Persistence/AccountRegistrationStore.cs`
+- `Yello.Infrastructure/Persistence/SchemaNames.cs`
+- `Yello.Infrastructure/Persistence/SequentialGuidIdentifierGenerator.cs`
+- `Yello.Infrastructure/Persistence/YelloDbContext.cs`
+- `Yello.Infrastructure/Persistence/YelloDbContextFactory.cs`
+- `Yello.Infrastructure/Persistence/Configurations/AccountConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Configurations/MembershipConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Configurations/SpaceConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Configurations/StatusDefinitionConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20260828164716_InitialSchema.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20260828164716_InitialSchema.Designer.cs`
+- `Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs`
+
+**Added — `Yello.Contracts`**
+- `Yello.Contracts/ProblemResponse.cs`
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Contracts/Accounts/AccountRoutes.cs`
+- `Yello.Contracts/Accounts/RegisterAccountRequest.cs`
+- `Yello.Contracts/Localisation/CultureSelection.cs`
+- `Yello.Contracts/Localisation/SupportedCultures.cs`
+
+**Added — `Yello.Host`**
+- `Yello.Host/Endpoints/RegisterAccountEndpoint.cs`
+- `Yello.Host/RegistrationLog.cs`
+
+**Added — `Yello.Client`**
+- `Yello.Client/Components/FormField.razor`
+- `Yello.Client/Components/InlineErrorRegion.razor`
+- `Yello.Client/Components/PrimaryButton.razor`
+- `Yello.Client/Layout/MainLayout.razor`
+- `Yello.Client/Localisation/ClientCopy.cs`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Localisation/DocumentLanguage.cs`
+- `Yello.Client/Pages/Register.razor`
+- `Yello.Client/Pages/RegistrationFields.cs`
+- `Yello.Client/Pages/RegistrationPhase.cs`
+- `Yello.Client/wwwroot/appsettings.Development.json`
+- `Yello.Client/wwwroot/css/components.css`
+
+**Added — tests**
+- `tests/Yello.Tests.Architecture/LocalisationGateTests.cs`
+- `tests/Yello.Tests.Architecture/PersistenceModelGateTests.cs`
+- `tests/Yello.Tests.Shared/DurationIndistinguishability.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/HostProcess.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/MigratedDatabaseFixture.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/RegisterAccountEndpointTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/RegisterAccountHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/RegisterAccountIntegrationTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/RegisterAccountValidatorTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/RegistrationDatabase.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/RegistrationDurationTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/SequentialGuidIdentifierGeneratorTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/SpaceIsolationSchemaTests.cs`
+
+**Modified**
+- `.config/dotnet-tools.json` — added `dotnet-ef` 10.0.11
+- `Directory.Packages.props` — added the non-AR-1 `Microsoft.Extensions.Localization` pin
+- `Yello.Client/App.razor` — `Router`, layout, localised not-found page
+- `Yello.Client/AssemblyMarker.cs` — stale hand-off comment
+- `Yello.Client/Program.cs` — culture provider, document language, Host base address
+- `Yello.Client/Yello.Client.csproj` — localisation package
+- `Yello.Client/_Imports.razor` — new namespaces
+- `Yello.Client/wwwroot/index.html` — `components.css` link, `lang` rationale, stale comment
+- `Yello.Host/Program.cs` — infrastructure, slice, clock, request localisation, endpoint
+- `Yello.Infrastructure/AssemblyMarker.cs` — stale hand-off comment
+- `Yello.Infrastructure/Yello.Infrastructure.csproj` — EF Core, Identity, localisation, `InternalsVisibleTo`
+- `tests/TESTING-CONVENTIONS.md` — B3 method, class-fixture pattern, migration pass, counts, B5
+- `tests/Yello.Tests.Architecture/AllowedReferenceEdges.cs` — Slices → Contracts edge
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.cs` — quote-aware `TextNodes`
+- `tests/Yello.Tests.Architecture/PackageVersionPinTests.cs` — the new non-AR-1 pin
+- `tests/Yello.Tests.Slices/Yello.Tests.Slices.csproj` — Contracts reference
+- `_bmad-output/implementation-artifacts/deferred-work.md` — one entry closed, five added
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` — status transitions
+
+`git diff --stat 73805cb` — **code, tests and build files only: 80 files changed, 7,367
+insertions, 65 deletions.**
+
+Stated that way on purpose. The whole-tree figure against the baseline includes this story record,
+so it moves every time this section is edited — which made an earlier draft of this line wrong
+within minutes of being written. The three excluded files are this story file, `deferred-work.md`
+and `sprint-status.yaml`; including them gives 83 files and 8,385 insertions at the moment of
+writing, and that number is not stable.
+
 ### Change Log
+
+| Date | Change |
+|---|---|
+| 2026-08-28 | Story picked up; status `ready-for-dev` → `in-progress`. Four questions put to Lee and answered: display name collected, `POST /api/v1/accounts` → 204, measure-then-choose the work factor, Space-scoped RLS now. |
+| 2026-08-28 | Domain entities, ports and the naming choke point; EF Core schema, four configurations and the initial migration carrying the row-level security policy; the `RegisterAccount` slice. |
+| 2026-08-28 | Work factor measured on an i7-12700H (100,000 → 145.9 ms p95; 220,000 → 297.7 ms p95). Reported to Lee, who chose **220,000**. Registration recorded as bounded by NFR-5 and meeting it. |
+| 2026-08-29 | The endpoint, its uniform 204 and its RFC 9457 rejection; the registration surface, the first three components, `components.css`, the resource system and the culture provider. |
+| 2026-08-29 | Closed `deferred-work.md`'s hard-coded `<html lang>` entry — the only entry this story closes — and added an IL-based gate so the fix cannot be silently undone. |
+| 2026-08-29 | Twelve planted violations run against the story's absence assertions; all caught. Plant D exposed a real weakness in a gate this story wrote, which was rewritten to assert the configuration's effect rather than the entity's presence. |
+| 2026-08-29 | Fixed a false positive in story 1.2's copy gate: `TextNodes` ended a tag at the first `>`, so a lambda in an attribute was reported as rendered copy. Now quote-aware. |
+| 2026-08-29 | Five new `deferred-work.md` entries: idempotency unowned, CORS needed for the cross-origin call, `Account`/`Space` RLS predicates undecided, the EF migration hand-editing pass, and the `Todo`-in-comments trap. |
+| 2026-08-29 | `dotnet build Yello.slnx` clean at **0 warnings**; `dotnet test Yello.slnx` **136 passed / 0 failed** (82 architecture, 54 slices). Status `in-progress` → `review`. |

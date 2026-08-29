@@ -1,0 +1,20 @@
+@inherits LayoutComponentBase
+
+@*
+    The application layout. A <main> landmark and the routed page inside it, and nothing else yet.
+
+    <main> is here rather than in index.html because it has to wrap the ROUTED content: a landmark
+    around the pre-boot placeholder would announce an empty region, and a screen-reader user
+    skipping to the main landmark expects to land on the page they navigated to.
+
+    WHAT IS DELIBERATELY ABSENT. No context bar, no Space switcher, no Role chip, no navigation
+    and no account menu. Story 1.7 owns the context bar and AccountScopedContext, and story 1.4
+    owns Sessions - so there is nothing yet for a chrome to display, and a placeholder header
+    would be a component a later story has to unpick. There is no skip link either, for the same
+    reason: a skip link needs something to skip PAST, and today the main landmark is the first
+    thing on the page.
+*@
+
+<main>
+    @Body
+</main>

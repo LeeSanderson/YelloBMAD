@@ -4,6 +4,63 @@
     see the allowed-edge table in Yello.Tests.Architecture/AllowedReferenceEdges.cs.
   -->
 
+  <!--
+    Ring 3, and the only ring below Host where EF Core and ASP.NET Core Identity may be
+    referenced at all. AllowedReferenceEdges.ForbiddenPackagePrefixes bans both prefixes from
+    Domain, Application, Contracts and Merge; this project and Yello.Host are the exceptions,
+    because this is where the adapters live.
+
+    No Version attributes: central package management supplies them, and
+    PackageVersionPinTests.No_project_declares_a_package_version_of_its_own gates that.
+    All four EF Core and Identity pins were already in Directory.Packages.props, labelled
+    "first referenced by story 1.3" - this is that story, and the pins are unchanged.
+  -->
+  <ItemGroup Label="AR-1: EF Core 10 and Identity 10 - first referenced here, story 1.3">
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <!--
+      Design is a development-time dependency: it is what `dotnet ef migrations add` loads to
+      build the model and scaffold a migration. PrivateAssets="all" keeps it out of the
+      published output and out of every transitive consumer, which is the shape the EF Core
+      templates use and the reason it does not reach Yello.Host at runtime.
+    -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" PrivateAssets="all" />
+    <!--
+      Referenced for exactly one type: PasswordHasher<T>, which lives in the
+      Microsoft.AspNetCore.Identity namespace and reaches here through this package.
+
+      NOT for IdentityDbContext, and that is the point worth stating. IdentityDbContext would
+      create AspNetUsers, AspNetRoles, AspNetUserRoles and four more tables - and there is no
+      Users table in this architecture (the entity is Account), while every role table is
+      precisely what AD-1 and Gate C exist to keep out. The package is the shipping vehicle for
+      the hasher; none of the rest of it is wired, and Gate C's IL scan is what keeps that true
+      rather than this comment.
+    -->
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+  </ItemGroup>
+
+  <!--
+    IStringLocalizer, for the one server-side resource this story reads: the Personal Space name
+    template. See the pin's comment in Directory.Packages.props for why it is a new central pin
+    rather than an inherited framework reference.
+  -->
+  <ItemGroup Label="Localisation">
+    <PackageReference Include="Microsoft.Extensions.Localization" />
+  </ItemGroup>
+
+  <!--
+    The adapters here are internal on purpose: a public AccountRegistrationStore is one a later
+    story can reach past its port, which is the whole thing the ports exist to prevent. The slice
+    tests still have to construct them, because a test that exercised only the public surface
+    would be testing the DI container rather than the adapter.
+
+    InternalsVisibleTo to exactly one project, not a blanket. Yello.Tests.Slices is where slice
+    and integration tests live; nothing else needs this, and widening it would quietly turn
+    "internal" into "public with extra steps".
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Yello.Tests.Slices" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Yello.Application\Yello.Application.csproj" />

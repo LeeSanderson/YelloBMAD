@@ -70,6 +70,31 @@
   </ItemGroup>
 
   <!--
+    LOCALISATION. Not an AR-1 stack choice, and added by story 1.3.
+
+    No acceptance criterion in that story mentions localisation. The build gate makes it
+    unavoidable anyway: No_user_visible_string_literal_appears_in_a_component fails on any word
+    of two or more letters that is not `Yello` in a .razor text node or in one of ten
+    attributes, so a single `Email` label is a build failure. The gate's own remedy message
+    names `IStringLocalizer` and `@Localizer["Key"]` as the idiom, and there was no
+    localisation infrastructure in the repository at all.
+
+    It needs a central pin because neither consumer inherits it. Yello.Client is a Blazor
+    WebAssembly app, which resolves against Microsoft.NETCore.App and the WebAssembly packages
+    rather than the ASP.NET Core shared framework - verified against the restored asset graph,
+    which contains no Microsoft.Extensions.Localization at all. Yello.Infrastructure is a plain
+    library and inherits no shared framework either. Yello.Host would get it free from
+    Microsoft.NET.Sdk.Web, and does not reference it.
+
+    Version tracks the runtime patch pinned in Directory.Build.props, like the Blazor WASM row
+    above and for the same reason: these ship as one band, and a Microsoft.Extensions.* package
+    a patch out of step with the runtime is the kind of divergence nothing here would notice.
+  -->
+  <ItemGroup Label="Localisation - pinned by story 1.3, referenced by Yello.Client and Yello.Infrastructure">
+    <PackageVersion Include="Microsoft.Extensions.Localization" Version="10.0.11" />
+  </ItemGroup>
+
+  <!--
     The SQL driver, referenced directly by Yello.Host to satisfy AC4's "a working connection
     from Host to container", and pulled in transitively by Aspire.Hosting.SqlServer. Not an
     AR-1 stack choice and not an ORM.

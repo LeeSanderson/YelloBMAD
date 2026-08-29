@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!--
+    Every user-visible string in Yello's interface.
+
+    TRANSLATORS, TWO RULES THAT ARE NOT NEGOTIABLE:
+      1. Sentence case only. Never type a value in capitals. Where the design shows uppercase it
+         is applied by CSS, because a stored uppercase string is read out letter by letter by
+         screen readers.
+      2. The Glossary words - Account, Space, Membership, Role, Owner, Admin, Member, Viewer,
+         Project, Task, Status, Session - are product vocabulary and are capitalised in every
+         language. Translate them consistently; do not substitute a synonym.
+
+    Expect your translation to run 30-40% longer than the English. Nothing here is sized to fit
+    the English string.
+  -->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+
+  <data name="RegisterHeading" xml:space="preserve">
+    <value>Create your Account</value>
+    <comment>The registration page's heading. "Account" is Glossary vocabulary.</comment>
+  </data>
+  <data name="RegisterIntro" xml:space="preserve">
+    <value>You get a Space of your own straight away. There is nothing else to decide.</value>
+    <comment>Sits under the heading. States what registering gets you, because the whole point of this flow is that no structural decision is asked for. "Space" is Glossary vocabulary.</comment>
+  </data>
+  <data name="DisplayNameLabel" xml:space="preserve">
+    <value>Your name</value>
+    <comment>Label for the display-name field. Deliberately not "full name" or "real name" - it is whatever this person wants to be called, and it is what their Space is named after.</comment>
+  </data>
+  <data name="DisplayNameHint" xml:space="preserve">
+    <value>Your Space will be named after this.</value>
+    <comment>Help text under the name field, explaining a consequence that is otherwise a surprise.</comment>
+  </data>
+  <data name="EmailAddressLabel" xml:space="preserve">
+    <value>Email address</value>
+    <comment>Label for the email field.</comment>
+  </data>
+  <data name="PasswordLabel" xml:space="preserve">
+    <value>Password</value>
+    <comment>Label for the password field.</comment>
+  </data>
+  <data name="SubmitLabel" xml:space="preserve">
+    <value>Create Account</value>
+    <comment>The submit button. "Account" is Glossary vocabulary.</comment>
+  </data>
+  <data name="SubmitInFlight" xml:space="preserve">
+    <value>Creating your Account. This takes a few seconds.</value>
+    <comment>Shown while the request is in flight, and announced politely. The wait is deliberately long - the password hashing is meant to be slow - so the copy says so plainly rather than leaving a person wondering whether anything happened. Never replace this with a spinner or a progress percentage.</comment>
+  </data>
+  <data name="SubmitComplete" xml:space="preserve">
+    <value>Your Account is ready, and so is your Space.</value>
+    <comment>Announced when registration completes. Deliberately plain - no celebration. Note this is shown whether the address was new or already registered; the two are indistinguishable by design, so this copy must never imply that something was created just now for the first time.</comment>
+  </data>
+  <data name="SubmitFailed" xml:space="preserve">
+    <value>That could not be sent. Check your connection and try again.</value>
+    <comment>Shown when the request never reached the server, or the server answered with something unexpected. It is about the transport, not about the submission.</comment>
+  </data>
+  <data name="ErrorHeading" xml:space="preserve">
+    <value>Check the form and try again.</value>
+    <comment>Heading of the error region, announced assertively when validation fails. Followed by one line per problem.</comment>
+  </data>
+  <data name="NotFoundHeading" xml:space="preserve">
+    <value>There is nothing here</value>
+    <comment>Heading of the page shown for an address that matches no route. No full stop: it is a heading, not a sentence.</comment>
+  </data>
+  <data name="NotFoundBody" xml:space="preserve">
+    <value>Check the address, or go back to where you were.</value>
+    <comment>Body of the not-found page. Deliberately offers no link: there is only one page in the product so far, and a link to it would read as a suggestion rather than a route.</comment>
+  </data>
+
+  <!--
+    Below: one entry per stable failure code the Host returns. The code IS the key - see
+    ClientCopy.cs. None of these can ever mean "that address is already registered": a duplicate
+    registration succeeds, indistinguishably, by design.
+  -->
+  <data name="display-name-required" xml:space="preserve">
+    <value>Enter the name you want to be called by.</value>
+  </data>
+  <data name="display-name-too-long" xml:space="preserve">
+    <value>That name is too long.</value>
+  </data>
+  <data name="email-address-required" xml:space="preserve">
+    <value>Enter your email address.</value>
+  </data>
+  <data name="email-address-too-long" xml:space="preserve">
+    <value>That email address is too long.</value>
+  </data>
+  <data name="email-address-malformed" xml:space="preserve">
+    <value>That does not look like an email address.</value>
+    <comment>Deliberately hedged - "does not look like" rather than "is invalid" - because the check is intentionally shallow and should not tell someone their real address is wrong.</comment>
+  </data>
+  <data name="password-required" xml:space="preserve">
+    <value>Enter a password.</value>
+  </data>
+  <data name="password-too-long" xml:space="preserve">
+    <value>That password is too long.</value>
+  </data>
+</root>

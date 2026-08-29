@@ -1,0 +1,205 @@
+/*
+    The first components in the product, drawn entirely from the token layer.
+
+    `tokens.css` declares the design and `base.css` applies what must hold for every surface.
+    Neither builds a component - `base.css` says so in its own opening lines - so this is the
+    third file and the first one that does. Story 1.3 needs three components and no more: a form
+    field, a primary button and an inline status region.
+
+    WHY A GLOBAL STYLESHEET AND NOT `*.razor.css`. Blazor's CSS isolation would work and is
+    gated for: `Every_stylesheet_is_linked_by_the_host_page` requires a `{Assembly}.styles.css`
+    bundle link as soon as any scoped sheet exists. It is not used because these are shared
+    components rather than one page's private styling, and because a global sheet keeps the whole
+    design in three files a reader can hold at once. A later story that wants isolation adds the
+    bundle link deliberately; this one does not need it.
+
+    EVERY RULE BELOW OBEYS THE GATES STORY 1.2 SHIPPED, and they are worth naming because they
+    are unusual:
+      * No colour literal anywhere - every colour is a token, so both themes resolve at the one
+        boundary in `tokens.css`.
+      * No `-light` token. A component that reads one pins itself to one theme.
+      * No px literal. Lengths come from the spacing scale, the radii and the border widths;
+        `rem` is used where a length must scale with text.
+      * No `height` or `block-size`. Boxes size to their content, so a WCAG 1.4.12 text-spacing
+        override grows them instead of clipping the glyphs.
+      * Logical properties only - `padding-inline`, `margin-block`, `border-inline-start`. Never
+        `left` or `right`. UX-DR42 makes RTL tolerance structural.
+      * No shadow. There is no elevation in this design.
+      * No `text-transform`. The two roles that uppercase are already handled in `base.css` with
+        the 26-locale exclusion list; a component adding its own would silently undo it.
+
+    VALIDATION ERRORS TAKE `--border-hairline`, NEVER `--danger`. `DESIGN.md:501` reserves danger
+    for the genuinely irreversible and says so twice in its Do's and Don'ts - "Don't use danger
+    for validation errors or ordinary refusals". `--danger` and `--danger-on` still have no
+    consumer in this product, and this story deliberately does not become their first.
+*/
+
+/*
+    THE REGISTRATION SURFACE.
+
+    A single centred panel on the page ground. It must work at a 320px CSS viewport - that is
+    WCAG 1.4.10's audit condition and NFR-9 names registration FIRST among the five gated flows -
+    so nothing here is sized to an English string and nothing has a fixed width. The mockup's
+    fixed 330px form is superseded by this: it would have overflowed at 320px before a single
+    word was translated, and German and Finnish run 30-40% longer than English.
+*/
+.auth-surface {
+    display: flex;
+    justify-content: center;
+    padding-block: var(--space-7) var(--space-6);
+    padding-inline: var(--space-4);
+}
+
+.auth-panel {
+    inline-size: 100%;
+
+    /*
+        A maximum in `rem`, not px, so the panel grows with the user's root font size instead of
+        squeezing the text inside a fixed box under a 200% text-only zoom.
+    */
+    max-inline-size: 26rem;
+    box-sizing: border-box;
+    background-color: var(--surface-card);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    padding-block: var(--space-6);
+    padding-inline: var(--space-5);
+}
+
+.auth-panel__heading {
+    margin-block: 0 var(--space-2);
+}
+
+.auth-panel__intro {
+    margin-block: 0 var(--space-6);
+    color: var(--text-muted);
+}
+
+/*
+    THE FORM FIELD.
+
+    Label above control, always. A real `<label for>` association is what makes the control
+    announce its own name; a placeholder is not a label, and this story uses no placeholders at
+    all - they vanish on focus, which is precisely when a person needs the name most.
+*/
+.form-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-block-end: var(--space-5);
+}
+
+.form-field__label {
+    color: var(--text-primary);
+}
+
+.form-field__control {
+    inline-size: 100%;
+
+    /*
+        So the padding and the hairline are inside the declared inline size rather than added to
+        it, which is what keeps the control inside the panel at a 320px viewport.
+    */
+    box-sizing: border-box;
+    background-color: var(--surface-page);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+
+    /*
+        Internal padding in `rem` rather than on the px spacing scale, deliberately. This is the
+        constructive half of WCAG 1.4.12: padding that scales with text grows the control under a
+        text-spacing override instead of letting the glyphs collide with the border.
+    */
+    padding-block: var(--space-control-pad-y);
+    padding-inline: var(--space-control-pad-x);
+    font-family: var(--type-body-family);
+    font-size: var(--type-body-size);
+    font-weight: var(--type-body-weight);
+    line-height: var(--type-body-line-height);
+    letter-spacing: var(--type-body-letter-spacing);
+}
+
+/*
+    The invalid state, carried by border WEIGHT rather than by colour.
+
+    Two reasons, and neither is stylistic. `--danger` is reserved for the irreversible, and a
+    validation error is the textbook case `DESIGN.md` says not to spend it on. And WCAG 1.4.1
+    forbids colour as the only carrier of information - so the weight change is the visual
+    signal, the message below the field is the textual one, and `aria-invalid` is the
+    programmatic one.
+*/
+.form-field__control[aria-invalid="true"] {
+    border-width: var(--border-emphasis-width);
+}
+
+.form-field__message {
+    color: var(--text-muted);
+}
+
+/*
+    THE PRIMARY BUTTON.
+
+    Its 24px minimum in both axes comes from the base rule in `base.css` rather than being
+    restated here - that rule exists so every control acquires the floor by default, and a
+    component that restates it is a component that can also get it wrong.
+*/
+.button-primary {
+    inline-size: 100%;
+    box-sizing: border-box;
+    appearance: none;
+    background-color: var(--accent);
+    color: var(--accent-on);
+    border: var(--border-hairline-width) solid var(--accent);
+    border-radius: var(--radius-md);
+    padding-block: var(--space-control-pad-y);
+    padding-inline: var(--space-control-pad-x);
+    font-family: var(--type-body-family);
+    font-size: var(--type-body-size);
+    font-weight: var(--type-task-title-weight);
+    line-height: var(--type-body-line-height);
+    cursor: pointer;
+    transition: background-color var(--motion-quick) var(--motion-easing-standard);
+}
+
+/*
+    The disabled state is what AC6's "resubmission is disabled" actually looks like. It is a real
+    `disabled` attribute rather than a class, so the control is genuinely unoperable by pointer,
+    keyboard and assistive technology alike rather than merely looking that way.
+*/
+.button-primary:disabled {
+    background-color: var(--surface-column);
+    border-color: var(--border-hairline);
+    color: var(--text-muted);
+    cursor: default;
+}
+
+/*
+    THE STATUS REGION - the in-flight condition, the completion, and the errors.
+
+    This is one of only two submit-and-wait interactions in a product with no save button, and
+    `EXPERIENCE.md:273` fixes the pattern: state the in-flight condition, disable resubmission,
+    announce completion. There is deliberately NO spinner over the surface, no progress
+    percentage and no celebration - and `DESIGN.md:508` is explicit that the wait is long by
+    design and motion must not cover it. So the region carries text and a border, and nothing
+    moves.
+
+    `tabindex="-1"` in the markup makes it a programmatic focus target. `base.css` excludes
+    `[tabindex="-1"]` from the 24px target floor for exactly this case: it is not a pointer
+    target, so 2.5.8 does not apply to it.
+*/
+.form-status {
+    margin-block-end: var(--space-5);
+    padding-block: var(--space-3);
+    padding-inline: var(--space-4);
+    border-inline-start: var(--border-emphasis-width) solid var(--border-hairline);
+    border-radius: var(--radius-sm);
+    background-color: var(--surface-column);
+    color: var(--text-primary);
+}
+
+.form-status__list {
+    margin-block: var(--space-2) 0;
+    padding-inline-start: var(--space-5);
+    color: var(--text-muted);
+}

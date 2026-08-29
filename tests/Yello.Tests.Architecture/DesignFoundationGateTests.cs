@@ -3129,12 +3129,73 @@ public sealed partial class DesignFoundationGateTests
                 yield return (index, source[index..textEnd]);
             }
 
-            var close = open < 0 ? -1 : source.IndexOf('>', open);
+            var close = open < 0 ? -1 : TagEnd(source, open);
 
             // No tag left to close means no further text node: either the file ended, or it ends
             // inside an unterminated tag.
             index = close < 0 ? source.Length : close + 1;
         }
+    }
+
+    /// <summary>
+    /// The offset of the <c>&gt;</c> that actually closes a tag, skipping any that sit inside a
+    /// quoted attribute value.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This gate produced a FALSE POSITIVE until story 1.3, which is the worse direction for
+    /// it to fail in.</b> <c>IndexOf('&gt;', open)</c> ended the tag at the first <c>&gt;</c>
+    /// anywhere, so a lambda in an attribute -
+    /// <c>ValueChanged="@(value =&gt; _name = value)"</c> - closed the tag at the arrow and
+    /// everything after it was read as a text node. The build failed saying
+    /// <c>Register.razor</c> "renders the literal text 'displayName value'", which is two
+    /// identifiers inside a C# expression: correct code, blocked, with a message pointing at
+    /// something that is not copy and could not be moved into a resource if it were.
+    /// </para>
+    /// <para>
+    /// The same break reaches any generic type argument written into markup, so epic 2's first
+    /// templated component - <c>&lt;Grid TItem="Task"&gt;</c> and its
+    /// <c>RenderFragment&lt;Task&gt;</c> parameters - would have hit it too.
+    /// </para>
+    /// <para>
+    /// <b>Quote-awareness is strictly stricter, never looser.</b> It can only move a tag's end
+    /// LATER, so every text node the old scan read is still read; what changes is that attribute
+    /// internals stop being mistaken for text. Validated in both directions - the lambda above
+    /// passes, and a planted literal in real markup is still caught by name. The class remark
+    /// above still holds: a genuinely malformed tag over-reads rather than under-reads.
+    /// </para>
+    /// </remarks>
+    private static int TagEnd(string source, int open)
+    {
+        var quote = '\0';
+
+        for (var index = open + 1; index < source.Length; index++)
+        {
+            var character = source[index];
+
+            if (quote != '\0')
+            {
+                if (character == quote)
+                {
+                    quote = '\0';
+                }
+
+                continue;
+            }
+
+            if (character is '"' or '\'')
+            {
+                quote = character;
+                continue;
+            }
+
+            if (character == '>')
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     /// <summary>

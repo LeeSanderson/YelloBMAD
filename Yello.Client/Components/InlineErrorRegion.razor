@@ -1,0 +1,60 @@
+@*
+    The inline error region: what a surface says when a submission comes back rejected.
+
+    role="alert" AND tabindex="-1" AND FOCUS MOVED TO IT. All three, and the third is the one that
+    was nearly missed. review-accessibility.md:62 records a critical review finding that rejected
+    exactly the shape this could have been: "a bare aria-live region with no focus move". An alert
+    region announces itself once, to a screen reader, and then the person is still standing on
+    whichever control they submitted from - with no way to reach the message, no way to re-read
+    it, and no idea where it is. Moving focus puts them at the message.
+
+    tabindex="-1" makes it a programmatic focus target without adding it to the tab order, which
+    would be worse: a static message a keyboard user has to tab THROUGH on every pass is a
+    permanent tax for a transient event. base.css excludes [tabindex="-1"] from the 24px target
+    floor for exactly this reason - it is not a pointer target, so WCAG 2.5.8 does not apply.
+
+    The focus move happens on FIRST RENDER of this component, so the caller controls when it
+    fires by keying the element on the attempt number: a new attempt is a new instance, and a new
+    instance re-announces and re-focuses. Without that, a second failed attempt would render into
+    the existing region and say nothing at all.
+*@
+
+<div class="form-status" role="alert" tabindex="-1" @ref="_region">
+    <p class="form-status__heading">@Heading</p>
+
+    @if (Messages.Count > 0)
+    {
+        <ul class="form-status__list">
+            @foreach (var message in Messages)
+            {
+                <li>@message</li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private ElementReference _region;
+
+    /// <summary>
+    /// The region's opening line, announced first. Always a resource lookup.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public string Heading { get; set; } = string.Empty;
+
+    /// <summary>
+    /// One line per problem, already resolved to localised text by the caller.
+    /// </summary>
+    [Parameter]
+    public IReadOnlyList<string> Messages { get; set; } = [];
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _region.FocusAsync();
+        }
+    }
+}

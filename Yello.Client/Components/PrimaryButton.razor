@@ -1,0 +1,43 @@
+@*
+    The primary action of a surface. A native <button>, always.
+
+    Story 1.2's second code review is the reason that is stated rather than assumed. The error
+    banner's dismiss control was a <span>, then a <span role="button" tabindex="0"> - which was
+    worse, because it ANNOUNCED itself as a button while no key could operate it. A native button
+    activates on Enter and Space with no JavaScript, takes an accessible name from its content,
+    and is the only element on which `disabled` genuinely prevents activation rather than merely
+    looking as though it does.
+
+    `disabled` is what AC6's "resubmission is disabled" actually means. A class that looks
+    disabled is still clickable, still keyboard-activatable, and still submits.
+
+    The 24px floor in both axes comes from base.css's `button` rule, acquired by default. It is
+    deliberately not restated here: a control that has to remember the floor is a control that
+    will forget it.
+*@
+
+<button class="button-primary" type="@ButtonType" disabled="@Disabled">@ChildContent</button>
+
+@code {
+    /// <summary>
+    /// The button's label, passed as content so it is always a resource lookup in the caller
+    /// rather than a string parameter something could pass a literal to.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>
+    /// Whether the button is disabled. True while a submission is in flight.
+    /// </summary>
+    [Parameter]
+    public bool Disabled { get; set; }
+
+    /// <summary>
+    /// The button type. Defaults to submit, because this is a form's primary action; an explicit
+    /// value matters because a button inside a form with no type submits it anyway, which is a
+    /// surprise wherever that was not the intent.
+    /// </summary>
+    [Parameter]
+    public string ButtonType { get; set; } = "submit";
+}

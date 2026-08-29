@@ -9,16 +9,20 @@ namespace Yello.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Superseded 2026-08-27 by story 1.2. This previously read "Story 1.1 adds no components and
-/// no CSS. Story 1.2 owns the design foundations and gates the token count at exactly 30" - a
-/// hand-off that became false when <c>wwwroot/css/tokens.css</c> landed.
+/// Superseded 2026-08-29 by story 1.3. The previous text ended "Still no components - task cards,
+/// columns, the context bar, dialogs, pickers and buttons are epic 2 onward", which stopped being
+/// true when the registration surface landed.
 /// </para>
 /// <para>
-/// The design foundations now exist: 30 colour tokens, 8 type roles, the spacing, radius,
-/// border and motion scales in <c>wwwroot/css/tokens.css</c>, and the type roles, focus ring,
-/// text link, target floor, reduced-motion contract and locale-aware casing in
-/// <c>wwwroot/css/base.css</c>. Still no components - task cards, columns, the context bar,
-/// dialogs, pickers and buttons are epic 2 onward.
+/// What exists now: the token layer and base layer from story 1.2, plus this story's
+/// <c>wwwroot/css/components.css</c>, a <c>Router</c>, a layout, the registration page, and the
+/// first three components - a form field, a primary button and an inline error region. Also the
+/// first localisation resources and the culture provider that sets the document's language, which
+/// is what makes <c>base.css</c>'s 26-locale casing exclusions reachable at all.
+/// </para>
+/// <para>
+/// Still absent, and owned elsewhere: task cards, columns, dialogs and pickers are epic 2 onward;
+/// the context bar, the Space switcher and the Role chip are story 1.7's.
 /// </para>
 /// </remarks>
 public static class AssemblyMarker

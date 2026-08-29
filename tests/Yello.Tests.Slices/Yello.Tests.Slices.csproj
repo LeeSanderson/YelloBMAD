@@ -47,6 +47,13 @@
     <ProjectReference Include="..\..\Yello.Domain\Yello.Domain.csproj" />
     <ProjectReference Include="..\..\Yello.Infrastructure\Yello.Infrastructure.csproj" />
     <ProjectReference Include="..\..\Yello.Host\Yello.Host.csproj" />
+    <!--
+      Added by story 1.3, together with the matching row in AllowedReferenceEdges. The slice
+      tests POST a Yello.Contracts request DTO and read back a problem body whose stable `type`
+      is a Yello.Contracts constant; reaching those transitively through Host is the exposure
+      deferred-work.md:10 records, so the edge is declared.
+    -->
+    <ProjectReference Include="..\..\Yello.Contracts\Yello.Contracts.csproj" />
     <ProjectReference Include="..\Yello.Tests.Shared\Yello.Tests.Shared.csproj" />
   </ItemGroup>
 

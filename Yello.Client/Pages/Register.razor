@@ -1,0 +1,208 @@
+@page "/"
+@page "/register"
+
+@using System.Text.Json
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+
+@*
+    THE REGISTRATION SURFACE. FR-1, FR-4, AC6.
+
+    THREE FIELDS, AND NOTHING ELSE. No plan picker, no team-size question, no confirm-password, no
+    terms checkbox, no CAPTCHA, no onboarding step. Every one of those is ruled out by UJ-1's
+    climax (EXPERIENCE.md:477) and the mockup's negative-constraints block, and adding one is a
+    specification violation rather than a product improvement. The point of this flow is that
+    somebody can start holding work without making a single structural decision first.
+
+    THERE IS NO "THAT EMAIL IS TAKEN" MESSAGE, AND THERE MUST NEVER BE ONE. A duplicate
+    registration renders this page's SUCCESS path, identically. No inline error on the email
+    field, no "sign in instead?" nudge, and no client-side email-availability check of any kind -
+    EXPERIENCE.md:479 is explicit that adding one is a specification violation, and AD-23 is what
+    it would violate. Note that this component could not do it if it wanted to: the server answers
+    204 for both paths and sends nothing that tells them apart.
+
+    THIS PAGE DOES NOT SIGN ANYONE IN AND DOES NOT NAVIGATE. Story 1.4 owns authentication and
+    Sessions; story 1.7 owns the context bar somebody would arrive at. AC6's obligation ends at
+    "completion is announced", and this is where it ends. Confirmed by Lee on 2026-08-28.
+
+    ROUTED AT BOTH "/" AND "/register". The root is provisional: there is nothing else to land on
+    yet, and stories 1.4 and 1.7 decide what belongs there once a Session and a context bar exist.
+
+    VALIDATION IS THE SERVER'S. The page submits, and renders whatever stable failure codes come
+    back as localised text. There is deliberately no second copy of the rules here to drift out of
+    step - and the round trip leaks nothing, because a validation failure depends only on what was
+    typed and never on what is stored.
+*@
+
+<div class="auth-surface">
+    <div class="auth-panel">
+        <h1 class="type-dialog-title auth-panel__heading">@Localizer["RegisterHeading"]</h1>
+        <p class="auth-panel__intro">@Localizer["RegisterIntro"]</p>
+
+        @if (_messages.Count > 0)
+        {
+            @* Keyed on the attempt so each failed submission is a NEW instance - which is what
+               re-announces the alert and moves focus back to it. Without the key, a second
+               failure would render into the existing region and say nothing at all. *@
+            <InlineErrorRegion @key="_attempt"
+                               Heading="@(Localizer["ErrorHeading"].Value)"
+                               Messages="@_messages" />
+        }
+
+        @if (_phase == RegistrationPhase.Submitting)
+        {
+            @* role="status" is polite: it announces without interrupting, which is right for
+               "this is under way". The wait is deliberately long - the password hash is meant to
+               be slow - so the copy says so in words. No spinner, no progress percentage, and
+               nothing that moves: DESIGN.md:508 is explicit that motion must not cover the wait. *@
+            <p class="form-status" role="status">@Localizer["SubmitInFlight"]</p>
+        }
+
+        @if (_phase == RegistrationPhase.Complete)
+        {
+            @* Announced politely, and focused - so a keyboard or screen-reader user is left at
+               the message rather than on a submit button that has just vanished. *@
+            <p class="form-status" role="status" tabindex="-1" @ref="_completion">
+                @Localizer["SubmitComplete"]
+            </p>
+        }
+
+        @if (_phase != RegistrationPhase.Complete)
+        {
+            <form @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+                <FormField FieldId="display-name"
+                           Label="@(Localizer["DisplayNameLabel"].Value)"
+                           Message="@(MessageFor(RegistrationFields.DisplayName) ?? Localizer["DisplayNameHint"].Value)"
+                           AutoComplete="name"
+                           Disabled="@IsBusy"
+                           @bind-Value="_displayName" />
+
+                <FormField FieldId="email-address"
+                           Label="@(Localizer["EmailAddressLabel"].Value)"
+                           Message="@MessageFor(RegistrationFields.EmailAddress)"
+                           InputType="email"
+                           AutoComplete="email"
+                           Disabled="@IsBusy"
+                           @bind-Value="_emailAddress" />
+
+                <FormField FieldId="password"
+                           Label="@(Localizer["PasswordLabel"].Value)"
+                           Message="@MessageFor(RegistrationFields.Password)"
+                           InputType="password"
+                           AutoComplete="new-password"
+                           Disabled="@IsBusy"
+                           @bind-Value="_password" />
+
+                <PrimaryButton Disabled="@IsBusy">@Localizer["SubmitLabel"]</PrimaryButton>
+            </form>
+        }
+    </div>
+</div>
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private RegistrationPhase _phase = RegistrationPhase.Editing;
+    private IReadOnlyList<string> _failureCodes = [];
+    private IReadOnlyList<string> _messages = [];
+    private int _attempt;
+    private bool _announceCompletion;
+    private ElementReference _completion;
+
+    private string _displayName = string.Empty;
+    private string _emailAddress = string.Empty;
+    private string _password = string.Empty;
+
+    private bool IsBusy => _phase == RegistrationPhase.Submitting;
+
+    private async Task SubmitAsync()
+    {
+        _phase = RegistrationPhase.Submitting;
+        _failureCodes = [];
+        _messages = [];
+        _attempt++;
+
+        var request = new RegisterAccountRequest(_displayName, _emailAddress, _password);
+
+        try
+        {
+            var response = await Http.PostAsJsonAsync(AccountRoutes.Register, request, JsonOptions);
+
+            if (response.IsSuccessStatusCode)
+            {
+                Complete();
+                return;
+            }
+
+            var problem = await ReadProblemAsync(response);
+
+            _failureCodes = problem?.Errors ?? [];
+            _messages = _failureCodes.Count > 0
+                ? [.. _failureCodes.Select(code => Localizer[code].Value)]
+                : [Localizer["SubmitFailed"].Value];
+        }
+        catch (HttpRequestException)
+        {
+            // The request never reached the server. Reported as a transport problem, which is
+            // what it is - and deliberately not as anything about the submission, which was never
+            // seen.
+            _messages = [Localizer["SubmitFailed"].Value];
+        }
+        catch (JsonException)
+        {
+            // The server answered something this client cannot read. Same report: it is not the
+            // person's submission that is wrong.
+            _messages = [Localizer["SubmitFailed"].Value];
+        }
+
+        _phase = RegistrationPhase.Editing;
+    }
+
+    private void Complete()
+    {
+        _phase = RegistrationPhase.Complete;
+        _announceCompletion = true;
+
+        // The password has done its one job. Dropping the reference is not a security control -
+        // the string is still in the managed heap until it is collected - but keeping it in a
+        // live field on a rendered component for no reason is worse.
+        _password = string.Empty;
+    }
+
+    private static async Task<ProblemResponse?> ReadProblemAsync(HttpResponseMessage response)
+    {
+        if (response.Content.Headers.ContentType?.MediaType is not "application/problem+json")
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ProblemResponse>(JsonOptions);
+    }
+
+    /// <summary>
+    /// The localised message for the first failure concerning a given field, if any.
+    /// </summary>
+    /// <remarks>
+    /// The field half of a code is its prefix - see RegistrationFields. A code matching no field
+    /// still reaches the person through the error region above, which lists every code returned;
+    /// what is lost is only the message under the specific control.
+    /// </remarks>
+    private string? MessageFor(string field)
+    {
+        var code = _failureCodes.FirstOrDefault(
+            candidate => candidate.StartsWith(field, StringComparison.Ordinal));
+
+        return code is null ? null : Localizer[code].Value;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_announceCompletion)
+        {
+            _announceCompletion = false;
+            await _completion.FocusAsync();
+        }
+    }
+}

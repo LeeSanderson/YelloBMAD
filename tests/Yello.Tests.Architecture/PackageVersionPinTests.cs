@@ -122,6 +122,17 @@ public sealed class PackageVersionPinTests
         // Transitive security pin, not a stack choice: GHSA-q939-rpr3-3284, first patched in
         // 2026.0.0. See the comment in Directory.Packages.props.
         ["SSH.NET"] = "2026.0.0",
+
+        // Localisation, added by story 1.3 and referenced by Yello.Client and
+        // Yello.Infrastructure. Neither inherits it: a Blazor WebAssembly app resolves against
+        // Microsoft.NETCore.App rather than the ASP.NET Core shared framework, and a plain
+        // library inherits no shared framework at all.
+        //
+        // DERIVED from the runtime pin for the same reason the two WASM rows above are: the
+        // Microsoft.Extensions.* packages ship in the same band as the runtime, so a version
+        // restated here would let a runtime bump leave this one behind with every assertion
+        // green.
+        ["Microsoft.Extensions.Localization"] = PinnedRuntimeVersion,
     };
 
     /// <summary>

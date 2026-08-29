@@ -1,23 +1,39 @@
+@inject IStringLocalizer<ClientCopy> Localizer
+
 @*
-    The application shell, and nothing more.
+    The application shell.
 
-    AC4 requires Yello.Client to be running under the AppHost, so the app needs a root
-    component to boot at all. It deliberately does not use <Router>: there are no routable
-    pages yet, and a Router with an empty route table cannot resolve its NotFound case.
-    Routing, the layout and the navigation surface arrive with the screens that need them.
+    Superseded 2026-08-29 by story 1.3. This previously said the shell "deliberately does not use
+    <Router>: there are no routable pages yet, and a Router with an empty route table cannot
+    resolve its NotFound case" - which described story 1.1's tree and stopped being true when
+    Pages/Register.razor landed. It also carried a paragraph recording what its story-1.1 comment
+    had said before story 1.2 corrected it.
 
-    Superseded 2026-08-27 by story 1.2, which shipped the design foundations. This previously
-    read "No markup here carries a class, a style attribute or a colour - story 1.2 owns the
-    design foundations", which described story 1.1's tree and became false the moment
-    css/tokens.css and css/base.css landed. Recorded as a correction rather than deleted,
-    because stale hand-off prose in these files produced six of story 1.1's review findings and
-    a seventh at story 1.2's review, which is where this one was caught.
+    That accumulation is itself a recorded finding - deferred-work.md:44 notes that review
+    archaeology is piling up in these files and assigns the convention decision to Lee, once, for
+    the project. This story does not act on it (it is not the next story's to take), but it does
+    not add a third layer either: the superseded story-1.1 paragraph is gone, and what is left is
+    one line saying what changed and why.
 
-    The shell still carries no class, style attribute or colour of its own, and it does not need
-    to: `base.css` styles the document from the tokens, so the shell inherits the body ground,
-    the body type role and the focus treatment without naming any of them. The product name
-    below is the one literal the externalised-copy gate permits, because a brand is not
-    translated.
+    FocusOnNavigate moves focus to the routed page's <h1> after every navigation. Without it a
+    single-page application changes the whole document under a screen-reader user while their
+    focus stays wherever the last link was - which is the most common accessibility defect in
+    client-side routing, and registration is named first among NFR-9's five gated flows.
 *@
 
-<p>Yello</p>
+<Router AppAssembly="@typeof(App).Assembly">
+    <Found Context="routeData">
+        <RouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)" />
+        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
+    </Found>
+    <NotFound>
+        <LayoutView Layout="@typeof(MainLayout)">
+            <div class="auth-surface">
+                <div class="auth-panel">
+                    <h1 class="type-dialog-title auth-panel__heading">@Localizer["NotFoundHeading"]</h1>
+                    <p class="auth-panel__intro">@Localizer["NotFoundBody"]</p>
+                </div>
+            </div>
+        </LayoutView>
+    </NotFound>
+</Router>

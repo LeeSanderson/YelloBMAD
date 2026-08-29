@@ -1,4 +1,23 @@
 <!DOCTYPE html>
+<!--
+    `lang` is the pre-boot default and is REPLACED at startup from the active culture -
+    Yello.Client/Program.cs sets it through `document.documentElement.setAttribute`, and
+    `The_document_language_is_set_from_the_active_culture` in the architecture suite fails the
+    build if that call disappears.
+
+    It matters more than it looks. `base.css:141-172` is the most elaborate thing in the base
+    layer: three rules that withhold `text-transform: uppercase` from Turkish, Azeri and Greek
+    because uppercasing is lossy there, and withhold letter-spacing from 24 case-less scripts
+    because it severs connected joins. All of it keys on `:lang()`, which resolves against this
+    attribute - so while it was hard-coded, the entire exclusion list was inert and Turkish
+    content would have been uppercased lossily. `deferred-work.md:32` recorded that and named the
+    first story to introduce localisation resources and a culture provider as its owner. Story
+    1.3 is that story.
+
+    The attribute cannot simply be removed: this file is served before the WebAssembly runtime
+    exists, so something has to be here for the pre-boot page, and a document with no `lang` at
+    all is a WCAG 3.1.1 failure in its own right.
+-->
 <html lang="en">
 
 <head>
@@ -11,16 +30,26 @@
 
     <!--
         The design foundations, in dependency order: tokens.css declares every colour, size,
-        space, radius and duration; base.css applies the parts that must hold for every surface.
-        Fingerprinted through the same `#[.{fingerprint}]` placeholder the framework script uses
-        below, which OverrideHtmlAssetPlaceholders (Yello.Client.csproj:4) rewrites at build.
+        space, radius and duration; base.css applies the parts that must hold for every surface;
+        components.css draws the components themselves. Fingerprinted through the same
+        `#[.{fingerprint}]` placeholder the framework script uses below, which
+        OverrideHtmlAssetPlaceholders (Yello.Client.csproj:4) rewrites at build.
 
-        There is no scoped-CSS bundle link and no `Yello.Client.styles.css`: the token layer is
-        global by definition, and story 1.1 removed that link deliberately. Adding a `.razor.css`
-        anywhere would produce the bundle and need its own link restored.
+        Superseded 2026-08-29 by story 1.3, which added the third sheet. This previously listed
+        two files and described `base.css` as the last of them.
+
+        There is still no scoped-CSS bundle link and no `Yello.Client.styles.css`: story 1.3's
+        components are shared rather than one page's private styling, so they live in a global
+        sheet. Adding a `.razor.css` anywhere would produce the bundle and need its own link
+        restored - `Every_stylesheet_is_linked_by_the_host_page` fails the build until it is.
+
+        Every sheet under wwwroot/css is required to be linked here, derived from the corpus
+        rather than from a list - so a fourth sheet is held to this without anyone extending a
+        gate.
     -->
     <link rel="stylesheet" href="css/tokens#[.{fingerprint}].css" />
     <link rel="stylesheet" href="css/base#[.{fingerprint}].css" />
+    <link rel="stylesheet" href="css/components#[.{fingerprint}].css" />
 
     <script type="importmap"></script>
 </head>

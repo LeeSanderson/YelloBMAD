@@ -113,12 +113,20 @@ internal static class AllowedReferenceEdges
             ["Yello.Tests.Isolation"] = ["Yello.Host", "Yello.Contracts", DeclaredVariance],
             ["Yello.Tests.Revocation"] = ["Yello.Host", "Yello.Contracts", DeclaredVariance],
             ["Yello.Tests.Merge"] = ["Yello.Merge", "Yello.Contracts"],
+            // Contracts was added by story 1.3, and the edit is the visible moment the rule
+            // changed - which is what this table is for. The slice tests assert the registration
+            // endpoint's wire behaviour: they POST a Yello.Contracts request DTO and read back an
+            // RFC 9457 problem body whose stable `type` is a Yello.Contracts constant. Reaching
+            // those through Host's transitive output was the alternative and is exactly what
+            // deferred-work.md:10 warns against - "declared edges are not the effective
+            // dependency closure" - so the edge is declared rather than relied on.
             ["Yello.Tests.Slices"] =
             [
                 "Yello.Application",
                 "Yello.Domain",
                 "Yello.Infrastructure",
                 "Yello.Host",
+                "Yello.Contracts",
                 DeclaredVariance,
             ],
 
