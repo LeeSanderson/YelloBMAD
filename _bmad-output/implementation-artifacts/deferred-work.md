@@ -79,3 +79,28 @@ What story 1.3 *did* discharge constructively, so the deferral is not over-scope
 
 - **`Todo` cannot appear in any comment in this repository** — `Yello.Domain/Statuses/DefaultStatusSet.cs`. Severity: low, and it is a **trap rather than a defect**. Owner: **Epic 6**, which builds the Status editor and will meet it constantly. SonarAnalyzer's S1135 treats the word as a task marker, and `TreatWarningsAsErrors` makes it a build error — so naming the first of FR-24's three default Statuses in a doc comment or an inline comment fails the build. String literals are unaffected, which is why the names live in `DefaultStatusSet.Names` and are deliberately not written in prose anywhere. Not suppressed: the rule is right about comments in general and the remedy costs nothing.
 
+## Deferred from: the first browser run of the client (2026-09-01)
+
+Story 1.3 shipped the product's first rendered surface and closed with 136 tests green. The
+client did not start — in any browser, in any locale. `Yello.Client/Program.cs` assigned the
+resolved culture to `CultureInfo.DefaultThreadCurrentCulture` and `DefaultThreadCurrentUICulture`
+*after* the WebAssembly runtime had booted, and Blazor loads one shard of the ICU dataset chosen
+for the boot culture: `WebAssemblyHost.RunAsync` refuses to run when the culture has changed
+since, unless `BlazorWebAssemblyLoadAllGlobalizationData` is true. Every browser tripped it,
+because tripping it was what the code was *for* — the browser sends `en-GB`, `SupportedCultures`
+serves `en`, and the assignment is a change. The throw lands before the first render, so the page
+held "Loading Yello…" behind `index.html`'s banner reading "An unhandled error has occurred."
+
+Fixed on 2026-09-01: the resolved culture drives `<html lang>` and nothing else, and the runtime's
+culture is left as the browser set it. The two entries below are what the episode leaves behind.
+
+- **No gate runs the client in a browser, so "the application starts" is asserted by nothing** — `tests/`, the whole suite. Severity: **high**. Owner: **blocker B5's `bmad-testarch-framework` run** — but see the interim below, because this half need not wait for it. The registration surface is covered by 82 architecture gates and 54 slice tests: the markup is parsed, the copy is scanned for literals, the tokens are checked for contrast, the compiled IL is read for the document-language call. Every one of them reads a *file*. Nothing loads the page. So a composition root that throws before the first render passes all 136, and the gap is not at the margin of what the suite claims — it is the difference between an application that works and one that cannot start.
+
+  **The interim is one command, not a framework.** Proved on 2026-09-01 against a dev server on a spare port: `msedge --headless=new --virtual-time-budget=20000 --dump-dom http://localhost:5131/` returns the rendered DOM, and the two assertions worth making on it are that `#app` contains the routed `<h1>` and that `#blazor-error-ui` still carries `display:none`. That is a boot smoke check. It needs no Playwright and does not depend on the TypeScript-versus-.NET binding the three measurement entries above are blocked on. Recorded as deferred rather than built because a browser-driven case would be the first of its kind here, and *where it lives* — which suite, which traits, how CI reaches a browser — is B5's question; answering it inside an unrelated fix is the shape of decision AR-3 exists to prevent.
+
+  Note for whoever picks it up: run it **per supported culture**, not once. This particular defect fired for every locale, and the fix was verified under `en-GB`, `tr-TR`, `ja-JP` and `de-AT` for that reason — but the class it belongs to is startup work conditioned on the browser's culture, and that class is exactly what a single `en-GB` run misses.
+
+- **Nothing stops the culture-change trap being re-armed by the story that adds a second translation** — `Yello.Client/Program.cs:28-63`, `Yello.Contracts/Localisation/SupportedCultures.cs`. Severity: medium. Owner: **whichever story ships a second translation**; no epic currently names one. The fix works by *not changing* the culture, and resource lookup reaches the right set anyway because `ResourceManager` walks `en-GB → en → neutral`, which is `CultureSelection`'s own rule (exact, then language, then default) reached by a different road. That holds precisely while there is one neutral resource set. A story adding `de` inherits a question it did not ask — whether a `de-AT` browser should also *format* as German — and inherits it in a form where the obvious answer is the one that breaks startup. Two things it needs to know: the supported way to change culture is `blazor.start({ applicationCulture })` before the runtime boots, never a post-boot assignment; and `BlazorWebAssemblyLoadAllGlobalizationData`, the remedy the framework's own error message names, buys the capability by trading the sharded ICU file for the full dataset on every page load, which is a page-weight decision rather than a build setting.
+
+  **The cheap interim, if it is wanted sooner:** assert that `SupportedCultures.All` has exactly one entry, with the trap named in the failure message. Same shape as AC9's "at most one pill" — honest today, and it fails loudly on the one day someone needs to read it.
+

@@ -965,7 +965,7 @@ EF migration needs a hand-editing pass to satisfy the coding standard; both are 
 - `tests/Yello.Tests.Architecture/DesignFoundationGateTests.cs` — quote-aware `TextNodes`
 - `tests/Yello.Tests.Architecture/PackageVersionPinTests.cs` — the new non-AR-1 pin
 - `tests/Yello.Tests.Slices/Yello.Tests.Slices.csproj` — Contracts reference
-- `_bmad-output/implementation-artifacts/deferred-work.md` — one entry closed, five added
+- `_bmad-output/implementation-artifacts/deferred-work.md` — one entry closed, five added; two more after the first browser run
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` — status transitions
 
 `git diff --stat 73805cb` — **code, tests and build files only: 80 files changed, 7,367
@@ -989,4 +989,6 @@ writing, and that number is not stable.
 | 2026-08-29 | Twelve planted violations run against the story's absence assertions; all caught. Plant D exposed a real weakness in a gate this story wrote, which was rewritten to assert the configuration's effect rather than the entity's presence. |
 | 2026-08-29 | Fixed a false positive in story 1.2's copy gate: `TextNodes` ended a tag at the first `>`, so a lambda in an attribute was reported as rendered copy. Now quote-aware. |
 | 2026-08-29 | Five new `deferred-work.md` entries: idempotency unowned, CORS needed for the cross-origin call, `Account`/`Space` RLS predicates undecided, the EF migration hand-editing pass, and the `Todo`-in-comments trap. |
+| 2026-09-01 | **The client did not start, and this story's 136 green tests did not notice.** `Program.cs` assigned the resolved culture after the WebAssembly runtime had booted; Blazor loads one ICU shard chosen for the boot culture and refuses a post-boot change unless `BlazorWebAssemblyLoadAllGlobalizationData` is set. Every browser tripped it — `en-GB` boots, `SupportedCultures` serves `en`. Fixed by using the resolved culture for `<html lang>` only and leaving the runtime's culture as the browser set it; resource lookup already reaches the same set through `ResourceManager`'s own `en-GB → en → neutral` fallback, and a UK browser now formats as `en-GB` rather than being forced onto neutral `en`. The remedy the error message names was declined: the full ICU dataset is a page-load cost on every visitor for a capability one neutral resource set does not use. Verified in a headless browser under `en-GB`, `tr-TR`, `ja-JP` and `de-AT` — the surface renders and `#blazor-error-ui` stays hidden in all four. Architecture suite still 82 passing, including the document-language IL gate. |
+| 2026-09-05 | Two new `deferred-work.md` entries recording what that episode left behind: no gate runs the client in a browser at all, so "the application starts" is asserted by nothing; and nothing stops the culture-change trap being re-armed by the story that adds a second translation. |
 | 2026-08-29 | `dotnet build Yello.slnx` clean at **0 warnings**; `dotnet test Yello.slnx` **136 passed / 0 failed** (82 architecture, 54 slices). Status `in-progress` → `review`. |
