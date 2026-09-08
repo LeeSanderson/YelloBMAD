@@ -13,9 +13,15 @@ re-deciding them.
 | `Yello.Tests.Merge` | AD-12 merge conformance | yes |
 | `Yello.Tests.Architecture` | AD-21 — the dependency rule, the Role-API ban, the version pins | yes |
 | `Yello.Tests.Slices` | use-case slice tests | **no** |
+| `Yello.Tests.Client` | the rendered client in a real browser — AD-29's two client-only invariants, NFR-9, and that the application starts at all | yes |
 
-Four gates, five projects. The readiness report says "the four test suites" in one section and
-"all five test projects" in another; both are correct, and this table is the reconciliation.
+Four gates across the Structural Seed's five projects. The readiness report says "the four test
+suites" in one section and "all five test projects" in another; both are correct, and this table
+is the reconciliation.
+
+`Yello.Tests.Client` is the **sixth project and the fifth gate**, added by the framework run on
+2026-09-07 rather than by the Structural Seed. See "The browser level" below for why it exists
+and what conversation preceded it.
 
 `Yello.Tests.Shared` is a sixth project but **not a suite**: it holds the shared
 Testcontainers SQL Server fixture and no test cases. It is the one declared variance from the
@@ -32,7 +38,7 @@ retrofitted. Four names, and only these four:
 
 | Trait | Values | Meaning |
 |---|---|---|
-| `Suite` | `Architecture`, `Isolation`, `Revocation`, `Merge`, `Slices` | which suite the case belongs to |
+| `Suite` | `Architecture`, `Isolation`, `Revocation`, `Merge`, `Slices`, `Client` | which suite the case belongs to |
 | `Priority` | `P0`, `P1`, `P2` | selection tier. `P0` is release-gating |
 | `Requirement` | e.g. `AR-1`, `AR-2`, `AR-4`, `NFR-1`, `FR-34` | the requirement the case traces to |
 | `Assumption` | e.g. `PRD-12-2` — source document, then location within it | the assumption the case hardens into an assertion |
@@ -100,6 +106,83 @@ story adding an absence assertion does the same.
 **No coverage threshold.** None appears in the PRD, the architecture spine, the epics or the
 spec kernel. The 80% figure in the test design is explicitly "offered as a proposal for Lee to
 accept or drop", and is called "the weakest gate on this list". Do not invent one.
+
+## The browser level — blocker B5
+
+`Yello.Tests.Client`, added by the framework run on 2026-09-07. It is the fifth of the five test
+levels the test design names and the only one it left unbound: UNIT, INT, ARCH and LOAD all had a
+binding, and E2E read "browser, binding per B5".
+
+**The binding is Playwright for .NET**, not a TypeScript `@playwright/test` project. The reasons
+are about this repository rather than about Playwright: one `dotnet test` invocation, the same
+four-name trait vocabulary CI tiers on, and a version that `Directory.Packages.props` states and
+`PackageVersionPinTests` asserts. An npm lockfile would be a second toolchain that none of those
+gates can read.
+
+**Adding a suite required a conversation, and this was it.** The rule below — "if a new suite
+seems necessary, that is a conversation about the architecture" — was followed rather than
+sidestepped. `test-design-architecture.md:315` asks for "the browser-test binding decision, and a
+sixth test project"; the alternative of folding the cases into `Yello.Tests.Slices` was considered
+and rejected because this suite's entry criterion is a live dev-server process and a real browser,
+which nothing else here needs. Decided with Lee on 2026-09-07; the record is in
+`_bmad-output/test-artifacts/framework-setup-progress.md`.
+
+### What it needs to run
+
+```
+pwsh tests/Yello.Tests.Client/bin/Debug/net10.0/playwright.ps1 install chromium
+```
+
+Once per machine, and once per cold CI agent — add `--with-deps` on a CI Linux agent to install
+the shared libraries headless Chromium links against. **The browser is pinned by the
+`Microsoft.Playwright` version**, so it is as fixed as every other dependency here; that is why
+the bundled Chromium was chosen over `Channel = "msedge"`, which would run whatever Edge the
+machine happened to have.
+
+**No container.** `Yello.Client` is a standalone WebAssembly application with its own dev server,
+so this suite starts one process, needs no SQL Server, and belongs in the **PR tier** despite
+being a browser suite. The whole suite runs in about 14 seconds. Cases that need a signed-in
+Session or real data will need more, and arrive with the stories that build them.
+
+The suite serves the real build output and launches it with `--no-build`, so
+`dotnet build Yello.slnx` has to have run first. It says so by name rather than timing out.
+
+### What it asserts today
+
+Eight cases: two claims across the four locales in `BrowserLocales`. That the application starts
+and renders the routed page with no error banner, and that `<html lang>` is the culture the client
+resolved — computed from `CultureSelection` against `SupportedCultures`, never a literal, so a
+second translation moves the expectation on its own.
+
+**Per locale, not once.** `SupportedCultures.All` has one entry, so iterating it would run each
+case once under `en` — which is exactly the run that misses culture-conditioned startup defects.
+The four locales are browser inputs chosen for the paths they take, not Yello's resource set.
+
+### Why it exists
+
+Story 1.3 shipped the first rendered surface and closed with 136 tests passing. The client did not
+start, in any browser, in any locale. All 136 read a *file*; nothing loaded the page. That gap is
+not at the margin of what a suite claims — it is the difference between an application that works
+and one that cannot start.
+
+### The plants, and the one that found a real hole
+
+Run 2026-09-08, per the planted-signal rule below.
+
+| Plant | Caught |
+|---|---|
+| The 2026-09-01 defect re-armed — culture assigned after the runtime booted | yes — all 8 |
+| Routed heading demoted from `h1` to `h2`, which also breaks `FocusOnNavigate` | yes — all 8 |
+| An exception after the first render, unhiding the framework error banner | yes — the 4 boot cases, and not the other 4 |
+| `DocumentLanguage` writing `data-lang` instead of `lang` — the feature disabled entirely | **no, at first** |
+
+The fourth is the one worth reading. `index.html` hard-codes `lang="en"`, every locale resolves to
+`en` while there is one neutral resource set, so `"en" == "en"` held with the feature switched
+off — a vacuous assertion of precisely the kind this suite exists to catch, sitting inside this
+suite. The fix is in the test rather than the product: the served document's pre-boot `lang` is
+rewritten to `und` before the page loads, so the asserted value can only have come from the
+client. The plant fails now, and the case asserts that its own rewrite actually matched — an
+inert rewrite would put the hole straight back.
 
 ## Comparing two code paths' durations — blocker B3
 

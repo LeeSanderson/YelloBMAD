@@ -191,4 +191,29 @@
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.11" />
   </ItemGroup>
 
+  <!--
+    THE BROWSER TEST LEVEL. Not an AR-1 stack choice: nothing ships it, and the AR-1 table
+    names no browser binding at all. That absence is what blocker B5 was - the test design
+    lists five test levels and binds four of them, leaving E2E as "browser, binding per B5"
+    (test-design-architecture.md:174). The TF run of 2026-09-07 decided it: Playwright for
+    .NET, so the browser level joins the same `dotnet test` invocation, the same
+    Suite/Priority/Requirement trait vocabulary that CI tiers on, and this file - rather than
+    arriving as a second toolchain with an npm lockfile no gate here can read.
+
+    THIS PIN ALSO PINS THE BROWSER. Playwright downloads a Chromium build chosen by the
+    package version, so the browser under test is fixed by the number on this line and by
+    nothing else. That is the whole reason the bundled browser was chosen over
+    `Channel = "msedge"`, which drives whatever Edge the machine happens to have and would
+    float exactly the way the SQL Server `2025-latest` tag above is recorded as floating.
+
+    First run on a machine or a cold CI agent needs the browser fetched once:
+
+        pwsh tests/Yello.Tests.Client/bin/Debug/net10.0/playwright.ps1 install chromium
+
+    See tests/TESTING-CONVENTIONS.md for what the suite asserts and why it needs no container.
+  -->
+  <ItemGroup Label="Browser test level - decided by the TF run (blocker B5), referenced by Yello.Tests.Client">
+    <PackageVersion Include="Microsoft.Playwright" Version="1.62.0" />
+  </ItemGroup>
+
 </Project>

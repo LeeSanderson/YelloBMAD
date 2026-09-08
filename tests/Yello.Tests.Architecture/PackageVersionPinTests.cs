@@ -133,6 +133,17 @@ public sealed class PackageVersionPinTests
         // restated here would let a runtime bump leave this one behind with every assertion
         // green.
         ["Microsoft.Extensions.Localization"] = PinnedRuntimeVersion,
+
+        // The browser test level, decided by the framework run of 2026-09-07 and referenced by
+        // Yello.Tests.Client. Non-AR-1 because nothing ships it and the AR-1 table names no
+        // browser binding at all - that absence WAS blocker B5.
+        //
+        // NOT derived from any other pin, and stated as a literal deliberately: this number
+        // also fixes the Chromium build the suite runs against, because Playwright downloads a
+        // browser chosen by the package version. It is the one pin here that reaches outside
+        // NuGet, which is why the bundled browser was chosen over `Channel = "msedge"` - the
+        // latter would run whatever Edge the machine has and pin nothing.
+        ["Microsoft.Playwright"] = "1.62.0",
     };
 
     /// <summary>

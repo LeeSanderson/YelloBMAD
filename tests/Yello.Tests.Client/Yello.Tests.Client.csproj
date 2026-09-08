@@ -1,0 +1,84 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    THE BROWSER TEST LEVEL - the sixth test project, and the resolution of blocker B5.
+
+    Why it exists at all: two AD-29 invariants live only in the rendered client and are
+    unreachable from every suite the Structural Seed names. ArchUnitNET reads compiled IL,
+    the slice suite runs in-process, and neither can observe which Task holds focus after a
+    Board pages. test-design-architecture.md:315 records that as testability concern T9 and
+    asks for "the browser-test binding decision, and a sixth test project". This is both.
+
+    The immediate reason it exists NOW rather than at story 2.8: story 1.3 shipped the first
+    rendered surface, closed with 136 passing tests, and the client did not start in any
+    browser in any locale. Every one of those 136 tests reads a FILE - markup is parsed, copy
+    is scanned, tokens are checked for contrast, compiled IL is read for the document-language
+    call. Nothing loaded the page. A composition root that throws before the first render
+    passed all of them, which is not a gap at the margin of what the suite claims: it is the
+    difference between an application that works and one that cannot start.
+
+    A DECLARED ADDITION TO THE STRUCTURAL SEED, not a variance. Yello.Tests.Shared is the
+    variance - infrastructure holding no cases. This project holds cases and is a suite, so
+    AC5's "later stories add cases to existing suites rather than creating suites" is the rule
+    it has to answer to. It answers by being the conversation TESTING-CONVENTIONS.md requires:
+    "If a new suite seems necessary, that is a conversation about the architecture, not a
+    project template." Held with Lee on 2026-09-07, on the record in the TF run's progress
+    document, and the alternative considered was folding these cases into Yello.Tests.Slices.
+    They were kept apart because this suite's entry criterion is a live dev-server process and
+    a real browser, which nothing else here needs.
+
+    NO CONTAINER, AND THAT IS A PROPERTY OF THE CLIENT RATHER THAN A CHOICE. Yello.Client is a
+    standalone WebAssembly application with its own dev server; Yello.Host serves it nothing.
+    So this suite starts one process, needs no SQL Server, and belongs in the PR tier despite
+    being a browser suite. Cases that need a signed-in Session or real data arrive with the
+    stories that build them, and those will need more.
+  -->
+
+  <!--
+    Runs on Microsoft.Testing.Platform only: xunit.v3 4.0.0 depends on
+    xunit.v3.mtp-v2 [4.0.0]. There is no VSTest path here, so Microsoft.NET.Test.Sdk is
+    deliberately absent.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <!--
+    NO `ignore-exit-code 8` SWITCH. This suite ships with cases, so the switch would be a lie
+    in the one direction that matters: with it in place a trait typo or broken discovery makes
+    the suite report success having run nothing.
+
+    `Only_suites_with_no_tests_may_ignore_the_zero_test_exit_code` in the architecture suite
+    enforces that rather than leaving it to whoever remembers - it fails the build if a project
+    carrying the switch contains a [Fact] or a [Theory], and equally if a project with no cases
+    omits it.
+  -->
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="Microsoft.Playwright" />
+  </ItemGroup>
+
+  <!--
+    Yello.Contracts, and deliberately nothing else.
+
+    It is here so the boot check computes its expected `<html lang>` from
+    CultureSelection.Resolve against SupportedCultures - the same single source the client and
+    the Host both read - rather than hard-coding "en". Today every locale resolves to "en"
+    because there is one neutral resource set, so a literal would pass and would keep passing
+    for the wrong reason: the day a `de` translation lands, `de-AT` must start resolving to
+    `de`, and a test carrying a literal would then assert the old answer.
+
+    No reference to Yello.Client. This suite drives the client as a BLACK BOX over HTTP, which
+    is the whole point of a browser level - a compile-time edge to the thing under test would
+    let a case assert against a type instead of against what the browser actually received.
+    The dev server is located by build-output convention instead; see ClientDevServer.
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\Yello.Contracts\Yello.Contracts.csproj" />
+  </ItemGroup>
+
+</Project>

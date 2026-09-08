@@ -51,11 +51,34 @@ internal static class AllowedReferenceEdges
     ];
 
     /// <summary>
-    /// The five test projects named in the Structural Seed. Four are release-gating;
-    /// <c>Yello.Tests.Slices</c> is the fifth and is not a gate. The readiness report says
-    /// "the four test suites" in one place and "all five test projects" in another - both
-    /// are correct, and this is the reconciliation.
+    /// The test suites. Five are named in the Structural Seed and the sixth was added by the
+    /// framework run; four of the six are release-gating.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Of the Structural Seed's five, <c>Yello.Tests.Slices</c> is the one that is not a gate.
+    /// The readiness report says "the four test suites" in one place and "all five test
+    /// projects" in another - both are correct, and this is the reconciliation.
+    /// </para>
+    /// <para>
+    /// <b><c>Yello.Tests.Client</c> is the sixth, and it is an addition rather than a
+    /// variance.</b> <c>Yello.Tests.Shared</c> is the variance: infrastructure holding no
+    /// cases. This one holds cases, so it is a suite, and AC5's "later stories add cases to
+    /// existing suites rather than creating suites" applies to it. It was added anyway because
+    /// the spine names a test level it never binds - <c>test-design-architecture.md:174</c>
+    /// lists five levels and gives E2E as "browser, binding per B5" - and
+    /// <c>test-design-architecture.md:315</c> asks for exactly this: "the browser-test binding
+    /// decision, and a sixth test project". Two AD-29 invariants exist only in the rendered
+    /// client and are unreachable from all five of the others.
+    /// </para>
+    /// <para>
+    /// The conversation <c>TESTING-CONVENTIONS.md</c> requires before a suite exists - "that is
+    /// a conversation about the architecture, not a project template" - was held with Lee on
+    /// 2026-09-07 and recorded in <c>framework-setup-progress.md</c>. The alternative
+    /// considered was folding the cases into <c>Yello.Tests.Slices</c>; they were kept apart
+    /// because this suite's entry criterion is a live dev-server process and a real browser.
+    /// </para>
+    /// </remarks>
     public static readonly string[] TestProjects =
     [
         "Yello.Tests.Isolation",
@@ -63,15 +86,21 @@ internal static class AllowedReferenceEdges
         "Yello.Tests.Merge",
         "Yello.Tests.Architecture",
         "Yello.Tests.Slices",
+        "Yello.Tests.Client",
     ];
 
     /// <summary>
-    /// The one declared variance from the Structural Seed: a fourteenth project holding the
-    /// shared Testcontainers SQL Server fixture, which is an entry criterion for every
-    /// suite and has no owning story. It is infrastructure, not a suite, so it does not
-    /// breach AC5's "later stories add cases to existing suites rather than creating
-    /// suites".
+    /// The one declared variance from the Structural Seed: a project holding the shared
+    /// Testcontainers SQL Server fixture, which is an entry criterion for every suite and has
+    /// no owning story. It is infrastructure, not a suite, so it does not breach AC5's "later
+    /// stories add cases to existing suites rather than creating suites".
     /// </summary>
+    /// <remarks>
+    /// Still the only <i>variance</i>. <c>Yello.Tests.Client</c> also arrived after story 1.1,
+    /// but it holds cases and is therefore a suite, listed in <see cref="TestProjects"/> with
+    /// the reasoning for it. The distinction is worth keeping: a variance is something the
+    /// Structural Seed did not anticipate and that no story owns, and there is exactly one.
+    /// </remarks>
     public const string DeclaredVariance = "Yello.Tests.Shared";
 
     /// <summary>
@@ -130,6 +159,20 @@ internal static class AllowedReferenceEdges
                 DeclaredVariance,
             ],
 
+            // The browser level, added by the framework run that resolved blocker B5.
+            //
+            // Contracts and NOTHING ELSE, and the absence is the deliberate half. The suite
+            // drives Yello.Client as a black box over HTTP, which is what a browser level is
+            // for: a compile-time edge to the thing under test would let a case assert against
+            // a type instead of against what the browser actually received - and the defect
+            // that prompted this suite was invisible to 136 tests that all did exactly that.
+            //
+            // Contracts is here so the boot check computes its expected `<html lang>` from
+            // CultureSelection against SupportedCultures - the one list both surfaces read -
+            // rather than hard-coding "en". Every locale resolves to "en" today, so a literal
+            // would pass and keep passing for the wrong reason.
+            ["Yello.Tests.Client"] = ["Yello.Contracts"],
+
             // Fixtures only. Depends on Testcontainers and xunit, and on no Yello project:
             // a fixture that knew about a ring would let a suite reach a ring its own row
             // forbids.
@@ -137,7 +180,8 @@ internal static class AllowedReferenceEdges
         };
 
     /// <summary>
-    /// Every project the solution is expected to contain: the thirteen named, plus the variance.
+    /// Every project the solution is expected to contain: the eight production projects, the
+    /// six test suites, and the one declared variance.
     /// </summary>
     public static IEnumerable<string> ExpectedProjects =>
         ProductionProjects.Concat(TestProjects).Append(DeclaredVariance);

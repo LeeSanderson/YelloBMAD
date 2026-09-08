@@ -13,7 +13,7 @@ namespace Yello.Tests.Architecture;
 public sealed class SolutionInventoryTests
 {
     [Fact]
-    public void The_solution_contains_exactly_the_thirteen_named_projects_and_the_one_declared_variance()
+    public void The_solution_contains_exactly_the_fourteen_named_projects_and_the_one_declared_variance()
     {
         var actual = RepositoryLayout.AllProjectFiles
             .Select(RepositoryLayout.ProjectName)
@@ -31,7 +31,7 @@ public sealed class SolutionInventoryTests
             $"{Environment.NewLine}  unexpected: " +
             $"{(unexpected.Count == 0 ? "(none)" : string.Join(", ", unexpected))}" +
             $"{Environment.NewLine}{Environment.NewLine}" +
-            "The expected set is the eight production projects, the five test projects, and " +
+            "The expected set is the eight production projects, the six test suites, and " +
             $"exactly one declared variance ({AllowedReferenceEdges.DeclaredVariance}, which " +
             "hosts the shared SQL Server fixture). Adding a project means adding a row to " +
             "AllowedReferenceEdges.Table and justifying it against AC1.");
@@ -104,9 +104,9 @@ public sealed class SolutionInventoryTests
     }
 
     /// <summary>
-    /// The five test projects sit under <c>tests/</c>; the eight production projects sit at
-    /// the repository root. There is no <c>src/</c> - that is the Structural Seed's layout,
-    /// reproduced literally.
+    /// The six test suites and the shared fixture project sit under <c>tests/</c>; the eight
+    /// production projects sit at the repository root. There is no <c>src/</c> - that is the
+    /// Structural Seed's layout, reproduced literally.
     /// </summary>
     /// <remarks>
     /// The depth check is the half that was missing. The only condition used to be

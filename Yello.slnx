@@ -6,6 +6,7 @@
   </Configurations>
   <Folder Name="/tests/">
     <Project Path="tests/Yello.Tests.Architecture/Yello.Tests.Architecture.csproj" />
+    <Project Path="tests/Yello.Tests.Client/Yello.Tests.Client.csproj" />
     <Project Path="tests/Yello.Tests.Isolation/Yello.Tests.Isolation.csproj" />
     <Project Path="tests/Yello.Tests.Merge/Yello.Tests.Merge.csproj" />
     <Project Path="tests/Yello.Tests.Revocation/Yello.Tests.Revocation.csproj" />
