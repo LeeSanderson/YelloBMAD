@@ -4,7 +4,7 @@ baseline_commit: 73805cb699b4d3c1868ddc4d9fb41cf4b377f21d
 
 # Story 1.3: Register an Account and receive a Personal Space
 
-Status: review
+Status: in-progress
 
 Epic: 1 — An Account, a Space of your own, and a boundary that holds
 Story key: `1-3-register-an-account-and-receive-a-personal-space`
@@ -160,6 +160,43 @@ convention `epics.md:8` establishes ("Acceptance Criteria, fifth block (AC5)").
   - [x] Update the now-stale comments in `Yello.Client/App.razor`, `wwwroot/index.html`, `Yello.Client/Program.cs`, `Yello.Infrastructure/AssemblyMarker.cs` (which says in so many words that story 1.3 creates the first three tables) and `Yello.Client/AssemblyMarker.cs`.
   - [x] Do **not** add review narration to source files. `deferred-work.md:44` records that as an open finding owned by **Lee, once, for the project** — not by the next story to touch those files.
   - [x] `git diff --stat` against `73805cb` before calling the File List complete.
+
+### Review Findings
+
+Code review of 2026-09-10, over `73805cb..6774f60` (this story's three commits only; the TEA
+framework run `4435cb3` and the `run.ps1` wrapper `7a90eb0` were excluded as belonging to no
+story). Three parallel layers: adversarial, edge-case, acceptance. Every severity below was
+re-rated by reading the code at the location rather than from the layer's own rating; two findings
+were dismissed and one was corrected against a hunter's claim.
+
+- [ ] [Review][Decision] **FR-1's two-field contract is contradicted by a three-field surface, and the amendment Completion Note 10 claims was never made** — `prd.md:119`, `epics.md:596` (`status: final`) and `harness-constraints.md:63` all still state "an email address and a password", verified unamended. The code ships three fields and `Account.DisplayName` is `required`. No planning artifact is in the diff. Amending a `status: final` epic is Lee's call, not a review's. Story 4.3 otherwise reads a superseded contract, and readiness issue 5's assumption 1 stands "confirmed" only inside a story record. Severity: high.
+- [x] [Review][Decision] **An unauthenticated 220,000-iteration PBKDF2 with no rate limit, no concurrency bound and no owner** — AD-23 requires the hash on every well-formed submission including the duplicate path, so any body clearing the validator costs ~273 ms of CPU with no credential and no stored state. Verified: no `AddRateLimiter`/`UseRateLimiter`/`RequireRateLimiting` anywhere, no rate-limiting package, and none of the ledger's 20 entries mentions it. Story 8.3 rate-limits API tokens, not this. `PasswordMaxLength = 4096`'s stated DoS rationale does not apply — PBKDF2's cost is iteration-driven, as its own comment says. Either a uniform-429 limiter now, or a ledger entry with an owner, since the work-factor decision that created the exposure was taken in this story. Severity: high.
+- [x] [Review][Decision] **Email uniqueness depends on the database collation the doc says it deliberately avoids** — `EmailAddressNormalisation.cs:22-25` claims the rule is "readable, in one function, rather than being a property of the database". Verified: no `COLLATE`, `HasCollation` or `UseCollation` anywhere, so the unique index takes the database default, whose equality semantics are exactly that property. Separately `ToUpperInvariant` merges distinct code points (ſ/s, µ/μ, ς/σ — 20 groups swept), and no Unicode normalisation form is applied, so NFC and NFD `café@b.com` are two Accounts. Case-folding vs. confusable rejection vs. pinning the collation is a design decision that interacts with AD-15's `Latin1_General_100_BIN2` (story 2.6's). Severity: medium.
+- [x] [Review][Decision] **Review narration kept growing in production files, against Task 11** — `index.html:38-40`, `Program.cs:29-62` (~34 lines on the 2026-09-01 episode, added by `6774f60`), both `AssemblyMarker.cs` files, `DesignFoundationGateTests.cs:3141-3167`. `App.razor:5-16` argues for the practice while doing it. Already recorded as owned by "Lee, once, for the project" (`deferred-work.md:44-50`), so this is the standing decision resurfacing rather than a new finding. Severity: low.
+- [x] [Review][Patch] The `<html lang>` ledger entry is marked CLOSED while the inertness it describes is unchanged [`_bmad-output/implementation-artifacts/deferred-work.md:32`, `Yello.Contracts/Localisation/SupportedCultures.cs:41`]
+- [x] [Review][Patch] Personal Space naming: the real resource adapter is exercised by no test, and a missing key silently names every Space `"PersonalSpaceName"` [`Yello.Domain/Spaces/PersonalSpaceName.cs:54`, `Yello.Infrastructure/Localisation/RegistrationCopy.cs:58`]
+- [x] [Review][Patch] `FormField` draws and announces the untouched display-name field as invalid [`Yello.Client/Components/FormField.razor:32`, `Yello.Client/Pages/Register.razor:76`]
+- [x] [Review][Patch] A unique violation anywhere is reported as "address already registered", so a colliding generated id returns 204 with nothing written and nothing logged [`Yello.Infrastructure/Persistence/AccountRegistrationStore.cs:105`]
+- [x] [Review][Patch] The duration gate's protection is far narrower than documented, and nothing pins the tolerance [`tests/Yello.Tests.Shared/DurationIndistinguishability.cs:79`, `:118`]
+- [x] [Review][Patch] Zero-width, NUL and bidi characters pass validation and create distinct Accounts for the same address [`Yello.Application/Accounts/RegisterAccount/RegisterAccountValidator.cs:135`]
+- [x] [Review][Patch] AC6's completion path is reachable by nothing and asserted by nothing, and Note 13 does not say so [`Yello.Client/Pages/Register.razor:162`]
+- [x] [Review][Patch] `HostProcess` redirects stderr and never drains it, so AC5's "every log" covers stdout only [`tests/Yello.Tests.Slices/Accounts/RegisterAccount/HostProcess.cs:56`, `:76`]
+- [x] [Review][Patch] The log-uniformity assertion asserts less than the test's remark and Note 2 claim [`tests/Yello.Tests.Slices/Accounts/RegisterAccount/RegisterAccountEndpointTests.cs:116`]
+- [x] [Review][Patch] **EF Core's command log discloses which registrations were duplicates — a live AD-23 violation** [`Yello.Host/Program.cs`]. Severity: **high**. Not raised by any review layer: found on 2026-09-12 when the strengthened log assertion above ran against a real Host for the first time. EF Core logs every generated statement to `Microsoft.EntityFrameworkCore.Database.Command` at Information, and the two paths do not generate the same statements — a new address reaches `SaveChangesAsync` and logs four `INSERT INTO` lines (Account, Space, Membership, StatusDefinition); a known address is refused by the existence check and rolls back before any insert, logging none. Uniform 204 either way, with the log beside it naming every duplicate. Parameter values were never exposed (EF redacts them without `EnableSensitiveDataLogging`, and the existing address assertion confirms it) — the statement shapes alone are the disclosure. Fixed by filtering that category to Warning unconditionally, since AD-23 is not environment-scoped. **Plant-validated by construction:** the assertion failed against the unfiltered Host and passes with the filter, which is the same evidence a deliberate plant would produce.
+- [x] [Review][Patch] `@read_only = 1` on the personal Space's id blocks the story 4.3 path the class says it was built for [`Yello.Infrastructure/Persistence/AccountRegistrationStore.cs:71`, `:37-41`]
+- [x] [Review][Patch] Five source comments name gates and types that do not exist, and one has no equivalent in the reverse direction [`Yello.Infrastructure/Identity/PasswordWorkFactor.cs:55`, `Yello.Contracts/Localisation/SupportedCultures.cs:27`, `Yello.Infrastructure/Persistence/YelloDbContext.cs:74`, `Yello.Client/Pages/RegistrationFields.cs:24`, `Yello.Infrastructure/Identity/IdentityPasswordHasher.cs:22`]
+- [x] [Review][Patch] The container-engine count handed to story 1.9 is wrong and self-contradictory — 7 sequential engines, not 4 [`_bmad-output/implementation-artifacts/deferred-work.md:8`, `tests/TESTING-CONVENTIONS.md:260`]
+- [x] [Review][Patch] "A stopped Rancher Desktop reports 136 total with 22 skipped and stays green" is contradicted by this story's own baseline observation [`tests/TESTING-CONVENTIONS.md:344`, `tests/Yello.Tests.Shared/SqlServerContainerFixture.cs:305`]
+- [x] [Review][Patch] Three of seven failure codes are emitted by no test, and the two length constants are duplicated across rings with nothing tying them [`Yello.Application/Accounts/RegisterAccount/RegisterAccountValidator.cs:40`, `Yello.Infrastructure/Persistence/Configurations/AccountConfiguration.cs:16`]
+- [x] [Review][Patch] `Register.razor` strands the form disabled on any exception the two catch clauses miss [`Yello.Client/Pages/Register.razor:159`]
+- [x] [Review][Patch] NFR-6's encryption-in-transit clause: the dev configuration sends the password over cleartext http [`Yello.Client/wwwroot/appsettings.Development.json`]
+- [x] [Review][Patch] `SchemaNames`' `SpaceScopedTables` remark contradicts the migration two paragraphs above it [`Yello.Infrastructure/Persistence/SchemaNames.cs:89`]
+- [x] [Review][Patch] The Change Log records an `in-progress` transition `sprint-status.yaml` never held [story Change Log row 1]
+- [x] [Review][Patch] `TagEnd`'s "strictly stricter, never looser" claim is unsound as stated, and an unbalanced quote makes the copy gate under-read [`tests/Yello.Tests.Architecture/DesignFoundationGateTests.cs:3161`]
+- [x] [Review][Patch] `dotnet-ef 10.0.11` is pinned with nothing keeping it in step with the EF Core pin [`.config/dotnet-tools.json`, `tests/Yello.Tests.Architecture/PackageVersionPinTests.cs:487`]
+- [x] [Review][Patch] AC7's "or none at all" half of the email-softness list is hardened without being recorded [`Yello.Domain/Accounts/Account.cs:62`]
+- [x] [Review][Patch] A leaked `DbContext` in the one class whose fixture remarks make a point of connection lifetime [`tests/Yello.Tests.Slices/Accounts/RegisterAccount/RegisterAccountIntegrationTests.cs:303`]
+- [x] [Review][Defer] `SequentialGuidIdentifierGenerator` reseeds from the wall clock, so a backwards clock step regresses the counter and two instances interleave [`Yello.Infrastructure/Persistence/SequentialGuidIdentifierGenerator.cs:36`] — deferred, no reachable consequence at the current wiring
 
 ## Dev Notes
 
@@ -796,7 +833,23 @@ EF migration needs a hand-editing pass to satisfy the coding standard; both are 
    caller has anything to branch on. Status, body, content type and header names are compared
    *between the two responses* rather than each against an expectation
    (`A_duplicate_registration_answers_exactly_as_a_new_one_does`), and duration is compared with the
-   B3 method. Logs are uniform too, which is the half a response-only test would miss.
+   B3 method.
+
+   **Corrected at code review on 2026-09-10.** This note ended "Logs are uniform too, which is the
+   half a response-only test would miss", and the log test did not assert that. It asserted three
+   things — the password is absent, the address is absent, and `"Registration request processed."`
+   occurs exactly twice — every one of which stays green if the duplicate path emits an
+   *additional* distinguishing line, which is precisely the failure mode the claim named. Nothing
+   can differ today by construction (`RegistrationLog` declares two messages, neither carrying a
+   field that varies between the paths, and the store takes no logger), so this was a coverage
+   claim rather than a live leak. The test now also requires the malformed-submission line to
+   appear on neither path, and refuses the vocabulary a disclosure would be written in. The log is
+   still not split per request, so strict identity is asserted even now by nothing — stated here
+   rather than implied.
+
+   The duration half has its own correction: see the `deferred-work.md` note and
+   `DurationIndistinguishabilityTests`. The plant behind this AC proved the method can see a ~98%
+   difference and nothing about where its 20% line falls, and no test pinned the tolerance.
 
 3. **AC3 — a failure is a failed transaction.** Forced at the *last* write rather than the first
    (`A_registration_that_cannot_complete_leaves_no_Account_behind`), so the Account and Space
@@ -825,6 +878,19 @@ EF migration needs a hand-editing pass to satisfy the coding standard; both are 
    one function; there is no soft-delete tombstone that would keep a deleted address occupied
    (FR-3). AD-22's "one slice, two paths" already accommodates a third.
 
+   **The one clause this note was silent on, added at code review on 2026-09-10.**
+   `harness-constraints.md:63` says a provider may return a different address "**or none at all**",
+   and an Account holding no address cannot be represented: `EmailAddress` and
+   `NormalizedEmailAddress` are `required` non-nullable, configured `IsRequired()`, and carry an
+   unfiltered unique index. This note answered the "different address" half and the password half
+   and did not mention this one. **No code change is implied** — it is consistent with FR-1 as
+   written, and softening it now would be inventing a requirement. What was missing is the record,
+   which is what the softness table exists to hold.
+
+   Also corrected: "`EmailAddressNormalisation` states the uniqueness rule in one function" is true
+   of what is *stored* and not of what compares *equal* — the unique index takes the database's
+   default collation, which nothing pins. Recorded in `deferred-work.md` against story 2.6.
+
 8. **Email verification is deliberately absent, and that is not an oversight.** No FR, CAP, NFR,
    acceptance criterion, journey, surface or architecture decision mentions it. Two reasons it must
    stay absent: `acceptance-criteria.md:47` requires the Space to be usable "at the moment
@@ -837,9 +903,29 @@ EF migration needs a hand-editing pass to satisfy the coding standard; both are 
 
 10. **One deviation from the story text, from Lee's decision.** Task 5 says "Two fields: email and
     password"; registration collects **three**, the third being the display name. That is Lee's
-    answer to question 1 and amends FR-1, `harness-constraints.md:64` and the mockup. Every other
-    negative constraint in that bullet holds: no plan picker, no team-size question, no
-    confirm-password, no terms checkbox, no CAPTCHA, no onboarding.
+    answer to question 1. Every other negative constraint in that bullet holds: no plan picker, no
+    team-size question, no confirm-password, no terms checkbox, no CAPTCHA, no onboarding.
+
+    **Corrected at code review on 2026-09-10: the amendment is PROPOSED, not applied.** This note
+    said the decision "amends FR-1, `harness-constraints.md:64` and the mockup", in the present
+    tense, as a thing that had happened. It had not. Verified at review: `prd.md:119` still reads
+    "A person can create an Account with an email address and a password"; `epics.md:596`
+    (`status: final`) still reads "with my email address and a password"; and
+    `harness-constraints.md:63` still lists "CAP-1 — an Account is created with an email address
+    **and a password**" as an assumption that must stay soft. No planning artifact was touched by
+    this story.
+
+    That matters beyond tidiness for two reasons. **Story 4.3** — registration-while-accepting-an-
+    Invitation — delegates to this slice and would read a two-field contract that the code cannot
+    satisfy, because `Account.DisplayName` is `required`. And the readiness report's **issue 5**
+    asks for PRD §12's thirteen assumptions to be *confirmed*; assumption 1 now stands "confirmed"
+    inside a story record while the three artifacts it contradicts are unchanged, which is the
+    weakest possible place for a confirmation to live.
+
+    **Routed to `bmad-correct-course` by Lee on 2026-09-10**, rather than amended from inside a
+    code review: changing a `status: final` epic, the PRD and the spec's harness-constraints ledger
+    is a spec change with downstream reach, and correct-course is the workflow that decides how far
+    it cascades.
 
 11. **One deviation from the story's structure note, for a stated reason.** It places "the schema
     test" in `Yello.Tests.Architecture`. It cannot go there: asserting a *migrated* schema needs a
@@ -862,6 +948,18 @@ EF migration needs a hand-editing pass to satisfy the coding standard; both are 
     needs a browser and is blocker B5's. Writing a gate that appeared to cover them would be the
     vacuous-gate defect this suite exists to avoid. Story 1.3 is the first story with a rendered
     surface, so the three `deferred-work.md` entries waiting on that condition are now live.
+
+    **AC6 belongs on this list, and was missing from it — added at code review on 2026-09-10.**
+    Nothing in this story executes `Register.razor`. The architecture suite's razor-facing gates
+    are copy, colour, px and stylesheet-link only; no gate reads `role="status"`, the `disabled`
+    binding, or the focus move. There is no bUnit and no component-rendering package, and at this
+    story's head there was no browser suite either — that arrived two commits later in `4435cb3`.
+    So AC6's three obligations are held **by construction and asserted by nothing**, which is
+    exactly what this note exists to say out loud and did not. The consequence is already recorded
+    in this story's own Change Log: "The client did not start, and this story's 136 green tests did
+    not notice." The client suite that now exists makes binding them possible, and two defects the
+    review found on that surface — an untouched field announced as invalid, and a form that stayed
+    disabled after a timeout — are exactly what a component-level assertion would have caught.
 
 14. **The end-to-end browser flow does not work yet, by design.** The client and Host are separate
     origins, so a browser POST is refused until CORS exists — and CORS is story 1.4's, by the
@@ -981,7 +1079,7 @@ writing, and that number is not stable.
 
 | Date | Change |
 |---|---|
-| 2026-08-28 | Story picked up; status `ready-for-dev` → `in-progress`. Four questions put to Lee and answered: display name collected, `POST /api/v1/accounts` → 204, measure-then-choose the work factor, Space-scoped RLS now. |
+| 2026-08-28 | Story picked up; status `backlog` → `ready-for-dev`. Four questions put to Lee and answered: display name collected, `POST /api/v1/accounts` → 204, measure-then-choose the work factor, Space-scoped RLS now. *(This row claimed `ready-for-dev` → `in-progress` until code review on 2026-09-10. Checked per commit: `f1bead7` wrote `backlog` → `ready-for-dev` and `15a7de1` wrote `ready-for-dev` → `review`; `in-progress` was never written to `sprint-status.yaml` at any point.)* |
 | 2026-08-28 | Domain entities, ports and the naming choke point; EF Core schema, four configurations and the initial migration carrying the row-level security policy; the `RegisterAccount` slice. |
 | 2026-08-28 | Work factor measured on an i7-12700H (100,000 → 145.9 ms p95; 220,000 → 297.7 ms p95). Reported to Lee, who chose **220,000**. Registration recorded as bounded by NFR-5 and meeting it. |
 | 2026-08-29 | The endpoint, its uniform 204 and its RFC 9457 rejection; the registration surface, the first three components, `components.css`, the resource system and the culture provider. |
@@ -991,4 +1089,13 @@ writing, and that number is not stable.
 | 2026-08-29 | Five new `deferred-work.md` entries: idempotency unowned, CORS needed for the cross-origin call, `Account`/`Space` RLS predicates undecided, the EF migration hand-editing pass, and the `Todo`-in-comments trap. |
 | 2026-09-01 | **The client did not start, and this story's 136 green tests did not notice.** `Program.cs` assigned the resolved culture after the WebAssembly runtime had booted; Blazor loads one ICU shard chosen for the boot culture and refuses a post-boot change unless `BlazorWebAssemblyLoadAllGlobalizationData` is set. Every browser tripped it — `en-GB` boots, `SupportedCultures` serves `en`. Fixed by using the resolved culture for `<html lang>` only and leaving the runtime's culture as the browser set it; resource lookup already reaches the same set through `ResourceManager`'s own `en-GB → en → neutral` fallback, and a UK browser now formats as `en-GB` rather than being forced onto neutral `en`. The remedy the error message names was declined: the full ICU dataset is a page-load cost on every visitor for a capability one neutral resource set does not use. Verified in a headless browser under `en-GB`, `tr-TR`, `ja-JP` and `de-AT` — the surface renders and `#blazor-error-ui` stays hidden in all four. Architecture suite still 82 passing, including the document-language IL gate. |
 | 2026-09-05 | Two new `deferred-work.md` entries recording what that episode left behind: no gate runs the client in a browser at all, so "the application starts" is asserted by nothing; and nothing stops the culture-change trap being re-armed by the story that adds a second translation. |
-| 2026-08-29 | `dotnet build Yello.slnx` clean at **0 warnings**; `dotnet test Yello.slnx` **136 passed / 0 failed** (82 architecture, 54 slices). Status `in-progress` → `review`. |
+| 2026-08-29 | `dotnet build Yello.slnx` clean at **0 warnings**; `dotnet test Yello.slnx` **136 passed / 0 failed** (82 architecture, 54 slices). Status `ready-for-dev` → `review`. |
+| 2026-09-10 | **Code review over `73805cb..6774f60`** — this story's three commits only, excluding `4435cb3` (the TEA framework run) and `7a90eb0` (the `run.ps1` wrapper), which belong to no story. Three parallel layers: adversarial, edge-case, acceptance. 40 raw findings → 27 after dedup and verification, 2 dismissed. Every severity re-rated by reading the code at the location rather than from the layer's rating. |
+| 2026-09-10 | Four decisions taken by Lee: FR-1's unmade amendment routed to `bmad-correct-course`; rate limiting recorded against story 1.6; NFR-6's collation clause recorded against story 2.6 with NFC normalisation applied now; review narration stripped from production files, history to live in commit messages and this log. |
+| 2026-09-10 | **Behavioural fixes.** `FormField` gained an `Invalid` parameter — `aria-invalid` and the emphasis border were derived from "has a message", and the display-name field always carries a hint, so an untouched field was announced as invalid on first paint, on the surface NFR-9 names first. `Register.razor` sets its phase in a `finally` and catches `OperationCanceledException`: `HttpClient`'s 100-second timeout escaped both catch clauses and left the form disabled until a page reload. `AccountRegistrationStore` verifies the address is genuinely taken before reporting `AddressAlreadyRegistered` — error 2601/2627 covers every unique index **including primary keys**, so a colliding generated id answered 204 with nothing written and nothing logged. `RegisterAccountValidator` refuses the control and format Unicode categories: zero-width, BOM, word-joiner, RTL-override, NUL and DEL all passed, creating separate Accounts for one visible address. `EmailAddressNormalisation` composes to NFC before casing. |
+| 2026-09-10 | **Coverage fixes.** `ResourcePersonalSpaceNamingTests` constructs the real naming adapter over the real resource set — every previous test used a fake that composed the suffix itself, so the resource path was executed by nothing and a renamed key would have named every Space `"PersonalSpaceName"` with the suite green. **Validated by planting**: the key was renamed, all 6 cases failed by name, and the plant was reverted and rebuilt. `PersonalSpaceName.From` now refuses a template that does not place the display name. `DurationIndistinguishabilityTests` pins the tolerance and sample size and asserts the boundary — nothing referenced either constant outside its own file, so the plant's claim that widening the tolerance would fail was true of nothing. Validator boundary theories for the three `TooLong` codes, which no test had ever emitted. `LocalisationGateTests.The_supported_culture_list_has_exactly_one_entry`. An EF tool-pin gate. `HostProcess` now drains stderr — AC5's "every log" read only stdout, which is not where an unhandled stack trace goes. |
+| 2026-09-10 | **Record corrections.** The `<html lang>` ledger entry **reopened**: the mechanism shipped, the inertness did not change, and the entry's own original finding had predicted exactly that. Container-engine count corrected from four to **seven** — the figure story 1.9 sizes its topology decision from. `TESTING-CONVENTIONS.md`'s "a stopped runtime reports 136 total with 22 skipped and stays green" corrected against a measured run: **74 total, 52 succeeded, 22 failed, 0 skipped**; the availability probe performs no I/O, so a dead-but-configured backend reports available. Five source comments naming gates and types that do not exist (`PasswordWorkFactorTests`, `SupportedCulturesTests`, `EntityConfigurationCompletenessTests`, `RegistrationFailureCodeTests`, `PasswordHashingOptions`) repointed at the real ones. `SchemaNames`' `SpaceScopedTables` remark corrected — it contradicted the migration, and the wrong sentence was the one a reader would act on. `TagEnd`'s "strictly stricter, never looser" claim was unsound; an unterminated quote now falls back to over-reading rather than silently swallowing text nodes. |
+| 2026-09-10 | Verified after the patches, without a container runtime: `dotnet build Yello.slnx` clean at **0 warnings**; architecture **84/84**, client **8/8** (a real browser), slices **52/52 of the non-container tests**. The 22 container-backed tests could not run. |
+| 2026-09-12 | **The strengthened log assertion caught a live AD-23 violation on its first run against a real Host.** EF Core's command log (`Microsoft.EntityFrameworkCore.Database.Command`, Information) carries four `INSERT INTO` statements for a new address and none for a duplicate, because the duplicate path rolls back before any insert. The uniform 204 was undone by the log beside it, and the previous assertion — a count of the endpoint's own message — could not see it. Filtered to Warning in `Yello.Host/Program.cs`, unconditionally: AD-23 is not environment-scoped and PRD §6.4's data-protection gate fires on these same rows. This finding was raised by **no review layer**; it exists only because a correction to a weak assertion was actually executed. |
+| 2026-09-12 | Also stripped a review-narration block in `Yello.Host/Program.cs` missed by the 2026-09-10 pass, and scoped the disclosure-vocabulary assertion to the post-startup window — the Host's own startup output legitimately says "does the database exist inside it?", which was a false positive on the first run. |
+| 2026-09-12 | **Full solution run with the container runtime up: `dotnet test Yello.slnx` — 166 total, 166 succeeded, 0 failed, 0 skipped.** Build clean at 0 warnings. Seven SQL Server containers started sequentially, as the corrected figure in `TESTING-CONVENTIONS.md` predicts. |

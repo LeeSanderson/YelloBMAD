@@ -59,6 +59,28 @@ namespace Yello.Tests.Shared;
 /// same comparison with the hash deliberately skipped and confirm it fails by name; story 1.3's
 /// result is in its Dev Agent Record.
 /// </para>
+/// <para>
+/// <b>THE MEDIAN'S BLIND SPOT, added at code review on 2026-09-10.</b> The statistic is chosen
+/// above to resist outliers, and it does. The cost of that choice is worth stating plainly,
+/// because it is not small: a <i>bimodal</i> arm is invisible to it up to the halfway point. An
+/// operation that skipped the hash on 49% of calls and performed it on the other 51% has a median
+/// identical to one that never skips - with 21 samples, ten fast and eleven slow, the eleventh
+/// sorted value is a slow one - so this method reports a relative difference of zero and calls the
+/// two paths indistinguishable. It only begins to fail once the skipping arm passes 50%. Nothing
+/// in the product is bimodal today, so this describes the method's reach rather than a live leak;
+/// it matters the day a cache, a fast path or a short-circuit is added to either arm. A method
+/// that closed it would have to compare a low quantile as well as the median, and that is a
+/// different design with a different flake profile - recorded rather than taken.
+/// </para>
+/// <para>
+/// The two constants below are pinned by
+/// <c>DurationIndistinguishabilityTests.The_methods_constants_are_the_ones_its_guarantee_rests_on</c>,
+/// and the tolerance boundary itself by
+/// <c>DurationIndistinguishabilityTests.The_verdict_draws_the_line_at_the_tolerance</c>. Before
+/// that pair existed, the sentence "if a later story widens the tolerance to quiet a flake, this
+/// fails" was true of nothing. Both live in a class with no database fixture, so they run when the
+/// container runtime is down - which is the machine where a tolerance is most likely to be edited.
+/// </para>
 /// </remarks>
 public static class DurationIndistinguishability
 {

@@ -3,18 +3,6 @@
 @*
     The application shell.
 
-    Superseded 2026-08-29 by story 1.3. This previously said the shell "deliberately does not use
-    <Router>: there are no routable pages yet, and a Router with an empty route table cannot
-    resolve its NotFound case" - which described story 1.1's tree and stopped being true when
-    Pages/Register.razor landed. It also carried a paragraph recording what its story-1.1 comment
-    had said before story 1.2 corrected it.
-
-    That accumulation is itself a recorded finding - deferred-work.md:44 notes that review
-    archaeology is piling up in these files and assigns the convention decision to Lee, once, for
-    the project. This story does not act on it (it is not the next story's to take), but it does
-    not add a third layer either: the superseded story-1.1 paragraph is gone, and what is left is
-    one line saying what changed and why.
-
     FocusOnNavigate moves focus to the routed page's <h1> after every navigation. Without it a
     single-page application changes the whole document under a screen-reader user while their
     focus stays wherever the last link was - which is the most common accessibility defect in

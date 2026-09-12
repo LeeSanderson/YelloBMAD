@@ -26,40 +26,21 @@ builder.RootComponents.Add<HeadOutlet>("head::after");
 // browser asking for de-AT gets. GetCultureInfo rather than a constructor: `new CultureInfo(string)`
 // is a banned API at build.
 //
-// Corrected 2026-09-01: this previously ASSIGNED the resolved culture to
-// CultureInfo.DefaultThreadCurrentCulture and DefaultThreadCurrentUICulture, and the application
-// did not start at all. Blazor WebAssembly loads one SHARD of the ICU data, chosen for the
-// culture the runtime booted in, and WebAssemblyHost.RunAsync refuses to run when the culture has
-// changed since boot unless the app carries the whole dataset:
+// THE RESOLVED CULTURE IS USED FOR <html lang> AND FOR NOTHING ELSE. Do not assign it to
+// CultureInfo.DefaultThreadCurrentCulture or DefaultThreadCurrentUICulture. Blazor WebAssembly
+// loads one SHARD of the ICU data, chosen for the culture the runtime booted in, and RunAsync
+// refuses to start when the culture has changed since boot - so that assignment stops the
+// application booting at all, in every browser. The supported way to change culture is
+// `blazor.start({ applicationCulture })` before the runtime boots.
 //
-//     Blazor detected a change in the application's culture that is not supported with the
-//     current project configuration. To change culture dynamically during startup, set
-//     <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
+// Nothing is lost by leaving the runtime's culture alone: ResourceManager walks en-GB -> en ->
+// neutral by itself, which is CultureSelection's rule reached by a different road, and a UK
+// browser gets en-GB formatting instead of being forced onto US-shaped neutral `en`.
 //
-// Every browser trips it, because tripping it is what this code was FOR: a browser sends `en-GB`,
-// SupportedCultures serves `en`, the two names differ, and the assignment is a change. The
-// failure is total - the exception reaches the framework before the first render, so the page
-// holds "Loading Yello..." under index.html's error banner, which says only "An unhandled error
-// has occurred."
-//
-// The remedy the message names is the wrong one here. All-globalization-data trades the sharded
-// ICU file for the full dataset, an order-of-magnitude page-load cost paid by every visitor, to
-// enable a capability Yello does not use: there is one resource set and it is neutral English.
-//
-// So the resolved culture is used for the one thing it is actually for - the document's language
-// - and the runtime's culture is left as the browser set it. Nothing is lost by that:
-//
-//   * Resources already resolve this way. ResourceManager walks en-GB -> en -> neutral on its
-//     own, which is CultureSelection's rule (exact, then language, then default) reached by a
-//     different road, so IStringLocalizer finds the set the assignment would have chosen.
-//   * Formatting gets better rather than worse. A UK browser now formats dates and numbers as
-//     en-GB instead of being forced onto neutral `en`, which is US-shaped.
-//   * `lang` still states the language the content is WRITTEN in rather than the one asked for,
-//     which is what DocumentLanguage's remarks require and what makes `:lang()` true.
-//
-// Changing culture at startup is a real capability, and the supported way to have it is
-// `blazor.start({ applicationCulture })` before the runtime boots - never a post-boot assignment.
-// That is the decision of whichever story ships a second translation; today there is none.
+// The full account - what was tried, the exact framework error, and why
+// BlazorWebAssemblyLoadAllGlobalizationData is the wrong remedy here - is in deferred-work.md
+// under "Nothing stops the culture-change trap being re-armed by the story that adds a second
+// translation", which is the story that has to make this decision again.
 var culture = CultureInfo.GetCultureInfo(
     CultureSelection.Resolve(CultureInfo.CurrentCulture, SupportedCultures.All, SupportedCultures.Default));
 

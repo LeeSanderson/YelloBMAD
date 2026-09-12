@@ -21,10 +21,12 @@ namespace Yello.Client.Pages;
 /// </para>
 /// <para>
 /// <b>The convention is asserted rather than trusted.</b>
-/// <c>RegistrationFailureCodeTests</c> lives in the architecture suite - the one project that
-/// references both <c>Yello.Application</c> and <c>Yello.Client</c> - and checks that every code
-/// the validator can emit begins with one of the prefixes below. So a renamed code fails the
-/// build here rather than silently detaching a message from its field.
+/// <c>LocalisationGateTests.Every_registration_failure_code_has_a_message_and_a_field</c> lives in
+/// the architecture suite - the one project that references both <c>Yello.Application</c> and
+/// <c>Yello.Client</c> - and checks that every code the validator can emit begins with one of the
+/// prefixes below. So a renamed code fails the build here rather than silently detaching a
+/// message from its field. (Named <c>RegistrationFailureCodeTests</c> until code review on
+/// 2026-09-10, which is not a class in this solution.)
 /// </para>
 /// <para>
 /// <b>Failing to match is degraded, not broken.</b> A code that matches no prefix still appears

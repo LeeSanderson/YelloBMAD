@@ -22,9 +22,19 @@ namespace Yello.Contracts.Localisation;
 /// <para>
 /// <b>Adding a translation means adding it here.</b> That is the deliberate coupling: a
 /// <c>.de.resx</c> that nobody adds to this list reaches no one, and a locale added here with no
-/// resources behind it falls back to English while claiming to be supported. The list and the
-/// resource files are asserted against each other by
-/// <c>SupportedCulturesTests</c> rather than left to whoever remembers.
+/// resources behind it falls back to English while claiming to be supported.
+/// </para>
+/// <para>
+/// <b>What actually asserts that, corrected at code review on 2026-09-10.</b> This paragraph used
+/// to name <c>SupportedCulturesTests</c>, which does not exist and never has. Two gates in
+/// <c>LocalisationGateTests</c> cover it, and they cover different amounts:
+/// <c>Every_supported_culture_has_resources_behind_it</c> holds the "listed here, resources
+/// missing" direction - though on a one-entry list its own <c>where</c> filter excludes the only
+/// entry, so what it asserts today is that the neutral set exists; and
+/// <c>The_supported_culture_list_has_exactly_one_entry</c> fails the day a second is added, with
+/// the reason in its message. The reverse direction - a satellite <c>.resx</c> present in the
+/// assembly with no entry here - is asserted by nothing, and that is recorded in
+/// <c>deferred-work.md</c> rather than claimed here.
 /// </para>
 /// </remarks>
 public static class SupportedCultures

@@ -3143,26 +3143,30 @@ public sealed partial class DesignFoundationGateTests
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>This gate produced a FALSE POSITIVE until story 1.3, which is the worse direction for
-    /// it to fail in.</b> <c>IndexOf('&gt;', open)</c> ended the tag at the first <c>&gt;</c>
-    /// anywhere, so a lambda in an attribute -
-    /// <c>ValueChanged="@(value =&gt; _name = value)"</c> - closed the tag at the arrow and
-    /// everything after it was read as a text node. The build failed saying
-    /// <c>Register.razor</c> "renders the literal text 'displayName value'", which is two
-    /// identifiers inside a C# expression: correct code, blocked, with a message pointing at
-    /// something that is not copy and could not be moved into a resource if it were.
+    /// <b>Why quote-awareness, rather than <c>IndexOf('&gt;', open)</c>.</b> A lambda in an
+    /// attribute - <c>ValueChanged="@(value =&gt; _name = value)"</c> - contains a <c>&gt;</c>, so
+    /// a naive scan ends the tag at the arrow and reads the rest of the attribute as rendered
+    /// copy. The copy gate then fails the build over two identifiers inside a C# expression:
+    /// correct code, blocked, pointed at something that is not copy and could not be moved into a
+    /// resource if it were. The same break reaches any generic type argument written into markup,
+    /// so epic 2's first templated component - <c>&lt;Grid TItem="Task"&gt;</c> with its
+    /// <c>RenderFragment&lt;Task&gt;</c> parameters - would hit it too.
     /// </para>
     /// <para>
-    /// The same break reaches any generic type argument written into markup, so epic 2's first
-    /// templated component - <c>&lt;Grid TItem="Task"&gt;</c> and its
-    /// <c>RenderFragment&lt;Task&gt;</c> parameters - would have hit it too.
+    /// <b>What quote-awareness costs, stated because it is not free.</b> Skipping quoted spans
+    /// moves a tag's end LATER, which necessarily <i>removes</i> the span in between from the text
+    /// the copy gate reads - that is the entire purpose. So it is not "strictly stricter, never
+    /// looser": it reads less than a naive scan by design, and the safety of that rests on the
+    /// skipped span really being attribute internals. Where that assumption breaks is an
+    /// <b>unbalanced</b> quote - an unquoted attribute value holding an apostrophe, or a malformed
+    /// tag - which would otherwise open a span running to the next matching quote anywhere in the
+    /// file, silently swallowing real text nodes and any literal in them. The gate would go quiet
+    /// rather than loud, which is the one failure direction this suite exists to prevent.
     /// </para>
     /// <para>
-    /// <b>Quote-awareness is strictly stricter, never looser.</b> It can only move a tag's end
-    /// LATER, so every text node the old scan read is still read; what changes is that attribute
-    /// internals stop being mistaken for text. Validated in both directions - the lambda above
-    /// passes, and a planted literal in real markup is still caught by name. The class remark
-    /// above still holds: a genuinely malformed tag over-reads rather than under-reads.
+    /// So an unterminated quote is not trusted: the scan falls back to the first <c>&gt;</c> after
+    /// the tag opens, which over-reads rather than under-reads and puts the class remark's
+    /// promise back on its feet.
     /// </para>
     /// </remarks>
     private static int TagEnd(string source, int open)
@@ -3195,7 +3199,14 @@ public sealed partial class DesignFoundationGateTests
             }
         }
 
-        return -1;
+        // Ran off the end. If a quote was still open, the span it swallowed may have held real
+        // text nodes, so the quote-aware answer is the untrustworthy one: fall back to the naive
+        // scan, which over-reads. Deliberately NOT bounded at a newline instead - Razor attribute
+        // values legitimately span lines, and the multi-line lambda is exactly the case
+        // quote-awareness was added for.
+        return quote != '\0'
+            ? source.IndexOf('>', open + 1)
+            : -1;
     }
 
     /// <summary>

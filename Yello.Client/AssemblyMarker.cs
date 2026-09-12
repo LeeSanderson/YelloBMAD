@@ -9,16 +9,11 @@ namespace Yello.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Superseded 2026-08-29 by story 1.3. The previous text ended "Still no components - task cards,
-/// columns, the context bar, dialogs, pickers and buttons are epic 2 onward", which stopped being
-/// true when the registration surface landed.
-/// </para>
-/// <para>
-/// What exists now: the token layer and base layer from story 1.2, plus this story's
-/// <c>wwwroot/css/components.css</c>, a <c>Router</c>, a layout, the registration page, and the
-/// first three components - a form field, a primary button and an inline error region. Also the
-/// first localisation resources and the culture provider that sets the document's language, which
-/// is what makes <c>base.css</c>'s 26-locale casing exclusions reachable at all.
+/// What this project contains: the token layer and base layer, <c>wwwroot/css/components.css</c>,
+/// a <c>Router</c>, a layout, the registration page, and three components - a form field, a
+/// primary button and an inline error region. Also the localisation resources and the culture
+/// provider that sets the document's language, which is what makes <c>base.css</c>'s 26-locale
+/// casing exclusions reachable at all.
 /// </para>
 /// <para>
 /// Still absent, and owned elsewhere: task cards, columns, dialogs and pickers are epic 2 onward;

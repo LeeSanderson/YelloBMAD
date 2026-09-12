@@ -34,10 +34,24 @@ namespace Yello.Infrastructure.Persistence;
 /// leaves an Account holding zero Spaces or two.
 /// </para>
 /// <para>
-/// <b>Built to be called by story 4.3.</b> Registration-while-accepting-an-Invitation delegates
-/// to this same path and then adds the invited Space's Membership as a separate, additional row
-/// (<c>epics.md:1703-1706</c>). So this must provision exactly once and must not grow a second
-/// provisioning route for that case.
+/// <b>Reusable by story 4.3 for the provisioning half, and NOT for the Membership half.</b>
+/// Registration-while-accepting-an-Invitation delegates to this same path and then adds the
+/// invited Space's Membership as a separate, additional row (<c>epics.md:1703-1706</c>). So this
+/// must provision exactly once and must not grow a second provisioning route for that case - that
+/// part holds.
+/// <para>
+/// <b>What does not hold, found at code review on 2026-09-10.</b> This paragraph used to say
+/// "built to be called by story 4.3" without qualification, and the invited Membership cannot be
+/// written on this unit of work. <c>@read_only = 1</c> makes the session context key immutable for
+/// the life of the <i>session</i>, not the transaction, and the <c>BLOCK PREDICATE ... AFTER
+/// INSERT</c> on <c>Membership</c> refuses any row whose <c>SpaceId</c> the context does not name.
+/// The context here names the <i>personal</i> Space. So 4.3 cannot insert the invited Space's
+/// Membership on this connection at all: it needs its own unit of work, which makes
+/// registration-while-accepting non-atomic across the two Spaces, or it reaches for the exemption
+/// AD-24 exists to forbid. That is a real design question for 4.3 and it is recorded in
+/// <c>deferred-work.md</c> rather than answered here - the ledger previously carried only the
+/// <i>read</i> consequence of this context (story 1.7's Space switcher), not the write one.
+/// </para>
 /// </para>
 /// </remarks>
 /// <param name="dbContext">The unit of work this registration is written through.</param>
@@ -107,6 +121,31 @@ internal sealed class AccountRegistrationStore(YelloDbContext dbContext) : IAcco
             // The race the check above cannot close. Reported as the same outcome, so the
             // response stays uniform even when two people register the same address at once.
             await transaction.RollbackAsync(cancellationToken).ConfigureAwait(false);
+
+            // BUT a unique violation is not necessarily THIS unique violation, and until code
+            // review on 2026-09-10 this branch assumed it was. Error 2601/2627 cover every unique
+            // index and constraint in the schema, primary keys included - so a colliding
+            // application-generated id would land here too and be answered as "that address is
+            // taken": a 204 identical to success, with no Account written, nothing logged, and
+            // the person told their registration completed. Silent data loss wearing AD-23's
+            // uniform response as a disguise.
+            //
+            // Asking the database whether the address is actually taken is the check that does
+            // not depend on index names or on a localised error message - the reason this class
+            // already refuses to match on message text. It costs one indexed lookup on a path
+            // that only a genuine race reaches, so it changes nothing about the duration AD-23
+            // cares about: the ordinary duplicate path returns above, having never come here.
+            var addressIsTaken = await dbContext.Accounts
+                .AnyAsync(
+                    account => account.NormalizedEmailAddress == registration.Account.NormalizedEmailAddress,
+                    cancellationToken)
+                .ConfigureAwait(false);
+
+            if (!addressIsTaken)
+            {
+                throw;
+            }
+
             return RegistrationOutcome.AddressAlreadyRegistered;
         }
     }

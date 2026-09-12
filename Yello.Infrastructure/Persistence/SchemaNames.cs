@@ -88,9 +88,21 @@ public static class SchemaNames
 
     /// <summary>
     /// The tables this story gives a row-level security policy, in the order the policy names
-    /// them. Both the migration and the schema test derive from this rather than listing tables
-    /// twice.
+    /// them.
     /// </summary>
+    /// <remarks>
+    /// <b>The schema test derives from this; the migration deliberately does not.</b> Corrected at
+    /// code review on 2026-09-10, where this said "both the migration and the schema test derive
+    /// from this rather than listing tables twice" - which contradicts this file's own opening
+    /// remark two paragraphs above, and contradicts the migration, which states "literal names
+    /// rather than <c>SchemaNames</c>, deliberately" and writes <c>dbo.Membership</c> and
+    /// <c>dbo.StatusDefinition</c> as literals. A migration that moved when a constant moved would
+    /// rewrite history rather than record it, which is why it holds literals. Drift between the
+    /// two is therefore <i>detected</i> by
+    /// <c>SpaceIsolationSchemaTests.Every_table_with_a_SpaceId_column_is_covered_by_the_policy</c>
+    /// rather than <i>prevented</i> by a shared source - and the wrong sentence was the one a
+    /// reader would have acted on.
+    /// </remarks>
     public static IReadOnlyList<string> SpaceScopedTables { get; } =
         [MembershipTable, StatusDefinitionTable];
 }

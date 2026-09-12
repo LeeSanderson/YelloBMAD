@@ -72,8 +72,19 @@ public sealed class RegistrationDurationTests(MigratedDatabaseFixture fixture)
     /// So this plants the exact defect AD-23 exists to prevent - a registration that skips the
     /// hash - and requires the method to call the two paths apart. Keeping it as a permanent test
     /// rather than a note in a story record is the difference between a validation that was true
-    /// once and one that stays true: if a later story widens the tolerance to quiet a flake, this
-    /// fails.
+    /// once and one that stays true.
+    /// </para>
+    /// <para>
+    /// <b>What this plant does NOT protect, corrected at code review on 2026-09-10.</b> This
+    /// paragraph used to end "if a later story widens the tolerance to quiet a flake, this fails",
+    /// and that was arithmetic nobody had done. The planted arm skips the hash entirely, so the
+    /// two medians differ by about 98% - five times the 20% tolerance. The tolerance could have
+    /// been widened to 0.90 and this test would still have failed-as-expected while the real
+    /// assertion above quietly accepted a work factor cut to a seventh of its value. A plant whose
+    /// effect sits five times past the threshold proves the method can see something enormous, and
+    /// nothing about where the line is. <c>DurationIndistinguishabilityTests</c> is what pins the
+    /// constants and the boundary now, and it lives outside this class so it runs on a machine
+    /// with no container runtime.
     /// </para>
     /// </remarks>
     [Fact]

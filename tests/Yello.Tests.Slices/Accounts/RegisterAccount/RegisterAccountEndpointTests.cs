@@ -114,10 +114,28 @@ public sealed class RegisterAccountEndpointTests(MigratedDatabaseFixture fixture
     /// two registration paths apart.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// <b>The second half is the one worth having.</b> A uniform response undone by a log line
     /// saying "account already exists" is the same leak by a slower route, and logs travel further
-    /// than responses do. Asserted by registering the same address twice and requiring the Host's
-    /// output for the two requests to be identical.
+    /// than responses do.
+    /// </para>
+    /// <para>
+    /// <b>What this asserts, stated exactly - corrected at code review on 2026-09-10.</b> This
+    /// remark used to say the two requests' output was required to be "identical", and it was not:
+    /// the assertions were that the password is absent, the address is absent, and the processed
+    /// line occurs twice. An <i>additional</i> distinguishing line on the duplicate path - which is
+    /// the precise failure mode the paragraph above names - would have left all three green. The
+    /// log is not split per request, so true identity is not asserted even now; what is asserted
+    /// is that the only line either path emits is the uniform one, that the malformed-submission
+    /// line appears on neither, and that none of the vocabulary such a leak would be written in
+    /// reaches the log at all.
+    /// </para>
+    /// <para>
+    /// Nothing can differ today by construction: <c>RegistrationLog</c> declares two messages,
+    /// neither carrying a field that varies between the paths, and the store takes no logger at
+    /// all. This is therefore a coverage assertion rather than a live defect - which is the reason
+    /// to write it down rather than rely on that construction holding.
+    /// </para>
     /// </remarks>
     [Fact]
     public async Task No_log_line_carries_the_password_or_distinguishes_the_two_paths()
@@ -143,6 +161,53 @@ public sealed class RegisterAccountEndpointTests(MigratedDatabaseFixture fixture
         var processed = CountOccurrences(log, "Registration request processed.");
 
         Assert.Equal(2, processed);
+
+        // And the other message RegistrationLog can emit appears on neither path. Both
+        // submissions here are well-formed, so a rejection line would mean one path took a route
+        // the other did not - which is the leak, whatever the line happens to say.
+        Assert.Equal(0, CountOccurrences(log, "Registration request rejected"));
+
+        // The vocabulary a disclosure would be written in, refused outright. This is the half the
+        // count above cannot cover: a NEW message added to the duplicate path by a later story
+        // leaves the processed count at two and says the quiet part anyway. None of these words
+        // has any business in a registration log whose whole contract is that it says nothing.
+        //
+        // Scoped to what the REQUESTS produced, not the whole log. The Host's startup output
+        // legitimately contains this vocabulary - StartupLog asks "does the database exist inside
+        // it?", and the framework's own boot lines say plenty - and scanning it was a false
+        // positive on the first run. The listening marker is the boundary: everything after it is
+        // what a request caused.
+        var listeningAt = log.LastIndexOf(HostProcess.ListeningMarker, StringComparison.Ordinal);
+
+        Assert.True(
+            listeningAt >= 0,
+            "The Host never reported an address, so there is no startup boundary to scan after and " +
+            "no requests were served. The assertions below would pass vacuously.");
+
+        var afterStartup = log[listeningAt..];
+
+        var disclosures = new[]
+        {
+            "already", "exists", "existing", "duplicate", "taken", "conflict",
+            "created", "new account", "registered",
+        };
+
+        var leaked = (
+            from line in afterStartup.Split(Environment.NewLine)
+            from word in disclosures
+            where line.Contains(word, StringComparison.OrdinalIgnoreCase)
+            select $"'{word}' in: {line.Trim()}")
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(
+            leaked.Count == 0,
+            "The Host logged registration vocabulary that can tell the two paths apart, and AD-23 " +
+            "is undone by a log line as surely as by a response body. If a later story needs one of " +
+            "these words in an unrelated message, narrow the list rather than deleting it - the " +
+            "uniform 204 is worth exactly as much as the log behind it." +
+            $"{Environment.NewLine}{Environment.NewLine}" +
+            string.Join(Environment.NewLine, leaked.Select(l => $"  - {l}")));
     }
 
     /// <summary>

@@ -29,9 +29,10 @@ namespace Yello.Tests.Slices.Accounts.RegisterAccount;
 internal static class HostProcess
 {
     /// <summary>
-    /// Kestrel's line, which is how a caller learns which port was allocated.
+    /// Kestrel's line, which is how a caller learns which port was allocated - and the boundary
+    /// between the Host's startup output and everything a request caused.
     /// </summary>
-    private const string ListeningMarker = "Now listening on:";
+    internal const string ListeningMarker = "Now listening on:";
 
     private static readonly TimeSpan StartupWindow = TimeSpan.FromSeconds(60);
 
@@ -71,9 +72,21 @@ internal static class HostProcess
         var lines = new ConcurrentQueue<string>();
         var listening = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        var pump = Task.Run(async () =>
+        // BOTH streams, into one queue. Until code review on 2026-09-10 stderr was redirected and
+        // then never read: RedirectStandardError = true creates the pipe, and nothing drained it.
+        //
+        // The consequence that matters is an assertion one, not a plumbing one. AC5's requirement
+        // is that the password appears in NO log line - "every log" - and the likeliest way a
+        // submitted value escapes into output is an unhandled exception's stack trace, which
+        // ASP.NET Core writes to stderr. So the single test standing behind AC5 was reading the
+        // one stream the leak would not be on, and would have reported green through it.
+        //
+        // The plumbing consequence is real too: an undrained pipe fills at around 4 KB and then
+        // blocks the Host mid-write, which arrived here as the startup-timeout line below and read
+        // like a container fault.
+        async Task PumpAsync(StreamReader reader)
         {
-            while (await process.StandardOutput.ReadLineAsync().ConfigureAwait(false) is { } line)
+            while (await reader.ReadLineAsync().ConfigureAwait(false) is { } line)
             {
                 lines.Enqueue(line);
 
@@ -84,7 +97,11 @@ internal static class HostProcess
                     listening.TrySetResult(line[(marker + ListeningMarker.Length)..].Trim());
                 }
             }
-        });
+        }
+
+        var pump = Task.WhenAll(
+            Task.Run(() => PumpAsync(process.StandardOutput)),
+            Task.Run(() => PumpAsync(process.StandardError)));
 
         try
         {
@@ -92,17 +109,32 @@ internal static class HostProcess
             // mechanism is banned outright by this repository's conventions.
             using var deadline = new CancellationTokenSource(StartupWindow);
 
-            var address = await listening.Task.WaitAsync(deadline.Token).ConfigureAwait(false);
+            // Awaited in its own step, and caught in its own clause. The startup wait and the work
+            // used to share a try, so HttpClient's 100-second timeout inside `work` - an
+            // OperationCanceledException - was recorded as "the Host did not report an address",
+            // which is a diagnostic pointing at the wrong half of the test. A request that hangs
+            // against a Host that started perfectly well now fails as itself.
+            string? address = null;
 
-            using var client = new HttpClient { BaseAddress = new Uri(address) };
+            try
+            {
+                address = await listening.Task.WaitAsync(deadline.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
+            {
+                lines.Enqueue(string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"(the Host did not report an address within {StartupWindow.TotalSeconds:F0}s)"));
+            }
 
-            await work(client).ConfigureAwait(false);
-        }
-        catch (OperationCanceledException)
-        {
-            lines.Enqueue(string.Create(
-                CultureInfo.InvariantCulture,
-                $"(the Host did not report an address within {StartupWindow.TotalSeconds:F0}s)"));
+            // Not an early return: the finally below is what drains the pump, and a return
+            // statement here would compose the result string before those last lines arrived.
+            if (address is not null)
+            {
+                using var client = new HttpClient { BaseAddress = new Uri(address) };
+
+                await work(client).ConfigureAwait(false);
+            }
         }
         finally
         {

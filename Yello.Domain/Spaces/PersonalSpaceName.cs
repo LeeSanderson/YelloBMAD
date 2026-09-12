@@ -25,8 +25,20 @@ namespace Yello.Domain.Spaces;
 /// </para>
 /// <para>
 /// The structure survives the decision going the other way. Changing the answer changes this one
-/// function and the one resource string the template comes from - not the slice, not the schema
-/// and not the tests, which assert against the composed value rather than against a spelling.
+/// function and the one resource string the template comes from - not the slice and not the
+/// schema.
+/// </para>
+/// <para>
+/// <b>What the tests do and do not reach, corrected at code review on 2026-09-10.</b> This
+/// paragraph used to end "not the tests, which assert against the composed value rather than
+/// against a spelling". That was not true: every test double is a fake that composes the suffix
+/// itself, so the assertions compared a fake against its own output and no test constructed
+/// <c>ResourcePersonalSpaceNaming</c> or read the resource at all. A renamed key, a lost embedded
+/// resource or an added <c>ResourcesPath</c> would have named every Space in production
+/// <c>"PersonalSpaceName"</c> - the key echoed back by <c>IStringLocalizer</c>, which returns the
+/// key rather than throwing - with the whole suite green.
+/// <c>ResourcePersonalSpaceNamingTests</c> now constructs the real adapter over the real resource
+/// set; <see cref="From"/> refuses a template that does not place the name.
 /// </para>
 /// <para>
 /// <b>Nothing about the composed name is recorded on the row.</b> The Space stores a name like
@@ -48,14 +60,20 @@ public static class PersonalSpaceName
     /// </param>
     /// <returns>The Space's name.</returns>
     /// <exception cref="ArgumentException">
-    /// The template is not a usable composite format string. Thrown rather than swallowed: a
-    /// malformed resource would otherwise name every Space after the exception's own text.
+    /// The template is not a usable composite format string, or does not place the display name
+    /// in its result. Thrown rather than swallowed: a malformed resource would otherwise name
+    /// every Space after the exception's own text, and a placeholder-less one would name every
+    /// Space after the template.
     /// </exception>
     public static string From(string displayName, string template)
     {
+        var name = displayName.Trim();
+
+        string composed;
+
         try
         {
-            return string.Format(CultureInfo.CurrentCulture, template, displayName.Trim());
+            composed = string.Format(CultureInfo.CurrentCulture, template, name);
         }
         catch (FormatException exception)
         {
@@ -65,6 +83,28 @@ public static class PersonalSpaceName
                 nameof(template),
                 exception);
         }
+
+        // A template with NO placeholder is not a FormatException - string.Format returns it
+        // unchanged - so the failure this method exists to catch used to pass straight through.
+        // That is not a hypothetical shape: it is exactly what a missing resource produces, since
+        // IStringLocalizer answers a key it cannot find with the key itself. Every Space would
+        // have been called "PersonalSpaceName". Checking the result rather than parsing the
+        // template also catches "{{0}}'s Space", where the placeholder is escaped rather than
+        // absent.
+        //
+        // Vacuous when the name is empty, which is honest: Contains("") is true. The slice cannot
+        // reach that - RegisterAccountValidator refuses a blank display name before the handler
+        // runs - and guarding it here would be a rule with no caller.
+        if (name.Length > 0 && !composed.Contains(name, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"The Personal Space name template '{template}' does not place the display name " +
+                "in its result. It must contain exactly one placeholder, '{0}', for the display " +
+                "name - an unplaceheld template names every Space after the template itself.",
+                nameof(template));
+        }
+
+        return composed;
     }
 }
 

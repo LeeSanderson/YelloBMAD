@@ -35,25 +35,40 @@ namespace Yello.Tests.Architecture;
 public sealed class LocalisationGateTests
 {
     /// <summary>
-    /// The document's language is set from the active culture at boot, so
-    /// <c>base.css</c>'s locale exclusions are reachable. UX-DR42.
+    /// Something in the client calls the document-language interop, so the mechanism
+    /// <c>base.css</c>'s locale exclusions depend on is wired at all. UX-DR42.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>This is the gate <c>deferred-work.md:32</c> asked for by name.</b> That entry records
-    /// that <c>&lt;html lang="en"&gt;</c> was hard-coded, which made <c>base.css:141-172</c> -
-    /// three rules withholding <c>text-transform</c> from Turkish, Azeri and Greek and
-    /// letter-spacing from 24 case-less scripts - <i>inert</i>, because every one of them is
-    /// scoped by <c>:lang()</c>. It also records the sharper half: "no gate detects the inertness
-    /// either". So the fix without this assertion would be one line of startup code that any
-    /// later story could delete, restoring the inertness with the whole suite green.
+    /// <b>Renamed at code review on 2026-09-10, because the old name claimed the half this does
+    /// not check.</b> It was called
+    /// <c>The_document_language_is_set_from_the_active_culture</c>, and nothing in it touches the
+    /// culture. What it asserts is that some method in <c>Yello.Client</c> contains a call
+    /// instruction to <see cref="DocumentLanguage.ApplyAsync"/>. It does not assert the argument,
+    /// that the call is reached, or that it runs before <c>host.RunAsync()</c> -
+    /// <c>ApplyAsync(js, "en")</c> with a hard-coded literal passes, and so does the call moved
+    /// after the runtime has booted, which is the exact shape of the 2026-09-01 incident recorded
+    /// in <c>Program.cs</c>. The name now says what it does; the story's Dev Agent Record and
+    /// <c>deferred-work.md</c> were corrected to match.
+    /// </para>
+    /// <para>
+    /// <b>This is the gate <c>deferred-work.md:32</c> asked for by name</b>, and it is worth being
+    /// exact about what that entry got in return. The entry records that
+    /// <c>&lt;html lang="en"&gt;</c> was hard-coded, which made <c>base.css:141-172</c> - three
+    /// rules withholding <c>text-transform</c> from Turkish, Azeri and Greek and letter-spacing
+    /// from 24 case-less scripts - <i>inert</i>, because every one of them is scoped by
+    /// <c>:lang()</c>. This gate stops the wiring being deleted. It does <b>not</b> make the
+    /// exclusions fire: <see cref="SupportedCultures"/> holds one entry, so every browser resolves
+    /// to <c>en</c> and the attribute is written with the value <c>index.html</c> already
+    /// hard-codes. The inertness is unchanged, and
+    /// <see cref="The_supported_culture_list_has_exactly_one_entry"/> below is what says so out
+    /// loud.
     /// </para>
     /// <para>
     /// <b>Read from compiled IL, not from source text.</b> A source scan for
     /// <c>document.documentElement</c> would be satisfied by the string appearing in a comment,
     /// in a doc remark, or in a constant nothing calls - and this class's own remarks mention it,
-    /// so a naive scan would find itself. What is asserted is that some method in
-    /// <c>Yello.Client</c> actually <i>calls</i> <see cref="DocumentLanguage.ApplyAsync"/>.
+    /// so a naive scan would find itself.
     /// </para>
     /// <para>
     /// Validated by planting: commenting out the call in <c>Program.cs</c> fails this by name,
@@ -61,7 +76,7 @@ public sealed class LocalisationGateTests
     /// </para>
     /// </remarks>
     [Fact]
-    public void The_document_language_is_set_from_the_active_culture()
+    public void The_client_calls_the_document_language_interop()
     {
         // The literals are asserted too. Without this, deleting the interop call and leaving the
         // constants would fail the IL check for the right reason, while CHANGING the constants -
@@ -130,6 +145,58 @@ public sealed class LocalisationGateTests
                    "language.");
 
         Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
+    }
+
+    /// <summary>
+    /// There is exactly one supported culture, so every locale still resolves to <c>en</c> and
+    /// <c>base.css</c>'s casing exclusions remain unreachable.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This is the assertion <c>deferred-work.md</c> proposed for itself, written at code
+    /// review on 2026-09-10 - and writing it is what reopened the entry above it.</b> The ledger
+    /// recorded the hard-coded <c>&lt;html lang&gt;</c> entry as CLOSED by this story, on the
+    /// grounds that the mechanism now exists and is gated. The mechanism does exist. The
+    /// <i>inertness</i> the entry was actually about does not change:
+    /// <see cref="SupportedCultures.All"/> holds one entry, <c>CultureSelection.Resolve</c>
+    /// therefore returns <c>en</c> for every browser, and the client writes <c>lang="en"</c> -
+    /// byte-identical to what <c>index.html</c> hard-codes. Not one of the 26 locale exclusions
+    /// can fire for any visitor.
+    /// </para>
+    /// <para>
+    /// The entry's own original finding predicted this outcome in as many words: "wiring
+    /// <c>lang</c> to a culture that is always <c>en</c> would be a no-op that looks like a fix".
+    /// It was closed anyway. So this test exists to make the state legible rather than arguable -
+    /// it passes while the product genuinely has one language, and fails the moment a second
+    /// arrives, which is the moment the exclusions become real and someone has to check they
+    /// work in a browser.
+    /// </para>
+    /// <para>
+    /// <b>Failing on the day someone adds German is the intent, not a side effect.</b> Same shape
+    /// as AC9's "at most one pill" from story 1.2: honest today, and it fails loudly on the one
+    /// day a person needs to read it. Whoever deletes this test should be doing so as part of
+    /// shipping that second translation, and should read the trap in the message first.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_supported_culture_list_has_exactly_one_entry()
+    {
+        Assert.Equal("en", SupportedCultures.Default);
+
+        // Stated as an assertion rather than a comment so the reason travels with the failure.
+        Assert.True(
+            SupportedCultures.All.Count == 1,
+            "SupportedCultures now lists more than one culture, which is the day three things stop " +
+            "being theoretical. (1) base.css's :lang() exclusions - no text-transform for tr/az/el, " +
+            "no letter-spacing for 24 case-less scripts - finally become reachable, and NOTHING has " +
+            "ever verified them in a rendered browser; the client suite can do that now. (2) " +
+            "CultureSelection.Resolve compares TwoLetterISOLanguageName when it walks to a parent, " +
+            "so a script-qualified supported culture (zh-Hans) will not match the way a reader " +
+            "expects, and the Host and the client can then disagree about what a browser gets - an " +
+            "English interface around a Space named in another language. (3) deferred-work.md's " +
+            "entry on the 2026-09-01 ICU incident applies directly: the supported way to change " +
+            "culture is blazor.start({ applicationCulture }) BEFORE the runtime boots, never a " +
+            "post-boot assignment. Read that entry before deleting this test.");
     }
 
     /// <summary>

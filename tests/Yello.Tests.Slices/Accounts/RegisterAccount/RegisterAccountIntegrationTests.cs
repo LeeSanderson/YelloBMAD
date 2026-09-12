@@ -298,9 +298,14 @@ public sealed class RegisterAccountIntegrationTests(MigratedDatabaseFixture fixt
         await using var context = database.CreateContext();
         var before = await context.Accounts.CountAsync(TestContext.Current.CancellationToken);
 
+        // Its own context, disposed with the test. Constructed inline, this leaked a context and
+        // its pooled connection on every run - in the one class whose fixture remarks make a point
+        // of connection lifetime.
+        await using var storeContext = database.CreateContext();
+
         var handler = new RegisterAccountHandler(
             new IdentityPasswordHasher(Hasher(PasswordWorkFactor.FrameworkDefaultIterationCount)),
-            new AccountRegistrationStore(database.CreateContext()),
+            new AccountRegistrationStore(storeContext),
             new OverlongNaming(),
             new SequentialGuidIdentifierGenerator(),
             TimeProvider.System);

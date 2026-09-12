@@ -71,9 +71,11 @@ public sealed class YelloDbContext(DbContextOptions<YelloDbContext> options) : D
         // configuration and forgets to add it here, and the entity quietly takes EF Core's
         // conventions instead - no explicit table name, no row-level security column mapping, no
         // filtered index. That is not left to discipline.
-        // EntityConfigurationCompletenessTests asserts that every IEntityTypeConfiguration<T> in
-        // this assembly reaches the built model, so the list below cannot fall behind the
-        // directory beside it.
+        // PersistenceModelGateTests.Every_entity_configuration_reaches_the_model asserts that
+        // every IEntityTypeConfiguration<T> in this assembly reaches the built model, so the list
+        // below cannot fall behind the directory beside it. (Named
+        // EntityConfigurationCompletenessTests here until code review on 2026-09-10; that class
+        // does not exist, so the assurance could not be checked by the reader it was written for.)
         modelBuilder.ApplyConfiguration(new AccountConfiguration());
         modelBuilder.ApplyConfiguration(new SpaceConfiguration());
         modelBuilder.ApplyConfiguration(new MembershipConfiguration());

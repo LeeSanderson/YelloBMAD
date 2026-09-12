@@ -19,8 +19,9 @@ namespace Yello.Infrastructure.Identity;
 /// <para>
 /// <b>The work factor is set explicitly rather than inherited.</b> Identity's default is 100,000
 /// iterations; leaving it implicit would make NFR-6's "the architecture's call" a framework
-/// default nobody chose. See <c>PasswordHashingOptions</c> for the number, the measurement it
-/// came from and the hardware it was measured on.
+/// default nobody chose. See <see cref="PasswordWorkFactor"/> for the number, the measurement it
+/// came from and the hardware it was measured on. (This pointed at <c>PasswordHashingOptions</c>
+/// until code review on 2026-09-10, which is not a type in this solution.)
 /// </para>
 /// <para>
 /// <b>IdentityV3, and why the format matters more than the algorithm.</b> The encoded hash

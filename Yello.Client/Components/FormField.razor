@@ -16,6 +16,15 @@
     as the only carrier, and DESIGN.md reserves --danger for the genuinely irreversible - a
     validation error is the case it explicitly says not to spend it on.
 
+    INVALID IS ITS OWN PARAMETER, AND MESSAGE IS NOT IT. Corrected at code review on 2026-09-10:
+    all three carriers used to fire on any non-empty Message, and Register.razor always supplies
+    the display-name field with a hint - so the very first paint announced an untouched field as
+    invalid and drew it in the error weight, on the surface NFR-9 names first among its five gated
+    flows. A hint and an error are different states that happen to occupy the same line of text.
+    Message says what to show; Invalid says what it means. aria-describedby still points at either,
+    because a hint is exactly as worth announcing as an error - it is only "this is wrong" that a
+    hint must not claim.
+
     Focus order follows reading order because the markup order IS the reading order: label, then
     control, then message. Nothing here sets tabindex.
 *@
@@ -29,7 +38,7 @@
            value="@Value"
            autocomplete="@AutoComplete"
            disabled="@Disabled"
-           aria-invalid="@(HasMessage ? "true" : null)"
+           aria-invalid="@(Invalid ? "true" : null)"
            aria-describedby="@(HasMessage ? MessageId : null)"
            @oninput="HandleInputAsync" />
 
@@ -75,6 +84,13 @@
     /// <summary>Hint or error text shown under the control, and referenced by aria-describedby.</summary>
     [Parameter]
     public string? Message { get; set; }
+
+    /// <summary>
+    /// Whether <see cref="Message"/> is an error rather than a hint. Drives aria-invalid and the
+    /// heavier border; a hint sets neither.
+    /// </summary>
+    [Parameter]
+    public bool Invalid { get; set; }
 
     /// <summary>Whether the control is disabled, which it is while a submission is in flight.</summary>
     [Parameter]

@@ -257,9 +257,21 @@ sharing out of reach without reuse or an external orchestrator. Nothing is share
 suites or processes. **Story 1.9** owns the decision, being the first story that has to make the
 sharing model real. Until then, read "shared" as intent rather than as description.
 
-**The cost is now measured rather than estimated.** A full `dotnet test Yello.slnx` starts four
-engines sequentially: two for story 1.3's container-backed test classes, two for story 1.1's
-direct constructions. Roughly 30 seconds to first assertion each, about 2 GB apiece.
+**The cost is now measured rather than estimated.** A full `dotnet test Yello.slnx` starts **seven**
+engines sequentially: **four** for story 1.3's container-backed test classes
+(`RegisterAccountEndpointTests`, `RegisterAccountIntegrationTests`, `RegistrationDurationTests`,
+`SpaceIsolationSchemaTests`, each taking `IClassFixture<MigratedDatabaseFixture>` and each getting
+its own container) and **three** for story 1.1's direct constructions
+(`SharedFixtureSmokeTest`, `HostStartupTests`, `StartupConnectivityCheckTests`). Roughly 30 seconds
+to first assertion each, about 2 GB apiece.
+
+> **Corrected at code review on 2026-09-10.** This said "four engines … two for story 1.3's
+> container-backed test classes, two for story 1.1's direct constructions" — while the paragraph
+> two lines above it said "four container-backed test classes" for story 1.3 alone. Both halves of
+> the four were wrong and the two sentences contradicted each other. The figure matters because
+> **story 1.9 sizes its topology decision from it**: the real cost of leaving the sharing model
+> unbuilt is roughly 14 GB and three and a half minutes of container startup per full run, not
+> eight and two.
 
 **One exception that holds regardless:** the pooled-connection isolation case in story 1.9
 needs its own container, with pool size pinned to 1 and parallelism disabled. A pooled
@@ -341,11 +353,28 @@ architecture suite and 54 in the slice suite. Isolation, Revocation and Merge st
 tests and exit 0 — they keep the `--ignore-exit-code 8` switch, and `Yello.Tests.Architecture`
 asserts that only empty suites may.
 
-**22 of the slice tests need a container runtime and skip with a reason** when none is reachable,
-rather than failing — 19 through the `MigratedDatabaseFixture` guard and 3 through a direct
-`Assert.SkipUnless`. A machine with Rancher Desktop stopped therefore reports 136 total with 22
-skipped, and stays green. That count is from the skip guards themselves rather than from an
-observed run: it was not measured with the runtime down.
+**22 of the slice tests need a container runtime, and with none reachable they FAIL — they do not
+skip.** Measured on 2026-09-10 with Rancher Desktop stopped: `dotnet test` on the slice suite
+reports **74 total, 52 succeeded, 22 failed, 0 skipped**, every failure a
+`Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'`.
+
+> **Corrected at code review on 2026-09-10, and this is the second time this claim has been
+> wrong in the same direction.** The text said a stopped runtime "reports 136 total with 22
+> skipped, and stays green", while disclosing that the number came from reading the skip guards
+> rather than from a run. The story's own baseline had already contradicted it — story 1.3 records
+> that on this machine with the Rancher backend stopped, the baseline run was "83 total / 80
+> passed, the 3 failures being container-dependent Slices tests". The mechanism is
+> `SqlServerContainerFixture.IsContainerRuntimeAvailable()`, which only checks that
+> `MsSqlBuilder…Build()` does not throw — a configuration-level check that performs no I/O. A
+> configured-but-dead backend therefore reports available, the skip guard passes, and the
+> container start fails afterwards. **Making the guard probe the daemon is the fix, and it is not
+> taken here** — it belongs with story 1.9's topology decision, which owns this fixture. Until
+> then: a stopped runtime is a red suite, and that is the honest expectation to hold.
+
+Note that the 22 are not evenly distributed: xunit constructs a class fixture before any test in
+the class runs, so a container-backed *class* fails entirely — including any test in it that never
+touches a database. That is why `DurationIndistinguishabilityTests` is a separate class from
+`RegistrationDurationTests`.
 
 ## CI tiering, for context
 

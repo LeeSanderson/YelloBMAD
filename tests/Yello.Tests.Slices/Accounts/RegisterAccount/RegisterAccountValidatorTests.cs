@@ -75,6 +75,105 @@ public sealed class RegisterAccountValidatorTests
         Assert.Empty(RegisterAccountValidator.Validate(
             new RegisterAccountCommand("Ravi", address, ValidPassword)));
 
+    /// <summary>
+    /// An address carrying an invisible character is refused rather than admitted as a distinct
+    /// address.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Added at code review on 2026-09-10.</b> The rule refused only whitespace, and none of
+    /// these is whitespace: zero-width space, byte-order mark, word joiner,
+    /// right-to-left override, NUL and DEL all passed. Each normalises to a value distinct from
+    /// the visible address, so <c>ravi@anand.test</c> with a zero-width space appended became a
+    /// <i>separate Account</i> rather than a duplicate.
+    /// </para>
+    /// <para>
+    /// Worse on the duplicate path than anywhere else, which is why it is a P0 rather than a
+    /// tidiness fix: AD-23 makes a duplicate registration indistinguishable from a new one, so
+    /// nobody is ever told that the address they registered is not the address they think they
+    /// registered. They simply cannot sign in later.
+    /// </para>
+    /// <para>
+    /// Written as escapes rather than as the characters themselves, and that is not a style
+    /// preference: pasted literally, these cases are indistinguishable from each other and from a
+    /// plain address in every editor, diff and review tool that will ever show this file. The
+    /// first draft of this test made exactly that mistake.
+    /// </para>
+    /// </remarks>
+    [Theory]
+    [InlineData("ravi@anand.test\u200B")] // zero-width space
+    [InlineData("ravi@anand.test\uFEFF")] // byte-order mark
+    [InlineData("ravi@anand.test\u2060")] // word joiner
+    [InlineData("ra\u202Evi@anand.test")] // right-to-left override
+    [InlineData("ra\u0000vi@anand.test")] // NUL
+    [InlineData("ravi@anand.test\u007F")] // DEL
+    [InlineData("ra\u00ADvi@anand.test")] // soft hyphen
+    public void An_address_carrying_an_invisible_character_is_refused(string address) =>
+        Assert.Contains(
+            RegisterAccountFailure.EmailAddressMalformed,
+            RegisterAccountValidator.Validate(
+                new RegisterAccountCommand("Ravi", address, ValidPassword)),
+            StringComparer.Ordinal);
+
+    /// <summary>
+    /// The three length ceilings, at the boundary and one past it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Added at code review on 2026-09-10: three of the seven failure codes were emitted by no
+    /// test at all.</b> <c>DisplayNameTooLong</c>, <c>EmailAddressTooLong</c> and
+    /// <c>PasswordTooLong</c> existed, had resource entries, and were reachable by nothing in the
+    /// suite - so a <c>&gt;</c> that became a <c>&gt;=</c>, or either constant drifting from the
+    /// column it claims to match, was caught by nothing.
+    /// </para>
+    /// <para>
+    /// Both sides of each boundary are asserted, because a test that only checks the failing side
+    /// passes just as well if the rule refuses everything.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_length_ceilings_are_refused_one_character_past_the_boundary()
+    {
+        // 254 for the address including the '@' and the domain; 128 for the display name; 4096
+        // for the password. The constants are private, so these are the column and RFC figures
+        // the validator's own comments cite - which is the point: if they drift apart, this fails.
+        const int emailAddressMax = 254;
+        const int displayNameMax = 128;
+        const int passwordMax = 4096;
+
+        const string domain = "@anand.test";
+
+        var addressAtLimit = new string('r', emailAddressMax - domain.Length) + domain;
+        var addressPastLimit = new string('r', emailAddressMax - domain.Length + 1) + domain;
+
+        Assert.Empty(RegisterAccountValidator.Validate(
+            new RegisterAccountCommand("Ravi", addressAtLimit, ValidPassword)));
+
+        Assert.Contains(
+            RegisterAccountFailure.EmailAddressTooLong,
+            RegisterAccountValidator.Validate(
+                new RegisterAccountCommand("Ravi", addressPastLimit, ValidPassword)),
+            StringComparer.Ordinal);
+
+        Assert.Empty(RegisterAccountValidator.Validate(
+            new RegisterAccountCommand(new string('r', displayNameMax), "ravi@anand.test", ValidPassword)));
+
+        Assert.Contains(
+            RegisterAccountFailure.DisplayNameTooLong,
+            RegisterAccountValidator.Validate(
+                new RegisterAccountCommand(new string('r', displayNameMax + 1), "ravi@anand.test", ValidPassword)),
+            StringComparer.Ordinal);
+
+        Assert.Empty(RegisterAccountValidator.Validate(
+            new RegisterAccountCommand("Ravi", "ravi@anand.test", new string('p', passwordMax))));
+
+        Assert.Contains(
+            RegisterAccountFailure.PasswordTooLong,
+            RegisterAccountValidator.Validate(
+                new RegisterAccountCommand("Ravi", "ravi@anand.test", new string('p', passwordMax + 1))),
+            StringComparer.Ordinal);
+    }
+
     [Fact]
     public void A_missing_password_is_refused() =>
         Assert.Contains(

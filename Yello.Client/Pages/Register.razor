@@ -71,9 +71,13 @@
         @if (_phase != RegistrationPhase.Complete)
         {
             <form @onsubmit="SubmitAsync" @onsubmit:preventDefault>
+                @* Invalid is passed separately from Message because the display-name field always
+                   has a Message - its hint - and deriving "invalid" from "has a message"
+                   announced an untouched field as invalid on first paint. See FormField. *@
                 <FormField FieldId="display-name"
                            Label="@(Localizer["DisplayNameLabel"].Value)"
                            Message="@(MessageFor(RegistrationFields.DisplayName) ?? Localizer["DisplayNameHint"].Value)"
+                           Invalid="@(MessageFor(RegistrationFields.DisplayName) is not null)"
                            AutoComplete="name"
                            Disabled="@IsBusy"
                            @bind-Value="_displayName" />
@@ -81,6 +85,7 @@
                 <FormField FieldId="email-address"
                            Label="@(Localizer["EmailAddressLabel"].Value)"
                            Message="@MessageFor(RegistrationFields.EmailAddress)"
+                           Invalid="@(MessageFor(RegistrationFields.EmailAddress) is not null)"
                            InputType="email"
                            AutoComplete="email"
                            Disabled="@IsBusy"
@@ -89,6 +94,7 @@
                 <FormField FieldId="password"
                            Label="@(Localizer["PasswordLabel"].Value)"
                            Message="@MessageFor(RegistrationFields.Password)"
+                           Invalid="@(MessageFor(RegistrationFields.Password) is not null)"
                            InputType="password"
                            AutoComplete="new-password"
                            Disabled="@IsBusy"
@@ -155,8 +161,33 @@
             // person's submission that is wrong.
             _messages = [Localizer["SubmitFailed"].Value];
         }
-
-        _phase = RegistrationPhase.Editing;
+        catch (OperationCanceledException)
+        {
+            // HttpClient's own 100-second timeout throws TaskCanceledException, which derives
+            // from this and from neither of the two above - so until code review on 2026-09-10 a
+            // timed-out request escaped every catch here. Reachable rather than theoretical: this
+            // endpoint is deliberately slow, and the cross-origin call it makes has no CORS
+            // behind it yet, so a request that hangs is an ordinary outcome. Reported as a
+            // transport problem, which is what it is.
+            _messages = [Localizer["SubmitFailed"].Value];
+        }
+        finally
+        {
+            // The phase used to be set after the try/catch, so anything that escaped left the
+            // form disabled for good: every field and the button stayed greyed, the "this is
+            // under way" status stayed on screen, and only a page reload recovered. The
+            // #blazor-error-ui banner did appear, so it was not silent - but the surface was
+            // dead, and the localised failure message this page exists to show was never
+            // reached.
+            //
+            // Guarded rather than assigned unconditionally, because the success path has already
+            // moved the phase to Complete and returned through here - resetting it to Editing
+            // would put the form back on screen underneath the completion message.
+            if (_phase == RegistrationPhase.Submitting)
+            {
+                _phase = RegistrationPhase.Editing;
+            }
+        }
     }
 
     private void Complete()

@@ -52,8 +52,11 @@ namespace Yello.Infrastructure.Identity;
 /// each stored hash, and <c>VerifyHashedPassword</c> returns <c>SuccessRehashNeeded</c> when the
 /// stored count is below the configured one - so the upgrade happens on the next successful
 /// sign-in, which is story 1.4's path. That is the whole of NFR-6's "tunable without
-/// re-registering existing Accounts", and <c>PasswordWorkFactorTests</c> asserts the mechanism
-/// directly rather than trusting this paragraph.
+/// re-registering existing Accounts", and
+/// <c>RegisterAccountIntegrationTests.Raising_the_work_factor_leaves_an_existing_hash_valid_and_asks_for_a_rehash</c>
+/// asserts the mechanism directly rather than trusting this paragraph. (Named
+/// <c>PasswordWorkFactorTests</c> here until code review on 2026-09-10; no such class has ever
+/// existed, so the pointer sent a reader looking for a gate they could not find.)
 /// </para>
 /// </remarks>
 public static class PasswordWorkFactor

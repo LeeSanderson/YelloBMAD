@@ -1,3 +1,5 @@
+using System.Text;
+
 namespace Yello.Domain.Accounts;
 
 /// <summary>
@@ -20,8 +22,16 @@ namespace Yello.Domain.Accounts;
 /// </para>
 /// <list type="bullet">
 ///   <item><description>
-///     The rule is <i>readable</i>, in one function, rather than being a property of the
-///     database that a restore onto a differently-collated server could change silently.
+///     The rule is <i>readable</i>, in one function, rather than being spread across a schema.
+///     <b>Corrected at code review on 2026-09-10:</b> this bullet used to claim the rule was not
+///     "a property of the database that a restore onto a differently-collated server could change
+///     silently". That was wrong as written. This function decides what value is <i>stored</i>;
+///     the unique index decides which stored values are <i>equal</i>, and nothing here pins that
+///     index's collation, so it takes the database default. Two addresses this function maps to
+///     different strings can still collide in the index under a width- or kana-insensitive
+///     collation. Pinning it is story 2.6's, alongside AD-15's
+///     <c>Latin1_General_100_BIN2</c> - recorded in <c>deferred-work.md</c> rather than taken
+///     here, because it is that story's decision to make.
 ///   </description></item>
 ///   <item><description>
 ///     It is stable under AD-15's <c>Latin1_General_100_BIN2</c>, the binary collation story 2.6
@@ -47,8 +57,21 @@ public static class EmailAddressNormalisation
     /// <summary>
     /// The comparable form of an email address.
     /// </summary>
+    /// <remarks>
+    /// <b>Composed to NFC before casing, added at code review on 2026-09-10.</b> Without it
+    /// <c>café@example.com</c> typed on a Mac (NFD: <c>e</c> + combining acute) and the same
+    /// address typed on Windows (NFC: precomposed <c>é</c>) normalise to different strings and
+    /// become two Accounts - a uniqueness rule that is not one rule. Composing first makes the
+    /// two spellings the same value.
+    /// <para>
+    /// Upper-casing an NFC string can in principle produce a string that is no longer NFC. That
+    /// is deliberately not re-composed afterwards, because it does not matter here: this value is
+    /// only ever compared against another output of this same function, so both sides take
+    /// identical steps and agree. Consistency is the property this needs, not canonical output.
+    /// </para>
+    /// </remarks>
     /// <param name="emailAddress">The address as the person typed it.</param>
     /// <returns>The value the unique index is built on.</returns>
     public static string Normalise(string emailAddress) =>
-        emailAddress.Trim().ToUpperInvariant();
+        emailAddress.Trim().Normalize(NormalizationForm.FormC).ToUpperInvariant();
 }

@@ -6,22 +6,39 @@ using Yello.Host;
 using Yello.Host.Endpoints;
 using Yello.Infrastructure;
 
-// The composition root, AC4's connectivity check, and - from story 1.3 - the product's first
-// endpoint.
+// The composition root, AC4's connectivity check, and the product's first endpoint.
 //
-// Superseded 2026-08-29 by story 1.3. This previously read "Story 1.1 registers NO endpoints and
-// no /sync WebSocket", which described story 1.1's tree and stopped being true when
-// POST /api/v1/accounts landed below. Recorded as a correction rather than deleted, because
-// stale hand-off prose in these files produced six of story 1.1's review findings and a seventh
-// at story 1.2's.
-//
-// Still true: there is no /sync WebSocket (Epic 7), and the request pipeline's cross-cutting
-// behaviours - authorisation, Space resolution, refusal recording, idempotency and the NFR-8
-// bound checks - do not exist yet. Stories 1.5 and 1.6 own them, and AR-3 makes a slice that
-// re-implements any of them a defect. Registration needs none of them: it is unauthenticated,
-// it creates the Space it writes into, and no NFR-8 bound applies to it.
+// There is no /sync WebSocket (Epic 7), and the request pipeline's cross-cutting behaviours -
+// authorisation, Space resolution, refusal recording, idempotency and the NFR-8 bound checks - do
+// not exist yet. Stories 1.5 and 1.6 own them, and AR-3 makes a slice that re-implements any of
+// them a defect. Registration needs none of them: it is unauthenticated, it creates the Space it
+// writes into, and no NFR-8 bound applies to it.
 
 var builder = WebApplication.CreateBuilder(args);
+
+// EF CORE'S COMMAND LOG IS AN AD-23 DISCLOSURE, AND MUST STAY OFF.
+//
+// Found at code review on 2026-09-10 by the assertion written in the same pass - it failed on its
+// first run against a real Host, which is the only reason anyone knows.
+//
+// EF Core logs every statement it generates to Microsoft.EntityFrameworkCore.Database.Command at
+// Information, and the two registration paths do not generate the same statements. A NEW address
+// reaches SaveChangesAsync and logs four `INSERT INTO` lines - Account, Space, Membership,
+// StatusDefinition. A KNOWN address is refused by the existence check and rolls back before any
+// insert, so it logs none of them. The response is a uniform 204 either way, and the log beside it
+// says exactly which registrations were duplicates.
+//
+// That is the precise failure AD-23 names and RegistrationLog's own remarks argue against: "a
+// uniform response undone by a log line is the same leak by a slower route, and logs travel
+// further than responses do." It was invisible to the log test until 2026-09-10 because that test
+// counted its own message rather than reading what else was there. Parameter VALUES were never
+// exposed - EF redacts them without EnableSensitiveDataLogging, and the address assertion confirms
+// it - but the statement shapes alone are the whole disclosure.
+//
+// Filtered unconditionally rather than per environment. AD-23 is not environment-scoped, and a
+// development log is still a log; PRD section 6.4's data-protection gate fires on these same rows.
+// A developer who wants to watch SQL can raise this locally for as long as they are looking at it.
+builder.Logging.AddFilter("Microsoft.EntityFrameworkCore.Database.Command", LogLevel.Warning);
 
 // Read once, here, rather than inside the registration below: the same value is needed by the
 // startup connectivity check, and a second GetConnectionString call would be a second place the

@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Yello.Application.Accounts.RegisterAccount;
 
 /// <summary>
@@ -131,6 +133,18 @@ public static class RegisterAccountValidator
     /// Written as a scan rather than a regular expression so there is no pattern to backtrack:
     /// this runs on unauthenticated input, before any cost is incurred.
     /// </para>
+    /// <para>
+    /// <b>Shallow is not the same as blind, and the difference was found at code review on
+    /// 2026-09-10.</b> The rule used to refuse only whitespace, which let every invisible
+    /// character through: <c>a@b.com​</c>, <c>a@b.com﻿</c>, <c>a\0b@c.com</c> and
+    /// <c>a‮b@c.com</c> all passed, normalised to values distinct from the visible address,
+    /// and became separate Accounts for what a person reads as one address. Worse on the duplicate
+    /// path than the new-address one: an address that differs from a registered one only by an
+    /// invisible character is a <i>new</i> Account rather than a refusal, so nobody is told
+    /// anything is wrong. Rejecting the control and format categories is the narrowest rule that
+    /// closes it, and it refuses nothing a real address can contain - no deliverable address has
+    /// ever held a zero-width space.
+    /// </para>
     /// </remarks>
     private static bool IsPlausibleEmailAddress(string candidate)
     {
@@ -139,8 +153,17 @@ public static class RegisterAccountValidator
         return at > 0
             && at == candidate.LastIndexOf('@')
             && at < candidate.Length - 1
-            && !candidate.Any(char.IsWhiteSpace);
+            && !candidate.Any(IsNeverPartOfAnAddress);
     }
+
+    /// <summary>
+    /// Characters no email address can contain: whitespace, the control category, and the format
+    /// category that carries the zero-width and bidirectional marks.
+    /// </summary>
+    private static bool IsNeverPartOfAnAddress(char character) =>
+        char.IsWhiteSpace(character)
+        || char.IsControl(character)
+        || char.GetUnicodeCategory(character) is UnicodeCategory.Format;
 }
 
 /// <summary>
