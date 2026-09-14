@@ -2,7 +2,24 @@
 title: Yello
 status: final
 created: 2026-08-15
-updated: 2026-08-20
+updated: 2026-09-14
+amendments:
+  - date: 2026-09-14
+    section: '§2 Glossary (Account) › §4.1 FR-1 › §4.2 FR-4 › §12 Assumptions Index item 1'
+    raisedBy: 'Code review of story 1.3, 2026-09-10 — [Review][Decision], severity high'
+    proposal: _bmad-output/planning-artifacts/sprint-change-proposal-2026-09-13.md
+    change: >-
+      Registration collects three fields, not two. Lee decided on 2026-08-28 that registration
+      would collect a display name — the Personal Space is named from it, and UX-DR34 needs one
+      for every Membership rendering from Epic 4 — and story 1.3 shipped it as a required
+      column. The amendment that decision required was never made, so FR-1 and the Requirements
+      Inventory in epics.md still stated a two-field contract that the shipped, reviewed and
+      passing code contradicted. Two defects were corrected together: the field-count
+      restatement, and the fact that no glossary anywhere defined the display-name attribute
+      that Account.DisplayName makes required — a violation of §2's own rule that a new domain
+      noun in §4 is added to the Glossary in the same pass. FR-4's [ASSUMPTION] and §12 item 1
+      are retired as confirmed; item 1 keeps its position rather than being renumbered, so
+      existing references to items 2–13 stay valid. Twelve assumptions remain open.
 ---
 
 # PRD: Yello
@@ -33,7 +50,7 @@ What follows from that is the part that actually matters: **the interesting user
 
 *These terms are used verbatim throughout this document and all downstream artifacts. Synonyms are a discipline violation. If a new domain noun appears in §4, it is added here in the same pass.*
 
-- **Account** — A registered identity in Yello, unique by email address. Global: one Account exists across all Spaces. An Account is never owned by a Space. *Uniqueness by email address is correct for v1 but is not permanent: OAuth sign-in (§9.2) breaks it, since a provider may return a different address than the one on file, or none. Do not build on email-as-identity in a way that cannot be revisited.*
+- **Account** — A registered identity in Yello, unique by email address, carrying a password and a **display name**. Global: one Account exists across all Spaces. An Account is never owned by a Space. The display name is how the Account is identified on every surface outside Space settings' Membership management (UX-DR34), and is the name the Space provisioned under FR-4 is derived from; **it is not unique and is never an identifier** — two identical display names are disambiguated by a Membership-scoped discriminator, never by the address. *Uniqueness by email address is correct for v1 but is not permanent: OAuth sign-in (§9.2) breaks it, since a provider may return a different address than the one on file, or none. Do not build on email-as-identity in a way that cannot be revisited.*
 - **User** — An Account acting in the context of a specific Space. "User" is always relative to a Space; where the Space is not established, the correct term is Account.
 - **Space** — The unit of both work containment and access control. Contains Projects. Has exactly one Owner and zero or more other Memberships. An Account may belong to unlimited Spaces. Nothing is visible across a Space boundary.
 - **Personal Space** — Descriptive only, not a distinct type. The Space created automatically when an Account registers. It is an ordinary Space in every respect: shareable, renameable, deletable, transferable.
@@ -81,7 +98,7 @@ What follows from that is the part that actually matters: **the interesting user
 *Named-persona narratives the product enables, numbered UJ-1 … UJ-8. FRs reference these inline. If a UX document is produced later it should mirror these IDs.*
 
 - **UJ-1. Ravi has somewhere to put a Task ninety seconds after signing up.**
-  Ravi, a freelance developer, signs up because he is tired of tasks living in three chat threads. He registers with email and password and lands directly in a Space already named "Ravi's Space" — he did not create it and was not asked to. He creates a Project called "Admin", adds a Task, and closes the tab. **Climax:** value landed before he made a single structural decision; he never saw an empty state asking him to configure something. **Resolution:** one Space, one Project, one Task, and no notion that Yello is collaborative at all yet. **Edge case:** if he abandons registration after the email is taken but before the password is set, retrying with the same address must not reveal whether that Account exists.
+  Ravi, a freelance developer, signs up because he is tired of tasks living in three chat threads. He registers with his email address, a password and the name he goes by, and lands directly in a Space already named "Ravi's Space" — he did not create it and was not asked to. He creates a Project called "Admin", adds a Task, and closes the tab. **Climax:** value landed before he made a single structural decision; he never saw an empty state asking him to configure something. **Resolution:** one Space, one Project, one Task, and no notion that Yello is collaborative at all yet. **Edge case:** if he abandons registration after the email is taken but before the password is set, retrying with the same address must not reveal whether that Account exists.
 
 - **UJ-2. Ravi opens a client engagement without exposing anything else.**
   Three weeks later Ravi wins work with a design studio. He creates a second Space, "Northwind Redesign", and invites the studio's producer Nadia by email as a Member, and Beatriz — Northwind's marketing lead, who is paying for the work and wants to watch it land — as a Viewer. Neither has a Yello Account. **Path:** create Space → invite by email address → assign Role at invitation time → send. **Climax:** Ravi's personal Space is not mentioned anywhere in what either invitee receives or sees; the invitation is scoped to one Space and carries one Role. **Resolution:** Ravi is Owner of two Spaces with different Memberships. **Edge case:** if he invites an address that already has a Yello Account, they join their existing Account rather than creating a second one, and their other Spaces remain invisible to Ravi.
@@ -116,13 +133,14 @@ What follows from that is the part that actually matters: **the interesting user
 
 #### FR-1: Register an Account
 
-A person can create an Account with an email address and a password. The email address uniquely identifies the Account across Yello. Realizes UJ-1, UJ-3.
+A person can create an Account with an email address, a password and a display name. The email address uniquely identifies the Account across Yello; the display name identifies the Account to other people and is not unique. Realizes UJ-1, UJ-3.
 
 **Consequences (testable):**
 - An email address that already has an Account cannot be registered a second time.
 - Attempting to register an address that already exists produces a response indistinguishable from registering a new address; the existence of an Account is never disclosed to an unauthenticated caller.
 - Registration completes with exactly one Space in existence for that Account (see FR-4), and that Space's Owner is the new Account.
 - An Account that has not completed registration holds no Membership and appears in no Space.
+- A display name is required to complete registration, and is the name the Space provisioned under FR-4 is derived from.
 
 #### FR-2: Authenticate and hold a Session
 
@@ -161,7 +179,7 @@ The system creates a Space for a newly registered Account and makes that Account
 **Consequences (testable):**
 - The Space exists and is usable at the moment registration completes; the Account never encounters a state in which it belongs to no Space.
 - The provisioned Space is an ordinary Space: it can be renamed, shared, transferred and deleted on the same terms as any other. No attribute distinguishes it from a Space created by FR-5.
-- `[ASSUMPTION: the provisioned Space is named from the Account's display name, e.g. "Ravi's Space", and is renameable immediately.]`
+- The provisioned Space is named from the Account's display name, e.g. "Ravi's Space", and is renameable immediately. *(Confirmed as a decision on 2026-08-28 and implemented in story 1.3; was an assumption until 2026-09-14. The display name it derives from is collected at registration under FR-1.)*
 
 #### FR-5: Create a Space
 
@@ -869,7 +887,9 @@ Everything in §4 — all forty-three functional requirements across eleven feat
 
 *Every `[ASSUMPTION]` in this document, surfaced for explicit confirmation. Two entries were retired on 2026-08-18 because they became decisions rather than assumptions — the FR-27 first-Status fallback (replaced by report-and-ask) and the NFR-8 bounds (confirmed final). One was added for the Ownership Offer. Four of those below have hardened into architecture and now cost more than a document edit to reverse; they are marked † and all remain unconfirmed.*
 
-1. §4.2 FR-4 — The auto-provisioned Space is named from the Account's display name and is immediately renameable.
+*A third entry was confirmed and retired on 2026-09-14 — item 1, the Personal Space naming — leaving **twelve open**. Retired entries keep their position rather than being renumbered, so existing references to items 2–13 stay valid.*
+
+1. §4.2 FR-4 — The auto-provisioned Space is named from the Account's display name and is immediately renameable. **— CONFIRMED 2026-08-28, retired as an assumption on 2026-09-14.** Now a decision stated at FR-4; the display name it derives from is collected at registration under FR-1.
 2. §4.2 FR-7 — Space deletion is immediate and irreversible; no trash, no restore window. †
 3. §4.2 FR-8 — An Ownership Offer expires after 7 days, mirroring FR-39. *The not-emailed half of this assumption was retired on 2026-08-20; the recipient is now emailed under FR-43.*
 4. §4.3 FR-13 — Admins cannot change each other's Role; only the Owner can promote to or demote from Admin.

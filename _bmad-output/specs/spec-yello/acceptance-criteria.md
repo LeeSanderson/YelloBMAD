@@ -18,6 +18,7 @@ Global identity, self-service only. Registration is the only path in. Authentica
 - Attempting to register an address that already exists produces a response indistinguishable from registering a new address; the existence of an Account is never disclosed to an unauthenticated caller.
 - Registration completes with exactly one Space in existence for that Account (CAP-4), and that Space's Owner is the new Account.
 - An Account that has not completed registration holds no Membership and appears in no Space.
+- A display name is required to complete registration, and is the name the Space provisioned under CAP-4 is derived from. It is not unique.
 
 ### CAP-2 — Authenticate and hold a Session
 
@@ -46,7 +47,7 @@ The same object serves as private notebook, client engagement and whole-company 
 
 - The Space exists and is usable at the moment registration completes; the Account never encounters a state in which it belongs to no Space.
 - The provisioned Space is an ordinary Space: it can be renamed, shared, transferred and deleted on the same terms as any other. **No attribute distinguishes it from a Space created by CAP-5.**
-- *Assumed:* it is named from the Account's display name (e.g. "Ravi's Space") and is renameable immediately.
+- It is named from the Account's display name (e.g. "Ravi's Space") and is renameable immediately. *(Settled 2026-08-28, retired as an assumption 2026-09-14; the display name is collected at registration under CAP-1.)*
 
 ### CAP-5 — Create a Space
 

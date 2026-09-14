@@ -61,7 +61,7 @@ This is the reason the choice had to be made before sprint planning. Stories tou
 | Must stay soft | Why OAuth breaks it |
 |---|---|
 | **`Account` is unique by email address** (`glossary.md`) | A provider may return a different address than the one already on file, or none at all. **This is the load-bearing one** — it is a Glossary-level claim, so it reaches every artifact |
-| CAP-1 — an Account is created with an email address **and a password** | An OAuth Account has no password. Nothing may assume a password exists on every Account |
+| CAP-1 — an Account is created with an email address, **a password** and a display name | An OAuth Account has no password. Nothing may assume a password exists on every Account. *The display name is not at risk from OAuth: providers return one, so collecting it hardens nothing the change breaks — recorded 2026-09-14 so a later reader does not add a soft row for it.* |
 | NFR-6 — password storage and work-factor requirements | Must tolerate Accounts that hold no password at all, rather than treating that as an invalid state |
 | AD-23 — uniform responses that never disclose existence | The guarantee must hold identically on the OAuth path, which is a new disclosure surface |
 

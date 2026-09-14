@@ -265,7 +265,7 @@ Behavioural measures are defined without thresholds in `success-metrics.md`: Yel
 ## Assumptions
 
 - Where the architecture spine settled a question the PRD or its addendum left open, the spine is authoritative and this spec does not reopen it. Four such questions were closed after the PRD was written: whether the effective Status set is derived or materialised, where authorisation sits in the real-time synchronisation path, how Board ordering converges, and the atomicity of Status removal and cross-Project Task move.
-- The auto-provisioned Space is named from the Account's display name and is immediately renameable.
+- ~~The auto-provisioned Space is named from the Account's display name and is immediately renameable.~~ **Settled 2026-08-28, retired as an assumption 2026-09-14** — now a decision stated at FR-4 (`prd.md`) and CAP-4 (`acceptance-criteria.md`). The display name it derives from is collected at registration under CAP-1.
 - Space deletion, Project deletion and Task deletion are immediate and irreversible; no trash, no restore window.
 - Admins cannot change each other's Role — only the Owner can promote to or demote from Admin. Asserted to keep the Owner meaningfully distinct from Admin; recorded as an assumption rather than a settled decision.
 - The default Space Status set is Todo / In Progress / Done.

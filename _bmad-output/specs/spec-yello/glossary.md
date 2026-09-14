@@ -4,7 +4,7 @@ Companion to `SPEC.md` (SPEC-yello). Holds the domain vocabulary.
 
 These terms are used **verbatim** in every downstream artifact — epics, stories, tests, code, UI copy. A synonym is a discipline violation, not a style choice. Where you see **Space**, no document says "workspace", "tenant" or "org". If a new domain noun appears in any downstream artifact, it is added here in the same pass.
 
-- **Account** — A registered identity in Yello, unique by email address. Global: one Account exists across all Spaces. An Account is never owned by a Space.
+- **Account** — A registered identity in Yello, unique by email address, carrying a password and a **display name**. Global: one Account exists across all Spaces. An Account is never owned by a Space. The display name is how the Account is identified everywhere outside Space settings' Membership management, and is the name the Space provisioned under CAP-4 is derived from; it is **not unique and never an identifier**.
 - **User** — An Account acting in the context of a specific Space. "User" is always relative to a Space; where the Space is not established, the correct term is Account.
 - **Space** — The unit of both work containment and access control. Contains Projects. Has exactly one Owner and zero or more other Memberships. An Account may belong to unlimited Spaces. Nothing is visible across a Space boundary.
 - **Personal Space** — Descriptive only, not a distinct type. The Space created automatically when an Account registers. It is an ordinary Space in every respect: shareable, renameable, deletable, transferable.

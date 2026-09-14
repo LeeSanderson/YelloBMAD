@@ -2,8 +2,26 @@
 title: Yello — Epic Breakdown
 status: final
 created: 2026-08-22
-updated: 2026-08-27
+updated: 2026-09-14
 amendments:
+  - date: 2026-09-14
+    section: 'Requirements Inventory › FR-1; Epic 1 › Story 1.3 › user story'
+    raisedBy: 'Code review of story 1.3, 2026-09-10 — [Review][Decision], severity high'
+    proposal: _bmad-output/planning-artifacts/sprint-change-proposal-2026-09-13.md
+    change: >-
+      Registration collects three fields, not two. Both of this document's statements of the
+      two-field contract were corrected: the Requirements Inventory's restatement of FR-1, and
+      Story 1.3's user story line. The Inventory site was missed by the code review that raised
+      the finding and found by the correct-course artifact sweep, which matters because it is an
+      independent statement of the contract inside the same final artifact — correcting only the
+      story line would have left the document contradicting itself. Lee took the underlying
+      decision on 2026-08-28; the Personal Space is named from the display name, and UX-DR34
+      needs one for every Membership rendering from Epic 4 onward. Story 1.3's acceptance
+      criteria are deliberately NOT amended: they are reproduced verbatim in the story file whose
+      implementation is complete, and the requirement is carried instead by a new testable
+      consequence on FR-1 in prd.md and on CAP-1 in acceptance-criteria.md. Story 4.3 inherits
+      the change with no edit — its AC already requires the same single slice as direct
+      registration.
   - date: 2026-08-27
     section: 'Epic 1 › Story 1.1 › Acceptance Criteria, fifth block (AC5)'
     raisedBy: 'Second code review of story 1.1, 2026-08-27'
@@ -57,7 +75,7 @@ All four input spines carry `status: final` and were mutually reconciled on 2026
 
 **4.1 Accounts and Authentication**
 
-FR-1: A person can create an Account with an email address and password; the address uniquely identifies it across Yello. Registering an existing address is indistinguishable from registering a new one. Registration completes with exactly one Space in existence for that Account, owned by it.
+FR-1: A person can create an Account with an email address, a password and a display name; the address uniquely identifies it across Yello and the display name does not. Registering an existing address is indistinguishable from registering a new one. Registration completes with exactly one Space in existence for that Account, owned by it.
 FR-2: An Account can authenticate and receive a Session that persists across requests and across every Space it belongs to. A Session carries no Role, Space or capability of its own; switching Space never re-authenticates; an expired Session grants access to nothing.
 FR-3: An Account can delete itself. Refused while it owns any Space. On deletion every Membership is removed, Tasks it was Assignee of become unassigned, authored content in Spaces it did not own is retained under a deleted-Account attribution, and the address is freed for reuse with no inherited history.
 
@@ -593,7 +611,7 @@ So that the product reads as one thing and its accessibility floor is verified r
 ### Story 1.3: Register an Account and receive a Personal Space
 
 As someone who has just found Yello,
-I want to create an Account with my email address and a password and immediately have a Space of my own,
+I want to create an Account with my email address, a password and the name I go by, and immediately have a Space of my own already carrying that name,
 So that I can start holding work without making a single structural decision first.
 
 **Acceptance Criteria:**
