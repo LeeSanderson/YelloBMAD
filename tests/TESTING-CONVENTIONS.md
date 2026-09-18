@@ -322,7 +322,14 @@ and `RehashIntegrationTests` — and **three** for story 1.1's direct constructi
 (`SharedFixtureSmokeTest`, `HostStartupTests`, `StartupConnectivityCheckTests`). Roughly 30 seconds
 to first assertion each, about 2 GB apiece. **They start in parallel rather than sequentially**,
 which is why the wall clock is around 50 seconds rather than four and a half minutes — but the
-memory is concurrent, which is the number story 1.9 has to size against: roughly **18 GB**.
+memory is concurrent, and that is the number story 1.9 has to size against rather than the time.
+
+**The headroom is gone, measured on 2026-09-18.** Docker on this machine reports 16.6 GB total and
+Rancher Desktop runs a Kubernetes control plane in the same allocation; during a full run the
+operating system killed a background process for low memory. No test failed and nothing flaked —
+nine engines are not all at their working-set peak at once — but the next story to add a
+container-backed class is the one that finds out. If a run starts behaving strangely, check memory
+before suspecting the tests.
 
 **Story 1.4 deliberately kept two classes OUT of that count**, and the reason is the one story 1.3
 recorded: `PasswordVerificationDurationTests` and `AuthenticateAccountHandlerTests` need no
