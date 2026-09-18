@@ -8,11 +8,20 @@
     skipping to the main landmark expects to land on the page they navigated to.
 
     WHAT IS DELIBERATELY ABSENT. No context bar, no Space switcher, no Role chip, no navigation
-    and no account menu. Story 1.7 owns the context bar and AccountScopedContext, and story 1.4
-    owns Sessions - so there is nothing yet for a chrome to display, and a placeholder header
-    would be a component a later story has to unpick. There is no skip link either, for the same
-    reason: a skip link needs something to skip PAST, and today the main landmark is the first
-    thing on the page.
+    and no account menu. Story 1.4 built Sessions, so a person can now be signed in - and there is
+    still nothing for a chrome to DISPLAY, because a Session carries no Space and no Role by
+    design (AC1) and the first Space-scoped surface arrives with story 1.5. Story 1.7 owns the
+    context bar and AccountScopedContext, and is the story that gives this layout something to
+    hold. A placeholder header now would be a component that story has to unpick.
+
+    NO SIGN-OUT CONTROL EITHER, and its absence is a recorded decision rather than an oversight.
+    No FR, CAP, journey or acceptance criterion in the artifact set asks for sign-out - yet
+    UX-DR31 names it as one of the five purge triggers, which presupposes it exists. Story 1.4
+    raised it as a question for Lee and assigned the purge seam's extension to story 1.7, which is
+    also the story that builds the bar such a control would live in.
+
+    There is no skip link either, for the original reason: a skip link needs something to skip
+    PAST, and today the main landmark is still the first thing on the page.
 *@
 
 <main>

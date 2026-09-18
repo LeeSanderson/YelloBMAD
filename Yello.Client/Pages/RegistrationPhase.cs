@@ -38,10 +38,13 @@ public enum RegistrationPhase
     /// ends.
     /// </summary>
     /// <remarks>
-    /// <b>This story does not sign the new Account in and does not navigate anywhere.</b> Story
-    /// 1.4 owns authentication and Sessions; story 1.7 owns the context bar a person would arrive
-    /// at. UJ-1's "lands directly in a Space already named" is the epic's outcome, realised once
-    /// those two land, not this story's - confirmed by Lee on 2026-08-28.
+    /// <b>Registration still does not sign the new Account in, and still does not navigate.</b>
+    /// This said "story 1.4 owns authentication and Sessions" and it now does - and it deliberately
+    /// did not wire the two together. Signing a newly-registered Account in automatically is a
+    /// decision no acceptance criterion asks for, and the surface it would land on does not exist:
+    /// story 1.7 owns the context bar, and the first Space-scoped surface is 1.5's. UJ-1's "lands
+    /// directly in a Space already named" is the epic's outcome, realised once those land, not this
+    /// one's - confirmed by Lee on 2026-08-28.
     /// </remarks>
     Complete,
 }

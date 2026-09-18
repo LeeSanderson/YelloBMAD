@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
 using Xunit;
@@ -20,6 +19,15 @@ namespace Yello.Tests.Slices.Accounts.RegisterAccount;
 /// One Host process per test rather than one for the class - each takes a couple of seconds, and
 /// the alternative is tests that can see each other's log output, which is the evidence half of
 /// these assertions.
+/// </para>
+/// <para>
+/// <b>Every request here now carries an anti-forgery token, and story 1.4 is why.</b> AR-14
+/// requires one on <i>every</i> state-changing request and registration is one, so 1.4's decision
+/// reached this shipped endpoint. These cases began failing the moment it did - which is the gate
+/// working rather than a cost - and two of them would otherwise have started passing for the wrong
+/// reason: a missing-token refusal is a <c>400</c>, and so is a malformed submission. A case that
+/// asserts a status without asserting the <c>type</c> beside it cannot tell those two apart, and
+/// both now assert the type.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Slices")]
@@ -49,18 +57,22 @@ public sealed class RegisterAccountEndpointTests(MigratedDatabaseFixture fixture
         var connectionString = Available();
         var address = RandomAddress();
 
-        HttpResponseMessage? first = null;
-        HttpResponseMessage? second = null;
+        WireResponse? first = null;
+        WireResponse? second = null;
         var firstBody = string.Empty;
         var secondBody = string.Empty;
 
         await HostProcess.RunAsync(connectionString, async client =>
         {
-            first = await client.PostAsJsonAsync(AccountRoutes.Register, Submission(address));
-            firstBody = await first.Content.ReadAsStringAsync();
+            var session = new WireSession(client);
 
-            second = await client.PostAsJsonAsync(AccountRoutes.Register, Submission(address));
-            secondBody = await second.Content.ReadAsStringAsync();
+            await session.FetchAntiforgeryTokenAsync();
+
+            first = await session.RegisterAsync(Submission(address));
+            firstBody = first.Body;
+
+            second = await session.RegisterAsync(Submission(address));
+            secondBody = second.Body;
         });
 
         Assert.NotNull(first);
@@ -73,12 +85,12 @@ public sealed class RegisterAccountEndpointTests(MigratedDatabaseFixture fixture
         Assert.Empty(firstBody);
         Assert.Equal(firstBody, secondBody);
 
-        Assert.Equal(first.Content.Headers.ContentType, second.Content.Headers.ContentType);
+        Assert.Equal(first.ContentType, second.ContentType);
 
         // Header NAMES, not values: Date differs between any two responses and Content-Length is
         // absent from both. What would matter is one path carrying a Location, an ETag or a
         // Set-Cookie the other does not.
-        Assert.Equal(HeaderNames(first), HeaderNames(second));
+        Assert.Equal(first.HeaderNames, second.HeaderNames);
     }
 
     /// <summary>
@@ -93,16 +105,16 @@ public sealed class RegisterAccountEndpointTests(MigratedDatabaseFixture fixture
 
         await HostProcess.RunAsync(connectionString, async client =>
         {
-            var created = await client.PostAsJsonAsync(AccountRoutes.Register, Submission(RandomAddress()));
-            bodies.Add(await created.Content.ReadAsStringAsync());
+            var session = new WireSession(client);
+
+            await session.FetchAntiforgeryTokenAsync();
+
+            bodies.Add((await session.RegisterAsync(Submission(RandomAddress()))).Body);
 
             // The rejection path too: an error body is where a value most often escapes, because
             // it is the one place a framework is tempted to echo what it was given.
-            var rejected = await client.PostAsJsonAsync(
-                AccountRoutes.Register,
-                new RegisterAccountRequest(string.Empty, "not-an-address", Password));
-
-            bodies.Add(await rejected.Content.ReadAsStringAsync());
+            bodies.Add((await session.RegisterAsync(
+                new RegisterAccountRequest(string.Empty, "not-an-address", Password))).Body);
         });
 
         Assert.Equal(2, bodies.Count);
@@ -145,8 +157,12 @@ public sealed class RegisterAccountEndpointTests(MigratedDatabaseFixture fixture
 
         var log = await HostProcess.RunAsync(connectionString, async client =>
         {
-            await client.PostAsJsonAsync(AccountRoutes.Register, Submission(address));
-            await client.PostAsJsonAsync(AccountRoutes.Register, Submission(address));
+            var session = new WireSession(client);
+
+            await session.FetchAntiforgeryTokenAsync();
+
+            await session.RegisterAsync(Submission(address));
+            await session.RegisterAsync(Submission(address));
         });
 
         Assert.DoesNotContain(Password, log, StringComparison.Ordinal);
@@ -218,23 +234,23 @@ public sealed class RegisterAccountEndpointTests(MigratedDatabaseFixture fixture
     {
         var connectionString = Available();
 
-        HttpResponseMessage? response = null;
-        var body = string.Empty;
+        WireResponse? response = null;
 
         await HostProcess.RunAsync(connectionString, async client =>
         {
-            response = await client.PostAsJsonAsync(
-                AccountRoutes.Register,
-                new RegisterAccountRequest(string.Empty, "not-an-address", string.Empty));
+            var session = new WireSession(client);
 
-            body = await response.Content.ReadAsStringAsync();
+            await session.FetchAntiforgeryTokenAsync();
+
+            response = await session.RegisterAsync(
+                new RegisterAccountRequest(string.Empty, "not-an-address", string.Empty));
         });
 
         Assert.NotNull(response);
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
-        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("application/problem+json", response.ContentType?.Split(';')[0]);
 
-        var problem = JsonSerializer.Deserialize<ProblemResponse>(body, JsonOptions);
+        var problem = JsonSerializer.Deserialize<ProblemResponse>(response.Body, JsonOptions);
 
         Assert.NotNull(problem);
         Assert.Equal(ProblemTypes.InvalidRegistration, problem.Type);
@@ -263,17 +279,30 @@ public sealed class RegisterAccountEndpointTests(MigratedDatabaseFixture fixture
     {
         var connectionString = Available();
 
-        HttpStatusCode? status = null;
+        WireResponse? response = null;
 
         await HostProcess.RunAsync(connectionString, async client =>
         {
-            using var content = new StringContent("null", Encoding.UTF8, "application/json");
-            var response = await client.PostAsync(new Uri(AccountRoutes.Register, UriKind.Relative), content);
+            var session = new WireSession(client);
 
-            status = response.StatusCode;
+            await session.FetchAntiforgeryTokenAsync();
+
+            response = await session.PostAsync(
+                AccountRoutes.Register,
+                new StringContent("null", Encoding.UTF8, "application/json"));
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, status);
+        Assert.NotNull(response);
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+
+        // THE `type`, NOT ONLY THE STATUS. A missing anti-forgery token is also a 400, so asserting
+        // the status alone would let this case pass while never reaching the endpoint at all -
+        // which is exactly what story 1.4's change to this endpoint's contract would otherwise have
+        // introduced here.
+        var problem = JsonSerializer.Deserialize<ProblemResponse>(response.Body, JsonOptions);
+
+        Assert.NotNull(problem);
+        Assert.Equal(ProblemTypes.InvalidRegistration, problem.Type);
     }
 
     private string Available()
@@ -287,13 +316,6 @@ public sealed class RegisterAccountEndpointTests(MigratedDatabaseFixture fixture
 
     private static RegisterAccountRequest Submission(string address) =>
         new("Ravi-" + Guid.NewGuid().ToString("N"), address, Password);
-
-    private static List<string> HeaderNames(HttpResponseMessage response) =>
-        response.Headers.Select(header => header.Key)
-            .Concat(response.Content.Headers.Select(header => header.Key))
-            .Where(name => !name.Equals("Date", StringComparison.OrdinalIgnoreCase))
-            .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
-            .ToList();
 
     private static int CountOccurrences(string text, string value)
     {

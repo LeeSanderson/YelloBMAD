@@ -2,8 +2,11 @@ using System.Globalization;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.JSInterop;
+using Microsoft.AspNetCore.Components;
 using Yello.Client;
 using Yello.Client.Localisation;
+using Yello.Client.Pages;
+using Yello.Client.Sessions;
 using Yello.Contracts.Localisation;
 
 // The client's composition root.
@@ -61,20 +64,66 @@ builder.Services.AddLocalization();
 // deployment, where the Host serves the client's static files, needs no configured address at
 // all. Story 1.10 owns deployment and decides which shape production takes.
 //
-// A CROSS-ORIGIN CALL ALSO NEEDS CORS, AND CORS IS STORY 1.4'S. The story's own scope table
-// assigns "Sign-in, Sessions, cookies, CORS, anti-forgery" to 1.4, so a browser POST from the
-// client's origin to the Host's is refused by the browser until that lands. That is a known and
-// deliberate seam, not a defect in this wiring: this story's acceptance criteria are about the
-// surface stating its wait and the server's behaviour, both of which are asserted directly.
+// THE CROSS-ORIGIN CALL NOW WORKS, and story 1.4 is what made it. This comment used to predict
+// that: "A CROSS-ORIGIN CALL ALSO NEEDS CORS, AND CORS IS STORY 1.4'S ... so a browser POST from
+// the client's origin to the Host's is refused by the browser until that lands." It has landed.
+// Yello.Host names exactly this origin in its CORS policy - injected by Yello.AppHost from this
+// project's own endpoint, so the two cannot drift - and allows credentials on it.
+//
+// Three things are needed for a Session to survive the trip, and all three are stated once each
+// rather than spread across the pages. The Host's cookie is HttpOnly, Secure and SameSite=None,
+// which SessionCookiePolicy decides. The Host allows exactly this origin, with credentials and no
+// wildcard, which CrossOriginPolicy decides. And every request from here asks for credentials to
+// be included, which YelloApiHandler does - because `fetch` defaults to same-origin and would
+// otherwise send no cookie at all, silently.
 var configuredHostAddress = builder.Configuration["HostBaseAddress"];
 
 var hostAddress = string.IsNullOrWhiteSpace(configuredHostAddress)
     ? builder.HostEnvironment.BaseAddress
     : configuredHostAddress;
 
-builder.Services.AddScoped(_ => new HttpClient { BaseAddress = new Uri(hostAddress) });
+// THE SESSION SEAM. Registered before the HttpClient that reads it.
+//
+// SessionState takes no framework type at all - no NavigationManager, no HttpClient - so the
+// purge-before-announce ordering UX-DR30 requires is assertable by an ordinary test rather than
+// by a browser. What "announce" means is wired here, once, and nowhere else.
+builder.Services.AddScoped<SessionState>();
+
+builder.Services.AddScoped(services =>
+{
+    // Constructed rather than registered through AddHttpClient: that lives in
+    // Microsoft.Extensions.Http, which has no central version pin, and adding one is an
+    // architecture edit rather than a convenience for a single client.
+    var handler = new YelloApiHandler(services.GetRequiredService<SessionState>())
+    {
+        InnerHandler = new HttpClientHandler(),
+    };
+
+    return new HttpClient(handler) { BaseAddress = new Uri(hostAddress) };
+});
+
+builder.Services.AddScoped<AntiforgeryTokenSource>();
 
 var host = builder.Build();
+
+// WHAT HAPPENS WHEN A SESSION ENDS, wired once. AC3, UX-DR30.
+//
+// PURGE, THEN ANNOUNCE - and the order is SessionState's to enforce, not this line's: it runs
+// every registered purge to completion before it reaches this callback. Reversing the two renders
+// a queued frame one tick after the announcement, disclosing a Space the Account no longer belongs
+// to, which is exactly what UX-DR30 exists to prevent.
+//
+// The reason travels in the address rather than in client state, because this navigation destroys
+// the component tree that state would have lived in.
+var sessionState = host.Services.GetRequiredService<SessionState>();
+var navigation = host.Services.GetRequiredService<NavigationManager>();
+
+sessionState.AnnounceSessionEndWith(() =>
+{
+    navigation.NavigateTo(ClientRoutes.SignInAfterSessionEnd);
+
+    return Task.CompletedTask;
+});
 
 // THE DOCUMENT LANGUAGE, and the reason deferred-work.md:32 named this story as its owner.
 //

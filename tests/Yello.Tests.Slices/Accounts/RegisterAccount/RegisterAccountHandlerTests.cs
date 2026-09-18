@@ -272,6 +272,14 @@ public sealed class RegisterAccountHandlerTests
 
             return "hashed:" + password.Length.ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
+
+        // Registration never verifies, so this records the fact rather than pretending to. A
+        // registration path that reached the verifier would be doing something no acceptance
+        // criterion asks for, and the throw says so where a silent `Failed` would not.
+        public PasswordVerification Verify(string? storedHash, string password) =>
+            throw new NotSupportedException(
+                "Registration does not verify a password. Reaching this from RegisterAccountHandler " +
+                "means the slice grew a credential check that no acceptance criterion asks for.");
     }
 
     private sealed class FakeStore(List<string> calls) : IAccountRegistrationStore

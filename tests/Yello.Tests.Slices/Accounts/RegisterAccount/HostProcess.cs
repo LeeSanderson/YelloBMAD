@@ -42,12 +42,55 @@ internal static class HostProcess
     private static readonly string[] ExecutableNames = ["Yello.Host.exe", "Yello.Host"];
 
     /// <summary>
+    /// The empty configuration the two-argument overload passes.
+    /// </summary>
+    private static readonly IReadOnlyDictionary<string, string> NoExtraSettings =
+        new Dictionary<string, string>(StringComparer.Ordinal);
+
+    /// <summary>
     /// Starts the Host, runs <paramref name="work"/> against it, stops it, and returns its log.
     /// </summary>
     /// <param name="connectionString">The container's connection string, injected as configuration.</param>
     /// <param name="work">What to do while it is up. Receives a client bound to its address.</param>
     /// <returns>Everything the Host wrote to stdout.</returns>
-    public static async Task<string> RunAsync(string connectionString, Func<HttpClient, Task> work)
+    public static Task<string> RunAsync(string connectionString, Func<HttpClient, Task> work) =>
+        RunAsync(connectionString, NoExtraSettings, work);
+
+    /// <summary>
+    /// Starts the Host with extra configuration, runs <paramref name="work"/> against it, stops it,
+    /// and returns its log.
+    /// </summary>
+    /// <param name="connectionString">The container's connection string, injected as configuration.</param>
+    /// <param name="settings">
+    /// Extra configuration, by its environment-variable name - so <c>Session:Lifetime</c> is passed
+    /// as <c>Session__Lifetime</c>, which is the spelling .NET's environment provider reads.
+    /// </param>
+    /// <param name="work">What to do while it is up. Receives a client bound to its address.</param>
+    /// <returns>Everything the Host wrote to stdout.</returns>
+    /// <remarks>
+    /// <b>Added by story 1.4, and the reason is AC3.</b> A Session expiring eight hours from now
+    /// cannot be watched expiring by any test this repository permits - <c>Task.Delay</c> as a
+    /// synchronisation mechanism is banned outright, and the Host is a separate process so no
+    /// in-process <c>TimeProvider</c> reaches it. Starting it with a NEGATIVE lifetime makes every
+    /// ticket born already expired, which turns "an expired Session grants nothing" into an
+    /// ordinary assertion against a real cookie and the framework's own expiry evaluation.
+    /// </remarks>
+    public static Task<string> RunAsync(
+        string connectionString,
+        IReadOnlyDictionary<string, string> settings,
+        Func<HttpClient, Task> work)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        // Split from the body below because S4457 requires an argument check to run eagerly rather
+        // than on the first await of a state machine.
+        return RunCoreAsync(connectionString, settings, work);
+    }
+
+    private static async Task<string> RunCoreAsync(
+        string connectionString,
+        IReadOnlyDictionary<string, string> settings,
+        Func<HttpClient, Task> work)
     {
         var executable = Locate();
 
@@ -64,7 +107,31 @@ internal static class HostProcess
         // its own, when a request arrives.
         startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Production";
         startInfo.Environment[$"ConnectionStrings__{HostMetadata.DatabaseResourceName}"] = connectionString;
-        startInfo.Environment["ASPNETCORE_URLS"] = "http://127.0.0.1:0";
+        // HTTPS, FROM STORY 1.4, AND IT IS NOT A PREFERENCE.
+        //
+        // AC5 requires the Session cookie to carry `Secure`, so the Host configures
+        // `CookieSecurePolicy.Always` - and ASP.NET Core's antiforgery system REFUSES OUTRIGHT to
+        // issue a token when that policy is set and the request is not an SSL request:
+        // "The antiforgery system has the configuration value AntiforgeryOptions.Cookie.
+        // SecurePolicy = Always, but the current request is not an SSL request." Found by running
+        // these tests over http on 2026-09-18, where it arrived as a 500 with an empty body.
+        //
+        // The framework is right and the test was wrong. Weakening the policy to SameAsRequest to
+        // make a suite pass would have removed `Secure` from a production cookie to accommodate a
+        // test - which is AC5 traded for convenience. Serving these tests over https instead means
+        // the transport under test is the one the product actually runs on, and it is what makes
+        // the `Secure` attribute assertion beside it mean something rather than describing a header
+        // no browser would have honoured.
+        //
+        // Needs the .NET development certificate, which `dotnet dev-certs https` creates. It is not
+        // TRUSTED by this client - see the validation callback below - so no machine state beyond
+        // the certificate's existence is required.
+        startInfo.Environment["ASPNETCORE_URLS"] = "https://127.0.0.1:0";
+
+        foreach (var (key, value) in settings)
+        {
+            startInfo.Environment[key] = value;
+        }
 
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException($"Could not start '{executable.FullName}'.");
@@ -131,7 +198,31 @@ internal static class HostProcess
             // statement here would compose the result string before those last lines arrived.
             if (address is not null)
             {
-                using var client = new HttpClient { BaseAddress = new Uri(address) };
+                // COOKIES ARE NOT HANDLED FOR THE CALLER, from story 1.4 onwards, and that is a
+                // deliberate change rather than a default left alone.
+                //
+                // Two reasons, and the second is the one that matters. A container would attach
+                // cookies invisibly, so an assertion that a request "was authenticated" could pass
+                // without anyone having said which cookie carried it - and the Session cookie's
+                // attributes ARE AC5's contract, so the test that reads them has to read the
+                // header. And .NET's CookieContainer refuses to store a `Secure` cookie received
+                // over http, which this Host is: with handling on, every Session cookie issued here
+                // would be silently dropped and every round trip would fail for a reason no
+                // assertion would name.
+                using var handler = new HttpClientHandler
+                {
+                    UseCookies = false,
+
+                    // The development certificate is self-signed and this process has no reason to
+                    // trust the machine's root store - a suite that required `dotnet dev-certs
+                    // https --trust` would fail on a cold CI agent for a reason unrelated to
+                    // anything it asserts. Scoped to the loopback address this test started the
+                    // Host on, so it cannot quietly accept a bad certificate from anywhere else.
+                    ServerCertificateCustomValidationCallback = (request, _, _, _) =>
+                        request.RequestUri?.IsLoopback == true,
+                };
+
+                using var client = new HttpClient(handler) { BaseAddress = new Uri(address) };
 
                 await work(client).ConfigureAwait(false);
             }

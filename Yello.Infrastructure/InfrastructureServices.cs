@@ -50,7 +50,14 @@ public static class InfrastructureServices
 
         // AD-1: Identity, for password hashing, and nothing else. No AddIdentity, no
         // AddIdentityCore, no IdentityDbContext, no UserManager<>, no SignInManager<> - and by
-        // Gate C's construction, no role surface of any kind. Story 1.4 adds authentication.
+        // Gate C's construction, no role surface of any kind.
+        //
+        // Story 1.4 added authentication and did not change that list. The Session is a plain
+        // cookie-authentication ticket configured once in Yello.Host's composition root
+        // (SessionCookiePolicy), not Identity's cookie stack: AddIdentityCookies would have
+        // brought a security-stamp validator with a per-request revalidation interval that AD-10
+        // forbids, and MapIdentityApi would have forked Account creation away from AD-22's single
+        // slice. What this story did add here is the Verify half of the hasher below.
         services.Configure<PasswordHasherOptions>(options =>
         {
             // Explicit, so NFR-6's work factor is a decision rather than an inherited default.
@@ -65,6 +72,7 @@ public static class InfrastructureServices
         services.AddScoped<IPersonalSpaceNaming, ResourcePersonalSpaceNaming>();
 
         services.AddScoped<IAccountRegistrationStore, AccountRegistrationStore>();
+        services.AddScoped<IAccountCredentialStore, AccountCredentialStore>();
 
         return services;
     }

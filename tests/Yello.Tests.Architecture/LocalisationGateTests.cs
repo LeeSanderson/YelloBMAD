@@ -4,6 +4,7 @@ using System.Resources;
 using Mono.Cecil;
 using Mono.Cecil.Cil;
 using Xunit;
+using Yello.Application.Accounts.AuthenticateAccount;
 using Yello.Application.Accounts.RegisterAccount;
 using Yello.Client.Localisation;
 using Yello.Client.Pages;
@@ -220,7 +221,98 @@ public sealed class LocalisationGateTests
     [Fact]
     public void Every_registration_failure_code_has_a_message_and_a_field()
     {
-        var codes = typeof(RegisterAccountFailure)
+        var problems = FailureCodeProblems(
+            typeof(RegisterAccountFailure),
+            RegistrationFields.All,
+            nameof(RegistrationFields));
+
+        Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
+    }
+
+    /// <summary>
+    /// The same, for sign-in. Story 1.4's codes are covered by a gate of their own because the one
+    /// above cannot reach them.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The registration gate reflects over <c>RegisterAccountFailure</c> specifically, so a new
+    /// failure class is invisible to it.</b> Without this, <c>AuthenticateAccountFailure</c> could
+    /// ship with a code that has no message and no field and nothing would complain - the interface
+    /// would render the raw code text, which looks like a bug in the copy rather than in the
+    /// contract, and the message would detach from the control it is about.
+    /// </para>
+    /// <para>
+    /// Written as a second case over a shared helper rather than as one case over both classes, so
+    /// a failure names which surface is wrong.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Every_sign_in_failure_code_has_a_message_and_a_field()
+    {
+        var problems = FailureCodeProblems(
+            typeof(AuthenticateAccountFailure),
+            SignInFields.All,
+            nameof(SignInFields));
+
+        Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
+    }
+
+    /// <summary>
+    /// The copy the sign-in surface needs that is keyed on nothing the server sends.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Two strings on this surface have no failure code behind them, which is exactly why they
+    /// need a gate.</b> The 401 carries one stable problem <c>type</c> and no codes at all (AD-23),
+    /// so <c>SignInFailed</c> is resolved from a key the server never mentions; and the
+    /// session-ended notice is originated by this story with no upstream string anywhere. Neither
+    /// is reachable from the code-driven check above, and a missing resource renders as the key -
+    /// "SignInFailed" on screen where "Email or password is incorrect." should be.
+    /// </para>
+    /// <para>
+    /// <b>The value is asserted, not only its presence, for the one string the spine prints
+    /// verbatim.</b> <c>EXPERIENCE.md:272</c> fixes the sign-in failure copy exactly, and it is the
+    /// single string that covers every cause - so a well-meaning edit to "No account was found with
+    /// that email." would satisfy a presence check while reintroducing the enumeration oracle AD-23
+    /// closed, in the one place a person actually reads.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_sign_in_surface_has_the_copy_no_failure_code_carries()
+    {
+        var manager = new ResourceManager(ClientCopy.ResourceName, typeof(ClientCopy).Assembly);
+
+        var required = new[]
+        {
+            "SignInHeading", "SignInIntro", "SignInSubmitLabel", "SignInInFlight",
+            "SignInComplete", "SignInFailed", "SignInToRegisterLink", "SessionEnded",
+        };
+
+        var missing = required
+            .Where(key => string.IsNullOrEmpty(manager.GetString(key, CultureInfo.InvariantCulture)))
+            .ToList();
+
+        Assert.True(
+            missing.Count == 0,
+            "The sign-in surface renders a resource key that ClientCopy.resx has no entry for, so "
+            + "the key itself would appear on screen. None of these is keyed on anything the server "
+            + "sends, so no failure-code gate can reach them."
+            + $"{Environment.NewLine}{string.Join(Environment.NewLine, missing.Select(k => "  - " + k))}");
+
+        Assert.Equal(
+            "Email or password is incorrect.",
+            manager.GetString("SignInFailed", CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
+    /// Checks one failure class's codes against the client's resources and field prefixes.
+    /// </summary>
+    private static List<string> FailureCodeProblems(
+        Type failureClass,
+        IReadOnlyList<string> fields,
+        string fieldsClassName)
+    {
+        var codes = failureClass
             .GetProperties(BindingFlags.Public | BindingFlags.Static)
             .Where(property => property.PropertyType == typeof(string))
             .Select(property => property.GetValue(null) as string)
@@ -231,6 +323,7 @@ public sealed class LocalisationGateTests
         // The reflection above has to have found something, or every assertion below is an
         // assertion about an empty list.
         Assert.NotEmpty(codes);
+        Assert.NotEmpty(fields);
 
         var manager = new ResourceManager(ClientCopy.ResourceName, typeof(ClientCopy).Assembly);
         var problems = new List<string>();
@@ -243,12 +336,12 @@ public sealed class LocalisationGateTests
 
         problems.AddRange(
             from code in codes
-            where !RegistrationFields.All.Any(field => code.StartsWith(field, StringComparison.Ordinal))
+            where !fields.Any(field => code.StartsWith(field, StringComparison.Ordinal))
             select $"The failure code '{code}' begins with none of the field prefixes in " +
-                   "RegistrationFields, so its message would never appear under the control it " +
+                   $"{fieldsClassName}, so its message would never appear under the control it " +
                    "is about.");
 
-        Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
+        return problems;
     }
 
     private static bool IsApplyCall(Instruction instruction) =>

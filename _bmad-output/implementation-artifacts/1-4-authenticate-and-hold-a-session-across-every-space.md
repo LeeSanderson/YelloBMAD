@@ -4,7 +4,7 @@ baseline_commit: 5651d415187629d0f337fed0a1a4b56d72e36f76
 
 # Story 1.4: Authenticate and hold a Session across every Space
 
-Status: ready-for-dev
+Status: review
 
 Epic: 1 — An Account, a Space of your own, and a boundary that holds
 Story key: `1-4-authenticate-and-hold-a-session-across-every-space`
@@ -70,101 +70,101 @@ the epic under-states this story* below.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Decide the Session's shape and lifetime, and record the decision** (AC: 1, 3)
-  - [ ] **Nothing in any artifact states a Session lifetime.** Verified by grep across `_bmad-output/`: no duration, no idle timeout, no absolute expiry, no sliding-vs-absolute choice, no rotation rule, no revocation-on-password-change rule. `decisions-settled.md` has no session row at all. This is question 1 — a deliverable, not an open question.
-  - [ ] **A pure cookie ticket is the recommended shape and the reasoning must be written down either way.** AD-27 (`ARCHITECTURE-SPINE.md:241`) requires anything expiring by the passage of time to carry `ExpiresAt` evaluated "server-side inside the guarded statement's own `WHERE` clause", and **fails the build on a scheduled component writing a terminal expiry state**. AD-10 (`:136`) forbids any component querying the database on a fixed interval. A cookie ticket's expiry is carried in the encrypted payload and evaluated on read, so it satisfies both by construction and adds no table, no sweeper and no per-request read.
-  - [ ] **The word "invalidated" in AC3 does not by itself require a server-side Session record.** Membership removal (FR-14) revokes *access*, and per-request Membership resolution (1.5) already makes that immediate — the Session survives and grants nothing. Read AC3 against AD-1 before concluding a revocation list is needed. If one is needed, it is `ExpiresAt`-shaped and evaluated on read.
-  - [ ] Whatever is chosen, state in the Completion Notes: the lifetime, whether it slides, what happens on password change, and whether a Session is represented in the database at all.
-  - [ ] `DateTimeOffset` in UTC, never `DateTime` (`ARCHITECTURE-SPINE.md:269`). `DateTimeOffset.Now` is banned at build.
+- [x] **Task 1 — Decide the Session's shape and lifetime, and record the decision** (AC: 1, 3)
+  - [x] **Nothing in any artifact states a Session lifetime.** Verified by grep across `_bmad-output/`: no duration, no idle timeout, no absolute expiry, no sliding-vs-absolute choice, no rotation rule, no revocation-on-password-change rule. `decisions-settled.md` has no session row at all. This is question 1 — a deliverable, not an open question.
+  - [x] **A pure cookie ticket is the recommended shape and the reasoning must be written down either way.** AD-27 (`ARCHITECTURE-SPINE.md:241`) requires anything expiring by the passage of time to carry `ExpiresAt` evaluated "server-side inside the guarded statement's own `WHERE` clause", and **fails the build on a scheduled component writing a terminal expiry state**. AD-10 (`:136`) forbids any component querying the database on a fixed interval. A cookie ticket's expiry is carried in the encrypted payload and evaluated on read, so it satisfies both by construction and adds no table, no sweeper and no per-request read.
+  - [x] **The word "invalidated" in AC3 does not by itself require a server-side Session record.** Membership removal (FR-14) revokes *access*, and per-request Membership resolution (1.5) already makes that immediate — the Session survives and grants nothing. Read AC3 against AD-1 before concluding a revocation list is needed. If one is needed, it is `ExpiresAt`-shaped and evaluated on read.
+  - [x] Whatever is chosen, state in the Completion Notes: the lifetime, whether it slides, what happens on password change, and whether a Session is represented in the database at all.
+  - [x] `DateTimeOffset` in UTC, never `DateTime` (`ARCHITECTURE-SPINE.md:269`). `DateTimeOffset.Now` is banned at build.
 
-- [ ] **Task 2 — The `AuthenticateAccount` slice** (AC: 1, 4)
-  - [ ] `Yello.Application/Accounts/AuthenticateAccount/` — command, handler, validator in one folder; tests mirror at `tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/` (AR-3, `epics.md:191`; namespace convention `Yello.Application.{Area}.{UseCase}`).
-  - [ ] **The slice verifies a credential and returns an `AccountId` or nothing. It does not issue a cookie, touch `HttpContext`, or know what a Session is.** `Yello.Application` may not reference ASP.NET Core — enforced twice, by the ring gate (`AllowedReferenceEdges.cs:110-180`, exact equality) and by the `Microsoft.AspNetCore.` package-prefix ban (`:233-246`).
-  - [ ] The handler **hashes unconditionally**, exactly as `RegisterAccountHandler` does. An unknown address must still perform a verification against a dummy hash of the same work factor, or AC4's duration clause fails the moment it is measured. `if (account is null) return Fail();` is the defect AD-23 exists to catch.
-  - [ ] Copy the validator shape: hand-written `public static IReadOnlyList<string> Validate(...)`, **not FluentValidation** — that package is not in AR-1 and adding one is an architecture edit. Every rule evaluated, never short-circuited.
-  - [ ] **A validator that rejects before the hash reintroduces the branch by another route.** A client-side rejection that never reaches the server is safe; a server-side one that returns early is not. Story 1.3's Dev Notes state this for registration and it transfers unchanged.
-  - [ ] Re-implementing authorisation, Space resolution, refusal recording, idempotency or a bound check inside this slice **is a defect** (AR-3). None of them exists yet; 1.5 and 1.6 build them.
+- [x] **Task 2 — The `AuthenticateAccount` slice** (AC: 1, 4)
+  - [x] `Yello.Application/Accounts/AuthenticateAccount/` — command, handler, validator in one folder; tests mirror at `tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/` (AR-3, `epics.md:191`; namespace convention `Yello.Application.{Area}.{UseCase}`).
+  - [x] **The slice verifies a credential and returns an `AccountId` or nothing. It does not issue a cookie, touch `HttpContext`, or know what a Session is.** `Yello.Application` may not reference ASP.NET Core — enforced twice, by the ring gate (`AllowedReferenceEdges.cs:110-180`, exact equality) and by the `Microsoft.AspNetCore.` package-prefix ban (`:233-246`).
+  - [x] The handler **hashes unconditionally**, exactly as `RegisterAccountHandler` does. An unknown address must still perform a verification against a dummy hash of the same work factor, or AC4's duration clause fails the moment it is measured. `if (account is null) return Fail();` is the defect AD-23 exists to catch.
+  - [x] Copy the validator shape: hand-written `public static IReadOnlyList<string> Validate(...)`, **not FluentValidation** — that package is not in AR-1 and adding one is an architecture edit. Every rule evaluated, never short-circuited.
+  - [x] **A validator that rejects before the hash reintroduces the branch by another route.** A client-side rejection that never reaches the server is safe; a server-side one that returns early is not. Story 1.3's Dev Notes state this for registration and it transfers unchanged.
+  - [x] Re-implementing authorisation, Space resolution, refusal recording, idempotency or a bound check inside this slice **is a defect** (AR-3). None of them exists yet; 1.5 and 1.6 build them.
 
-- [ ] **Task 3 — `Verify` on the hasher port, and the rehash path story 1.3 left here** (AC: 1, 4)
-  - [ ] Add a `Verify` member to `Yello.Domain/Accounts/IPasswordHasher.cs`. Its current doc comment (`:14-16`) says the omission is deliberate — "verification is authentication, which is story 1.4's, and a port that offered it here would invite this story to grow a sign-in path". **Update that comment; do not leave it claiming an absence that is no longer true.**
-  - [ ] Return a three-state result, not a bool: `IdentityPasswordHasher` wraps `VerifyHashedPassword`, which returns `Failed`, `Success` and **`SuccessRehashNeeded`**. `IdentityPasswordHasher.cs:26-32` already records that "story 1.4 rewrites the hash on the next successful sign-in", and `Account.PasswordHash` is `{ get; set; }` rather than `init` **specifically so this story can write it** (`Account.cs:93-98`).
-  - [ ] The mechanism is already proved: `RegisterAccountIntegrationTests.Raising_the_work_factor_leaves_an_existing_hash_valid_and_asks_for_a_rehash`. This story makes it *reachable* — assert the rehash actually lands in the datastore, which nothing does today.
-  - [ ] **A rehash write must not make a successful sign-in distinguishable in duration from a failed one.** It happens only on success, so it cannot leak existence on the failure path — but say so in the notes rather than leaving a reviewer to work it out.
-  - [ ] **`Account.PasswordHash` is nullable and must stay representable as null.** `harness-constraints.md:65` requires NFR-6 to "tolerate Accounts that hold no password at all, rather than treating that as an invalid state". A passwordless Account must fail sign-in through the *same uniform path*, not throw and not be treated as corruption.
+- [x] **Task 3 — `Verify` on the hasher port, and the rehash path story 1.3 left here** (AC: 1, 4)
+  - [x] Add a `Verify` member to `Yello.Domain/Accounts/IPasswordHasher.cs`. Its current doc comment (`:14-16`) says the omission is deliberate — "verification is authentication, which is story 1.4's, and a port that offered it here would invite this story to grow a sign-in path". **Update that comment; do not leave it claiming an absence that is no longer true.**
+  - [x] Return a three-state result, not a bool: `IdentityPasswordHasher` wraps `VerifyHashedPassword`, which returns `Failed`, `Success` and **`SuccessRehashNeeded`**. `IdentityPasswordHasher.cs:26-32` already records that "story 1.4 rewrites the hash on the next successful sign-in", and `Account.PasswordHash` is `{ get; set; }` rather than `init` **specifically so this story can write it** (`Account.cs:93-98`).
+  - [x] The mechanism is already proved: `RegisterAccountIntegrationTests.Raising_the_work_factor_leaves_an_existing_hash_valid_and_asks_for_a_rehash`. This story makes it *reachable* — assert the rehash actually lands in the datastore, which nothing does today.
+  - [x] **A rehash write must not make a successful sign-in distinguishable in duration from a failed one.** It happens only on success, so it cannot leak existence on the failure path — but say so in the notes rather than leaving a reviewer to work it out.
+  - [x] **`Account.PasswordHash` is nullable and must stay representable as null.** `harness-constraints.md:65` requires NFR-6 to "tolerate Accounts that hold no password at all, rather than treating that as an invalid state". A passwordless Account must fail sign-in through the *same uniform path*, not throw and not be treated as corruption.
 
-- [ ] **Task 4 — Identity for authentication only: cookie issuance in the composition root** (AC: 1, 5)
-  - [ ] `InfrastructureServices.cs:52-53` is the hand-off and names what is absent: "no `AddIdentity`, no `AddIdentityCore`, no `IdentityDbContext`, no `UserManager<>`, no `SignInManager<>` — and by Gate C's construction, no role surface of any kind. **Story 1.4 adds authentication.**"
-  - [ ] **`AddIdentity<TUser, TRole>()` fails the build.** Gate C (`RoleApiBanTests`) is a live IL scan over every assembly and refuses `IdentityRole` at any arity, `RoleManager<>`, `IRoleStore<>`, `AddRoles<>()`, `[Authorize(Roles = …)]`, `RequireRole`, `ClaimsPrincipal.IsInRole`, and `ClaimTypes.Role` however spelled. Plain `[Authorize]` with no `Roles` argument is **not** banned.
-  - [ ] **Do not use `MapIdentityApi`.** It mints its own `/register` and `/login`, which forks Account creation away from AD-22's single slice (`ARCHITECTURE-SPINE.md:210`) and answers differently for a known and an unknown address — a direct AD-23 violation. It is the framework's shortcut for a shape this architecture has ruled out.
-  - [ ] **No new package is needed on the Host.** Cookie authentication lives in the `Microsoft.AspNetCore.App` shared framework, which `Yello.Host` (`Microsoft.NET.Sdk.Web`) already has. Adding a central pin is an architecture edit — `epics.md`'s AR-1 table first, then `Directory.Packages.props`, then `PackageVersionPinTests`' expected set, which is asserted as an **exact** set.
-  - [ ] **Cookie policy is configured once, in the composition root.** AD-7's *Prevents* clause (`ARCHITECTURE-SPINE.md:117`) bans "per-endpoint cookie configuration" in as many words — this is stronger than AR-14's paraphrase and is the binding text.
-  - [ ] The cookie carries an Account identifier and nothing else. **No Role claim, no Space claim, no capability claim** — AC1, AD-1 (`:75`: "Role is never read from a cookie, a claim, an API Token payload, or any cache outliving the request") and NFR-2 (`quality-budgets.md:20-25`).
-  - [ ] `Yello.Host/RegistrationLog.cs` uses EventIds 1008–1009 and `StartupLog.cs` uses 1000–1007. **A sign-in log starts at 1010.** `[LoggerMessage]` source-generated partials only — CA1848 and CA1873 are errors.
-  - [ ] **Never log the cookie** (`ARCHITECTURE-SPINE.md:274`, AR-34). And the log must not distinguish the two failure causes, which is the trap story 1.3 met on 2026-09-12 when EF Core's command log named every duplicate registration — that filter (`Program.cs:41`) is already unconditional and covers this story too.
+- [x] **Task 4 — Identity for authentication only: cookie issuance in the composition root** (AC: 1, 5)
+  - [x] `InfrastructureServices.cs:52-53` is the hand-off and names what is absent: "no `AddIdentity`, no `AddIdentityCore`, no `IdentityDbContext`, no `UserManager<>`, no `SignInManager<>` — and by Gate C's construction, no role surface of any kind. **Story 1.4 adds authentication.**"
+  - [x] **`AddIdentity<TUser, TRole>()` fails the build.** Gate C (`RoleApiBanTests`) is a live IL scan over every assembly and refuses `IdentityRole` at any arity, `RoleManager<>`, `IRoleStore<>`, `AddRoles<>()`, `[Authorize(Roles = …)]`, `RequireRole`, `ClaimsPrincipal.IsInRole`, and `ClaimTypes.Role` however spelled. Plain `[Authorize]` with no `Roles` argument is **not** banned.
+  - [x] **Do not use `MapIdentityApi`.** It mints its own `/register` and `/login`, which forks Account creation away from AD-22's single slice (`ARCHITECTURE-SPINE.md:210`) and answers differently for a known and an unknown address — a direct AD-23 violation. It is the framework's shortcut for a shape this architecture has ruled out.
+  - [x] **No new package is needed on the Host.** Cookie authentication lives in the `Microsoft.AspNetCore.App` shared framework, which `Yello.Host` (`Microsoft.NET.Sdk.Web`) already has. Adding a central pin is an architecture edit — `epics.md`'s AR-1 table first, then `Directory.Packages.props`, then `PackageVersionPinTests`' expected set, which is asserted as an **exact** set.
+  - [x] **Cookie policy is configured once, in the composition root.** AD-7's *Prevents* clause (`ARCHITECTURE-SPINE.md:117`) bans "per-endpoint cookie configuration" in as many words — this is stronger than AR-14's paraphrase and is the binding text.
+  - [x] The cookie carries an Account identifier and nothing else. **No Role claim, no Space claim, no capability claim** — AC1, AD-1 (`:75`: "Role is never read from a cookie, a claim, an API Token payload, or any cache outliving the request") and NFR-2 (`quality-budgets.md:20-25`).
+  - [x] `Yello.Host/RegistrationLog.cs` uses EventIds 1008–1009 and `StartupLog.cs` uses 1000–1007. **A sign-in log starts at 1010.** `[LoggerMessage]` source-generated partials only — CA1848 and CA1873 are errors.
+  - [x] **Never log the cookie** (`ARCHITECTURE-SPINE.md:274`, AR-34). And the log must not distinguish the two failure causes, which is the trap story 1.3 met on 2026-09-12 when EF Core's command log named every duplicate registration — that filter (`Program.cs:41`) is already unconditional and covers this story too.
 
-- [ ] **Task 5 — The cross-origin contract: CORS, the cookie's attributes, anti-forgery** (AC: 5)
-  - [ ] **Read the .NET 10 CSRF note in the Dev Notes before writing any of this.** The framework now registers an automatic CSRF middleware by default, its trust list *is* the CORS policy, and its verdict is enforced only by a form consumer. Getting this wrong produces a configuration that looks protected and is not.
-  - [ ] CORS: `WithOrigins(<the configured origin>)` + `AllowCredentials()`. **Never `AllowAnyOrigin`, never `SetIsOriginAllowed(_ => true)`.** The second is the trap — `AllowAnyOrigin` combined with `AllowCredentials` throws at runtime, which pushes an implementer straight onto the reflected-`Origin` form AD-7 bans by name.
-  - [ ] The allowed origin comes from **configuration, not source** (`ARCHITECTURE-SPINE.md:273`, AR-37: environment variables only, "no secret in source, appsettings, or a container image"). That is also what makes "exactly the configured client origin" testable rather than tautological.
-  - [ ] Cookie: `HttpOnly`, `SecurePolicy = CookieSecurePolicy.Always`, `SameSite = SameSiteMode.None`. `SameSite=None` without `Secure` is rejected by every current browser, so these are one decision, not three.
-  - [ ] Anti-forgery on every state-changing request. **This reaches registration too** — `AccountRoutes.Register` is a state-changing POST and AR-14 says *every*. Whether an unauthenticated endpoint takes a token is question 5; decide it, do not let it default.
-  - [ ] Nothing may write a credential to `localStorage` or `sessionStorage` (AC5), and UX-DR31 (`epics.md:275`) extends the ban to Space-scoped *content* in `localStorage`, `sessionStorage` **or IndexedDB**. There is no browser-storage interop in the client today — keep it that way, and assert it.
-  - [ ] The `/sync` WebSocket crosses the same origin boundary with the same cookie (`ARCHITECTURE-SPINE.md:323-325`). Nothing about it is built here; do not configure the cookie in a way that assumes HTTP only.
+- [x] **Task 5 — The cross-origin contract: CORS, the cookie's attributes, anti-forgery** (AC: 5)
+  - [x] **Read the .NET 10 CSRF note in the Dev Notes before writing any of this.** The framework now registers an automatic CSRF middleware by default, its trust list *is* the CORS policy, and its verdict is enforced only by a form consumer. Getting this wrong produces a configuration that looks protected and is not.
+  - [x] CORS: `WithOrigins(<the configured origin>)` + `AllowCredentials()`. **Never `AllowAnyOrigin`, never `SetIsOriginAllowed(_ => true)`.** The second is the trap — `AllowAnyOrigin` combined with `AllowCredentials` throws at runtime, which pushes an implementer straight onto the reflected-`Origin` form AD-7 bans by name.
+  - [x] The allowed origin comes from **configuration, not source** (`ARCHITECTURE-SPINE.md:273`, AR-37: environment variables only, "no secret in source, appsettings, or a container image"). That is also what makes "exactly the configured client origin" testable rather than tautological.
+  - [x] Cookie: `HttpOnly`, `SecurePolicy = CookieSecurePolicy.Always`, `SameSite = SameSiteMode.None`. `SameSite=None` without `Secure` is rejected by every current browser, so these are one decision, not three.
+  - [x] Anti-forgery on every state-changing request. **This reaches registration too** — `AccountRoutes.Register` is a state-changing POST and AR-14 says *every*. Whether an unauthenticated endpoint takes a token is question 5; decide it, do not let it default.
+  - [x] Nothing may write a credential to `localStorage` or `sessionStorage` (AC5), and UX-DR31 (`epics.md:275`) extends the ban to Space-scoped *content* in `localStorage`, `sessionStorage` **or IndexedDB**. There is no browser-storage interop in the client today — keep it that way, and assert it.
+  - [x] The `/sync` WebSocket crosses the same origin boundary with the same cookie (`ARCHITECTURE-SPINE.md:323-325`). Nothing about it is built here; do not configure the cookie in a way that assumes HTTP only.
 
-- [ ] **Task 6 — The client reaches the Host: credentials on the wire** (AC: 3, 5)
-  - [ ] `Yello.Client/Program.cs:75` registers a bare `AddScoped(_ => new HttpClient { BaseAddress = ... })` — no factory, no typed client, **no `DelegatingHandler`**. A cross-origin cookie is not sent by `fetch` unless credentials are included.
-  - [ ] Use `SetBrowserRequestCredentials(BrowserRequestCredentials.Include)`. The namespace `Microsoft.AspNetCore.Components.WebAssembly.Http` is **already imported** at `_Imports.razor:7`, so this needs no package.
-  - [ ] Update the capitalised comment at `Yello.Client/Program.cs:64-68` — "A CROSS-ORIGIN CALL ALSO NEEDS CORS, AND CORS IS STORY 1.4'S". This story is that story; the comment must stop predicting and start describing.
-  - [ ] **Do not touch the culture block at `:29-34`.** It carries a capitalised prohibition for a reason: assigning the resolved culture to `CultureInfo.DefaultThreadCurrentCulture` stopped the application booting in *every* browser on 2026-09-01, and 136 green tests did not notice. The resolved culture drives `<html lang>` and nothing else.
-  - [ ] `deferred-work.md:76` closes here, or is rewritten. It is the CORS entry, owned by this story by name.
+- [x] **Task 6 — The client reaches the Host: credentials on the wire** (AC: 3, 5)
+  - [x] `Yello.Client/Program.cs:75` registers a bare `AddScoped(_ => new HttpClient { BaseAddress = ... })` — no factory, no typed client, **no `DelegatingHandler`**. A cross-origin cookie is not sent by `fetch` unless credentials are included.
+  - [x] Use `SetBrowserRequestCredentials(BrowserRequestCredentials.Include)`. The namespace `Microsoft.AspNetCore.Components.WebAssembly.Http` is **already imported** at `_Imports.razor:7`, so this needs no package.
+  - [x] Update the capitalised comment at `Yello.Client/Program.cs:64-68` — "A CROSS-ORIGIN CALL ALSO NEEDS CORS, AND CORS IS STORY 1.4'S". This story is that story; the comment must stop predicting and start describing.
+  - [x] **Do not touch the culture block at `:29-34`.** It carries a capitalised prohibition for a reason: assigning the resolved culture to `CultureInfo.DefaultThreadCurrentCulture` stopped the application booting in *every* browser on 2026-09-01, and 136 green tests did not notice. The resolved culture drives `<html lang>` and nothing else.
+  - [x] `deferred-work.md:76` closes here, or is rewritten. It is the CORS entry, owned by this story by name.
 
-- [ ] **Task 7 — The sign-in surface** (AC: 3, 4, 6)
-  - [ ] `Yello.Client/Pages/SignIn.razor`. Copy `Register.razor`'s structure: `@inject IStringLocalizer<ClientCopy> Localizer`, `@inject HttpClient Http`, a phase enum, an `_attempt` counter used as `@key` so a repeated failure re-announces, and the existing `FormField` / `PrimaryButton` / `InlineErrorRegion` components.
-  - [ ] **Two fields, email and password.** No "remember me" — nothing in any artifact mentions one, and it is a Session-lifetime decision wearing a checkbox. No password-reset link: no FR, CAP or journey anywhere mentions password reset, and adding one is inventing a requirement (the same reasoning that kept email verification out of 1.3).
-  - [ ] **Sign-in is a submit-and-wait interaction** — `EXPERIENCE.md:273` names registration and sign-in as "the only submit-and-wait interactions in a product with no save button". State the in-flight condition, disable resubmission, announce completion. Never a whole-surface spinner.
-  - [ ] **One error string for every cause**: `"Email or password is incorrect."` (`EXPERIENCE.md:272`; drawn at `mockups/registration.html:123`). One resource key, one problem `type` on the wire, no client-side branch.
-  - [ ] **Validation errors take `--border-hairline`, never `--danger`.** `DESIGN.md:501` lists "use danger for validation errors or ordinary refusals" as the Don't; `DESIGN.md:289` and `:482` make the spine win over any mock. The sign-in mockup's `border:1px solid var(--danger)` is precisely the forbidden move, and the file is one of the four rendered before the border and type corrections.
-  - [ ] **Do not copy the mockup's `1px` borders, its `px` type, or its fixed `330px` width.** All three are superseded (UX-DR2, UX-DR4, and story 1.3's registration surface, which dropped the fixed width because it would overflow a 320px viewport before a word was translated).
-  - [ ] Copy resources hold **sentence case** — `Email`, `Password`, not `EMAIL`. The uppercase comes from `text-transform`. A resource holding `VIEWER` makes the accessible name "V-I-E-W-E-R" under JAWS (`DESIGN.md:396-400`).
-  - [ ] `autocomplete`: UX-DR33's `="off"` rule covers **Space, Project and Task name inputs only**. Do not over-apply it here — `autocomplete="email"` and `="current-password"` are what WCAG 1.3.5 asks for, and `FormField` already takes an `AutoComplete` parameter.
-  - [ ] Decide what `/` becomes. `Register.razor:25-30` routes at both `/` and `/register` and says the root is provisional, "stories 1.4 and 1.7 decide what belongs there". This story is half of that decision — question 6.
+- [x] **Task 7 — The sign-in surface** (AC: 3, 4, 6)
+  - [x] `Yello.Client/Pages/SignIn.razor`. Copy `Register.razor`'s structure: `@inject IStringLocalizer<ClientCopy> Localizer`, `@inject HttpClient Http`, a phase enum, an `_attempt` counter used as `@key` so a repeated failure re-announces, and the existing `FormField` / `PrimaryButton` / `InlineErrorRegion` components.
+  - [x] **Two fields, email and password.** No "remember me" — nothing in any artifact mentions one, and it is a Session-lifetime decision wearing a checkbox. No password-reset link: no FR, CAP or journey anywhere mentions password reset, and adding one is inventing a requirement (the same reasoning that kept email verification out of 1.3).
+  - [x] **Sign-in is a submit-and-wait interaction** — `EXPERIENCE.md:273` names registration and sign-in as "the only submit-and-wait interactions in a product with no save button". State the in-flight condition, disable resubmission, announce completion. Never a whole-surface spinner.
+  - [x] **One error string for every cause**: `"Email or password is incorrect."` (`EXPERIENCE.md:272`; drawn at `mockups/registration.html:123`). One resource key, one problem `type` on the wire, no client-side branch.
+  - [x] **Validation errors take `--border-hairline`, never `--danger`.** `DESIGN.md:501` lists "use danger for validation errors or ordinary refusals" as the Don't; `DESIGN.md:289` and `:482` make the spine win over any mock. The sign-in mockup's `border:1px solid var(--danger)` is precisely the forbidden move, and the file is one of the four rendered before the border and type corrections.
+  - [x] **Do not copy the mockup's `1px` borders, its `px` type, or its fixed `330px` width.** All three are superseded (UX-DR2, UX-DR4, and story 1.3's registration surface, which dropped the fixed width because it would overflow a 320px viewport before a word was translated).
+  - [x] Copy resources hold **sentence case** — `Email`, `Password`, not `EMAIL`. The uppercase comes from `text-transform`. A resource holding `VIEWER` makes the accessible name "V-I-E-W-E-R" under JAWS (`DESIGN.md:396-400`).
+  - [x] `autocomplete`: UX-DR33's `="off"` rule covers **Space, Project and Task name inputs only**. Do not over-apply it here — `autocomplete="email"` and `="current-password"` are what WCAG 1.3.5 asks for, and `FormField` already takes an `AutoComplete` parameter.
+  - [x] Decide what `/` becomes. `Register.razor:25-30` routes at both `/` and `/register` and says the root is provisional, "stories 1.4 and 1.7 decide what belongs there". This story is half of that decision — question 6.
 
-- [ ] **Task 8 — The expiry path: the 401, the reason, and the purge** (AC: 3, 6)
-  - [ ] **An expired Session must be refused at the authentication boundary, not the Space boundary.** AD-3 (`ARCHITECTURE-SPINE.md:88-94`) draws the 403/404 line at the Space boundary *and nowhere else*; an unauthenticated request must not enter Space resolution at all. This is a **401**, and it is not a 404.
-  - [ ] **Do not write an `AccessRefusal` row for a failed sign-in or an expired Session.** AD-20 (`:198`) scopes that record to "every 403 and every Space-boundary 404", with exactly two kinds, `CrossSpace` and `InsufficientRole`. A sign-in failure has no acting Account and no target Space; recording one would need a third kind and would create an enumeration artifact in the audit store. The pipeline that writes those rows is 1.6's and does not exist yet.
-  - [ ] **The reason stated may name the Session and nothing else.** UJ-6 tells a *live* participant that access ended, because that connection was already authorised for the Space; UJ-4's cold path must not (`surfaces-and-journeys.md:62-64`). An expired Session is the cold case. No Space name, no Membership information, no "you were removed" — UX-DR38 keeps the Space name out of the copy "in any case".
-  - [ ] **No copy string exists for this anywhere.** Contrast `"Access ended."`, `"Not available."`, `"Email or password is incorrect."` and `"This invitation is no longer valid."`, all printed verbatim in the spine. Session expiry gets a requirement to state the reason and no string. This story originates it — question 4.
-  - [ ] **No focus destination is specified either.** `EXPERIENCE.md:396-405` enumerates seven remote events and session expiry is not among them, despite `:394` stating the hazard: a destroyed focused node drops focus to `<body>` and silently strands a keyboard user. Returning to sign-in destroys the whole focused subtree. The only sanctioned pattern to extend is `:398`'s — `role="alert"`, `tabindex="-1"`, persistent, in the reading order — which `InlineErrorRegion.razor` already implements.
-  - [ ] **Purge before announce** (UX-DR30, `epics.md:274`). Reversing the order renders a queued frame one tick after the announcement, disclosing a Space the Account no longer belongs to.
-  - [ ] **The purge is nearly vacuous today and must be recorded as such.** There is no replica, no cached Board, no filter state, no Space-scoped client state of any kind — the client holds three fields in one component. A test asserting "everything Space-scoped is purged" would pass against a system with nothing to purge, which is the vacuous-gate defect this repository keeps rediscovering (`deferred-work.md:30`). **Build the seam so 1.7 and epic 2 extend it; assert what the seam does, not what it will one day cover; and say plainly in the Completion Notes that the coverage is a seam and not a proof.**
-  - [ ] AC6 is in the same position. There is no editor and no unsent input until epic 7. What this story can honestly hold is the *rule* — nothing auto-submits after re-authentication — and the absence of any code path that would. State the limit rather than implying coverage.
+- [x] **Task 8 — The expiry path: the 401, the reason, and the purge** (AC: 3, 6)
+  - [x] **An expired Session must be refused at the authentication boundary, not the Space boundary.** AD-3 (`ARCHITECTURE-SPINE.md:88-94`) draws the 403/404 line at the Space boundary *and nowhere else*; an unauthenticated request must not enter Space resolution at all. This is a **401**, and it is not a 404.
+  - [x] **Do not write an `AccessRefusal` row for a failed sign-in or an expired Session.** AD-20 (`:198`) scopes that record to "every 403 and every Space-boundary 404", with exactly two kinds, `CrossSpace` and `InsufficientRole`. A sign-in failure has no acting Account and no target Space; recording one would need a third kind and would create an enumeration artifact in the audit store. The pipeline that writes those rows is 1.6's and does not exist yet.
+  - [x] **The reason stated may name the Session and nothing else.** UJ-6 tells a *live* participant that access ended, because that connection was already authorised for the Space; UJ-4's cold path must not (`surfaces-and-journeys.md:62-64`). An expired Session is the cold case. No Space name, no Membership information, no "you were removed" — UX-DR38 keeps the Space name out of the copy "in any case".
+  - [x] **No copy string exists for this anywhere.** Contrast `"Access ended."`, `"Not available."`, `"Email or password is incorrect."` and `"This invitation is no longer valid."`, all printed verbatim in the spine. Session expiry gets a requirement to state the reason and no string. This story originates it — question 4.
+  - [x] **No focus destination is specified either.** `EXPERIENCE.md:396-405` enumerates seven remote events and session expiry is not among them, despite `:394` stating the hazard: a destroyed focused node drops focus to `<body>` and silently strands a keyboard user. Returning to sign-in destroys the whole focused subtree. The only sanctioned pattern to extend is `:398`'s — `role="alert"`, `tabindex="-1"`, persistent, in the reading order — which `InlineErrorRegion.razor` already implements.
+  - [x] **Purge before announce** (UX-DR30, `epics.md:274`). Reversing the order renders a queued frame one tick after the announcement, disclosing a Space the Account no longer belongs to.
+  - [x] **The purge is nearly vacuous today and must be recorded as such.** There is no replica, no cached Board, no filter state, no Space-scoped client state of any kind — the client holds three fields in one component. A test asserting "everything Space-scoped is purged" would pass against a system with nothing to purge, which is the vacuous-gate defect this repository keeps rediscovering (`deferred-work.md:30`). **Build the seam so 1.7 and epic 2 extend it; assert what the seam does, not what it will one day cover; and say plainly in the Completion Notes that the coverage is a seam and not a proof.**
+  - [x] AC6 is in the same position. There is no editor and no unsent input until epic 7. What this story can honestly hold is the *rule* — nothing auto-submits after re-authentication — and the absence of any code path that would. State the limit rather than implying coverage.
 
-- [ ] **Task 9 — AC4's duration proof, reusing the existing method** (AC: 4)
-  - [ ] `tests/Yello.Tests.Shared/DurationIndistinguishability.cs` already exists, built by story 1.3. `TESTING-CONVENTIONS.md:189`: "**Use it; do not improvise a second one.**" Its four fixed decisions are 21 samples per arm, the **median** not the mean, 20% of the slower median as the tolerance, a server-side measurement point, and interleaved samples.
-  - [ ] Two arms: unknown address, and known address with a wrong password. The measurement point is server-side, timing the operation and nothing around it.
-  - [ ] **Pair it with a planted oracle as a permanent test**, exactly as `RegistrationDurationTests.The_method_detects_a_registration_that_skips_the_hash` does. Keeping the plant as a live test is what stops a later story widening the tolerance to quiet a flake and silently disarming the real assertion beside it.
-  - [ ] Put the pure cases in a class separate from the container-backed ones, as `DurationIndistinguishabilityTests` is deliberately separate from `RegistrationDurationTests` — so a stopped container runtime does not take the pure cases down with it.
-  - [ ] Also assert the two responses match in **status, body, shape and headers**, compared *against each other* rather than each against an expectation. `A_duplicate_registration_answers_exactly_as_a_new_one_does` is the shape to copy.
+- [x] **Task 9 — AC4's duration proof, reusing the existing method** (AC: 4)
+  - [x] `tests/Yello.Tests.Shared/DurationIndistinguishability.cs` already exists, built by story 1.3. `TESTING-CONVENTIONS.md:189`: "**Use it; do not improvise a second one.**" Its four fixed decisions are 21 samples per arm, the **median** not the mean, 20% of the slower median as the tolerance, a server-side measurement point, and interleaved samples.
+  - [x] Two arms: unknown address, and known address with a wrong password. The measurement point is server-side, timing the operation and nothing around it.
+  - [x] **Pair it with a planted oracle as a permanent test**, exactly as `RegistrationDurationTests.The_method_detects_a_registration_that_skips_the_hash` does. Keeping the plant as a live test is what stops a later story widening the tolerance to quiet a flake and silently disarming the real assertion beside it.
+  - [x] Put the pure cases in a class separate from the container-backed ones, as `DurationIndistinguishabilityTests` is deliberately separate from `RegistrationDurationTests` — so a stopped container runtime does not take the pure cases down with it.
+  - [x] Also assert the two responses match in **status, body, shape and headers**, compared *against each other* rather than each against an expectation. `A_duplicate_registration_answers_exactly_as_a_new_one_does` is the shape to copy.
 
-- [ ] **Task 10 — Tests** (AC: all)
-  - [ ] **Cases go in `tests/Yello.Tests.Slices`, mirroring `Accounts/AuthenticateAccount/`.** Do not create a suite (`TESTING-CONVENTIONS.md:30`).
-  - [ ] **Do not add cases to `Yello.Tests.Isolation` or `Yello.Tests.Revocation`.** Both are still empty and both carry `--ignore-exit-code 8`; adding one case means removing that property in the same change, gated both ways by `Only_suites_with_no_tests_may_ignore_the_zero_test_exit_code`. More to the point, AD-4 requires every isolation case to run on **both** surfaces and the API-token surface does not exist until 1.8 — so the isolation suite genuinely cannot be populated here. 1.9 owns it.
-  - [ ] Endpoint tests boot the real Host as a process via `HostProcess.RunAsync` — there is no `WebApplicationFactory` and no `Microsoft.AspNetCore.Mvc.Testing` in this solution, and no central pin for one.
-  - [ ] Container-backed classes take `IClassFixture<MigratedDatabaseFixture>` and open with `Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason)`. **Each consumer gets its own ~2 GB SQL Server**; a full run already starts seven engines sequentially. Do not attempt to settle the topology — that is 1.9's, and `deferred-work.md:8` is explicit.
-  - [ ] **Randomise the email address in every test** (`TESTING-CONVENTIONS.md:93`). Cleanup by transaction rollback or container disposal, never by delete statements.
-  - [ ] **No `Task.Delay` as a synchronisation mechanism. Ever.** An expiry test that sleeps is the obvious way to write this and is forbidden — inject `TimeProvider` (already registered as `TimeProvider.System` at `Program.cs:58`) and advance it, or construct a ticket that is already expired.
-  - [ ] Traits: `Suite`, `Priority`, `Requirement` — **cite the `AR` id and the `AD` id** (`TESTING-CONVENTIONS.md:59`) — and `Assumption` naming its source document.
-  - [ ] **Every absence assertion gets a planted violation, and the result is recorded.** This story is dense with them: no Role or Space in the cookie; no credential in web storage; no wildcard or reflected origin accepted; no log line distinguishing the two failure causes; no auto-submit after re-authentication. Every one of those is the shape that passes vacuously.
-  - [ ] The four R8 negative tests are named and owned: wildcard origin rejected, arbitrary reflected `Origin` rejected, state change without an anti-forgery token refused, no credential in web storage (`test-design-architecture.md:522-528`, `YelloBMAD-handoff.md:86`). They are **P0**.
-  - [ ] A browser-level case needs thought before it is written. `tests/Yello.Tests.Client` sees `Yello.Contracts` and nothing else, runs no container, and the conventions already flag that "cases that need a signed-in Session or real data will need more, and arrive with the stories that build them" (`TESTING-CONVENTIONS.md:110-185`). Adding a Host and a database to that suite is a visible architecture edit — take it deliberately or not at all.
-  - [ ] No coverage threshold. Do not invent one.
+- [x] **Task 10 — Tests** (AC: all)
+  - [x] **Cases go in `tests/Yello.Tests.Slices`, mirroring `Accounts/AuthenticateAccount/`.** Do not create a suite (`TESTING-CONVENTIONS.md:30`).
+  - [x] **Do not add cases to `Yello.Tests.Isolation` or `Yello.Tests.Revocation`.** Both are still empty and both carry `--ignore-exit-code 8`; adding one case means removing that property in the same change, gated both ways by `Only_suites_with_no_tests_may_ignore_the_zero_test_exit_code`. More to the point, AD-4 requires every isolation case to run on **both** surfaces and the API-token surface does not exist until 1.8 — so the isolation suite genuinely cannot be populated here. 1.9 owns it.
+  - [x] Endpoint tests boot the real Host as a process via `HostProcess.RunAsync` — there is no `WebApplicationFactory` and no `Microsoft.AspNetCore.Mvc.Testing` in this solution, and no central pin for one.
+  - [x] Container-backed classes take `IClassFixture<MigratedDatabaseFixture>` and open with `Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason)`. **Each consumer gets its own ~2 GB SQL Server**; a full run already starts seven engines sequentially. Do not attempt to settle the topology — that is 1.9's, and `deferred-work.md:8` is explicit.
+  - [x] **Randomise the email address in every test** (`TESTING-CONVENTIONS.md:93`). Cleanup by transaction rollback or container disposal, never by delete statements.
+  - [x] **No `Task.Delay` as a synchronisation mechanism. Ever.** An expiry test that sleeps is the obvious way to write this and is forbidden — inject `TimeProvider` (already registered as `TimeProvider.System` at `Program.cs:58`) and advance it, or construct a ticket that is already expired.
+  - [x] Traits: `Suite`, `Priority`, `Requirement` — **cite the `AR` id and the `AD` id** (`TESTING-CONVENTIONS.md:59`) — and `Assumption` naming its source document.
+  - [x] **Every absence assertion gets a planted violation, and the result is recorded.** This story is dense with them: no Role or Space in the cookie; no credential in web storage; no wildcard or reflected origin accepted; no log line distinguishing the two failure causes; no auto-submit after re-authentication. Every one of those is the shape that passes vacuously.
+  - [x] The four R8 negative tests are named and owned: wildcard origin rejected, arbitrary reflected `Origin` rejected, state change without an anti-forgery token refused, no credential in web storage (`test-design-architecture.md:522-528`, `YelloBMAD-handoff.md:86`). They are **P0**.
+  - [x] A browser-level case needs thought before it is written. `tests/Yello.Tests.Client` sees `Yello.Contracts` and nothing else, runs no container, and the conventions already flag that "cases that need a signed-in Session or real data will need more, and arrive with the stories that build them" (`TESTING-CONVENTIONS.md:110-185`). Adding a Host and a database to that suite is a visible architecture edit — take it deliberately or not at all.
+  - [x] No coverage threshold. Do not invent one.
 
-- [ ] **Task 11 — Housekeeping and hand-offs**
-  - [ ] Comments that predict this story and must now describe it: `IPasswordHasher.cs:14-16`, `IdentityPasswordHasher.cs:26-32`, `InfrastructureServices.cs:52-53`, `Yello.Client/Program.cs:64-68`, `Register.razor:25-30`, `MainLayout.razor:11-15`, `RegistrationPhase.cs:41-44`, `Yello.Host/Program.cs:11-15`.
-  - [ ] **Do not add review narration to source files.** `deferred-work.md:56` records that as an open finding owned by **Lee, once, for the project** — history lives in the commit message and this story's Change Log.
-  - [ ] If a new failure-code class is added, decide whether `LocalisationGateTests.Every_registration_failure_code_has_a_message_and_a_field` is extended to cover it. As written it reflects over `typeof(RegisterAccountFailure)` specifically, so a `SignInFailure` class is **not** covered — an uncovered code would ship with no message and no gate complaining.
-  - [ ] `InlineErrorRegion.razor:23` emits `class="form-status__heading"` and no such rule exists in any stylesheet. Small, pre-existing, and this story is the first to reuse that component — fix it or record it.
-  - [ ] `git diff --stat 5651d41` before calling the File List complete, and state the figure excluding this story file, `deferred-work.md` and `sprint-status.yaml` — including them makes the number move every time the record is edited.
+- [x] **Task 11 — Housekeeping and hand-offs**
+  - [x] Comments that predict this story and must now describe it: `IPasswordHasher.cs:14-16`, `IdentityPasswordHasher.cs:26-32`, `InfrastructureServices.cs:52-53`, `Yello.Client/Program.cs:64-68`, `Register.razor:25-30`, `MainLayout.razor:11-15`, `RegistrationPhase.cs:41-44`, `Yello.Host/Program.cs:11-15`.
+  - [x] **Do not add review narration to source files.** `deferred-work.md:56` records that as an open finding owned by **Lee, once, for the project** — history lives in the commit message and this story's Change Log.
+  - [x] If a new failure-code class is added, decide whether `LocalisationGateTests.Every_registration_failure_code_has_a_message_and_a_field` is extended to cover it. As written it reflects over `typeof(RegisterAccountFailure)` specifically, so a `SignInFailure` class is **not** covered — an uncovered code would ship with no message and no gate complaining.
+  - [x] `InlineErrorRegion.razor:23` emits `class="form-status__heading"` and no such rule exists in any stylesheet. Small, pre-existing, and this story is the first to reuse that component — fix it or record it.
+  - [x] `git diff --stat 5651d41` before calling the File List complete, and state the figure excluding this story file, `deferred-work.md` and `sprint-status.yaml` — including them makes the number move every time the record is edited.
 
 ## Dev Notes
 
@@ -603,14 +603,280 @@ is established the correct term is Account." The registration surface already ob
 
 ### Agent Model Used
 
+Claude Opus 5 (`claude-opus-5`), via the `bmad-dev-story` workflow.
+
 ### Debug Log References
+
+Four things were found by running rather than by reading, and all four changed the implementation
+or the tests. They are recorded here because in each case the first guess was wrong.
+
+1. **ASP.NET Core's antiforgery system refuses outright to issue a token over a non-SSL request
+   when `Cookie.SecurePolicy = Always`.** `GET /api/v1/antiforgery/token` answered `500` with an
+   empty body, and eleven of fourteen endpoint tests went down with it. The exact message:
+   *"The antiforgery system has the configuration value AntiforgeryOptions.Cookie.SecurePolicy =
+   Always, but the current request is not an SSL request."* **The framework was right and the test
+   was wrong.** Weakening the policy to `SameAsRequest` would have made the suite pass by removing
+   `Secure` from a production cookie — AC5 traded for a green run. `HostProcess` now serves the Host
+   over `https://127.0.0.1:0` with the .NET development certificate, and the client accepts it
+   through a validation callback scoped to the loopback address rather than requiring
+   `dotnet dev-certs https --trust`.
+
+2. **An anti-forgery token is bound to the identity it was issued to, and the client did not
+   refresh it after sign-in.** A defect in this story's own client code, found because
+   `No_log_line_carries_the_password_the_cookie_or_the_outcome` counted **one** processed line
+   where three sign-ins had been made: the second and third were refused with a `400` before they
+   reached the endpoint, because they carried the token minted while anonymous.
+   `SessionState.SignedIn()` now drops the token so the next request fetches a fresh one, and
+   `SessionSeamTests.Signing_in_drops_the_token_that_was_issued_to_an_anonymous_caller` is the
+   regression test. **Without this, the first state-changing action after every sign-in would have
+   failed in the real product**, and no assertion in the story would have said so.
+
+3. **An assertion I wrote claimed more than CORS can deliver, and it failed.**
+   `A_sign_in_claiming_an_unknown_origin_establishes_no_session` expected no `Set-Cookie`; the
+   response set one. That is correct behaviour: the caller is not a browser, it holds the
+   anti-forgery cookie *and* the matching token, and explicit token validation takes precedence
+   over .NET 10's automatic middleware and replaces its verdict. Forgery means causing *somebody
+   else's* browser to make a request with *their* credentials, and a raw HTTP client is neither.
+   The case is now `A_response_to_an_unknown_origin_carries_no_cors_grant`, which is what an origin
+   policy actually guarantees, with the reasoning in its remarks so nobody re-widens it.
+
+4. **Registration's own tests began failing, and two of them would otherwise have passed for the
+   wrong reason.** AR-14's "every state-changing request" reached `POST /api/v1/accounts`
+   (question 5), so story 1.3's four endpoint cases broke. Two of them —
+   `A_malformed_submission_answers_with_a_stable_problem_type` and
+   `An_empty_body_is_refused_as_a_malformed_submission` — assert a `400`, and a missing-token
+   refusal is also a `400`: they would have gone green again while never reaching the endpoint.
+   Both now assert the problem `type` as well as the status.
+
+**Latency, measured rather than argued** (2026-09-18, this machine, end to end over HTTPS through
+the real endpoint — CORS, token validation, the indexed read and the verification):
+**success p50 267.4 ms / p95 285.3 ms**, **failure p50 269.0 ms / p95 304.1 ms**. Both inside
+NFR-5's 500 ms p95 write budget. The measurement harness was temporary and was deleted; story 1.10
+re-measures on the deploy target.
+
+**Planted violations — ten, all caught, each by the expected test name.**
+`TESTING-CONVENTIONS.md:101` requires every absence assertion to be validated against a planted
+signal. Originals were held in memory and restored in a `finally`, never by `git checkout --`.
+
+| # | Plant | Caught by |
+|---|---|---|
+| 1 | A Space claim added to the Session ticket | `SessionContractTests.The_session_ticket_carries_one_claim_and_it_is_the_account` |
+| 2 | `localStorage.setItem` interop added to the client | `ClientStorageBanTests.No_client_code_reaches_browser_storage` |
+| 3 | Announce moved before the purge | `SessionSeamTests.Every_purge_runs_before_the_session_end_is_announced` (+2 others) |
+| 4 | The API handler retries after a 401 | `SessionSeamTests.A_refused_request_is_never_retried_after_the_session_ends` |
+| 5 | `SlidingExpiration = true` | `SessionContractTests.The_session_expires_absolutely_and_never_slides` |
+| 6 | `SameSite = Lax` | `SessionContractTests.The_session_cookie_is_http_only_secure_and_same_site_none` |
+| 7 | `SetIsOriginAllowed(_ => true)` — the reflected origin AD-7 bans by name | `SessionEndpointTests.Cors_allows_exactly_the_configured_origin_and_never_a_wildcard_or_a_reflection` (+1) |
+| 8 | A log line naming "no account exists for that address" on the failure path | `SessionEndpointTests.No_log_line_carries_the_password_the_cookie_or_the_outcome` |
+| 9 | The anti-forgery filter removed from sign-in | `SessionEndpointTests.A_state_changing_request_without_an_antiforgery_token_is_refused` |
+| 10 | `if (credential is null) return Failed;` above the verification — the AD-23 oracle | `AuthenticateAccountHandlerTests.An_unknown_address_still_reaches_the_verifier` |
+
+Three further oracles are **permanent tests** rather than one-off runs, following story 1.3's
+precedent: `PasswordVerificationDurationTests.The_method_detects_a_verifier_that_returns_early_when_there_is_no_hash`,
+`ClientStorageBanTests.The_scan_detects_a_planted_storage_call`,
+`SessionContractTests.The_claim_set_assertion_rejects_a_ticket_that_grew_a_space` and
+`CrossOriginConfigurationTests.The_scan_does_not_match_a_key_that_is_merely_similar`.
 
 ### Completion Notes List
 
+**The eight questions, answered — every one is a decision this story took, and every one is a line
+Lee can cut.**
+
+1. **What a Session is, and how long it lasts.** Recommendation (a), taken: **a pure encrypted
+   cookie ticket, 8-hour absolute lifetime, no sliding, and no row in any table.** It does not
+   slide. On a password change nothing happens — because **there is no password-change flow
+   anywhere in the artifact set**, and the honest answer for a stateless ticket is that existing
+   Sessions survive until the lifetime elapses; whichever story adds one inherits the question.
+   **A Session is not represented in the database at all.** AD-27 forbids a scheduled sweeper and
+   AD-10 forbids interval polling; a ticket satisfies both by construction, adds no table and costs
+   no per-request read. AC3's word "invalidated" does not by itself require a server-side record:
+   Membership removal revokes *access*, and 1.5's per-request resolution makes that immediate. All
+   of it is in `SessionCookiePolicy`, behind one named constant.
+2. **Route and shapes.** `POST /api/v1/sessions` → **204** with the cookie; **401** with one stable
+   `type` for *every* failure cause and no `errors` extension. Malformed → **400** with
+   `urn:yello:problem:invalid-sign-in`. Plus `GET /api/v1/sessions/current` → **204/401**, which I
+   added and which is the one place AC3 is observable at all — see the limits below.
+3. **Anti-forgery across two origins.** The documented double-submit, with one change from the
+   story's recommendation: the request token is returned **in the response body** from
+   `GET /api/v1/antiforgery/token` and held in a field, rather than in a non-`HttpOnly` cookie the
+   page reads back. Both cookie halves stay `HttpOnly`, and nothing needs `document.cookie` interop
+   — which is also what keeps AC5's web-storage ban from resting on restraint.
+4. **The expiry copy and its focus destination.** `"Your Session ended. Sign in to continue."`,
+   rendered through `InlineErrorRegion` — `role="alert"`, `tabindex="-1"`, focus moved to it, which
+   is the only pattern the spine sanctions (`EXPERIENCE.md:398`) and the one that component already
+   implements. It names the Session and nothing else.
+5. **Registration gains anti-forgery: yes.** AR-14 says *every*. It protects against nothing on an
+   unauthenticated endpoint; an exception list is where that kind of rule rots, and the cost is one
+   header. **This changes a shipped endpoint's contract** and broke four of story 1.3's tests, which
+   is the loudest possible way to raise it for your decision.
+6. **`/` routes to sign-in**, `/register` to registration, and 1.7 repoints `/` at the Space home.
+   The sign-in surface carries a link to registration — without it UJ-1 would be reachable only by
+   typing a path, which "decide what `/` becomes" cannot reasonably mean.
+7. **The `https` dev loop: taken.** Both projects run on their `https` launch profiles. This was
+   not finally a free choice: AC5 requires a `Secure` cookie, and ASP.NET Core's antiforgery system
+   refuses to issue a token at all over a non-SSL request when that policy is set. It needs
+   `dotnet dev-certs https --trust` once if a browser complains.
+8. **Sign-out: not built.** No FR, CAP, journey or acceptance criterion asks for one; UX-DR31
+   presupposes it. The story's own header assigns the purge seam's extension "to Space switch and
+   sign-out" to **1.7**, which also builds the bar such a control would live in. The seam it needs
+   exists.
+
+---
+
+**What this story can and cannot honestly claim. Three of six ACs describe behaviour over systems
+that do not exist yet, and each is named here rather than implied covered.**
+
+- **AC2 — "a Space change does not touch the Session" is true by construction and is not tested as
+  a switch.** Nothing on the Session stores the active Space: the ticket carries exactly one claim,
+  asserted as an *exact set* by `SessionContractTests`. There is therefore nothing for a Space
+  change to alter. **What is not asserted is an actual switch**, because no Space switcher exists
+  until 1.7 and no Space-scoped endpoint until 1.5.
+- **AC3's purge clause is a SEAM, not coverage.** There is no replica, no cached Board, no filter
+  state and no Space-scoped client state of any kind. A test asserting "everything Space-scoped is
+  purged" would pass against a system with nothing to purge. What `SessionSeamTests` asserts is what
+  the seam *does*: registrations run, they run before the announcement (UX-DR30), a failing one does
+  not strand the rest, and the announcement is wired (read from the client's IL, so deleting it
+  fails the build). Stories 1.7 and epic 2 extend it.
+- **AC3's "grants access to nothing, including Spaces the Account still holds a Membership in" is
+  demonstrated against the only endpoint there is.** `An_expired_session_grants_nothing` uses a real
+  expired ticket — the Host is started with a negative lifetime so every ticket is born past its
+  expiry, which is how a real expiry is observed with `Task.Delay` banned. But **there is no
+  Space-scoped surface for it to fail to grant access to until story 1.5**, so the Membership clause
+  is not proved.
+- **AC6 is the rule and the absence of a path that would break it, not a demonstration.** There is
+  no editor and no unsent input until epic 7. What is asserted is that a refused request is returned
+  to its caller and **never retried** (planted: a retry fails the test), and that nothing stores a
+  request to re-send.
+- **AC5's web-storage ban is real and is gated twice** — compiled IL for the C# and Razor, and the
+  `wwwroot` assets for what the browser loads directly, neither of which sees the other. Both
+  validated against plants.
+- **No browser has driven sign-in end to end.** `tests/Yello.Tests.Client` sees only
+  `Yello.Contracts`, runs no container and has no Host. What is unverified as a result: that a
+  browser accepts the `SameSite=None; Secure` cookie across the two development origins, that the
+  header survives the preflight, and that the surface renders and submits. Every one of those is
+  asserted at the level below a browser. Recorded in `deferred-work.md`.
+- **`aspire run` has not been run.** The `https` configuration is proved against a real Host process
+  with a real certificate; the orchestration itself is not. Recorded in `deferred-work.md` as a
+  five-minute confirmation rather than a story.
+
+---
+
+**What was deliberately not built, and why.**
+
+- **No rate limit.** The exposure doubled — two unauthenticated 220,000-iteration PBKDF2 endpoints
+  now — and AR-3 forbids a slice bolting a limiter into itself. `deferred-work.md`'s entry is
+  widened to name both endpoints, with the note that an anti-forgery token is **not** a rate limit:
+  it costs an attacker one extra request in total, not one per attempt.
+- **No NFR-8 bound.** 1.6 owns it. This story surfaces the contradiction underneath it rather than
+  resolving it: **a Session carries no Space, so "50 concurrent active Sessions per Space" cannot be
+  a property of a Session and cannot be counted at sign-in.** Recorded against 1.6 with the
+  reasoning, and with the instruction not to put a `SpaceId` on the Session to make the count easy.
+- **No Identity builder.** No `AddIdentity` (fails Gate C outright), no `AddIdentityCore`, no
+  `MapIdentityApi` (forks Account creation away from AD-22 and answers differently for a known and
+  an unknown address), and not `AddIdentityCookies` either — that brings a security-stamp validator
+  whose `ValidationInterval` is a re-read of the user store on a timer, which is the shape AD-10
+  bans. Plain cookie authentication is the same ticket without any of it, so "the whole of Identity
+  that Yello wires" is still one hasher.
+- **No new package.** Cookie authentication, CORS and anti-forgery all live in the
+  `Microsoft.AspNetCore.App` shared framework that `Yello.Host` already has, so
+  `Directory.Packages.props` and `PackageVersionPinTests`' exact expected set are untouched.
+- **No `AddAuthorization`, no `UseAuthorization`, no policy and no `[Authorize]`.** Authentication is
+  wired; authorisation is 1.5's and 1.6's, and AD-1 makes every authorisation decision a per-request
+  `(Account, Space)` resolution nothing here can perform. The current-session endpoint reads
+  `HttpContext.User` and answers 401 itself.
+
+**One correction to the story's own framing, for the record.** The story recommends implementing
+AD-23's uniformity "in the endpoint, not inside the password comparator". Both halves were needed
+and they are different halves: the *response* uniformity is in the endpoint, over the slice's single
+`null` — and the *duration* uniformity has to be in the comparator, because that is the only place
+the work happens. `IPasswordHasher.Verify` therefore takes a **nullable** hash and does a full
+verification against a dummy hash when there is none, which is what removes the branch a caller
+would otherwise have to write.
+
+**Small pre-existing finding, fixed rather than recorded.** `InlineErrorRegion.razor:23` emits
+`class="form-status__heading"` and no such rule existed in any stylesheet — story 1.4 is the first
+story to reuse that component. It now has one.
+
 ### File List
+
+**Production — new**
+
+- `Yello.Domain/Accounts/IAccountCredentialStore.cs`
+- `Yello.Application/Accounts/AuthenticateAccount/AuthenticateAccountCommand.cs`
+- `Yello.Application/Accounts/AuthenticateAccount/AuthenticateAccountValidator.cs`
+- `Yello.Application/Accounts/AuthenticateAccount/AuthenticateAccountHandler.cs`
+- `Yello.Infrastructure/Persistence/AccountCredentialStore.cs`
+- `Yello.Contracts/Accounts/SessionRoutes.cs`
+- `Yello.Contracts/Accounts/SignInRequest.cs`
+- `Yello.Contracts/Accounts/Antiforgery.cs`
+- `Yello.Host/Sessions/SessionCookiePolicy.cs`
+- `Yello.Host/Sessions/SessionPrincipal.cs`
+- `Yello.Host/Sessions/CrossOriginPolicy.cs`
+- `Yello.Host/Sessions/AntiforgeryRequirement.cs`
+- `Yello.Host/Endpoints/SessionEndpoints.cs`
+- `Yello.Host/SessionLog.cs`
+- `Yello.Client/Sessions/SessionState.cs`
+- `Yello.Client/Sessions/YelloApiHandler.cs`
+- `Yello.Client/Sessions/AntiforgeryTokenSource.cs`
+- `Yello.Client/Pages/SignIn.razor`
+- `Yello.Client/Pages/SignInPhase.cs`
+- `Yello.Client/Pages/SignInFields.cs`
+- `Yello.Client/Pages/ClientRoutes.cs`
+
+**Production — modified**
+
+- `Yello.Domain/Accounts/IPasswordHasher.cs` — gains `Verify` and `PasswordVerification`; the
+  doc comment claiming a deliberate absence is replaced.
+- `Yello.Infrastructure/Identity/IdentityPasswordHasher.cs` — `Verify`, the dummy hash, and the
+  corrected "whole of Identity" paragraph.
+- `Yello.Infrastructure/InfrastructureServices.cs` — registers the credential store; hand-off
+  comment updated.
+- `Yello.Contracts/ProblemTypes.cs` — three new stable types.
+- `Yello.Host/Program.cs` — authentication, CORS, anti-forgery, the route table.
+- `Yello.Client/Program.cs` — the session seam, the API handler, the announcement wiring.
+- `Yello.Client/Pages/Register.razor` — drops `@page "/"`, carries an anti-forgery token.
+- `Yello.Client/Pages/RegistrationPhase.cs` — hand-off comment updated.
+- `Yello.Client/Layout/MainLayout.razor` — hand-off comment updated; sign-out's absence recorded.
+- `Yello.Client/Localisation/ClientCopy.resx` — eight sign-in strings.
+- `Yello.Client/wwwroot/css/components.css` — `.auth-panel__aside`, and `.form-status__heading`
+  which had no rule at all.
+- `Yello.Client/wwwroot/appsettings.Development.json` — the Host address moves to `https`.
+- `Yello.AppHost/Program.cs` — both projects on `https`, and `ClientOrigin` injected.
+
+**Tests — new**
+
+- `tests/Yello.Tests.Slices/WireSession.cs`
+- `tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/AuthenticateAccountValidatorTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/AuthenticateAccountHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/PasswordVerificationDurationTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/SessionEndpointTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/RehashIntegrationTests.cs`
+- `tests/Yello.Tests.Architecture/SessionContractTests.cs`
+- `tests/Yello.Tests.Architecture/SessionSeamTests.cs`
+- `tests/Yello.Tests.Architecture/ClientStorageBanTests.cs`
+- `tests/Yello.Tests.Architecture/CrossOriginConfigurationTests.cs`
+
+**Tests — modified**
+
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/HostProcess.cs` — HTTPS, explicit cookies,
+  extra configuration.
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/RegisterAccountEndpointTests.cs` — carries a
+  token; two cases now assert the problem `type` as well as the status.
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/RegisterAccountHandlerTests.cs`,
+  `RegistrationDurationTests.cs` — their fakes implement `Verify`.
+- `tests/Yello.Tests.Architecture/LocalisationGateTests.cs` — the sign-in failure-code gate and the
+  sign-in copy gate.
+
+**Records**
+
+- `tests/TESTING-CONVENTIONS.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/1-4-authenticate-and-hold-a-session-across-every-space.md`
 
 ### Change Log
 
 | Date | Change |
 |---|---|
 | 2026-09-15 | Story context created; status `backlog` → `ready-for-dev`. Eight questions raised for Lee, each with a recommendation and an interim default. |
+| 2026-09-18 | Implemented. All eight questions answered as decisions; ten planted violations run and caught; sign-in measured at p95 285 ms against NFR-5's 500 ms. Status `ready-for-dev` → `in-progress` → `review`. |

@@ -31,6 +31,16 @@ spine's Structural Seed.
 new suite seems necessary, that is a conversation about the architecture, not a project
 template.
 
+**Where a `Yello.Client` unit test goes, and why it is not obvious.** The ring table gives
+`Yello.Tests.Slices` no edge to `Yello.Client`, and `Yello.Tests.Client` sees only
+`Yello.Contracts` — deliberately, because a compile-time edge to the thing under test would let a
+case assert against a type instead of against what the browser actually received, which is the
+defect that suite exists to catch. So the only suite that can see the client's types is
+`Yello.Tests.Architecture`, which references all eight production projects because it has to load
+their assemblies. Story 1.4 put `SessionSeamTests` and `ClientStorageBanTests` there for that
+reason rather than widening a ring row for a unit test. Widening one is available and is an
+architecture edit; it should be taken deliberately, by a story that needs it, not as a side effect.
+
 ## Trait vocabulary
 
 CI tiering selects on these filters, so they exist from story 1.1 rather than being
@@ -184,6 +194,44 @@ rewritten to `und` before the page loads, so the asserted value can only have co
 client. The plant fails now, and the case asserts that its own rewrite actually matched — an
 inert rewrite would put the hole straight back.
 
+## The Host process is served over HTTPS — added by story 1.4
+
+`HostProcess.RunAsync` starts `Yello.Host` on `https://127.0.0.1:0`, not `http`. That is not a
+preference and it is not about realism for its own sake.
+
+AC5 requires the Session cookie to carry `Secure`, so the Host sets
+`CookieSecurePolicy.Always` — and **ASP.NET Core's antiforgery system refuses outright to issue a
+token when that policy is set and the request is not an SSL request**:
+
+```
+The antiforgery system has the configuration value AntiforgeryOptions.Cookie.SecurePolicy = Always,
+but the current request is not an SSL request.
+```
+
+Found on 2026-09-18 by running story 1.4's endpoint tests over http, where it arrived as a `500`
+with an empty body and took eleven of fourteen cases down with it. **The framework was right and
+the test was wrong.** Weakening the policy to `SameAsRequest` would have made the suite pass by
+removing `Secure` from a production cookie — AC5 traded for convenience.
+
+Two consequences for anyone writing a case here:
+
+- **It needs the .NET development certificate** (`dotnet dev-certs https`). It does **not** need it
+  trusted: the client sets a `ServerCertificateCustomValidationCallback` scoped to the loopback
+  address it started the Host on, so a cold CI agent needs the certificate created and nothing else.
+- **The framework's cookie container is off** (`UseCookies = false`), and every cookie is attached
+  by hand — `WireSession` does it. Two reasons: a container attaches the Session cookie invisibly,
+  so a case asserting a request was authenticated could pass without anyone having said which cookie
+  carried it; and .NET's `CookieContainer` refuses to store a `Secure` cookie at all when the
+  response arrived over `http`, which is how this was going to fail next.
+
+**A second lesson from the same run, and it was a product defect rather than a test one.** ASP.NET
+Core binds an anti-forgery token to the identity it was issued to, so a token minted while anonymous
+is refused once a Session exists. Three sign-ins in one Host process produced one processed log line
+instead of three, because the second and third never reached the endpoint. `SessionState.SignedIn`
+now drops the token so the next request fetches a fresh one, and
+`SessionSeamTests.Signing_in_drops_the_token_that_was_issued_to_an_anonymous_caller` is the
+regression test. A case that signs in and then posts again must re-fetch the token.
+
 ## Comparing two code paths' durations — blocker B3
 
 `Yello.Tests.Shared/DurationIndistinguishability.cs`, added by story 1.3. Use it; do not
@@ -208,6 +256,15 @@ comfortably.
 holds both the real assertion and a planted one that skips the hash and requires the method to
 tell the two paths apart. Keeping the plant as a test is what stops a later story widening the
 tolerance to quiet a flake and quietly disarming the assertion beside it.
+
+**Story 1.4 reused it and kept the pattern**, in `PasswordVerificationDurationTests`: the real
+assertion is that verifying against *no stored hash* costs what verifying against a wrong one
+costs — AD-23 on the sign-in path — and the plant is a verifier that returns early when there is
+no hash, which is `if (account is null) return Fail();` written one layer down. **That class takes
+no database fixture, deliberately.** xunit builds a class fixture before any test in the class
+runs, so a container-backed class fails entirely when the runtime is down, including cases that
+never touch a database — and the whole of AC4's duration guarantee is decided by the hasher, which
+needs no rows.
 
 ## EF Core migrations need a hand-editing pass
 
@@ -257,13 +314,20 @@ sharing out of reach without reuse or an external orchestrator. Nothing is share
 suites or processes. **Story 1.9** owns the decision, being the first story that has to make the
 sharing model real. Until then, read "shared" as intent rather than as description.
 
-**The cost is now measured rather than estimated.** A full `dotnet test Yello.slnx` starts **seven**
-engines sequentially: **four** for story 1.3's container-backed test classes
-(`RegisterAccountEndpointTests`, `RegisterAccountIntegrationTests`, `RegistrationDurationTests`,
-`SpaceIsolationSchemaTests`, each taking `IClassFixture<MigratedDatabaseFixture>` and each getting
-its own container) and **three** for story 1.1's direct constructions
+**The cost is now measured rather than estimated.** A full `dotnet test Yello.slnx` starts **nine**
+engines: **six** for the container-backed test classes taking `IClassFixture<MigratedDatabaseFixture>`
+— story 1.3's `RegisterAccountEndpointTests`, `RegisterAccountIntegrationTests`,
+`RegistrationDurationTests` and `SpaceIsolationSchemaTests`, plus story 1.4's `SessionEndpointTests`
+and `RehashIntegrationTests` — and **three** for story 1.1's direct constructions
 (`SharedFixtureSmokeTest`, `HostStartupTests`, `StartupConnectivityCheckTests`). Roughly 30 seconds
-to first assertion each, about 2 GB apiece.
+to first assertion each, about 2 GB apiece. **They start in parallel rather than sequentially**,
+which is why the wall clock is around 50 seconds rather than four and a half minutes — but the
+memory is concurrent, which is the number story 1.9 has to size against: roughly **18 GB**.
+
+**Story 1.4 deliberately kept two classes OUT of that count**, and the reason is the one story 1.3
+recorded: `PasswordVerificationDurationTests` and `AuthenticateAccountHandlerTests` need no
+database, so they take no fixture and run on a machine with the container runtime down — which is
+the machine where a tolerance or a uniformity assertion is most likely to be edited.
 
 > **Corrected at code review on 2026-09-10.** This said "four engines … two for story 1.3's
 > container-backed test classes, two for story 1.1's direct constructions" — while the paragraph
@@ -348,10 +412,17 @@ dotnet test             # the gate
 dotnet aspire run       # local orchestration, from Yello.AppHost
 ```
 
-`dotnet test` is the gate. As of story 1.3 it runs **136 tests, all passing**: 82 in the
-architecture suite and 54 in the slice suite. Isolation, Revocation and Merge still report zero
-tests and exit 0 — they keep the `--ignore-exit-code 8` switch, and `Yello.Tests.Architecture`
-asserts that only empty suites may.
+`dotnet test` is the gate. As of story 1.4 it runs **235 tests, all passing**: **117** in the
+architecture suite, **110** in the slice suite and **8** in the client suite. Isolation, Revocation
+and Merge still report zero tests and exit 0 — they keep the `--ignore-exit-code 8` switch, and
+`Yello.Tests.Architecture` asserts that only empty suites may. (Story 1.3 closed at 136: 82
+architecture and 54 slice, before the client suite existed.)
+
+**Story 1.4 did not add a case to `Yello.Tests.Isolation` or `Yello.Tests.Revocation`, and could
+not have.** AD-4 requires every isolation case to run on **both** surfaces, and the API-token
+surface does not exist until story 1.8 — so the suite genuinely cannot be populated yet. Story 1.9
+owns it. Adding one case to either would also mean removing its `--ignore-exit-code 8` property in
+the same change, which the convention gate enforces in both directions.
 
 **22 of the slice tests need a container runtime, and with none reachable they FAIL — they do not
 skip.** Measured on 2026-09-10 with Rancher Desktop stopped: `dotnet test` on the slice suite

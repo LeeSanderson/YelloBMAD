@@ -1,10 +1,11 @@
-@page "/"
 @page "/register"
 
 @using System.Text.Json
+@using Yello.Client.Sessions
 
 @inject IStringLocalizer<ClientCopy> Localizer
 @inject HttpClient Http
+@inject AntiforgeryTokenSource Antiforgery
 
 @*
     THE REGISTRATION SURFACE. FR-1, FR-4, AC6.
@@ -22,12 +23,21 @@
     it would violate. Note that this component could not do it if it wanted to: the server answers
     204 for both paths and sends nothing that tells them apart.
 
-    THIS PAGE DOES NOT SIGN ANYONE IN AND DOES NOT NAVIGATE. Story 1.4 owns authentication and
-    Sessions; story 1.7 owns the context bar somebody would arrive at. AC6's obligation ends at
-    "completion is announced", and this is where it ends. Confirmed by Lee on 2026-08-28.
+    THIS PAGE STILL DOES NOT SIGN ANYONE IN AND STILL DOES NOT NAVIGATE. Story 1.4 built
+    authentication and deliberately did not wire registration into it: signing a new Account in
+    automatically is a decision no acceptance criterion asks for, and AC6's obligation ends at
+    "completion is announced", which is where it ends. Story 1.7 owns the context bar somebody
+    would arrive at. Confirmed by Lee on 2026-08-28.
 
-    ROUTED AT BOTH "/" AND "/register". The root is provisional: there is nothing else to land on
-    yet, and stories 1.4 and 1.7 decide what belongs there once a Session and a context bar exist.
+    ROUTED AT "/register" ONLY. It held "/" as well until story 1.4, and its comment here said the
+    root was provisional - "stories 1.4 and 1.7 decide what belongs there once a Session and a
+    context bar exist". 1.4 decided the first half: "/" is the sign-in surface, because after the
+    first week returning is the common case. 1.7 decides the second half, repointing "/" at the
+    Space home. The sign-in surface carries a link here so this route stays reachable.
+
+    IT SENDS AN ANTI-FORGERY TOKEN NOW. AR-14 requires one on EVERY state-changing request, and
+    this is one. It is unauthenticated, so the token protects against nothing an attacker wants -
+    but an exception list is where that kind of rule rots, and the cost is one header.
 
     VALIDATION IS THE SERVER'S. The page submits, and renders whatever stable failure codes come
     back as localised text. There is deliberately no second copy of the rules here to drift out of
@@ -133,6 +143,15 @@
 
         try
         {
+            // AR-14: every state-changing request carries an anti-forgery token. Fetched on the
+            // first submit rather than at boot, and a failure to get one is reported as the
+            // transport problem it is rather than submitted without.
+            if (!await Antiforgery.EnsureTokenAsync())
+            {
+                _messages = [Localizer["SubmitFailed"].Value];
+                return;
+            }
+
             var response = await Http.PostAsJsonAsync(AccountRoutes.Register, request, JsonOptions);
 
             if (response.IsSuccessStatusCode)

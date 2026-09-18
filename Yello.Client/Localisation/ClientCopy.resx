@@ -117,6 +117,44 @@
     <value>Check the form and try again.</value>
     <comment>Heading of the error region, announced assertively when validation fails. Followed by one line per problem.</comment>
   </data>
+  <!--
+    THE SIGN-IN SURFACE. Every string here says "Account", never "User": sign-in is
+    unauthenticated, so no Space is established, and where no Space is established the correct
+    Glossary term is Account.
+  -->
+  <data name="SignInHeading" xml:space="preserve">
+    <value>Sign in to your Account</value>
+    <comment>The sign-in page's heading. "Account" is Glossary vocabulary.</comment>
+  </data>
+  <data name="SignInIntro" xml:space="preserve">
+    <value>One sign-in covers every Space you belong to.</value>
+    <comment>Sits under the heading. States the promise the story is about - moving between contexts never asks who you are again. "Space" is Glossary vocabulary.</comment>
+  </data>
+  <data name="SignInSubmitLabel" xml:space="preserve">
+    <value>Sign in</value>
+    <comment>The submit button on the sign-in form.</comment>
+  </data>
+  <data name="SignInInFlight" xml:space="preserve">
+    <value>Signing you in. This takes a few seconds.</value>
+    <comment>Shown while the request is in flight, and announced politely. The wait is deliberately long - checking the password is meant to be slow, and it takes the same time whether or not the address is known - so the copy says so plainly. Never replace this with a spinner or a progress percentage.</comment>
+  </data>
+  <data name="SignInComplete" xml:space="preserve">
+    <value>You are signed in.</value>
+    <comment>Announced when sign-in completes. Deliberately plain, and it names no Space: no Space is established by signing in, and there is nowhere to go yet.</comment>
+  </data>
+  <data name="SignInFailed" xml:space="preserve">
+    <value>Email or password is incorrect.</value>
+    <comment>THE ONLY MESSAGE FOR A FAILED SIGN-IN, AND IT COVERS EVERY CAUSE. Printed verbatim in the experience spine. It must never become "no account found", "wrong password" or anything else that says which of the two happened - the server answers one problem type with no detail, so this string is the whole of what a person is told, by design. Do not add a second string beside it, and do not add a "create an Account instead?" nudge here.</comment>
+  </data>
+  <data name="SignInToRegisterLink" xml:space="preserve">
+    <value>No Account yet? Create one.</value>
+    <comment>Link to the registration surface, below the sign-in form. It exists because "/" is now sign-in and registration would otherwise be reachable only by typing a path. It is NOT a response to a failed sign-in and must never be shown as one - that would say the address is unknown. "Account" is Glossary vocabulary.</comment>
+  </data>
+  <data name="SessionEnded" xml:space="preserve">
+    <value>Your Session ended. Sign in to continue.</value>
+    <comment>Shown when a person is returned here because their Session expired or stopped being valid. It names the Session and NOTHING else - no Space name, no Membership information, and never "you were removed": this is the cold path, where the person is not in a Space and must not be told anything about one. "Session" is Glossary vocabulary and is capitalised in every language, per rule 2 at the top of this file.</comment>
+  </data>
+
   <data name="NotFoundHeading" xml:space="preserve">
     <value>There is nothing here</value>
     <comment>Heading of the page shown for an address that matches no route. No full stop: it is a heading, not a sentence.</comment>

@@ -150,6 +150,11 @@ public sealed class RegistrationDurationTests(MigratedDatabaseFixture fixture)
     private sealed class SkippedHasher : IPasswordHasher
     {
         public string Hash(string password) => "not-a-hash";
+
+        // Unreachable from registration, which never verifies. The plant this class exists to be
+        // is about Hash and nothing else.
+        public PasswordVerification Verify(string? storedHash, string password) =>
+            PasswordVerification.Failed;
     }
 
     private sealed class SuffixNaming : IPersonalSpaceNaming

@@ -1,18 +1,33 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Localization;
+using Yello.Application.Accounts.AuthenticateAccount;
 using Yello.Application.Accounts.RegisterAccount;
+using Yello.Contracts.Accounts;
 using Yello.Contracts.Localisation;
 using Yello.Host;
 using Yello.Host.Endpoints;
+using Yello.Host.Sessions;
 using Yello.Infrastructure;
 
-// The composition root, AC4's connectivity check, and the product's first endpoint.
+// The composition root, AC4's connectivity check, the product's endpoints, and - from story 1.4 -
+// the whole of the cross-origin session contract: the cookie's attributes, CORS, and anti-forgery.
 //
-// There is no /sync WebSocket (Epic 7), and the request pipeline's cross-cutting behaviours -
-// authorisation, Space resolution, refusal recording, idempotency and the NFR-8 bound checks - do
-// not exist yet. Stories 1.5 and 1.6 own them, and AR-3 makes a slice that re-implements any of
-// them a defect. Registration needs none of them: it is unauthenticated, it creates the Space it
-// writes into, and no NFR-8 bound applies to it.
+// ALL THREE ARE CONFIGURED EXACTLY ONCE, HERE. AD-7's Prevents clause bans "per-endpoint cookie
+// configuration" in as many words, which is stronger than AR-14's paraphrase and is the binding
+// text. Nothing outside SessionCookiePolicy sets a cookie attribute, and nothing outside
+// CrossOriginPolicy decides an allowed origin.
+//
+// There is no /sync WebSocket (Epic 7) - though the cookie below is deliberately configured in a
+// way that does not assume HTTP only, because ARCHITECTURE-SPINE.md:323-325 has that socket
+// crossing the same origin boundary with the same cookie.
+//
+// The request pipeline's cross-cutting behaviours - AUTHORISATION, Space resolution, refusal
+// recording, idempotency, rate limiting and the NFR-8 bound checks - still do not exist. Stories
+// 1.5 and 1.6 own them, and AR-3 makes a slice that re-implements any of them a defect. Note the
+// distinction this story turns on: AUTHENTICATION is wired below, and authorisation is not. There
+// is no AddAuthorization, no UseAuthorization and no policy anywhere in this file, because AD-1
+// makes every authorisation decision a per-request (Account, Space) resolution that nothing here
+// can perform.
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -48,9 +63,44 @@ var connectionString = builder.Configuration.GetConnectionString(databaseResourc
 
 builder.Services.AddYelloInfrastructure(connectionString);
 
-// The slice. Registered here rather than from Yello.Application, which would need a DI package
+// The slices. Registered here rather than from Yello.Application, which would need a DI package
 // its ring does not carry and its per-ring package ban would then have to be reasoned about.
 builder.Services.AddScoped<RegisterAccountHandler>();
+builder.Services.AddScoped<AuthenticateAccountHandler>();
+
+// AUTHENTICATION. A plain cookie ticket, and no Identity builder of any kind - see
+// SessionCookiePolicy for the decision, and Yello.Infrastructure/InfrastructureServices.cs for
+// what "the whole of Identity that Yello wires" still means. No new package: cookie
+// authentication lives in the Microsoft.AspNetCore.App shared framework, which this project
+// (Microsoft.NET.Sdk.Web) already has, so Directory.Packages.props and PackageVersionPinTests'
+// exact expected set are both untouched.
+var sessionLifetime = SessionCookiePolicy.ReadLifetime(
+    builder.Configuration[SessionCookiePolicy.LifetimeConfigurationKey]);
+
+builder.Services
+    .AddAuthentication(SessionCookiePolicy.SchemeName)
+    .AddCookie(SessionCookiePolicy.SchemeName, options => SessionCookiePolicy.Configure(options, sessionLifetime));
+
+// CORS, and it is read by more than CORS. .NET 10 registers an anti-request-forgery middleware by
+// default whose trust list IS this policy - so what is configured here decides two defences, and a
+// wildcard would disarm both. CrossOriginPolicy fails closed when nothing is configured.
+var clientOrigin = builder.Configuration[CrossOriginPolicy.OriginConfigurationKey];
+
+builder.Services.AddCors(options => CrossOriginPolicy.Configure(options, clientOrigin));
+
+// ANTI-FORGERY, as a token system rather than only the automatic middleware. The middleware's
+// verdict is recorded on IAntiforgeryValidationFeature and read only by a form consumer, so for
+// a JSON API it records a verdict nobody reads - see Yello.Contracts/Accounts/Antiforgery.cs.
+// The cookie half takes the same cross-origin attributes as the Session cookie, because it has to
+// survive the same journey.
+builder.Services.AddAntiforgery(options =>
+{
+    options.HeaderName = Antiforgery.HeaderName;
+    options.Cookie.Name = "yello_antiforgery";
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+    options.Cookie.SameSite = SameSiteMode.None;
+});
 
 // The clock, injected rather than read statically, so a test can assert that every row one
 // registration writes carries the same instant. The local-time properties on the date types are
@@ -74,6 +124,23 @@ var app = builder.Build();
 
 app.UseRequestLocalization();
 
+// ORDER MATTERS AND IS NOT ARBITRARY. CORS runs before authentication so that a cross-origin
+// preflight - which carries no cookie by definition - is answered rather than being asked to
+// authenticate. Authentication runs before the endpoints, because that is what populates
+// HttpContext.User for GET /api/v1/sessions/current to read.
+app.UseCors(CrossOriginPolicy.PolicyName);
+
+// Fails closed rather than silently: with no origin configured every browser request is refused,
+// and a Host that does that without saying so is a morning lost to a CORS error in a console.
+if (string.IsNullOrWhiteSpace(clientOrigin))
+{
+    SessionLog.NoClientOriginConfigured(
+        app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Yello.Host.Startup"),
+        CrossOriginPolicy.OriginConfigurationKey);
+}
+
+app.UseAuthentication();
+
 // AC4's check lives in StartupConnectivityCheck rather than here so that a test can reach it.
 // Two review passes found that nothing asserted this code at all: deleting the call, inverting
 // the environment guard inside it or dropping this await was caught by nothing, and AC4 was
@@ -85,9 +152,27 @@ await StartupConnectivityCheck.RunAsync(
     app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Yello.Host.Startup"),
     app.Lifetime.ApplicationStopping);
 
+// THE ROUTE TABLE, AND WHICH ROUTES CARRY WHICH INVARIANT - all four lines in one place, which is
+// the point of applying anti-forgery as a filter rather than as a statement inside each endpoint.
+//
+// AR-14 says EVERY state-changing request carries an anti-forgery token, so registration takes one
+// too. It is unauthenticated, so a token there protects against nothing an attacker wants - but an
+// exception list is where this kind of rule rots, and the cost is one header. Question 5 for Lee,
+// because it changes a shipped endpoint's contract.
+
 // POST /api/v1/accounts. 204 on both the new-address and the already-registered paths - see
 // RegisterAccountEndpoint for why the handler it calls returns nothing at all.
-app.MapRegisterAccount();
+app.MapRegisterAccount().RequireAntiforgeryToken();
+
+// POST /api/v1/sessions. 204 with the Session cookie, or ONE 401 for every failure cause.
+app.MapAuthenticate().RequireAntiforgeryToken();
+
+// GET /api/v1/sessions/current. 204 or 401, no body either way - and no anti-forgery token,
+// because it changes no state and AR-14 asks for one on the requests that do.
+app.MapCurrentSession();
+
+// GET /api/v1/antiforgery/token. Issues the request token the two POSTs above must carry.
+app.MapAntiforgeryToken();
 
 // RunAsync, not Run: this file is already an async entry point (the connectivity check above
 // awaits), and the blocking overload would park the entry-point thread for the process

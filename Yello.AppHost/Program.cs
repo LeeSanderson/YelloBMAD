@@ -40,11 +40,41 @@ var database = sqlServer.AddDatabase(BuildConstant("Yello.DatabaseResourceName")
 // `yello` catalog existing inside it. "Container up, database missing" therefore still reaches
 // the Host, which logs it as a connectivity failure - see Yello.Host/StartupConnectivityCheck.cs,
 // which distinguishes that case in its log rather than leaving it to look like "container down".
-builder.AddProject<Projects.Yello_Host>("host")
-    .WithReference(database)
-    .WaitFor(database);
+// BOTH PROJECTS RUN ON THEIR `https` LAUNCH PROFILE, AND THAT IS STORY 1.4'S DOING.
+//
+// The default is the FIRST profile in each launchSettings.json, which is `http` - and that was
+// deliberate until now. Story 1.4's AC5 requires the Session cookie to carry `Secure`, and a
+// `Secure` cookie is only reliably accepted over https: Chromium treats http://localhost as a
+// secure context, Firefox and Safari do not agree in every version, and an acceptance criterion
+// that holds in one browser is not one that holds. NFR-6's encryption-in-transit clause pulls the
+// same way - deferred-work.md recorded, at the 2026-09-10 review, that a password crossed the
+// loopback interface in cleartext under `aspire run`, and assigned the swap to story 1.10 because
+// it could not be verified from a review context.
+//
+// Taken here instead because AC5 is this story's and an unverifiable cookie attribute is worse
+// than a configuration change. WHAT IT COSTS: a trusted development certificate. If the browser
+// warns about one, run `dotnet dev-certs https --trust` once. Nothing in the test suites depends
+// on this - they boot Yello.Host as a process on http://127.0.0.1:0 and assert the Set-Cookie
+// header directly rather than round-tripping it - so a certificate problem stops the dev loop and
+// nothing else.
+var client = builder.AddProject<Projects.Yello_Client>("client", launchProfileName: "https");
 
-builder.AddProject<Projects.Yello_Client>("client");
+// THE ONE ALLOWED ORIGIN, INJECTED RATHER THAN RESTATED.
+//
+// AD-7 requires CORS to allow "exactly the configured client origin", and AR-37 puts configuration
+// in the environment rather than in source. Taking the value from the client resource's own
+// endpoint means the Host and the client cannot disagree about what the client's origin is - which
+// they would the moment somebody edited one launchSettings.json and not the other, and the symptom
+// would be a CORS error in a browser console pointing at neither file.
+//
+// The key is a literal here because this project cannot compile against Yello.Host at all: the
+// Aspire SDK marks project references ReferenceOutputAssembly=false. CrossOriginPolicy states the
+// same key on the other side, and CrossOriginConfigurationTests reads THIS assembly's IL for it,
+// so the two spellings cannot drift apart silently.
+builder.AddProject<Projects.Yello_Host>("host", launchProfileName: "https")
+    .WithReference(database)
+    .WaitFor(database)
+    .WithEnvironment("ClientOrigin", client.GetEndpoint("https"));
 
 // RunAsync rather than Run (S6966): the blocking overload parks the entry-point thread for
 // the whole orchestration session. Awaiting it turns this file into an async entry point,

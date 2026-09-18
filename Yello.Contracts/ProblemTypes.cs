@@ -33,4 +33,49 @@ public static class ProblemTypes
     /// is a malformed submission, which depends on what was sent and never on what is stored.
     /// </remarks>
     public static string InvalidRegistration => "urn:yello:problem:invalid-registration";
+
+    /// <summary>
+    /// The sign-in submission was not well-formed. Carries an <c>errors</c> extension listing the
+    /// failed rules by their stable codes.
+    /// </summary>
+    /// <remarks>
+    /// <b>This never means "those credentials are wrong".</b> It reports a submission that is not
+    /// an authentication attempt at all - a missing field, or a value longer than any stored one
+    /// could be - and every one of its codes depends only on what was sent. A wrong password and an
+    /// unknown address both answer <see cref="AuthenticationFailed"/>, identically.
+    /// </remarks>
+    public static string InvalidSignIn => "urn:yello:problem:invalid-sign-in";
+
+    /// <summary>
+    /// Authentication did not succeed. <b>One type for every cause</b>, carried by both the
+    /// unknown-address and the wrong-password paths, and by a request made with a Session that has
+    /// expired.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This constant is AD-23 on the wire, and its single-valued-ness is the contract.</b> AC4
+    /// requires the two failure causes to be identical "in status, body, shape and duration", and
+    /// the surest way to keep a client from branching on the cause is to send it nothing to branch
+    /// on. There is deliberately no <c>errors</c> extension on this response and no second type
+    /// beside it: a client that wanted to say "no account found" could not discover it here.
+    /// </para>
+    /// <para>
+    /// The wording a person reads is one string for every cause - "Email or password is
+    /// incorrect." (<c>EXPERIENCE.md:272</c>) - resolved from a resource on the client, keyed on
+    /// this type.
+    /// </para>
+    /// </remarks>
+    public static string AuthenticationFailed => "urn:yello:problem:authentication-failed";
+
+    /// <summary>
+    /// A state-changing request arrived without a valid anti-forgery token. AR-14 / AD-7.
+    /// </summary>
+    /// <remarks>
+    /// <b>A <c>400</c>, not a <c>403</c>.</b> AD-3 draws the 403/404 line at the Space boundary
+    /// "and nowhere else", and this request never reached one - it is malformed in the sense that
+    /// matters, being a request the caller did not assemble correctly. Nothing is recorded in the
+    /// audit store for it either: AD-20 scopes <c>AccessRefusal</c> to "every 403 and every
+    /// Space-boundary 404", with exactly two kinds, and this is neither.
+    /// </remarks>
+    public static string AntiforgeryTokenMissing => "urn:yello:problem:antiforgery-token-missing";
 }
