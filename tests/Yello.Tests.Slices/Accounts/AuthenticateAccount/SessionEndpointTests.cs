@@ -4,6 +4,7 @@ using System.Text.Json;
 using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.Accounts;
+using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
 
 namespace Yello.Tests.Slices.Accounts.AuthenticateAccount;
@@ -61,6 +62,67 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         ["ClientOrigin"] = ClientOrigin,
         ["Session__Lifetime"] = "-00:00:01",
     };
+
+    /// <summary>
+    /// AC4's fourth clause, measured where AC4 actually states it: between the two RESPONSES.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The standing duration test measures <c>IdentityPasswordHasher.Verify</c>, which is not
+    /// what AC4 says.</b> AC4 requires "the two responses are identical in status, body, shape and
+    /// duration", and <c>PasswordVerificationDurationTests</c> compares the hasher in isolation - so
+    /// the component that genuinely differs between the two arms is the one thing it cannot see. An
+    /// unknown address returns <c>null</c> from <c>FindByEmailAddressAsync</c>; a wrong password
+    /// materialises a projected row first. That difference is a datastore round trip, and until this
+    /// test it was never measured. Story 1.3 shipped a container-backed
+    /// <c>RegistrationDurationTests</c> beside its pure one for exactly this reason; story 1.4
+    /// shipped no container-backed duration class at all, and its only end-to-end figures came from
+    /// a harness that was deleted. Added at code review on 2026-09-19.
+    /// </para>
+    /// <para>
+    /// <b>It lives in this class deliberately, rather than in a new one.</b> A fresh
+    /// container-backed class would start a tenth SQL Server engine on a machine the deferred-work
+    /// ledger already records running nine concurrently against 16.6 GB, with the operating system
+    /// killing a background process for memory during this story's own test run. This class already
+    /// holds the fixture, so the measurement costs no additional engine. Story 1.9 owns the topology
+    /// decision that would make that constraint go away.
+    /// </para>
+    /// <para>
+    /// <b>What it cannot prove.</b> Both arms here verify against a hash at the CURRENT work factor,
+    /// so this says nothing about the legacy-factor asymmetry -
+    /// <c>PasswordVerificationDurationTests.The_work_factor_has_not_been_raised_without_closing_the_timing_oracle</c>
+    /// guards that, and the skipped test beside it demonstrates it.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task The_two_failure_causes_take_the_same_time_over_the_wire()
+    {
+        var connectionString = Available();
+        var known = RandomAddress();
+
+        DurationVerdict? verdict = null;
+
+        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        {
+            var session = new WireSession(client);
+
+            await RegisterAsync(session, known);
+
+            // A wrong password for an address that EXISTS, against an address that does not. Both
+            // answer the same 401; the question is whether they take the same time to do it.
+            verdict = await DurationIndistinguishability.CompareAsync(
+                async () => await session.SignInAsync(known, WrongPassword),
+                async () => await session.SignInAsync(RandomAddress(), WrongPassword));
+        });
+
+        Assert.NotNull(verdict);
+        Assert.True(
+            verdict.AreIndistinguishable,
+            "An unknown address and a wrong password produce responses that differ in DURATION, so "
+            + "AC4's fourth clause does not hold on the wire however identical the bodies are. The "
+            + "read is the likely cause: one arm materialises a row and the other returns null, "
+            + $"and only an end-to-end measurement can see it. {verdict.Describe()}");
+    }
 
     /// <summary>
     /// AC1: valid credentials issue a Session, and the endpoint says nothing else at all.
@@ -378,28 +440,66 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
     /// AR-14: registration is a state-changing request too, and takes a token.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Question 5, decided yes. An exception list is where a rule like this rots; the cost is one
     /// header. Asserted because it changes a shipped endpoint's contract, so a later story removing
     /// it should have to say so.
+    /// </para>
+    /// <para>
+    /// <b>It asserted only the status code until code review on 2026-09-19, which is the exact
+    /// defect Debug Log #4 records fixing on its sign-in sibling.</b> A malformed registration is
+    /// also a 400, and so is a framework binding failure - so this stayed green with the
+    /// anti-forgery requirement removed from <c>POST /api/v1/accounts</c> entirely, refusing the
+    /// request for some other reason. The weakest assertion in the file was the one carrying the
+    /// most contested decision. It now asserts the problem <c>type</c> and pairs the refusal with a
+    /// correctly-tokened registration that must succeed, matching
+    /// <see cref="A_state_changing_request_without_an_antiforgery_token_is_refused"/>.
+    /// </para>
     /// </remarks>
     [Fact]
     public async Task Registration_requires_an_antiforgery_token_as_well()
     {
         var connectionString = Available();
+        var address = RandomAddress();
 
-        HttpStatusCode? without = null;
+        HttpStatusCode? withoutStatus = null;
+        var withoutBody = string.Empty;
+        WireResponse? with = null;
 
         await HostProcess.RunAsync(connectionString, Configured, async client =>
         {
             var response = await client.PostAsJsonAsync(
                 AccountRoutes.Register,
-                new RegisterAccountRequest("Ravi", RandomAddress(), Password),
+                new RegisterAccountRequest("Ravi", address, Password),
                 JsonOptions);
 
-            without = response.StatusCode;
+            withoutStatus = response.StatusCode;
+            withoutBody = await response.Content.ReadAsStringAsync();
+
+            // The same address, now with a token. Registration answers 204 on both the new-address
+            // and the already-registered paths, so this cannot be confused by ordering.
+            //
+            // FetchAntiforgeryTokenAsync first, because WireSession sends the header only when a
+            // token is already held - it does not fetch one on demand. Without it this half returns
+            // the same 400 as the half above and the pairing proves nothing.
+            var session = new WireSession(client);
+
+            await session.FetchAntiforgeryTokenAsync();
+
+            with = await session.RegisterAsync(
+                new RegisterAccountRequest("Ravi", address, Password));
         });
 
-        Assert.Equal(HttpStatusCode.BadRequest, without);
+        Assert.Equal(HttpStatusCode.BadRequest, withoutStatus);
+
+        var problem = JsonSerializer.Deserialize<ProblemResponse>(withoutBody, JsonOptions);
+
+        Assert.NotNull(problem);
+        Assert.Equal(ProblemTypes.AntiforgeryTokenMissing, problem.Type);
+
+        // The refusal is about the missing token and nothing else.
+        Assert.NotNull(with);
+        Assert.Equal(HttpStatusCode.NoContent, with.StatusCode);
     }
 
     /// <summary>

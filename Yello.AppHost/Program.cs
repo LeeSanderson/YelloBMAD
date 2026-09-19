@@ -53,10 +53,17 @@ var database = sqlServer.AddDatabase(BuildConstant("Yello.DatabaseResourceName")
 //
 // Taken here instead because AC5 is this story's and an unverifiable cookie attribute is worse
 // than a configuration change. WHAT IT COSTS: a trusted development certificate. If the browser
-// warns about one, run `dotnet dev-certs https --trust` once. Nothing in the test suites depends
-// on this - they boot Yello.Host as a process on http://127.0.0.1:0 and assert the Set-Cookie
-// header directly rather than round-tripping it - so a certificate problem stops the dev loop and
-// nothing else.
+// warns about one, run `dotnet dev-certs https --trust` once.
+//
+// THE TEST SUITES DO DEPEND ON IT, and this comment said the opposite until code review on
+// 2026-09-19. It read "Nothing in the test suites depends on this - they boot Yello.Host as a
+// process on http://127.0.0.1:0", which was true when it was written and was falsified by this very
+// story: HostProcess now sets ASPNETCORE_URLS to https://127.0.0.1:0, because .NET's CookieContainer
+// refuses a `Secure` cookie over http and eleven of fourteen endpoint tests went down with it. So
+// Kestrel needs the development certificate to bind, and a cold CI agent without
+// `dotnet dev-certs https` fails the entire Slices suite at Host startup - for a reason no assertion
+// names, told otherwise by the one file somebody provisioning that agent would read.
+// tests/TESTING-CONVENTIONS.md states the requirement.
 var client = builder.AddProject<Projects.Yello_Client>("client", launchProfileName: "https");
 
 // THE ONE ALLOWED ORIGIN, INJECTED RATHER THAN RESTATED.

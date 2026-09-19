@@ -30,6 +30,28 @@ public sealed class AntiforgeryTokenSource(HttpClient http, SessionState session
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     /// <summary>
+    /// Discards the held token, so the next <see cref="EnsureTokenAsync"/> fetches a fresh one.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Without this, a refused token is a permanent, unrecoverable failure.</b>
+    /// <see cref="EnsureTokenAsync"/> returns early whenever a token is held, and nothing cleared
+    /// one in response to the server refusing it - so the same dead token was re-sent forever and
+    /// the person met the same "there was a problem submitting" on every attempt, with a hard reload
+    /// the only escape and nothing telling them to try it. Found at code review on 2026-09-19.
+    /// </para>
+    /// <para>
+    /// <b>Four ordinary ways a held token stops being valid.</b> ASP.NET Core binds the token pair
+    /// to the identity it was minted for: a second tab whose token was issued while anonymous is
+    /// refused once the first tab signs in; a token fetched before the Session cookie expired is
+    /// refused after; the Host restarting rotates the Data Protection key ring in development; and
+    /// the anti-forgery cookie is a browser session cookie that a privacy tool can drop while the
+    /// in-memory request token survives. None is exotic and none was recoverable.
+    /// </para>
+    /// </remarks>
+    public void Invalidate() => session.HoldAntiforgeryToken(null);
+
+    /// <summary>
     /// Makes sure a token is held, fetching one if it is not.
     /// </summary>
     /// <returns>

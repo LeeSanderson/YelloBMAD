@@ -205,10 +205,14 @@ internal static class HostProcess
                 // cookies invisibly, so an assertion that a request "was authenticated" could pass
                 // without anyone having said which cookie carried it - and the Session cookie's
                 // attributes ARE AC5's contract, so the test that reads them has to read the
-                // header. And .NET's CookieContainer refuses to store a `Secure` cookie received
-                // over http, which this Host is: with handling on, every Session cookie issued here
-                // would be silently dropped and every round trip would fail for a reason no
-                // assertion would name.
+                // header.
+                //
+                // The second reason used to say ".NET's CookieContainer refuses to store a `Secure`
+                // cookie received over http, which this Host is". That was the diagnosis, not the
+                // state: it is why this Host was MOVED to https (see ASPNETCORE_URLS above), so by
+                // the time the sentence was committed it described the problem rather than the
+                // configuration. Corrected at code review on 2026-09-19. The first reason is the
+                // one that still holds, and it holds regardless of scheme.
                 using var handler = new HttpClientHandler
                 {
                     UseCookies = false,

@@ -74,10 +74,63 @@ public static class CrossOriginPolicy
             }
 
             policy
-                .WithOrigins(configuredOrigin.TrimEnd('/'))
+                .WithOrigins(configuredOrigin.Trim().TrimEnd('/'))
                 .AllowCredentials()
                 .AllowAnyHeader()
                 .AllowAnyMethod();
         });
+    }
+
+    /// <summary>
+    /// Says why a configured origin could never match a browser's <c>Origin</c> header, or
+    /// <c>null</c> when it is usable.
+    /// </summary>
+    /// <param name="configuredOrigin">The value of <see cref="OriginConfigurationKey"/>.</param>
+    /// <returns>A sentence naming the problem, or <c>null</c>.</returns>
+    /// <remarks>
+    /// <para>
+    /// <b>This exists because failing closed silently is indistinguishable from working.</b> The
+    /// startup warning only fired when the setting was BLANK, and ASP.NET Core matches
+    /// <c>Origins</c> by ordinal equality without validating what it was given - so a value that is
+    /// present but not a bare origin refuses every browser request with nothing logged anywhere.
+    /// The likely mistakes are all of that shape: a path on the end
+    /// (<c>https://localhost:7045/app</c>), a missing scheme (<c>localhost:7045</c>), a trailing
+    /// space. Each produces the morning lost to a CORS error in a console that
+    /// <c>NoClientOriginConfigured</c> was written to prevent, through the one door it did not
+    /// cover. Found at code review on 2026-09-19.
+    /// </para>
+    /// <para>
+    /// A description rather than a correction: it reports and does not rewrite, because guessing
+    /// what an operator meant by a malformed origin is how a policy quietly allows something nobody
+    /// configured. <see cref="Configure"/> trims whitespace and a trailing slash, which are
+    /// unambiguous; anything else is named here and left alone.
+    /// </para>
+    /// </remarks>
+    public static string? Describe(string? configuredOrigin)
+    {
+        if (string.IsNullOrWhiteSpace(configuredOrigin))
+        {
+            return null;
+        }
+
+        var candidate = configuredOrigin.Trim().TrimEnd('/');
+
+        if (!Uri.TryCreate(candidate, UriKind.Absolute, out var origin))
+        {
+            return $"'{configuredOrigin}' is not an absolute URL. "
+                + "It must be a bare origin, such as 'https://localhost:7045'.";
+        }
+
+        if (origin.Scheme is not ("http" or "https"))
+        {
+            return $"'{configuredOrigin}' uses the scheme '{origin.Scheme}'. "
+                + "A browser origin is http or https.";
+        }
+
+        // PathAndQuery is "/" for a bare origin, which Configure's TrimEnd already removes.
+        return origin.PathAndQuery is "/" && string.IsNullOrEmpty(origin.Fragment)
+            ? null
+            : $"'{configuredOrigin}' carries a path, query or fragment. An Origin header is only "
+                + $"scheme, host and port - use '{origin.Scheme}://{origin.Authority}'.";
     }
 }

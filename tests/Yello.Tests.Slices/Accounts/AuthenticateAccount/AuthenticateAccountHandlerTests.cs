@@ -72,7 +72,7 @@ public sealed class AuthenticateAccountHandlerTests
     /// <remarks>
     /// <para>
     /// <b>This is the structural half of AC4, and it is the one that can be asserted without a
-    /// stopwatch.</b> <c>SignInDurationTests</c> measures the consequence; this asserts the cause,
+    /// stopwatch.</b> <c>PasswordVerificationDurationTests</c> measures the consequence; this asserts the cause,
     /// and it fails instantly and deterministically where a timing test needs 21 samples and a
     /// tolerance. The defect it catches is one line - <c>if (credential is null) return null;</c>
     /// above the verification - which is exactly what AD-23 exists to prevent and exactly what a

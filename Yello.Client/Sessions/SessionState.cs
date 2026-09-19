@@ -43,11 +43,29 @@ namespace Yello.Client.Sessions;
 /// implied as coverage.
 /// </para>
 /// </remarks>
-public sealed class SessionState
+public sealed class SessionState : IDisposable
 {
     private readonly List<Registration> _purges = [];
 
     private Func<Task>? _announce;
+
+    /// <summary>
+    /// Cancelled when the Session ends, so that requests already on the wire do not deliver
+    /// Space-scoped content <i>after</i> the purge that was supposed to discard it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>UX-DR30 arriving by the other door.</b> The purge-before-announce ordering closes the case
+    /// where a queued frame renders one tick late. It does nothing about request R1, already in
+    /// flight, whose continuation resolves normally against a component that has just been purged -
+    /// same disclosure, different route. Found at code review on 2026-09-19.
+    /// </para>
+    /// <para>
+    /// Replaced rather than reused after a cancellation, because a cancelled source stays cancelled:
+    /// signing in again on the same client would otherwise start every request pre-cancelled.
+    /// </para>
+    /// </remarks>
+    private CancellationTokenSource _inFlight = new();
 
     /// <summary>
     /// Whether this client believes it holds a Session.
@@ -153,27 +171,79 @@ public sealed class SessionState
         IsSignedIn = false;
         AntiforgeryRequestToken = null;
 
-        // A copy, because a purge may unregister itself - which is the ordinary shape for a
-        // component disposing during teardown, and would otherwise mutate the list being walked.
-        foreach (var registration in _purges.ToArray())
+        // FIRST, so that nothing already on the wire can deliver Space-scoped content after the
+        // purge below has discarded it. Swapped before cancelling, so a request starting on another
+        // continuation right now links to the fresh source rather than to one about to be cancelled.
+        var cancelling = _inFlight;
+
+        _inFlight = new CancellationTokenSource();
+
+        await cancelling.CancelAsync().ConfigureAwait(false);
+
+        cancelling.Dispose();
+
+        try
         {
-            try
+            // A copy, because a purge may unregister itself - which is the ordinary shape for a
+            // component disposing during teardown, and would otherwise mutate the list being walked.
+            foreach (var registration in _purges.ToArray())
             {
-                await registration.Purge().ConfigureAwait(false);
-            }
-            catch (InvalidOperationException)
-            {
-                // A component torn down mid-purge. Deliberately swallowed rather than allowed to
-                // abandon the remaining purges and the announcement: the failure mode of stopping
-                // here is Space-scoped content left on screen, which is what UX-DR30 forbids.
+                try
+                {
+                    await registration.Purge().ConfigureAwait(false);
+                }
+                // S2221 disabled here, deliberately and narrowly, following the same reasoning as
+                // StartupConnectivityCheck. An allow-list IS the defect this catch was widened to
+                // fix: it listed one type, the test planted that same type, and every realistic
+                // teardown failure fell outside it.
+#pragma warning disable S2221 // "Catch a list of specific exception subtype or use exception filters"
+                catch (Exception purgeFailure) when (purgeFailure is not OutOfMemoryException)
+#pragma warning restore S2221
+                {
+                    // EVERY exception type, and the narrowing is the defect rather than the fix.
+                    // This caught only InvalidOperationException until code review on 2026-09-19,
+                    // while the remarks above promised - unconditionally - that "a purge that throws
+                    // does not stop the others or the announcement". The failures a purge actually
+                    // meets during teardown are JSDisconnectedException from an interop call,
+                    // ObjectDisposedException, TaskCanceledException from a request this very method
+                    // just cancelled, and HttpRequestException - none of them InvalidOperationException,
+                    // and the test that proved the behaviour planted the one type that was caught.
+                    //
+                    // A purge is "discard what you are holding". There is no failure of one that
+                    // should be allowed to strand the rest, because the state that leaves on screen
+                    // is exactly what UX-DR30 forbids. The single exclusion above is a process-level
+                    // failure that nothing here could meaningfully continue through anyway.
+                    _ = purgeFailure;
+                }
             }
         }
-
-        if (_announce is not null)
+        finally
         {
-            await _announce().ConfigureAwait(false);
+            // IN A FINALLY, because the announcement is what takes the person off the Space-scoped
+            // surface. Reaching it only when every purge returned normally made the announcement
+            // conditional on the thing most likely to fail - so the one case that needed the
+            // navigation most was the one that skipped it.
+            if (_announce is not null)
+            {
+                await _announce().ConfigureAwait(false);
+            }
         }
     }
+
+    /// <summary>
+    /// Links a request's own cancellation to this Session's, so it is abandoned if the Session ends
+    /// while it is in flight.
+    /// </summary>
+    /// <param name="caller">The cancellation token the caller supplied.</param>
+    /// <returns>
+    /// A linked source the caller must dispose. Linked rather than replaced, so a caller that
+    /// cancels its own request still does.
+    /// </returns>
+    public CancellationTokenSource LinkToSession(CancellationToken caller) =>
+        CancellationTokenSource.CreateLinkedTokenSource(caller, _inFlight.Token);
+
+    /// <inheritdoc />
+    public void Dispose() => _inFlight.Dispose();
 
     private sealed class Registration(SessionState owner, Func<Task> purge) : IDisposable
     {

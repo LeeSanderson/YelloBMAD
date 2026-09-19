@@ -1,22 +1,23 @@
 {
   "$schema": "https://json.schemastore.org/launchsettings.json",
+  "//": "`https` IS FIRST DELIBERATELY, matching Yello.Host. `dotnet run` with no --launch-profile takes the first profile, and the Host's CORS policy allows exactly this project's https origin (https://localhost:7045), injected by Yello.AppHost - so booting the client on the http profile is refused by the browser for a reason that appears nowhere in this file. Reordered at code review on 2026-09-19.",
   "profiles": {
-    "http": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": true,
-      "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
-      "applicationUrl": "http://localhost:5131",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    },
     "https": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
       "applicationUrl": "https://localhost:7045;http://localhost:5131",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}",
+      "applicationUrl": "http://localhost:5131",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }

@@ -66,8 +66,9 @@ public sealed class ClientStorageBanTests
             from method in type.Methods
             where method.HasBody
             from instruction in method.Body.Instructions
-            where instruction.Operand is string text && NamesBrowserStorage(text)
-            select $"{type.FullName}.{method.Name} states '{instruction.Operand}'")
+            let operand = DescribeOperand(instruction.Operand)
+            where operand is not null && NamesBrowserStorage(operand)
+            select $"{type.FullName}.{method.Name} states '{operand}'")
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
@@ -171,6 +172,89 @@ public sealed class ClientStorageBanTests
         }
     }
 
+    /// <summary>
+    /// The plant that runs the <i>scan</i>, not just the predicate - over real IL that reaches
+    /// storage through a typed member rather than a string.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The sibling plant above validates <see cref="NamesBrowserStorage"/> and nothing else.</b>
+    /// It passes strings to the predicate directly, so it cannot see how the scan chooses what to
+    /// pass it - and the scan's own remarks claimed the plant covered "a scan that read the wrong
+    /// member", which was the exact defect present: only <c>ldstr</c> operands were read. This test
+    /// exists because that claim needed to become true. Added at code review on 2026-09-19.
+    /// </para>
+    /// <para>
+    /// It scans this assembly rather than <c>Yello.Client</c>, so the plant cannot make the real
+    /// gate fail; and it scans one named method rather than the whole module, so it asserts that
+    /// <i>this</i> call was seen rather than that something somewhere matched.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_scan_reads_a_called_member_and_not_only_a_string_literal()
+    {
+        using var module = ModuleDefinition.ReadModule(typeof(ClientStorageBanTests).Assembly.Location);
+
+        var plant = module
+            .GetTypes()
+            .Single(type => type.Name == nameof(PlantedLocalStorageShim))
+            .Methods
+            .Single(method => method.Name == nameof(PlantedLocalStorageShim.Reach));
+
+        // Called as well as scanned, for two reasons. MA0182 removes an internal type nothing uses,
+        // which would delete the plant; and running it proves the plant is inert - it stores
+        // nothing anywhere, so the only thing it contributes to this suite is the IL above.
+        PlantedLocalStorageShim.Reach();
+
+        var found = plant.Body.Instructions
+            .Select(instruction => DescribeOperand(instruction.Operand))
+            .Where(operand => operand is not null)
+            .Any(operand => NamesBrowserStorage(operand!));
+
+        Assert.True(
+            found,
+            $"The IL scan did not see '{nameof(PlantedLocalStorageShim)}.{nameof(PlantedLocalStorageShim.Reach)}' "
+            + "reaching browser storage through a typed member. No string literal names the API "
+            + "there - which is precisely how ProtectedLocalStorage, ProtectedSessionStorage and "
+            + "every wrapper around them compile. A scan that reads only ldstr operands reports "
+            + "green while the client writes a credential to localStorage, so AC5 and UX-DR31 "
+            + "would both be gated by nothing.");
+    }
+
+    /// <summary>
+    /// What an instruction names, whether that is a literal string or a member it calls.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The IL scan read only <c>ldstr</c> operands until code review on 2026-09-19, which made it
+    /// blind to every typed way of reaching browser storage.</b> A raw interop call carries the API
+    /// name as a string literal and was caught; <c>ProtectedLocalStorage.SetAsync(...)</c>,
+    /// <c>ProtectedSessionStorage</c>, <c>Blazored.LocalStorage.ILocalStorageService.SetItemAsync(...)</c>
+    /// or any wrapper compiles to a <c>callvirt</c> whose operand is a <c>MethodReference</c> with no
+    /// matching literal anywhere - so AC5's credential ban and UX-DR31's Space-scoped content ban
+    /// both reported green against the shapes an implementer is most likely to reach for, being the
+    /// convenient ones.
+    /// </para>
+    /// <para>
+    /// The repository already knew how to do this: <c>SessionSeamTests</c> and
+    /// <c>LocalisationGateTests</c> both match on <c>MemberReference</c> operands. The declaring
+    /// type is included as well as the member name, so a call to <c>ILocalStorageService.SetItemAsync</c>
+    /// is caught by the type even though the method name alone names no storage API.
+    /// </para>
+    /// </remarks>
+    /// <param name="operand">The instruction's operand.</param>
+    /// <returns>Text to test, or <c>null</c> for an operand that names nothing.</returns>
+    private static string? DescribeOperand(object? operand) => operand switch
+    {
+        string text => text,
+
+        // BEFORE MemberReference, because Cecil's TypeReference derives from it - putting this arm
+        // second makes it unreachable, which the compiler refuses outright.
+        TypeReference type => type.FullName,
+        MemberReference member => $"{member.DeclaringType?.FullName}.{member.Name}",
+        _ => null,
+    };
+
     private static bool NamesBrowserStorage(string text) =>
         Array.Exists(BannedStorageNames, name => text.Contains(name, StringComparison.OrdinalIgnoreCase));
 
@@ -179,4 +263,39 @@ public sealed class ClientStorageBanTests
     /// </summary>
     private static readonly string[] ScannableExtensions =
         [".html", ".js", ".mjs", ".css", ".json"];
+}
+
+/// <summary>
+/// A stand-in for the typed browser-storage wrappers a Blazor implementer actually reaches for,
+/// so that <see cref="ClientStorageBanTests.The_scan_reads_a_called_member_and_not_only_a_string_literal"/>
+/// has real IL to scan.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>It lives in the test assembly, never in <c>Yello.Client</c>.</b> The gate it validates scans
+/// the client's module, so a plant placed there would fail the real assertion rather than prove it
+/// works - and a plant that has to be deleted before the suite passes is not a permanent test.
+/// </para>
+/// <para>
+/// The name carries the banned token the way <c>ProtectedLocalStorage</c> does: the detector must
+/// catch this through the <i>declaring type</i> of the call, because <see cref="Reach"/> contains no
+/// string literal naming any storage API. That is the whole point - it is the shape that slipped
+/// past the scan until code review on 2026-09-19.
+/// </para>
+/// </remarks>
+internal static class PlantedLocalStorageShim
+{
+    /// <summary>
+    /// Calls the planted member, and says nothing in a string while doing it.
+    /// </summary>
+    internal static void Reach() => SetItem("yello_session", "not-a-real-credential");
+
+    private static void SetItem(string key, string value)
+    {
+        // Deliberately empty. Nothing is stored anywhere - the parameters exist so the call site
+        // compiles to a real `call` instruction with a MethodReference operand, which is the only
+        // thing the scan under test is looking at.
+        _ = key;
+        _ = value;
+    }
 }

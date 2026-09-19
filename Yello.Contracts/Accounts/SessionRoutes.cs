@@ -37,14 +37,24 @@ public static class SessionRoutes
 
     /// <summary>
     /// <c>GET</c> here to ask whether the caller holds a Session that is still good. Answers
-    /// <c>204 No Content</c> when it does and <c>401</c> when it does not, and carries no body in
-    /// either case.
+    /// <c>204 No Content</c> when it does - with no body - and <c>401</c> with the same
+    /// <c>application/problem+json</c> shape every other refusal in this API uses when it does not.
     /// </summary>
     /// <remarks>
-    /// <b>No body, deliberately.</b> AC1 fixes a Session as identifying the Account "and nothing
-    /// more", and the surest way to keep that true on the wire is for the endpoint that reads one
-    /// to return nothing at all. A body would be a profile contract this story has no requirement
-    /// for, and the first place a Role or a Space would later be tempted onto a Session.
+    /// <b>NOTHING ABOUT THE SESSION IS EVER ON THE WIRE, WHICH IS THE PART AC1 CARES ABOUT.</b> This
+    /// said "carries no body in either case" until code review on 2026-09-19, which is not what the
+    /// endpoint does: the 401 carries a problem document, like every other refusal. The summary now
+    /// describes the endpoint rather than an intention.
+    /// <para>
+    /// The underlying rule is unchanged and is the one worth keeping: the <i>success</i> answer is
+    /// empty. AC1 fixes a Session as identifying the Account "and nothing more", and the surest way
+    /// to keep that true on the wire is for the endpoint that reads one to return nothing at all. A
+    /// success body would be a profile contract this story has no requirement for, and the first
+    /// place a Role or a Space would later be tempted onto a Session. A problem document on the
+    /// refusal path says nothing about any Session - there isn't one - so it costs that rule
+    /// nothing, and making this endpoint the single exception to the API's error shape would cost a
+    /// caller something real.
+    /// </para>
     /// <para>
     /// It exists because AC3 - "an expired Session grants access to nothing" - cannot otherwise be
     /// demonstrated: until story 1.5 builds the first Space-scoped endpoint there is nothing in the

@@ -65,7 +65,14 @@ public sealed class YelloApiHandler(SessionState session) : DelegatingHandler
             request.Headers.TryAddWithoutValidation(Antiforgery.HeaderName, token);
         }
 
-        var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+        // LINKED TO THE SESSION, so that a request still on the wire when the Session ends is
+        // abandoned rather than allowed to resolve against a client that has just been purged.
+        // Without this the purge-before-announce ordering closes only the queued-frame case, and a
+        // response arriving a moment later delivers Space-scoped content anyway - the same
+        // disclosure UX-DR30 forbids, reached by the other door. Found at code review on 2026-09-19.
+        using var linked = session.LinkToSession(cancellationToken);
+
+        var response = await base.SendAsync(request, linked.Token).ConfigureAwait(false);
 
         if (IsSessionEnded(request, response))
         {

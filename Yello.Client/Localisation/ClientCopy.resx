@@ -113,6 +113,10 @@
     <value>That could not be sent. Check your connection and try again.</value>
     <comment>Shown when the request never reached the server, or the server answered with something unexpected. It is about the transport, not about the submission.</comment>
   </data>
+  <data name="SubmitRetry" xml:space="preserve">
+    <value>That did not go through. Please try again.</value>
+    <comment>Shown when the server refused the request's anti-forgery token - which happens for ordinary reasons a person cannot see or act on, such as another tab signing in, or a Session expiring while this form sat open. Pressing the button again fetches a fresh token and works, so this copy asks for exactly that and explains nothing: anti-forgery is not a concept the person has, and naming it would be alarming rather than useful. It must not imply they typed something wrong, and must not imply anything was saved.</comment>
+  </data>
   <data name="ErrorHeading" xml:space="preserve">
     <value>Check the form and try again.</value>
     <comment>Heading of the error region, announced assertively when validation fails. Followed by one line per problem.</comment>

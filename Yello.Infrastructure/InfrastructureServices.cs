@@ -76,4 +76,36 @@ public static class InfrastructureServices
 
         return services;
     }
+
+    /// <summary>
+    /// Materialises the password hasher's dummy hash, so that the first unknown-address sign-in in
+    /// this process is not the request that pays to create it.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>AC4's duration clause, on the one axis laziness left open.</b> The dummy hash a
+    /// non-existent address is verified against is built on first use. Without this call that first
+    /// use is a real request, which then performs a full <c>HashPassword</c> in addition to its
+    /// verification - roughly twice what a known address costs on the same cold process, one sample
+    /// per process, on exactly the axis AC4 requires to be indistinguishable. Found at code review
+    /// on 2026-09-19; no test could see it because <c>DurationIndistinguishability</c> warms each
+    /// arm before measuring, which hides the single occurrence.
+    /// </para>
+    /// <para>
+    /// Exposed here rather than on <c>Domain.Accounts.IPasswordHasher</c> deliberately: warming is a
+    /// property of <i>this</i> implementation, and putting it on the port would make every future
+    /// hasher answer a question only this one has. Costs one hash (~273 ms) at startup and is
+    /// idempotent, so calling it twice is harmless.
+    /// </para>
+    /// </remarks>
+    /// <param name="services">The built provider.</param>
+    public static void WarmPasswordHashing(this IServiceProvider services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        if (services.GetRequiredService<Domain.Accounts.IPasswordHasher>() is IdentityPasswordHasher hasher)
+        {
+            hasher.Warm();
+        }
+    }
 }

@@ -1,20 +1,21 @@
 {
   "$schema": "https://json.schemastore.org/launchsettings.json",
+  "//": "`https` IS FIRST DELIBERATELY. `dotnet run` with no --launch-profile takes the first profile, and story 1.4 moved the client's HostBaseAddress onto the https applicationUrl - so with `http` first the two disagreed and every call under `dotnet run` was a connection refusal surfaced as a generic submit failure. Reordered at code review on 2026-09-19. NFR-6 wants all traffic encrypted in transit and AC5's Session cookie carries `Secure`, which browsers only reliably accept over https, so https is also the profile that should be hard to avoid rather than the one you opt into.",
   "profiles": {
-    "http": {
-      "commandName": "Project",
-      "dotnetRunMessages": true,
-      "launchBrowser": true,
-      "applicationUrl": "http://localhost:5026",
-      "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
-      }
-    },
     "https": {
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": true,
       "applicationUrl": "https://localhost:7093;http://localhost:5026",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    },
+    "http": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": true,
+      "applicationUrl": "http://localhost:5026",
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }

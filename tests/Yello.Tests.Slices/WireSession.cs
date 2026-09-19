@@ -25,9 +25,12 @@ namespace Yello.Tests.Slices;
 /// than inferred from behaviour.
 /// </para>
 /// <para>
-/// It is also a practical necessity rather than only a discipline: the cookie carries
-/// <c>Secure</c>, and .NET's <c>CookieContainer</c> refuses to store a <c>Secure</c> cookie
-/// received over <c>http</c> - which is what the Host under test listens on.
+/// <b>The Host under test listens on <c>https</c>.</b> This paragraph previously ended "- which is
+/// what the Host under test listens on", of <c>http</c>; that was the diagnosis that caused
+/// <c>HostProcess</c> to be moved to <c>https</c> in this same story, so it described a state that
+/// no longer existed by the time it was written. Corrected at code review on 2026-09-19. What
+/// remains true is the reason above: reading the header is how the attributes get asserted at all,
+/// and a <c>CookieContainer</c> would attach cookies invisibly.
 /// </para>
 /// </remarks>
 internal sealed class WireSession(HttpClient client)

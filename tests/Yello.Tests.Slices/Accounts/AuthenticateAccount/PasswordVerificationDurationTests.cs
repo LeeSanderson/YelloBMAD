@@ -130,11 +130,86 @@ public sealed class PasswordVerificationDurationTests
         Assert.Equal(1, hasher.VerifyCalls);
     }
 
-    private static IdentityPasswordHasher RealHasher() =>
+    /// <summary>
+    /// The work factor may not be raised until the timing oracle that a raise opens has a remedy.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>THIS IS A TRIPWIRE, NOT A MEASUREMENT, AND IT GUARDS THE ONE THING THE DURATION SUITE
+    /// CANNOT SEE.</b> PBKDF2's cost follows the iteration count embedded in the STORED hash. The
+    /// dummy hash an unknown address is verified against is minted by the same hasher at the
+    /// CONFIGURED count. Those are equal only while every stored hash is already current - which is
+    /// precisely the condition <c>SuccessRehashNeeded</c> and the whole rehash path exist to
+    /// violate.
+    /// </para>
+    /// <para>
+    /// Raise <see cref="PasswordWorkFactor.IterationCount"/> and every Account that has not signed
+    /// in since verifies at the OLD count while an unknown address pays the NEW one - so a known
+    /// address answers measurably FASTER, which is AD-23 and AC4 inverted. It does not decay,
+    /// because the rehash only fires on the success path: an attacker probing with wrong passwords
+    /// never upgrades the row. Account enumeration by stopwatch, for as long as the migration window
+    /// lasts.
+    /// </para>
+    /// <para>
+    /// <b>Why a constant rather than a duration comparison.</b>
+    /// <see cref="A_legacy_factor_hash_costs_less_than_the_dummy_and_that_is_the_oracle"/> below
+    /// measures the asymmetry and is skipped, because it fails today by design. This one passes
+    /// today and fails the moment somebody changes the number - which is the only moment that
+    /// matters, and the moment nothing else in the suite notices. Added at code review on
+    /// 2026-09-19; the remedy is recorded in <c>deferred-work.md</c> under this story's review.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void The_work_factor_has_not_been_raised_without_closing_the_timing_oracle()
+    {
+        Assert.Equal(220_000, PasswordWorkFactor.IterationCount);
+    }
+
+    /// <summary>
+    /// The oracle itself, measured. Skipped because it fails today, deliberately.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>This is a demonstration rather than a guard, and un-skipping it is the acceptance test for
+    /// the remedy.</b> It plants a stored hash at the framework default (100,000) - the arrangement
+    /// <c>RehashIntegrationTests</c> already uses, which existed all along and which no duration
+    /// test ever borrowed - and compares verifying it against the unknown-address arm at the
+    /// configured 220,000. The two differ by roughly 2.2x, eleven times the method's own 20%
+    /// tolerance.
+    /// </para>
+    /// <para>
+    /// <b>It is skipped rather than deleted or inverted</b> because a red suite is not a record and
+    /// an inverted assertion ("the arms DO differ") would have to be inverted back by whoever fixes
+    /// this - and would pass for the wrong reason the day a fixed-cost budget makes them equal. Skip
+    /// means: this is the behaviour we know we have, named, with the ledger entry beside it.
+    /// </para>
+    /// </remarks>
+    [Fact(Skip = "Fails by design: demonstrates the work-factor timing oracle. Remove the Skip when "
+        + "the remedy lands - see deferred-work.md, code review of story 1.4 (2026-09-19).")]
+    public async Task A_legacy_factor_hash_costs_less_than_the_dummy_and_that_is_the_oracle()
+    {
+        var current = RealHasher();
+        var legacy = HasherAt(PasswordWorkFactor.FrameworkDefaultIterationCount);
+        var legacyHash = legacy.Hash(CorrectPassword);
+
+        var verdict = await DurationIndistinguishability.CompareAsync(
+            () => VerifyAsync(current, legacyHash, WrongPassword),
+            () => VerifyAsync(current, storedHash: null, WrongPassword));
+
+        Assert.True(
+            verdict.AreIndistinguishable,
+            "A stored hash at an older work factor costs less to verify than the dummy hash an "
+            + "unknown address is checked against, so the two causes AC4 requires to be "
+            + $"indistinguishable are not. {verdict.Describe()}");
+    }
+
+    private static IdentityPasswordHasher RealHasher() => HasherAt(PasswordWorkFactor.IterationCount);
+
+    private static IdentityPasswordHasher HasherAt(int iterationCount) =>
         new(new PasswordHasher<HashedCredential>(Options.Create(new PasswordHasherOptions
         {
             CompatibilityMode = PasswordHasherCompatibilityMode.IdentityV3,
-            IterationCount = PasswordWorkFactor.IterationCount,
+            IterationCount = iterationCount,
         })));
 
     private static Task VerifyAsync(IPasswordHasher hasher, string? storedHash, string password)

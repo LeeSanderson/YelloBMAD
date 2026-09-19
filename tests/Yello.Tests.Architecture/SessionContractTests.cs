@@ -105,6 +105,31 @@ public sealed class SessionContractTests
         Assert.Equal(SessionCookiePolicy.DefaultLifetime, SessionCookiePolicy.ReadLifetime(configured));
     }
 
+    /// <summary>
+    /// A bare number is refused rather than read as days.
+    /// </summary>
+    /// <remarks>
+    /// <b><c>TimeSpan.TryParse("8")</c> succeeds and yields eight DAYS.</b> For a setting documented
+    /// in hours, <c>8</c> is the obvious thing an operator types - and it bought a Session lasting
+    /// twenty-four times its documented life, silently, because the value parsed fine and the
+    /// "unparseable falls back to the default" safety net never fired. None of the four cases in the
+    /// Theory above is a value anybody would plausibly type; this is. Found at code review on
+    /// 2026-09-19.
+    /// </remarks>
+    /// <param name="configured">A duration missing its units.</param>
+    [Theory]
+    [InlineData("8")]
+    [InlineData("0")]
+    [InlineData("365")]
+    public void A_bare_number_is_refused_rather_than_read_as_days(string configured)
+    {
+        var setting = SessionCookiePolicy.ReadLifetimeSetting(configured);
+
+        Assert.Equal(SessionCookiePolicy.DefaultLifetime, setting.Lifetime);
+        Assert.NotNull(setting.Problem);
+        Assert.Contains("DAYS", setting.Problem, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void A_configured_lifetime_is_honoured()
     {
@@ -114,6 +139,29 @@ public sealed class SessionContractTests
         // that a later change making ReadLifetime clamp to a positive range fails HERE, naming the
         // test it would otherwise turn into a silent no-op.
         Assert.Equal(TimeSpan.FromSeconds(-1), SessionCookiePolicy.ReadLifetime("-00:00:01"));
+    }
+
+    /// <summary>
+    /// Every value that is not simply absent and sound is described, so the composition root can
+    /// report it.
+    /// </summary>
+    /// <remarks>
+    /// <b>The fallback used to be silent, while <c>ReadLifetime</c>'s own remarks said the process
+    /// "starts and reports the problem rather than refusing to boot".</b> Nothing reported anything,
+    /// so a mistyped duration was indistinguishable from an absent one - and a zero or negative
+    /// lifetime, which takes authentication completely down, said nothing at all. The negative case
+    /// stays legal because AC3's expiry test depends on it; it just became loud. Added at code
+    /// review on 2026-09-19.
+    /// </remarks>
+    [Fact]
+    public void A_lifetime_problem_is_described_and_a_sound_one_is_not()
+    {
+        Assert.Null(SessionCookiePolicy.ReadLifetimeSetting(null).Problem);
+        Assert.Null(SessionCookiePolicy.ReadLifetimeSetting("08:00:00").Problem);
+
+        Assert.NotNull(SessionCookiePolicy.ReadLifetimeSetting("not-a-duration").Problem);
+        Assert.NotNull(SessionCookiePolicy.ReadLifetimeSetting("-00:00:01").Problem);
+        Assert.NotNull(SessionCookiePolicy.ReadLifetimeSetting("00:00:00").Problem);
     }
 
     /// <summary>
@@ -149,6 +197,39 @@ public sealed class SessionContractTests
     }
 
     /// <summary>
+    /// The access-denied redirect is suppressed too, and by the same handler. AD-3.
+    /// </summary>
+    /// <remarks>
+    /// <b>Only one of the two suppressions was tested.</b> <c>SessionCookiePolicy.Configure</c> sets
+    /// <c>OnRedirectToLogin</c> and <c>OnRedirectToAccessDenied</c> on consecutive lines; deleting
+    /// the second restored the framework's 302 to <c>/Account/AccessDenied</c> with every gate
+    /// green. The untested half is the one aimed at a future story - the policy's own rationale is
+    /// that it exists so "the first story to write <c>[Authorize]</c> inherits a 302 nobody chose" -
+    /// which makes it precisely the half that will be relied on before anyone looks at it again.
+    /// Added at code review on 2026-09-19.
+    /// </remarks>
+    [Fact]
+    public async Task An_access_denied_is_refused_with_a_status_code_rather_than_redirecting()
+    {
+        var options = Configured();
+        var context = new DefaultHttpContext();
+
+        await options.Events.RedirectToAccessDenied(
+            new Microsoft.AspNetCore.Authentication.RedirectContext<CookieAuthenticationOptions>(
+                context,
+                new Microsoft.AspNetCore.Authentication.AuthenticationScheme(
+                    SessionCookiePolicy.SchemeName,
+                    SessionCookiePolicy.SchemeName,
+                    typeof(CookieAuthenticationHandler)),
+                options,
+                new Microsoft.AspNetCore.Authentication.AuthenticationProperties(),
+                "/Account/AccessDenied"));
+
+        Assert.False(context.Response.Headers.ContainsKey("Location"));
+        Assert.NotEqual(StatusCodes.Status302Found, context.Response.StatusCode);
+    }
+
+    /// <summary>
     /// AC1: the Session ticket carries the Account's identity and <i>exactly</i> that.
     /// </summary>
     /// <remarks>
@@ -174,13 +255,27 @@ public sealed class SessionContractTests
         var accountId = Guid.NewGuid();
         var principal = SessionPrincipal.For(accountId);
 
-        Assert.Equal(
-            [SessionPrincipal.AccountIdClaimType],
-            principal.Claims.Select(claim => claim.Type).ToList());
+        AssertCarriesExactlyTheAccountClaim(principal);
 
         Assert.Equal(accountId, SessionPrincipal.AccountIdOf(principal));
         Assert.True(principal.Identity?.IsAuthenticated);
     }
+
+    /// <summary>
+    /// AC1's exact-set comparison, in one place so that the test and its planted violation cannot
+    /// drift apart.
+    /// </summary>
+    /// <remarks>
+    /// <b>Shared deliberately.</b> The plant below asserts that <i>this</i> comparison rejects a
+    /// grown ticket. When the two were separate copies of the same assertion, loosening one left the
+    /// other passing - which is exactly what the plant was written to prevent and exactly what it
+    /// failed to do. Extracted at code review on 2026-09-19.
+    /// </remarks>
+    /// <param name="principal">The principal to check.</param>
+    private static void AssertCarriesExactlyTheAccountClaim(ClaimsPrincipal principal) =>
+        Assert.Equal(
+            [SessionPrincipal.AccountIdClaimType],
+            principal.Claims.Select(claim => claim.Type).ToList());
 
     /// <summary>
     /// The planted violation for the assertion above, kept as a permanent test.
@@ -195,22 +290,34 @@ public sealed class SessionContractTests
     /// <para>
     /// Kept as a test rather than recorded as a one-off run for the same reason story 1.3 kept its
     /// duration oracle: a validation that was true once is not a validation that stays true. If
-    /// somebody later loosens the assertion above to a "contains" check, this fails.
+    /// somebody later loosens <see cref="AssertCarriesExactlyTheAccountClaim"/> to a "contains"
+    /// check, this fails.
+    /// </para>
+    /// <para>
+    /// <b>That last sentence was false until code review on 2026-09-19, and the shape of the
+    /// falsehood is worth keeping.</b> This test used to build a principal by hand, project its
+    /// claim types by hand, and re-implement the comparison inline as
+    /// <c>Assert.NotEqual([AccountIdClaimType], types)</c>. It never called
+    /// <see cref="SessionPrincipal.For"/> and never ran the assertion it claimed to guard, so it
+    /// asserted only that a one-element list differs from a two-element one - true by construction,
+    /// for any implementation, including a deleted one. Loosening the real assertion left it green.
+    /// It now grows the ticket from a REAL principal and requires the REAL assertion to reject it.
     /// </para>
     /// </remarks>
     [Fact]
     public void The_claim_set_assertion_rejects_a_ticket_that_grew_a_space()
     {
-        var planted = new ClaimsPrincipal(new ClaimsIdentity(
-            [
-                new Claim(SessionPrincipal.AccountIdClaimType, Guid.NewGuid().ToString()),
-                new Claim("urn:yello:claim:space-id", Guid.NewGuid().ToString()),
-            ],
-            SessionPrincipal.AuthenticationType));
+        var principal = SessionPrincipal.For(Guid.NewGuid());
 
-        var types = planted.Claims.Select(claim => claim.Type).ToList();
+        // The claim a later story is most likely to add: the active Space, put on the ticket to save
+        // a lookup. Added to the principal SessionPrincipal.For actually produced, so this exercises
+        // production code rather than a hand-built stand-in for it.
+        var identity = Assert.IsType<ClaimsIdentity>(principal.Identity);
 
-        Assert.NotEqual<IReadOnlyList<string>>([SessionPrincipal.AccountIdClaimType], types);
+        identity.AddClaim(new Claim("urn:yello:claim:space-id", Guid.NewGuid().ToString()));
+
+        Assert.ThrowsAny<Xunit.Sdk.XunitException>(
+            () => AssertCarriesExactlyTheAccountClaim(principal));
     }
 
     /// <summary>

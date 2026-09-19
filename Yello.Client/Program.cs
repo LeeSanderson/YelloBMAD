@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.JSInterop;
@@ -7,6 +8,7 @@ using Yello.Client;
 using Yello.Client.Localisation;
 using Yello.Client.Pages;
 using Yello.Client.Sessions;
+using Yello.Contracts.Accounts;
 using Yello.Contracts.Localisation;
 
 // The client's composition root.
@@ -124,6 +126,57 @@ sessionState.AnnounceSessionEndWith(() =>
 
     return Task.CompletedTask;
 });
+
+// WHETHER THIS BROWSER ALREADY HOLDS A SESSION, ASKED ONCE, BEFORE ANYTHING RENDERS.
+//
+// GET /api/v1/sessions/current was built for exactly this and had NO CLIENT CONSUMER AT ALL until
+// code review on 2026-09-19 - the only callers in the solution were tests. The consequence was that
+// SessionState.IsSignedIn, which is set only by a successful sign-in on a live component, was false
+// after every reload, new tab and restored browser session, while the browser still held a valid
+// eight-hour cookie. Two things followed from that, and the second is the one that mattered:
+//
+// A person holding a Session was shown the sign-in form again - the one thing this story's own
+// sentence promises will not happen ("moving between contexts never asks me who I am again").
+//
+// And AC3 was unreachable. YelloApiHandler announces a 401 only to a client that BELIEVED it held a
+// Session, so after a reload every 401 was swallowed silently: no purge, no navigation, nothing
+// said. Every test of that path reaches its state by calling SignedIn() directly, which is a state
+// the real application could not get into after a page load - so the seam suite was green against a
+// path no person could take.
+//
+// FAILS TO "SIGNED OUT", ALWAYS. A Host that is down, slow or answering nonsense must not stop the
+// client booting: this is a belief the server re-decides on every request anyway (AD-1), so the
+// safe direction is obvious and every failure takes it. The short timeout is the point of the
+// linked source - HttpClient's own default is 100 seconds, and a boot that hangs that long because
+// the API is unreachable would be a worse bug than the one this fixes.
+using (var probeTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(5)))
+{
+    try
+    {
+        var http = host.Services.GetRequiredService<HttpClient>();
+
+        using var probe = new HttpRequestMessage(
+            HttpMethod.Get,
+            new Uri(SessionRoutes.Current, UriKind.Relative));
+        using var answer = await http.SendAsync(probe, probeTimeout.Token);
+
+        if (answer.StatusCode == HttpStatusCode.NoContent)
+        {
+            // Records the belief and drops any held anti-forgery token. There is none at boot, so
+            // the second half is a no-op here - but going through the same method as a fresh
+            // sign-in keeps one definition of what "this client holds a Session" does.
+            sessionState.SignedIn();
+        }
+    }
+    catch (HttpRequestException)
+    {
+        // The Host is unreachable. Signed out, and the surfaces report their own failures.
+    }
+    catch (OperationCanceledException)
+    {
+        // The probe timed out, or the app is shutting down. Signed out.
+    }
+}
 
 // THE DOCUMENT LANGUAGE, and the reason deferred-work.md:32 named this story as its owner.
 //

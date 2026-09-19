@@ -55,4 +55,36 @@ internal static partial class SessionLog
             + "cross-origin browser request will be refused. Set it to the address the client is "
             + "served from.")]
     internal static partial void NoClientOriginConfigured(ILogger logger, string configurationKey);
+
+    // 1013-1015: startup diagnostics added at code review on 2026-09-19, for three configuration
+    // mistakes that previously failed closed in silence. None of them can carry anything sensitive -
+    // they name a configuration KEY and a description of a value the operator typed themselves, and
+    // all three are emitted before the server starts listening, so the post-startup line counting in
+    // SessionEndpointTests is unaffected.
+
+    [LoggerMessage(
+        EventId = 1013,
+        Level = LogLevel.Warning,
+        Message = "The client origin configured under '{ConfigurationKey}' cannot be matched: "
+            + "{Problem} Every cross-origin browser request will be refused until it is corrected.")]
+    internal static partial void ClientOriginUnusable(
+        ILogger logger,
+        string configurationKey,
+        string problem);
+
+    [LoggerMessage(
+        EventId = 1014,
+        Level = LogLevel.Warning,
+        Message = "The Session lifetime configured under '{ConfigurationKey}' was not used: "
+            + "{Problem}")]
+    internal static partial void SessionLifetimeUnusable(
+        ILogger logger,
+        string configurationKey,
+        string problem);
+
+    [LoggerMessage(
+        EventId = 1015,
+        Level = LogLevel.Information,
+        Message = "Sessions are issued for {Lifetime}.")]
+    internal static partial void SessionLifetimeResolved(ILogger logger, TimeSpan lifetime);
 }

@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.AspNetCore.Identity;
 using Yello.Domain.Accounts;
 
@@ -62,20 +63,27 @@ internal sealed class IdentityPasswordHasher(IPasswordHasher<HashedCredential> h
     /// and is invisible in the diff that causes it.
     /// </para>
     /// <para>
-    /// <b><c>Lazy</c> rather than eager, and it costs one slow call rather than one slow
-    /// startup.</b> The container resolves this class on first use, so an eager hash in the
-    /// constructor would land on whichever request resolved it - a registration, as often as a
-    /// sign-in. Deferring it puts the cost on the first <i>verification</i> instead, which is the
-    /// path that needs it, and <c>DurationIndistinguishability</c> takes a warm-up sample of each
-    /// arm outside its measurements for exactly this class of first-call cost.
+    /// <b><c>Lazy</c> rather than eager, and the composition root forces it at startup.</b> The
+    /// container resolves this class on first use, so an eager hash in the constructor would land on
+    /// whichever request resolved it - a registration, as often as a sign-in. Laziness alone,
+    /// however, put a measurable cost on the first unknown-address verification in each process:
+    /// that request performs a full <c>HashPassword</c> (~273 ms) <i>in addition to</i> the
+    /// verification that follows, while a known address on the same cold process pays one. One ~2x
+    /// sample per process, on the exact axis AC4 requires to be indistinguishable, and
+    /// <c>DurationIndistinguishability</c>'s per-arm warm-up is precisely why no test could see it -
+    /// the warm-up hides the only occurrence. Found at code review on 2026-09-19. <see cref="Warm"/>
+    /// is called by <c>Yello.Host</c>'s composition root so the first real request finds this
+    /// materialised; the field stays <c>Lazy</c> so that a caller who forgets is merely slow rather
+    /// than wrong.
     /// </para>
     /// </remarks>
     private readonly Lazy<string> _dummyHash = new(
-        () => hasher.HashPassword(HashedCredential.Unread, "there-is-no-account-for-this-address"),
+        () => hasher.HashPassword(HashedCredential.Unread, Normalise("there-is-no-account-for-this-address")),
         isThreadSafe: true);
 
     /// <inheritdoc />
-    public string Hash(string password) => hasher.HashPassword(HashedCredential.Unread, password);
+    public string Hash(string password) =>
+        hasher.HashPassword(HashedCredential.Unread, Normalise(password));
 
     /// <inheritdoc />
     public PasswordVerification Verify(string? storedHash, string password)
@@ -85,10 +93,53 @@ internal sealed class IdentityPasswordHasher(IPasswordHasher<HashedCredential> h
         // The work happens either way. Note the ordering: the subject is CHOSEN before the
         // verification and the outcome is DISCARDED after it, so there is no path through this
         // method that performs less work than another.
-        var outcome = VerifyOrFail(usable ? storedHash! : _dummyHash.Value, password);
+        var outcome = VerifyOrFail(usable ? storedHash! : _dummyHash.Value, Normalise(password));
 
         return usable ? outcome : PasswordVerification.Failed;
     }
+
+    /// <summary>
+    /// Materialises the dummy hash, so that the first unknown-address verification in this process
+    /// is not the request that pays for it.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent and thread-safe - <c>Lazy</c> with <c>isThreadSafe: true</c> guarantees the
+    /// factory runs once however many callers arrive together. Costs one full hash (~273 ms) at
+    /// startup, which is the trade this deliberately takes: one slow startup rather than one slow
+    /// request on the path AC4 measures.
+    /// </remarks>
+    internal void Warm() => _ = _dummyHash.Value;
+
+    /// <summary>
+    /// The exact bytes that reach PBKDF2, for both hashing and verification.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>NFKC, per NIST SP 800-63B §5.1.1.2.</b> A password typed with a composed accent on macOS
+    /// (NFD: <c>e</c> + U+0301) and re-typed on Windows (NFC: U+00E9) is the same password to the
+    /// person and two different byte sequences to PBKDF2, so verification fails and the person meets
+    /// the deliberately uninformative uniform 401 forever - with no password reset anywhere in epic
+    /// 1 to recover through. <c>EmailAddressNormalisation</c> has composed the other credential
+    /// field since story 1.3 for exactly this reason; the reasoning was never extended to this one.
+    /// Found at code review on 2026-09-19.
+    /// </para>
+    /// <para>
+    /// <b>Why this had to be taken now rather than recorded.</b> Normalising changes the bytes fed
+    /// to PBKDF2, so it invalidates any stored hash whose password carries combining characters -
+    /// and that is a migration nobody can perform, because the hash is one-way and the plaintext is
+    /// gone. Story 1.10 has not run, so there are no production Accounts and the change costs
+    /// nothing today. It becomes permanent and unfixable the moment Yello deploys.
+    /// </para>
+    /// <para>
+    /// <b>Compatibility composition rather than <c>FormC</c>.</b> NFKC also folds full-width forms
+    /// and ligatures, so visually identical passwords typed through different input methods agree.
+    /// It costs a little entropy and buys cross-platform reliability, which is the trade NIST makes
+    /// and the reason this differs from the email path's <c>FormC</c>.
+    /// </para>
+    /// </remarks>
+    /// <param name="password">The password as it was typed.</param>
+    /// <returns>The normalised password.</returns>
+    private static string Normalise(string password) => password.Normalize(NormalizationForm.FormKC);
 
     /// <summary>
     /// Runs Identity's verification, treating an unreadable stored hash as a failure rather than

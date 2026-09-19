@@ -142,7 +142,7 @@
     /// The parameter's NAME is the query key - Blazor binds <c>?reason=</c> to a property called
     /// <c>Reason</c> - and <c>ClientRoutes.ReasonQueryKey</c> is what builds the address at the
     /// other end. Two spellings of one key is a drift risk, so
-    /// <c>SignInSurfaceTests.The_reason_query_key_matches_the_parameter_that_reads_it</c> asserts
+    /// <c>SessionSeamTests.The_reason_query_key_matches_the_parameter_that_reads_it</c> asserts
     /// they agree rather than leaving it to whoever renames one.
     /// </remarks>
     [Parameter]
@@ -155,12 +155,29 @@
         // Read from the address rather than from client state, because the navigation that brings
         // a person here has already destroyed the component tree any state would have lived in -
         // and because it survives the reload they may well perform next.
-        if (_notice is null
-            && string.Equals(Reason, ClientRoutes.SessionEndedReason, StringComparison.Ordinal))
+        if (!string.Equals(Reason, ClientRoutes.SessionEndedReason, StringComparison.Ordinal))
         {
-            _notice = Localizer["SessionEnded"].Value;
-            _attempt++;
+            return;
         }
+
+        // THE COMPONENT INSTANCE IS REUSED, AND EVERY FIELD FROM ITS PREVIOUS LIFE SURVIVES.
+        //
+        // The router resolves /sign-in?reason=session-ended to this same component type, so Blazor
+        // hands it new parameters rather than constructing a fresh one. Two things went wrong
+        // because of that, both found at code review on 2026-09-19:
+        //
+        // _phase was never reset. Someone who signed in on this surface (_phase = Complete) and
+        // whose Session then ended was shown the SignInComplete copy and the SessionEnded copy at
+        // the same time, with no form, no submit button and no registration link - the whole @if
+        // block stays closed on Complete. Only a manual reload recovered.
+        //
+        // And the reason was suppressed whenever _notice was already set, so a person who had just
+        // failed a submission was returned here and told nothing at all about why.
+        _phase = SignInPhase.Editing;
+        _failureCodes = [];
+        _messages = [];
+        _notice = Localizer["SessionEnded"].Value;
+        _attempt++;
     }
 
     private async Task SubmitAsync()
@@ -191,25 +208,7 @@
                 return;
             }
 
-            var problem = await ReadProblemAsync(response);
-
-            // ONE STRING FOR EVERY CAUSE. The 401 carries a single stable `type` and no codes, so
-            // this branch cannot say anything about WHY - which is the point of it. The 400 beside
-            // it carries codes that depend only on what was typed and never on what is stored.
-            if (string.Equals(problem?.Type, ProblemTypes.AuthenticationFailed, StringComparison.Ordinal))
-            {
-                Fail(Localizer["SignInFailed"].Value);
-                return;
-            }
-
-            _failureCodes = problem?.Errors ?? [];
-            _messages = _failureCodes.Count > 0
-                ? [.. _failureCodes.Select(code => Localizer[code].Value)]
-                : [];
-
-            _notice = _failureCodes.Count > 0
-                ? Localizer["ErrorHeading"].Value
-                : Localizer["SubmitFailed"].Value;
+            await ShowFailureAsync(response);
         }
         catch (HttpRequestException)
         {
@@ -240,6 +239,53 @@
                 _phase = SignInPhase.Editing;
             }
         }
+    }
+
+    /// <summary>
+    /// Turns a refused response into what the person reads.
+    /// </summary>
+    /// <remarks>
+    /// Split out of <c>SubmitAsync</c> when the anti-forgery branch was added at code review on
+    /// 2026-09-19: S1541 caps cyclomatic complexity at 10 and the combined method reached 12. The
+    /// seam is a natural one - everything above it is the request, everything here is the reading of
+    /// the answer.
+    /// </remarks>
+    /// <param name="response">The refused response.</param>
+    private async Task ShowFailureAsync(HttpResponseMessage response)
+    {
+        var problem = await ReadProblemAsync(response);
+
+        // ONE STRING FOR EVERY CAUSE. The 401 carries a single stable `type` and no codes, so this
+        // branch cannot say anything about WHY - which is the point of it. The 400 beside it
+        // carries codes that depend only on what was typed and never on what is stored.
+        if (string.Equals(problem?.Type, ProblemTypes.AuthenticationFailed, StringComparison.Ordinal))
+        {
+            Fail(Localizer["SignInFailed"].Value);
+            return;
+        }
+
+        // A REFUSED TOKEN IS RECOVERABLE, AND USED NOT TO BE. The held token is bound to the
+        // identity it was minted for and stops being valid in four ordinary ways - see
+        // AntiforgeryTokenSource.Invalidate. Nothing dropped it, EnsureTokenAsync returns early
+        // whenever one is held, so the same dead token was re-sent on every attempt forever and
+        // this fell through to the generic "there was a problem submitting". Dropping it means the
+        // next press fetches a fresh one and simply works, which is what the message now asks for.
+        // Found at code review on 2026-09-19.
+        if (string.Equals(problem?.Type, ProblemTypes.AntiforgeryTokenMissing, StringComparison.Ordinal))
+        {
+            Antiforgery.Invalidate();
+            Fail(Localizer["SubmitRetry"].Value);
+            return;
+        }
+
+        _failureCodes = problem?.Errors ?? [];
+        _messages = _failureCodes.Count > 0
+            ? [.. _failureCodes.Select(code => Localizer[code].Value)]
+            : [];
+
+        _notice = _failureCodes.Count > 0
+            ? Localizer["ErrorHeading"].Value
+            : Localizer["SubmitFailed"].Value;
     }
 
     private void Fail(string message) => _notice = message;

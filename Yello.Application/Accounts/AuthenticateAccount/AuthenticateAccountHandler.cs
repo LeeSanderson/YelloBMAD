@@ -86,12 +86,47 @@ public sealed class AuthenticateAccountHandler(
             // returned above and never arrives here, so the two causes AC4 compares still cost the
             // same. What it does mean is that a successful sign-in with an out-of-date hash costs
             // roughly twice a failed one - which AC4 does not ask to be equal, and deliberately so.
-            await credentialStore
-                .RehashAsync(
-                    credential.AccountId,
-                    passwordHasher.Hash(command.Password),
-                    cancellationToken)
-                .ConfigureAwait(false);
+            //
+            // BEST EFFORT, AND A FAILURE HERE MUST NOT REFUSE A CORRECT PASSWORD. The credential
+            // has already been verified; everything below this point is an optimisation that makes
+            // the NEXT sign-in cheaper. Letting the write throw would turn a correct sign-in into a
+            // 500 - and because the causes are deterministic (a read-only replica, a grant that
+            // permits SELECT but not UPDATE on Account.PasswordHash, a database that auto-pauses),
+            // it would lock out EVERY Account whose hash predates the work-factor raise while
+            // Accounts registered after it signed in normally. Found at code review on 2026-09-19.
+            //
+            // Swallowed rather than logged because Yello.Application references Yello.Domain and
+            // nothing else - the ring gate's exact-equality table would refuse a logging package
+            // here, and AR-3 puts cross-cutting concerns in the pipeline story 1.6 builds. The
+            // consequence of swallowing is bounded and self-correcting: the hash stays at its old
+            // work factor and the next successful sign-in tries the upgrade again.
+            try
+            {
+                await credentialStore
+                    .RehashAsync(
+                        credential.AccountId,
+                        passwordHasher.Hash(command.Password),
+                        cancellationToken)
+                    .ConfigureAwait(false);
+            }
+            // S2221 disabled here, deliberately and narrowly, following the same reasoning as
+            // StartupConnectivityCheck. An allow-list of exception types IS the defect: this slice
+            // reaches the store through an interface, by AR-3, so it cannot know which
+            // provider-specific types the implementation raises - and the one type an allow-list
+            // omitted would be the one that refuses a correct password. The contract wanted here is
+            // "a failed hash upgrade never fails a verified sign-in", which is a statement about
+            // every exception rather than about a list of them.
+#pragma warning disable S2221 // "Catch a list of specific exception subtype or use exception filters"
+            catch (Exception rehashFailure) when (rehashFailure is not OperationCanceledException
+                and not OutOfMemoryException)
+#pragma warning restore S2221
+            {
+                // The two exclusions, and each is excluded for its own reason. A cancellation means
+                // the caller gave up: no Session is issued either way, and suppressing it would
+                // report success for a request nobody is waiting for. The other is a process-level
+                // failure that no slice should absorb.
+                _ = rehashFailure;
+            }
         }
 
         return new AuthenticatedAccount(credential.AccountId);

@@ -190,12 +190,73 @@ public static class SessionCookiePolicy
     /// the process starts and reports the problem rather than refusing to boot, and the failure
     /// mode of throwing here is a Host that will not start because somebody typed a duration
     /// wrongly - while the failure mode of falling back is a Session lasting the documented eight
-    /// hours. The second is plainly the better one to have.
+    /// hours. The second is plainly the better one to have. <b>"Reports the problem" was not
+    /// implemented until code review on 2026-09-19</b> - the fallback was silent, so the sentence
+    /// above described something nothing did. Use the overload below to get the diagnostic; the
+    /// composition root logs it.
     /// </remarks>
-    public static TimeSpan ReadLifetime(string? configured) =>
-        TimeSpan.TryParse(configured, CultureInfo.InvariantCulture, out var lifetime)
-            ? lifetime
-            : DefaultLifetime;
+    public static TimeSpan ReadLifetime(string? configured) => ReadLifetimeSetting(configured).Lifetime;
+
+    /// <summary>
+    /// Resolves the ticket lifetime and says what was wrong with the configured value, if anything.
+    /// </summary>
+    /// <param name="configured">The configured value, or <c>null</c>/blank when none is set.</param>
+    /// <returns>
+    /// The lifetime to issue tickets for, and the problem with the configured value - <c>null</c>
+    /// when it was absent or entirely sound. An absent value is not a problem: it is the ordinary
+    /// case, and the default is documented. Returned as a pair rather than through an <c>out</c>
+    /// parameter, which S3874 refuses.
+    /// </returns>
+    /// <remarks>
+    /// <para>
+    /// <b>A bare integer is refused, because <c>TimeSpan</c> reads it as DAYS.</b>
+    /// <c>TimeSpan.TryParse("8")</c> succeeds and yields <c>8.00:00:00</c> - eight days. For a
+    /// setting documented in hours, <c>8</c> is the obvious thing an operator types, and it silently
+    /// bought a Session lasting twenty-four times its documented life with no warning anywhere,
+    /// because the value parsed fine and the "unparseable falls back" safety net never fired.
+    /// Requiring a <c>:</c> makes the unit explicit and costs nothing: every value anybody means
+    /// here has one. Found at code review on 2026-09-19.
+    /// </para>
+    /// <para>
+    /// <b>A zero or negative lifetime is still honoured, and still reported.</b> It cannot simply be
+    /// refused: the negative value is the mechanism AC3's expiry test depends on - it makes every
+    /// ticket born already expired, which is how a real framework expiry evaluation gets observed
+    /// without <c>Task.Delay</c>. So it stays legal and becomes loud. Left silent, the symptom is a
+    /// Host where sign-in returns 204 with a cookie, the client reports success, and every
+    /// subsequent request answers 401: authentication completely down, with no error anywhere.
+    /// </para>
+    /// </remarks>
+    public static LifetimeSetting ReadLifetimeSetting(string? configured)
+    {
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return new LifetimeSetting(DefaultLifetime, Problem: null);
+        }
+
+        if (!configured.Contains(':', StringComparison.Ordinal))
+        {
+            return new LifetimeSetting(
+                DefaultLifetime,
+                $"'{configured}' is not a duration - a bare number is read as DAYS. "
+                + "Write it as hh:mm:ss (eight hours is '08:00:00'). Falling back to the default.");
+        }
+
+        if (!TimeSpan.TryParse(configured, CultureInfo.InvariantCulture, out var lifetime))
+        {
+            return new LifetimeSetting(
+                DefaultLifetime,
+                $"'{configured}' could not be read as a duration. Write it as hh:mm:ss. "
+                + "Falling back to the default.");
+        }
+
+        return new LifetimeSetting(
+            lifetime,
+            lifetime <= TimeSpan.Zero
+                ? $"'{configured}' is zero or negative, so every Session is issued already expired "
+                    + "and nobody can stay signed in. This is deliberate in the tests that observe "
+                    + "expiry; anywhere else it is a mistake."
+                : null);
+    }
 
     private static Task RefuseWithStatusCodeAsync<TOptions>(RedirectContext<TOptions> context)
         where TOptions : AuthenticationSchemeOptions
@@ -207,3 +268,18 @@ public static class SessionCookiePolicy
         return Task.CompletedTask;
     }
 }
+
+/// <summary>
+/// A resolved Session lifetime, and what was wrong with the configured value that produced it.
+/// </summary>
+/// <remarks>
+/// A pair rather than an <c>out</c> parameter because S3874 refuses the latter. The problem travels
+/// beside the value rather than being thrown, because AR-33's shape is that the process starts and
+/// reports the problem: the composition root logs it and boots on the default.
+/// </remarks>
+/// <param name="Lifetime">The lifetime to issue tickets for.</param>
+/// <param name="Problem">
+/// A sentence naming what was wrong with the configured value, or <c>null</c> when it was absent or
+/// entirely sound.
+/// </param>
+public sealed record LifetimeSetting(TimeSpan Lifetime, string? Problem);

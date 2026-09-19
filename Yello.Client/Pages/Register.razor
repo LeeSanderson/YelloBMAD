@@ -162,6 +162,18 @@
 
             var problem = await ReadProblemAsync(response);
 
+            // A REFUSED TOKEN IS RECOVERABLE, AND USED NOT TO BE. Identical to the branch on the
+            // sign-in surface and for the identical reason - see AntiforgeryTokenSource.Invalidate.
+            // This surface reaches the state most easily of the two: a second tab left open on
+            // registration holds a token minted while anonymous, which the Host refuses for good the
+            // moment the first tab signs in. Found at code review on 2026-09-19.
+            if (string.Equals(problem?.Type, ProblemTypes.AntiforgeryTokenMissing, StringComparison.Ordinal))
+            {
+                Antiforgery.Invalidate();
+                _messages = [Localizer["SubmitRetry"].Value];
+                return;
+            }
+
             _failureCodes = problem?.Errors ?? [];
             _messages = _failureCodes.Count > 0
                 ? [.. _failureCodes.Select(code => Localizer[code].Value)]
