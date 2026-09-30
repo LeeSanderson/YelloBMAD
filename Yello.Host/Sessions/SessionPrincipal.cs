@@ -20,9 +20,10 @@ namespace Yello.Host.Sessions;
 /// keys in the whole spine are <c>SESSION_CONTEXT('SpaceId')</c> (AD-2) and
 /// <c>SESSION_CONTEXT('AccountId')</c> (AD-24), and the active Space arrives per request in the
 /// <c>{spaceId}</c> route segment. There is therefore nothing here for a Space change to alter,
-/// which makes AC2 a property of this method rather than a behaviour to implement. What can be
-/// asserted honestly today is the claim set below; what cannot is an actual switch, because no
-/// Space switcher exists until story 1.7 and no Space-scoped endpoint until 1.5.
+/// which makes AC2 a property of this method rather than a behaviour to implement. Requests for
+/// two different Spaces on one Session are served each from their own Space
+/// (<c>ActiveSpaceEndpointTests</c>); what is not yet exercised is a switch through the product,
+/// because no Space switcher exists until story 1.7.
 /// </para>
 /// <para>
 /// <b>A Yello-owned claim type rather than <c>ClaimTypes.NameIdentifier</c>.</b> The framework's

@@ -32,9 +32,10 @@ namespace Yello.Client.Sessions;
 /// </para>
 /// <para>
 /// <b>What is honest to claim about that path today.</b> No surface in this client yet makes an
-/// authenticated request, because there is no Space-scoped endpoint until story 1.5 - so the
-/// branch below is a seam that this story's tests drive directly rather than a path a person can
-/// currently take. Recorded as such rather than described as covered.
+/// authenticated request: the Host has a Space-scoped endpoint, but no client surface calls it
+/// until story 1.7 builds the chrome that knows which Space is active - so the branch below is a
+/// seam that tests drive directly rather than a path a person can currently take. Recorded as such
+/// rather than described as covered.
 /// </para>
 /// </remarks>
 /// <param name="session">The client's Session state, and the purge seam.</param>

@@ -8,9 +8,10 @@ namespace Yello.Application;
 /// against an assembly they cannot load.
 /// </summary>
 /// <remarks>
-/// Story 1.1 adds no use-case slices and no request pipeline. The pipeline behaviours --
-/// authorisation, Space resolution, refusal recording, idempotency, NFR-8 bound checks -- are
-/// owned by stories 1.5 and 1.6; AR-3 makes a slice that re-implements any of them a defect.
+/// The pipeline behaviours -- authorisation, Space resolution, refusal recording, idempotency,
+/// NFR-8 bound checks -- live in the request pipeline, never in a slice; AR-3 makes a slice that
+/// re-implements any of them a defect. Space resolution exists (its port is
+/// <c>Spaces.IActiveSpaceResolver</c>); the rest are story 1.6's.
 /// </remarks>
 public static class AssemblyMarker
 {

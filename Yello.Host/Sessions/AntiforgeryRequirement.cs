@@ -9,10 +9,10 @@ namespace Yello.Host.Sessions;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>An endpoint filter, applied in the composition root, is the closest this solution gets to a
-/// pipeline behaviour today.</b> AR-3 forbids a slice implementing a cross-cutting invariant
-/// itself, and the request pipeline stories 1.5 and 1.6 build does not exist yet. What this is
-/// instead: one implementation, named once, attached at the single place the routes are registered.
+/// <b>An endpoint filter, applied in the composition root, is how this solution expresses a
+/// pipeline behaviour.</b> AR-3 forbids a slice implementing a cross-cutting invariant itself, so
+/// this is one implementation, named once, attached at the single place the routes are registered -
+/// the same shape <c>ActiveSpaceResolution</c> takes beside it.
 /// </para>
 /// <para>
 /// <b>Attached by HTTP method rather than by a list of routes, and that changed at code review on

@@ -121,7 +121,7 @@ static string BuildConstant(string key)
 //     digest, so the split yielded image "mssql/server@sha256" and tag "<hex>" with no throw.
 //     The fixture hands the whole reference to Testcontainers, which parses digests correctly -
 //     so the AppHost and the suites would have pulled different images, silently, from one
-//     shared value. Pinning a digest is an open question for stories 1.5 / 2.6; when it is
+//     shared value. Pinning a digest is an open question for story 2.6; when it is
 //     settled, this file and SqlServerContainerFixture must be changed together, and this
 //     failure is what says so.
 //   * A reference with NO registry host. `library/postgres:17` split cleanly and used "library"

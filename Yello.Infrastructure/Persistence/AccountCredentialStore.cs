@@ -15,7 +15,8 @@ namespace Yello.Infrastructure.Persistence;
 /// <c>deferred-work.md</c> records as an open question owned by the AD-24 amendment due before
 /// Epic 3, not by this story. Setting a context here would need a Space, and sign-in has none: a
 /// Session carries no Space (AC1), and the acting Space arrives per request in the
-/// <c>{spaceId}</c> route segment, which story 1.5 builds.
+/// <c>{spaceId}</c> route segment, where <c>ActiveSpaceResolution</c> resolves it - on
+/// Space-scoped routes only, which sign-in is not.
 /// </para>
 /// <para>
 /// <b>The read projects rather than loading the entity.</b> Two reasons, and the second is the one

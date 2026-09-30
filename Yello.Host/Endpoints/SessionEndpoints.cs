@@ -29,9 +29,9 @@ namespace Yello.Host.Endpoints;
 /// </para>
 /// <para>
 /// <b>These endpoints read <c>HttpContext.User</c> rather than carrying <c>[Authorize]</c>.</b>
-/// No <c>AddAuthorization</c>, no <c>UseAuthorization</c> and no policy: the authorisation
-/// pipeline is stories 1.5 and 1.6's, and AD-1 makes every authorisation decision a per-request
-/// <c>(Account, Space)</c> resolution that nothing here can perform. What
+/// No <c>AddAuthorization</c>, no <c>UseAuthorization</c> and no policy: AD-1 makes every
+/// authorisation decision a per-request <c>(Account, Space)</c> resolution, which
+/// <c>ActiveSpaceResolution</c> performs for Space-scoped routes and none of these is one. What
 /// <see cref="CurrentSession"/> asks is strictly the <i>authentication</i> question - did the cookie
 /// handler produce an authenticated principal - which is the boundary Task 8 requires an expired
 /// Session to be refused at, and it is refused with a 401 rather than the framework's default 302.
@@ -166,10 +166,10 @@ public static class SessionEndpoints
     /// and without anything on a timer (AD-10, AD-27).
     /// </para>
     /// <para>
-    /// <b>It grants nothing, including to Spaces the Account still holds a Membership in</b>, for
-    /// the structural reason that it grants nothing to anybody: there is no Space-scoped surface
-    /// in the product until story 1.5. That is a limit of what this story can demonstrate, not a
-    /// claim that the clause is proved.
+    /// <b>It grants nothing, including to Spaces the Account still holds a Membership in.</b> That
+    /// clause is asserted on a Space-scoped route by
+    /// <c>ActiveSpaceEndpointTests.An_expired_Session_grants_nothing_in_a_Space_the_Account_is_still_a_member_of</c>:
+    /// an expired ticket is refused with 401 before any Space is resolved.
     /// </para>
     /// </remarks>
     public static IResult CurrentSession(HttpContext httpContext)

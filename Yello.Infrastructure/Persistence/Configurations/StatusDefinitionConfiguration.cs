@@ -7,9 +7,10 @@ namespace Yello.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// The StatusDefinition table. Space-scoped, and therefore covered by the row-level security
-/// policy the migration creates.
+/// policy the migration creates and by a query filter on the request's Space.
 /// </summary>
-internal sealed class StatusDefinitionConfiguration : IEntityTypeConfiguration<StatusDefinition>
+/// <param name="context">The context whose request-scoped Space the query filter closes over.</param>
+internal sealed class StatusDefinitionConfiguration(YelloDbContext context) : IEntityTypeConfiguration<StatusDefinition>
 {
     /// <summary>
     /// A Status name is a column heading. The Board renders it uppercased by
@@ -31,6 +32,9 @@ internal sealed class StatusDefinitionConfiguration : IEntityTypeConfiguration<S
         builder.Property(status => status.SpaceId)
             .HasColumnName(SchemaNames.SpaceIdColumn)
             .IsRequired();
+
+        // AD-2's second layer, from application state. See MembershipConfiguration.
+        builder.HasQueryFilter(status => status.SpaceId == context.ScopedSpaceId);
 
         builder.Property(status => status.Name)
             .IsRequired()

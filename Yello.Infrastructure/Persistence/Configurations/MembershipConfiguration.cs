@@ -9,7 +9,12 @@ namespace Yello.Infrastructure.Persistence.Configurations;
 /// <summary>
 /// The Membership table, where AD-5's "exactly one Owner per Space" becomes a database fact.
 /// </summary>
-internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Membership>
+/// <param name="context">
+/// The context whose request-scoped Space the query filter closes over. EF Core substitutes the
+/// executing context for this instance on every query, so the model built once serves every
+/// request with that request's scope.
+/// </param>
+internal sealed class MembershipConfiguration(YelloDbContext context) : IEntityTypeConfiguration<Membership>
 {
     /// <summary>
     /// The longest Role name plus room for one more. Roles are persisted as their names.
@@ -32,6 +37,18 @@ internal sealed class MembershipConfiguration : IEntityTypeConfiguration<Members
             .IsRequired();
 
         builder.Property(membership => membership.AccountId).IsRequired();
+
+        // AD-2's second layer: the request's Space, from application state. Independent of the
+        // row-level security policy by construction - it never reads SESSION_CONTEXT - so a
+        // session context set to the wrong Space still returns nothing from another one.
+        builder.HasQueryFilter(membership => membership.SpaceId == context.ScopedSpaceId);
+
+        // AD-2's composite-key rule, enabled rather than exercised. A reference to a Membership
+        // from another Space-scoped row - the first is FR-21's Assignee in story 4.6 - has to be
+        // the pair (SpaceId, MembershipId) so that "same Space" holds by construction, and a
+        // composite foreign key can only target a matching unique key on the principal. The
+        // primary key is Id alone, so this is that key.
+        builder.HasAlternateKey(membership => new { membership.SpaceId, membership.Id });
 
         // Stored as the name rather than the ordinal. Two things follow: reordering the enum is
         // not a migration, and the filtered index below reads as `WHERE [Role] = N'Owner'` in

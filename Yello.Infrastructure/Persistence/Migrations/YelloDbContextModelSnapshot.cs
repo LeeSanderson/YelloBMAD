@@ -80,6 +80,8 @@ namespace Yello.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasAlternateKey("SpaceId", "Id");
+
                     b.HasIndex("AccountId");
 
                     b.HasIndex("SpaceId")

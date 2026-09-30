@@ -30,7 +30,8 @@ namespace Yello.Application.Accounts.RegisterAccount;
 /// <para>
 /// <b>Nothing cross-cutting is re-implemented here</b> (AR-3). No authorisation, no Space
 /// resolution, no refusal recording, no idempotency and no bound check. Those belong to the
-/// request pipeline, and stories 1.5, 1.6 and 1.7 build it. Registration is unauthenticated, so
+/// request pipeline. Registration is unauthenticated and its route carries no <c>{spaceId}</c>, so
+/// Space resolution never runs for it, and
 /// there is nothing for authorisation to decide; and no NFR-8 bound applies - the bound registry
 /// is built in 1.6 and assigns Spaces-per-Account to story 3.1.
 /// </para>

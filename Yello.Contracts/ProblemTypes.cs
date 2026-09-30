@@ -78,4 +78,23 @@ public static class ProblemTypes
     /// Space-boundary 404", with exactly two kinds, and this is neither.
     /// </remarks>
     public static string AntiforgeryTokenMissing => "urn:yello:problem:antiforgery-token-missing";
+
+    /// <summary>
+    /// The request named a Space it cannot act in. <b>One type for both causes</b>: a Space that
+    /// does not exist and a Space the caller holds no Membership in. AD-3.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>A <c>404</c>, never a <c>403</c>, and never distinguished.</b> AD-1
+    /// (<c>ARCHITECTURE-SPINE.md:75</c>): "A request whose Space context cannot be resolved - no
+    /// such Space, or no Membership in it - is refused with 404 (AD-3), never defaulted and never
+    /// distinguished." Answering differently for the two would tell a caller which Space ids exist.
+    /// </para>
+    /// <para>
+    /// Story 1.5 refuses with this type; story 1.6 owns the refusal's full contract - the identical
+    /// bodies across the two causes, their timing, and the <c>AccessRefusal</c> row every
+    /// Space-boundary 404 records.
+    /// </para>
+    /// </remarks>
+    public static string SpaceNotFound => "urn:yello:problem:space-not-found";
 }

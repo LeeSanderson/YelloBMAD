@@ -56,10 +56,10 @@ public static class SessionRoutes
     /// caller something real.
     /// </para>
     /// <para>
-    /// It exists because AC3 - "an expired Session grants access to nothing" - cannot otherwise be
-    /// demonstrated: until story 1.5 builds the first Space-scoped endpoint there is nothing in the
-    /// product for a Session to fail to grant access to, and an assertion with nothing to refuse
-    /// would pass against a system that refuses nothing.
+    /// It exists because it answers the <i>authentication</i> question alone, with no Space
+    /// involved: "an expired Session grants access to nothing" is demonstrable here without a
+    /// Space-scoped resource, and <c>SpaceRoutes</c> shows the same refusal on a route that has
+    /// one.
     /// </para>
     /// </remarks>
     public static string Current => "/api/v1/sessions/current";

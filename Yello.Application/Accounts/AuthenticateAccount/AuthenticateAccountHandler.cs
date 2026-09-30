@@ -31,9 +31,9 @@ namespace Yello.Application.Accounts.AuthenticateAccount;
 /// </para>
 /// <para>
 /// <b>Nothing cross-cutting is re-implemented here</b> (AR-3). No authorisation, no Space
-/// resolution, no refusal recording, no idempotency, no rate limit and no bound check. Stories 1.5
-/// and 1.6 build the pipeline that owns them; a limiter bolted into this slice is precisely what
-/// that rule forbids, and <c>deferred-work.md</c> records the exposure against 1.6 by name.
+/// resolution, no refusal recording, no idempotency, no rate limit and no bound check. The request
+/// pipeline owns them - Space resolution exists, the rest are story 1.6's; a limiter bolted into
+/// this slice is precisely what that rule forbids, and <c>deferred-work.md</c> records the exposure against 1.6 by name.
 /// </para>
 /// </remarks>
 /// <param name="passwordHasher">Checks the credential, and makes the upgraded hash when one is due.</param>

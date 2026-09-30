@@ -97,8 +97,9 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
     /// security are both engine behaviour.
     /// <para>
     /// The tag still floats by cumulative update rather than being pinned by digest. That is a
-    /// stated open question for Lee rather than an oversight, revisited when stories 1.5 and
-    /// 2.6 give a reason to freeze the engine - but it now floats in one place. Note that
+    /// stated open question for Lee rather than an oversight, revisited when story 2.6 gives a
+    /// reason to freeze the engine (story 1.5's engine-behaviour tests found none) - but it now
+    /// floats in one place. Note that
     /// <c>Yello.AppHost</c> rejects a digest reference outright rather than mis-splitting it,
     /// so pinning one is a deliberate change to both files.
     /// </para>

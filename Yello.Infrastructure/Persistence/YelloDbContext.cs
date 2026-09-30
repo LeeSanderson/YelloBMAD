@@ -26,17 +26,27 @@ namespace Yello.Infrastructure.Persistence;
 /// <c>Yello.Domain</c>, whose job is invariants rather than a queryable object graph.
 /// </para>
 /// <para>
-/// <b>What is deliberately NOT here, and belongs to story 1.5:</b> the global query filters that
-/// form row-level security's independent second layer, <c>ActiveSpaceContext</c> and the
-/// per-request session-context wiring, <c>MAXDOP = 1</c>, and the pooled-connection reuse case.
-/// This story writes the database-side policies (see the migration) and the one place that sets
-/// the session context - <see cref="AccountRegistrationStore"/> - because registration is
-/// unauthenticated and has no request-scoped Space to resolve.
+/// <b>Two independent layers of Space isolation meet here.</b> The database's row-level security
+/// policy filters on <c>SESSION_CONTEXT('SpaceId')</c>, which
+/// <see cref="SpaceSessionContext"/> sets at the start of every unit of work. Every Space-scoped
+/// entity also carries an EF Core global query filter on <see cref="ScopedSpaceId"/>, which is
+/// the request's <see cref="SpaceScope"/> - application state, never read from the session
+/// context - so either layer alone still excludes another Space's rows (AD-2, AC4).
+/// <c>Account</c> and <c>Space</c> carry neither: the spine states no predicate for them, and
+/// choosing one belongs to the AD-24 amendment due before Epic 3 (<c>deferred-work.md:90</c>).
 /// </para>
 /// </remarks>
 /// <param name="options">Provider and connection configuration, supplied by DI.</param>
-public sealed class YelloDbContext(DbContextOptions<YelloDbContext> options) : DbContext(options)
+/// <param name="spaceScope">
+/// The request's Space scope. Optional so that a context built outside a request - the design-time
+/// factory, a test - still constructs; such a context has no Space in scope and its query filters
+/// match no Space-scoped row.
+/// </param>
+public sealed class YelloDbContext(DbContextOptions<YelloDbContext> options, SpaceScope? spaceScope = null)
+    : DbContext(options)
 {
+    private readonly SpaceScope _spaceScope = spaceScope ?? new SpaceScope();
+
     /// <summary>
     /// Accounts. One row per registered email address.
     /// </summary>
@@ -57,6 +67,17 @@ public sealed class YelloDbContext(DbContextOptions<YelloDbContext> options) : D
     /// </summary>
     public DbSet<StatusDefinition> StatusDefinitions => Set<StatusDefinition>();
 
+    /// <summary>
+    /// The Space every global query filter compares against, read from this context's
+    /// <see cref="SpaceScope"/> each time a query runs.
+    /// </summary>
+    /// <remarks>
+    /// A property of the context rather than a captured value, because EF Core builds the model
+    /// once per process and re-evaluates a context member on every query - so each request's
+    /// filters see that request's scope, never the first one's.
+    /// </remarks>
+    internal Guid? ScopedSpaceId => _spaceScope.SpaceId;
+
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -73,13 +94,15 @@ public sealed class YelloDbContext(DbContextOptions<YelloDbContext> options) : D
         // filtered index. That is not left to discipline.
         // PersistenceModelGateTests.Every_entity_configuration_reaches_the_model asserts that
         // every IEntityTypeConfiguration<T> in this assembly reaches the built model, so the list
-        // below cannot fall behind the directory beside it. (Named
-        // EntityConfigurationCompletenessTests here until code review on 2026-09-10; that class
-        // does not exist, so the assurance could not be checked by the reader it was written for.)
+        // below cannot fall behind the directory beside it.
+        //
+        // The Space-scoped configurations take this context so their query filters can close over
+        // ScopedSpaceId. PersistenceModelGateTests.Every_Space_scoped_entity_has_a_query_filter
+        // fails the build on one that does not.
         modelBuilder.ApplyConfiguration(new AccountConfiguration());
         modelBuilder.ApplyConfiguration(new SpaceConfiguration());
-        modelBuilder.ApplyConfiguration(new MembershipConfiguration());
-        modelBuilder.ApplyConfiguration(new StatusDefinitionConfiguration());
+        modelBuilder.ApplyConfiguration(new MembershipConfiguration(this));
+        modelBuilder.ApplyConfiguration(new StatusDefinitionConfiguration(this));
 
         base.OnModelCreating(modelBuilder);
     }

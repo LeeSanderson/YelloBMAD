@@ -42,7 +42,8 @@ public enum RegistrationPhase
     /// This said "story 1.4 owns authentication and Sessions" and it now does - and it deliberately
     /// did not wire the two together. Signing a newly-registered Account in automatically is a
     /// decision no acceptance criterion asks for, and the surface it would land on does not exist:
-    /// story 1.7 owns the context bar, and the first Space-scoped surface is 1.5's. UJ-1's "lands
+    /// story 1.7 owns the context bar, and the Host's first Space-scoped endpoint has no client
+    /// surface yet. UJ-1's "lands
     /// directly in a Space already named" is the epic's outcome, realised once those land, not this
     /// one's - confirmed by Lee on 2026-08-28.
     /// </remarks>

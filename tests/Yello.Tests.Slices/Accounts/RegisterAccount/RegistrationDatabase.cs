@@ -46,6 +46,15 @@ internal sealed class RegistrationDatabase(string connectionString)
         new(new DbContextOptionsBuilder<YelloDbContext>().UseSqlServer(connectionString).Options);
 
     /// <summary>
+    /// A context bound to the container whose query filters read <paramref name="spaceScope"/> - the
+    /// shape a request's context has.
+    /// </summary>
+    /// <param name="spaceScope">The Space scope the context's query filters close over.</param>
+    /// <returns>The context.</returns>
+    public YelloDbContext CreateContext(SpaceScope spaceScope) =>
+        new(new DbContextOptionsBuilder<YelloDbContext>().UseSqlServer(connectionString).Options, spaceScope);
+
+    /// <summary>
     /// Opens a connection, sets the row-level security session context to a Space, and hands it
     /// over.
     /// </summary>

@@ -174,6 +174,34 @@ internal sealed class WireSession(HttpClient client)
     }
 
     /// <summary>
+    /// Gets a route, carrying whatever cookies are held.
+    /// </summary>
+    /// <param name="route">The route.</param>
+    /// <returns>The response, with its body already read.</returns>
+    public async Task<WireResponse> GetAsync(string route)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(route, UriKind.Relative));
+
+        using var response = await SendAsync(request).ConfigureAwait(false);
+
+        return await WireResponse.ReadAsync(response).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Gets a route carrying no cookie at all, whatever is held.
+    /// </summary>
+    /// <param name="route">The route.</param>
+    /// <returns>The response, with its body already read.</returns>
+    public async Task<WireResponse> GetAnonymouslyAsync(string route)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(route, UriKind.Relative));
+
+        using var response = await SendAsync(request, attachCookies: false).ConfigureAwait(false);
+
+        return await WireResponse.ReadAsync(response).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Sends a CORS preflight for a sign-in from a given origin.
     /// </summary>
     /// <param name="origin">The origin to claim.</param>

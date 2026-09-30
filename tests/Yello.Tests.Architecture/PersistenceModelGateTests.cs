@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using Yello.Infrastructure.Persistence;
@@ -156,6 +157,130 @@ public sealed class PersistenceModelGateTests
     }
 
     /// <summary>
+    /// Every Space-scoped entity carries a global query filter derived from application state.
+    /// AD-2 / AR-7, AC4.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// AD-2 (<c>ARCHITECTURE-SPINE.md:84</c>): the query filters "restate every policy as an
+    /// independent second layer, derived from application state rather than session context, so
+    /// neither layer alone carries NFR-1". Two ways to break that, and this catches both. An entity
+    /// with a <c>SpaceId</c> and no filter is one layer where there should be two. A filter that
+    /// calls anything - <c>SESSION_CONTEXT</c> through a mapped function, raw SQL - is the database's
+    /// layer restated, which fails the moment the session context is wrong, which is exactly when
+    /// the second layer exists to hold.
+    /// </para>
+    /// <para>
+    /// <b>The shape required is the one the product uses</b>: the entity's <c>SpaceId</c> compared
+    /// with a member of <see cref="YelloDbContext"/> - the request's <c>SpaceScope</c> - and no method
+    /// call anywhere in the expression. Derived from the model, so an entity added by a later story
+    /// is held to it without anyone extending this gate. Behaviour is asserted separately, against a
+    /// real database, by <c>SpaceIsolationLayerTests.The_query_filter_alone_excludes_another_Spaces_rows</c>.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Every_Space_scoped_entity_has_a_query_filter_from_application_state()
+    {
+        using var context = new YelloDbContextFactory().CreateDbContext([]);
+
+        var scoped = context.Model.GetEntityTypes()
+            .Where(entity => entity.FindProperty(SchemaNames.SpaceIdColumn) is not null)
+            .ToList();
+
+        // Vacuity guard: two Space-scoped entities exist today, and a gate that found none would be
+        // green over a model it never looked at.
+        Assert.NotEmpty(scoped);
+
+        var problems = new List<string>();
+
+        foreach (var entity in scoped)
+        {
+            var filters = entity.GetDeclaredQueryFilters();
+
+            if (filters.Count == 0)
+            {
+                problems.Add(
+                    $"{entity.ClrType.Name} carries {SchemaNames.SpaceIdColumn} and no query filter, so "
+                    + "row-level security is its only layer.");
+
+                continue;
+            }
+
+            foreach (var filter in filters)
+            {
+                var shape = new FilterShape();
+                shape.Visit(filter.Expression);
+
+                if (!shape.ReadsSpaceId || !shape.ReadsContextState || shape.CallsAMethod)
+                {
+                    problems.Add(
+                        $"{entity.ClrType.Name}'s query filter `{filter.Expression}` is not the "
+                        + $"application-state shape: it must compare {SchemaNames.SpaceIdColumn} with a "
+                        + "member of YelloDbContext and call nothing. "
+                        + $"(reads SpaceId: {shape.ReadsSpaceId}, reads context state: "
+                        + $"{shape.ReadsContextState}, calls a method: {shape.CallsAMethod})");
+                }
+            }
+        }
+
+        Assert.True(problems.Count == 0, string.Join(Environment.NewLine, problems));
+    }
+
+    /// <summary>
+    /// A reference from one Space-scoped entity to another carries <c>SpaceId</c> on both sides.
+    /// AD-2 / AR-8, AC6.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// AD-2: "cross-entity references inside a Space use composite foreign keys carrying
+    /// <c>SpaceId</c>, so a same-Space constraint holds by construction rather than by validation."
+    /// A single-column reference to a Membership - <c>AssigneeId → Membership.Id</c> - lets a Task in
+    /// Space A name a Membership in Space B, and nothing in the database refuses it. The composite
+    /// <c>(SpaceId, AssigneeId) → Membership(SpaceId, Id)</c> makes that row impossible to write.
+    /// </para>
+    /// <para>
+    /// <b>No such reference exists yet</b> - the first is FR-21's Assignee in story 4.6 - so this
+    /// passes today by having nothing to inspect, and was failed on purpose with a planted
+    /// single-column reference before it was trusted (story 1.5's plant table). A reference to
+    /// <c>Space</c> itself is outside it: <c>Space</c> is the Space, and its key already is the
+    /// <c>SpaceId</c>.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Every_reference_between_Space_scoped_entities_carries_SpaceId()
+    {
+        using var context = new YelloDbContextFactory().CreateDbContext([]);
+
+        var foreignKeys = context.Model.GetEntityTypes()
+            .SelectMany(entity => entity.GetDeclaredForeignKeys())
+            .ToList();
+
+        // Vacuity guard on the scan rather than on its findings: the model has foreign keys, so a
+        // green result means they were inspected and none crosses two Space-scoped entities badly.
+        Assert.NotEmpty(foreignKeys);
+
+        var problems = foreignKeys
+            .Where(foreignKey =>
+                foreignKey.DeclaringEntityType.FindProperty(SchemaNames.SpaceIdColumn) is not null
+                && foreignKey.PrincipalEntityType.FindProperty(SchemaNames.SpaceIdColumn) is not null)
+            .Where(foreignKey =>
+                !foreignKey.Properties.Any(property => property.Name == SchemaNames.SpaceIdColumn)
+                || !foreignKey.PrincipalKey.Properties.Any(property => property.Name == SchemaNames.SpaceIdColumn))
+            .Select(foreignKey =>
+                $"{foreignKey.DeclaringEntityType.ClrType.Name}({string.Join(", ", foreignKey.Properties.Select(p => p.Name))}) → "
+                + $"{foreignKey.PrincipalEntityType.ClrType.Name}({string.Join(", ", foreignKey.PrincipalKey.Properties.Select(p => p.Name))})")
+            .ToList();
+
+        Assert.True(
+            problems.Count == 0,
+            "A reference between two Space-scoped entities does not carry SpaceId on both sides, so "
+            + "nothing in the database stops it pointing into another Space. Make it composite, "
+            + "targeting the principal's (SpaceId, Id) key:"
+            + Environment.NewLine
+            + string.Join(Environment.NewLine, problems.Select(problem => $"  - {problem}")));
+    }
+
+    /// <summary>
     /// No entity is store-generated: the application produces every id before the insert.
     /// </summary>
     /// <remarks>
@@ -184,5 +309,39 @@ public sealed class PersistenceModelGateTests
             "security session context to a SpaceId it has not written yet - see AD-2 and " +
             $"IIdentifierGenerator:{Environment.NewLine}" +
             string.Join(Environment.NewLine, generated.Select(name => $"  - {name}")));
+    }
+
+    /// <summary>
+    /// What a query filter's expression touches.
+    /// </summary>
+    private sealed class FilterShape : ExpressionVisitor
+    {
+        public bool ReadsSpaceId { get; private set; }
+
+        public bool ReadsContextState { get; private set; }
+
+        public bool CallsAMethod { get; private set; }
+
+        protected override Expression VisitMember(MemberExpression node)
+        {
+            if (node.Member.Name == SchemaNames.SpaceIdColumn && node.Expression is ParameterExpression)
+            {
+                ReadsSpaceId = true;
+            }
+
+            if (node.Member.DeclaringType == typeof(YelloDbContext))
+            {
+                ReadsContextState = true;
+            }
+
+            return base.VisitMember(node);
+        }
+
+        protected override Expression VisitMethodCall(MethodCallExpression node)
+        {
+            CallsAMethod = true;
+
+            return base.VisitMethodCall(node);
+        }
     }
 }

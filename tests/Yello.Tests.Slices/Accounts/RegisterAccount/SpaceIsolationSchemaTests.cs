@@ -166,6 +166,63 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
     }
 
     /// <summary>
+    /// Every predicate in the policy filters on <c>SESSION_CONTEXT('SpaceId')</c>, through the
+    /// Space-scoped table's own <c>SpaceId</c> column. AC3 of story 1.5.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>The two tests above count predicates; this reads what they say.</b> A predicate bound to
+    /// the wrong column, or a function edited to compare against something other than the session
+    /// key, is still a predicate and still counted - and filters on the wrong thing with every
+    /// count green. AC3 requires "a row-level security policy filtering on
+    /// <c>SESSION_CONTEXT('SpaceId')</c>", which is a statement about the predicate's content.
+    /// </para>
+    /// <para>
+    /// Read from <c>sys.security_predicates.predicate_definition</c> and <c>sys.sql_modules</c>, as the
+    /// engine normalises them, rather than from the migration's text - the migration is what was
+    /// asked for, and this is what the database holds.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public async Task Every_predicate_filters_on_the_SpaceId_session_context()
+    {
+        var database = Available();
+
+        await using var connection = await database.OpenWithoutSpaceContextAsync(
+            TestContext.Current.CancellationToken);
+
+        var definitions = await ReadNamesAsync(
+            connection,
+            """
+            SELECT sp.predicate_definition
+            FROM sys.security_predicates sp
+            JOIN sys.security_policies p ON p.object_id = sp.object_id
+            WHERE p.name = @name
+            """,
+            SchemaNames.SpaceIsolationPolicy,
+            TestContext.Current.CancellationToken);
+
+        Assert.NotEmpty(definitions);
+
+        var expected = $"([dbo].[{SchemaNames.SpacePredicateFunction}]([{SchemaNames.SpaceIdColumn}]))";
+
+        Assert.All(definitions, definition => Assert.Equal(expected, definition));
+
+        var function = await ReadNamesAsync(
+            connection,
+            "SELECT m.definition FROM sys.sql_modules m WHERE m.object_id = OBJECT_ID(N'dbo.' + @name)",
+            SchemaNames.SpacePredicateFunction,
+            TestContext.Current.CancellationToken);
+
+        var body = Assert.Single(function);
+
+        Assert.Contains(
+            $"CAST(SESSION_CONTEXT(N'{SchemaNames.SpaceIdSessionKey}') AS uniqueidentifier)",
+            body,
+            StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// AD-5 / AR-12's filtered unique index exists, is unique, and is actually filtered.
     /// </summary>
     /// <remarks>

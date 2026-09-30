@@ -2,11 +2,13 @@ using System.Globalization;
 using Microsoft.AspNetCore.Localization;
 using Yello.Application.Accounts.AuthenticateAccount;
 using Yello.Application.Accounts.RegisterAccount;
+using Yello.Application.Statuses.ListStatuses;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Localisation;
 using Yello.Host;
 using Yello.Host.Endpoints;
 using Yello.Host.Sessions;
+using Yello.Host.Spaces;
 using Yello.Infrastructure;
 
 // The composition root, AC4's connectivity check, the product's endpoints, and - from story 1.4 -
@@ -21,13 +23,15 @@ using Yello.Infrastructure;
 // way that does not assume HTTP only, because ARCHITECTURE-SPINE.md:323-325 has that socket
 // crossing the same origin boundary with the same cookie.
 //
-// The request pipeline's cross-cutting behaviours - AUTHORISATION, Space resolution, refusal
-// recording, idempotency, rate limiting and the NFR-8 bound checks - still do not exist. Stories
-// 1.5 and 1.6 own them, and AR-3 makes a slice that re-implements any of them a defect. Note the
-// distinction this story turns on: AUTHENTICATION is wired below, and authorisation is not. There
-// is no AddAuthorization, no UseAuthorization and no policy anywhere in this file, because AD-1
-// makes every authorisation decision a per-request (Account, Space) resolution that nothing here
-// can perform.
+// SPACE RESOLUTION is the first of the request pipeline's cross-cutting behaviours, from story 1.5:
+// ActiveSpaceResolution, attached to the route group below, resolves the active Space from the
+// Membership row for every route whose pattern carries {spaceId}, and scopes that request's unit of
+// work to it in the database. Refusal recording, the FR-16 capability checks, idempotency, rate
+// limiting and the NFR-8 bound checks are story 1.6's and do not exist yet; AR-3 makes a slice that
+// re-implements any of them a defect. There is still no AddAuthorization, no UseAuthorization and no
+// policy anywhere in this file: AD-1 makes every authorisation decision a per-request
+// (Account, Space) resolution, and the Role it reads comes off the Membership row on each request,
+// never off a principal a policy could inspect.
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -67,6 +71,12 @@ builder.Services.AddYelloInfrastructure(connectionString);
 // its ring does not carry and its per-ring package ban would then have to be reasoned about.
 builder.Services.AddScoped<RegisterAccountHandler>();
 builder.Services.AddScoped<AuthenticateAccountHandler>();
+builder.Services.AddScoped<ListStatusesHandler>();
+
+// How a Space-scoped request establishes its Account and its Space. The Session half only; story
+// 1.8 adds the API Token half behind the same interface, so the two surfaces differ in this one
+// step and share everything after it (AD-4).
+builder.Services.AddSingleton<ISpaceRequestEstablishment, SessionSpaceRequestEstablishment>();
 
 // AUTHENTICATION. A plain cookie ticket, and no Identity builder of any kind - see
 // SessionCookiePolicy for the decision, and Yello.Infrastructure/InfrastructureServices.cs for
@@ -204,7 +214,14 @@ app.Services.WarmPasswordHashing();
 // AR-14 reaches registration too. It is unauthenticated, so a token there protects against nothing
 // an attacker wants - but under a method-shaped rule that is not a decision anybody has to defend,
 // which is how Lee settled question 5 at that review. There is no exception list to keep.
-var api = app.MapGroup(string.Empty).AddEndpointFilter(AntiforgeryRequirement.ValidateStateChangingAsync);
+//
+// SPACE RESOLUTION IS ATTACHED THE SAME WAY, by the shape of the route: every endpoint whose pattern
+// carries {spaceId} is resolved because of what it is. It runs after anti-forgery, so a forged
+// state change is refused before any Space is read, and after UseAuthentication above, so a request
+// with no Session is answered 401 before resolution begins.
+var api = app.MapGroup(string.Empty)
+    .AddEndpointFilter(AntiforgeryRequirement.ValidateStateChangingAsync)
+    .AddEndpointFilter(ActiveSpaceResolution.ResolveAsync);
 
 // POST /api/v1/accounts. 204 on both the new-address and the already-registered paths - see
 // RegisterAccountEndpoint for why the handler it calls returns nothing at all.
@@ -219,6 +236,10 @@ api.MapCurrentSession();
 
 // GET /api/v1/antiforgery/token. Issues the request token the two POSTs above must carry.
 api.MapAntiforgeryToken();
+
+// GET /api/v1/spaces/{spaceId}/statuses. The first Space-scoped route: 200, 401, or one 404 for a
+// Space that does not exist and a Space the caller is not a member of alike.
+api.MapListStatuses();
 
 // RunAsync, not Run: this file is already an async entry point (the connectivity check above
 // awaits), and the blocking overload would park the entry-point thread for the process

@@ -1,0 +1,41 @@
+namespace Yello.Contracts.Spaces;
+
+/// <summary>
+/// The Space-scoped endpoints' paths, stated once for the client that calls them and the Host that
+/// serves them.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b><c>{spaceId}</c> is always the first segment after the version</b>
+/// (<c>ARCHITECTURE-SPINE.md:267</c>), and it is the input to Space resolution. The Host resolves
+/// the active Space for every route whose pattern carries that parameter - by the shape of the
+/// route rather than by a list of routes - so a Space-scoped path added here is resolved because of
+/// what it is.
+/// </para>
+/// <para>
+/// <b>The <c>guid</c> constraint is part of the refusal, not a convenience.</b> A segment that is not
+/// a Space id matches no route and answers 404, which is the same answer a real Space the caller
+/// holds no Membership in receives (AD-3: "never distinguished").
+/// </para>
+/// </remarks>
+public static class SpaceRoutes
+{
+    /// <summary>
+    /// The route parameter every Space-scoped path carries.
+    /// </summary>
+    public static string SpaceIdParameter => "spaceId";
+
+    /// <summary>
+    /// <c>GET</c> here for the active Space's Statuses, in Board order. Answers <c>200</c> with the
+    /// list, <c>401</c> without a Session, and <c>404</c> for a Space the caller holds no Membership
+    /// in or that does not exist.
+    /// </summary>
+    public static string Statuses => "/api/v1/spaces/{spaceId:guid}/statuses";
+
+    /// <summary>
+    /// The Statuses path for one Space, as a client calls it.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The path.</returns>
+    public static string StatusesOf(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}/statuses";
+}

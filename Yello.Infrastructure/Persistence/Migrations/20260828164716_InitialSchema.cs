@@ -202,7 +202,9 @@ public partial class InitialSchema : Migration
     /// readable <i>across</i> Spaces for story 1.7's Space switcher under a
     /// <c>SESSION_CONTEXT('AccountId')</c> predicate AD-24 has not been amended to describe.
     /// That amendment is readiness issue 3 and is already due before Epic 3; pre-empting it
-    /// inside a migration would be inventing an architecture decision.
+    /// inside a migration would be inventing an architecture decision. (Per-request Space
+    /// resolution does not need that read: it scopes the connection to the requested Space first
+    /// and reads the one Membership under this predicate - see <c>MembershipActiveSpaceResolver</c>.)
     /// </para>
     /// <para>
     /// <b>Literal names rather than <c>SchemaNames</c>, deliberately.</b> An applied migration is

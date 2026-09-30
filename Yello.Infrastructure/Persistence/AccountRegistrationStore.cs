@@ -1,4 +1,3 @@
-using System.Data;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Yello.Domain.Accounts;
@@ -67,12 +66,6 @@ internal sealed class AccountRegistrationStore(YelloDbContext dbContext) : IAcco
     /// </summary>
     private const int UniqueConstraintViolationErrorNumber = 2627;
 
-    /// <summary>
-    /// <c>sp_set_session_context</c>'s key parameter is <c>sysname</c>, which is
-    /// <c>nvarchar(128)</c>.
-    /// </summary>
-    private const int SessionKeyMaxLength = 128;
-
     /// <inheritdoc />
     public async Task<RegistrationOutcome> RegisterAsync(
         AccountRegistration registration,
@@ -82,7 +75,12 @@ internal sealed class AccountRegistrationStore(YelloDbContext dbContext) : IAcco
             .BeginTransactionAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        await SetSpaceSessionContextAsync(registration.Space.Id, cancellationToken).ConfigureAwait(false);
+        // The same setter every Space-scoped request goes through. Registration never meets that
+        // path - it is unauthenticated and its route carries no {spaceId} - so the read-only key is
+        // set exactly once on this connection.
+        await SpaceSessionContext
+            .SetAsync(dbContext.Database, registration.Space.Id, cancellationToken)
+            .ConfigureAwait(false);
 
         // Inside the transaction, so the check and the insert see one consistent state. It is
         // not the guarantee, though - the unique index below is. Under READ COMMITTED two
@@ -148,37 +146,6 @@ internal sealed class AccountRegistrationStore(YelloDbContext dbContext) : IAcco
 
             return RegistrationOutcome.AddressAlreadyRegistered;
         }
-    }
-
-    /// <summary>
-    /// Sets the row-level security session context for this transaction.
-    /// </summary>
-    /// <remarks>
-    /// <c>@read_only = 1</c> is AD-2's, and it is the half that makes the context a boundary
-    /// rather than a suggestion: once set, nothing later in the same session can move it, so a
-    /// query that ran after some other code changed the Space cannot exist.
-    /// <para>
-    /// Parameterised with explicit types rather than interpolated. The key parameter is
-    /// <c>sysname</c> and the value is <c>sql_variant</c>; letting the provider infer them sends
-    /// an <c>nvarchar(4000)</c> key into a 128-character parameter, which is a conversion nobody
-    /// asked for in the one statement the whole isolation model rests on.
-    /// </para>
-    /// </remarks>
-    private async Task SetSpaceSessionContextAsync(Guid spaceId, CancellationToken cancellationToken)
-    {
-        var key = new SqlParameter("@key", SqlDbType.NVarChar, SessionKeyMaxLength)
-        {
-            Value = SchemaNames.SpaceIdSessionKey,
-        };
-
-        var value = new SqlParameter("@value", SqlDbType.Variant) { Value = spaceId };
-
-        await dbContext.Database
-            .ExecuteSqlRawAsync(
-                "EXEC sp_set_session_context @key = @key, @value = @value, @read_only = 1",
-                [key, value],
-                cancellationToken)
-            .ConfigureAwait(false);
     }
 
     /// <summary>

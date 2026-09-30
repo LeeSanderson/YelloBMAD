@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Yello.Application.Spaces;
 using Yello.Domain;
 using Yello.Domain.Accounts;
 using Yello.Domain.Spaces;
+using Yello.Domain.Statuses;
 using Yello.Infrastructure.Identity;
 using Yello.Infrastructure.Localisation;
 using Yello.Infrastructure.Persistence;
@@ -73,6 +75,25 @@ public static class InfrastructureServices
 
         services.AddScoped<IAccountRegistrationStore, AccountRegistrationStore>();
         services.AddScoped<IAccountCredentialStore, AccountCredentialStore>();
+
+        // SPACE RESOLUTION, FROM STORY 1.5. Every registration below is SCOPED, and that is AC7 and
+        // NFR-2 rather than a default: the Role on an ActiveSpaceContext is the value the Membership
+        // row held when this request read it, and a singleton or a cache here would be a Role
+        // outliving the request that read it. The DbContext takes the same SpaceScope, which is how
+        // its query filters see this request's Space and no other.
+        services.AddScoped<SpaceScope>();
+        services.AddScoped<IActiveSpaceResolver, MembershipActiveSpaceResolver>();
+
+        // For a slice that needs the Role. It throws rather than defaulting when no Space has been
+        // resolved: a slice asking for a context on a route the pipeline never resolved is a
+        // wiring defect, and an empty context would be a Role nobody read from anywhere.
+        services.AddScoped(provider => provider.GetRequiredService<SpaceScope>().Resolved
+            ?? throw new InvalidOperationException(
+                "No active Space has been resolved on this request. ActiveSpaceContext exists only " +
+                "on a route whose pattern carries {spaceId}, after the pipeline has verified the " +
+                "Membership."));
+
+        services.AddScoped<IStatusDefinitionReader, StatusDefinitionReader>();
 
         return services;
     }
