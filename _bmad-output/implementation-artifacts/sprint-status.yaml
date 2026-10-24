@@ -82,7 +82,7 @@ development_status:
   1-7-list-and-switch-between-the-spaces-you-belong-to: done
   1-8-issue-an-api-token-scoped-to-one-space: done
   1-9-prove-isolation-on-both-surfaces: done
-  1-10-ship-it-to-azure-with-migrations-as-an-explicit-step: backlog
+  1-10-ship-it-to-azure-with-migrations-as-an-explicit-step: ready-for-dev
   epic-1-retrospective: optional
 
   # Epic 2: Track your own work on a Board
