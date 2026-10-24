@@ -99,6 +99,108 @@ public sealed class PooledConnectionIsolationTests(MigratedDatabaseFixture fixtu
     }
 
     /// <summary>
+    /// Story 1.7 / AC3 - an Account-scoped read and a Space-scoped read served consecutively on one
+    /// physical connection disclose nothing to each other, in either order: the pool reset clears
+    /// the <c>AccountId</c> key exactly as it clears <c>SpaceId</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Red-phase scaffold, ATDD run 2026-10-24.</b> The Account-scoped read is anchored first - it
+    /// must see Account A's two Memberships - and today the policy does not read the
+    /// <c>AccountId</c> key, so that anchor is empty.
+    /// </para>
+    /// <para>
+    /// <b>Raw session-context calls, for now.</b> The class's rule is "through the product's own
+    /// path"; the product's Account-scoped adapter (<c>IAccountSpaceDirectory</c>) does not exist yet.
+    /// On activation, serve the Account-scoped half through it, and keep the Space-scoped half on
+    /// <see cref="MembershipActiveSpaceResolver"/>.
+    /// </para>
+    /// </remarks>
+    [Fact(Skip = "red: AC3 - Membership's filter predicate does not read SESSION_CONTEXT('AccountId') yet (story 1.7 Task 2), so the Account-scoped anchor read is empty")]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "AD-24")]
+    public async Task A_reused_connection_carries_no_Account_key_into_a_Space_scoped_read_or_the_reverse()
+    {
+        var database = new RegistrationDatabase(PinnedPool());
+        var a = SpaceSeeding.NewAccount();
+        var b = SpaceSeeding.NewAccount();
+        var spaceA1 = Guid.NewGuid();
+        var spaceA2 = Guid.NewGuid();
+        var spaceB = Guid.NewGuid();
+
+        // A in two Spaces, B in a third: FK_Membership_Account_AccountId (Accounts first),
+        // FK_Membership_Space_SpaceId (Space in its own block), one Owner per Space.
+        await SpaceSeeding.SeedAsync(database, spaceA1, context =>
+        {
+            context.Accounts.AddRange(a, b);
+            context.Spaces.Add(SpaceSeeding.NewSpace(spaceA1));
+            context.Memberships.Add(SpaceSeeding.NewMembership(spaceA1, a.Id, Role.Owner));
+        }, TestContext.Current.CancellationToken);
+
+        await SpaceSeeding.SeedAsync(database, spaceA2, context =>
+        {
+            context.Spaces.Add(SpaceSeeding.NewSpace(spaceA2));
+            context.Memberships.Add(SpaceSeeding.NewMembership(spaceA2, a.Id, Role.Viewer));
+        }, TestContext.Current.CancellationToken);
+
+        await SpaceSeeding.SeedAsync(database, spaceB, context =>
+        {
+            context.Spaces.Add(SpaceSeeding.NewSpace(spaceB));
+            context.Memberships.Add(SpaceSeeding.NewMembership(spaceB, b.Id, Role.Owner));
+        }, TestContext.Current.CancellationToken);
+
+        // Account-scoped first, then Space-scoped.
+        var (accountSession, asA) = await ReadAsAccountAsync(database, a.Id);
+        var (spaceSession, inB) = await ReadInSpaceAsync(database, spaceB);
+
+        Assert.Equal(accountSession, spaceSession);
+        Assert.Equal(new[] { spaceA1, spaceA2 }.Order(), asA.Select(row => row.SpaceId).Order());
+        Assert.Equal([(spaceB, b.Id)], inB);
+
+        // And the reverse.
+        var (spaceSessionAgain, inBAgain) = await ReadInSpaceAsync(database, spaceB);
+        var (accountSessionAgain, asAAgain) = await ReadAsAccountAsync(database, a.Id);
+
+        Assert.Equal(spaceSessionAgain, accountSessionAgain);
+        Assert.Equal([(spaceB, b.Id)], inBAgain);
+        Assert.All(asAAgain, row => Assert.Equal(a.Id, row.AccountId));
+        Assert.Equal(2, asAAgain.Count);
+    }
+
+    private static async Task<(short Session, List<(Guid SpaceId, Guid AccountId)> Rows)> ReadAsAccountAsync(
+        RegistrationDatabase database,
+        Guid accountId)
+    {
+        await using var connection = await SpaceIsolationLayerTests.OpenForAccountAsync(database, accountId);
+
+        return (await SessionOfAsync(connection), await SpaceIsolationLayerTests.MembershipsAsync(connection));
+    }
+
+    private static async Task<(short Session, List<(Guid SpaceId, Guid AccountId)> Rows)> ReadInSpaceAsync(
+        RegistrationDatabase database,
+        Guid spaceId)
+    {
+        await using var connection = await database.OpenForSpaceAsync(spaceId, TestContext.Current.CancellationToken);
+
+        await using var leftover = connection.CreateCommand();
+        leftover.CommandText = "SELECT SESSION_CONTEXT(N'AccountId')";
+
+        var carried = await leftover.ExecuteScalarAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(carried is null or DBNull, "A pooled connection carried an AccountId key into a Space-scoped read.");
+
+        return (await SessionOfAsync(connection), await SpaceIsolationLayerTests.MembershipsAsync(connection));
+    }
+
+    private static async Task<short> SessionOfAsync(SqlConnection connection)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT @@SPID";
+
+        return Convert.ToInt16(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
     /// One request: its own context and scope, a resolved unit of work, the product's reader.
     /// </summary>
     private static async Task<(short Session, IReadOnlyList<string> Statuses)> ServeAsync(

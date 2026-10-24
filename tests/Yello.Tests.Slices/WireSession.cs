@@ -152,6 +152,34 @@ internal sealed class WireSession(HttpClient client)
     }
 
     /// <summary>
+    /// Sends a <c>DELETE</c> to a route, carrying whatever cookies and token are held. Added for
+    /// story 1.7's sign-out (<c>DELETE /api/v1/sessions</c>), the first state-changing verb other
+    /// than <c>POST</c>.
+    /// </summary>
+    /// <param name="route">The route.</param>
+    /// <param name="withAntiforgeryToken">Whether to send the token header.</param>
+    /// <param name="attachCookies">
+    /// Whether to send the held cookies. <c>false</c> is the "no Session at all" case.
+    /// </param>
+    /// <returns>The response, with its body already read.</returns>
+    public async Task<WireResponse> DeleteAsync(
+        string route,
+        bool withAntiforgeryToken = true,
+        bool attachCookies = true)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, new Uri(route, UriKind.Relative));
+
+        if (withAntiforgeryToken && AntiforgeryRequestToken is { } token)
+        {
+            request.Headers.TryAddWithoutValidation(Antiforgery.HeaderName, token);
+        }
+
+        using var response = await SendAsync(request, attachCookies).ConfigureAwait(false);
+
+        return await WireResponse.ReadAsync(response).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Asks whether the Session held is still good.
     /// </summary>
     /// <param name="sessionCookie">

@@ -309,6 +309,33 @@ The dev phase takes these as **reversible, recorded decisions** in the Completio
 10. **Scroll restoration.** (a) `history.scrollRestoration = 'manual'` inline in `index.html`, global; (b) set only on Space-scoped routes via interop — needs a JS file the repo does not have, or an `eval`-shaped call. **Recommend (a)**: global satisfies "disabled on Space-scoped routes", costs nothing on the three non-Space routes, and adds no JS file.
 11. **The SPEC refusal copy** (`acceptance-criteria.md:161`, `deferred-work.md:282`). (a) Correct the SPEC companion to "Not available." citing UX-DR32, keeping the reasoning; (b) implement the SPEC's wording — contradicts the epic's AC, UX-DR32, 1.6's shipped copy and its gate (`The_refusal_copy_is_the_clients_own…` asserts "Not available."); (c) leave both. **Recommend (a)**, recorded as the divergence report SPEC.md:22 asks for, and close the ledger entry.
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-1-7-list-and-switch-between-the-spaces-you-belong-to.md` (ATDD run 2026-10-24). It holds the scenario map, the seed constraints checked, the plant results and the scenarios deliberately left for this story to write (the widened `PersistenceModelGateTests`/`SpaceIsolationSchemaTests` gates, the call-site gates, the `ActiveSpaceState` purge unit cases, A-12's permitted list).
+
+| File | Cases | ACs | Green today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.Switcher.cs` (new partial of the existing class) | 7 | AC1, AC2, AC3, AC4 | none |
+| `tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/SessionEndpointTests.cs` (+3; `WireSession.DeleteAsync` added) | 3 | AC11 | none |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/SpaceIsolationLayerTests.cs` (+4) | 4 | AC3 | `A_Space_scoped_unit_of_work_sees_only_its_own_Membership_of_an_Account_in_several_Spaces` - a standing gate. It cannot be planted until the widening exists; plant it then |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/PooledConnectionIsolationTests.cs` (+1) | 1 | AC3 | none |
+| `tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.cs` (new, no container) | 10 | AC2, AC3, AC5, AC6, AC8, AC9 | `No_client_code_sets_the_document_title`, `No_client_code_remembers_a_last_Space` (both planted, both caught) and their two detector checks |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs` (+1; A-4's walk split into `HandlerReaches`) | 1 | AC3 (I-11 static) | none |
+| `tests/Yello.Tests.Client/SpaceSwitchingTests.cs` + `FakeYelloApi.cs` (new, existing collection, no container) | 13 (two theories) | AC1, AC2, AC4, AC5, AC7, AC8, AC9, AC10, AC11 | `A_faked_API_answers_the_client_across_origins_with_credentials` - the `RouteAsync` harness, planted (CORS removed -> caught) |
+
+Every skipped case is `Skip = "red: AC<n> - <why>"`. Types, routes and copy keys this story has not written are reached by name, literal or `ResourceManager`, so all of it compiles today. Replace each with the typed reference on activation. No new container-backed class, so activation adds no engine.
+
+**Activation order:**
+1. `Under_the_AccountId_key_row_level_security_alone_admits_exactly_that_Accounts_Memberships`. It tests the riskiest assumption first: that one `ALTER SECURITY POLICY … ALTER FILTER PREDICATE` on `Membership` (Q1a) admits exactly the Account's rows. Then `Under_the_AccountId_key_no_other_Space_scoped_table_is_visible`, `A_reused_connection_carries_no_Account_key_into_a_Space_scoped_read_or_the_reverse` and `The_query_filter_alone_admits_only_the_scoped_Accounts_Memberships`.
+2. Plant the standing layer gate, both halves.
+3. `The_switcher_response_and_the_Space_identity_carry_exactly_an_id_and_a_name`, `The_Account_scoped_surfaces_are_exactly_the_two_AD_24_names` and `The_switcher_endpoint_reaches_no_Space_scoped_content`. Then the four switcher wire cases.
+4. The three active-Space wire cases.
+5. The three sign-out cases. The Session is a stateless cookie, so a replayed pre-sign-out cookie is not refused. Record that decision.
+6. Client cases: first `A_Space_id_the_switcher_did_not_list_renders_the_refusal_page_and_is_never_requested` and `Back_navigation_purges_the_departed_Space_before_the_destination_answers`, then the rest.
+7. Copy, chip and browser-owned-surface cases.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

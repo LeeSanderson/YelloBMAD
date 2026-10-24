@@ -1,5 +1,6 @@
 using System.Data;
 using System.Globalization;
+using System.Reflection;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
@@ -485,6 +486,321 @@ public sealed class SpaceIsolationLayerTests(MigratedDatabaseFixture fixture)
         await using var underB = await database.OpenForSpaceAsync(spaceB, TestContext.Current.CancellationToken);
 
         Assert.Empty(await StatusNamesAsync(underB, TestContext.Current.CancellationToken));
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Story 1.7 - the Account-scoped context (AD-24 / AR-29): a second session-context key,
+    // `AccountId`, that widens exactly one table's filter - `Membership` - in both layers. Written by
+    // the ATDD run on 2026-10-24. Three are red-phase scaffolds; one is green today and is left
+    // active as a standing gate (see its remarks).
+    //
+    // The key is set here by a raw `sp_set_session_context`, in TEST code, because the product's
+    // entry point for it does not exist yet. `SpaceResolutionSeamTests` counts production call sites
+    // under Yello.Infrastructure only, so these do not count against it. On activation, prefer the
+    // product's Account-scoped entry point where one is reachable.
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// AC3 / Q1 - under the <c>AccountId</c> key and nothing else, row-level security alone admits
+    /// exactly that Account's Memberships, in every Space it holds one in, and no other Account's -
+    /// including another Account's Membership of a Space they share.
+    /// </summary>
+    /// <remarks>
+    /// Raw SQL on a raw connection: no query filter exists on this path, so the policy is the only
+    /// thing deciding. Two Accounts with different ids, sharing a Space, so a predicate that admitted
+    /// by Space rather than by Account would show the other Account's row.
+    /// </remarks>
+    [Fact(Skip = "red: AC3 - Membership's filter predicate does not read SESSION_CONTEXT('AccountId') yet (story 1.7 Task 2, open question 1)")]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "AD-24")]
+    public async Task Under_the_AccountId_key_row_level_security_alone_admits_exactly_that_Accounts_Memberships()
+    {
+        var database = Available();
+        var (a, b, shared, onlyA, onlyB) = await SeedTwoAccountsSharingASpaceAsync(database);
+
+        await using (var asA = await OpenForAccountAsync(database, a.Id))
+        {
+            var visible = await MembershipsAsync(asA);
+
+            Assert.Equal(new[] { shared, onlyA }.Order(), visible.Select(row => row.SpaceId).Order());
+            Assert.All(visible, row => Assert.Equal(a.Id, row.AccountId));
+        }
+
+        await using var asB = await OpenForAccountAsync(database, b.Id);
+
+        var visibleToB = await MembershipsAsync(asB);
+
+        Assert.Equal(new[] { shared, onlyB }.Order(), visibleToB.Select(row => row.SpaceId).Order());
+        Assert.All(visibleToB, row => Assert.Equal(b.Id, row.AccountId));
+    }
+
+    /// <summary>
+    /// AC3 - the <c>AccountId</c> key widens <c>Membership</c> and nothing else: under it, no
+    /// <c>StatusDefinition</c> and no <c>SpacePresence</c> row of any of the Account's Spaces is
+    /// visible.
+    /// </summary>
+    /// <remarks>
+    /// Anchored on the widening itself: the same connection does see the Account's Memberships, so
+    /// the two empty reads are the other policies holding rather than a connection that sees nothing.
+    /// </remarks>
+    [Fact(Skip = "red: AC3 - Membership's filter predicate does not read SESSION_CONTEXT('AccountId') yet, so the anchor read is empty (story 1.7 Task 2)")]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "AD-24")]
+    public async Task Under_the_AccountId_key_no_other_Space_scoped_table_is_visible()
+    {
+        var database = Available();
+        var (a, _, shared, onlyA, _) = await SeedTwoAccountsSharingASpaceAsync(database);
+
+        foreach (var spaceId in new[] { shared, onlyA })
+        {
+            await using var underSpace = await database.OpenForSpaceAsync(spaceId, TestContext.Current.CancellationToken);
+            await using var presence = underSpace.CreateCommand();
+
+            presence.CommandText = "INSERT INTO dbo.[SpacePresence] (SpaceId, AccountId, ExpiresAt) VALUES (@space, @account, @expires)";
+            presence.Parameters.Add(new SqlParameter("@space", spaceId));
+            presence.Parameters.Add(new SqlParameter("@account", a.Id));
+            presence.Parameters.Add(new SqlParameter("@expires", DateTimeOffset.UtcNow.AddMinutes(10)));
+
+            await presence.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        await using var asA = await OpenForAccountAsync(database, a.Id);
+
+        Assert.Equal(2, (await MembershipsAsync(asA)).Count);
+
+        Assert.Equal(0, await RegistrationDatabase.CountAsync(asA, SchemaNames.StatusDefinitionTable, TestContext.Current.CancellationToken));
+        Assert.Equal(0, await RegistrationDatabase.CountAsync(asA, SchemaNames.SpacePresenceTable, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>
+    /// AC3 / AD-2 - the EF query filter alone, from application state, admits only the scoped
+    /// Account's Memberships, even where row-level security admits another Account's.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The two layers are set to disagree, as <see cref="The_query_filter_alone_excludes_another_Spaces_rows"/>
+    /// does for Spaces: the session context names the shared Space, so the policy admits both
+    /// Accounts' Memberships of it, while the application state names Account A and no Space. Only
+    /// the filter can exclude B's row. The same connection with the filter disarmed is read first.
+    /// </para>
+    /// <para>
+    /// <b>Reached by name.</b> <c>AccountScope</c> and the three-argument <see cref="YelloDbContext"/>
+    /// constructor are story 1.7 Task 2's; on activation replace both lookups with typed references.
+    /// </para>
+    /// </remarks>
+    [Fact(Skip = "red: AC3 - AccountScope and the Membership filter's AccountId disjunct do not exist yet (story 1.7 Task 2)")]
+    [Trait("Requirement", "AR-7")]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "AD-24")]
+    public async Task The_query_filter_alone_admits_only_the_scoped_Accounts_Memberships()
+    {
+        var database = Available();
+        var (a, b, shared, _, _) = await SeedTwoAccountsSharingASpaceAsync(database);
+
+        await using var context = ContextScopedToAccount(a.Id);
+        await using var transaction = await context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
+
+        await SpaceSessionContext.SetAsync(context.Database, shared, TestContext.Current.CancellationToken);
+
+        var admittedByRowLevelSecurity = await context.Memberships
+            .IgnoreQueryFilters()
+            .Select(membership => membership.AccountId)
+            .ToListAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(new[] { a.Id, b.Id }.Order(), admittedByRowLevelSecurity.Order());
+
+        var visible = await context.Memberships
+            .Select(membership => new { membership.AccountId, membership.SpaceId })
+            .ToListAsync(TestContext.Current.CancellationToken);
+
+        var only = Assert.Single(visible);
+        Assert.Equal(a.Id, only.AccountId);
+        Assert.Equal(shared, only.SpaceId);
+    }
+
+    /// <summary>
+    /// AC3 / Task 2 "one key per unit of work" - a Space-scoped unit of work, for an Account that
+    /// holds Memberships in several Spaces, sees only its Membership of the requested Space, through
+    /// either layer alone.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Green today, and left active as a standing gate.</b> Today both layers are keyed on
+    /// <c>SpaceId</c> alone, so this holds trivially. It is the regression gate for story 1.7's
+    /// widening: if a Space-scoped unit of work ever also set the <c>AccountId</c> key, or narrowed
+    /// <c>AccountScope</c>, the widened predicate and filter would admit the Account's Memberships
+    /// in every other Space - and this fails, in whichever layer leaked.
+    /// </para>
+    /// <para>
+    /// <b>Not plantable before the widening, and that is recorded rather than papered over.</b> While
+    /// both layers are keyed on <c>SpaceId</c> alone, no leak of this shape can be constructed: a filter
+    /// planted to admit the Account everywhere is masked by the policy, and the policy cannot be
+    /// planted without a migration. Story 1.7 plants it once the widening exists - "a Space-scoped
+    /// unit of work also sets <c>AccountId</c>" (RLS half) and "<c>AccountScope</c> narrowed in a
+    /// Space-scoped unit of work" (filter half) - and records both in its plant table.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "AD-24")]
+    public async Task A_Space_scoped_unit_of_work_sees_only_its_own_Membership_of_an_Account_in_several_Spaces()
+    {
+        var database = Available();
+        var (a, _, shared, onlyA, _) = await SeedTwoAccountsSharingASpaceAsync(database);
+
+        var (context, scope) = Request(database);
+
+        await using (context)
+        {
+            await using var unitOfWork = await new MembershipActiveSpaceResolver(context, scope)
+                .BeginAsync(a.Id, shared, TestContext.Current.CancellationToken);
+
+            Assert.NotNull(unitOfWork);
+
+            var throughBothLayers = await context.Memberships
+                .Where(membership => membership.AccountId == a.Id)
+                .Select(membership => membership.SpaceId)
+                .ToListAsync(TestContext.Current.CancellationToken);
+
+            var throughRowLevelSecurityAlone = await context.Memberships
+                .IgnoreQueryFilters()
+                .Where(membership => membership.AccountId == a.Id)
+                .Select(membership => membership.SpaceId)
+                .ToListAsync(TestContext.Current.CancellationToken);
+
+            Assert.Equal([shared], throughBothLayers);
+            Assert.Equal([shared], throughRowLevelSecurityAlone);
+            Assert.DoesNotContain(onlyA, throughBothLayers);
+        }
+    }
+
+    /// <summary>
+    /// Account A: Member of a shared Space and Owner of one of its own. Account B: Member of the
+    /// shared Space and Owner of one of its own. Every Membership's Account is added before it
+    /// (<c>FK_Membership_Account_AccountId</c>), every Space in the block that first writes into it
+    /// (<c>FK_Membership_Space_SpaceId</c>), one Owner per Space (<c>UX_Membership_SpaceId_Owner</c>),
+    /// one Membership per Account per Space (<c>IX_Membership_SpaceId_AccountId</c>), and a Status in
+    /// each Space so a widening that leaked beyond <c>Membership</c> has a row to show.
+    /// </summary>
+    private static async Task<(Account A, Account B, Guid Shared, Guid OnlyA, Guid OnlyB)> SeedTwoAccountsSharingASpaceAsync(
+        RegistrationDatabase database)
+    {
+        var a = SpaceSeeding.NewAccount();
+        var b = SpaceSeeding.NewAccount();
+        var shared = Guid.NewGuid();
+        var onlyA = Guid.NewGuid();
+        var onlyB = Guid.NewGuid();
+
+        await SpaceSeeding.SeedAsync(database, shared, context =>
+        {
+            context.Accounts.AddRange(a, b);
+            context.Spaces.Add(SpaceSeeding.NewSpace(shared));
+            context.StatusDefinitions.Add(SpaceSeeding.NewStatus(shared, "Shared"));
+            context.Memberships.Add(SpaceSeeding.NewMembership(shared, a.Id, Role.Member));
+            context.Memberships.Add(SpaceSeeding.NewMembership(shared, b.Id, Role.Member));
+        }, TestContext.Current.CancellationToken);
+
+        foreach (var (spaceId, owner) in new[] { (onlyA, a), (onlyB, b) })
+        {
+            await SpaceSeeding.SeedAsync(database, spaceId, context =>
+            {
+                context.Spaces.Add(SpaceSeeding.NewSpace(spaceId));
+                context.StatusDefinitions.Add(SpaceSeeding.NewStatus(spaceId, "Own"));
+                context.Memberships.Add(SpaceSeeding.NewMembership(spaceId, owner.Id, Role.Owner));
+            }, TestContext.Current.CancellationToken);
+        }
+
+        return (a, b, shared, onlyA, onlyB);
+    }
+
+    /// <summary>
+    /// A connection with the <c>AccountId</c> key set <c>@read_only = 1</c> and no <c>SpaceId</c> key -
+    /// the session context an Account-scoped unit of work runs under (AD-24).
+    /// </summary>
+    internal static async Task<SqlConnection> OpenForAccountAsync(RegistrationDatabase database, Guid accountId)
+    {
+        var connection = await database.OpenWithoutSpaceContextAsync(TestContext.Current.CancellationToken);
+
+        try
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "EXEC sp_set_session_context @key = @key, @value = @value, @read_only = 1";
+            command.Parameters.Add(new SqlParameter("@key", SqlDbType.NVarChar, 128) { Value = "AccountId" });
+            command.Parameters.Add(new SqlParameter("@value", SqlDbType.Variant) { Value = accountId });
+
+            await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+
+            return connection;
+        }
+        catch
+        {
+            await connection.DisposeAsync();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Every <c>Membership</c> row the connection's session context admits, read raw.
+    /// </summary>
+    internal static async Task<List<(Guid SpaceId, Guid AccountId)>> MembershipsAsync(SqlConnection connection)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText = "SELECT SpaceId, AccountId FROM dbo.[Membership]";
+
+        var rows = new List<(Guid SpaceId, Guid AccountId)>();
+
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+        {
+            rows.Add((reader.GetGuid(0), reader.GetGuid(1)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// A request-shaped context whose application state names an Account and no Space. Reached by
+    /// name because <c>AccountScope</c> is story 1.7's; the failure message says which part is
+    /// missing.
+    /// </summary>
+    private YelloDbContext ContextScopedToAccount(Guid accountId)
+    {
+        const string accountScopeName = "Yello.Infrastructure.Persistence.AccountScope";
+
+        var accountScopeType = typeof(SpaceScope).Assembly.GetType(accountScopeName, throwOnError: false);
+
+        Assert.True(accountScopeType is not null, $"{accountScopeName} is not in Yello.Infrastructure - story 1.7 Task 2 writes it.");
+
+        var accountScope = Activator.CreateInstance(accountScopeType)!;
+
+        var narrow = accountScopeType.GetMethod("Narrow", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+
+        Assert.True(narrow is not null, $"{accountScopeName} has no Narrow(Guid) - story 1.7 Task 2 mirrors SpaceScope.");
+
+        narrow.Invoke(accountScope, [accountId]);
+
+        var constructor = Array.Find(
+            typeof(YelloDbContext).GetConstructors(),
+            candidate => Array.Exists(candidate.GetParameters(), parameter => parameter.ParameterType == accountScopeType));
+
+        Assert.True(constructor is not null, "YelloDbContext takes no AccountScope - story 1.7 Task 2 adds it to the constructor.");
+
+        var options = new DbContextOptionsBuilder<YelloDbContext>().UseSqlServer(fixture.ConnectionString!).Options;
+
+        object? ArgumentFor(ParameterInfo parameter)
+        {
+            if (parameter.ParameterType == accountScopeType)
+            {
+                return accountScope;
+            }
+
+            return parameter.ParameterType == typeof(DbContextOptions<YelloDbContext>) ? options : null;
+        }
+
+        var arguments = constructor.GetParameters().Select(ArgumentFor).ToArray();
+
+        return Assert.IsType<YelloDbContext>(constructor.Invoke(arguments));
     }
 
     private static (YelloDbContext Context, SpaceScope Scope) Request(RegistrationDatabase database)

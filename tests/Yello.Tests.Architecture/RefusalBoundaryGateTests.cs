@@ -280,6 +280,46 @@ public sealed class RefusalBoundaryGateTests
     }
 
     /// <summary>
+    /// Story 1.7 / AC3 / I-11 (static half) - the switcher endpoint reaches no Space-scoped content:
+    /// no Project, Task, Label, Status, presence or refusal record, through anything it calls. It may
+    /// reach <c>Membership</c> and <c>Space</c>, and only for identity.
+    /// </summary>
+    /// <remarks>
+    /// <b>Red-phase scaffold, ATDD run 2026-10-24.</b> Today no <c>GET /api/v1/spaces</c> endpoint is
+    /// mapped, so the first assertion fails. Vacuity guard: the same walk must find the statuses
+    /// endpoint reaching <c>StatusDefinition</c>, so a walk that reads nothing cannot pass.
+    /// </remarks>
+    [Fact(Skip = "red: AC3 - GET /api/v1/spaces is not mapped yet (story 1.7 Task 3)")]
+    [Trait("Requirement", "FR-9")]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "AD-24")]
+    public void The_switcher_endpoint_reaches_no_Space_scoped_content()
+    {
+        string[] content =
+        [
+            .. SpaceScopedEntities,
+            "Yello.Domain.Spaces.SpacePresence",
+            AccessRefusalTypeName,
+        ];
+
+        var endpoints = RouteTable();
+
+        var switcher = endpoints.SingleOrDefault(endpoint => endpoint.RoutePattern.RawText == "/api/v1/spaces"
+            && endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()?.HttpMethods.Contains("GET") == true);
+
+        Assert.True(switcher is not null, "No GET /api/v1/spaces endpoint is mapped - story 1.7 Task 3 maps it.");
+
+        using var graph = new CallGraph();
+
+        Assert.Contains(endpoints, endpoint => CarriesSpaceId(endpoint) && HandlerReaches(endpoint, graph, content));
+
+        Assert.False(
+            HandlerReaches(switcher, graph, content),
+            "The Space switcher reaches Space-scoped content. AD-24: an Account-scoped surface returns "
+            + "Space identity (id, name) and nothing else - no count, no Role, no Status, no record.");
+    }
+
+    /// <summary>
     /// A-12 - nothing but the pipeline depends on the capability matrix or the refusal recorder.
     /// </summary>
     [Fact]
@@ -620,7 +660,15 @@ public sealed class RefusalBoundaryGateTests
     /// reaches <c>StatusDefinition</c> only inside <c>AccountRegistrationStore</c>.
     /// </para>
     /// </remarks>
-    private static bool HandlerReachesSpaceScopedEntity(RouteEndpoint endpoint, CallGraph graph)
+    private static bool HandlerReachesSpaceScopedEntity(RouteEndpoint endpoint, CallGraph graph) =>
+        HandlerReaches(endpoint, graph, SpaceScopedEntities);
+
+    /// <summary>
+    /// Whether the endpoint's handler reaches any of <paramref name="entities"/>, by the same
+    /// transitive walk. Split out by the story 1.7 ATDD run so the switcher's I-11 gate can walk a
+    /// wider list than A-4's.
+    /// </summary>
+    private static bool HandlerReaches(RouteEndpoint endpoint, CallGraph graph, string[] entities)
     {
         var handler = endpoint.Metadata.GetMetadata<MethodInfo>();
 
@@ -648,7 +696,7 @@ public sealed class RefusalBoundaryGateTests
 
         while (queue.TryDequeue(out var method))
         {
-            if (Array.Exists(SpaceScopedEntities, entity => MethodReferences(method, entity)))
+            if (Array.Exists(entities, entity => MethodReferences(method, entity)))
             {
                 return true;
             }

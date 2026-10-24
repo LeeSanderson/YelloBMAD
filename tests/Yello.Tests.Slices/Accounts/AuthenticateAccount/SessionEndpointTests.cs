@@ -889,6 +889,142 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
             JsonSerializer.Deserialize<ProblemResponse>(newRefused.Body, JsonOptions)?.Type);
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // Story 1.7 - sign-out (open question 4: DELETE /api/v1/sessions, 204, anti-forgery required,
+    // idempotent). Written as red-phase scaffolds by the ATDD run on 2026-10-24; today the route has
+    // no DELETE handler. In this class rather than a new one: a container-backed class is one more
+    // SQL Server engine on a full run.
+    //
+    // NOT ASSERTED, AND WHY: that a copy of the pre-sign-out cookie is refused when replayed. The
+    // Session is a stateless cookie ticket (no ticket store), so SignOutAsync expires the cookie in
+    // the browser and nothing on the server remembers the ticket. AC11's "ends the Session on the
+    // server" is read here as "the server answers the sign-out and instructs the browser to drop the
+    // cookie"; server-side revocation is FR-34's (SM-2) and is recorded in the checklist as a
+    // decision for dev-story to record, not invented here.
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// AC11 / Q4 - signing out answers <c>204</c>, expires the Session cookie, and the next request
+    /// carrying what the browser now holds is refused.
+    /// </summary>
+    [Fact(Skip = "red: AC11 - DELETE /api/v1/sessions does not exist yet (story 1.7 Task 5)")]
+    [Trait("Requirement", "FR-2")]
+    [Trait("Requirement", "UX-DR31")]
+    public async Task Sign_out_ends_the_Session_and_expires_its_cookie()
+    {
+        var connectionString = Available();
+        var address = RandomAddress();
+
+        WireResponse? before = null;
+        WireResponse? signOut = null;
+        WireResponse? after = null;
+        string? expiry = null;
+
+        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        {
+            var session = new WireSession(client);
+
+            await RegisterAsync(session, address);
+            Assert.Equal(HttpStatusCode.NoContent, (await session.SignInAsync(address, Password)).StatusCode);
+
+            before = await session.CurrentSessionAsync();
+
+            // A token minted while anonymous is refused once a Session exists
+            // (TESTING-CONVENTIONS.md:227-233), so it is re-fetched after sign-in.
+            await session.FetchAntiforgeryTokenAsync();
+
+            signOut = await session.DeleteAsync(SessionRoutes.Authenticate);
+            expiry = session.SetCookieFor("yello_session");
+
+            after = await session.CurrentSessionAsync();
+        });
+
+        Assert.NotNull(before);
+        Assert.Equal(HttpStatusCode.NoContent, before.StatusCode);
+
+        Assert.NotNull(signOut);
+        Assert.Equal(HttpStatusCode.NoContent, signOut.StatusCode);
+
+        // The cookie is cleared with a past expiry and the same attributes it was set with.
+        Assert.NotNull(expiry);
+        Assert.Contains("expires=Thu, 01 Jan 1970", expiry, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("secure", expiry, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("samesite=none", expiry, StringComparison.OrdinalIgnoreCase);
+
+        Assert.NotNull(after);
+        Assert.Equal(HttpStatusCode.Unauthorized, after.StatusCode);
+    }
+
+    /// <summary>
+    /// AC11 / AR-14 - sign-out is state-changing, so without an anti-forgery token it is refused and
+    /// the Session survives; the same request with the token then succeeds.
+    /// </summary>
+    [Fact(Skip = "red: AC11 - DELETE /api/v1/sessions does not exist yet (story 1.7 Task 5)")]
+    [Trait("Requirement", "AR-14")]
+    public async Task Sign_out_without_an_antiforgery_token_is_refused_and_the_Session_survives()
+    {
+        var connectionString = Available();
+        var address = RandomAddress();
+
+        WireResponse? without = null;
+        WireResponse? stillSignedIn = null;
+        WireResponse? with = null;
+
+        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        {
+            var session = new WireSession(client);
+
+            await RegisterAsync(session, address);
+            Assert.Equal(HttpStatusCode.NoContent, (await session.SignInAsync(address, Password)).StatusCode);
+            await session.FetchAntiforgeryTokenAsync();
+
+            without = await session.DeleteAsync(SessionRoutes.Authenticate, withAntiforgeryToken: false);
+            stillSignedIn = await session.CurrentSessionAsync();
+            with = await session.DeleteAsync(SessionRoutes.Authenticate);
+        });
+
+        Assert.NotNull(without);
+        Assert.Equal(HttpStatusCode.BadRequest, without.StatusCode);
+
+        Assert.NotNull(stillSignedIn);
+        Assert.Equal(HttpStatusCode.NoContent, stillSignedIn.StatusCode);
+
+        // The anchor that makes the refusal mean something: the tokened request is accepted.
+        Assert.NotNull(with);
+        Assert.Equal(HttpStatusCode.NoContent, with.StatusCode);
+    }
+
+    /// <summary>
+    /// Q4 - sign-out is idempotent: a caller holding no Session is answered <c>204</c>, not
+    /// <c>401</c>, so a double press is harmless.
+    /// </summary>
+    [Fact(Skip = "red: AC11 - DELETE /api/v1/sessions does not exist yet (story 1.7 Task 5; idempotence is open question 4)")]
+    [Trait("Priority", "P1")]
+    [Trait("Requirement", "AR-14")]
+    public async Task Sign_out_without_a_Session_answers_204()
+    {
+        var connectionString = Available();
+
+        WireResponse? noSession = null;
+        WireResponse? current = null;
+
+        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        {
+            var session = new WireSession(client);
+
+            await session.FetchAntiforgeryTokenAsync();
+
+            current = await session.CurrentSessionAsync();
+            noSession = await session.DeleteAsync(SessionRoutes.Authenticate);
+        });
+
+        Assert.NotNull(current);
+        Assert.Equal(HttpStatusCode.Unauthorized, current.StatusCode);
+
+        Assert.NotNull(noSession);
+        Assert.Equal(HttpStatusCode.NoContent, noSession.StatusCode);
+    }
+
     private string Available()
     {
         Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? string.Empty);
