@@ -349,6 +349,43 @@ The dev phase takes these as **reversible, recorded decisions** in the Completio
 7. **Is `/sync` a third isolation surface?** (`test-design-architecture.md:339-347`.) (a) Yes, from story 7.3, when the channel exists: it becomes a third `IsolationSurface` member and the gap gate then forces an expectation on every row. Ledger to 7.3. (b) Decide nothing now. **Recommend (a)** — the enum and the gate make it a one-line change with a loud consequence.
 8. **The Session-surface answer for a Token-only case (ISO-TOKEN-BOUND-ELSEWHERE).** A Session carries no Space, so "credential established for SA, request to SA2" is `200` for a Session by FR-2 and `404` for a Token by FR-36. (a) Keep it as one row with different per-surface expectations — AC1's rule is that each surface has a stated outcome, not the same one. (b) Split it into a Token-only row with an exemption — that is the "choice" AC1 forbids. **Recommend (a).**
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-1-9-prove-isolation-on-both-surfaces.md`. It holds the scenario map, the schema constraints checked, the red-reason evidence and the plants.
+
+The ATDD phase added 45 cases: 38 are skipped (`red: AC<n> - ...`) and 7 are active. The full run is 479 total, 440 passed, 0 failed, 39 skipped (baseline 434 / 433 / 1). No scaffold starts an engine: still 13.
+
+| File | Cases | ACs | Green today |
+|---|---|---|---|
+| `tests/Yello.Tests.Isolation/IsolationWorld.cs` | 0 (scaffold contract `IIsolationWorld`; `StartAsync` throws naming Tasks 2-3) | - | - |
+| `tests/Yello.Tests.Isolation/IsolationCaseListTests.cs` | 4 (GATE-001..004, the case list reached by name) | AC1, AC8 | none |
+| `tests/Yello.Tests.Isolation/IsolationBoundaryTests.cs` | 11 (ISO-001..011, one per case-list row, each over both surfaces, with the I-17 log check inside each) | AC2, AC6, AC10 | none |
+| `tests/Yello.Tests.Isolation/IsolationTimingTests.cs` | 3 (TIME-001..003, including the permanent oracle) | AC3 | none |
+| `tests/Yello.Tests.Isolation/PooledConnectionCaseTests.cs` | 1 (POOL-001, `DisableParallelization` collection, no fixture) | AC4, AC12 | none |
+| `tests/Yello.Tests.Isolation/SchemaVarianceTests.cs` | 1 (SCHEMA-001) | AC2 (Task 10) | none |
+| `tests/Yello.Tests.Revocation/RevocationWorld.cs` | 0 (scaffold contract `IRevocationWorld`) | - | - |
+| `tests/Yello.Tests.Revocation/RevocationCaseTests.cs` | 9 (REV-000..008; Lee's decisions are REV-001 and REV-008) | AC9, AC10, AC1 | none |
+| `tests/Yello.Tests.Architecture/ContainerTopologyGateTests.cs` | 3 (ARCH-001 direct engines, ARCH-002 engine budget of 5, ARCH-003 memory cap) | AC12 | none |
+| `tests/Yello.Tests.Architecture/ReleaseGatingSuiteTests.cs` | 1 (ARCH-004, no `--ignore-exit-code` on Isolation/Revocation) | AC5 | **yes, planted** |
+| `tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.Isolation.cs` | 2 (ARCH-005 Account-scoped reads by exact list; ARCH-006 wider last-Space scan) | AC2/AC8, AC7 | **ARCH-005 yes, planted**; ARCH-006 no |
+| `tests/Yello.Tests.Slices/ContainerRuntimeProbeTests.cs` | 2 (PROBE-001/002, the probe reached by name, no engine) | AC12 | none |
+| `tests/Yello.Tests.Client/SpaceScopedFirstLoadTests.cs` | 5 (E2E-001..005, against `FakeYelloApi`) | AC7 | **all five**; E2E-002 planted |
+| `tests/Yello.Tests.Client/RealHostBrowserTests.cs` | 3 (E2E-006..008, no collection yet) | AC11, AC2 | none |
+
+`--ignore-exit-code 8` came off both `Yello.Tests.Isolation.csproj` and `Yello.Tests.Revocation.csproj` in the ATDD change. The zero-test gate counts skipped facts, and an all-skipped run under `dotnet test` exits 0. The per-row facts loop both surfaces, and three branch on the surface. On activation they become rows of `IsolationCases` / `RevocationCases` and one generated theory (Task 4).
+
+Activation order:
+1. **ARCH-001, ARCH-002, ARCH-003**, then PROBE-001/002. They test the riskiest assumption: that the shared-engine topology (one engine per test process, a database per class, a memory cap) brings a full run to 5 engines or fewer with the browser suite green in the same run.
+2. POOL-001, the pinned pool on the shared engine.
+3. The harness (Task 3), then ISO-001.
+4. GATE-001, GATE-004 and GATE-003 with `IsolationCases`, then GATE-002.
+5. ISO-002..011 and SCHEMA-001. TIME-003 (the oracle) goes before TIME-001/002.
+6. REV-000..008.
+7. ARCH-006. ARCH-004 and ARCH-005 stay green throughout.
+8. Keep E2E-001..005 green, then E2E-006..008 with `RealHostCollection`, E2E-006 first.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used
