@@ -4,7 +4,7 @@ baseline_commit: 54d50a9
 
 # Story 1.6: Refuse at the Space boundary, and record every refusal
 
-Status: review
+Status: done
 
 Epic: 1 — An Account, a Space of your own, and a boundary that holds
 Story key: `1-6-refuse-at-the-space-boundary-and-record-every-refusal`
@@ -198,6 +198,32 @@ AC1–AC9 are reproduced **verbatim** from `epics.md:734-790` (`status: final`),
   - [x] Close or rewrite the `deferred-work.md` entries this story owns; add new entries with owners for what it defers (at least: the switcher-sourced route back → 1.7; the boundary-vs-in-Space duration comparison → 1.9 / 2.2; idempotency if deferred).
   - [x] **Do not add review narration to source files** (owned by Lee, project-wide). Do not tick this unless the diff holds it.
   - [x] Logs: `[LoggerMessage]` partials only (CA1848/CA1873). Continue `SpaceLog` EventIds after 1017. `SpaceId` as a field, never a Space name, never the email, never the cookie (AR-34).
+
+### Review Findings
+
+Code review 2026-10-24, range `9118277..HEAD` (ATDD scaffolds and develop), three layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor). 40 raw findings, 29 after dedupe: 12 patch, 7 defer, 10 dismissed.
+
+- [x] [Review][Patch] Two concurrent first requests from one Account both insert `(SpaceId, AccountId)` and the loser answers 500 on a primary-key violation [Yello.Infrastructure/Persistence/SpacePresenceRegister.cs:72]
+- [x] [Review][Patch] A capability code the client has no copy for renders as the bare code, though the resx promises a fallback [Yello.Client/Components/RefusalSurface.razor:40]
+- [x] [Review][Patch] The A-4 `{spaceId}` gate looks one call deep, not through the readers and ports Task 8 names [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs:545]
+- [x] [Review][Patch] The unknown-route refusal page does not move focus to its `h1`, unlike `/not-available` (AC9 "same focus") [Yello.Client/App.razor:15]
+- [x] [Review][Patch] The 403 capability code, the `CrossSpace` record's capability and `OccurredAt`, and the 409's `bound` are asserted only as non-blank [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/SpaceBoundaryPipelineTests.cs, ActiveSpaceEndpointTests.cs]
+- [x] [Review][Patch] Nothing asserts a bound refusal (409) writes no `AccessRefusal` row [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.cs]
+- [x] [Review][Patch] Registration's rate limit is never tested; removing it from `MapRegisterAccount` fails nothing [Yello.Host/Program.cs:257]
+- [x] [Review][Patch] The A-12 Role gate covers `ActiveSpaceContext.Role` but not `Membership.Role` [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs:325]
+- [x] [Review][Patch] `IAccessRefusalRecorder` documents its token as cancelling the write; the implementation ignores it by design [Yello.Application/Spaces/IAccessRefusalRecorder.cs:37]
+- [x] [Review][Patch] A backwards clock step after a claim suppresses the purge for longer than a day [Yello.Infrastructure/Persistence/RefusalPurgeSchedule.cs:50]
+- [x] [Review][Patch] The A-12 ledger entry repeats its title and leaves an unbalanced `**` [_bmad-output/implementation-artifacts/deferred-work.md:238]
+- [x] [Review][Patch] The idempotency ledger entry says both "owner is now story 2.1" and "Owner: unassigned" [_bmad-output/implementation-artifacts/deferred-work.md:76]
+- [x] [Review][Patch] `Each_boundary_404_records_one_CrossSpace_refusal_and_a_served_request_records_none` failed in 2 of 7 full runs. The cause is not load: it compared the **sorted** actual target-Space ids with an **unsorted** expected pair of two random `Guid`s, so it failed whenever `missingSpace` sorted after `otherSpace`, about half the time. It passed alone only by chance. The other suspects were ruled out: rows are filtered by a fresh Account's id, the record is awaited before the 404 is returned, and the purge deletes only rows older than 90 days. Both sides are now sorted [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.cs:335]
+  - How the patches were applied (2026-10-24, review phase): `SpacePresenceRegister` now catches the primary-key violation (2627, matched on number, as `AccountRegistrationStore` does), detaches the entity and admits the Account. This has **no deterministic test**: the race needs both reads to run before either insert, and nothing in the harness can order that. `RefusalCopy.For` gained a `hasCopy` overload, which `RefusalSurface` feeds from `ResourceNotFound`. The surface focuses its own `h1` on first render. The new browser case `RefusalSurfaceTests` was **planted** (focus move removed): the unknown-route arm failed and the routed arm passed. The A-4 gate now walks calls transitively, through state machines, closures and interface implementations. Registration is named as the one exemption, and it must be found reaching, which also proves the walk crosses a port. The new `No_slice_or_endpoint_reads_the_Role_off_a_Membership_row` gate was **planted** (a Host type reading `Membership.Role`) and caught it. Other changes: tightened assertions (exact capability code, `OccurredAt` in range, exact bound code, no refusal row for a 409); a new registration 429 case; a new backwards-clock purge case; and the two ledger corrections.
+- [x] [Review][Defer] Rate-limit partition: a null remote address shares one bucket, and IPv6 per-address keys let one host rotate within its /64 [Yello.Host/Sessions/CredentialHashingRateLimit.cs:124] — deferred, owner story 1.10
+- [x] [Review][Defer] The presence count can block behind another request's uncommitted presence write when `READ_COMMITTED_SNAPSHOT` is off [Yello.Infrastructure/Persistence/SpacePresenceRegister.cs:62] — deferred, owner story 2.9
+- [x] [Review][Defer] The purge is one unbatched delete, and an authenticated caller can write refusal rows without throttle [Yello.Infrastructure/Persistence/AccessRefusalPurge.cs:63] — deferred, owner story 2.9
+- [x] [Review][Defer] Qualified Admin cells pass the Role gate, but the Role-read gate leaves nowhere for 4.4/4.5 to enforce the target constraint [Yello.Host/Spaces/ActiveSpaceResolution.cs:170] — deferred, owner stories 4.4 / 4.5
+- [x] [Review][Defer] `BoundRegistry` is not in the A-12 gate, so a slice could consult a bound itself [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs:272] — deferred, owner story 2.1
+- [x] [Review][Defer] The purge trigger runs on every request, so a probe of a database-free route wakes an idle database once a day [Yello.Host/Program.cs:211] — deferred, owner story 1.10
+- [x] [Review][Defer] `AccessRefusal` rows keep an `AccountId` for up to 90 days after the Account is deleted, with no erasure rule stated [Yello.Infrastructure/Persistence/Configurations/AccessRefusalConfiguration.cs] — deferred, owner story 5.4
 
 ## Dev Notes
 

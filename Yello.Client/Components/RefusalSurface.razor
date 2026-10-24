@@ -6,7 +6,7 @@
     THE REFUSAL SURFACE. AC9; UX-DR32, UX-DR35; EXPERIENCE.md:122-147.
 
     A PAGE, NEVER A TOAST. A toast implies a transient fault and a refusal is a final answer, so this
-    is a whole surface with an <h1>, which App.razor's FocusOnNavigate moves focus to.
+    is a whole surface with an <h1>, which focus moves to on every route to it - routed or not.
 
     ONE PAGE FOR EVERY NOT-FOUND. A Space the Account is not in, a Space that does not exist and an
     address that matches nothing render this component with the same key, the same words, the same
@@ -22,12 +22,14 @@
 
 <div class="auth-surface">
     <div class="auth-panel">
-        <h1 class="type-dialog-title auth-panel__heading">@Heading</h1>
+        <h1 class="type-dialog-title auth-panel__heading" tabindex="-1" @ref="_heading">@Heading</h1>
         <p class="auth-panel__aside"><a href="@ClientRoutes.Home">@Localizer[RefusalCopy.RouteBackKey]</a></p>
     </div>
 </div>
 
 @code {
+    private ElementReference _heading;
+
     /// <summary>
     /// The problem the refusal arrived with, or <c>null</c> for an address the client cannot route.
     /// </summary>
@@ -38,11 +40,27 @@
     {
         get
         {
-            var message = RefusalCopy.For(Problem);
+            var message = RefusalCopy.For(Problem, key => !Localizer[key].ResourceNotFound);
 
             return message.Limit is { } limit
                 ? Localizer[message.Key, limit]
                 : Localizer[message.Key];
+        }
+    }
+
+    /// <summary>
+    /// Moves focus to the heading on first render. The routed page gets the same move from
+    /// App.razor's FocusOnNavigate; the router's NotFound branch has no route data to give
+    /// FocusOnNavigate, so without this an unknown address would leave focus where the last link
+    /// was - the same page, but not the same focus (AC9).
+    /// </summary>
+    /// <param name="firstRender">Whether this is the component's first render.</param>
+    /// <returns>The focus move.</returns>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _heading.FocusAsync();
         }
     }
 }

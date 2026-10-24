@@ -1,3 +1,4 @@
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Yello.Application.Spaces;
 using Yello.Domain.Spaces;
@@ -38,6 +39,11 @@ namespace Yello.Infrastructure.Persistence;
 internal sealed class SpacePresenceRegister(YelloDbContext dbContext, TimeProvider time) : ISpacePresenceRegister
 {
     /// <summary>
+    /// SQL Server's "violation of PRIMARY KEY constraint" - the same number as a UNIQUE constraint.
+    /// </summary>
+    private const int PrimaryKeyViolationErrorNumber = 2627;
+
+    /// <summary>
     /// How long a presence counts after the Account's last request in the Space. Fifteen minutes,
     /// the horizon over which the database itself treats a quiet workload as idle.
     /// </summary>
@@ -71,24 +77,63 @@ internal sealed class SpacePresenceRegister(YelloDbContext dbContext, TimeProvid
 
         if (own is null)
         {
-            dbContext.SpacePresences.Add(new SpacePresence
+            return await EnterAsync(new SpacePresence
             {
                 SpaceId = spaceId,
                 AccountId = accountId,
                 ExpiresAt = now + Window,
-            });
+            }, cancellationToken).ConfigureAwait(false);
         }
-        else if (own.ExpiresAt - now < RefreshBelow)
-        {
-            own.ExpiresAt = now + Window;
-        }
-        else
+
+        if (own.ExpiresAt - now >= RefreshBelow)
         {
             // Present, and with more than half the window left: nothing to write.
             return true;
         }
 
+        own.ExpiresAt = now + Window;
+
         await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return true;
+    }
+
+    /// <summary>
+    /// True when a failed save was a primary-key violation. <c>(SpaceId, AccountId)</c> is the
+    /// table's only key and it has no unique index, so on this table that can mean one thing: the
+    /// same Account's row, inserted by a concurrent request.
+    /// </summary>
+    /// <remarks>
+    /// Matched on the error number, never on the message, which the server localises - the same
+    /// rule <see cref="AccountRegistrationStore"/> follows.
+    /// </remarks>
+    private static bool IsPrimaryKeyViolation(DbUpdateException exception) =>
+        exception.InnerException is SqlException sqlException
+        && sqlException.Errors.Cast<SqlError>().Any(error => error.Number == PrimaryKeyViolationErrorNumber);
+
+    /// <summary>
+    /// Inserts the Account's first presence in the Space.
+    /// </summary>
+    /// <remarks>
+    /// <b>The same Account entering twice at once is admitted, not answered 500.</b> Two requests
+    /// from one Account (two tabs, or a page that fires its first calls in parallel) can both find no
+    /// row. The second insert waits on the first's key lock. If the first commits, the second fails
+    /// on the primary key, and that is the Account already present: admitted. A primary-key violation
+    /// ends only the statement, not the transaction, so the request's unit of work carries on. The
+    /// failed entity is detached so the endpoint's own save does not try the insert again.
+    /// </remarks>
+    private async Task<bool> EnterAsync(SpacePresence presence, CancellationToken cancellationToken)
+    {
+        dbContext.SpacePresences.Add(presence);
+
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (DbUpdateException exception) when (IsPrimaryKeyViolation(exception))
+        {
+            dbContext.Entry(presence).State = EntityState.Detached;
+        }
 
         return true;
     }

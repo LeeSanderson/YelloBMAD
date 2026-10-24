@@ -75,6 +75,28 @@ public sealed class RefusalCopyTests
     }
 
     /// <summary>
+    /// A <c>403</c> whose capability code the client has no copy for - a server newer than a cached
+    /// client - renders the generic capability statement, never the bare code.
+    /// </summary>
+    [Fact]
+    public void A_capability_code_without_client_copy_renders_the_generic_capability_statement()
+    {
+        static bool HasCopy(string key) => Copy.GetString(key, CultureInfo.InvariantCulture) is not null;
+
+        // Anchored: a known code keeps its own statement through the same overload.
+        Assert.Equal(
+            StableCode.Of(Capability.ManageTasks),
+            RefusalCopy.For(new ProblemResponse(ProblemTypes.InsufficientRole, null, Capability: StableCode.Of(Capability.ManageTasks)), HasCopy).Key);
+
+        var unknown = RefusalCopy.For(
+            new ProblemResponse(ProblemTypes.InsufficientRole, null, Capability: "a-capability-from-a-newer-server"),
+            HasCopy);
+
+        Assert.Equal(RefusalCopy.RoleDoesNotPermitKey, unknown.Key);
+        Assert.NotNull(Copy.GetString(unknown.Key, CultureInfo.InvariantCulture));
+    }
+
+    /// <summary>
     /// Every capability and every bound the Host can name in a refusal has client copy behind its
     /// code, so the interface never renders a bare code.
     /// </summary>

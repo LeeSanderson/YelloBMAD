@@ -53,6 +53,13 @@ public sealed class RefusalBoundaryGateTests
 {
     private const string PipelineTypeName = "Yello.Host.Spaces.ActiveSpaceResolution";
 
+    /// <summary>
+    /// The one endpoint that reaches a Space-scoped entity without <c>{spaceId}</c>: registration
+    /// creates the Personal Space and its default Statuses under an id it has just minted. It
+    /// resolves nothing by id, so there is nothing for a boundary refusal to be told apart from.
+    /// </summary>
+    private const string CreatesItsOwnSpace = "/api/v1/accounts";
+
     private static readonly string MatrixTypeName = typeof(RoleCapabilityMatrix).FullName!;
     private static readonly string RecorderPortName = typeof(IAccessRefusalRecorder).FullName!;
     private static readonly string PresencePortName = typeof(ISpacePresenceRegister).FullName!;
@@ -222,15 +229,23 @@ public sealed class RefusalBoundaryGateTests
     {
         var endpoints = RouteTable();
 
+        using var graph = new CallGraph();
+
         var reaching = endpoints
-            .Where(endpoint => HandlerReachesSpaceScopedEntity(endpoint))
+            .Where(endpoint => HandlerReachesSpaceScopedEntity(endpoint, graph))
             .ToList();
 
         Assert.Contains(reaching, endpoint => CarriesSpaceId(endpoint));
 
+        // The exemption must be found reaching, or it is a hole rather than an exemption - and since
+        // registration reaches StatusDefinition only inside the store behind its port, finding it is
+        // also the proof that the walk crosses a port.
+        Assert.Contains(reaching, endpoint => endpoint.RoutePattern.RawText == CreatesItsOwnSpace);
+
         var offenders = reaching
             .Where(endpoint => !CarriesSpaceId(endpoint))
             .Select(endpoint => endpoint.RoutePattern.RawText)
+            .Where(pattern => pattern != CreatesItsOwnSpace)
             .ToList();
 
         Assert.True(
@@ -327,25 +342,7 @@ public sealed class RefusalBoundaryGateTests
         var context = typeof(ActiveSpaceContext).FullName!;
         var getter = "get_" + nameof(ActiveSpaceContext.Role);
 
-        var readers = new SortedSet<string>(StringComparer.Ordinal);
-
-        foreach (var assembly in RuntimeAssemblies())
-        {
-            using var module = ModuleDefinition.ReadModule(assembly.Location);
-
-            foreach (var type in module.GetTypes())
-            {
-                var reads = type.Methods.Any(method => method.HasBody && method.Body.Instructions.Any(instruction =>
-                    instruction.Operand is MethodReference called
-                    && called.Name == getter
-                    && called.DeclaringType.FullName == context));
-
-                if (reads)
-                {
-                    readers.Add(OutermostOf(type).FullName);
-                }
-            }
-        }
+        var readers = RoleReaders(context, getter);
 
         Assert.Contains(PipelineTypeName, readers);
 
@@ -357,6 +354,70 @@ public sealed class RefusalBoundaryGateTests
             $"{string.Join(", ", offenders)} read the Role off the active Space context. The pipeline "
             + "checks the endpoint's declared capability against the matrix (AR-3); nothing else may "
             + "decide by Role.");
+    }
+
+    /// <summary>
+    /// A-12, the authorisation clause, the other way in - no slice, handler or endpoint reads the
+    /// Role off a <see cref="Membership"/> row either.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The gate above holds the resolved context. A slice could skip it and read the Membership row
+    /// through a reader port instead, which is the same re-implemented capability check. So no type
+    /// in <c>Yello.Application</c> or <c>Yello.Host</c> may call <c>Membership.Role</c>'s getter.
+    /// Infrastructure may: the resolver is what copies the row's Role into the context, and the
+    /// model configuration maps the column.
+    /// </para>
+    /// <para>
+    /// <b>Vacuity guard:</b> the same scan must find the resolver reading it.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    [Trait("Priority", "P1")]
+    [Trait("Requirement", "AD-1")]
+    public void No_slice_or_endpoint_reads_the_Role_off_a_Membership_row()
+    {
+        var readers = RoleReaders(typeof(Membership).FullName!, "get_" + nameof(Membership.Role));
+
+        Assert.Contains("Yello.Infrastructure.Persistence.MembershipActiveSpaceResolver", readers);
+
+        var offenders = readers
+            .Where(name => name.StartsWith("Yello.Application.", StringComparison.Ordinal)
+                || name.StartsWith("Yello.Host.", StringComparison.Ordinal))
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            $"{string.Join(", ", offenders)} read the Role off a Membership row. The pipeline decides by "
+            + "Role (AR-3); a slice that reads it is re-implementing the capability check.");
+    }
+
+    /// <summary>
+    /// Every production type whose IL calls a property getter on a type, named by its outermost type.
+    /// </summary>
+    private static SortedSet<string> RoleReaders(string declaringType, string getter)
+    {
+        var readers = new SortedSet<string>(StringComparer.Ordinal);
+
+        foreach (var assembly in RuntimeAssemblies())
+        {
+            using var module = ModuleDefinition.ReadModule(assembly.Location);
+
+            foreach (var type in module.GetTypes())
+            {
+                var reads = type.Methods.Any(method => method.HasBody && method.Body.Instructions.Any(instruction =>
+                    instruction.Operand is MethodReference called
+                    && called.Name == getter
+                    && called.DeclaringType.FullName == declaringType));
+
+                if (reads)
+                {
+                    readers.Add(OutermostOf(type).FullName);
+                }
+            }
+        }
+
+        return readers;
     }
 
     /// <summary>
@@ -542,23 +603,148 @@ public sealed class RefusalBoundaryGateTests
             .OfType<RouteEndpoint>()];
     }
 
-    private static bool HandlerReachesSpaceScopedEntity(RouteEndpoint endpoint)
+    /// <summary>
+    /// Whether the endpoint's handler reaches a Space-scoped entity, through everything it calls in
+    /// production code.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Transitive, not one call deep.</b> A handler that calls a port which returns a DTO reaches
+    /// the entity only inside the port's implementation. So the walk follows every call into a
+    /// production type: through compiler-generated state machines and lambda closures, and from an
+    /// interface or abstract method into every production implementation of it.
+    /// </para>
+    /// <para>
+    /// It over-approximates, as a gate should: an interface call is taken to reach every
+    /// implementation. The registration endpoint is the proof that the walk crosses a port - it
+    /// reaches <c>StatusDefinition</c> only inside <c>AccountRegistrationStore</c>.
+    /// </para>
+    /// </remarks>
+    private static bool HandlerReachesSpaceScopedEntity(RouteEndpoint endpoint, CallGraph graph)
     {
         var handler = endpoint.Metadata.GetMetadata<MethodInfo>();
 
         Assert.True(handler is not null, $"{endpoint.RoutePattern.RawText} carries no handler method.");
 
-        using var module = ModuleDefinition.ReadModule(handler.Module.Assembly.Location);
+        var declaring = graph.TypeNamed(handler.DeclaringType!.FullName!.Replace('+', '/'));
 
-        var declaring = module.GetType(handler.DeclaringType!.FullName!.Replace('+', '/'));
+        Assert.True(declaring is not null, $"{endpoint.RoutePattern.RawText}'s handler type was not found in production code.");
 
-        // The handler itself, and the state machine an async handler's body is compiled into.
-        var bodies = declaring.Methods.Where(method => method.Name == handler.Name)
-            .Concat(declaring.NestedTypes
-                .Where(nested => nested.Name.StartsWith($"<{handler.Name}>", StringComparison.Ordinal))
-                .SelectMany(nested => nested.Methods));
+        var queue = new Queue<MethodDefinition>();
+        var seen = new HashSet<MethodDefinition>();
 
-        return bodies.Any(method => Array.Exists(SpaceScopedEntities, entity => MethodReferences(method, entity)));
+        void Enqueue(MethodDefinition method)
+        {
+            if (seen.Add(method))
+            {
+                queue.Enqueue(method);
+            }
+        }
+
+        foreach (var method in declaring.Methods.Where(method => method.Name == handler.Name))
+        {
+            Enqueue(method);
+        }
+
+        while (queue.TryDequeue(out var method))
+        {
+            if (Array.Exists(SpaceScopedEntities, entity => MethodReferences(method, entity)))
+            {
+                return true;
+            }
+
+            // The state machine an async method is compiled into, and a local function's body.
+            foreach (var nested in method.DeclaringType.NestedTypes
+                .Where(nested => nested.Name.StartsWith($"<{method.Name}>", StringComparison.Ordinal))
+                .SelectMany(nested => nested.Methods))
+            {
+                Enqueue(nested);
+            }
+
+            foreach (var implementation in graph.ImplementationsOf(method))
+            {
+                Enqueue(implementation);
+            }
+
+            if (!method.HasBody)
+            {
+                continue;
+            }
+
+            foreach (var called in method.Body.Instructions
+                .Select(instruction => instruction.Operand)
+                .OfType<MethodReference>()
+                .Select(graph.Resolve)
+                .OfType<MethodDefinition>())
+            {
+                Enqueue(called);
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Every production type, read once, so calls can be resolved without an assembly resolver.
+    /// </summary>
+    private sealed class CallGraph : IDisposable
+    {
+        private readonly List<ModuleDefinition> _modules;
+        private readonly Dictionary<string, TypeDefinition> _types;
+
+        public CallGraph()
+        {
+            _modules = [.. RuntimeAssemblies().Select(assembly => ModuleDefinition.ReadModule(assembly.Location))];
+            // TryAdd, not ToDictionary: every module has its own <Module> and compiler-generated
+            // <PrivateImplementationDetails>, and those are never what a call resolves to.
+            _types = new Dictionary<string, TypeDefinition>(StringComparer.Ordinal);
+
+            foreach (var type in _modules.SelectMany(module => module.GetTypes()))
+            {
+                _types.TryAdd(type.FullName, type);
+            }
+        }
+
+        public TypeDefinition? TypeNamed(string fullName) => _types.GetValueOrDefault(fullName);
+
+        /// <summary>
+        /// The production definition a call names, or <c>null</c> for a call outside production code.
+        /// </summary>
+        public MethodDefinition? Resolve(MethodReference reference) =>
+            TypeNamed(reference.DeclaringType.GetElementType().FullName) is { } type
+                ? type.Methods.FirstOrDefault(method =>
+                    method.Name == reference.Name && method.Parameters.Count == reference.Parameters.Count)
+                : null;
+
+        /// <summary>
+        /// Every production method that implements or overrides an interface or abstract method,
+        /// matched by name and arity - an over-approximation, which is the safe direction for a gate.
+        /// </summary>
+        public IEnumerable<MethodDefinition> ImplementationsOf(MethodDefinition method)
+        {
+            if (!method.IsAbstract)
+            {
+                return [];
+            }
+
+            var owner = method.DeclaringType.FullName;
+
+            return _types.Values
+                .Where(type => type.Interfaces.Any(implemented => implemented.InterfaceType.GetElementType().FullName == owner)
+                    || type.BaseType?.GetElementType().FullName == owner)
+                .SelectMany(type => type.Methods)
+                .Where(candidate => !candidate.IsAbstract
+                    && (candidate.Name == method.Name || candidate.Name.EndsWith("." + method.Name, StringComparison.Ordinal))
+                    && candidate.Parameters.Count == method.Parameters.Count);
+        }
+
+        public void Dispose()
+        {
+            foreach (var module in _modules)
+            {
+                module.Dispose();
+            }
+        }
     }
 
     private static SortedSet<string> DependentsOf(string fullName)

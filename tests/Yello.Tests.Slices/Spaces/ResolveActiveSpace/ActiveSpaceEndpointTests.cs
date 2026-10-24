@@ -313,6 +313,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
         var otherSpace = Guid.NewGuid();
         var missingSpace = Guid.NewGuid();
         var accountId = Guid.Empty;
+        var before = DateTimeOffset.UtcNow;
 
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
@@ -327,17 +328,22 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
             Assert.Equal(HttpStatusCode.NotFound, (await session.GetAsync(SpaceRoutes.StatusesOf(missingSpace))).StatusCode);
         });
 
+        var after = DateTimeOffset.UtcNow;
         var rows = await RefusalsOfAsync(database, accountId);
 
         Assert.Equal(2, rows.Count);
-        Assert.Equal([missingSpace, otherSpace], rows.Select(row => row.TargetSpaceId).Order());
+        // Both sides sorted: the ids are random, so an unsorted expectation held only half the time.
+        Assert.Equal(new[] { missingSpace, otherSpace }.Order(), rows.Select(row => row.TargetSpaceId).Order());
         Assert.DoesNotContain(rows, row => row.TargetSpaceId == memberSpace);
 
         Assert.All(rows, row =>
         {
             Assert.Equal("CrossSpace", row.Kind);
             Assert.Equal("404", row.Outcome);
-            Assert.False(string.IsNullOrWhiteSpace(row.Capability));
+
+            // The capability the statuses endpoint declares - the one attempted - not merely some value.
+            Assert.Equal(nameof(Capability.ReadProjectsAndTasks), row.Capability);
+            Assert.InRange(row.OccurredAt, before, after);
         });
     }
 
@@ -430,11 +436,12 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
 
         WireResponse? served = null;
         WireResponse? refused = null;
+        var accountId = Guid.Empty;
 
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
-            var accountId = await AccountIdOfAsync(database, address);
+            accountId = await AccountIdOfAsync(database, address);
 
             await SeedSpaceAsync(database, quiet, "Alpha", accountId);
             var present = await SeedCrowdedSpaceAsync(database, crowded, accountId, PresenceBound);
@@ -453,10 +460,13 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
         using var body = JsonDocument.Parse(refused.Body);
         Assert.Equal("urn:yello:problem:bound-reached", body.RootElement.GetProperty("type").GetString());
         Assert.Equal(PresenceBound, body.RootElement.GetProperty("limit").GetInt32());
-        Assert.False(string.IsNullOrWhiteSpace(body.RootElement.GetProperty("bound").GetString()));
+        Assert.Equal("concurrent-active-sessions-per-space", body.RootElement.GetProperty("bound").GetString());
 
         // Raised inside the resolution transaction: the refused Account's presence was not written.
         Assert.Equal(PresenceBound, await LivePresenceCountAsync(database, crowded));
+
+        // And not an AccessRefusal: AD-20 has exactly two kinds, and a bound is neither.
+        Assert.Empty(await RefusalsOfAsync(database, accountId));
     }
 
     /// <summary>
@@ -579,7 +589,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
         await using var command = connection.CreateCommand();
 
         command.CommandText = """
-            SELECT TargetSpaceId, Capability, CAST(Outcome AS nvarchar(16)), Kind
+            SELECT TargetSpaceId, Capability, CAST(Outcome AS nvarchar(16)), Kind, OccurredAt
             FROM dbo.[AccessRefusal] WHERE AccountId = @account
             """;
         command.Parameters.Add(new SqlParameter("@account", accountId));
@@ -590,7 +600,12 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
 
         while (await reader.ReadAsync(TestContext.Current.CancellationToken))
         {
-            rows.Add(new RefusalRow(reader.GetGuid(0), reader.GetString(1), reader.GetString(2), reader.GetString(3)));
+            rows.Add(new RefusalRow(
+                reader.GetGuid(0),
+                reader.GetString(1),
+                reader.GetString(2),
+                reader.GetString(3),
+                await reader.GetFieldValueAsync<DateTimeOffset>(4, TestContext.Current.CancellationToken)));
         }
 
         return rows;
@@ -704,7 +719,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
     [GeneratedRegex("[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}", RegexOptions.None, 1000)]
     private static partial Regex GuidShaped { get; }
 
-    private sealed record RefusalRow(Guid TargetSpaceId, string Capability, string Outcome, string Kind);
+    private sealed record RefusalRow(Guid TargetSpaceId, string Capability, string Outcome, string Kind, DateTimeOffset OccurredAt);
 
     private static async Task<WireSession> SignedInAsync(HttpClient client, string address)
     {

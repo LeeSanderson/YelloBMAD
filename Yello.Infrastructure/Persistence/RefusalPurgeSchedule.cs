@@ -47,7 +47,9 @@ internal sealed class RefusalPurgeSchedule
         {
             var last = Interlocked.Read(ref _lastClaimedTicks);
 
-            if (last != long.MinValue && nowTicks - last < Interval.Ticks)
+            // A clock that stepped back behind the last claim is due now, rather than waiting out the
+            // step as well as the interval.
+            if (last != long.MinValue && nowTicks >= last && nowTicks - last < Interval.Ticks)
             {
                 return false;
             }

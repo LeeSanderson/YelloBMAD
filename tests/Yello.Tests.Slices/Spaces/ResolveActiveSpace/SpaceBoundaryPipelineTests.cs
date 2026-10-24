@@ -8,6 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Yello.Contracts.Spaces;
 using Yello.Application.Spaces;
+using Yello.Domain;
 using Yello.Domain.Accounts;
 using Yello.Domain.Memberships;
 using Yello.Host.Spaces;
@@ -120,8 +121,12 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
 
         // Capability-shaped, never object-shaped: a stable code the client renders from its own
         // resources, and nothing naming the Space.
+        // The exact code of the capability that was denied - not merely some code - so a pipeline that
+        // named the wrong capability would be caught.
         Assert.True(problem.ProblemDetails.Extensions.TryGetValue("capability", out var code));
-        Assert.False(string.IsNullOrWhiteSpace(code?.ToString()));
+        Assert.Equal(StableCode.Of(Enum.Parse<Capability>(capability)), code?.ToString());
+        Assert.DoesNotContain(spaceId.ToString(), problem.ProblemDetails.Title ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(spaceId.ToString(), problem.ProblemDetails.Detail ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain(spaceId.ToString(), problem.ProblemDetails.Extensions.Values.Select(value => value?.ToString()));
     }
 

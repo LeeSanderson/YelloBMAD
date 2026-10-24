@@ -132,6 +132,34 @@ public sealed class SpaceBoundaryRouteTests
         Assert.False(await ReachedForTheDatabaseAsync(retention), "The purge ran twice on the same instant.");
     }
 
+    /// <summary>
+    /// AC4 - a clock that steps back behind the last purge does not hold the next one off for the
+    /// step as well as the day: the purge is due at once, and then at most daily from there.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "AR-33")]
+    [Trait("Requirement", "AD-20")]
+    public async Task A_clock_stepped_back_behind_the_last_purge_does_not_postpone_the_next()
+    {
+        var clock = new SettableClock(new DateTimeOffset(2026, 10, 24, 9, 0, 0, TimeSpan.Zero));
+
+        await using var provider = new ServiceCollection()
+            .AddLogging()
+            .AddSingleton<TimeProvider>(clock)
+            .AddYelloInfrastructure(connectionString: null)
+            .BuildServiceProvider();
+
+        var retention = provider.GetRequiredService<IRefusalRetention>();
+
+        Assert.True(await ReachedForTheDatabaseAsync(retention), "The first request of a process did not purge.");
+
+        clock.Now -= TimeSpan.FromDays(3);
+        Assert.True(await ReachedForTheDatabaseAsync(retention), "A backwards clock step postponed the purge.");
+
+        clock.Now += TimeSpan.FromHours(1);
+        Assert.False(await ReachedForTheDatabaseAsync(retention), "A second purge ran inside the same day.");
+    }
+
     private static async Task<bool> ReachedForTheDatabaseAsync(IRefusalRetention retention)
     {
         try

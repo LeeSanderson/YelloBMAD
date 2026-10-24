@@ -40,14 +40,30 @@ public static class RefusalCopy
     /// </summary>
     /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
     /// <returns>The resource key, and the limit to format it with when it is a bound refusal.</returns>
-    public static RefusalMessage For(ProblemResponse? problem)
+    public static RefusalMessage For(ProblemResponse? problem) => For(problem, hasCopy: _ => true);
+
+    /// <summary>
+    /// The resource a refusal is rendered with, given which resource keys the client has copy for.
+    /// </summary>
+    /// <remarks>
+    /// A capability code the client has no copy for - a server newer than a cached client - falls
+    /// back to the generic capability statement, so the page never renders a bare code.
+    /// </remarks>
+    /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
+    /// <param name="hasCopy">Whether the client has a resource for a key.</param>
+    /// <returns>The resource key, and the limit to format it with when it is a bound refusal.</returns>
+    public static RefusalMessage For(ProblemResponse? problem, Func<string, bool> hasCopy)
     {
+        ArgumentNullException.ThrowIfNull(hasCopy);
+
         var type = problem?.Type;
 
         if (string.Equals(type, ProblemTypes.InsufficientRole, StringComparison.Ordinal))
         {
+            var capability = problem!.Capability;
+
             return new RefusalMessage(
-                string.IsNullOrWhiteSpace(problem!.Capability) ? RoleDoesNotPermitKey : problem.Capability,
+                string.IsNullOrWhiteSpace(capability) || !hasCopy(capability) ? RoleDoesNotPermitKey : capability,
                 Limit: null);
         }
 

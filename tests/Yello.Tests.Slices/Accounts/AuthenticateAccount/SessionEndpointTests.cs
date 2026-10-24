@@ -828,6 +828,67 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
             JsonSerializer.Deserialize<ProblemResponse>(knownRefused.Body, JsonOptions)?.Type);
     }
 
+    /// <summary>
+    /// Story 1.6 Task 9 - registration, the other PBKDF2 endpoint, is rate-limited too, and its 429
+    /// is the same for a new address and one already registered.
+    /// </summary>
+    /// <remarks>
+    /// Only registrations are sent, so the limit reached is registration's own. Taking the policy off
+    /// <c>MapRegisterAccount</c> fails this case. Anchored on a first registration answered 204, so a
+    /// limiter refusing everything cannot pass. The already-registered address is refused with the
+    /// same body as a new one, so the limiter is no oracle for which addresses exist (AD-23).
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "AR-25")]
+    [Trait("Requirement", "AD-18")]
+    [Trait("Requirement", "AD-23")]
+    public async Task Registration_past_the_limit_is_refused_with_429_alike_for_a_new_and_a_registered_address()
+    {
+        var connectionString = Available();
+        var registered = RandomAddress();
+
+        var limited = new Dictionary<string, string>(Configured, StringComparer.Ordinal)
+        {
+            ["RateLimiting__PermitsPerWindow"] = "3",
+        };
+
+        WireResponse? first = null;
+        WireResponse? newRefused = null;
+        WireResponse? registeredRefused = null;
+
+        await HostProcess.RunAsync(connectionString, limited, async client =>
+        {
+            var session = new WireSession(client);
+            await session.FetchAntiforgeryTokenAsync();
+
+            first = await session.RegisterAsync(new RegisterAccountRequest("Ravi", registered, Password));
+
+            // Bounded: a limiter that never refuses fails on the assertion below, not by hanging.
+            for (var attempt = 0; attempt < 10 && newRefused?.StatusCode != HttpStatusCode.TooManyRequests; attempt++)
+            {
+                newRefused = await session.RegisterAsync(new RegisterAccountRequest("Ravi", RandomAddress(), Password));
+            }
+
+            registeredRefused = await session.RegisterAsync(new RegisterAccountRequest("Ravi", registered, Password));
+        });
+
+        Assert.NotNull(first);
+        Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
+
+        Assert.NotNull(newRefused);
+        Assert.NotNull(registeredRefused);
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, newRefused.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, registeredRefused.StatusCode);
+
+        Assert.Equal(newRefused.Body, registeredRefused.Body);
+        Assert.Equal(newRefused.HeaderNames, registeredRefused.HeaderNames);
+        Assert.NotNull(newRefused.Header("Retry-After"));
+        Assert.Equal(
+            "urn:yello:problem:rate-limited",
+            JsonSerializer.Deserialize<ProblemResponse>(newRefused.Body, JsonOptions)?.Type);
+    }
+
     private string Available()
     {
         Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? string.Empty);

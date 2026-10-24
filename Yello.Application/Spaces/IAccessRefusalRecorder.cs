@@ -32,7 +32,10 @@ public interface IAccessRefusalRecorder
     /// <param name="targetSpaceId">The Space the request named, which may not exist.</param>
     /// <param name="capability">The capability the refused endpoint declares.</param>
     /// <param name="kind">Which refusal it was; the outcome status follows from it.</param>
-    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <param name="cancellationToken">
+    /// The request's token. An implementation may ignore it, and the production one does: a caller
+    /// who disconnects as the refusal is written has still been refused, and the record is the point.
+    /// </param>
     /// <returns>A task that completes once the record is durable.</returns>
     Task RecordAsync(
         Guid accountId,
