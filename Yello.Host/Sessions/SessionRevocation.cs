@@ -84,7 +84,10 @@ internal static class SessionRevocation
 
         if (standing is null || !standing.Admits(IssuedAt(context.Properties)))
         {
+            // Rejecting makes this request unauthenticated; expiring the cookie stops the browser
+            // presenting a ticket that will never be admitted again, and paying this read for it.
             context.RejectPrincipal();
+            await context.HttpContext.SignOutAsync(SessionCookiePolicy.SchemeName).ConfigureAwait(false);
         }
     }
 

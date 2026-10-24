@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Yello.Client.Pages;
 
 /// <summary>
@@ -98,12 +100,19 @@ public static class ClientRoutes
     /// it - with or without a query or fragment.
     /// </param>
     /// <returns>The Space id in the route's first two segments, if they are <c>spaces/{id}</c>.</returns>
+    /// <remarks>
+    /// Read as the router reads it: the segment case-insensitively, and the id in any format the
+    /// <c>:guid</c> constraint accepts. A stricter reading would leave an address the router renders
+    /// as a Space page looking like no Space at all to the purge hook.
+    /// </remarks>
     public static Guid? SpaceIn(string? relativePath)
     {
         var path = PathOf(relativePath);
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
-        return segments is [SpacesSegment, var id, ..] && Guid.TryParseExact(id, "D", out var spaceId)
+        return segments is [var first, var id, ..]
+            && string.Equals(first, SpacesSegment, StringComparison.OrdinalIgnoreCase)
+            && Guid.TryParse(id, CultureInfo.InvariantCulture, out var spaceId)
             ? spaceId
             : null;
     }
@@ -113,13 +122,21 @@ public static class ClientRoutes
     /// where the context bar is never drawn.
     /// </summary>
     /// <param name="relativePath">The path relative to the base address.</param>
-    /// <returns><c>true</c> for sign-in and registration, with or without a query.</returns>
+    /// <returns><c>true</c> for sign-in and registration, with or without a query, in any case.</returns>
     public static bool IsReachedWithoutASession(string? relativePath)
     {
         var path = PathOf(relativePath);
 
-        return path == SignIn.TrimStart('/') || path == Register.TrimStart('/');
+        return string.Equals(path, SignIn.TrimStart('/'), StringComparison.OrdinalIgnoreCase)
+            || string.Equals(path, Register.TrimStart('/'), StringComparison.OrdinalIgnoreCase);
     }
+
+    /// <summary>
+    /// Whether a client route is the entry point, <see cref="Home"/>.
+    /// </summary>
+    /// <param name="relativePath">The path relative to the base address.</param>
+    /// <returns><c>true</c> for <c>/</c>, with or without a query or fragment.</returns>
+    public static bool IsHome(string? relativePath) => PathOf(relativePath).Length == 0;
 
     private static string PathOf(string? relativePath) =>
         (relativePath ?? string.Empty).Split(PathEnds)[0].Trim('/');

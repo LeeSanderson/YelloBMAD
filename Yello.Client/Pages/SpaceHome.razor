@@ -80,16 +80,18 @@
 
         var token = ActiveSpace.Token;
 
-        if (Directory.Current is null && await Directory.RefreshAsync(token) is null)
-        {
-            Refuse(problem: null);
-            return;
-        }
-
+        // A held answer that does not list this Space is asked again once before it refuses: a
+        // Membership gained since the last look is otherwise refused until the switcher is opened.
+        // A refresh that fails leaves the held answer as it was, so it still does not list the Space.
         if (!Directory.Lists(SpaceId))
         {
-            Refuse(problem: null);
-            return;
+            await Directory.RefreshAsync(token);
+
+            if (!Directory.Lists(SpaceId))
+            {
+                RefuseUnlessLeft(token);
+                return;
+            }
         }
 
         await AskAsync(token);
@@ -134,9 +136,21 @@
         }
         catch (HttpRequestException)
         {
-            Refuse(problem: null);
+            RefuseUnlessLeft(token);
         }
         catch (JsonException)
+        {
+            RefuseUnlessLeft(token);
+        }
+    }
+
+    /// <summary>
+    /// Refuses this Space - unless the tab has already left it. This component is reused across
+    /// Spaces, so a late failure about the departed Space would otherwise refuse the destination.
+    /// </summary>
+    private void RefuseUnlessLeft(CancellationToken token)
+    {
+        if (!token.IsCancellationRequested)
         {
             Refuse(problem: null);
         }

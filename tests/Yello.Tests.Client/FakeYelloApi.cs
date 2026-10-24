@@ -52,6 +52,12 @@ internal sealed class FakeYelloApi
     public bool SignedIn { get; set; }
 
     /// <summary>
+    /// Whether the first <c>DELETE /api/v1/sessions</c> is refused for its anti-forgery token, as
+    /// the Host refuses a token minted to a Session that has since been ended on another device.
+    /// </summary>
+    public bool RefuseFirstSignOut { get; set; }
+
+    /// <summary>
     /// The switcher's answer, in the order the Host serves it.
     /// </summary>
     public IList<(Guid Id, string Name)> Switcher { get; } = new List<(Guid Id, string Name)>();
@@ -160,6 +166,10 @@ internal sealed class FakeYelloApi
                 SignedIn = true;
                 _signInSeen.TrySetResult(request);
                 return (noContent, string.Empty);
+
+            case ("DELETE", var path) when path == SessionRoutes.Authenticate && RefuseFirstSignOut:
+                RefuseFirstSignOut = false;
+                return (400, Problem(ProblemTypes.AntiforgeryTokenMissing));
 
             case ("DELETE", var path) when path == SessionRoutes.Authenticate:
                 SignedIn = false;

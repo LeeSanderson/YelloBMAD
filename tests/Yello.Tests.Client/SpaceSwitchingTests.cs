@@ -341,6 +341,15 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
             Assert.NotEqual("0px", await chip.EvaluateAsync<string>("e => getComputedStyle(e).borderTopWidth"));
             Assert.Equal(expectedTransform, await chip.EvaluateAsync<string>("e => getComputedStyle(e).textTransform"));
             Assert.Equal("Owner", (await chip.TextContentAsync())?.Trim());
+
+            // The exclusion itself, exercised in a browser: until a Turkish translation exists the
+            // client never serves a Turkish document, so this row gives the rendered chip one.
+            if (string.Equals(locale, "tr-TR", StringComparison.Ordinal))
+            {
+                await page.EvaluateAsync("() => { document.documentElement.lang = 'tr'; }");
+
+                Assert.Equal("none", await chip.EvaluateAsync<string>("e => getComputedStyle(e).textTransform"));
+            }
         }
     }
 
@@ -420,6 +429,61 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// AC11 / Q4 - a sign-out refused for its anti-forgery token is sent once more with a fresh
+    /// token, so the server still ends the Session and expires the cookie.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "FR-2")]
+    public async Task A_sign_out_refused_for_its_token_is_sent_again_with_a_fresh_one()
+    {
+        var api = TwoSpaces();
+        api.RefuseFirstSignOut = true;
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSpaceAsync(api, page, Northwind);
+
+            await page.Locator(ContextBar).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Sign out" }).ClickAsync();
+
+            await WaitForPathAsync(page, ClientSignInPath);
+
+            Assert.Equal(2, api.Requests.Count(request => request.Method == "DELETE" && request.Path == Contracts.Accounts.SessionRoutes.Authenticate));
+            Assert.False(api.SignedIn, "The second sign-out never reached the server.");
+        }
+    }
+
+    /// <summary>
+    /// Q8 / UX-DR40 - Esc closes the switcher from its trigger, where focus sits once it is opened,
+    /// and focus stays on the trigger.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "UX-DR40")]
+    public async Task Esc_on_the_trigger_closes_the_switcher_and_keeps_focus_there()
+    {
+        var api = TwoSpaces();
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSpaceAsync(api, page, Northwind);
+            await OpenSwitcherAsync(page);
+
+            var trigger = page.Locator(SwitcherTrigger);
+            await trigger.PressAsync("Escape");
+
+            await page.WaitForFunctionAsync(
+                $"() => document.querySelector('{SwitcherTrigger}').getAttribute('aria-expanded') === 'false'",
+                null,
+                new PageWaitForFunctionOptions { Timeout = Timeout });
+
+            Assert.Equal(0, await page.Locator("nav.context-bar .space-switcher").CountAsync());
+            Assert.True(await trigger.EvaluateAsync<bool>("e => e === document.activeElement"));
+        }
+    }
+
+    /// <summary>
     /// AC11 / Q6 / UX-DR35 - an Account holding no Membership arriving at <c>/</c> is told so, and no
     /// Space is created for it.
     /// </summary>
@@ -443,6 +507,12 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
             Assert.DoesNotContain(api.Requests, request => request.Method == "POST" && request.Path.StartsWith(Contracts.Spaces.SpaceRoutes.Directory, StringComparison.Ordinal));
             Assert.DoesNotContain("sign-in", page.Url, StringComparison.Ordinal);
             Assert.Equal(0, await page.Locator(RoleChip).CountAsync());
+
+            // The heading renders after FocusOnNavigate has run, so the page focuses it itself.
+            await page.WaitForFunctionAsync(
+                $"() => document.activeElement && document.activeElement.matches('{Heading}')",
+                null,
+                new PageWaitForFunctionOptions { Timeout = Timeout });
         }
     }
 

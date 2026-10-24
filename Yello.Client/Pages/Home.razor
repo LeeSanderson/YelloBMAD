@@ -25,7 +25,7 @@
 {
     <div class="auth-surface">
         <div class="auth-panel">
-            <h1 class="type-dialog-title auth-panel__heading">@Localizer["NoSpaceHeading"]</h1>
+            <h1 class="type-dialog-title auth-panel__heading" tabindex="-1" @ref="_noSpaceHeading">@Localizer["NoSpaceHeading"]</h1>
             <p class="auth-panel__intro">@Localizer["NoSpaceBody"]</p>
         </div>
     </div>
@@ -40,6 +40,8 @@
 @code {
     private bool _noSpace;
     private bool _unavailable;
+    private bool _focusNoSpace;
+    private ElementReference _noSpaceHeading;
 
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
@@ -55,6 +57,13 @@
 
         var spaces = await Directory.RefreshAsync(CancellationToken.None);
 
+        // The person may have gone elsewhere, or signed out, while the answer was on its way; this
+        // page no longer decides where they land.
+        if (!ClientRoutes.IsHome(Navigation.ToBaseRelativePath(Navigation.Uri)))
+        {
+            return;
+        }
+
         if (spaces is null)
         {
             // The switcher could not be asked. A 401 has already ended the Session and is on its way
@@ -65,10 +74,23 @@
 
         if (spaces.Count == 0)
         {
+            // The heading renders after FocusOnNavigate has already looked for one, so it is
+            // focused here instead.
             _noSpace = true;
+            _focusNoSpace = true;
             return;
         }
 
         Navigation.NavigateTo(ClientRoutes.SpaceHome(spaces[0].Id), replace: true);
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusNoSpace && _noSpace)
+        {
+            _focusNoSpace = false;
+            await _noSpaceHeading.FocusAsync();
+        }
     }
 }

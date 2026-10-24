@@ -30,6 +30,9 @@ public sealed class SpaceDirectory(HttpClient http)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    // Advanced by every Forget, so an answer requested before one is recognised when it lands.
+    private int _generation;
+
     /// <summary>
     /// The last answer, in the order the server gave it, or <c>null</c> before the first and after
     /// the Session ends.
@@ -43,11 +46,20 @@ public sealed class SpaceDirectory(HttpClient http)
     /// <returns>The new answer, or <c>null</c> when it could not be had - which the caller reports.</returns>
     public async Task<IReadOnlyList<SpaceIdentityResponse>?> RefreshAsync(CancellationToken cancellationToken)
     {
+        var generation = _generation;
+
         try
         {
             var spaces = await http
                 .GetFromJsonAsync<List<SpaceIdentityResponse>>(SpaceRoutes.Directory, JsonOptions, cancellationToken)
                 .ConfigureAwait(false);
+
+            // An answer that lands after the Session ended belongs to the Account that has gone,
+            // and is dropped rather than held for whoever signs in next.
+            if (generation != _generation)
+            {
+                return null;
+            }
 
             Current = spaces;
 
@@ -79,5 +91,9 @@ public sealed class SpaceDirectory(HttpClient http)
     /// <summary>
     /// Drops the answer - on sign-out and when the Session ends.
     /// </summary>
-    public void Forget() => Current = null;
+    public void Forget()
+    {
+        _generation++;
+        Current = null;
+    }
 }

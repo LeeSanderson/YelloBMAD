@@ -4,7 +4,7 @@ baseline_commit: c713b43b56bfd578af77de3d18f71b36a643cff2
 
 # Story 1.7: List and switch between the Spaces you belong to
 
-Status: review
+Status: done
 
 Epic: 1 — An Account, a Space of your own, and a boundary that holds
 Story key: `1-7-list-and-switch-between-the-spaces-you-belong-to`
@@ -194,6 +194,35 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:800-836` (`status: final`),
   - [x] Fix the stale `TESTING-CONVENTIONS.md:465-479` "No E2E / browser project exists. Blocker B5 … is open" — it contradicts `:120-138`. Update the browser-level section with the `RouteAsync` convention if adopted.
   - [x] **Do not add review narration to source files** (owned by Lee, project-wide). Do not tick this unless the diff holds it.
   - [x] Logs: `[LoggerMessage]` partials only (CA1848/CA1873); continue `SpaceLog` EventIds after the last 1.6 used. `SpaceId`/`AccountId` as fields, never a Space name, email or cookie (AR-34).
+
+### Review Findings
+
+Code review 2026-10-24, range `859d8cd..HEAD` (ATDD scaffolds `c713b43` and develop `4d12ea8`). There were 40 raw findings from three layers (Blind 16, Edge 13, Auditor 11). After deduplication and triage: 0 decision-needed, 14 patch, 10 defer and 8 dismissed. The `aria-controls`-while-closed finding was dismissed: assistive technology ignores an unresolved IDREF, the disclosure pattern keeps the attribute, and the browser cases identify the trigger by it.
+
+- [x] [Review][Patch] Sign-out ignores the server's answer. A `DELETE` refused for an anti-forgery token minted to an identity that has since ended (for example, a Session already ended on another device) is never retried, so the dead cookie is never expired [Yello.Client/Components/ContextBar.razor:196]
+- [x] [Review][Patch] Sign-out's remarks claim an idempotent `204` for "a ticket already ended elsewhere". Over the wire that case is a `400`, because revocation runs before anti-forgery and the token is bound to the signed-in identity [Yello.Host/Endpoints/SignOutEndpoints.cs:40]
+- [x] [Review][Patch] `SessionsValidAfter` can move backwards. The write is unconditional, so a racing sign-out with an earlier instant, or a clock step back, re-admits tickets [Yello.Infrastructure/Persistence/AccountSessionStore.cs:36]
+- [x] [Review][Patch] A refused ticket's cookie is never expired, so every later request still carries it and pays the read [Yello.Host/Sessions/SessionRevocation.cs:84]
+- [x] [Review][Patch] A cancelled directory refresh or transport failure from the departed Space sets `_refused` on the destination Space, because `SpaceHome` instances are reused [Yello.Client/Pages/SpaceHome.razor:83]
+- [x] [Review][Patch] A held switcher answer that misses the route's id refuses at once. A Membership gained since the last look shows "Not available." without the server being asked again [Yello.Client/Pages/SpaceHome.razor:89]
+- [x] [Review][Patch] A switcher answer that lands after `Forget()` restores the previous Account's list, and `Home` navigates after the person has left `/` [Yello.Client/Spaces/SpaceDirectory.cs:52]
+- [x] [Review][Patch] Esc does nothing from the trigger, where focus sits after opening; Q8 says Esc closes the list and returns focus [Yello.Client/Components/ContextBar.razor:46]
+- [x] [Review][Patch] `SpaceIn` accepts only the `D` Guid format, and both route helpers compare case-sensitively, but the router accepts any Guid format and ignores case. This skips the purge hook and draws the bar on `/Sign-In` [Yello.Client/Pages/ClientRoutes.cs:106]
+- [x] [Review][Patch] The no-Space heading never takes focus. `FocusOnNavigate` runs before the asynchronous answer renders it, and sign-in no longer focuses its completion message [Yello.Client/Pages/Home.razor:28]
+- [x] [Review][Patch] `.visually-hidden` has no 1px box. A long announcement keeps its full width inside the sticky bar and can cause horizontal scrolling at 320px [Yello.Client/wwwroot/css/components.css:354]
+- [x] [Review][Patch] A completed sign-in pushes `/` instead of replacing it, so Back shows the sign-in form to someone who is signed in [Yello.Client/Pages/SignIn.razor:308]
+- [x] [Review][Patch] The session-context key is chosen by a two-way ternary, so any other key value would silently write `SpaceId` [Yello.Infrastructure/Persistence/SpaceSessionContext.cs:99]
+- [x] [Review][Patch] The tr-TR Role-chip row asserts `uppercase`, the same as en-GB, because the document is always `en`, so no browser case exercises the `:lang(tr)` exclusion [tests/Yello.Tests.Client/SpaceSwitchingTests.cs:319]
+- [x] [Review][Defer] A clock step back after a sign-out refuses fresh sign-ins until the clock passes the stamp [Yello.Domain/Accounts/IAccountSessionStore.cs:56]. Deferred to story 1.10.
+- [x] [Review][Defer] A failure reading the revocation instant makes every authenticated request a `500` (it fails closed) [Yello.Host/Sessions/SessionRevocation.cs:80]. Deferred to story 1.10.
+- [x] [Review][Defer] The per-request revocation read runs before the rate limiter, including on the two rate-limited endpoints [Yello.Host/Program.cs:210]. Deferred to story 2.9.
+- [x] [Review][Defer] Transport failures, 5xx and bad JSON render the Space-boundary refusal page, with no retry, and "/" can loop back to it [Yello.Client/Pages/SpaceHome.razor:135, Yello.Client/Pages/Home.razor:58]. Deferred to story 7.6.
+- [x] [Review][Defer] The switcher opens as an empty, unexplained list when its answer fails or the Account has no Space [Yello.Client/Components/ContextBar.razor:167]. Deferred to story 3.3.
+- [x] [Review][Defer] The route back always lands on `spaces[0]`, so a `409` or `403` from that Space loops back to the same refusal [Yello.Client/Pages/Home.razor:72]. Deferred to story 3.2.
+- [x] [Review][Defer] `ActiveSpaceNameReader` uses `SingleAsync` and throws if the Space is deleted between resolution and the name read [Yello.Infrastructure/Persistence/ActiveSpaceNameReader.cs:30]. Deferred to story 3.3.
+- [x] [Review][Defer] `No_caller_sets_both_session_context_keys` is per type, not per request, and the `RemembersASpace` regex is easy to evade [tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.cs]. Deferred to story 1.9.
+- [x] [Review][Defer] The route-back browser case reaches the unlisted id by a full reload, so it cannot catch a last Space remembered in memory [tests/Yello.Tests.Client/SpaceSwitchingTests.cs:294]. Deferred to story 3.2.
+- [x] [Review][Defer] AC9's "same layout" is compared as inner text and the focused element's markup, not structure [tests/Yello.Tests.Client/SpaceSwitchingTests.cs]. Deferred to story 1.9.
 
 ## Dev Notes
 
@@ -525,3 +554,4 @@ Not corrections, but the scaffolds' own activation instructions: every by-name t
 ## Change Log
 
 - 2026-10-24 - Dev-story: the Space switcher (`GET /api/v1/spaces`, Account-scoped under a widened `Membership` predicate and filter), the active Space's answer (`GET /api/v1/spaces/{spaceId}`), sign-out that ends the Session on the server (Lee's decision (a): `Account.SessionsValidAfter`), and the client's context bar, Role chip, switcher, Space home, entry point and synchronous purge. Two migrations. 4 ATDD scaffolds corrected; 29 plants run, 28 caught. Status -> review.
+- 2026-10-24 - Code review (`859d8cd..HEAD`): 40 raw findings, triaged to 14 patches (all applied), 10 deferrals (ledgered with owners 1.9, 1.10, 2.9, 3.2, 3.3 and 7.6) and 8 dismissed. Applied: sign-out retries once with a fresh token after an anti-forgery refusal; a refused ticket's cookie is expired; `SessionsValidAfter` only moves forward; `SpaceHome` no longer refuses the destination on a late failure about the departed Space, and asks the switcher again before refusing an id it does not hold; a switcher answer that lands after the Session ends is dropped; Esc closes the switcher from its trigger; the route helpers read Guids and case as the router does; the no-Space heading takes focus; sign-in replaces its history entry; `.visually-hidden` cannot widen the page; the session-context key switch is exhaustive; and the tr-TR chip row exercises the `:lang(tr)` exclusion. Three tests added. 392 total, 391 passed, 1 skipped. Status -> done.

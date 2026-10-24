@@ -1,3 +1,4 @@
+@using System.Net
 @using Yello.Client.Sessions
 @using Yello.Client.Spaces
 @using Yello.Contracts.Spaces
@@ -48,6 +49,7 @@
                 aria-expanded="@(_open ? "true" : "false")"
                 aria-controls="@ListId"
                 @onclick="ToggleAsync"
+                @onkeydown="TriggerKeyDown"
                 @ref="_trigger">
             @if (ActiveSpace.Current is { } current)
             {
@@ -187,6 +189,18 @@
         }
     }
 
+    /// <summary>
+    /// Esc on the trigger closes an open list. Opening leaves focus on the trigger, so this is
+    /// where Esc lands until the person moves into the list; the rows carry the same key.
+    /// </summary>
+    private void TriggerKeyDown(KeyboardEventArgs key)
+    {
+        if (_open && string.Equals(key.Key, "Escape", StringComparison.Ordinal))
+        {
+            Dismiss();
+        }
+    }
+
     private void Dismiss()
     {
         _open = false;
@@ -197,22 +211,43 @@
     {
         // The server first, so every copy of the cookie is refused from now on - then the purge.
         // A sign-out the server never heard of still purges this client: the person asked to leave.
-        if (await Antiforgery.EnsureTokenAsync())
+        try
         {
-            try
+            // A refused anti-forgery token is asked for again once. The held token is bound to the
+            // identity it was minted for, and that identity has gone whenever the Session was
+            // already ended - on another device, say - so the first DELETE is refused and only a
+            // token minted for the caller as it now is gets the 204 that expires the dead cookie.
+            if (await SendSignOutAsync() == HttpStatusCode.BadRequest)
             {
-                using var response = await Http.DeleteAsync(new Uri(SessionRoutes.Authenticate, UriKind.Relative));
+                Antiforgery.Invalidate();
+                await SendSignOutAsync();
             }
-            catch (HttpRequestException)
-            {
-                // Unreachable server: the purge below still runs.
-            }
-            catch (OperationCanceledException)
-            {
-                // Timed out: the purge below still runs.
-            }
+        }
+        catch (HttpRequestException)
+        {
+            // Unreachable server: the purge below still runs.
+        }
+        catch (OperationCanceledException)
+        {
+            // Timed out: the purge below still runs.
         }
 
         await Session.SignedOutAsync();
+    }
+
+    /// <summary>
+    /// Sends one <c>DELETE /api/v1/sessions</c>, with an anti-forgery token if one can be had.
+    /// </summary>
+    /// <returns>The answer's status, or <c>null</c> when no token could be had and nothing was sent.</returns>
+    private async Task<HttpStatusCode?> SendSignOutAsync()
+    {
+        if (!await Antiforgery.EnsureTokenAsync())
+        {
+            return null;
+        }
+
+        using var response = await Http.DeleteAsync(new Uri(SessionRoutes.Authenticate, UriKind.Relative));
+
+        return response.StatusCode;
     }
 }

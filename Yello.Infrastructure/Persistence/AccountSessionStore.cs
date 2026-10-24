@@ -16,8 +16,10 @@ namespace Yello.Infrastructure.Persistence;
 /// <para>
 /// <b>One row by primary key, projected to one column.</b> Nothing else about the Account - not the
 /// address, not the hash - is read on this per-request path. The write is an <c>ExecuteUpdate</c> by
-/// id, like <see cref="AccountCredentialStore.RehashAsync"/>: there is no invariant to re-check, and
-/// two sign-outs racing each other both end everything issued before either.
+/// id, like <see cref="AccountCredentialStore.RehashAsync"/>, and it only ever moves the instant
+/// forward: two sign-outs racing each other end everything issued before the later of them,
+/// whichever commits last, and a clock that has stepped back cannot re-admit a ticket already
+/// refused.
 /// </para>
 /// </remarks>
 /// <param name="dbContext">The request's unit of work.</param>
@@ -35,7 +37,8 @@ internal sealed class AccountSessionStore(YelloDbContext dbContext) : IAccountSe
     /// <inheritdoc />
     public async Task EndSessionsAsync(Guid accountId, DateTimeOffset at, CancellationToken cancellationToken) =>
         await dbContext.Accounts
-            .Where(account => account.Id == accountId)
+            .Where(account => account.Id == accountId
+                && (account.SessionsValidAfter == null || account.SessionsValidAfter < at))
             .ExecuteUpdateAsync(
                 setters => setters.SetProperty(account => account.SessionsValidAfter, at),
                 cancellationToken)

@@ -304,8 +304,9 @@
         _password = string.Empty;
 
         // Signing in lands somewhere (story 1.7, AC11): the entry point asks the Space switcher and
-        // goes to the first Space it lists, or says the Account belongs to none.
-        Navigation.NavigateTo(ClientRoutes.Home);
+        // goes to the first Space it lists, or says the Account belongs to none. It replaces this
+        // entry, so Back does not return a signed-in person to the sign-in form.
+        Navigation.NavigateTo(ClientRoutes.Home, replace: true);
     }
 
     private static async Task<ProblemResponse?> ReadProblemAsync(HttpResponseMessage response)

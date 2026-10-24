@@ -39,10 +39,13 @@ public static class SignOutEndpoints
     /// the cookie is expired with the attributes it was set with.
     /// </para>
     /// <para>
-    /// <b>Idempotent, and that is open question 4's answer.</b> A caller with no Session - a double
-    /// press, or a ticket already ended elsewhere - is answered <c>204</c> rather than <c>401</c>:
-    /// the state it asked for is the state it is in. Anti-forgery still applies; the group attaches
-    /// it to every unsafe method.
+    /// <b>Idempotent, and that is open question 4's answer.</b> A caller with no Session is
+    /// answered <c>204</c> rather than <c>401</c>: the state it asked for is the state it is in.
+    /// Anti-forgery still applies; the group attaches it to every unsafe method, and the token is
+    /// bound to the identity it was minted for. A caller whose ticket was already ended elsewhere
+    /// is therefore unauthenticated by the time anti-forgery runs, and a token minted while it was
+    /// signed in is refused with <c>400</c>. The client asks for a fresh token and sends again,
+    /// which is answered <c>204</c> and expires the dead cookie.
     /// </para>
     /// </remarks>
     public static Task<IResult> SignOutAsync(

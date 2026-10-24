@@ -96,7 +96,12 @@ internal static class SpaceSessionContext
     {
         var keyParameter = new SqlParameter("@key", SqlDbType.NVarChar, SessionKeyMaxLength)
         {
-            Value = key == SessionContextKey.AccountId ? SchemaNames.AccountIdSessionKey : SchemaNames.SpaceIdSessionKey,
+            Value = key switch
+            {
+                SessionContextKey.SpaceId => SchemaNames.SpaceIdSessionKey,
+                SessionContextKey.AccountId => SchemaNames.AccountIdSessionKey,
+                _ => throw new ArgumentOutOfRangeException(nameof(key), key, "No session-context key is named for this value."),
+            },
         };
 
         var valueParameter = new SqlParameter("@value", SqlDbType.Variant) { Value = value };

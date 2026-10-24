@@ -353,6 +353,9 @@
 */
 .visually-hidden {
     position: absolute;
+    /* Held to its containing block's width, so a long announcement on one line is clipped there
+       rather than widening the page (UX-DR41: no horizontal scroll at 320px). No length is fixed. */
+    inset-inline: 0;
     overflow: hidden;
     white-space: nowrap;
     clip-path: inset(50%);

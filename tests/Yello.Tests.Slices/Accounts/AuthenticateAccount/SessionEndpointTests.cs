@@ -1101,6 +1101,76 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         Assert.Equal(HttpStatusCode.NoContent, noSession.StatusCode);
     }
 
+    /// <summary>
+    /// AC11 / FR-2 / Q4 - a device whose Session was ended by a sign-out on another device is
+    /// refused with <c>401</c>, and that refusal expires the dead cookie. Its own sign-out, with the
+    /// token minted while it was signed in, is refused by anti-forgery. With a fresh token, the same
+    /// sign-out is answered <c>204</c>, and that is the client's retry.
+    /// </summary>
+    /// <remarks>
+    /// Signing out twice also stamps <c>SessionsValidAfter</c> twice. A later sign-in is served, so
+    /// the stored instant ends Sessions issued before the later sign-out, and only those.
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "FR-2")]
+    [Trait("Requirement", "AR-14")]
+    public async Task A_Session_ended_on_another_device_is_refused_and_its_cookie_expired()
+    {
+        var connectionString = Available();
+        var address = RandomAddress();
+
+        WireResponse? refused = null;
+        string? expiry = null;
+        WireResponse? staleSignOut = null;
+        WireResponse? freshSignOut = null;
+        WireResponse? later = null;
+
+        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        {
+            var registration = new WireSession(client);
+            await RegisterAsync(registration, address);
+
+            var first = new WireSession(client);
+            await first.FetchAntiforgeryTokenAsync();
+            Assert.Equal(HttpStatusCode.NoContent, (await first.SignInAsync(address, Password)).StatusCode);
+            await first.FetchAntiforgeryTokenAsync();
+
+            var second = new WireSession(client);
+            await second.FetchAntiforgeryTokenAsync();
+            Assert.Equal(HttpStatusCode.NoContent, (await second.SignInAsync(address, Password)).StatusCode);
+            await second.FetchAntiforgeryTokenAsync();
+            Assert.Equal(HttpStatusCode.NoContent, (await second.DeleteAsync(SessionRoutes.Authenticate)).StatusCode);
+
+            refused = await first.CurrentSessionAsync();
+            expiry = first.SetCookieFor(SessionCookie);
+
+            staleSignOut = await first.DeleteAsync(SessionRoutes.Authenticate);
+
+            await first.FetchAntiforgeryTokenAsync();
+            freshSignOut = await first.DeleteAsync(SessionRoutes.Authenticate);
+
+            var third = new WireSession(client);
+            await third.FetchAntiforgeryTokenAsync();
+            Assert.Equal(HttpStatusCode.NoContent, (await third.SignInAsync(address, Password)).StatusCode);
+            later = await third.CurrentSessionAsync();
+        });
+
+        Assert.NotNull(refused);
+        Assert.Equal(HttpStatusCode.Unauthorized, refused.StatusCode);
+
+        Assert.NotNull(expiry);
+        Assert.Contains("expires=Thu, 01 Jan 1970", expiry, StringComparison.OrdinalIgnoreCase);
+
+        Assert.NotNull(staleSignOut);
+        Assert.Equal(HttpStatusCode.BadRequest, staleSignOut.StatusCode);
+
+        Assert.NotNull(freshSignOut);
+        Assert.Equal(HttpStatusCode.NoContent, freshSignOut.StatusCode);
+
+        Assert.NotNull(later);
+        Assert.Equal(HttpStatusCode.NoContent, later.StatusCode);
+    }
+
     private string Available()
     {
         Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? string.Empty);
