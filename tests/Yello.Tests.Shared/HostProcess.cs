@@ -1,8 +1,9 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
+using System.Reflection;
 
-namespace Yello.Tests.Slices.Accounts.RegisterAccount;
+namespace Yello.Tests.Shared;
 
 /// <summary>
 /// Boots <c>Yello.Host</c> as a real process, talks to it over HTTP, and hands back everything it
@@ -26,13 +27,28 @@ namespace Yello.Tests.Slices.Accounts.RegisterAccount;
 /// route.
 /// </para>
 /// </remarks>
-internal static class HostProcess
+public static class HostProcess
 {
     /// <summary>
     /// Kestrel's line, which is how a caller learns which port was allocated - and the boundary
     /// between the Host's startup output and everything a request caused.
     /// </summary>
-    internal const string ListeningMarker = "Now listening on:";
+    public static string ListeningMarker => "Now listening on:";
+
+    /// <summary>
+    /// The configuration key the Host reads its connection string from, as the build stamped it.
+    /// </summary>
+    /// <remarks>
+    /// Read from this assembly's own metadata, which <c>Directory.Build.props</c> emits into every
+    /// project, so <c>Yello.Tests.Shared</c> needs no edge to <c>Yello.Host</c> (story 1.9 Task 3). It
+    /// is the same value the Host reads, from the same place, so a test cannot pass while the Host
+    /// looks for a different key.
+    /// </remarks>
+    public static string ConnectionStringKey { get; } =
+        "ConnectionStrings__" + typeof(HostProcess).Assembly
+            .GetCustomAttributes<AssemblyMetadataAttribute>()
+            .Single(a => a.Key.Equals("Yello.DatabaseResourceName", StringComparison.Ordinal))
+            .Value;
 
     private static readonly TimeSpan StartupWindow = TimeSpan.FromSeconds(60);
 
@@ -92,56 +108,10 @@ internal static class HostProcess
         IReadOnlyDictionary<string, string> settings,
         Func<HttpClient, Task> work)
     {
-        var executable = Locate();
-
-        var startInfo = new ProcessStartInfo(executable.FullName)
-        {
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false,
-            WorkingDirectory = executable.DirectoryName,
-        };
-
-        // Production, so the startup connectivity check returns at its environment guard rather
-        // than opening a connection these tests do not need. The endpoint reaches the database on
-        // its own, when a request arrives.
-        startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Production";
-        startInfo.Environment[$"ConnectionStrings__{HostMetadata.DatabaseResourceName}"] = connectionString;
-        // HTTPS, FROM STORY 1.4, AND IT IS NOT A PREFERENCE.
-        //
-        // AC5 requires the Session cookie to carry `Secure`, so the Host configures
-        // `CookieSecurePolicy.Always` - and ASP.NET Core's antiforgery system REFUSES OUTRIGHT to
-        // issue a token when that policy is set and the request is not an SSL request:
-        // "The antiforgery system has the configuration value AntiforgeryOptions.Cookie.
-        // SecurePolicy = Always, but the current request is not an SSL request." Found by running
-        // these tests over http on 2026-09-18, where it arrived as a 500 with an empty body.
-        //
-        // The framework is right and the test was wrong. Weakening the policy to SameAsRequest to
-        // make a suite pass would have removed `Secure` from a production cookie to accommodate a
-        // test - which is AC5 traded for convenience. Serving these tests over https instead means
-        // the transport under test is the one the product actually runs on, and it is what makes
-        // the `Secure` attribute assertion beside it mean something rather than describing a header
-        // no browser would have honoured.
-        //
-        // Needs the .NET development certificate, which `dotnet dev-certs https` creates. It is not
-        // TRUSTED by this client - see the validation callback below - so no machine state beyond
-        // the certificate's existence is required.
-        startInfo.Environment["ASPNETCORE_URLS"] = "https://127.0.0.1:0";
-
-        // THE PASSWORD-HASHING RATE LIMIT, RAISED OUT OF THE WAY BY DEFAULT, FROM STORY 1.6. The
-        // product's default is ten attempts a minute per client address, and every Host these tests
-        // start is called from one address - the duration comparison alone signs in more than forty
-        // times. A test that is about the limit sets its own value through `settings`, which is
-        // applied after this and wins.
-        startInfo.Environment["RateLimiting__PermitsPerWindow"] = "1000000";
-
-        foreach (var (key, value) in settings)
-        {
-            startInfo.Environment[key] = value;
-        }
+        var startInfo = CreateStartInfo(connectionString, settings);
 
         using var process = Process.Start(startInfo)
-            ?? throw new InvalidOperationException($"Could not start '{executable.FullName}'.");
+            ?? throw new InvalidOperationException($"Could not start '{startInfo.FileName}'.");
 
         var lines = new ConcurrentQueue<string>();
         var listening = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -220,18 +190,7 @@ internal static class HostProcess
                 // the time the sentence was committed it described the problem rather than the
                 // configuration. Corrected at code review on 2026-09-19. The first reason is the
                 // one that still holds, and it holds regardless of scheme.
-                using var handler = new HttpClientHandler
-                {
-                    UseCookies = false,
-
-                    // The development certificate is self-signed and this process has no reason to
-                    // trust the machine's root store - a suite that required `dotnet dev-certs
-                    // https --trust` would fail on a cold CI agent for a reason unrelated to
-                    // anything it asserts. Scoped to the loopback address this test started the
-                    // Host on, so it cannot quietly accept a bad certificate from anywhere else.
-                    ServerCertificateCustomValidationCallback = (request, _, _, _) =>
-                        request.RequestUri?.IsLoopback == true,
-                };
+                using var handler = CreateClientHandler();
 
                 using var client = new HttpClient(handler) { BaseAddress = new Uri(address) };
 
@@ -252,22 +211,114 @@ internal static class HostProcess
     }
 
     /// <summary>
-    /// <c>Yello.Host</c>'s build output, by the same convention <c>HostStartupTests</c> uses: the
-    /// tail of this assembly's path below its own project directory.
+    /// The Host's start information: the executable, and every environment value these suites start
+    /// it with. Shared by <see cref="RunAsync(string, Func{HttpClient, Task})"/> and
+    /// <see cref="RunningHost"/>, so the two cannot drift apart (story 1.9 Task 3).
     /// </summary>
-    private static FileInfo Locate()
+    /// <param name="connectionString">The database's connection string, injected as configuration.</param>
+    /// <param name="settings">Extra configuration by environment-variable name, applied last.</param>
+    /// <returns>The start information.</returns>
+    public static ProcessStartInfo CreateStartInfo(string connectionString, IReadOnlyDictionary<string, string> settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        var executable = Locate();
+
+
+        var startInfo = new ProcessStartInfo(executable.FullName)
+        {
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            UseShellExecute = false,
+            WorkingDirectory = executable.DirectoryName,
+        };
+
+        // Production, so the startup connectivity check returns at its environment guard rather
+        // than opening a connection these tests do not need. The endpoint reaches the database on
+        // its own, when a request arrives.
+        startInfo.Environment["ASPNETCORE_ENVIRONMENT"] = "Production";
+        startInfo.Environment[ConnectionStringKey] = connectionString;
+        // HTTPS, FROM STORY 1.4, AND IT IS NOT A PREFERENCE.
+        //
+        // AC5 requires the Session cookie to carry `Secure`, so the Host configures
+        // `CookieSecurePolicy.Always` - and ASP.NET Core's antiforgery system REFUSES OUTRIGHT to
+        // issue a token when that policy is set and the request is not an SSL request:
+        // "The antiforgery system has the configuration value AntiforgeryOptions.Cookie.
+        // SecurePolicy = Always, but the current request is not an SSL request." Found by running
+        // these tests over http on 2026-09-18, where it arrived as a 500 with an empty body.
+        //
+        // The framework is right and the test was wrong. Weakening the policy to SameAsRequest to
+        // make a suite pass would have removed `Secure` from a production cookie to accommodate a
+        // test - which is AC5 traded for convenience. Serving these tests over https instead means
+        // the transport under test is the one the product actually runs on, and it is what makes
+        // the `Secure` attribute assertion beside it mean something rather than describing a header
+        // no browser would have honoured.
+        //
+        // Needs the .NET development certificate, which `dotnet dev-certs https` creates. It is not
+        // TRUSTED by this client - see the validation callback below - so no machine state beyond
+        // the certificate's existence is required.
+        startInfo.Environment["ASPNETCORE_URLS"] = "https://127.0.0.1:0";
+
+        // THE PASSWORD-HASHING RATE LIMIT, RAISED OUT OF THE WAY BY DEFAULT, FROM STORY 1.6. The
+        // product's default is ten attempts a minute per client address, and every Host these tests
+        // start is called from one address - the duration comparison alone signs in more than forty
+        // times. A test that is about the limit sets its own value through `settings`, which is
+        // applied after this and wins.
+        startInfo.Environment["RateLimiting__PermitsPerWindow"] = "1000000";
+
+        foreach (var (key, value) in settings)
+        {
+            startInfo.Environment[key] = value;
+        }
+
+        return startInfo;
+    }
+
+    /// <summary>
+    /// The handler every client of a started Host uses: no cookie container, and the development
+    /// certificate accepted for loopback only.
+    /// </summary>
+    /// <returns>The handler.</returns>
+    /// <remarks>
+    /// <b>Cookies are not handled for the caller</b>, from story 1.4 onwards: a container would attach
+    /// cookies invisibly, so an assertion that a request "was authenticated" could pass without anyone
+    /// having said which cookie carried it - and the Session cookie's attributes are AC5's contract.
+    /// The development certificate is self-signed and this process has no reason to trust the
+    /// machine's root store, so validation is scoped to the loopback address the Host was started on.
+    /// </remarks>
+    public static HttpClientHandler CreateClientHandler() =>
+        new()
+        {
+            UseCookies = false,
+            ServerCertificateCustomValidationCallback = (request, _, _, _) =>
+                request.RequestUri?.IsLoopback == true,
+        };
+
+    /// <summary>
+    /// <c>Yello.Host</c>'s build output, by the same convention <c>HostStartupTests</c> uses: the
+    /// tail of the running test assembly's path below its own project directory.
+    /// </summary>
+    /// <remarks>
+    /// Since story 1.9 this lives in <c>Yello.Tests.Shared</c> and serves every suite, so the test
+    /// project is read from the path (<c>tests/{project}/{tail}</c>) rather than named.
+    /// </remarks>
+    /// <returns>The executable.</returns>
+    public static FileInfo Locate()
     {
         var root = RepositoryRoot();
-        var ownProjectDirectory = Path.Combine(root.FullName, "tests", "Yello.Tests.Slices");
-        var tail = Path.GetRelativePath(ownProjectDirectory, AppContext.BaseDirectory);
+        var testsDirectory = Path.Combine(root.FullName, "tests");
+        var below = Path.GetRelativePath(testsDirectory, AppContext.BaseDirectory);
+        var segments = below.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], 2);
 
-        if (tail.StartsWith("..", StringComparison.Ordinal))
+        if (below.StartsWith("..", StringComparison.Ordinal) || segments.Length < 2)
         {
             throw new InvalidOperationException(
                 "This assembly's output layout is not the one the convention assumes, so " +
                 "Yello.Host's executable cannot be located from it. Build the solution normally " +
                 "(`dotnet build Yello.slnx`) rather than with a custom ArtifactsPath.");
         }
+
+        var tail = segments[1];
 
         var candidates = ExecutableNames
             .Select(name => new FileInfo(Path.GetFullPath(Path.Combine(root.FullName, "Yello.Host", tail, name))));
@@ -278,7 +329,11 @@ internal static class HostProcess
                 "Run `dotnet build Yello.slnx` before this suite.");
     }
 
-    private static DirectoryInfo RepositoryRoot()
+    /// <summary>
+    /// The repository root: the nearest directory above this assembly holding <c>Yello.slnx</c>.
+    /// </summary>
+    /// <returns>The directory.</returns>
+    public static DirectoryInfo RepositoryRoot()
     {
         var candidate = new DirectoryInfo(AppContext.BaseDirectory);
 

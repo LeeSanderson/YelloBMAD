@@ -98,7 +98,8 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <remarks>
     /// The first browser-driven sign-in (<c>deferred-work.md:153</c>), faked at the network edge - so
-    /// it does not prove the real cookie across origins or the real preflight (re-owned by 1.9).
+    /// it does not prove the real cookie across origins or the real preflight;
+    /// <c>RealHostBrowserTests</c> does, against the real Host.
     /// </remarks>
     [Theory]
     [InlineData("en-GB")]
@@ -573,7 +574,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
         return rows;
     }
 
-    private async Task<(string Text, string Focused)> RefusalPageAtAsync(IPage page, string path)
+    private async Task<string> RefusalPageAtAsync(IPage page, string path)
     {
         await page.GotoAsync(Address(path));
 
@@ -585,9 +586,9 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
             null,
             new PageWaitForFunctionOptions { Timeout = Timeout });
 
-        return (
-            await page.Locator("main").InnerTextAsync(),
-            await page.EvaluateAsync<string>("() => document.activeElement.outerHTML"));
+        // Structural, not text (story 1.9 Task 8): an extra wrapper or a different role would pass a
+        // comparison of main's text.
+        return await RefusalFingerprint.ReadAsync(page);
     }
 
     private static async Task SubmitSignInAsync(IPage page)

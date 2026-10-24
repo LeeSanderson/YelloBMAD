@@ -33,12 +33,16 @@ namespace Yello.Tests.Slices;
 /// before Kestrel binds, with no probe, no timer and no migration.
 /// </para>
 /// </remarks>
+/// <param name="engine">
+/// The process's one SQL Server. The Development case needs an engine the Host can reach, not one
+/// of its own: nothing here stops or breaks it, so it takes the shared one (story 1.9 Task 2).
+/// </param>
 [Trait("Suite", "Slices")]
 [Trait("Priority", "P1")]
 [Trait("Requirement", "AR-1")]
 [Trait("Requirement", "AR-33")]
 [Trait("Requirement", "AR-36")]
-public sealed class HostStartupTests
+public sealed class HostStartupTests(SqlServerEngine engine)
 {
     /// <summary>
     /// The log message <c>StartupLog.ConnectivityConfirmed</c> produces.
@@ -81,10 +85,9 @@ public sealed class HostStartupTests
             SqlServerContainerFixture.IsContainerRuntimeAvailable(),
             "No container runtime is reachable, so there is no engine for the Host to connect to.");
 
-        await using var fixture = new SqlServerContainerFixture();
-        await fixture.InitializeAsync();
-
-        var output = await RunHostAsync("Development", fixture.ConnectionString);
+        var output = await RunHostAsync(
+            "Development",
+            await engine.ServerConnectionStringAsync(TestContext.Current.CancellationToken));
 
         Assert.Contains(ConnectedMessage, output, StringComparison.Ordinal);
         Assert.DoesNotContain(SkippedMessage, output, StringComparison.Ordinal);

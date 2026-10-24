@@ -1,4 +1,5 @@
 using Xunit;
+using Yello.Tests.Shared;
 
 namespace Yello.Tests.Isolation;
 
@@ -11,12 +12,17 @@ namespace Yello.Tests.Isolation;
 /// <c>SpaceIsolationSchemaTests:127</c> in Slices sees only columns named exactly <c>SpaceId</c>, so
 /// <c>AccessRefusal.TargetSpaceId</c> and <c>ApiToken.BoundSpaceId</c> are outside it by their names
 /// rather than by a decision anyone can read. This case makes the decision the list.
+/// <para>
+/// <b>A migrated database of its own, and no Host</b>: the subject is the schema, so the case needs the
+/// migrations' output and nothing that serves requests.
+/// </para>
 /// </remarks>
+/// <param name="engine">The process's one SQL Server.</param>
 [Trait("Suite", "Isolation")]
 [Trait("Priority", "P0")]
 [Trait("Requirement", "NFR-1")]
 [Trait("Requirement", "AD-2")]
-public sealed class SchemaVarianceTests
+public sealed class SchemaVarianceTests(SqlServerEngine engine)
 {
     /// <summary>
     /// Tables holding a Space identifier that are outside the policy by design, with why.
@@ -44,12 +50,23 @@ public sealed class SchemaVarianceTests
     /// named variance still exists. Plant (Task 12): a new table with an <c>OtherSpaceId</c> column and
     /// no policy is caught.
     /// </summary>
-    [Fact(Skip = "red: AC2 - the shared engine and a migrated database per class do not exist yet (story 1.9 Tasks 2 and 10)")]
+    [Fact]
     public async Task Every_SpaceId_column_is_under_the_Space_policy_or_a_named_variance()
     {
-        await using var world = await IsolationWorld.StartAsync();
+        Assert.SkipWhen(SqlServerEngine.UnavailableReason is not null, SqlServerEngine.UnavailableReason ?? string.Empty);
 
-        var columns = await world.QueryCatalogAsync(SpaceIdColumnsAndTheirPolicy);
+        var connectionString = await engine.CreateDatabaseAsync(TestContext.Current.CancellationToken);
+        IReadOnlyList<string[]> columns;
+
+        try
+        {
+            await IsolationWorld.MigrateAsync(connectionString);
+            columns = await new WireDatabase(connectionString).QueryAsync(SpaceIdColumnsAndTheirPolicy);
+        }
+        finally
+        {
+            await engine.DropDatabaseAsync(connectionString);
+        }
 
         // Vacuity guard: the query sees a table known to be under the policy before it judges any.
         Assert.Contains(columns, row => row[0] == "Membership" && row[1] == "SpaceId" && row[2] == "covered");

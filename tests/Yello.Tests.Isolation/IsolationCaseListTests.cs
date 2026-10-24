@@ -1,7 +1,6 @@
-using System.Collections;
-using System.Reflection;
 using Xunit;
 using Yello.Contracts.Spaces;
+using Yello.Tests.Shared;
 
 namespace Yello.Tests.Isolation;
 
@@ -11,17 +10,14 @@ namespace Yello.Tests.Isolation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds.</b> The case list is story 1.9 Task 4's
-/// <c>Yello.Tests.Isolation.IsolationCases</c>, reached here <b>by name</b> because it does not
-/// exist yet. Each read fails naming the Task that makes it real. On activation, replace the
-/// reflection with typed references. The member names (<c>All</c>, <c>CrossProduct</c>, <c>Id</c>,
-/// <c>Route</c>, <c>Method</c>, <c>Expectations</c>, <c>PendingUntil</c>, <c>PendingReason</c>) are
-/// the story's; a different name chosen in dev-story is corrected here and recorded in the Debug
-/// Log.
+/// <b>Activated by story 1.9 Task 4.</b> The scaffolds reached the list by name through reflection
+/// because it did not exist; they now read <see cref="IsolationCases"/> directly. The member names the
+/// scaffold proposed (<c>All</c>, <c>CrossProduct</c>, <c>Id</c>, <c>Route</c>, <c>Method</c>,
+/// <c>Expectations</c>, <c>PendingUntil</c>, <c>PendingReason</c>) are the ones the list has.
 /// </para>
 /// <para>
-/// <b>No fixture.</b> Gates 1, 3 and 4 read data. Gate 2 starts a Host through the scaffold contract,
-/// on the story's shared engine once Task 2 has built it - never one of its own.
+/// <b>No fixture.</b> Gates 1, 3 and 4 read data. Gate 2 reads the real Host's route table in process
+/// (<see cref="HostRouteTable"/>), which needs no database.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Isolation")]
@@ -31,71 +27,50 @@ namespace Yello.Tests.Isolation;
 [Trait("Requirement", "AD-4")]
 public sealed class IsolationCaseListTests
 {
-    private const string CaseListTypeName = "Yello.Tests.Isolation.IsolationCases";
-
-    private const string SurfaceTypeName = "Yello.Tests.Isolation.IsolationSurface";
-
     /// <summary>
     /// 1.9-GATE-001 / AC1 - every case declares an expectation for every surface; there is no "not
     /// applicable", only the answer that surface gets.
     /// </summary>
-    [Fact(Skip = "red: AC1 - the case list IsolationCases and the IsolationSurface enum do not exist yet (story 1.9 Task 4)")]
+    [Fact]
     public void Every_case_declares_an_expectation_for_every_surface()
     {
-        var surfaces = SurfaceMembers();
-        var cases = Cases();
+        var surfaces = Enum.GetValues<IsolationSurface>();
 
         // Vacuity guard: a gate over an empty list, or over a one-member enum, passes by construction.
-        Assert.NotEmpty(cases);
-        Assert.True(surfaces.Count >= 2, $"IsolationSurface has {surfaces.Count} member(s); AD-4 names two surfaces.");
+        Assert.NotEmpty(IsolationCases.All);
+        Assert.True(surfaces.Length >= 2, $"IsolationSurface has {surfaces.Length} member(s); AD-4 names two surfaces.");
 
-        var gaps = cases
-            .SelectMany(@case => surfaces
-                .Where(surface => !ExpectationSurfaces(@case).Contains(surface, StringComparer.Ordinal))
-                .Select(surface => $"{Text(@case, "Id")} / {surface}"))
-            .ToList();
-
-        Assert.True(gaps.Count == 0, "A case exists for one surface and not the other - a gap, not a choice (AD-4): " + string.Join(", ", gaps));
+        Assert.Equal([], Gaps(IsolationCases.All));
     }
 
     /// <summary>
     /// 1.9-GATE-002 / AC8 - every Space-scoped and Account-scoped route the real Host maps is named by
-    /// at least one case, so a route added without an isolation row fails the suite. The anonymous
-    /// and session routes are the Revocation suite's 401 cases and are not isolation rows.
+    /// at least one case, so a route added without an isolation row fails the suite. The anonymous and
+    /// session routes are the Revocation suite's <c>401</c> cases, and are not isolation rows.
     /// </summary>
-    [Fact(Skip = "red: AC8 - needs the real Host's route table (Task 3 harness, Q4 (a)) and the case list (Task 4)")]
+    /// <returns>A task.</returns>
+    [Fact]
     public async Task Every_Space_scoped_and_Account_scoped_route_the_Host_maps_is_named_by_a_case()
     {
-        await using var world = await IsolationWorld.StartAsync();
-
-        var mapped = (await world.MappedRoutesAsync())
+        var mapped = (await HostRouteTable.ReadAsync())
             .Where(route => IsSpaceScoped(route.Pattern) || IsAccountScoped(route.Pattern))
             .ToList();
 
         // Vacuity guard: the comparison set must hold a route known to exist before anything is asserted.
         Assert.Contains(mapped, route => route.Pattern == SpaceRoutes.Active && route.Method == HttpMethod.Get.Method);
 
-        var named = Cases()
-            .Select(@case => (Method: Text(@case, "Method"), Pattern: Text(@case, "Route")))
-            .ToHashSet();
-
-        var uncovered = mapped
-            .Where(route => !named.Contains((route.Method, route.Pattern)))
-            .Select(route => $"{route.Method} {route.Pattern}")
-            .ToList();
-
-        Assert.True(uncovered.Count == 0, "A route is mapped with no isolation case on it (AC8): " + string.Join(", ", uncovered));
+        Assert.Equal([], Uncovered(mapped, IsolationCases.All));
     }
 
     /// <summary>
-    /// 1.9-GATE-003 / AC8 - a row deferred to a later story names that story and a reason, and the
-    /// story is still <c>backlog</c>, so a pending row cannot outlive its story silently.
+    /// 1.9-GATE-003 / AC8 - a row deferred to a later story names that story and a reason, and the story
+    /// is still <c>backlog</c>, so a pending row cannot outlive its story silently.
     /// </summary>
-    [Fact(Skip = "red: AC8 - the case list and its pending rows (ISO-TIMING-IN-SPACE -> 2.2, InsufficientRole -> 2.1) do not exist yet (Task 4)")]
+    [Fact]
     public void Every_pending_row_names_a_story_that_is_still_in_backlog()
     {
         var statuses = SprintStatuses();
-        var pending = Cases().Where(@case => !string.IsNullOrEmpty(TextOrNull(@case, "PendingUntil"))).ToList();
+        var pending = IsolationCases.All.Where(@case => @case.PendingUntil is not null).ToList();
 
         // Vacuity guard: story 1.9 lands at least two pending rows (2.1 and 2.2), and the status file was read.
         Assert.True(pending.Count >= 2, $"Expected the 2.1 and 2.2 pending rows; found {pending.Count}.");
@@ -105,23 +80,22 @@ public sealed class IsolationCaseListTests
 
         foreach (var @case in pending)
         {
-            var id = Text(@case, "Id");
-            var story = Text(@case, "PendingUntil");
+            var story = @case.PendingUntil!;
             var prefix = story.Replace('.', '-') + "-";
             var key = statuses.Keys.SingleOrDefault(candidate => candidate.StartsWith(prefix, StringComparison.Ordinal));
 
-            if (string.IsNullOrWhiteSpace(TextOrNull(@case, "PendingReason")))
+            if (string.IsNullOrWhiteSpace(@case.PendingReason))
             {
-                stale.Add($"{id}: pending until {story} with no reason");
+                stale.Add($"{@case.Id}: pending until {story} with no reason");
             }
 
             if (key is null)
             {
-                stale.Add($"{id}: pending until {story}, which is not a story in sprint-status.yaml");
+                stale.Add($"{@case.Id}: pending until {story}, which is not a story in sprint-status.yaml");
             }
             else if (!string.Equals(statuses[key], "backlog", StringComparison.Ordinal))
             {
-                stale.Add($"{id}: pending until {story}, which is now '{statuses[key]}' - convert the row");
+                stale.Add($"{@case.Id}: pending until {story}, which is now '{statuses[key]}' - convert the row");
             }
             else
             {
@@ -134,29 +108,58 @@ public sealed class IsolationCaseListTests
 
     /// <summary>
     /// 1.9-GATE-004 / AC1, AC8 - the theory data is generated from the list as exactly
-    /// <c>active cases x surfaces</c>, and each row is named "case id / surface" so a failure names its
-    /// case rather than an index.
+    /// <c>active cases x surfaces</c>, each row named "case id / surface" so a failure names its case
+    /// rather than an index; and every runner's rows together are exactly that cross product, so no
+    /// active row is generated without a theory that runs it.
     /// </summary>
-    [Fact(Skip = "red: AC1 - IsolationCases.CrossProduct does not exist yet (Task 4)")]
+    [Fact]
     public void The_cross_product_is_generated_from_the_list_and_names_each_row_by_case_and_surface()
     {
-        var surfaces = SurfaceMembers();
-        var active = Cases().Where(@case => string.IsNullOrEmpty(TextOrNull(@case, "PendingUntil"))).ToList();
-        var rows = Member(CaseListType(), "CrossProduct") as IEnumerable
-            ?? throw new InvalidOperationException("IsolationCases.CrossProduct is not enumerable (Task 4).");
-
-        var names = rows.Cast<object>()
-            .Select(row => row is ITheoryDataRow theoryRow ? theoryRow.TestDisplayName ?? string.Empty : string.Empty)
-            .ToList();
+        var surfaces = Enum.GetValues<IsolationSurface>();
+        var active = IsolationCases.All.Where(@case => @case.PendingUntil is null).ToList();
+        var names = IsolationCases.CrossProduct.Select(row => row.TestDisplayName ?? string.Empty).ToList();
 
         Assert.NotEmpty(active);
-        Assert.Equal(active.Count * surfaces.Count, names.Count);
+        Assert.Equal(active.Count * surfaces.Length, names.Count);
 
         var expected = active
-            .SelectMany(@case => surfaces.Select(surface => $"{Text(@case, "Id")} / {surface}"))
-            .Order(StringComparer.Ordinal);
+            .SelectMany(@case => surfaces.Select(surface => $"{@case.Id} / {surface}"))
+            .Order(StringComparer.Ordinal)
+            .ToList();
 
         Assert.Equal(expected, names.Order(StringComparer.Ordinal));
+
+        var byRunner = IsolationCases.BoundaryRows
+            .Concat(IsolationCases.TimingRows)
+            .Concat(IsolationCases.PooledRows)
+            .Select(row => row.TestDisplayName ?? string.Empty)
+            .Order(StringComparer.Ordinal);
+
+        Assert.Equal(expected, byRunner);
+    }
+
+    /// <summary>
+    /// "Case id / surface" for every surface a case declares no expectation for - the generic gate
+    /// both suites share.
+    /// </summary>
+    /// <param name="cases">The list.</param>
+    /// <returns>The gaps.</returns>
+    internal static IReadOnlyList<string> Gaps(IEnumerable<IsolationCase> cases) =>
+        SurfaceGaps.Find(cases, @case => @case.Id, @case => @case.Expectations);
+
+    /// <summary>
+    /// "METHOD pattern" for every mapped route no case names.
+    /// </summary>
+    /// <param name="mapped">The routes.</param>
+    /// <param name="cases">The list.</param>
+    /// <returns>The uncovered routes.</returns>
+    internal static List<string> Uncovered(IEnumerable<(string Method, string Pattern)> mapped, IEnumerable<IsolationCase> cases)
+    {
+        var named = cases.Select(@case => (@case.Method.Method, @case.Route)).ToHashSet();
+
+        return [.. mapped
+            .Where(route => !named.Contains((route.Method, route.Pattern)))
+            .Select(route => $"{route.Method} {route.Pattern}")];
     }
 
     private static bool IsSpaceScoped(string pattern) =>
@@ -165,56 +168,12 @@ public sealed class IsolationCaseListTests
     private static bool IsAccountScoped(string pattern) =>
         pattern == SpaceRoutes.Directory || pattern.StartsWith("/api/v1/account/", StringComparison.Ordinal);
 
-    private static Type CaseListType() =>
-        typeof(IsolationCaseListTests).Assembly.GetType(CaseListTypeName)
-        ?? throw new InvalidOperationException($"{CaseListTypeName} does not exist (story 1.9 Task 4).");
-
-    private static List<object> Cases() =>
-        Member(CaseListType(), "All") is IEnumerable all
-            ? [.. all.Cast<object>()]
-            : throw new InvalidOperationException("IsolationCases.All is not enumerable (Task 4).");
-
-    private static List<string> SurfaceMembers()
-    {
-        var surface = typeof(IsolationCaseListTests).Assembly.GetType(SurfaceTypeName)
-            ?? throw new InvalidOperationException($"{SurfaceTypeName} does not exist (story 1.9 Task 3).");
-
-        return [.. Enum.GetNames(surface)];
-    }
-
-    private static List<string> ExpectationSurfaces(object @case) =>
-        Member(@case.GetType(), "Expectations", @case) is IDictionary expectations
-            ? [.. expectations.Keys.Cast<object>().Select(key => key.ToString() ?? string.Empty)]
-            : throw new InvalidOperationException($"{Text(@case, "Id")} has no Expectations dictionary (Task 4).");
-
-    private static string Text(object @case, string name) =>
-        TextOrNull(@case, name) ?? throw new InvalidOperationException($"A case has no {name} (Task 4).");
-
-    private static string? TextOrNull(object @case, string name) =>
-        Member(@case.GetType(), name, @case)?.ToString();
-
-    private static object? Member(Type type, string name, object? instance = null)
-    {
-        const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance;
-
-        return type.GetProperty(name, flags)?.GetValue(instance) ?? type.GetField(name, flags)?.GetValue(instance);
-    }
-
     /// <summary>
     /// <c>development_status</c> of <c>sprint-status.yaml</c>, as story key to status.
     /// </summary>
     private static Dictionary<string, string> SprintStatuses()
     {
-        var root = new DirectoryInfo(AppContext.BaseDirectory);
-
-        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Yello.slnx")))
-        {
-            root = root.Parent;
-        }
-
-        Assert.NotNull(root);
-
-        var file = Path.Combine(root.FullName, "_bmad-output", "implementation-artifacts", "sprint-status.yaml");
+        var file = Path.Combine(HostProcess.RepositoryRoot().FullName, "_bmad-output", "implementation-artifacts", "sprint-status.yaml");
 
         return File.ReadAllLines(file)
             .Select(line => line.Trim())

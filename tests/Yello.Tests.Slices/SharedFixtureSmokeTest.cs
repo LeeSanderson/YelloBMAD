@@ -5,8 +5,9 @@ using Yello.Tests.Shared;
 namespace Yello.Tests.Slices;
 
 /// <summary>
-/// Proves that <see cref="SqlServerContainerFixture"/> actually starts, and that the engine
-/// behind the pinned image tag is the one the architecture was verified against.
+/// Proves that the shared engine (<see cref="SqlServerEngine"/>, over
+/// <see cref="SqlServerContainerFixture"/>) actually starts, and that the engine behind the pinned
+/// image tag is the one the architecture was verified against.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -36,10 +37,11 @@ namespace Yello.Tests.Slices;
 /// assertion.
 /// </para>
 /// </remarks>
+/// <param name="engine">The process's one SQL Server (story 1.9: no class starts its own).</param>
 [Trait("Suite", "Slices")]
 [Trait("Priority", "P1")]
 [Trait("Requirement", "AR-1")]
-public sealed class SharedFixtureSmokeTest
+public sealed class SharedFixtureSmokeTest(SqlServerEngine engine)
 {
     /// <summary>
     /// SQL Server 2025 reports major version 17. The image tag is <c>2025-latest</c>, so
@@ -57,10 +59,8 @@ public sealed class SharedFixtureSmokeTest
             "skip rather than a failure because a stopped Rancher Desktop backend is a local " +
             "condition, not a defect in the solution.");
 
-        await using var fixture = new SqlServerContainerFixture();
-        await fixture.InitializeAsync();
-
-        await using var connection = new SqlConnection(fixture.ConnectionString);
+        await using var connection = new SqlConnection(
+            await engine.ServerConnectionStringAsync(TestContext.Current.CancellationToken));
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
         Assert.StartsWith(ExpectedEngineMajorVersion, connection.ServerVersion, StringComparison.Ordinal);
@@ -74,6 +74,8 @@ public sealed class SharedFixtureSmokeTest
     /// <remarks>
     /// Costs no container: this is the one thing about the fixture that can be asserted
     /// without starting anything, so it runs everywhere including where the runtime is absent.
+    /// It constructs the fixture and never starts it, which is why this class is on
+    /// <c>ContainerTopologyGateTests</c>' list of constructions that start no engine.
     /// </remarks>
     [Fact]
     public void The_connection_string_refuses_to_answer_before_the_container_is_started()

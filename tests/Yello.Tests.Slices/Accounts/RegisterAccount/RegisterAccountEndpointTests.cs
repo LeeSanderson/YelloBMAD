@@ -4,6 +4,7 @@ using System.Text.Json;
 using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.Accounts;
+using Yello.Tests.Shared;
 
 namespace Yello.Tests.Slices.Accounts.RegisterAccount;
 

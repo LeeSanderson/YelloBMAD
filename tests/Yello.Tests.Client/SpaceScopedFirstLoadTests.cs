@@ -290,28 +290,6 @@ public sealed class SpaceScopedFirstLoadTests(ClientSurfaceFixture surface)
             null,
             new PageWaitForFunctionOptions { Timeout = Timeout });
 
-        return await page.EvaluateAsync<string>("""
-            () => {
-                const main = document.querySelector('main');
-                const lines = [];
-                const walk = (element, depth) => {
-                    const aria = [...element.attributes]
-                        .filter(a => a.name === 'role' || a.name.startsWith('aria-'))
-                        .map(a => `${a.name}=${a.value}`).sort().join(' ');
-                    const text = [...element.childNodes]
-                        .filter(n => n.nodeType === Node.TEXT_NODE)
-                        .map(n => n.textContent.trim()).filter(t => t).join(' ');
-                    lines.push(`${depth}|${element.tagName}|${aria}|${[...element.classList].sort().join('.')}|${text}`);
-                    [...element.children].forEach(child => walk(child, depth + 1));
-                };
-                walk(main, 0);
-                const focusPath = [];
-                for (let e = document.activeElement; e && e !== main; e = e.parentElement) {
-                    focusPath.unshift(`${e.tagName}:${[...e.parentElement.children].indexOf(e)}`);
-                }
-                lines.push('focus:' + focusPath.join('/'));
-                return lines.join('\n');
-            }
-            """);
+        return await RefusalFingerprint.ReadAsync(page);
     }
 }

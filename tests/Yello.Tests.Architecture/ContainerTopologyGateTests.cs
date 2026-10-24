@@ -11,9 +11,9 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds.</b> Today a full run starts thirteen engines: ten class fixtures that each
-/// wrap one, and three direct constructions. These gates go green when Task 2 makes the engine an
-/// xunit v3 assembly fixture (one per test process) with a database per class.
+/// <b>Story 1.9 Task 2 made them green.</b> A full run used to start thirteen engines (ten class
+/// fixtures that each wrapped one, and three direct constructions). The engine is now an xunit v3
+/// assembly fixture, <c>SqlServerEngine</c>, one per test process, with a database per class.
 /// </para>
 /// <para>
 /// <b>Read from source, comments blanked</b>, because this suite has no edge to the test projects and
@@ -36,16 +36,30 @@ public sealed partial class ContainerTopologyGateTests
 
     /// <summary>
     /// Test classes allowed an engine of their own, each with the reason its subject needs one.
-    /// Empty until Task 2 decides; every entry needs a reason a reviewer can check.
+    /// Empty: story 1.9 found no class whose subject needs an engine it can stop or break - the three
+    /// story-1.1 classes only need one they can reach, so they take the shared engine. Every entry
+    /// added needs a reason a reviewer can check, and counts against <see cref="EngineBudget"/>.
     /// </summary>
     private static readonly Dictionary<string, string> PrivateEngines = new(StringComparer.Ordinal);
+
+    /// <summary>
+    /// Test classes that construct the fixture and never start it, each with why. These start no
+    /// engine, so they are not <see cref="PrivateEngines"/> and do not count against the budget; a
+    /// listed class that calls <c>InitializeAsync</c> is an offender again.
+    /// </summary>
+    private static readonly Dictionary<string, string> ConstructedNeverStarted = new(StringComparer.Ordinal)
+    {
+        ["SharedFixtureSmokeTest"] =
+            "asserts that ConnectionString refuses to answer before InitializeAsync - the one fixture property "
+            + "that can be checked without a container, so it runs where no runtime exists",
+    };
 
     /// <summary>
     /// 1.9-ARCH-001 - no test class constructs the SQL Server fixture directly or takes it as a class
     /// fixture, outside <see cref="PrivateEngines"/>. Plant (Task 12): a new direct construction is
     /// caught.
     /// </summary>
-    [Fact(Skip = "red: AC12 - ten class fixtures and three direct constructions each start an engine today (story 1.9 Task 2)")]
+    [Fact]
     public void No_test_class_starts_an_engine_of_its_own_outside_the_named_list()
     {
         var shared = TestSources().Where(file => file.Path.StartsWith("tests/Yello.Tests.Shared/", StringComparison.Ordinal)).ToList();
@@ -58,6 +72,7 @@ public sealed partial class ContainerTopologyGateTests
             .Where(file => DirectEngine.IsMatch(file.Source))
             .Select(file => file.Path)
             .Where(path => !PrivateEngines.ContainsKey(Path.GetFileNameWithoutExtension(path)))
+            .Where(path => !ConstructedNeverStarted.ContainsKey(Path.GetFileNameWithoutExtension(path)) || StartsTheFixture.IsMatch(Source(path)))
             .ToList();
 
         Assert.True(
@@ -71,7 +86,7 @@ public sealed partial class ContainerTopologyGateTests
     /// the engines a full run starts are within <see cref="EngineBudget"/>, and
     /// <c>TESTING-CONVENTIONS.md</c> states that budget.
     /// </summary>
-    [Fact(Skip = "red: AC12 - no suite declares the engine as an assembly fixture yet (story 1.9 Task 2)")]
+    [Fact]
     public void Each_suite_starts_at_most_one_engine_and_the_run_stays_within_the_stated_budget()
     {
         // Shared is the engine; this suite names the engine in its own patterns and starts none.
@@ -108,7 +123,7 @@ public sealed partial class ContainerTopologyGateTests
     /// 1.9-ARCH-003 - the engine is started with a memory cap of at most 2 GB
     /// (<c>MSSQL_MEMORY_LIMIT_MB</c>), so a full run cannot take the machine's free memory.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the engine sets no memory limit today (story 1.9 Task 2)")]
+    [Fact]
     [Trait("Priority", "P1")]
     public void The_engine_is_memory_capped()
     {
@@ -129,6 +144,9 @@ public sealed partial class ContainerTopologyGateTests
             .Where(entry => entry.Path.StartsWith("tests/", StringComparison.Ordinal))
             .Select(entry => (entry.Path, Source: CommentPattern.Replace(File.ReadAllText(entry.File.FullName), " ")));
 
+    private static string Source(string path) =>
+        TestSources().Single(file => string.Equals(file.Path, path, StringComparison.Ordinal)).Source;
+
     private static Regex StatedBudget(int budget) =>
         new($@"(?i)at most\s+\**{budget}\**\s+(SQL Server\s+)?engines", RegexOptions.None, TimeSpan.FromSeconds(1));
 
@@ -136,10 +154,13 @@ public sealed partial class ContainerTopologyGateTests
     private static partial Regex EngineDeclaration { get; }
 
     [GeneratedRegex(
-        @"new\s+SqlServerContainerFixture\s*\(|SqlServerContainerFixture\s+\w+\s*=\s*new\s*\(|IClassFixture\s*<\s*SqlServerContainerFixture\s*>|ICollectionFixture\s*<\s*SqlServerContainerFixture\s*>",
+        @"new\s+(global::)?([\w.]+\.)?(SqlServerContainerFixture|SqlServerEngine)\s*\(|(SqlServerContainerFixture|SqlServerEngine)\s+\w+\s*=\s*new\s*\(|I(Class|Collection)Fixture\s*<\s*(global::)?([\w.]+\.)?(SqlServerContainerFixture|SqlServerEngine)\s*>",
         RegexOptions.None,
         5000)]
     private static partial Regex DirectEngine { get; }
+
+    [GeneratedRegex(@"\.InitializeAsync\s*\(", RegexOptions.None, 5000)]
+    private static partial Regex StartsTheFixture { get; }
 
     [GeneratedRegex(@"\b(SqlServerContainerFixture|SqlServerEngine|MigratedDatabaseFixture)\b", RegexOptions.None, 5000)]
     private static partial Regex UsesEngine { get; }

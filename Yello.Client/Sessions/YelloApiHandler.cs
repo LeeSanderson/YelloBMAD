@@ -33,9 +33,10 @@ namespace Yello.Client.Sessions;
 /// <para>
 /// <b>What is honest to claim about that path.</b> Since story 1.7 the client makes authenticated
 /// requests - the Space switcher and a Space's own answer - so a Session that ends under a person
-/// reaches this branch from a real surface. The seam tests drive it directly; the browser suite
-/// fakes the API at the network edge and so does not drive a real 401 from the Host (re-owned by
-/// story 1.9 with the real-Host browser sign-in).
+/// reaches this branch from a real surface. The seam tests drive it directly, and the browser
+/// suite drives it twice: against a fake at the network edge, and against the real Host
+/// (<c>RealHostBrowserTests</c>), whose real 401 lands the running client on sign-in with the
+/// reason stated.
 /// </para>
 /// </remarks>
 /// <param name="session">The client's Session state, and the purge seam.</param>

@@ -63,7 +63,7 @@
   </ItemGroup>
 
   <!--
-    Yello.Contracts, and deliberately nothing else.
+    Yello.Contracts, Yello.Tests.Shared and Yello.Infrastructure - and still NOT Yello.Client.
 
     It is here so the boot check computes its expected `<html lang>` from
     CultureSelection.Resolve against SupportedCultures - the same single source the client and
@@ -76,9 +76,18 @@
     is the whole point of a browser level - a compile-time edge to the thing under test would
     let a case assert against a type instead of against what the browser actually received.
     The dev server is located by build-output convention instead; see ClientDevServer.
+
+    Story 1.9 (AC11) added the other two for RealHostCollection: the real client in Chromium
+    against a real Host on a real database. Yello.Tests.Shared carries the Host harness
+    (RunningHost, ProductActor) and the one SQL Server engine; Yello.Infrastructure is there for
+    the schema only - the collection's database is created by running the migrations through
+    YelloDbContext, as the isolation and revocation suites do, because AR-36 forbids the Host
+    applying them. Neither is the thing under test, so the black-box rule above still holds.
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\Yello.Contracts\Yello.Contracts.csproj" />
+    <ProjectReference Include="..\Yello.Tests.Shared\Yello.Tests.Shared.csproj" />
+    <ProjectReference Include="..\..\Yello.Infrastructure\Yello.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

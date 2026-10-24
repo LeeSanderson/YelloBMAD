@@ -34,8 +34,9 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// than the one it was opened for fails here rather than seeding silently.
 /// </para>
 /// <para>
-/// <b>Story 1.9 inherits this.</b> Its isolation fixtures need two Spaces populated and a request made
-/// as an Account holding Membership in only one; this is the helper that makes that setup.
+/// <b>The slice suite's helper only.</b> Story 1.9's isolation and revocation suites seed through the
+/// product instead (<c>ProductActor</c>: register, sign in, issue a Token over HTTP), so every row
+/// they read was written by the product.
 /// </para>
 /// </remarks>
 internal static class SpaceSeeding

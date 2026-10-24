@@ -63,7 +63,7 @@ public sealed partial class SpaceSwitcherGateTests
     /// (<c>prior</c>, <c>history</c>, <c>lastUsed</c>, <c>mru</c>), and still leaves the client's own
     /// <c>SpaceDirectory</c> and <c>ActiveSpace</c> alone.
     /// </summary>
-    [Fact(Skip = "red: AC7 - RemembersASpace misses _priorSpace and spaceHistory (story 1.9 Task 10, deferred-work.md:344)")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public void The_last_Space_scan_detects_both_word_orders_and_the_names_it_missed()
     {

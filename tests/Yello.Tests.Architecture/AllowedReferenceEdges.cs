@@ -139,8 +139,13 @@ internal static class AllowedReferenceEdges
             // suite legitimately references all eight production projects - it has to load
             // their assemblies - so without its own row the gate would fail on itself.
             ["Yello.Tests.Architecture"] = [.. ProductionProjects],
-            ["Yello.Tests.Isolation"] = ["Yello.Host", "Yello.Contracts", DeclaredVariance],
-            ["Yello.Tests.Revocation"] = ["Yello.Host", "Yello.Contracts", DeclaredVariance],
+            // Infrastructure was added by story 1.9, for the schema only: each test class gets a
+            // database of its own and runs the migrations into it through YelloDbContext, because
+            // AR-36 forbids the Host applying them at startup. Seeding stays through the product
+            // over HTTP, and InternalsVisibleTo still names only the slice suite, so these suites
+            // reach Infrastructure's public migration surface and nothing internal.
+            ["Yello.Tests.Isolation"] = ["Yello.Host", "Yello.Contracts", "Yello.Infrastructure", DeclaredVariance],
+            ["Yello.Tests.Revocation"] = ["Yello.Host", "Yello.Contracts", "Yello.Infrastructure", DeclaredVariance],
             ["Yello.Tests.Merge"] = ["Yello.Merge", "Yello.Contracts"],
             // Contracts was added by story 1.3, and the edit is the visible moment the rule
             // changed - which is what this table is for. The slice tests assert the registration
@@ -171,12 +176,21 @@ internal static class AllowedReferenceEdges
             // CultureSelection against SupportedCultures - the one list both surfaces read -
             // rather than hard-coding "en". Every locale resolves to "en" today, so a literal
             // would pass and keep passing for the wrong reason.
-            ["Yello.Tests.Client"] = ["Yello.Contracts"],
+            //
+            // Story 1.9 (AC11) added Shared and Infrastructure for RealHostCollection - the real
+            // client against a real Host on a real database. Shared carries the Host harness and the
+            // one SQL Server engine; Infrastructure is for the schema only (the migrations, through
+            // YelloDbContext, as the isolation and revocation suites run them). Neither is the thing
+            // under test, so the black-box reason above still holds, and Yello.Client stays absent.
+            ["Yello.Tests.Client"] = ["Yello.Contracts", DeclaredVariance, "Yello.Infrastructure"],
 
-            // Fixtures only. Depends on Testcontainers and xunit, and on no Yello project:
-            // a fixture that knew about a ring would let a suite reach a ring its own row
-            // forbids.
-            [DeclaredVariance] = [],
+            // Fixtures and the wire harness. Depends on Testcontainers and xunit, and on one
+            // Yello project: Contracts, added by story 1.9 when HostProcess and WireSession moved
+            // here so the isolation and revocation suites share the slice suite's harness (Q2 (a)).
+            // WireSession posts Contracts DTOs and reads Contracts routes. Contracts references
+            // nothing, so this edge reaches no ring: a fixture that knew about a ring would let a
+            // suite reach a ring its own row forbids, and that is still why nothing else is here.
+            [DeclaredVariance] = ["Yello.Contracts"],
         };
 
     /// <summary>

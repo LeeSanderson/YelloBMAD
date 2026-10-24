@@ -289,6 +289,8 @@ public sealed partial class SpaceSwitcherGateTests
         Assert.Matches(RemembersASpace, "private Guid? _lastSpaceId;");
         Assert.Matches(RemembersASpace, "var previousSpace = route;");
         Assert.Matches(RemembersASpace, "[SupplyParameterFromQuery(Name = \"last-space\")]");
+        Assert.Matches(RemembersASpace, "private Guid? _priorSpace;");
+        Assert.Matches(RemembersASpace, "var spaceHistory = new List<Guid>();");
         Assert.DoesNotMatch(RemembersASpace, "// never a remembered last Space");
         Assert.DoesNotMatch(RemembersASpace, "var activeSpace = directory.First();");
     }
@@ -423,6 +425,11 @@ public sealed partial class SpaceSwitcherGateTests
     [GeneratedRegex(@"@\*.*?\*@", RegexOptions.Singleline, 1000)]
     private static partial Regex RazorComment { get; }
 
-    [GeneratedRegex(@"\b_?(last|previous|recent|remembered)[-_]?(visited|active)?[-_]?space(id)?\b", RegexOptions.IgnoreCase, 1000)]
+    // Both word orders since story 1.9 (deferred-work.md:344): "lastSpace" and "spaceHistory", with the
+    // words the first version missed - prior, history, lastUsed, mru.
+    [GeneratedRegex(
+        @"\b_?(last|previous|prior|recent|remembered|mru)[-_]?(visited|active|used)?[-_]?spaces?(id)?\b|\b_?spaces?[-_]?(history|previous|prior|last|recent|mru)",
+        RegexOptions.IgnoreCase,
+        1000)]
     private static partial Regex RemembersASpace { get; }
 }

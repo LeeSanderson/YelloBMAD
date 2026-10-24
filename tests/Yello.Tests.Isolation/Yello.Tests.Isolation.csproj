@@ -18,11 +18,25 @@
   <ItemGroup>
     <PackageReference Include="xunit.v3" />
     <PackageReference Include="xunit.runner.visualstudio" />
+    <!--
+      Story 1.9: raw SQL for what no endpoint does yet - reading AccessRefusal, the revocation
+      events, and the pinned-pool session count. The statements live in Yello.Tests.Shared's
+      WireDatabase; this suite opens the connections it hands them.
+    -->
+    <PackageReference Include="Microsoft.Data.SqlClient" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\Yello.Host\Yello.Host.csproj" />
     <ProjectReference Include="..\..\Yello.Contracts\Yello.Contracts.csproj" />
+    <!--
+      Story 1.9, for the schema only: each test class gets a database of its own on the process's
+      one SQL Server and runs the migrations into it through YelloDbContext, because AR-36 forbids
+      the Host doing that at startup and no other path applies them. Seeding is through the
+      product, never through Infrastructure. Declared rather than reached through Host's
+      transitive output (deferred-work.md:10); the matching row is in AllowedReferenceEdges.
+    -->
+    <ProjectReference Include="..\..\Yello.Infrastructure\Yello.Infrastructure.csproj" />
     <ProjectReference Include="..\Yello.Tests.Shared\Yello.Tests.Shared.csproj" />
   </ItemGroup>
 

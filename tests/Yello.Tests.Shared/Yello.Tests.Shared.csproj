@@ -42,6 +42,22 @@
     <PackageReference Include="xunit.v3.extensibility.core" />
     <PackageReference Include="Testcontainers.XunitV3" />
     <PackageReference Include="Testcontainers.MsSql" />
+    <!--
+      Story 1.9: the shared engine creates a database per test class on its one SQL Server, and
+      the wire harness reads the refusal record and the Host's sessions from a side connection.
+    -->
+    <PackageReference Include="Microsoft.Data.SqlClient" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Story 1.9 (Q2 (a)): the wire harness (HostProcess, WireSession, RunningHost) moved here so
+      the isolation and revocation suites send exactly what the slice suite sends. WireSession
+      posts Yello.Contracts DTOs and reads Yello.Contracts routes, so Contracts is the one Yello
+      project this fixture project may reference - and nothing else, so no suite reaches a ring
+      through it. The matching row is in AllowedReferenceEdges.
+    -->
+    <ProjectReference Include="..\..\Yello.Contracts\Yello.Contracts.csproj" />
   </ItemGroup>
 
 </Project>

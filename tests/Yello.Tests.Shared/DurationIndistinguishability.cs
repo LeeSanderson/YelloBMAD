@@ -153,6 +153,50 @@ public static class DurationIndistinguishability
             secondSamples.Add(await TimeAsync(second).ConfigureAwait(false));
         }
 
+        return Verdict(firstSamples, secondSamples, allowed);
+    }
+
+    /// <summary>
+    /// The same comparison, where each arm measures itself and returns its own duration in
+    /// milliseconds - for a measurement point other than the caller's round trip.
+    /// </summary>
+    /// <param name="first">One arm: performs the operation once and returns its duration.</param>
+    /// <param name="second">The other arm.</param>
+    /// <returns>The verdict.</returns>
+    /// <remarks>
+    /// <b>Not a second method</b> (<c>TESTING-CONVENTIONS.md</c>): the samples, the warm-up, the
+    /// interleaving, the median and the tolerance are this class's, unchanged. Only the point at which
+    /// the duration is read moves. Story 1.9 added it for the isolation suite, which reads the Host's
+    /// own elapsed time from its request-finished line (Q5) rather than timing the round trip.
+    /// </remarks>
+    public static Task<DurationVerdict> CompareMeasuredAsync(Func<Task<double>> first, Func<Task<double>> second)
+    {
+        ArgumentNullException.ThrowIfNull(first);
+        ArgumentNullException.ThrowIfNull(second);
+
+        return CompareMeasuredCoreAsync(first, second);
+    }
+
+    private static async Task<DurationVerdict> CompareMeasuredCoreAsync(Func<Task<double>> first, Func<Task<double>> second)
+    {
+        var count = MinimumSamples;
+        var firstSamples = new List<double>(count);
+        var secondSamples = new List<double>(count);
+
+        await first().ConfigureAwait(false);
+        await second().ConfigureAwait(false);
+
+        for (var round = 0; round < count; round++)
+        {
+            firstSamples.Add(await first().ConfigureAwait(false));
+            secondSamples.Add(await second().ConfigureAwait(false));
+        }
+
+        return Verdict(firstSamples, secondSamples, DefaultTolerance);
+    }
+
+    private static DurationVerdict Verdict(List<double> firstSamples, List<double> secondSamples, double allowed)
+    {
         var firstMedian = Median(firstSamples);
         var secondMedian = Median(secondSamples);
 

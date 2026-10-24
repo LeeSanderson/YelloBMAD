@@ -31,7 +31,7 @@ namespace Yello.Tests.Slices;
 /// </para>
 /// <para>
 /// <b>Why here.</b> <c>Yello.Tests.Slices</c> is the fifth suite and the only one that is not
-/// release-gating, it already starts a container for <see cref="SharedFixtureSmokeTest"/>, and
+/// release-gating, it already holds the shared engine (<see cref="SqlServerEngine"/>), and
 /// it already references <c>Yello.Host</c> under the dependency rule. It is also not among the
 /// suites AC5's zero-tests clause names.
 /// </para>
@@ -41,10 +41,14 @@ namespace Yello.Tests.Slices;
 /// everywhere, including where the runtime is absent.
 /// </para>
 /// </remarks>
+/// <param name="engine">
+/// The process's one SQL Server. The check needs an engine it can open a connection to, not one of
+/// its own, so it takes the shared one (story 1.9 Task 2).
+/// </param>
 [Trait("Suite", "Slices")]
 [Trait("Priority", "P1")]
 [Trait("Requirement", "AR-1")]
-public sealed class StartupConnectivityCheckTests
+public sealed class StartupConnectivityCheckTests(SqlServerEngine engine)
 {
     /// <summary>
     /// EventId 1001, <c>ConnectivityConfirmed</c> - the check ran and opened a connection.
@@ -68,14 +72,11 @@ public sealed class StartupConnectivityCheckTests
             SqlServerContainerFixture.IsContainerRuntimeAvailable(),
             "No container runtime is reachable, so there is no engine to connect to.");
 
-        await using var fixture = new SqlServerContainerFixture();
-        await fixture.InitializeAsync();
-
         var logger = new CapturingLogger();
 
         await StartupConnectivityCheck.RunAsync(
             new StubEnvironment("Development"),
-            ConfigurationWithConnectionString(fixture.ConnectionString),
+            ConfigurationWithConnectionString(await engine.ServerConnectionStringAsync(TestContext.Current.CancellationToken)),
             logger,
             TestContext.Current.CancellationToken);
 

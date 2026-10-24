@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.Playwright;
 using Xunit;
 
@@ -12,25 +13,21 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds, and deliberately not in a collection yet.</b> Task 9 builds
-/// <c>RealHostCollection</c>: the client dev server first, then a Host with
-/// <c>ClientOrigin</c> set to the client's origin, on a database on the suite's <b>one</b> shared
-/// engine, with <c>wwwroot/appsettings.Development.json</c> answered by <c>page.RouteAsync</c> carrying
-/// the Host's real address - the only fake in that collection. Until then this class takes no
-/// fixture, so it starts no engine, no Host and no browser.
+/// <b>Activated by story 1.9 Task 9</b> on <see cref="RealHostCollection"/>. The scaffold's
+/// <c>IRealHostWorld</c> contract became <see cref="RealHostFixture"/>.
 /// </para>
 /// <para>
-/// <b>Scaffold contract.</b> <see cref="IRealHostWorld"/> lists what the cases need; on activation,
-/// implement it over Task 9's collection or replace it, and record which in the Debug Log. The Host's
-/// log, not a fake's request list, is the witness that B's id was never requested.
+/// <b>The Host's log, not a fake's request list, is the witness</b> that B's id was never requested.
 /// </para>
 /// </remarks>
+/// <param name="world">The real Host, the dev server and the browser.</param>
 [Trait("Suite", "Client")]
 [Trait("Priority", "P0")]
 [Trait("Requirement", "NFR-1")]
 [Trait("Requirement", "AR-14")]
 [Trait("Requirement", "UX-DR31")]
-public sealed class RealHostBrowserTests
+[Collection(nameof(RealHostCollection))]
+public sealed class RealHostBrowserTests(RealHostFixture world)
 {
     private const float Timeout = 30_000;
 
@@ -43,104 +40,124 @@ public sealed class RealHostBrowserTests
     /// with the bar and the Role chip drawn: the real cookie crossed the two origins, and the real
     /// preflight admitted the anti-forgery header.
     /// </summary>
-    [Fact(Skip = "red: AC11 - the real-Host collection does not exist yet (story 1.9 Task 9)")]
+    /// <returns>A task.</returns>
+    [Fact]
     [Trait("Requirement", "FR-2")]
     public async Task Signing_in_against_the_real_Host_lands_on_the_Space_with_the_bar_drawn()
     {
-        await using var world = await RealHost.StartAsync();
-        var page = await world.OpenSignedInAsync();
+        RealHostFixture.SkipUnlessAnEngineIsConfigured();
 
-        await WaitForPathAsync(page, $"/spaces/{world.SpaceOfA:D}");
-        await page.Locator(RoleChip).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+        var (context, page) = await world.OpenSignedInAsync(world.A);
 
-        Assert.Equal(world.SpaceNameOfA, (await page.Locator(SpaceName).TextContentAsync())?.Trim());
+        await using (context)
+        {
+            await WaitForPathAsync(page, $"/spaces/{world.A.SpaceId:D}");
+            await page.Locator(RoleChip).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal(world.A.SpaceName, (await page.Locator(SpaceName).TextContentAsync())?.Trim());
+        }
     }
 
     /// <summary>
-    /// 1.9-E2E-007 / AC2 - a deep link to B's Space renders the refusal page, and the Host received
-    /// no request naming B's Space. Anchored on the Host having logged A's own Space request.
+    /// 1.9-E2E-007 / AC2 - a deep link to B's Space renders the refusal page, and the Host received no
+    /// request naming B's Space. Anchored on the Host having logged the switcher request the full load
+    /// made, so the absence is read from a log that did record this navigation.
     /// </summary>
-    [Fact(Skip = "red: AC11 - the real-Host collection does not exist yet (story 1.9 Task 9)")]
+    /// <returns>A task.</returns>
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task A_deep_link_to_another_Accounts_Space_is_refused_without_reaching_the_Host()
     {
-        await using var world = await RealHost.StartAsync();
-        var page = await world.OpenSignedInAsync();
-        await page.Locator(RoleChip).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+        RealHostFixture.SkipUnlessAnEngineIsConfigured();
 
-        var cursor = world.HostLogCursor();
+        var (context, page) = await world.OpenSignedInAsync(world.A);
 
-        await page.GotoAsync(new Uri(world.ClientAddress, $"spaces/{world.SpaceOfB:D}").ToString());
-        await page.Locator(Heading, new PageLocatorOptions { HasText = "Not available." })
-            .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+        await using (context)
+        {
+            await page.Locator(RoleChip).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
-        var log = await world.HostLogSinceAsync(cursor);
+            var cursor = await world.Host.LogCursorAsync();
+            var switcher = $"GET {world.Host.Address.GetLeftPart(UriPartial.Authority)}/api/v1/spaces ";
 
-        Assert.Contains("/api/v1/spaces", log, StringComparison.Ordinal);
-        Assert.DoesNotContain(world.SpaceOfB.ToString("D"), log, StringComparison.OrdinalIgnoreCase);
+            await page.GotoAsync(new Uri(world.ClientAddress, $"spaces/{world.B.SpaceId:D}").ToString());
+            await page.Locator(Heading, new PageLocatorOptions { HasText = "Not available." })
+                .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var log = await world.Host.WaitForLogAsync(
+                cursor,
+                slice => slice.Contains("Request finished", StringComparison.Ordinal) && slice.Contains(switcher, StringComparison.Ordinal));
+
+            Assert.DoesNotContain(world.B.SpaceId.ToString("D"), log, StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     /// <summary>
-    /// 1.9-E2E-008 - A's Sessions ended on the server: A's next navigation gets a real <c>401</c> and
-    /// lands on <c>/sign-in</c> with the reason stated, the Space-scoped state purged.
+    /// 1.9-E2E-008 - an Account's Sessions ended on the server (sign-out from a second context, which
+    /// stamps <c>SessionsValidAfter</c>): the browser's next navigation gets a real <c>401</c> and lands
+    /// on <c>/sign-in</c> with the reason stated, the Space-scoped state purged.
     /// </summary>
-    [Fact(Skip = "red: AC11 - the real-Host collection does not exist yet (story 1.9 Task 9)")]
+    /// <returns>A task.</returns>
+    [Fact]
     [Trait("Requirement", "FR-2")]
     [Trait("Requirement", "NFR-2")]
     public async Task A_Session_ended_on_the_server_lands_the_client_on_sign_in_with_the_reason()
     {
-        await using var world = await RealHost.StartAsync();
-        var page = await world.OpenSignedInAsync();
-        await page.Locator(RoleChip).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+        RealHostFixture.SkipUnlessAnEngineIsConfigured();
 
-        await world.EndSessionsOfAAsync();
+        // A fresh Account, because this case ends every Session it holds - with a second Space, so the
+        // running client has somewhere listed to move to.
+        var actor = await world.NewActorAsync();
+        var second = await world.AddSecondSpaceAsync(actor);
+        var (context, page) = await world.OpenSignedInAsync(actor);
 
-        await page.GotoAsync(new Uri(world.ClientAddress, $"spaces/{world.SpaceOfA:D}").ToString());
-        await WaitForPathAsync(page, "/sign-in");
+        await using (context)
+        {
+            await page.Locator(RoleChip).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
-        Assert.Contains("reason=", page.Url, StringComparison.Ordinal);
-        Assert.Equal(0, await page.Locator(SpaceName).CountAsync());
-        Assert.DoesNotContain(world.SpaceNameOfA, await page.Locator("#app").InnerTextAsync(), StringComparison.Ordinal);
+            // The client lands on the first Space its switcher lists, which is either of the two; the
+            // in-app move below is to the other one, so the running client has to ask the Host.
+            var shown = new Uri(page.Url).AbsolutePath;
+            var other = shown.EndsWith(second.ToString("D"), StringComparison.OrdinalIgnoreCase) ? actor.SpaceId : second;
+
+            // The second context: the Account's own API Session signs out, which ends every Session the
+            // Account holds - the browser's included (Lee's decision 1).
+            Assert.Equal(HttpStatusCode.NoContent, (await actor.SignOutAndKeepTheOldCookieAsync()).StatusCode);
+
+            var cursor = await world.Host.LogCursorAsync();
+
+            // In-app, not a reload, and to the Space not shown: a reload boots a client that never held
+            // the Session, which treats a 401 as "not signed in" rather than "your Session ended"; and a
+            // navigation to the Space already shown asks the Host nothing. The running client is the one
+            // whose session-end path is under test. A window marker proves no reload happened.
+            await page.EvaluateAsync("() => { window.__inApp = true; }");
+            await page.EvaluateAsync("id => Blazor.navigateTo('/spaces/' + id)", other.ToString("D"));
+            await WaitForPathAsync(page, "/sign-in");
+
+            Assert.True(await page.EvaluateAsync<bool>("() => window.__inApp === true"), "The navigation reloaded the page, so it was not the running client's session-end path.");
+
+            // The 401 was the real Host's: its log holds a refused request from this navigation.
+            await world.Host.WaitForLogAsync(cursor, slice => slice.Contains(" - 401 ", StringComparison.Ordinal));
+
+            Assert.Contains("reason=", page.Url, StringComparison.Ordinal);
+            Assert.Equal(0, await page.Locator(SpaceName).CountAsync());
+            Assert.DoesNotContain(actor.SpaceName, await page.Locator("#app").InnerTextAsync(), StringComparison.Ordinal);
+        }
     }
 
-    private static Task WaitForPathAsync(IPage page, string path) =>
-        page.WaitForFunctionAsync(
-            "path => location.pathname === path",
-            path,
-            new PageWaitForFunctionOptions { Timeout = Timeout });
-
-    /// <summary>
-    /// The entry point of the scaffold contract. Throws until story 1.9 Task 9 builds the collection.
-    /// </summary>
-    private static class RealHost
+    private static async Task WaitForPathAsync(IPage page, string path)
     {
-        public static Task<IRealHostWorld> StartAsync() =>
+        try
+        {
+            await page.WaitForFunctionAsync(
+                "path => location.pathname === path",
+                path,
+                new PageWaitForFunctionOptions { Timeout = Timeout });
+        }
+        catch (TimeoutException exception)
+        {
             throw new InvalidOperationException(
-                "The real-Host collection does not exist yet (story 1.9 Task 9: client dev server, Host with ClientOrigin, "
-                + "a database on the shared engine, two Accounts seeded through the real API).");
-    }
-
-    /// <summary>
-    /// What the real-Host cases need: two Accounts seeded through the real API, A signed in through
-    /// the real sign-in page, the Host's log for the case, and a way to end A's Sessions on the server
-    /// (sign-out from a second context, or <c>SessionsValidAfter</c> stamped by SQL).
-    /// </summary>
-    private interface IRealHostWorld : IAsyncDisposable
-    {
-        Uri ClientAddress { get; }
-
-        Guid SpaceOfA { get; }
-
-        string SpaceNameOfA { get; }
-
-        Guid SpaceOfB { get; }
-
-        Task<IPage> OpenSignedInAsync();
-
-        long HostLogCursor();
-
-        Task<string> HostLogSinceAsync(long cursor);
-
-        Task EndSessionsOfAAsync();
+                $"The page never reached {path}; it is at {page.Url}, showing: {await page.Locator("#app").InnerTextAsync()}",
+                exception);
+        }
     }
 }

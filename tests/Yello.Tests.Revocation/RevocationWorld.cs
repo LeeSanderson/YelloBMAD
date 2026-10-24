@@ -1,122 +1,139 @@
+using Microsoft.EntityFrameworkCore;
+using Xunit;
+using Yello.Infrastructure.Persistence;
+using Yello.Tests.Shared;
+
 namespace Yello.Tests.Revocation;
 
 /// <summary>
-/// The entry point of the scaffold contract. Throws until story 1.9 Task 3 gives it a harness.
-/// </summary>
-internal static class RevocationWorld
-{
-    public static readonly RevocationSurface[] Surfaces = Enum.GetValues<RevocationSurface>();
-
-    /// <summary>
-    /// A fresh Account, registered through the product, signed in, holding one Token for its Personal
-    /// Space - on the class's one running Host. Each call seeds a new Account, because every case here
-    /// destroys what it was given.
-    /// </summary>
-    public static Task<IRevocationWorld> StartAsync() =>
-        throw new InvalidOperationException(
-            "The revocation harness does not exist yet (story 1.9 Task 2: one engine per test process; Task 3: RunningHost, "
-            + "surface actor, product seeding; Task 7: the raw-SQL events).");
-}
-
-/// <summary>
-/// The two surfaces every revocation case runs on (AD-4).
-/// </summary>
-/// <remarks>
-/// <b>Red-phase scaffold contract.</b> Replaced by the story's <c>IsolationSurface</c> from
-/// <c>Yello.Tests.Shared</c> once Task 3 has moved the harness there.
-/// </remarks>
-internal enum RevocationSurface
-{
-    Session,
-    ApiToken,
-}
-
-/// <summary>
-/// One wire answer: status, content type, body and header names (<c>Date</c> excluded).
-/// </summary>
-internal interface IRevocationAnswer
-{
-    int Status { get; }
-
-    string? ContentType { get; }
-
-    string Body { get; }
-
-    IReadOnlyList<string> HeaderNames { get; }
-}
-
-/// <summary>
-/// What every revocation case needs: one Account with a Session and a Token for the same Space, a way
-/// to send as either, and the five events that end or narrow a credential.
+/// One Host on a database of its own on the process's one SQL Server, for a class of revocation cases.
+/// Each case registers a fresh Account through the product, because every case destroys what it was
+/// given.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffold contract.</b> It lists operations; it is not a design. On activation,
-/// implement it over Task 3's harness or replace it with the real types, and record which in the
-/// Debug Log.
+/// <b>Lee's decisions, 2026-10-24, are the expectations:</b> (1) sign-out ends Sessions server-side
+/// through <c>SessionsValidAfter</c>, so a replayed pre-sign-out cookie grants nothing; (2) a Token on
+/// sign-out is no credential.
 /// </para>
 /// <para>
-/// <b>The Session surface always sends the cookie captured at sign-in.</b> Sign-out's expiring
-/// <c>Set-Cookie</c> is not applied, so the request after sign-out is the replay of the pre-sign-out
-/// cookie that Lee's decision 1 says grants nothing.
-/// </para>
-/// <para>
-/// <b>Raw SQL only where no endpoint exists yet</b> (Membership removal, Space and Account deletion,
-/// Role change - their endpoints arrive in 3.3, 4.5 and 5.4), mirroring
-/// <c>ActiveSpaceEndpointTests.Tokens.cs:1090-1188</c>. The constraints checked: Membership removal runs
-/// under the Space's session key (RLS FILTER on <c>Membership</c>) and cascades to <c>ApiToken</c>
-/// through <c>FK_ApiToken_Membership_BoundSpaceId_AccountId</c> (Cascade). Space deletion runs under the
-/// Space's key so the FILTER predicate exposes every <c>Membership</c>, <c>StatusDefinition</c> and
-/// <c>SpacePresence</c> row the cascades reach (<c>FK_Membership_Space_SpaceId</c>,
-/// <c>FK_StatusDefinition_Space_SpaceId</c>, <c>FK_SpacePresence_Space_SpaceId</c>, all Cascade).
-/// Account deletion removes the Memberships first, because <c>FK_Membership_Account_AccountId</c> is
-/// Restrict, under the <c>AccountId</c> session key, then the Account, in one transaction. A Role
-/// change updates one Membership under its Space's key and leaves at most one Owner per Space
-/// (<c>UX_Membership_SpaceId_Owner</c>).
+/// <b>Raw SQL only where no endpoint exists yet</b> - Membership removal, Space and Account deletion, a
+/// Role change - through <see cref="WireDatabase"/>, under the session keys the schema requires. Their
+/// endpoints arrive in 3.3, 4.5 and 5.4, and each owner adds the endpoint-driven row to this list.
 /// </para>
 /// </remarks>
-internal interface IRevocationWorld : IAsyncDisposable
+internal sealed class RevocationWorld : IAsyncDisposable
 {
-    Guid AccountId { get; }
+    private readonly SqlServerEngine _engine;
 
-    Guid SpaceId { get; }
+    private readonly List<ProductActor> _actors = [];
 
-    Guid TokenId { get; }
-
-    Task<IRevocationAnswer> SendAsync(RevocationSurface surface, HttpMethod method, string path);
-
-    Task<IRevocationAnswer> SendWithoutCredentialAsync(HttpMethod method, string path);
-
-    /// <summary>
-    /// <c>DELETE /api/v1/sessions</c> with the Session cookie and the anti-forgery header.
-    /// </summary>
-    Task<IRevocationAnswer> SignOutAsync();
+    private RevocationWorld(SqlServerEngine engine, RunningHost host, WireDatabase database)
+    {
+        _engine = engine;
+        Host = host;
+        Database = database;
+    }
 
     /// <summary>
-    /// <c>DELETE /api/v1/sessions</c> with the bearer Token alone and no anti-forgery header.
+    /// The Host.
     /// </summary>
-    Task<IRevocationAnswer> SignOutWithTokenAsync();
+    public RunningHost Host { get; }
 
     /// <summary>
-    /// <c>DELETE /api/v1/sessions</c> with no credential and no anti-forgery header.
+    /// The world's own database.
     /// </summary>
-    Task<IRevocationAnswer> SignOutWithoutCredentialAsync();
+    public WireDatabase Database { get; }
 
-    Task RemoveMembershipAsync(bool commit);
+    /// <summary>
+    /// Every secret any actor in this world has held.
+    /// </summary>
+    public IReadOnlyList<string> Secrets => [.. _actors.SelectMany(actor => actor.Secrets).Where(secret => secret.Length > 0)];
 
-    Task DeleteSpaceAsync();
+    /// <summary>
+    /// Starts a world: a database of its own, migrated, and a Host on it.
+    /// </summary>
+    /// <param name="engine">The process's one SQL Server.</param>
+    /// <returns>The world.</returns>
+    public static async Task<RevocationWorld> StartAsync(SqlServerEngine engine)
+    {
+        var connectionString = await engine.CreateDatabaseAsync(TestContext.Current.CancellationToken);
 
-    Task DeleteAccountAsync();
+        await using (var context = new YelloDbContext(new DbContextOptionsBuilder<YelloDbContext>().UseSqlServer(connectionString).Options))
+        {
+            await context.Database.MigrateAsync(TestContext.Current.CancellationToken);
+        }
 
-    Task ChangeRoleAsync(string roleStableCode);
+        return new RevocationWorld(engine, await RunningHost.StartAsync(connectionString), new WireDatabase(connectionString));
+    }
 
-    Task<DateTimeOffset?> SessionsValidAfterAsync();
+    /// <summary>
+    /// A fresh Account: registered, signed in, holding one Token for its Personal Space.
+    /// </summary>
+    /// <returns>The actor.</returns>
+    public async Task<ProductActor> NewActorAsync()
+    {
+        var actor = await ProductActor.RegisterAsync(Host, Database, "Rev");
 
-    Task<IReadOnlyList<string>> RefusalKindsAsync();
+        _actors.Add(actor);
 
-    long LogCursor();
+        return actor;
+    }
 
-    Task<string> LogSinceAsync(long cursor);
+    /// <summary>
+    /// The same request with no credential at all - the anchor <c>401</c>.
+    /// </summary>
+    /// <param name="method">The method.</param>
+    /// <param name="path">The route.</param>
+    /// <returns>The answer.</returns>
+    public Task<WireResponse> SendWithoutCredentialAsync(HttpMethod method, string path) =>
+        ProductActor.SendWithoutCredentialAsync(Host.Client, method, path);
 
-    IReadOnlyList<string> Secrets { get; }
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        await Host.DisposeAsync();
+        await _engine.DropDatabaseAsync(Database.ConnectionString);
+    }
+}
+
+/// <summary>
+/// A class's revocation world. An unconfigured container runtime is recorded and each case skips with
+/// it; a configured but dead one fails (story 1.9 Q1).
+/// </summary>
+/// <param name="engine">The process's one SQL Server.</param>
+public sealed class RevocationWorldFixture(SqlServerEngine engine) : IAsyncLifetime
+{
+    private RevocationWorld? _world;
+
+    /// <summary>
+    /// The world, or a skip with the reason there is none.
+    /// </summary>
+    internal RevocationWorld World
+    {
+        get
+        {
+            Assert.SkipWhen(SqlServerEngine.UnavailableReason is not null, SqlServerEngine.UnavailableReason ?? string.Empty);
+
+            return _world ?? throw new InvalidOperationException("The revocation world did not start; its InitializeAsync failure is the one to read.");
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask InitializeAsync()
+    {
+        if (SqlServerEngine.UnavailableReason is null)
+        {
+            _world = await RevocationWorld.StartAsync(engine);
+        }
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        if (_world is not null)
+        {
+            await _world.DisposeAsync();
+        }
+    }
 }

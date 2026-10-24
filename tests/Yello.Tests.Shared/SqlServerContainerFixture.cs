@@ -29,28 +29,23 @@ namespace Yello.Tests.Shared;
 /// against a migrated database rather than reviewed.
 /// </para>
 /// <para>
-/// <b>Topology is NOT settled, and this class does not settle it.</b> The intent recorded
-/// during story 1.1 was "one container amortised across collections", and as written that
-/// cannot hold: this is a plain fixture with no <c>[CollectionDefinition]</c>, no
-/// assembly-level fixture and no <c>WithReuse</c>, so xunit constructs one instance per
-/// collection - and the suites run as separate Microsoft.Testing.Platform <i>processes</i>,
-/// which puts cross-suite sharing out of reach without container reuse or an external
-/// orchestrator. Each consumer therefore gets its own SQL Server today. That is a real cost
-/// and a real decision, and it belongs with <b>story 1.9</b>, which owns the single-connection
-/// pooled variant and is the first story that has to make the sharing model real. Until then,
-/// read the sentence above as intent rather than as description. The pooled-connection
-/// isolation case will need its own container regardless, with pool size pinned to 1 and
-/// parallelism disabled: a pooled connection carrying a stale session context is the thing
-/// that case exists to catch, and it cannot be observed on a shared pool.
-/// <para>
-/// <b>The current cost, measured rather than estimated.</b> Three test classes in
-/// <c>Yello.Tests.Slices</c> each construct this fixture directly, so a full run starts three
-/// separate engines sequentially. A collection fixture would make it one - but it would also
-/// couple the cases that deliberately need <i>no</i> container (the inverted-guard regressions)
-/// to a container start, which is the opposite of what those cases are for. Resolving that
-/// properly means deciding the sharing model, which is story 1.9's, and this note is here so
-/// that story inherits a number rather than an impression.
+/// <b>The topology is settled by story 1.9: one engine per test process.</b> This class is one
+/// SQL Server; <see cref="SqlServerEngine"/> is the xunit v3 assembly fixture that owns the one
+/// instance a test process starts, and every test class takes <i>its own database</i> on it
+/// rather than an engine of its own. Before this, a full <c>dotnet test Yello.slnx</c> started
+/// thirteen engines concurrently (ten class fixtures and three direct constructions; measured on
+/// 2026-10-24 at a 7.9 GB Docker peak with 0.6 GB of host memory left, and the Rancher backend
+/// stopped answering mid-run). <c>ContainerTopologyGateTests</c> holds the shape: no test class
+/// starts this fixture outside a named list, and each suite declares exactly one assembly fixture.
 /// </para>
+/// <para>
+/// <b>The pooled-connection cases need no engine of their own.</b> SqlClient keys a pool by its
+/// exact connection string, so <c>Max Pool Size=1</c> on a class's own database is its own pinned
+/// pool on the shared engine; those cases run in a collection with parallelisation disabled.
+/// </para>
+/// <para>
+/// <b>Each engine is capped at <c>MSSQL_MEMORY_LIMIT_MB</c> 2048</b>, the floor SQL Server on
+/// Linux is documented to need, so the engines of a full run cannot take the machine's memory.
 /// </para>
 /// <para>
 /// <b>No <c>Task.Delay</c>.</b> Readiness is a wait strategy, never a sleep. The test
@@ -61,8 +56,7 @@ namespace Yello.Tests.Shared;
 /// <remarks>
 /// Sealed deliberately. Fixtures are consumed through xunit's <c>IClassFixture</c> /
 /// <c>ICollectionFixture</c>, never by inheritance, and sealing settles CA1816: with no
-/// derived types there is no finalizer for <see cref="DisposeAsync"/> to suppress. Story
-/// 1.9's single-connection variant will be its own fixture, not a subclass of this one.
+/// derived types there is no finalizer for <see cref="DisposeAsync"/> to suppress.
 /// </remarks>
 public sealed class SqlServerContainerFixture : IAsyncLifetime
 {
@@ -292,15 +286,12 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
     /// </para>
     /// <para>
     /// <b>What this does not detect, stated rather than implied.</b> It answers "is a runtime
-    /// configured and reachable enough to build a container definition", which is a
-    /// configuration question answered without I/O. A socket that exists while the daemon behind
-    /// it is dead or unhealthy passes here, and the failure then surfaces from
-    /// <see cref="InitializeAsync"/> - bounded by <see cref="StartupTimeout"/> and reported with
-    /// container diagnostics, which is the reason that deadline is not optional. Distinguishing
-    /// the two properly needs a daemon ping, and the only client available for one arrives
-    /// transitively through Testcontainers; referencing it directly would add an unpinned
-    /// package, which Gate A correctly forbids. So the honest split is: configuration problems
-    /// skip, daemon problems fail with a diagnosis.
+    /// configured", without I/O. A socket that exists while the daemon behind it is dead passes
+    /// here; <see cref="ProbeContainerRuntimeAsync(TimeSpan)"/> is the check that asks the daemon,
+    /// and <see cref="SqlServerEngine"/> runs it before it starts anything. The split is deliberate
+    /// and story 1.9's (Q1's sub-question): an <i>unconfigured</i> runtime skips, a configured but
+    /// <i>dead</i> one fails, with the probe's reason as the message. Skipping SM-1 silently on a
+    /// dead runtime would be the vacuous gate this repository refuses.
     /// </para>
     /// </remarks>
     public static bool IsContainerRuntimeAvailable()
@@ -330,8 +321,82 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
         }
     }
 
+    /// <summary>
+    /// Asks the configured container runtime's daemon to answer, within <paramref name="deadline"/>.
+    /// </summary>
+    /// <param name="deadline">How long the daemon has to answer.</param>
+    /// <returns><c>null</c> when the daemon answered; otherwise why it did not.</returns>
+    /// <remarks>
+    /// The Docker client used here is the one Testcontainers already carries; no package is added.
+    /// It is the answer to <c>TESTING-CONVENTIONS.md</c>'s "the skip guard does no I/O": on this
+    /// machine Rancher's Hyper-V socket times out while the configuration still reads as present.
+    /// </remarks>
+    public static Task<string?> ProbeContainerRuntimeAsync(TimeSpan deadline)
+    {
+        Uri endpoint;
+        Docker.DotNet.DockerClientConfiguration configuration;
+
+        try
+        {
+            var authentication = DotNet.Testcontainers.Configurations.TestcontainersSettings.OS.DockerEndpointAuthConfig;
+            endpoint = authentication.Endpoint;
+            configuration = authentication.GetDockerClientConfiguration(Guid.Empty);
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            return Task.FromResult<string?>($"No container runtime is configured: {exception.Message}");
+        }
+
+        return PingAsync(endpoint, configuration, deadline);
+    }
+
+    /// <summary>
+    /// Asks the daemon at <paramref name="endpoint"/> to answer, within <paramref name="deadline"/>.
+    /// </summary>
+    /// <param name="endpoint">The daemon's endpoint, for example <c>npipe://./pipe/docker_engine</c>.</param>
+    /// <param name="deadline">How long the daemon has to answer.</param>
+    /// <returns><c>null</c> when the daemon answered; otherwise why it did not, naming the endpoint.</returns>
+    public static Task<string?> ProbeContainerRuntimeAsync(Uri endpoint, TimeSpan deadline)
+    {
+        ArgumentNullException.ThrowIfNull(endpoint);
+
+        return PingAsync(endpoint, new Docker.DotNet.DockerClientConfiguration(endpoint), deadline);
+    }
+
+    private static async Task<string?> PingAsync(
+        Uri endpoint,
+        Docker.DotNet.DockerClientConfiguration configuration,
+        TimeSpan deadline)
+    {
+        using var cancellation = new CancellationTokenSource(deadline);
+
+        try
+        {
+            using (configuration)
+            using (var client = configuration.CreateClient())
+            {
+                await client.System.PingAsync(cancellation.Token).WaitAsync(cancellation.Token).ConfigureAwait(false);
+            }
+
+            return null;
+        }
+        catch (OperationCanceledException)
+        {
+            return string.Create(
+                CultureInfo.InvariantCulture,
+                $"The container runtime at {endpoint} did not answer a ping within {deadline.TotalSeconds:F0}s. On Rancher Desktop: `rdctl shutdown`, `wsl --terminate rancher-desktop`, then relaunch.");
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            return $"The container runtime at {endpoint} did not answer a ping: {exception.GetType().Name}: {exception.Message}";
+        }
+    }
+
     private static MsSqlContainer BuildContainer() =>
-        new MsSqlBuilder().WithImage(Image).Build();
+        new MsSqlBuilder()
+            .WithImage(Image)
+            .WithEnvironment("MSSQL_MEMORY_LIMIT_MB", "2048")
+            .Build();
 
     /// <summary>
     /// Whatever the engine managed to say before it gave up.

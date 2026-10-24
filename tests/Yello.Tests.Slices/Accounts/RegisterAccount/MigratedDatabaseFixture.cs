@@ -4,44 +4,35 @@ using Yello.Tests.Shared;
 namespace Yello.Tests.Slices.Accounts.RegisterAccount;
 
 /// <summary>
-/// One migrated SQL Server for one test class.
+/// One migrated database for one test class, on the process's one shared SQL Server.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>This does not settle the container topology, and must not be read as doing so.</b>
-/// <c>deferred-work.md:8</c> defers that decision to <b>story 1.9</b>, which owns the
-/// single-connection pooled variant and is the first story that has to make the sharing model
-/// real. What this is, is xunit's ordinary <c>IClassFixture</c> lifetime - which
-/// <c>SqlServerContainerFixture</c>'s own remarks already anticipate ("one instance per
-/// collection, or per class under IClassFixture"). Nothing here reuses a container across
-/// classes, across suites or across processes, and nothing assumes it could.
+/// <b>A database per class, not an engine per class</b> (story 1.9 Q1 (a)). The engine is the
+/// suite's <see cref="SqlServerEngine"/> assembly fixture; this fixture creates a database of its
+/// own on it (<c>yello_{guid:N}</c>), runs the migrations into it, and drops it at the end. Classes
+/// therefore share the engine and nothing else: every connection string handed out names this
+/// class's database as its <c>Initial Catalog</c>, which
+/// <c>SharedEngineDatabaseIsolationTests</c> proves rather than assumes.
 /// </para>
 /// <para>
-/// <b>Why not construct the fixture per test, as story 1.1's smoke test does.</b> That pattern is
-/// right for one or two cases and unusable for a class of them: each SQL Server is roughly 2 GB
-/// and takes tens of seconds to become ready, so eight tests would mean eight sequential engine
-/// starts. The per-test pattern also exists to allow a clean skip when no container runtime is
-/// present, and that is the property this class has to preserve - which is the whole reason it is
-/// a wrapper rather than a direct <c>IClassFixture&lt;SqlServerContainerFixture&gt;</c>.
-/// </para>
-/// <para>
-/// <b>An unavailable runtime is recorded, not thrown.</b> xunit builds a class fixture before any
-/// test in the class runs, so letting <c>InitializeAsync</c> throw would turn "Rancher Desktop is
-/// stopped" into eight red tests with a container stack trace. Recording the reason lets each
-/// test skip with it instead - a stopped local backend is a condition, not a defect.
+/// <b>An unconfigured runtime is recorded, not thrown.</b> xunit builds a class fixture before any
+/// test in the class runs, so letting <c>InitializeAsync</c> throw would turn "no container runtime
+/// on this machine" into a red class. Recording the reason lets each test skip with it instead. A
+/// configured runtime whose daemon is dead is different and fails: see
+/// <see cref="SqlServerEngine"/>.
 /// </para>
 /// </remarks>
-public sealed class MigratedDatabaseFixture : IAsyncLifetime
+/// <param name="engine">The process's one SQL Server.</param>
+public sealed class MigratedDatabaseFixture(SqlServerEngine engine) : IAsyncLifetime
 {
-    private SqlServerContainerFixture? _container;
-
     /// <summary>
-    /// The migrated database, or <c>null</c> when no container runtime was reachable.
+    /// The migrated database, or <c>null</c> when no container runtime is configured.
     /// </summary>
     internal RegistrationDatabase? Database { get; private set; }
 
     /// <summary>
-    /// The migrated container's connection string, for a test that needs to hand it to a separate
+    /// This class's database's connection string, for a test that needs to hand it to a separate
     /// process rather than open it here.
     /// </summary>
     /// <remarks>
@@ -63,20 +54,15 @@ public sealed class MigratedDatabaseFixture : IAsyncLifetime
     /// <inheritdoc />
     public async ValueTask InitializeAsync()
     {
-        if (!SqlServerContainerFixture.IsContainerRuntimeAvailable())
-        {
-            UnavailableReason =
-                "No container runtime is reachable, so there is no SQL Server to migrate. This " +
-                "is a skip rather than a failure because a stopped Rancher Desktop backend is a " +
-                "local condition, not a defect in the solution.";
+        UnavailableReason = SqlServerEngine.UnavailableReason;
 
+        if (UnavailableReason is not null)
+        {
             return;
         }
 
-        _container = new SqlServerContainerFixture();
-        await _container.InitializeAsync();
-
-        var database = new RegistrationDatabase(_container.ConnectionString);
+        var connectionString = await engine.CreateDatabaseAsync(TestContext.Current.CancellationToken);
+        var database = new RegistrationDatabase(connectionString);
 
         // The schema comes from the migrations, so every assertion in this class is an assertion
         // about what the migration produces rather than about what the model would have produced.
@@ -84,19 +70,18 @@ public sealed class MigratedDatabaseFixture : IAsyncLifetime
         await database.MigrateAsync(TestContext.Current.CancellationToken);
 
         Database = database;
-        ConnectionString = _container.ConnectionString;
+        ConnectionString = connectionString;
     }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (_container is not null)
+        if (ConnectionString is not null)
         {
-            // Cleanup is container disposal. Never delete statements - those would need a session
-            // context to see the rows they are removing, so a cleanup that "works" may be
+            // Cleanup is disposal of the whole database. Never delete statements - those would need
+            // a session context to see the rows they are removing, so a cleanup that "works" may be
             // evidence that isolation is broken.
-            await _container.DisposeAsync();
-            _container = null;
+            await engine.DropDatabaseAsync(ConnectionString);
         }
 
         Database = null;

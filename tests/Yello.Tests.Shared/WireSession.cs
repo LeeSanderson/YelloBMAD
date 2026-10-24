@@ -2,7 +2,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Yello.Contracts.Accounts;
 
-namespace Yello.Tests.Slices;
+namespace Yello.Tests.Shared;
 
 /// <summary>
 /// Cookies and anti-forgery tokens, handled explicitly, because both are what these tests are
@@ -10,7 +10,9 @@ namespace Yello.Tests.Slices;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>At the suite root rather than beside one use case, because both endpoints need it.</b>
+/// <b>In <c>Yello.Tests.Shared</c> since story 1.9</b>, so the isolation and revocation suites send
+/// exactly what the slice suite sends: one copy of the thing every wire case trusts (Q2 (a)). It was
+/// at the slice suite's root before that, because both endpoints needed it.
 /// AR-14 requires an anti-forgery token on <i>every</i> state-changing request, so story 1.4's
 /// decision reached <c>POST /api/v1/accounts</c> as well - and story 1.3's endpoint tests, which
 /// had never sent one, began failing the moment it did. That is the gate working: a shipped
@@ -33,7 +35,8 @@ namespace Yello.Tests.Slices;
 /// and a <c>CookieContainer</c> would attach cookies invisibly.
 /// </para>
 /// </remarks>
-internal sealed class WireSession(HttpClient client)
+#pragma warning disable S2360 // Optional parameters on a public API: moved from Yello.Tests.Slices unchanged (story 1.9 Q2 (a)); overloads would rewrite every call site while moving.
+public sealed class WireSession(HttpClient client)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -356,6 +359,8 @@ internal sealed class WireSession(HttpClient client)
     }
 }
 
+#pragma warning restore S2360
+
 /// <summary>
 /// A response, read into memory so two of them can be compared to each other after both have been
 /// disposed.
@@ -371,7 +376,7 @@ internal sealed class WireSession(HttpClient client)
 /// <param name="ContentType">The content type, or <c>null</c>.</param>
 /// <param name="HeaderNames">Every header name, ordered, less the ones that differ between any two responses.</param>
 /// <param name="Headers">Every header, by name, for the cases that read one.</param>
-internal sealed record WireResponse(
+public sealed record WireResponse(
     System.Net.HttpStatusCode StatusCode,
     string Body,
     string? ContentType,

@@ -13,20 +13,18 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Its own class, and that is not tidiness.</b> <c>TESTING-CONVENTIONS.md:347-350</c>: "the
-/// pooled-connection isolation case needs its own container, with pool size pinned to 1 and
-/// parallelism disabled. A pooled connection carrying a stale session context is the thing that
-/// case exists to catch, and it cannot be observed on a shared pool." A class fixture is one
-/// container, so a separate class is how that is obtained without settling the sharing model.
+/// <b>Its own class, its own database, and no parallelism.</b> Since story 1.9 there is one SQL
+/// Server per test process, and this class takes a database of its own on it like every other.
+/// That is enough for a pinned pool: SqlClient keys pools by the exact connection string, so
+/// <c>Max Pool Size=1</c> on this class's database is a pool no other class can draw from. The
+/// collection below has parallelisation disabled, so nothing else runs while the reuse is observed.
 /// </para>
 /// <para>
-/// <b>What this story owns and what story 1.9 owns.</b> The behaviour is story 1.5's acceptance
-/// criterion, so it is asserted here against a locally pinned pool. The isolation suite's own
-/// harness for it - test id <b>I-8</b>, its own collection with parallelism disabled, run on both
-/// surfaces per AD-4 - is story 1.9's (<c>test-design-architecture.md:329-337</c>), and this is not
-/// that case. <c>Yello.Tests.Isolation</c> cannot be populated until the API-token surface exists
-/// in story 1.8, and a case built against the wrong topology is precisely the one that gets
-/// quarantined for flakiness.
+/// <b>The lower-level guard; I-8 itself is in the isolation suite.</b> The behaviour is story
+/// 1.5's acceptance criterion, asserted here in process against the product's resolver and reader
+/// with <c>@@SPID</c> as the identity of the reused connection. The isolation suite's case - test
+/// id <b>I-8</b>, over the wire on both surfaces per AD-4 - is
+/// <c>Yello.Tests.Isolation.PooledConnectionCaseTests</c> (story 1.9).
 /// </para>
 /// <para>
 /// <b>Through the product's own resolver and reader</b>, not a hand-rolled session-context call: the
@@ -40,6 +38,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 [Trait("Requirement", "AR-6")]
 [Trait("Requirement", "AD-2")]
 [Trait("Requirement", "NFR-1")]
+[Collection(nameof(PinnedPoolCollection))]
 public sealed class PooledConnectionIsolationTests(MigratedDatabaseFixture fixture)
     : IClassFixture<MigratedDatabaseFixture>
 {
@@ -238,3 +237,10 @@ public sealed class PooledConnectionIsolationTests(MigratedDatabaseFixture fixtu
         }.ConnectionString;
     }
 }
+
+/// <summary>
+/// The pinned-pool case runs alone: a collection with parallelisation disabled runs after the
+/// parallel ones, by itself (story 1.9, AC12).
+/// </summary>
+[CollectionDefinition(nameof(PinnedPoolCollection), DisableParallelization = true)]
+public sealed class PinnedPoolCollection;

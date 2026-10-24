@@ -323,65 +323,52 @@ assembly as metadata and read by both the fixture and `Yello.AppHost`. It used t
 in each, which let the suites and local orchestration run different engine builds with nothing
 in the repository changing. A gate asserts no source file states it literally.
 
-**One container per test CLASS, via `IClassFixture`.** Story 1.3 added `MigratedDatabaseFixture`
-(`Yello.Tests.Slices`), which wraps `SqlServerContainerFixture`, applies the migrations once, and
-exposes both a `RegistrationDatabase` and the raw connection string. Use it rather than
-constructing the fixture per test: each engine is roughly 2 GB and takes tens of seconds to become
-ready, so a class of eight cases would otherwise mean eight sequential starts.
+**One engine per test PROCESS, a database per test CLASS - settled by story 1.9.**
+`SqlServerEngine` (`Yello.Tests.Shared`) is an xunit v3 **assembly fixture**: each suite that needs
+SQL Server declares `[assembly: AssemblyFixture(typeof(SqlServerEngine))]` exactly once, and xunit
+creates one instance per test assembly, which under Microsoft.Testing.Platform is one per process.
+It starts the container on first use, not at assembly start, so the classes that need no database
+(the inverted-guard cases, the probes, the gates) never wait for one. Each class then takes a
+**database of its own** on it: `MigratedDatabaseFixture` (Slices) and the isolation and revocation
+worlds call `CreateDatabaseAsync`, which creates `yello_{guid:N}` and hands back a connection string
+whose `Initial Catalog` names it, and drop it at the end. Classes share the engine and nothing else;
+`SharedEngineDatabaseIsolationTests` proves that rather than assuming it.
 
-It is a **wrapper** rather than a direct `IClassFixture<SqlServerContainerFixture>` for one reason,
-and any replacement must keep it: xunit builds a class fixture *before* any test in the class runs,
-so letting `InitializeAsync` throw turns "Rancher Desktop is stopped" into a class of red tests
-with a container stack trace. It records the reason instead, and each test opens with
-`Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason)`.
+A full `dotnet test Yello.slnx` therefore starts **at most 5 SQL Server engines** - one each for
+Slices, Isolation, Revocation and Client, plus at most one private engine kept where a test's
+subject needs one - and `ContainerTopologyGateTests` holds that budget: no test class constructs
+and starts `SqlServerContainerFixture` outside a named list, and each suite using the engine
+declares exactly one assembly fixture. Every engine is capped at `MSSQL_MEMORY_LIMIT_MB` 2048.
 
-**Topology is NOT settled, and the class fixture does not settle it.** The intent recorded in
-story 1.1 was "one instance amortised across collections", and as built that cannot hold: the
-fixture has no `[CollectionDefinition]`, no assembly-level registration and no container reuse,
-and the suites run as separate Microsoft.Testing.Platform *processes* — which puts cross-suite
-sharing out of reach without reuse or an external orchestrator. Nothing is shared across classes,
-suites or processes. **Story 1.9** owns the decision, being the first story that has to make the
-sharing model real. Until then, read "shared" as intent rather than as description.
+**Measured, 2026-10-24.** Before: thirteen engines started concurrently (ten class fixtures, three
+direct constructions), a 7.9 GB Docker peak, 0.63 GB of host memory left at the low point, and the
+Rancher backend timing out mid-run ("timed out dialing Hyper-V socket"), which failed 62 Slices
+tests. After: **four** engines (Slices, Isolation, Revocation, Client), a **3.4 GB** Docker peak,
+and the full run green with the browser suite in the same run (504 total, 503 passed, 1 skipped).
+The Slices suite alone starts one engine and peaks at about 1 GB. Host memory is not the cleaner
+measure on this machine - Chromium, the editor and the WSL VM move it more than the tests do - so
+the Docker peak is the number to compare.
 
-**The cost is now measured rather than estimated.** A full `dotnet test Yello.slnx` starts **nine**
-engines: **six** for the container-backed test classes taking `IClassFixture<MigratedDatabaseFixture>`
-— story 1.3's `RegisterAccountEndpointTests`, `RegisterAccountIntegrationTests`,
-`RegistrationDurationTests` and `SpaceIsolationSchemaTests`, plus story 1.4's `SessionEndpointTests`
-and `RehashIntegrationTests` — and **three** for story 1.1's direct constructions
-(`SharedFixtureSmokeTest`, `HostStartupTests`, `StartupConnectivityCheckTests`). Roughly 30 seconds
-to first assertion each, about 2 GB apiece. **They start in parallel rather than sequentially**,
-which is why the wall clock is around 50 seconds rather than four and a half minutes — but the
-memory is concurrent, and that is the number story 1.9 has to size against rather than the time.
+`MigratedDatabaseFixture` is still a **wrapper** for the reason it always was: xunit builds a class
+fixture *before* any test in the class runs, so an unconfigured runtime is recorded as
+`UnavailableReason` and each test opens with `Assert.SkipUnless(fixture.IsAvailable,
+fixture.UnavailableReason)`. A runtime that is **configured but dead** is different and **fails**:
+the engine pings the daemon first (`SqlServerContainerFixture.ProbeContainerRuntimeAsync`) and
+throws with the probe's reason. Skipping SM-1 silently on a dead runtime would be a vacuous gate.
 
-**The headroom is gone, measured on 2026-09-18.** Docker on this machine reports 16.6 GB total and
-Rancher Desktop runs a Kubernetes control plane in the same allocation; during a full run the
-operating system killed a background process for low memory. No test failed and nothing flaked —
-nine engines are not all at their working-set peak at once — but the next story to add a
-container-backed class is the one that finds out. If a run starts behaving strangely, check memory
-before suspecting the tests.
+**The pooled-connection cases need no engine of their own.** SqlClient keys pools by the exact
+connection string, so `Max Pool Size=1` on a class's own database is its own pinned pool on the
+shared engine. Those cases (`Slices/PooledConnectionIsolationTests` and
+`Isolation/PooledConnectionCaseTests`) run in a collection with `DisableParallelization = true`.
 
-**Story 1.4 deliberately kept two classes OUT of that count**, and the reason is the one story 1.3
-recorded: `PasswordVerificationDurationTests` and `AuthenticateAccountHandlerTests` need no
-database, so they take no fixture and run on a machine with the container runtime down — which is
-the machine where a tolerance or a uniformity assertion is most likely to be edited.
-
-> **Corrected at code review on 2026-09-10.** This said "four engines … two for story 1.3's
-> container-backed test classes, two for story 1.1's direct constructions" — while the paragraph
-> two lines above it said "four container-backed test classes" for story 1.3 alone. Both halves of
-> the four were wrong and the two sentences contradicted each other. The figure matters because
-> **story 1.9 sizes its topology decision from it**: the real cost of leaving the sharing model
-> unbuilt is roughly 14 GB and three and a half minutes of container startup per full run, not
-> eight and two.
-
-**One exception that holds regardless:** the pooled-connection isolation case in story 1.9
-needs its own container, with pool size pinned to 1 and parallelism disabled. A pooled
-connection carrying a stale session context is the thing that case exists to catch, and it
-cannot be observed on a shared pool.
+**Story 1.4 deliberately kept two classes away from the database**, and the reason still holds:
+`PasswordVerificationDurationTests` and `AuthenticateAccountHandlerTests` need no rows, so they
+take no fixture and run on a machine with the container runtime down.
 
 **Startup is bounded.** The fixture fails after five minutes rather than hanging
 (`YELLO_CONTAINER_STARTUP_TIMEOUT_SECONDS` raises it for a cold image pull), captures the
 container log on failure, and exposes `IsContainerRuntimeAvailable()` so a suite can skip with
-a reason instead of erroring when no container runtime is up. Its wait strategy is
+a reason instead of erroring when no container runtime is configured. Its wait strategy is
 `MsSqlBuilder`'s own `sqlcmd` probe, deliberately not overridden: `WithWaitStrategy` *replaces*
 the strategy list, so substituting a port check trades engine readiness for "1433 is bound",
 and SQL Server binds the port well before it accepts logins. Measured on this repository's
@@ -448,20 +435,22 @@ dotnet test             # the gate
 dotnet aspire run       # local orchestration, from Yello.AppHost
 ```
 
-`dotnet test` is the gate. As of story 1.4 it runs **235 tests, all passing**: **117** in the
-architecture suite, **110** in the slice suite and **8** in the client suite. Isolation, Revocation
-and Merge still report zero tests and exit 0 — they keep the `--ignore-exit-code 8` switch, and
-`Yello.Tests.Architecture` asserts that only empty suites may. (Story 1.3 closed at 136: 82
-architecture and 54 slice, before the client suite existed.)
+`dotnet test` is the gate. As of story 1.9 it runs **504 tests: 503 passing, 1 skipped** (the
+legacy-factor duration case): **187** architecture, **221** slice, **44** client, **35** isolation
+and **17** revocation. Merge still reports zero tests and exit 0 - it keeps the
+`--ignore-exit-code 8` switch, and `Yello.Tests.Architecture` asserts that only empty suites may.
+Isolation and Revocation are strict (`ReleaseGatingSuiteTests`): no ignored exit code, so one
+failing row fails the run with exit code 2. (Story 1.4 closed at 235; story 1.3 at 136.)
 
-**Story 1.4 did not add a case to `Yello.Tests.Isolation` or `Yello.Tests.Revocation`, and could
-not have.** AD-4 requires every isolation case to run on **both** surfaces, and the API-token
-surface does not exist until story 1.8 — so the suite genuinely cannot be populated yet. Story 1.9
-owns it. Adding one case to either would also mean removing its `--ignore-exit-code 8` property in
-the same change, which the convention gate enforces in both directions.
+**A configured but dead container runtime FAILS fast; an unconfigured one SKIPS.** Story 1.9 made
+the guard probe the daemon: `SqlServerEngine` pings it
+(`SqlServerContainerFixture.ProbeContainerRuntimeAsync`, a 15-second deadline) before it starts an
+engine, and fails every container-backed class with the probe's reason - including the Rancher
+remedy - instead of letting each one time out against a dead socket. No runtime configured at all
+is still a skip with a reason. The history below is why the split is where it is.
 
-**22 of the slice tests need a container runtime, and with none reachable they FAIL — they do not
-skip.** Measured on 2026-09-10 with Rancher Desktop stopped: `dotnet test` on the slice suite
+**Before story 1.9, 22 of the slice tests needed a container runtime, and with none reachable they
+FAILED - they did not skip.** Measured on 2026-09-10 with Rancher Desktop stopped: `dotnet test` on the slice suite
 reports **74 total, 52 succeeded, 22 failed, 0 skipped**, every failure a
 `Failed to connect to Docker endpoint at 'npipe://./pipe/docker_engine'`.
 
@@ -474,14 +463,63 @@ reports **74 total, 52 succeeded, 22 failed, 0 skipped**, every failure a
 > `SqlServerContainerFixture.IsContainerRuntimeAvailable()`, which only checks that
 > `MsSqlBuilder…Build()` does not throw — a configuration-level check that performs no I/O. A
 > configured-but-dead backend therefore reports available, the skip guard passes, and the
-> container start fails afterwards. **Making the guard probe the daemon is the fix, and it is not
-> taken here** — it belongs with story 1.9's topology decision, which owns this fixture. Until
-> then: a stopped runtime is a red suite, and that is the honest expectation to hold.
+> container start fails afterwards. **Making the guard probe the daemon is the fix** - taken by
+> story 1.9, as described above. A stopped runtime is still a red suite, now with a precise
+> message, and that is still the honest expectation to hold.
 
 Note that the 22 are not evenly distributed: xunit constructs a class fixture before any test in
 the class runs, so a container-backed *class* fails entirely — including any test in it that never
 touches a database. That is why `DurationIndistinguishabilityTests` is a separate class from
 `RegistrationDurationTests`.
+
+## The isolation and revocation suites - added by story 1.9
+
+**Every case is a row of data, and every row states what every surface gets.**
+`Yello.Tests.Isolation/IsolationCases.cs` and `Yello.Tests.Revocation/RevocationCases.cs` are single
+declared lists. Each row names its route (a `Yello.Contracts` pattern constant, never a literal), and
+an expectation for **each** member of `IsolationSurface` (`Yello.Tests.Shared`): `Session` is the
+Session cookie plus the anti-forgery header on a state-changing request, exactly what the browser
+sends; `ApiToken` is a bearer and nothing else. There is no "not applicable": a Token on a
+Session-only route is the no-credential `401`, byte for byte, and the row says so. The theory data is
+generated as `cases x surfaces`, each row named "case id / surface". A case never branches on the
+surface; it reads its expectation from the row.
+
+**Three gates hold the list.** A row with no expectation for a surface fails as a gap
+(`SurfaceGaps`, both suites). A Space-scoped or Account-scoped route the real Host maps with no row
+fails as a gap - **so a new `{spaceId}` route needs an isolation row on both surfaces before the
+suite goes green**; the route table is read from the Host's own endpoint data source, in process,
+not from a hand list. A row pending a later story names that story, and fails the suite once the
+story leaves `backlog`.
+
+**The harness is shared, and seeds through the product.** `HostProcess` and `WireSession` moved from
+the slice suite into `Yello.Tests.Shared`, beside `RunningHost` (one Host process per test class, with
+a log cursor that waits for the request-finished line of every request a case sent),
+`ProductActor` (register, sign in, read the Personal Space, issue a Token - all over HTTP) and
+`WireDatabase` (raw SQL only for what no endpoint does yet: the refusal record, a second owned Space,
+Membership removal, Space and Account deletion, a Role change). Each class gets a world: a database
+of its own on the process's one engine, migrated, and a Host on it.
+
+**Every row ends with its own slice of the Host's log checked** for every password, Token plaintext,
+Session cookie value and Space name the world has held (I-17, AC10), anchored on the Host's
+request-finished line - the Hosts these suites start log those lines through configuration, which
+the product's own level does not. Every refusal is compared as bytes against its anchor (an absent
+Space on the same surface, or no credential), and every absence is anchored on the actor reading its
+own Space first.
+
+**Timing rows run alone and read the Host's own figure.** `DurationIndistinguishability` has one
+method and two measurement points: the caller's round trip (`CompareAsync`) and a duration each arm
+reports itself (`CompareMeasuredAsync`); the isolation timing rows feed it the elapsed time from the
+Host's request-finished line. A permanent oracle (the boundary refusal against the unmatched-path
+fallback, which records nothing) must read as distinguishable on both surfaces. The timing and
+pooled-connection rows run in collections with parallelisation disabled.
+
+**The real browser against the real Host** is `Yello.Tests.Client`'s `RealHostCollection`: the dev
+server first, then a Host with `ClientOrigin` set to the client's origin, on a database on the
+suite's one engine, with `appsettings.Development.json` answered by `page.RouteAsync` carrying the
+Host's address - the only fake there. Chromium keeps the Host's `SameSite=None; Secure` cookie from
+`https://127.0.0.1` on an `http://127.0.0.1` page, so the client is not moved to https. A case that
+needs the running client's session-end path navigates in-app (`Blazor.navigateTo`), because a reload
+boots a client that never held the Session.
 
 ## CI tiering, for context
 

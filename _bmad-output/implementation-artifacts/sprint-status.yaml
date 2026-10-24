@@ -81,7 +81,7 @@ development_status:
   1-6-refuse-at-the-space-boundary-and-record-every-refusal: done
   1-7-list-and-switch-between-the-spaces-you-belong-to: done
   1-8-issue-an-api-token-scoped-to-one-space: done
-  1-9-prove-isolation-on-both-surfaces: ready-for-dev
+  1-9-prove-isolation-on-both-surfaces: review
   1-10-ship-it-to-azure-with-migrations-as-an-explicit-step: backlog
   epic-1-retrospective: optional
 

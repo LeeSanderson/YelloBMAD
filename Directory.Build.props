@@ -66,6 +66,26 @@
   </ItemGroup>
 
   <!--
+    ONE-OFF AUDIT SUPPRESSION - approved by Lee, 2026-10-24.
+
+    System.Security.Cryptography.Pkcs 9.0.x arrives transitively via Microsoft.Data.SqlClient
+    (and 10.0.8 via the AppHost). No stable SqlClient release fixes it: 7.1.1, the newest, still
+    brings 9.0.18 and the fix is 9.0.21. Suppressed by advisory, not by NU1902/NU1903 as a whole,
+    so any new advisory still fails the build.
+
+    MessagePack 2.5.302 (GHSA-qhrr-8q5h-9q3h, moderate) arrives transitively via Aspire in the
+    AppHost and the Architecture tests that reference it; same one-off, remove when Aspire moves on.
+
+    Remove this ItemGroup when SqlClient ships a fix or Pkcs >= 9.0.21 is in the graph. Tracked
+    in deferred-work.md (Pkcs audit entry, owner story 1.10).
+  -->
+  <ItemGroup Label="One-off NuGet audit suppressions">
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-846f-f764-76mx" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-2fmv-rv2c-59x7" />
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-qhrr-8q5h-9q3h" />
+  </ItemGroup>
+
+  <!--
     Nothing else belongs here. Two ordering facts, both verified against
     `dotnet msbuild -preprocess`, decide where an override has to go:
 

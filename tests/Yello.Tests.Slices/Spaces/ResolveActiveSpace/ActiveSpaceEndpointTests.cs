@@ -9,6 +9,7 @@ using Yello.Contracts.Accounts;
 using Yello.Contracts.Spaces;
 using Yello.Domain.Accounts;
 using Yello.Domain.Memberships;
+using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
 
 namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;

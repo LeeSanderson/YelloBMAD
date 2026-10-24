@@ -86,8 +86,8 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
     /// container-backed class would start a tenth SQL Server engine on a machine the deferred-work
     /// ledger already records running nine concurrently against 16.6 GB, with the operating system
     /// killing a background process for memory during this story's own test run. This class already
-    /// holds the fixture, so the measurement costs no additional engine. Story 1.9 owns the topology
-    /// decision that would make that constraint go away.
+    /// holds the fixture, so the measurement costs no additional engine. Since story 1.9 that
+    /// constraint is gone: a new class costs a database on the process's one engine, not an engine.
     /// </para>
     /// <para>
     /// <b>What it cannot prove.</b> Both arms here verify against a hash at the CURRENT work factor,

@@ -1,4 +1,3 @@
-using System.Reflection;
 using Xunit;
 using Yello.Tests.Shared;
 
@@ -12,12 +11,10 @@ namespace Yello.Tests.Slices;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds.</b> The probe does not exist yet, so it is reached <b>by name</b>:
-/// <c>ProbeContainerRuntimeAsync(Uri endpoint, TimeSpan deadline)</c> and
-/// <c>ProbeContainerRuntimeAsync(TimeSpan deadline)</c> (the configured endpoint), each returning
-/// <c>Task&lt;string?&gt;</c> - <c>null</c> when the daemon answered, otherwise the reason. The names
-/// and shape are proposals; a different choice in dev-story is corrected here and recorded in the
-/// Debug Log. On activation, replace the reflection with typed calls.
+/// <b>Activated by story 1.9 Task 2.</b> The probe is
+/// <see cref="SqlServerContainerFixture.ProbeContainerRuntimeAsync(Uri, TimeSpan)"/> and its
+/// configured-endpoint overload, each returning <c>null</c> when the daemon answered and the reason
+/// otherwise - the shape the scaffold proposed.
 /// </para>
 /// <para>
 /// <b>The decision the probe serves is recorded, not changed:</b> a dead runtime still makes
@@ -41,13 +38,13 @@ public sealed class ContainerRuntimeProbeTests
     /// 1.9-PROBE-001 - an endpoint nothing listens on is reported unavailable within the deadline, with
     /// a reason that names the endpoint.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the daemon probe does not exist yet; IsContainerRuntimeAvailable() does no I/O (story 1.9 Task 2)")]
+    [Fact]
     public async Task A_dead_runtime_endpoint_is_reported_unavailable_within_the_deadline()
     {
         var dead = new Uri("tcp://127.0.0.1:1");
         var started = TimeProvider.System.GetTimestamp();
 
-        var reason = await ProbeAsync([typeof(Uri), typeof(TimeSpan)], dead, Deadline);
+        var reason = await SqlServerContainerFixture.ProbeContainerRuntimeAsync(dead, Deadline);
 
         Assert.NotNull(reason);
         Assert.Contains("127.0.0.1:1", reason, StringComparison.Ordinal);
@@ -58,26 +55,11 @@ public sealed class ContainerRuntimeProbeTests
     /// 1.9-PROBE-002 - anchor: the configured runtime, running, is reported available. Without this,
     /// a probe that always says "dead" would pass PROBE-001.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the daemon probe does not exist yet (story 1.9 Task 2)")]
+    [Fact]
     public async Task The_configured_running_runtime_is_reported_available()
     {
         Assert.True(SqlServerContainerFixture.IsContainerRuntimeAvailable(), "No container runtime is configured on this machine.");
 
-        Assert.Null(await ProbeAsync([typeof(TimeSpan)], Deadline));
-    }
-
-    private static async Task<string?> ProbeAsync(Type[] parameters, params object[] arguments)
-    {
-        var probe = typeof(SqlServerContainerFixture).GetMethod(
-            "ProbeContainerRuntimeAsync",
-            BindingFlags.Public | BindingFlags.Static,
-            parameters)
-            ?? throw new InvalidOperationException(
-                $"SqlServerContainerFixture.ProbeContainerRuntimeAsync({string.Join(", ", parameters.Select(p => p.Name))}) does not exist (story 1.9 Task 2).");
-
-        var task = probe.Invoke(null, arguments) as Task<string?>
-            ?? throw new InvalidOperationException("ProbeContainerRuntimeAsync does not return Task<string?> (story 1.9 Task 2).");
-
-        return await task;
+        Assert.Null(await SqlServerContainerFixture.ProbeContainerRuntimeAsync(Deadline));
     }
 }
