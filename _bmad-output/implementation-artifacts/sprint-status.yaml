@@ -80,7 +80,7 @@ development_status:
   1-5-resolve-the-active-space-per-request-enforced-in-the-database: done
   1-6-refuse-at-the-space-boundary-and-record-every-refusal: done
   1-7-list-and-switch-between-the-spaces-you-belong-to: done
-  1-8-issue-an-api-token-scoped-to-one-space: backlog
+  1-8-issue-an-api-token-scoped-to-one-space: ready-for-dev
   1-9-prove-isolation-on-both-surfaces: backlog
   1-10-ship-it-to-azure-with-migrations-as-an-explicit-step: backlog
   epic-1-retrospective: optional
