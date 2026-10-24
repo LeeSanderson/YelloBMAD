@@ -1,0 +1,458 @@
+@page "/account"
+
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Sessions
+@using Yello.Client.Spaces
+@using Yello.Contracts.ApiTokens
+@using Yello.Contracts.Spaces
+
+@implements IDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+@inject SessionState Session
+@inject SpaceDirectory Directory
+@inject NavigationManager Navigation
+@inject IJSRuntime JS
+@inject AntiforgeryTokenSource Antiforgery
+
+@*
+    ACCOUNT SETTINGS - AD-24's second Account-scoped surface. Story 1.8: AC4, AC7, AC11; UX-DR12,
+    UX-DR37; EXPERIENCE.md:55, :191, :274, UJ-7.
+
+    THE API TOKEN SECTION ONLY. Profile, password and Account deletion are later stories'.
+
+    BEFORE GENERATING, THE PAGE SAYS THE TOKEN IS SHOWN ONCE (AC4). The sentence is on the page from
+    the first render, before any request is made.
+
+    THE PLAINTEXT IS SHOWN INLINE, NOT IN A DIALOG (open question 10). It replaces the form in place,
+    in a read-only field that takes focus; Copy is the primary action. Esc does nothing to it -
+    EXPERIENCE.md:221 has Esc close a dialog, which would put an unconfirmed loss of the only copy one
+    key away. Done asks first, in place; only Dismiss removes it.
+
+    THE PLAINTEXT LIVES IN ONE FIELD OF THIS COMPONENT AND NOWHERE ELSE (AC11) - never in browser
+    storage, never in a service. Leaving the page disposes it with the component; a Session's end or a
+    sign-out clears it through SessionState's purge; and every answer that arrives after either is
+    dropped by the generation check, so a late issuance cannot put it back.
+
+    NO ROLE ANYWHERE (AC7, AR-29). The list shows a Token's name, its Space's name and when it was
+    made; the Space picker offers the switcher's Spaces by name. A Role here would be a Membership
+    read across a boundary on an Account-scoped surface.
+*@
+
+<div class="account-settings">
+    <h1 class="type-dialog-title" tabindex="-1" @ref="_heading">@Localizer["AccountSettingsHeading"]</h1>
+
+    <section class="api-tokens" aria-labelledby="api-tokens-heading">
+        <h2 class="type-space-name" id="api-tokens-heading">@Localizer["ApiTokensHeading"]</h2>
+
+        @if (_plaintext is { } plaintext)
+        {
+            <div class="api-token-reveal">
+                <p>@Localizer["ApiTokenShownNow"]</p>
+
+                <div class="form-field">
+                    <label class="form-field__label" for="api-token-plaintext">@Localizer["ApiTokenPlaintextLabel"]</label>
+                    <input class="form-field__control api-token-reveal__plaintext"
+                           id="api-token-plaintext"
+                           type="text"
+                           readonly
+                           value="@plaintext"
+                           autocomplete="off"
+                           spellcheck="false"
+                           @ref="_plaintextField" />
+                </div>
+
+                <button type="button" class="button-primary" @onclick="CopyAsync">@Localizer["ApiTokenCopy"]</button>
+                <p class="api-token-reveal__status" role="status">@_copyStatus</p>
+
+                @if (_confirmingDismissal)
+                {
+                    <div class="api-token-confirm">
+                        <p>@Localizer["ApiTokenDismissWarning"]</p>
+                        <button type="button" class="button-danger" @onclick="Dismiss">@Localizer["ApiTokenDismiss"]</button>
+                        <button type="button" class="button-secondary" @onclick="KeepShowing">@Localizer["ApiTokenKeepShowing"]</button>
+                    </div>
+                }
+
+                @if (!_confirmingDismissal)
+                {
+                    <button type="button" class="button-secondary" @onclick="AskToDismiss">@Localizer["ApiTokenDone"]</button>
+                }
+            </div>
+        }
+
+        @if (_plaintext is null)
+        {
+            <p>@Localizer["ApiTokenShownOnce"]</p>
+
+            <form class="api-token-form" @onsubmit="GenerateAsync" novalidate>
+                <FormField FieldId="api-token-name"
+                           Label="@Localizer["ApiTokenNameLabel"]"
+                           Value="@_name"
+                           ValueChanged="value => _name = value"
+                           Message="@_nameMessage"
+                           Invalid="@(_nameMessage is not null)"
+                           Disabled="@_issuing" />
+
+                <div class="form-field">
+                    <label class="form-field__label" for="api-token-space">@Localizer["ApiTokenSpaceLabel"]</label>
+                    <select class="form-field__control"
+                            id="api-token-space"
+                            disabled="@_issuing"
+                            @bind="_spaceId">
+                        @foreach (var space in _spaces)
+                        {
+                            <option value="@space.Id">@space.Name</option>
+                        }
+                    </select>
+                </div>
+
+                @if (_issueRefusal is { } refusal)
+                {
+                    <p class="api-token-form__refusal" role="status">@refusal</p>
+                }
+
+                <PrimaryButton Disabled="@(_issuing || _spaces.Count == 0)">@Localizer["ApiTokenGenerate"]</PrimaryButton>
+            </form>
+        }
+
+        @if (_tokens.Count == 0)
+        {
+            <p class="api-token-list__empty">@Localizer["ApiTokenListEmpty"]</p>
+        }
+
+        @if (_tokens.Count > 0)
+        {
+            <ul class="api-token-list">
+                @foreach (var token in _tokens)
+                {
+                    <ApiTokenRow @key="token.Id"
+                                 Token="@token"
+                                 Confirming="@(_confirmingRevoke == token.Id)"
+                                 OnAskToRevoke="AskToRevoke"
+                                 OnRevoke="RevokeAsync"
+                                 OnCancel="CancelRevoke" />
+                }
+            </ul>
+        }
+    </section>
+</div>
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private readonly CancellationTokenSource _disposal = new();
+
+    private ElementReference _heading;
+    private ElementReference _plaintextField;
+    private IDisposable? _purgeRegistration;
+
+    /// <summary>
+    /// Bumped by every purge. An answer that started before one is dropped when it arrives.
+    /// </summary>
+    private int _generation;
+
+    private string? _plaintext;
+    private string? _copyStatus;
+    private bool _confirmingDismissal;
+    private bool _focusPlaintext;
+    private bool _focusHeading;
+
+    private string _name = string.Empty;
+    private string? _nameMessage;
+    private string? _issueRefusal;
+    private bool _issuing;
+    private Guid _spaceId;
+
+    private Guid? _confirmingRevoke;
+
+    private IReadOnlyList<SpaceIdentityResponse> _spaces = [];
+    private IReadOnlyList<ApiTokenResponse> _tokens = [];
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Navigation.NavigateTo(ClientRoutes.SignIn, replace: true);
+            return;
+        }
+
+        _purgeRegistration = Session.RegisterPurge(PurgeAsync);
+        _focusHeading = true;
+
+        UseSpaces(Directory.Current);
+
+        var generation = _generation;
+
+        UseSpaces(await Directory.RefreshAsync(_disposal.Token), generation);
+        await LoadTokensAsync(generation);
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusPlaintext)
+        {
+            _focusPlaintext = false;
+            await _plaintextField.FocusAsync();
+        }
+        else if (_focusHeading)
+        {
+            _focusHeading = false;
+            await _heading.FocusAsync();
+        }
+        else
+        {
+            // Nothing asked for focus on this render; it stays where the person put it.
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _generation++;
+        _plaintext = null;
+        _purgeRegistration?.Dispose();
+        _disposal.Cancel();
+        _disposal.Dispose();
+    }
+
+    private void UseSpaces(IReadOnlyList<SpaceIdentityResponse>? spaces, int? generation = null)
+    {
+        if (spaces is null || (generation is { } started && started != _generation))
+        {
+            return;
+        }
+
+        _spaces = spaces;
+
+        if (!spaces.Any(space => space.Id == _spaceId))
+        {
+            _spaceId = spaces.Count > 0 ? spaces[0].Id : Guid.Empty;
+        }
+    }
+
+    private async Task LoadTokensAsync(int generation)
+    {
+        try
+        {
+            using var linked = Session.LinkToSession(_disposal.Token);
+
+            var tokens = await Http.GetFromJsonAsync<List<ApiTokenResponse>>(ApiTokenRoutes.List, JsonOptions, linked.Token);
+
+            if (tokens is not null && generation == _generation)
+            {
+                _tokens = tokens;
+            }
+        }
+        catch (HttpRequestException)
+        {
+            // The list stays as it was. A 401 is YelloApiHandler's: the Session has ended.
+        }
+        catch (JsonException)
+        {
+            // The list stays as it was.
+        }
+        catch (OperationCanceledException)
+        {
+            // The page was left, or the Session ended.
+        }
+    }
+
+    private async Task GenerateAsync()
+    {
+        if (_issuing || _spaceId == Guid.Empty)
+        {
+            return;
+        }
+
+        _issuing = true;
+        _nameMessage = null;
+        _issueRefusal = null;
+
+        var generation = _generation;
+
+        try
+        {
+            using var linked = Session.LinkToSession(_disposal.Token);
+
+            var spaceId = _spaceId;
+            var request = new IssueApiTokenRequest(_name);
+
+            using var response = await SendStateChangeAsync(
+                () => Http.PostAsJsonAsync(ApiTokenRoutes.IssueIn(spaceId), request, JsonOptions, linked.Token),
+                linked.Token);
+
+            if (generation != _generation)
+            {
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.Created
+                && await response.Content.ReadFromJsonAsync<IssuedApiTokenResponse>(JsonOptions, linked.Token) is { } issued
+                && generation == _generation)
+            {
+                Reveal(issued.Token);
+                await LoadTokensAsync(generation);
+            }
+            else if (response.StatusCode == HttpStatusCode.BadRequest)
+            {
+                _nameMessage = Localizer["ApiTokenNameInvalid"];
+            }
+            else if (response.StatusCode != HttpStatusCode.Unauthorized && generation == _generation)
+            {
+                // The chosen Space has gone from under the person, or a refusal of another kind: the
+                // refusal surface's own words, in place.
+                var problem = await ReadProblemAsync(response, linked.Token);
+                _issueRefusal = Localizer[RefusalCopy.For(problem, key => !Localizer[key].ResourceNotFound).Key];
+            }
+            else
+            {
+                // A 401 is YelloApiHandler's: the Session has ended and the purge has run.
+            }
+        }
+        catch (HttpRequestException)
+        {
+            _issueRefusal = Localizer[RefusalCopy.NotAvailableKey];
+        }
+        catch (JsonException)
+        {
+            _issueRefusal = Localizer[RefusalCopy.NotAvailableKey];
+        }
+        catch (OperationCanceledException)
+        {
+            // The page was left, or the Session ended, while the answer was on its way.
+        }
+        finally
+        {
+            _issuing = false;
+        }
+    }
+
+    private void Reveal(string plaintext)
+    {
+        _plaintext = plaintext;
+        _name = string.Empty;
+        _copyStatus = null;
+        _confirmingDismissal = false;
+        _focusPlaintext = true;
+    }
+
+    private async Task CopyAsync()
+    {
+        if (_plaintext is not { } plaintext)
+        {
+            return;
+        }
+
+        try
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", plaintext);
+            _copyStatus = Localizer["ApiTokenCopied"];
+        }
+        catch (JSException)
+        {
+            _copyStatus = Localizer["ApiTokenCopyFailed"];
+            _focusPlaintext = true;
+        }
+    }
+
+    private void AskToDismiss() => _confirmingDismissal = true;
+
+    private void KeepShowing()
+    {
+        _confirmingDismissal = false;
+        _focusPlaintext = true;
+    }
+
+    private void Dismiss()
+    {
+        _plaintext = null;
+        _copyStatus = null;
+        _confirmingDismissal = false;
+        _focusHeading = true;
+    }
+
+    private void AskToRevoke(Guid tokenId) => _confirmingRevoke = tokenId;
+
+    private void CancelRevoke() => _confirmingRevoke = null;
+
+    private async Task RevokeAsync(Guid tokenId)
+    {
+        _confirmingRevoke = null;
+
+        var generation = _generation;
+
+        try
+        {
+            using var linked = Session.LinkToSession(_disposal.Token);
+            using var response = await SendStateChangeAsync(
+                () => Http.DeleteAsync(new Uri(ApiTokenRoutes.RevokeOf(tokenId), UriKind.Relative), linked.Token),
+                linked.Token);
+        }
+        catch (HttpRequestException)
+        {
+            // The list below is the server's answer either way.
+        }
+        catch (OperationCanceledException)
+        {
+            return;
+        }
+
+        await LoadTokensAsync(generation);
+    }
+
+    /// <summary>
+    /// The Session ended or was signed out: the plaintext, the list and every half-finished answer go.
+    /// </summary>
+    private Task PurgeAsync()
+    {
+        _generation++;
+        _plaintext = null;
+        _copyStatus = null;
+        _confirmingDismissal = false;
+        _confirmingRevoke = null;
+        _tokens = [];
+        _spaces = [];
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// Sends a state-changing request with an anti-forgery token, asking for a fresh token and sending
+    /// once more if the held one is refused - it is bound to the identity it was minted for, which a
+    /// sign-in since may have replaced.
+    /// </summary>
+    private async Task<HttpResponseMessage> SendStateChangeAsync(Func<Task<HttpResponseMessage>> send, CancellationToken token)
+    {
+        await Antiforgery.EnsureTokenAsync();
+
+        var response = await send();
+
+        if (response.StatusCode != HttpStatusCode.BadRequest
+            || (await ReadProblemAsync(response, token))?.Type != ProblemTypes.AntiforgeryTokenMissing)
+        {
+            return response;
+        }
+
+        response.Dispose();
+        Antiforgery.Invalidate();
+        await Antiforgery.EnsureTokenAsync();
+
+        return await send();
+    }
+
+    private static async Task<ProblemResponse?> ReadProblemAsync(HttpResponseMessage response, CancellationToken token)
+    {
+        if (response.Content.Headers.ContentType?.MediaType is not "application/problem+json")
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ProblemResponse>(JsonOptions, token);
+    }
+}

@@ -246,6 +246,12 @@ Two consequences for anyone writing a case here:
   so a case asserting a request was authenticated could pass without anyone having said which cookie
   carried it; and .NET's `CookieContainer` refuses to store a `Secure` cookie at all when the
   response arrived over `http`, which is how this was going to fail next.
+- **A Token request attaches no cookie** (story 1.8). `WireSession.GetWithTokenAsync`,
+  `PostWithTokenAsync` and `DeleteWithTokenAsync` send `Authorization: Bearer` and nothing else —
+  no cookie and no anti-forgery header, whatever the session holds — so a case asserting a Token was
+  served cannot pass because the Session cookie rode along. The bearer value is sent unvalidated, so
+  a malformed one reaches the Host as written. `GetWithTokenAndCookiesAsync` attaches both and exists
+  only to prove a request carrying both is authenticated by the Token alone; use it for nothing else.
 
 **A second lesson from the same run, and it was a product defect rather than a test one.** ASP.NET
 Core binds an anti-forgery token to the identity it was issued to, so a token minted while anonymous

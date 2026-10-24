@@ -18,7 +18,7 @@ public enum AccountScopedSurface
     SpaceSwitcher,
 
     /// <summary>
-    /// Account settings. Reserved: stories 1.8 (API Tokens) and 5.4 (deletion) map it.
+    /// Account settings - the API Token list and revocation (story 1.8); Account deletion is 5.4's.
     /// </summary>
     AccountSettings,
 }

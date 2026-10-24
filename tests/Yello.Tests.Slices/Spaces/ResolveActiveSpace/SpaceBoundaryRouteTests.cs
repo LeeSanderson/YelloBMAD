@@ -7,6 +7,7 @@ using Xunit;
 using Yello.Application.Spaces;
 using Yello.Domain.Memberships;
 using Yello.Host;
+using Yello.Host.ApiTokens;
 using Yello.Host.Sessions;
 using Yello.Host.Spaces;
 using Yello.Infrastructure;
@@ -65,12 +66,12 @@ public sealed class SpaceBoundaryRouteTests
     /// </summary>
     /// <remarks>
     /// Through the real group, on the route that is not Space-scoped so no database is needed. The
-    /// principal is the one Task 4 builds: authentication type <c>Yello.ApiToken</c> and the three
-    /// Token claims, written here as literals until <c>ApiTokenPrincipal</c> exists - replace them
-    /// with it on activation. The Session-authenticated case below is the same request with a Session
+    /// principal is the one the Token scheme builds, set on the request directly: the scheme itself
+    /// only authenticates on a Space-scoped route that admits Tokens, and the exemption is decided by
+    /// the principal. The Session-authenticated case below is the same request with a Session
     /// principal, still refused, so the exemption is shown to be exactly the Token's.
     /// </remarks>
-    [Fact(Skip = "red: story 1.8 AC12 - AntiforgeryRequirement does not exempt a Token-authenticated request (Task 4)")]
+    [Fact]
     [Trait("Priority", "P0")]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AR-14")]
@@ -84,13 +85,7 @@ public sealed class SpaceBoundaryRouteTests
             api.MapPost(UnscopedProbe, () => Results.NoContent());
         });
 
-        var token = new ClaimsPrincipal(new ClaimsIdentity(
-            [
-                new Claim("urn:yello:claim:token-account-id", Guid.NewGuid().ToString()),
-                new Claim("urn:yello:claim:token-space-id", Guid.NewGuid().ToString()),
-                new Claim("urn:yello:claim:token-id", Guid.NewGuid().ToString()),
-            ],
-            authenticationType: "Yello.ApiToken"));
+        var token = ApiTokenPrincipal.For(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
 
         Assert.Equal(StatusCodes.Status204NoContent, await PostAsync(app, UnscopedProbe, routeValues: null, token));
     }
@@ -245,7 +240,7 @@ public sealed class SpaceBoundaryRouteTests
         var builder = WebApplication.CreateSlimBuilder();
 
         builder.Services.AddAntiforgery();
-        builder.Services.AddSingleton<ISpaceRequestEstablishment, SessionSpaceRequestEstablishment>();
+        builder.Services.AddSingleton<ISpaceRequestEstablishment, SpaceRequestEstablishment>();
 
         var app = builder.Build();
         map(app);

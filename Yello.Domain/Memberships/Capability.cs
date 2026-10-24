@@ -99,8 +99,8 @@ public enum Capability
     DeleteSpace,
 
     /// <summary>
-    /// Issue an API Token for oneself. Every Role. Listed per Space by the matrix; story 1.8 decides
-    /// where its Account-scoped surface checks it.
+    /// Issue an API Token for oneself. Every Role. Checked per Space, on the Space-scoped issue route
+    /// (story 1.8, open question 1), because a Token is bound to the Space it is issued in.
     /// </summary>
     IssueApiTokenForOneself,
 }

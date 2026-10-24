@@ -19,9 +19,10 @@ namespace Yello.Host.Spaces;
 /// <para>
 /// <b>The Account comes from the Session the server issued</b>, never from the request (AD-2), and
 /// this surface is Session-only: CAP-35 forbids any API operation enumerating Spaces beyond a
-/// Token's own, so story 1.8's Token surface must never reach it. It reads
+/// Token's own, so the Token surface must never reach it. It reads
 /// <see cref="SessionPrincipal"/> directly rather than <see cref="ISpaceRequestEstablishment"/>,
-/// which 1.8 extends with Tokens.
+/// which story 1.8 extended with Tokens - and the Token scheme authenticates nothing on a route
+/// without <c>{spaceId}</c>, so a Token is no credential here at all.
 /// </para>
 /// <para>
 /// <b>The answer without a Session is the authentication boundary's <c>401</c></b>, ahead of

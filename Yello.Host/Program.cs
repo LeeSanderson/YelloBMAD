@@ -1,6 +1,9 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Localization;
 using Yello.Application.Accounts.AuthenticateAccount;
+using Yello.Application.ApiTokens.IssueApiToken;
+using Yello.Application.ApiTokens.ListApiTokens;
+using Yello.Application.ApiTokens.RevokeApiToken;
 using Yello.Application.Accounts.RegisterAccount;
 using Yello.Application.Accounts.SignOut;
 using Yello.Application.Spaces.ListSpaces;
@@ -8,6 +11,7 @@ using Yello.Application.Statuses.ListStatuses;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Localisation;
 using Yello.Host;
+using Yello.Host.ApiTokens;
 using Yello.Host.Endpoints;
 using Yello.Host.Sessions;
 using Yello.Host.Spaces;
@@ -78,14 +82,17 @@ builder.Services.AddScoped<AuthenticateAccountHandler>();
 builder.Services.AddScoped<SignOutHandler>();
 builder.Services.AddScoped<ListStatusesHandler>();
 builder.Services.AddScoped<ListSpacesHandler>();
+builder.Services.AddScoped<IssueApiTokenHandler>();
+builder.Services.AddScoped<ListApiTokensHandler>();
+builder.Services.AddScoped<RevokeApiTokenHandler>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
 builder.Services.AddAccountScopedResolution();
 
-// How a Space-scoped request establishes its Account and its Space. The Session half only; story
-// 1.8 adds the API Token half behind the same interface, so the two surfaces differ in this one
-// step and share everything after it (AD-4).
-builder.Services.AddSingleton<ISpaceRequestEstablishment, SessionSpaceRequestEstablishment>();
+// How a Space-scoped request establishes its Account and its Space - from the Session, or from an
+// API Token's row (story 1.8). The two surfaces differ in this one step and share everything after
+// it (AD-4).
+builder.Services.AddSingleton<ISpaceRequestEstablishment, SpaceRequestEstablishment>();
 
 // AUTHENTICATION. A plain cookie ticket, and no Identity builder of any kind - see
 // SessionCookiePolicy for the decision, and Yello.Infrastructure/InfrastructureServices.cs for
@@ -98,9 +105,16 @@ var sessionSetting = SessionCookiePolicy.ReadLifetimeSetting(
 
 var sessionLifetime = sessionSetting.Lifetime;
 
+//
+// API TOKENS (story 1.8, open question 5): the default is a policy scheme that forwards a request
+// carrying `Authorization: Bearer` to the Token scheme ALONE, and every other request to the cookie.
+// The Token scheme looks the Token up on every request, with no cache, and authenticates it only on
+// a Space-scoped route that admits Tokens - see ApiTokenAuthenticationHandler. Every SignInAsync and
+// SignOutAsync names the cookie scheme, so the selector never decides where a Session is written.
 builder.Services
-    .AddAuthentication(SessionCookiePolicy.SchemeName)
-    .AddCookie(SessionCookiePolicy.SchemeName, options => SessionCookiePolicy.Configure(options, sessionLifetime));
+    .AddAuthentication(ApiTokenAuthentication.SelectorScheme)
+    .AddCookie(SessionCookiePolicy.SchemeName, options => SessionCookiePolicy.Configure(options, sessionLifetime))
+    .AddApiTokens();
 
 // CORS, and it is read by more than CORS. .NET 10 registers an anti-request-forgery middleware by
 // default whose trust list IS this policy - so what is configured here decides two defences, and a
@@ -292,6 +306,14 @@ api.MapActiveSpace();
 // Spaces as identity only (an empty list included), or 401 without a Session. Never a refusal
 // surface, and never reachable with an API Token (CAP-35; story 1.8).
 api.MapListSpaces();
+
+// API Tokens (story 1.8). POST /api/v1/spaces/{spaceId}/api-tokens issues one bound to that Space:
+// Space-scoped, so the pipeline resolves the Membership and records a boundary refusal, and
+// Session-only, so a Token cannot issue a Token. GET and DELETE /api/v1/account/api-tokens list and
+// revoke the Account's own, on AD-24's second Account-scoped surface - Account settings.
+api.MapIssueApiToken();
+api.MapListApiTokens();
+api.MapRevokeApiToken();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

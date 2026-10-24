@@ -9,6 +9,7 @@ using Microsoft.Data.SqlClient;
 using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.Accounts;
+using Yello.Contracts.ApiTokens;
 using Yello.Contracts.Spaces;
 using Yello.Domain.Memberships;
 using Yello.Tests.Shared;
@@ -23,19 +24,11 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds, written by the story 1.8 ATDD run on 2026-10-24.</b> Every case is
-/// skipped with the AC it waits for. Activate one at a time; each fails first on its success anchor
-/// (the issue route does not exist, so it falls through to <c>UnmatchedApiEndpoint</c>'s
-/// <c>404 not-available</c>), never on an absence assertion over nothing.
-/// </para>
-/// <para>
-/// <b>Routes are string literals and bodies are raw JSON</b> because the contract types and route
-/// constants are Task 6's. On activation replace <see cref="IssueRoute"/>, <see cref="ListRoute"/>
-/// and <see cref="RevokeRoute"/> with the <c>ApiTokenRoutes</c> constants, so a rename becomes a
-/// compile error. The property names (<c>id</c>, <c>name</c>, <c>space</c>, <c>createdAt</c>,
-/// <c>token</c>) and the columns read by SQL (<c>ApiToken.Id</c>, <c>AccountId</c>,
-/// <c>BoundSpaceId</c>, <c>SecretHash</c>) are the story's Task 2 and Task 6. A different name
-/// chosen in dev-story is corrected here and recorded in the Debug Log.
+/// <b>Written as red-phase scaffolds by the story 1.8 ATDD run on 2026-10-24, activated by its
+/// dev-story run.</b> Routes are the <see cref="ApiTokenRoutes"/> constants and the issue body is
+/// <see cref="IssueApiTokenRequest"/>; responses are still read as raw JSON, so an added property
+/// cannot hide behind a DTO. The columns read by SQL are <c>ApiToken.Id</c>, <c>AccountId</c>,
+/// <c>BoundSpaceId</c> and <c>SecretHash</c>.
 /// </para>
 /// <para>
 /// <b>A Token request carries no cookie.</b> Every bearer call goes through
@@ -55,7 +48,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// same block (<c>FK_Membership_Account_AccountId</c>, Restrict); every <c>Space</c> is added in the
 /// block that first writes a <c>Membership</c> into it (<c>FK_Membership_Space_SpaceId</c>,
 /// Cascade); at most one Owner per Space (<c>UX_Membership_SpaceId_Owner</c>); one Membership per
-/// Account per Space (<c>IX_Membership_SpaceId_AccountId</c>, unique - and the alternate key Task 2
+/// Account per Space (<c>AK_Membership_SpaceId_AccountId</c>, unique - and the alternate key Task 2
 /// adds for the Token's composite foreign key). Every Token is issued through the product for a
 /// Space its Account holds a Membership in, so the composite FK <c>(BoundSpaceId, AccountId) -&gt;
 /// Membership(SpaceId, AccountId)</c> is satisfied by construction; no case inserts an
@@ -70,8 +63,6 @@ public sealed partial class ActiveSpaceEndpointTests
 {
     private const string TokenPrefix = "yello_pat_";
 
-    private const string ListRoute = "/api/v1/account/api-tokens";
-
     private static readonly string[] TokenListRowProperties = ["createdAt", "id", "name", "space"];
     private static readonly string[] IssuedTokenProperties = ["createdAt", "id", "name", "space", "token"];
 
@@ -80,7 +71,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// the plaintext; the row is bound to that Space and holds a 32-byte hash, and no stored value
     /// anywhere equals or contains the plaintext.
     /// </summary>
-    [Fact(Skip = "red: AC1/AC4 - the ApiToken table, the issue route and the secret do not exist (Tasks 2, 3, 6)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "NFR-6")]
     [Trait("Requirement", "AD-6")]
@@ -138,7 +129,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// for themselves; a Space the Account is not in and a Space that does not exist are both refused
     /// with the boundary's byte-identical <c>404</c>, each recorded as one <c>CrossSpace</c> refusal.
     /// </summary>
-    [Fact(Skip = "red: AC1/AC2 - the issue route and IssueApiTokenForOneself's endpoint do not exist (Task 6)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "AD-3")]
@@ -201,7 +192,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>CrossSpace</c> record against B - and the same for a Space of another Account. Anchored on
     /// the Token being served in A.
     /// </summary>
-    [Fact(Skip = "red: AC2 - Token authentication and the bound-Space mismatch branch do not exist (Tasks 4, 5)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AD-6")]
     [Trait("Requirement", "AD-3")]
@@ -277,7 +268,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// in-process, because a planted early return cannot be put into a separate Host process from a
     /// test.
     /// </remarks>
-    [Fact(Skip = "red: AC2 - the mismatch branch does not exist; it must still call the resolver (Task 5, Q2a)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AR-10")]
     [Trait("Requirement", "AD-3")]
@@ -319,7 +310,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// AC3 / AD-1 - a Token acts with its Account's <b>current</b> Role, read on each request: a
     /// Role changed between two Token requests reaches the second, and the Token row stores none.
     /// </summary>
-    [Fact(Skip = "red: AC3 - Token authentication does not exist (Tasks 4, 5)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AR-4")]
     [Trait("Requirement", "AD-1")]
@@ -373,7 +364,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// next Token request is <c>401</c> even though the Account is still a member elsewhere. Anchored
     /// on a removal that is rolled back leaving the Token working.
     /// </summary>
-    [Fact(Skip = "red: AC5/AC8 - the ApiToken -> Membership cascading FK and Token authentication do not exist (Tasks 2, 4)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "FR-2")]
     [Trait("Requirement", "AD-6")]
@@ -424,7 +415,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// statement, and the next Token request is <c>401</c>. Story 3.3 owns the event; this proves the
     /// schema carries it.
     /// </summary>
-    [Fact(Skip = "red: AC5/AC8 - the ApiToken -> Membership cascading FK does not exist (Task 2)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AD-6")]
     public async Task Deleting_the_Space_invalidates_its_Tokens()
@@ -472,7 +463,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// AC5 / V-3 - deleting an Account (its Memberships first, then the Account, in one transaction -
     /// the order <c>Restrict</c> forces and story 5.4 will follow) takes every Token it held with it.
     /// </summary>
-    [Fact(Skip = "red: AC5 - the ApiToken -> Membership cascading FK does not exist (Task 2)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "AD-6")]
@@ -515,7 +506,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// AC8 / Q3 - revoking a Token answers <c>204</c> and the next request with it is <c>401</c>; an id
     /// belonging to another Account answers the same <c>204</c> and that Token keeps working.
     /// </summary>
-    [Fact(Skip = "red: AC8 - the revoke route does not exist (Task 6, Q3a)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "FR-2")]
     [Trait("Requirement", "AD-24")]
@@ -543,11 +534,11 @@ public sealed partial class ActiveSpaceEndpointTests
             _ = IssuedToken(await IssueAsync(y, spaceY, "y"));
 
             await y.FetchAntiforgeryTokenAsync();
-            crossRevoke = await y.DeleteAsync(RevokeRoute(tokenX.Id));
+            crossRevoke = await y.DeleteAsync(ApiTokenRoutes.RevokeOf(tokenX.Id));
             afterCrossRevoke = await x.GetWithTokenAsync(SpaceRoutes.ActiveOf(spaceX), tokenX.Plaintext);
 
             await x.FetchAntiforgeryTokenAsync();
-            ownRevoke = await x.DeleteAsync(RevokeRoute(tokenX.Id));
+            ownRevoke = await x.DeleteAsync(ApiTokenRoutes.RevokeOf(tokenX.Id));
             afterOwnRevoke = await x.GetWithTokenAsync(SpaceRoutes.ActiveOf(spaceX), tokenX.Plaintext);
         });
 
@@ -572,7 +563,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// removed are byte-identical <c>401 authentication-failed</c> - body, content type and header
     /// names, so a <c>WWW-Authenticate</c> that names the Token scheme is caught too.
     /// </summary>
-    [Fact(Skip = "red: AC8 - Token authentication and revocation do not exist (Tasks 4, 6)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "FR-2")]
     [Trait("Requirement", "AR-10")]
@@ -600,7 +591,7 @@ public sealed partial class ActiveSpaceEndpointTests
             anchor = await session.GetWithTokenAsync(SpaceRoutes.ActiveOf(removedSpace), removed);
 
             await session.FetchAntiforgeryTokenAsync();
-            Assert.Equal(HttpStatusCode.NoContent, (await session.DeleteAsync(RevokeRoute(revoked.Id))).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await session.DeleteAsync(ApiTokenRoutes.RevokeOf(revoked.Id))).StatusCode);
             await RemoveMembershipAsync(database, removedSpace, accountId, commit: true);
 
             var route = SpaceRoutes.ActiveOf(revokedSpace);
@@ -643,11 +634,12 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <remarks>
     /// <b>Sign-out is compared, not asserted <c>401</c>.</b> AC9 lists <c>DELETE /api/v1/sessions</c>
     /// among the 401s, but story 1.7 made sign-out with no Session idempotent (Q4) and anti-forgery
-    /// answers a credential-less <c>DELETE</c> first - so "exactly as no credential" may be a
-    /// <c>400</c> there. The property that matters is that the Token is not a Session: same answer as
-    /// no credential, and nothing stamped. Dev-story records what the wire gives.
+    /// answers a credential-less <c>DELETE</c> first - so "exactly as no credential" is a <c>400</c>
+    /// there, and the wire gives exactly that: <c>400 antiforgery-token-missing</c> for both, pinned
+    /// below. The Token scheme authenticates nothing on sign-out, so the request is the anonymous one.
+    /// AC9 was amended to say so (Lee, 2026-10-24: it conflicts with 1.7 Q4).
     /// </remarks>
-    [Fact(Skip = "red: AC9 - Token authentication and the Account-settings routes do not exist (Tasks 4, 6)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "AR-29")]
@@ -677,9 +669,9 @@ public sealed partial class ActiveSpaceEndpointTests
             var anonymous = new WireSession(client);
 
             pairs.Add(("switcher", await session.GetWithTokenAsync(SpaceRoutes.Directory, token.Plaintext), await anonymous.GetAsync(SpaceRoutes.Directory)));
-            pairs.Add(("token list", await session.GetWithTokenAsync(ListRoute, token.Plaintext), await anonymous.GetAsync(ListRoute)));
-            pairs.Add(("issue", await session.PostWithTokenAsync(IssueRoute(spaceId), NameBody("from a script"), token.Plaintext), await anonymous.PostAsync(IssueRoute(spaceId), NameBody("anonymous"), withAntiforgeryToken: false)));
-            pairs.Add(("revoke", await session.DeleteWithTokenAsync(RevokeRoute(token.Id), token.Plaintext), await anonymous.DeleteAsync(RevokeRoute(token.Id), withAntiforgeryToken: false)));
+            pairs.Add(("token list", await session.GetWithTokenAsync(ApiTokenRoutes.List, token.Plaintext), await anonymous.GetAsync(ApiTokenRoutes.List)));
+            pairs.Add(("issue", await session.PostWithTokenAsync(ApiTokenRoutes.IssueIn(spaceId), NameBody("from a script"), token.Plaintext), await anonymous.PostAsync(ApiTokenRoutes.IssueIn(spaceId), NameBody("anonymous"), withAntiforgeryToken: false)));
+            pairs.Add(("revoke", await session.DeleteWithTokenAsync(ApiTokenRoutes.RevokeOf(token.Id), token.Plaintext), await anonymous.DeleteAsync(ApiTokenRoutes.RevokeOf(token.Id), withAntiforgeryToken: false)));
             pairs.Add(("current session", await session.GetWithTokenAsync(SessionRoutes.Current, token.Plaintext), await anonymous.GetAsync(SessionRoutes.Current)));
 
             signOut = (
@@ -705,6 +697,8 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.NotNull(signOut);
         Assert.Equal(signOut.Value.Anonymous.StatusCode, signOut.Value.WithToken.StatusCode);
         Assert.Equal(signOut.Value.Anonymous.Body, signOut.Value.WithToken.Body);
+        Assert.Equal(HttpStatusCode.BadRequest, signOut.Value.WithToken.StatusCode);
+        Assert.Equal(ProblemTypes.AntiforgeryTokenMissing, ProblemType(signOut.Value.WithToken));
 
         // A Token never issues a Token: still exactly the one issued through the Session.
         Assert.Single(await TokenRowsOfAsync(database, accountId));
@@ -716,7 +710,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Token it issued still serves its Space. Recorded so the choice is visible rather than
     /// incidental.
     /// </summary>
-    [Fact(Skip = "red: Q11 - Token authentication does not exist (Task 4)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "FR-2")]
@@ -756,7 +750,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// the bearer alone: with an invalid bearer it is <c>401</c>, though the same cookie alone is
     /// served.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the policy scheme that selects the Token scheme on a bearer does not exist (Task 4, Q5a)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AR-14")]
     [Trait("Requirement", "AD-7")]
@@ -795,7 +789,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Anchored on the log being captured at all (the Host's listening line is in it) and on the
     /// plaintext having really been issued.
     /// </remarks>
-    [Fact(Skip = "red: AC10 - the issue route and Token authentication do not exist (Tasks 3, 4, 6)")]
+    [Fact]
     [Trait("Requirement", "NFR-6")]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-36")]
@@ -822,10 +816,10 @@ public sealed partial class ActiveSpaceEndpointTests
             others.Add(await session.GetWithTokenAsync(SpaceRoutes.ActiveOf(elsewhere), plaintext));
             others.Add(await session.GetWithTokenAsync(SpaceRoutes.ActiveOf(spaceId), plaintext + "x"));
             others.Add(await session.GetWithTokenAsync(SpaceRoutes.Directory, plaintext));
-            others.Add(await session.GetAsync(ListRoute));
+            others.Add(await session.GetAsync(ApiTokenRoutes.List));
 
             await session.FetchAntiforgeryTokenAsync();
-            others.Add(await session.DeleteAsync(RevokeRoute(issued.Id)));
+            others.Add(await session.DeleteAsync(ApiTokenRoutes.RevokeOf(issued.Id)));
             others.Add(await session.GetWithTokenAsync(SpaceRoutes.ActiveOf(spaceId), plaintext));
         });
 
@@ -846,7 +840,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// and no secret anywhere in the body. Read as raw JSON so an added property cannot hide behind a
     /// DTO.
     /// </summary>
-    [Fact(Skip = "red: AC7 - the list route does not exist (Task 6)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-24")]
@@ -873,7 +867,7 @@ public sealed partial class ActiveSpaceEndpointTests
             issued.Add(IssuedToken(await IssueAsync(session, owned, "owned script")));
             issued.Add(IssuedToken(await IssueAsync(session, viewed, "viewed script")));
 
-            listed = await session.GetAsync(ListRoute);
+            listed = await session.GetAsync(ApiTokenRoutes.List);
         });
 
         Assert.NotNull(listed);
@@ -904,7 +898,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>400</c> with a problem <c>type</c> the client can branch on, and nothing is written; a
     /// 100-character name is issued.
     /// </summary>
-    [Fact(Skip = "red: Q8 - the issue route and its validation do not exist (Task 6)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AR-34")]
@@ -947,11 +941,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Single(await TokenRowsOfAsync(database, accountId));
     }
 
-    private static string IssueRoute(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}/api-tokens";
-
-    private static string RevokeRoute(Guid tokenId) => $"{ListRoute}/{tokenId:D}";
-
-    private static JsonContent NameBody(string name) => JsonContent.Create(new { name }, options: JsonOptions);
+    private static JsonContent NameBody(string name) => JsonContent.Create(new IssueApiTokenRequest(name), options: JsonOptions);
 
     /// <summary>
     /// Issues a Token through the Session, as the browser does: a fresh anti-forgery token first,
@@ -961,7 +951,7 @@ public sealed partial class ActiveSpaceEndpointTests
     {
         await session.FetchAntiforgeryTokenAsync();
 
-        return await session.PostAsync(IssueRoute(spaceId), NameBody(name));
+        return await session.PostAsync(ApiTokenRoutes.IssueIn(spaceId), NameBody(name));
     }
 
     private static IssuedTokenAnswer IssuedToken(WireResponse response)

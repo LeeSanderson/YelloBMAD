@@ -360,3 +360,124 @@
     white-space: nowrap;
     clip-path: inset(50%);
 }
+
+/*
+    THE CONTEXT BAR'S ACCOUNT LINK, from story 1.8 - the way to Account settings, beside Sign out. A
+    link, drawn as the bar's other quiet controls are, meeting the 24px target floor that `a` does
+    not acquire from base.css.
+*/
+.context-bar__account-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.context-bar__account {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding-block: var(--space-1);
+    padding-inline: var(--space-3);
+    color: var(--text-primary);
+    text-decoration: underline;
+}
+
+/*
+    ACCOUNT SETTINGS, from story 1.8. One column, the page's own padding, nothing sized to English:
+    every control wraps, and the plaintext field takes the full width so a Token never forces a
+    horizontal scroll at 320px.
+*/
+.account-settings {
+    padding-block: var(--space-5);
+    padding-inline: var(--space-4);
+}
+
+.api-tokens {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-block-start: var(--space-5);
+}
+
+.api-token-form,
+.api-token-reveal {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+/* The plaintext: monospace, so a misread character is less likely, and wrapped rather than clipped. */
+.api-token-reveal__plaintext {
+    font-family: var(--font-system-mono);
+}
+
+.api-token-reveal__status,
+.api-token-form__refusal {
+    margin-block: 0;
+    color: var(--text-muted);
+}
+
+.api-token-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.api-token-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-block-start: var(--border-hairline-width) solid var(--border-hairline);
+}
+
+.api-token-list__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding-block: var(--space-2);
+    border-block-end: var(--border-hairline-width) solid var(--border-hairline);
+}
+
+.api-token-list__name {
+    font-weight: var(--type-task-title-weight);
+}
+
+.api-token-list__space,
+.api-token-list__created,
+.api-token-list__empty {
+    color: var(--text-muted);
+}
+
+/*
+    THE SECONDARY AND DANGER BUTTONS (DESIGN.md:468 - primary, danger, secondary only), first needed
+    by story 1.8. Secondary is the quiet one; danger is spent only on the genuinely irreversible -
+    dismissing the only copy of a Token, and revoking one.
+*/
+.button-secondary,
+.button-danger {
+    appearance: none;
+    border-radius: var(--radius-md);
+    padding-block: var(--space-control-pad-y);
+    padding-inline: var(--space-control-pad-x);
+    font-family: var(--type-body-family);
+    font-size: var(--type-body-size);
+    line-height: var(--type-body-line-height);
+    cursor: pointer;
+}
+
+.button-secondary {
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+}
+
+.button-danger {
+    background-color: var(--danger);
+    color: var(--danger-on);
+    border: var(--border-hairline-width) solid var(--danger);
+    font-weight: var(--type-task-title-weight);
+}

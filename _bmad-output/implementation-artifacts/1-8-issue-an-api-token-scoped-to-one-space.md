@@ -4,7 +4,7 @@ baseline_commit: e074c55fe80e68ae495deb7fa07ba177d5995332
 
 # Story 1.8: Issue an API Token scoped to one Space
 
-Status: ready-for-dev
+Status: review
 
 Epic: 1 — An Account, a Space of your own, and a boundary that holds
 Story key: `1-8-issue-an-api-token-scoped-to-one-space`
@@ -75,8 +75,10 @@ AC1–AC7 are reproduced **verbatim** from `epics.md:846-875` (`status: final`),
 **AC9 — a Token cannot reach the Account-scoped surfaces** *(carried from `deferred-work.md:316`, the Token half of I-11; CAP-35 `acceptance-criteria.md:355`; AD-24)*
 **Given** a valid Token
 **When** it is presented to `GET /api/v1/spaces` (the switcher), to any Account-settings endpoint (listing, issuing or revoking Tokens), to `GET /api/v1/sessions/current`, or to `DELETE /api/v1/sessions`
-**Then** each answers exactly as it does with no credential at all — `401 authentication-failed` — and nothing enumerates any Space, Account or Membership beyond the Token's own Space
+**Then** each answers exactly as it does with no credential at all — `401 authentication-failed`, except `DELETE /api/v1/sessions`, which answers exactly as it does with no credential and stamps nothing — and nothing enumerates any Space, Account or Membership beyond the Token's own Space
 **And** a Token can never issue, list or revoke Tokens
+
+*Amended (Lee, 2026-10-24, conflicts with 1.7 Q4):* "401" is dropped for sign-out only. Without a credential, sign-out is idempotent and anti-forgery runs first, so a Token there gets the same answer as no credential (`400 antiforgery-token-missing` without an anti-forgery token), and `SessionsValidAfter` is not stamped.
 
 **AC10 — no Token in any log, error, or response but the one** *(carried from NFR-6 `prd.md:726`, AR-34 `epics.md:222`, I-17)*
 **Given** a Token's plaintext
@@ -98,75 +100,75 @@ AC1–AC7 are reproduced **verbatim** from `epics.md:846-875` (`status: final`),
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Read the open questions first, and record each decision before the code that depends on it** (AC: all)
-  - [ ] Q1 (where issuance lives), Q2 (where the bound Space meets the route), Q4 (the table's isolation shape) and Q5 (scheme selection) must be settled before Task 2. Q3 (revocation) and Q8 (name, count) before Task 5. Q10 (the display-once surface) before Task 7.
-  - [ ] Each decision goes in the Completion Notes as "**Qn - (x).** … Cost to later stories: …". Every one is reversible.
+- [x] **Task 1 — Read the open questions first, and record each decision before the code that depends on it** (AC: all)
+  - [x] Q1 (where issuance lives), Q2 (where the bound Space meets the route), Q4 (the table's isolation shape) and Q5 (scheme selection) must be settled before Task 2. Q3 (revocation) and Q8 (name, count) before Task 5. Q10 (the display-once surface) before Task 7.
+  - [x] Each decision goes in the Completion Notes as "**Qn - (x).** … Cost to later stories: …". Every one is reversible.
 
-- [ ] **Task 2 — The `ApiToken` entity, table and invalidation-by-construction** (AC: 1, 4, 5, 8)
-  - [ ] `Yello.Domain/ApiTokens/ApiToken.cs`: `Id` (from `IIdentifierGenerator`, `ValueGeneratedNever` — gate `No_key_is_generated_by_the_database`), `AccountId`, `BoundSpaceId` (**not** named `SpaceId`, Q4), `Name` (Q8), `SecretHash` (`byte[]`, 32 bytes), `CreatedAt` (`DateTimeOffset` from `TimeProvider`). `BoundSpaceId` has a private/init-only setter and no method changes it (AC1). No Role, no expiry column (Q7), no last-used column (Q8).
-  - [ ] `Yello.Infrastructure/Persistence/Configurations/ApiTokenConfiguration.cs`, added to the explicit `ApplyConfiguration` list in `YelloDbContext.cs:136-141` (gate `Every_entity_configuration_reaches_the_model`). Table and column names in `SchemaNames.cs`; **do not** add it to `SpaceScopedTables` (`SchemaNames.cs:137-138`).
-  - [ ] Unique index on `SecretHash` (`varbinary(32)`) — the authentication lookup.
-  - [ ] Index on `AccountId` — the Account-settings list.
-  - [ ] **Composite FK `(BoundSpaceId, AccountId) → Membership(SpaceId, AccountId)` with `ON DELETE CASCADE`.** Add `HasAlternateKey(m => new { m.SpaceId, m.AccountId })` on `MembershipConfiguration` (the unique index at `:86-87` already holds the pair). This makes AC5 a database fact: removing the Membership deletes its Tokens in the same statement; deleting a Space cascades Space → Membership (`MembershipConfiguration.cs:92-95`) → ApiToken in the same statement; deleting an Account must delete its Memberships first (Account → Membership is `Restrict`, `:104-107`), which takes the Tokens with them. **Do not** add a second cascade from `Space` or `Account` directly: SQL Server refuses multiple cascade paths (error 1785; reasoning at `MembershipConfiguration.cs:97-103`).
-  - [ ] Migration `yyyyMMddHHmmss_ApiTokens` scaffolded with the pinned `dotnet-ef` 10.0.11 (`dotnet tool restore`), then hand-edited to `TESTING-CONVENTIONS.md:292-305` (file-scoped namespace, real XML docs, no `// <auto-generated />`, literal names not `SchemaNames`, composite columns in static fields for CA1861, `Up` under 80 lines). It must apply cleanly after `20261024145154_SessionRevocation`.
-  - [ ] **Verify on the real engine, not by reasoning** (this repository has twice shipped a plausible-but-wrong platform claim): (i) inserting an `ApiToken` whose `(BoundSpaceId, AccountId)` matches a Membership succeeds while the Space session context is set, and one that matches no Membership fails with the FK error; (ii) a `DELETE` of a Membership under that Space's session context cascades into `ApiToken`; (iii) a `DELETE` of a Space cascades through Membership into `ApiToken`. Record the outcome in the Debug Log.
+- [x] **Task 2 — The `ApiToken` entity, table and invalidation-by-construction** (AC: 1, 4, 5, 8)
+  - [x] `Yello.Domain/ApiTokens/ApiToken.cs`: `Id` (from `IIdentifierGenerator`, `ValueGeneratedNever` — gate `No_key_is_generated_by_the_database`), `AccountId`, `BoundSpaceId` (**not** named `SpaceId`, Q4), `Name` (Q8), `SecretHash` (`byte[]`, 32 bytes), `CreatedAt` (`DateTimeOffset` from `TimeProvider`). `BoundSpaceId` has a private/init-only setter and no method changes it (AC1). No Role, no expiry column (Q7), no last-used column (Q8).
+  - [x] `Yello.Infrastructure/Persistence/Configurations/ApiTokenConfiguration.cs`, added to the explicit `ApplyConfiguration` list in `YelloDbContext.cs:136-141` (gate `Every_entity_configuration_reaches_the_model`). Table and column names in `SchemaNames.cs`; **do not** add it to `SpaceScopedTables` (`SchemaNames.cs:137-138`).
+  - [x] Unique index on `SecretHash` (`varbinary(32)`) — the authentication lookup.
+  - [x] Index on `AccountId` — the Account-settings list.
+  - [x] **Composite FK `(BoundSpaceId, AccountId) → Membership(SpaceId, AccountId)` with `ON DELETE CASCADE`.** Add `HasAlternateKey(m => new { m.SpaceId, m.AccountId })` on `MembershipConfiguration` (the unique index at `:86-87` already holds the pair). This makes AC5 a database fact: removing the Membership deletes its Tokens in the same statement; deleting a Space cascades Space → Membership (`MembershipConfiguration.cs:92-95`) → ApiToken in the same statement; deleting an Account must delete its Memberships first (Account → Membership is `Restrict`, `:104-107`), which takes the Tokens with them. **Do not** add a second cascade from `Space` or `Account` directly: SQL Server refuses multiple cascade paths (error 1785; reasoning at `MembershipConfiguration.cs:97-103`).
+  - [x] Migration `yyyyMMddHHmmss_ApiTokens` scaffolded with the pinned `dotnet-ef` 10.0.11 (`dotnet tool restore`), then hand-edited to `TESTING-CONVENTIONS.md:292-305` (file-scoped namespace, real XML docs, no `// <auto-generated />`, literal names not `SchemaNames`, composite columns in static fields for CA1861, `Up` under 80 lines). It must apply cleanly after `20261024145154_SessionRevocation`.
+  - [x] **Verify on the real engine, not by reasoning** (this repository has twice shipped a plausible-but-wrong platform claim): (i) inserting an `ApiToken` whose `(BoundSpaceId, AccountId)` matches a Membership succeeds while the Space session context is set, and one that matches no Membership fails with the FK error; (ii) a `DELETE` of a Membership under that Space's session context cascades into `ApiToken`; (iii) a `DELETE` of a Space cascades through Membership into `ApiToken`. Record the outcome in the Debug Log.
 
-- [ ] **Task 3 — The Token secret: generation and hashing** (AC: 4, 10)
-  - [ ] `Yello.Infrastructure/ApiTokens/ApiTokenSecret.cs` (BCL only — no package; `PackageVersionPinTests` asserts the exact set): `RandomNumberGenerator.GetBytes(32)`, encoded base64url, with a fixed readable prefix (`yello_pat_`, Q9) so a leaked Token is recognisable by secret scanners. Hash with `SHA256.HashData` over the full plaintext's UTF-8 bytes. A fast hash is correct here and a slow one is wrong: the secret carries 256 bits of entropy, so there is nothing to brute-force, and a 270 ms PBKDF2 on every API request would breach NFR-5. Say so in the type's remarks; the planning set is silent on the algorithm (Q9).
-  - [ ] Lookup is by the hash through the unique index, so no plaintext comparison happens anywhere and there is no timing oracle on the secret.
-  - [ ] A format check before the lookup (prefix, length, base64url alphabet) answers `401` without touching the database — but answers it identically in body and shape to a well-formed unknown Token.
-  - [ ] The plaintext is never a field of any persisted or logged type. `ApiToken.ToString()` is not overridden to include `SecretHash`. The EF command log filter (`Program.cs:64`) logs no parameter values; confirm `EnableSensitiveDataLogging` stays off.
+- [x] **Task 3 — The Token secret: generation and hashing** (AC: 4, 10)
+  - [x] `Yello.Infrastructure/ApiTokens/ApiTokenSecret.cs` (BCL only — no package; `PackageVersionPinTests` asserts the exact set): `RandomNumberGenerator.GetBytes(32)`, encoded base64url, with a fixed readable prefix (`yello_pat_`, Q9) so a leaked Token is recognisable by secret scanners. Hash with `SHA256.HashData` over the full plaintext's UTF-8 bytes. A fast hash is correct here and a slow one is wrong: the secret carries 256 bits of entropy, so there is nothing to brute-force, and a 270 ms PBKDF2 on every API request would breach NFR-5. Say so in the type's remarks; the planning set is silent on the algorithm (Q9).
+  - [x] Lookup is by the hash through the unique index, so no plaintext comparison happens anywhere and there is no timing oracle on the secret.
+  - [x] A format check before the lookup (prefix, length, base64url alphabet) answers `401` without touching the database — but answers it identically in body and shape to a well-formed unknown Token.
+  - [x] The plaintext is never a field of any persisted or logged type. `ApiToken.ToString()` is not overridden to include `SecretHash`. The EF command log filter (`Program.cs:64`) logs no parameter values; confirm `EnableSensitiveDataLogging` stays off.
 
-- [ ] **Task 4 — Authenticate a Token on every request, and refuse an invalidated one** (AC: 3, 6, 8, 9, 12)
-  - [ ] `Yello.Host/ApiTokens/ApiTokenAuthenticationHandler.cs`: an `AuthenticationHandler<AuthenticationSchemeOptions>` (in .NET 8+ the constructor takes `IOptionsMonitor<>`, `ILoggerFactory`, `UrlEncoder` — no `ISystemClock`). It reads `Authorization: Bearer <token>`, hashes, and looks the row up through a new Infrastructure store (`IApiTokenStore.FindByHashAsync` → `(TokenId, AccountId, BoundSpaceId)?`) on its own read with **no session context**, exactly as `AccountSessionStore` reads `Account` (`AccountSessionStore.cs`, remarks `:11-15`). One indexed read per Token request; **no cache** (gate `SpaceResolutionSeamTests` cache ban, `:224-251`; and Lee's standard above).
-  - [ ] No row → `AuthenticateResult.Fail`/`NoResult` so the request continues unauthenticated, and the existing 401 path answers. A deleted Token (cascade, or revocation) is therefore refused on the very next request (AC8) with no extra code.
-  - [ ] The principal is built from the **row**, never from anything in the Token string: an `ApiTokenPrincipal` with its own claim types (`urn:yello:claim:token-account-id`, `urn:yello:claim:token-space-id`, `urn:yello:claim:token-id`) and its own authentication type (`Yello.ApiToken`). **It must not carry `SessionPrincipal`'s claim type** (`urn:yello:claim:account-id`) and must not be built with `SessionPrincipal.For`. That single property is what makes the switcher (`AccountScopedResolution.cs:73`), `CurrentSession` (`SessionEndpoints.cs`) and sign-out (`SignOutEndpoints.cs:70-73`) answer a Token `401` with no further code (AC9). No Role claim (AD-1; `RoleApiBanTests`). The token id claim exists for story 8.3's rate-limit partition.
-  - [ ] Scheme selection (Q5, recommended (a)): register `AddAuthentication(SelectorScheme).AddPolicyScheme(SelectorScheme, …, o => o.ForwardDefaultSelector = ctx => HasBearer(ctx) ? ApiTokenScheme : SessionCookiePolicy.SchemeName)`, keep `.AddCookie(SessionCookiePolicy.SchemeName, …)` exactly as it is, and add `.AddScheme<…, ApiTokenAuthenticationHandler>(ApiTokenScheme, …)`. A request carrying `Authorization: Bearer` is authenticated by the Token **alone** and its cookie is ignored. `SignInAsync`/`SignOutAsync` already name the cookie scheme explicitly (`SessionEndpoints.cs:152-156`, `SignOutEndpoints.cs:75`, `SessionRevocation.cs:90`) — keep it that way and re-check every `HttpContext.SignInAsync`/`SignOutAsync`/`AuthenticateAsync`/`ChallengeAsync` call names a scheme, because the default changes.
-  - [ ] `SessionRevocation` stays on the cookie scheme only. Sign-out does not invalidate Tokens (Q11).
-  - [ ] Unknown, malformed and invalidated Tokens answer the same body: `401 authentication-failed`, exactly `BoundaryProblems.Unauthenticated()`. Assert byte-identity between "no credential", "malformed Token", "unknown Token" and "Token whose Membership was removed".
+- [x] **Task 4 — Authenticate a Token on every request, and refuse an invalidated one** (AC: 3, 6, 8, 9, 12)
+  - [x] `Yello.Host/ApiTokens/ApiTokenAuthenticationHandler.cs`: an `AuthenticationHandler<AuthenticationSchemeOptions>` (in .NET 8+ the constructor takes `IOptionsMonitor<>`, `ILoggerFactory`, `UrlEncoder` — no `ISystemClock`). It reads `Authorization: Bearer <token>`, hashes, and looks the row up through a new Infrastructure store (`IApiTokenStore.FindByHashAsync` → `(TokenId, AccountId, BoundSpaceId)?`) on its own read with **no session context**, exactly as `AccountSessionStore` reads `Account` (`AccountSessionStore.cs`, remarks `:11-15`). One indexed read per Token request; **no cache** (gate `SpaceResolutionSeamTests` cache ban, `:224-251`; and Lee's standard above).
+  - [x] No row → `AuthenticateResult.Fail`/`NoResult` so the request continues unauthenticated, and the existing 401 path answers. A deleted Token (cascade, or revocation) is therefore refused on the very next request (AC8) with no extra code.
+  - [x] The principal is built from the **row**, never from anything in the Token string: an `ApiTokenPrincipal` with its own claim types (`urn:yello:claim:token-account-id`, `urn:yello:claim:token-space-id`, `urn:yello:claim:token-id`) and its own authentication type (`Yello.ApiToken`). **It must not carry `SessionPrincipal`'s claim type** (`urn:yello:claim:account-id`) and must not be built with `SessionPrincipal.For`. That single property is what makes the switcher (`AccountScopedResolution.cs:73`), `CurrentSession` (`SessionEndpoints.cs`) and sign-out (`SignOutEndpoints.cs:70-73`) answer a Token `401` with no further code (AC9). No Role claim (AD-1; `RoleApiBanTests`). The token id claim exists for story 8.3's rate-limit partition.
+  - [x] Scheme selection (Q5, recommended (a)): register `AddAuthentication(SelectorScheme).AddPolicyScheme(SelectorScheme, …, o => o.ForwardDefaultSelector = ctx => HasBearer(ctx) ? ApiTokenScheme : SessionCookiePolicy.SchemeName)`, keep `.AddCookie(SessionCookiePolicy.SchemeName, …)` exactly as it is, and add `.AddScheme<…, ApiTokenAuthenticationHandler>(ApiTokenScheme, …)`. A request carrying `Authorization: Bearer` is authenticated by the Token **alone** and its cookie is ignored. `SignInAsync`/`SignOutAsync` already name the cookie scheme explicitly (`SessionEndpoints.cs:152-156`, `SignOutEndpoints.cs:75`, `SessionRevocation.cs:90`) — keep it that way and re-check every `HttpContext.SignInAsync`/`SignOutAsync`/`AuthenticateAsync`/`ChallengeAsync` call names a scheme, because the default changes.
+  - [x] `SessionRevocation` stays on the cookie scheme only. Sign-out does not invalidate Tokens (Q11).
+  - [x] Unknown, malformed and invalidated Tokens answer the same body: `401 authentication-failed`, exactly `BoundaryProblems.Unauthenticated()`. Assert byte-identity between "no credential", "malformed Token", "unknown Token" and "Token whose Membership was removed".
 
-- [ ] **Task 5 — Establish `AccountId` and `SpaceId` from a Token, through the same pipeline** (AC: 2, 3, 6)
-  - [ ] Extend `EstablishedSpaceRequest` (`ISpaceRequestEstablishment.cs:40`) with `Guid? BoundSpaceId` — `null` for a Session. It stays a claim to be verified, never a grant, and still carries no Role.
-  - [ ] Replace the singleton `SessionSpaceRequestEstablishment` registration (`Program.cs:88`) with one establishment that reads the principal's authentication type: Session → today's behaviour unchanged; Token → `AccountId` and `BoundSpaceId` from `ApiTokenPrincipal`, `SpaceId` from the `{spaceId}` route segment exactly as the Session branch parses it (`SessionSpaceRequestEstablishment.cs:26-30`). Keep it synchronous and allocation-cheap: it runs twice per request (`ActiveSpaceResolution.cs:78,130`). Either a composite type or a rename; Q2 decides the shape.
-  - [ ] In `ActiveSpaceResolution.ResolveCoreAsync` (`:123-182`): when `BoundSpaceId` is set and differs from the route's `SpaceId`, the request is refused **exactly** as a non-member is: `CrossSpace` `AccessRefusal` recorded against the **route's** Space, `404 not-available`, byte-identical body. Do **not** return `SpaceId = null` from the establishment for this — that takes the unrecorded 404 at `:144-149` and violates AC2 and AD-20.
-  - [ ] Equal work for equal answers (AD-3): the mismatch branch must not be measurably faster than a real non-member resolution. Recommended (Q2 (a)): still call `IActiveSpaceResolver.BeginAsync(accountId, routeSpaceId)`, discard and dispose whatever it returns, then refuse — so a Token for Space A used against Space B costs one Membership read just as a non-member does. Prove it with `DurationIndistinguishability` (21 samples, median, 20%) against a non-member Session request to the same Space, anchored by a planted oracle (an early return) that the comparison catches.
-  - [ ] The Role still comes only from `MembershipActiveSpaceResolver.cs:65-70` on this request. The `ApiToken` row stores none, so demotion narrows a Token on the next request (AC3) without any Token code.
-  - [ ] No slice, endpoint or handler learns which surface called it (AC6). `ActiveSpaceContext` is unchanged. Presence (`ServeAsync:196`) counts the Account the same way for both surfaces — the concurrent-Sessions bound counts Accounts, not credentials (story 1.6 decision 1).
+- [x] **Task 5 — Establish `AccountId` and `SpaceId` from a Token, through the same pipeline** (AC: 2, 3, 6)
+  - [x] Extend `EstablishedSpaceRequest` (`ISpaceRequestEstablishment.cs:40`) with `Guid? BoundSpaceId` — `null` for a Session. It stays a claim to be verified, never a grant, and still carries no Role.
+  - [x] Replace the singleton `SessionSpaceRequestEstablishment` registration (`Program.cs:88`) with one establishment that reads the principal's authentication type: Session → today's behaviour unchanged; Token → `AccountId` and `BoundSpaceId` from `ApiTokenPrincipal`, `SpaceId` from the `{spaceId}` route segment exactly as the Session branch parses it (`SessionSpaceRequestEstablishment.cs:26-30`). Keep it synchronous and allocation-cheap: it runs twice per request (`ActiveSpaceResolution.cs:78,130`). Either a composite type or a rename; Q2 decides the shape.
+  - [x] In `ActiveSpaceResolution.ResolveCoreAsync` (`:123-182`): when `BoundSpaceId` is set and differs from the route's `SpaceId`, the request is refused **exactly** as a non-member is: `CrossSpace` `AccessRefusal` recorded against the **route's** Space, `404 not-available`, byte-identical body. Do **not** return `SpaceId = null` from the establishment for this — that takes the unrecorded 404 at `:144-149` and violates AC2 and AD-20.
+  - [x] Equal work for equal answers (AD-3): the mismatch branch must not be measurably faster than a real non-member resolution. Recommended (Q2 (a)): still call `IActiveSpaceResolver.BeginAsync(accountId, routeSpaceId)`, discard and dispose whatever it returns, then refuse — so a Token for Space A used against Space B costs one Membership read just as a non-member does. Prove it with `DurationIndistinguishability` (21 samples, median, 20%) against a non-member Session request to the same Space, anchored by a planted oracle (an early return) that the comparison catches.
+  - [x] The Role still comes only from `MembershipActiveSpaceResolver.cs:65-70` on this request. The `ApiToken` row stores none, so demotion narrows a Token on the next request (AC3) without any Token code.
+  - [x] No slice, endpoint or handler learns which surface called it (AC6). `ActiveSpaceContext` is unchanged. Presence (`ServeAsync:196`) counts the Account the same way for both surfaces — the concurrent-Sessions bound counts Accounts, not credentials (story 1.6 decision 1).
 
-- [ ] **Task 6 — The endpoints: issue, list, revoke** (AC: 1, 4, 7, 9, 10)
-  - [ ] Routes in `Yello.Contracts/ApiTokens/ApiTokenRoutes.cs` (or beside `AccountRoutes`), DTOs in `Yello.Contracts/ApiTokens/`. Endpoint classes expose `public static Map*(IEndpointRouteBuilder)` — the route-table discovery in `RefusalBoundaryGateTests.cs:698-735` finds nothing else, and a gate that cannot see an endpoint passes vacuously.
-  - [ ] **Issue** (Q1, recommended (a)): `POST /api/v1/spaces/{spaceId}/api-tokens`, body `{ name }`, mapped through `api`, `.RequiresCapability(Capability.IssueApiTokenForOneself)` (every Role, incl. Viewer — `RoleCapabilityMatrix.cs:52`, `prd.md:354`), and a new pipeline-owned `.SessionOnly()` marker that answers a Token-authenticated request `401` before anti-forgery, exactly as the switcher does (AC9). The Membership check, the boundary 404, the `CrossSpace` record and the matrix all come from the existing pipeline. Response `201` with `{ id, name, space: { id, name }, createdAt, token }` — the **only** response that ever carries the plaintext. The handler writes the row inside the request's unit of work. `ApiToken` carries no RLS (Q4), and the FK to `Membership` confirms the pair at insert.
-  - [ ] **List**: `GET /api/v1/account/api-tokens`, `.AccountScoped(AccountScopedSurface.AccountSettings)` — the reserved member, now used. Rows are exactly `{ id, name, space: { id, name }, createdAt }`: **no Role** (AC7, AR-29), no hash, no prefix beyond what Q9 decides. Space identity only (AD-24). Read under the Account-scoped unit of work: the Space names join through `Membership`, which is RLS-filtered on `SESSION_CONTEXT('AccountId')`, and `AccountSpaceDirectory` is the **only** permitted setter of that key (`SpaceSwitcherGateTests.cs:343-353`) — so either add the Token read to `AccountSpaceDirectory`'s unit of work or give it a sibling method there. Do not add a second `SetAccountAsync` caller. If the read touches `Space`, add its type to `Space_is_read_only_where_named` (`RefusalBoundaryGateTests.cs:376-405`) with a stated reason.
-  - [ ] **Revoke** (Q3, recommended (a)): `DELETE /api/v1/account/api-tokens/{tokenId}`, `.AccountScoped(AccountScopedSurface.AccountSettings)`, anti-forgery required (it is a cookie request). Deletes the row `WHERE Id = @id AND AccountId = @account`. `204` whether or not it matched — an id belonging to another Account must be indistinguishable from an unknown one and must not be deleted. Recorded nothing (not a Space boundary). The next request with that Token answers `401` (AC8).
-  - [ ] Extend the exact expected list in `Every_Account_scoped_endpoint_names_an_AD_24_surface` (`RefusalBoundaryGateTests.cs:340-355`) with the two Account-settings routes. `The_Account_scoped_surfaces_are_exactly_the_two_AD_24_names` stays green unchanged.
-  - [ ] Validation: `name` required, trimmed, 1–100 characters (Q8); a validation failure is `400` with a problem `type` the client can branch on, copy client-owned.
-  - [ ] Idempotency: AD-18's `Idempotency-Key` is not built yet (story 2.1 owns it). Issuance accepts no key. Ledger to 2.1: a replayed issuance must **never** return the plaintext a second time (Q12).
-  - [ ] Map the new routes in `Program.cs` through `api`. `SpaceScopedRouteCheck.EnsureEveryRouteIsResolved` stays last and must accept the issue route (one capability declared).
+- [x] **Task 6 — The endpoints: issue, list, revoke** (AC: 1, 4, 7, 9, 10)
+  - [x] Routes in `Yello.Contracts/ApiTokens/ApiTokenRoutes.cs` (or beside `AccountRoutes`), DTOs in `Yello.Contracts/ApiTokens/`. Endpoint classes expose `public static Map*(IEndpointRouteBuilder)` — the route-table discovery in `RefusalBoundaryGateTests.cs:698-735` finds nothing else, and a gate that cannot see an endpoint passes vacuously.
+  - [x] **Issue** (Q1, recommended (a)): `POST /api/v1/spaces/{spaceId}/api-tokens`, body `{ name }`, mapped through `api`, `.RequiresCapability(Capability.IssueApiTokenForOneself)` (every Role, incl. Viewer — `RoleCapabilityMatrix.cs:52`, `prd.md:354`), and a new pipeline-owned `.SessionOnly()` marker that answers a Token-authenticated request `401` before anti-forgery, exactly as the switcher does (AC9). The Membership check, the boundary 404, the `CrossSpace` record and the matrix all come from the existing pipeline. Response `201` with `{ id, name, space: { id, name }, createdAt, token }` — the **only** response that ever carries the plaintext. The handler writes the row inside the request's unit of work. `ApiToken` carries no RLS (Q4), and the FK to `Membership` confirms the pair at insert.
+  - [x] **List**: `GET /api/v1/account/api-tokens`, `.AccountScoped(AccountScopedSurface.AccountSettings)` — the reserved member, now used. Rows are exactly `{ id, name, space: { id, name }, createdAt }`: **no Role** (AC7, AR-29), no hash, no prefix beyond what Q9 decides. Space identity only (AD-24). Read under the Account-scoped unit of work: the Space names join through `Membership`, which is RLS-filtered on `SESSION_CONTEXT('AccountId')`, and `AccountSpaceDirectory` is the **only** permitted setter of that key (`SpaceSwitcherGateTests.cs:343-353`) — so either add the Token read to `AccountSpaceDirectory`'s unit of work or give it a sibling method there. Do not add a second `SetAccountAsync` caller. If the read touches `Space`, add its type to `Space_is_read_only_where_named` (`RefusalBoundaryGateTests.cs:376-405`) with a stated reason.
+  - [x] **Revoke** (Q3, recommended (a)): `DELETE /api/v1/account/api-tokens/{tokenId}`, `.AccountScoped(AccountScopedSurface.AccountSettings)`, anti-forgery required (it is a cookie request). Deletes the row `WHERE Id = @id AND AccountId = @account`. `204` whether or not it matched — an id belonging to another Account must be indistinguishable from an unknown one and must not be deleted. Recorded nothing (not a Space boundary). The next request with that Token answers `401` (AC8).
+  - [x] Extend the exact expected list in `Every_Account_scoped_endpoint_names_an_AD_24_surface` (`RefusalBoundaryGateTests.cs:340-355`) with the two Account-settings routes. `The_Account_scoped_surfaces_are_exactly_the_two_AD_24_names` stays green unchanged.
+  - [x] Validation: `name` required, trimmed, 1–100 characters (Q8); a validation failure is `400` with a problem `type` the client can branch on, copy client-owned.
+  - [x] Idempotency: AD-18's `Idempotency-Key` is not built yet (story 2.1 owns it). Issuance accepts no key. Ledger to 2.1: a replayed issuance must **never** return the plaintext a second time (Q12).
+  - [x] Map the new routes in `Program.cs` through `api`. `SpaceScopedRouteCheck.EnsureEveryRouteIsResolved` stays last and must accept the issue route (one capability declared).
 
-- [ ] **Task 7 — Account settings in the client: issue, show once, list, revoke** (AC: 4, 7, 11)
-  - [ ] Route `/account` in `ClientRoutes.cs` (`Pages/AccountSettings.razor`), reachable only with a Session. An **Account** link in the context bar (`Components/ContextBar.razor:45-78`), after the switcher and before Sign out — three tab stops; re-check the skip-link note at `MainLayout.razor:23-27`.
-  - [ ] The page is the Token section only (profile, password and deletion are not this story's). A list (name, Space name, created date, a **Revoke** control — no Role, no chip), and an issue form: a name `FormField` and a Space picker whose options come from the switcher's answer (`SpaceDirectory`) — identity only, no Role.
-  - [ ] Before generating: a sentence stating the Token will be shown once and cannot be retrieved afterwards (AC4, `EXPERIENCE.md:274`). Copy is client-owned in `ClientCopy.resx` (PascalCase keys; no literal in any `.razor` — `LocalisationGateTests`).
-  - [ ] After generating (Q10, recommended (a) — inline, no modal; no dialog component exists and building one is out of scope): the plaintext replaces the form in place, in a read-only monospace field; **Copy** is the primary action (`navigator.clipboard.writeText` via a small JS interop, with a visible confirmation that it was copied); **Done** asks "You will not be able to see this Token again." with **Dismiss** / **Keep showing** — dismissal is the confirmed act. `Esc` does nothing to it. Focus moves to the plaintext field when shown, and to the list's new row (or the page heading) when dismissed.
-  - [ ] The plaintext lives only in a component field. On dismiss, navigation away, sign-out, Session end or Space switch it is cleared: register with `SessionState`'s purge (`Client/Program.cs:151-157`). `ClientStorageBanTests` must stay green.
-  - [ ] Revoke asks for confirmation in place ("Scripts using this Token will stop working." / **Revoke** (danger) / **Cancel**), then refreshes the list.
-  - [ ] A 401 from any of these is the Session ending (`YelloApiHandler`'s existing path). A 404 from issue (the chosen Space has gone from under you) renders `RefusalSurface`'s words in place.
-  - [ ] `document.title` stays `Yello`. Strings respect 30–40% expansion: nothing sized to English.
+- [x] **Task 7 — Account settings in the client: issue, show once, list, revoke** (AC: 4, 7, 11)
+  - [x] Route `/account` in `ClientRoutes.cs` (`Pages/AccountSettings.razor`), reachable only with a Session. An **Account** link in the context bar (`Components/ContextBar.razor:45-78`), after the switcher and before Sign out — three tab stops; re-check the skip-link note at `MainLayout.razor:23-27`.
+  - [x] The page is the Token section only (profile, password and deletion are not this story's). A list (name, Space name, created date, a **Revoke** control — no Role, no chip), and an issue form: a name `FormField` and a Space picker whose options come from the switcher's answer (`SpaceDirectory`) — identity only, no Role.
+  - [x] Before generating: a sentence stating the Token will be shown once and cannot be retrieved afterwards (AC4, `EXPERIENCE.md:274`). Copy is client-owned in `ClientCopy.resx` (PascalCase keys; no literal in any `.razor` — `LocalisationGateTests`).
+  - [x] After generating (Q10, recommended (a) — inline, no modal; no dialog component exists and building one is out of scope): the plaintext replaces the form in place, in a read-only monospace field; **Copy** is the primary action (`navigator.clipboard.writeText` via a small JS interop, with a visible confirmation that it was copied); **Done** asks "You will not be able to see this Token again." with **Dismiss** / **Keep showing** — dismissal is the confirmed act. `Esc` does nothing to it. Focus moves to the plaintext field when shown, and to the list's new row (or the page heading) when dismissed.
+  - [x] The plaintext lives only in a component field. On dismiss, navigation away, sign-out, Session end or Space switch it is cleared: register with `SessionState`'s purge (`Client/Program.cs:151-157`). `ClientStorageBanTests` must stay green.
+  - [x] Revoke asks for confirmation in place ("Scripts using this Token will stop working." / **Revoke** (danger) / **Cancel**), then refreshes the list.
+  - [x] A 401 from any of these is the Session ending (`YelloApiHandler`'s existing path). A 404 from issue (the chosen Space has gone from under you) renders `RefusalSurface`'s words in place.
+  - [x] `document.title` stays `Yello`. Strings respect 30–40% expansion: nothing sized to English.
 
-- [ ] **Task 8 — Gates** (AC: 6, 7, 9, 10)
-  - [ ] A Token principal never carries the Session claim: a unit test over `ApiTokenPrincipal` asserting its exact claim set (mirroring `SessionContractTests.cs:253-321`) and that `SessionPrincipal.AccountIdOf` returns `null` for it.
-  - [ ] No slice branches on surface (AC6): an architecture gate that no type in `Yello.Application` references `ApiTokenPrincipal`, the Token scheme name, `ClaimsPrincipal`, or `HttpContext`, and that only the establishment, the handler and the `.SessionOnly()` filter in `Yello.Host` read the Token claims. Name it for exactly what it checks.
-  - [ ] Only the Token store reads `ApiToken.SecretHash`, and no Contracts type except the issuance response carries a field named `Token`/`Secret`/`Plaintext` (AC10).
-  - [ ] Every Session-only endpoint is enumerated: a gate that the set of endpoints carrying `.SessionOnly()` or `.AccountScoped(…)` is exactly the expected list, so a new Token-management route cannot be added without the marker.
-  - [ ] **Plant every gate and every new refusal** (see Testing requirements). Write each gate so its name is exactly what it checks. Do not write a gate that passes vacuously over zero inputs — each must first find its subject and assert it found it.
+- [x] **Task 8 — Gates** (AC: 6, 7, 9, 10)
+  - [x] A Token principal never carries the Session claim: a unit test over `ApiTokenPrincipal` asserting its exact claim set (mirroring `SessionContractTests.cs:253-321`) and that `SessionPrincipal.AccountIdOf` returns `null` for it.
+  - [x] No slice branches on surface (AC6): an architecture gate that no type in `Yello.Application` references `ApiTokenPrincipal`, the Token scheme name, `ClaimsPrincipal`, or `HttpContext`, and that only the establishment, the handler and the `.SessionOnly()` filter in `Yello.Host` read the Token claims. Name it for exactly what it checks.
+  - [x] Only the Token store reads `ApiToken.SecretHash`, and no Contracts type except the issuance response carries a field named `Token`/`Secret`/`Plaintext` (AC10).
+  - [x] Every Session-only endpoint is enumerated: a gate that the set of endpoints carrying `.SessionOnly()` or `.AccountScoped(…)` is exactly the expected list, so a new Token-management route cannot be added without the marker.
+  - [x] **Plant every gate and every new refusal** (see Testing requirements). Write each gate so its name is exactly what it checks. Do not write a gate that passes vacuously over zero inputs — each must first find its subject and assert it found it.
 
-- [ ] **Task 9 — Tests** (AC: all) — see Testing requirements for the case list. Put wire cases in a new partial `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.Tokens.cs` (no new container class — a full run already starts thirteen engines). Add `WireSession` support for a bearer request that attaches **no** cookie (`GetWithTokenAsync`, `PostWithTokenAsync`, `DeleteWithTokenAsync`). Add Token routes to `FakeYelloApi` for the browser cases. **Do not** add cases to `Yello.Tests.Isolation` or `Yello.Tests.Revocation`: story 1.9 owns populating them, they cannot reference Slices' helpers (`AllowedReferenceEdges.cs:142-143`), and adding a case means removing `--ignore-exit-code 8` in the same change.
+- [x] **Task 9 — Tests** (AC: all) — see Testing requirements for the case list. Put wire cases in a new partial `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.Tokens.cs` (no new container class — a full run already starts thirteen engines). Add `WireSession` support for a bearer request that attaches **no** cookie (`GetWithTokenAsync`, `PostWithTokenAsync`, `DeleteWithTokenAsync`). Add Token routes to `FakeYelloApi` for the browser cases. **Do not** add cases to `Yello.Tests.Isolation` or `Yello.Tests.Revocation`: story 1.9 owns populating them, they cannot reference Slices' helpers (`AllowedReferenceEdges.cs:142-143`), and adding a case means removing `--ignore-exit-code 8` in the same change.
 
-- [ ] **Task 10 — Housekeeping and the ledger** (AC: all)
-  - [ ] Close `deferred-work.md:316` (the Token half of I-11) with a dated CLOSED note naming the wire case.
-  - [ ] Add ledger entries: to **3.3**, **4.5** and **5.4** — "the Token is invalidated by the `ApiToken → Membership` cascade; your slice must delete the Membership row (5.4: before the Account row) inside its own transaction, and add V-3's case for your event"; to **2.1** — Idempotency-Key on issuance must never replay the plaintext, and the first Space-scoped write must show a Viewer's Token refused `403` (V-1); to **8.3** — partition by the `token-id` claim; to **1.9** — lift I-12, the Token half of I-11 and V-3 into the Isolation/Revocation suites on both surfaces; and any Q-decision whose cost lands on a later story.
-  - [ ] Update `tests/TESTING-CONVENTIONS.md` with the bearer helpers and the "a Token request attaches no cookie" rule.
-  - [ ] **Do not add review narration to source files** (owned by Lee, project-wide). Do not tick this unless the diff holds it.
+- [x] **Task 10 — Housekeeping and the ledger** (AC: all)
+  - [x] Close `deferred-work.md:316` (the Token half of I-11) with a dated CLOSED note naming the wire case.
+  - [x] Add ledger entries: to **3.3**, **4.5** and **5.4** — "the Token is invalidated by the `ApiToken → Membership` cascade; your slice must delete the Membership row (5.4: before the Account row) inside its own transaction, and add V-3's case for your event"; to **2.1** — Idempotency-Key on issuance must never replay the plaintext, and the first Space-scoped write must show a Viewer's Token refused `403` (V-1); to **8.3** — partition by the `token-id` claim; to **1.9** — lift I-12, the Token half of I-11 and V-3 into the Isolation/Revocation suites on both surfaces; and any Q-decision whose cost lands on a later story.
+  - [x] Update `tests/TESTING-CONVENTIONS.md` with the bearer helpers and the "a Token request attaches no cookie" rule.
+  - [x] **Do not add review narration to source files** (owned by Lee, project-wide). Do not tick this unless the diff holds it.
 
 ## Dev Notes
 
@@ -350,14 +352,138 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, run unattended by the story-cycle orchestrator on 2026-10-24.
+
 ### Debug Log References
+
+**Activation and red evidence.** The browser cases were activated before Task 7 and all eight failed for the stated reason (`TimeoutException` waiting for the context bar's Account link), then went green. For the server side (Tasks 2-6) the product code was written before the scaffolds were un-skipped, so the red step for those cases rests on the ATDD run's recorded red reasons (each wire case failed on the issue anchor; ARCH-001/002/005 failed naming the missing type) and on the plants below, each of which makes its gate fail for the reason it names. Recorded as a deviation from the activation order, not hidden.
+
+**Real engine (Task 2), verified, not reasoned.** SQL Server accepted the composite FK `FK_ApiToken_Membership_BoundSpaceId_AccountId` to Membership's new alternate key `AK_Membership_SpaceId_AccountId` with `ON DELETE CASCADE`, beside `Space -> Membership` cascade, with no error 1785. (i) `An_ApiToken_row_is_admitted_only_for_a_real_Membership`: under the Space's session context a row matching the Membership inserts, and one naming another Account fails with error 547, so the FK check is not hidden by Membership's RLS. (ii) `Removing_the_Membership_invalidates_its_Token_in_the_same_statement`: a Membership `DELETE` under the Space context removes the Token row, and a rolled-back delete leaves it. (iii) `Deleting_the_Space_invalidates_its_Tokens`: a Space `DELETE` cascades through Membership into ApiToken. Account deletion (Memberships, then Account, in one transaction) removes every Token.
+
+**AC9 on the wire (the ATDD finding).** A valid Token on `DELETE /api/v1/sessions` (bearer, no cookie, no anti-forgery header) answers `400 antiforgery-token-missing`, byte-identical to no credential, and stamps nothing. It is not `401`. This is now pinned in `A_Token_reaches_none_of_the_Session_only_surfaces`. The other five Session-only surfaces answer `401 authentication-failed`, identical to no credential. See the blocker in Completion Notes.
+
+**Scaffolds corrected: 2.**
+1. `SpaceIsolationSchemaTests.ApiToken_cascades_from_its_Membership_and_is_outside_the_policy_by_design`: the FK query concatenated `sys.tables.name` with `delete_referential_action_desc`, which SQL Server refused as a collation conflict (`Latin1_General_CI_AS_KS_WS` vs `SQL_Latin1_General_CP1_CI_AS`). Both operands are now `COLLATE DATABASE_DEFAULT`.
+2. `AccountSettingsTests`: `page.GetByLabel("Space")` also matched the context bar, whose accessible name off a Space is "Your Spaces", so `SelectOptionAsync` hit two elements. Scoped to `main` in `GenerateAsync` and in the picker case (`Name` likewise).
+
+Activation replacements (expected, not corrections): route literals became `ApiTokenRoutes`; the issue body became `IssueApiTokenRequest`; `ApiTokenPrincipal`, `ApiToken` and the three-argument `EstablishedSpaceRequest` are typed; the fake's anonymous bodies became contract types. `ApiTokenSecret` is still reached by name in `ApiTokenGateTests`, because Infrastructure grants the architecture suite no internals. INT-011 gained two assertions that pin the observed sign-out answer. `SpaceBoundaryRouteTests.ProbeApplication` follows the establishment's rename.
+
+**Plants: 19, all caught.** Each was restored byte-identical (SHA-256 checked) in a `finally`, one at a time, in the foreground.
+
+| # | Plant | Gate | Caught |
+|---|---|---|---|
+| 1 | Token principal also carries the Session claim | ARCH-001 `The_Token_principal_carries_exactly_its_three_claims_and_not_the_Session_claim` | yes |
+| 2 | Establishment returns `SpaceId = null` on a bound-Space mismatch (unrecorded 404) | INT-003 `A_Token_is_refused_in_another_Space_its_Account_owns_exactly_as_a_non_member_is` (no CrossSpace rows) | yes |
+| 3 | Mismatch branch records and returns before the resolver | PIPE-002 `A_Token_mismatch_and_a_non_member_take_the_same_time_to_refuse` | yes |
+| 4 | Static cache around the Token lookup | INT-006 `Removing_the_Membership_invalidates_its_Token_in_the_same_statement` | yes |
+| 5 | `Role` property on `ApiToken` | ARCH-002 | yes |
+| 6 | Anti-forgery exemption widened to every authenticated request | ROUTE-002 | yes |
+| 7 | `.SessionOnly()` removed from issue | new marker gate + INT-011 | yes (both) |
+| 8 | `Role` added to the list DTO | INT-015 | yes |
+| 9 | Plaintext logged at issue | INT-014 | yes |
+| 10 | FK `ON DELETE CASCADE` changed to `NO ACTION` in the migration | SCHEMA-001 | yes |
+| 11 | Second `SetAccountAsync` caller (in the Token store) | `SpaceSwitcherGateTests.No_caller_sets_both_session_context_keys` | yes |
+| 12 | `SecretHash` read in the list query | `Only_the_Token_store_and_its_configuration_read_a_Token_hash` | yes |
+| 13 | Issue endpoint reads the Token principal | `Only_the_establishment_the_Token_scheme_and_anti_forgery_read_the_Token_principal` | yes |
+| 14 | Token scheme authenticates on every route (confinement removed) | INT-011 | yes |
+| 15 | `Esc` on the plaintext field dismisses it | E2E-003 | yes |
+| 16 | Done dismisses without confirmation | E2E-004 | yes |
+| 17 | Plaintext written to `sessionStorage` | E2E-005 | yes |
+| 18 | Role chip in the Token list row | E2E-006 | yes |
+| 19 | The ApiToken -> Membership FK dropped | `An_ApiToken_row_is_admitted_only_for_a_real_Membership` | yes |
+
+Known blind spot, recorded: E2E-005's sign-out half cannot tell the `SessionState` purge registration apart from component disposal, because sign-out navigates away. The purge is defence in depth for a Session that ends while the page stays open.
+
+**Runs.** Final: `dotnet build Yello.slnx`, 0 warnings, 0 errors. `dotnet test Yello.slnx`: **431 total, 430 passed, 0 failed, 1 skipped** (the legacy-factor duration case). The browser suite was green in the combined run. No intermittent failure was seen.
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created.
+- **AC9 sign-out - Lee's decision, 2026-10-24: option (a).** On `DELETE /api/v1/sessions` a Token is treated exactly as no credential: it answers `400` (anti-forgery first, per 1.7 Q4's idempotent sign-out) and nothing is stamped. AC9 was amended to drop "401" for sign-out only; no code change. The other options were (b) a bearer on sign-out answers `401` before anti-forgery, and (c) credential-less sign-out answers `401`, which would reverse 1.7 Q4. Neither epics.md nor the SPEC states a sign-out clause for Tokens, so no ledger entry was needed.
+- **Q1 - (a).** Issue is `POST /api/v1/spaces/{spaceId}/api-tokens`: Space-scoped, `IssueApiTokenForOneself`, `.SessionOnly()`. Cost to later stories: none.
+- **Q2 - (a).** `EstablishedSpaceRequest.BoundSpaceId`. `ResolveCoreAsync` still calls the resolver for the route Space, disposes what it returns, records `CrossSpace` against the route Space and answers the one 404. Cost: none.
+- **Q3 - (a).** `DELETE /api/v1/account/api-tokens/{tokenId}` deletes the row and answers `204` whether or not it matched. This is the one capability beyond the epic's ACs. Cost: none.
+- **Q4 - (a).** `ApiToken` has no RLS policy and a `BoundSpaceId` column. Only `ApiTokenStore` (and the configuration) reads the hash, and a gate holds that. Cost to 1.9: the Isolation suite must treat this as a deliberate variance.
+- **Q5 - (a), with one refinement you can cut.** A policy scheme selects the Token scheme on `Authorization: Bearer`, and the cookie otherwise. The refinement: the Token scheme authenticates only on a Space-scoped route without `SessionOnlyEndpoint`. Everywhere else a Token is no credential, so the switcher, Account settings, `sessions/current` and sign-out answer it exactly as no credential by construction rather than by a filter. `.SessionOnly()` is therefore metadata that the handler reads, not a filter. Cost: a future non-Space route that should accept Tokens (story 8.1) must widen the rule deliberately.
+- **Q6 - (a).** Invalidation is structural (a cascading composite FK), ledgered to 3.3, 4.5 and 5.4. Membership's `(SpaceId, AccountId)` unique index became the alternate key `AK_Membership_SpaceId_AccountId`: same uniqueness, no duplicate index.
+- **Q7 - (a).** No expiry. Ledgered to 8.3.
+- **Q8 - (a).** The name is required, trimmed, 1-100 characters; otherwise `400 urn:yello:problem:invalid-api-token`. No count bound and no last-used column. Ledgered to 8.3.
+- **Q9 - (a).** `yello_pat_` + base64url(32 random bytes); the stored value is the SHA-256 of the UTF-8 plaintext; lookup is by hash through `UX_ApiToken_SecretHash`. A malformed value is refused without a database read and answered identically. The list shows the name only, with no prefix.
+- **Q10 - (a).** Inline display, `Esc` inert, and Done opens an in-place confirmation (Dismiss as danger, Keep showing as secondary). Focus moves to the plaintext when it is shown and to the page heading on dismissal.
+- **Q11 - (a).** Sign-out does not end Tokens. `A_Token_keeps_working_after_its_Account_signs_out_of_a_Session` makes this visible.
+- **Q12 - (a).** No `Idempotency-Key` on issuance; ledgered to 2.1. The issuance response also sends `Cache-Control: no-store`.
+- **Q13 - (a).** `epics.md:351` cites AR-6 for this story; it means AD-6. Recorded here; `epics.md` is untouched.
+- **Copy proposed** (`ClientCopy.resx`): Account; Account settings; API Tokens; "A Token is shown once, when it is generated. Copy it then: you will not be able to see it again."; Name; Space; Generate; "Enter a name of 1 to 100 characters."; "This Token is shown once. Copy it now: you will not be able to see it again."; Your new Token; Copy; Copied.; "Copying did not work. Select the Token and copy it."; Done; "You will not be able to see this Token again."; Dismiss; Keep showing; No Tokens yet.; Revoke; "Scripts using this Token will stop working."; Cancel.
+- **Gates added (Task 8):** the set of endpoints marked unreachable with a Token is exactly issue, list, revoke and the switcher; only the store and its configuration read `SecretHash`; only the establishment, the Token scheme and anti-forgery depend on `ApiTokenPrincipal`. The AD-24 surface gate now lists the two Account-settings routes. `No_Application_type_references_claims_HTTP_or_the_Host` (from the ATDD run) covers "no slice branches on surface".
+- Requirements: FR-36/CAP-36, AD-6, AD-4, AD-24, NFR-6 (Token clauses), the Token half of CAP-35/FR-35, AR-34, AR-29. Test design: I-12, I-11 (Token half), V-3 (schema), the NFR-6 credentials row, I-17.
 
 ### File List
+
+New:
+- Yello.Domain/ApiTokens/ApiToken.cs
+- Yello.Domain/ApiTokens/ApiTokenName.cs
+- Yello.Domain/ApiTokens/IApiTokenStore.cs
+- Yello.Application/ApiTokens/IAccountApiTokenDirectory.cs
+- Yello.Application/ApiTokens/IssueApiToken/IssueApiTokenHandler.cs
+- Yello.Application/ApiTokens/ListApiTokens/ListApiTokensHandler.cs
+- Yello.Application/ApiTokens/RevokeApiToken/RevokeApiTokenHandler.cs
+- Yello.Contracts/ApiTokens/ApiTokenRoutes.cs
+- Yello.Contracts/ApiTokens/ApiTokenResponse.cs
+- Yello.Contracts/ApiTokens/IssueApiTokenRequest.cs
+- Yello.Contracts/ApiTokens/IssuedApiTokenResponse.cs
+- Yello.Infrastructure/ApiTokens/ApiTokenSecret.cs
+- Yello.Infrastructure/ApiTokens/ApiTokenServices.cs
+- Yello.Infrastructure/Persistence/ApiTokenStore.cs
+- Yello.Infrastructure/Persistence/Configurations/ApiTokenConfiguration.cs
+- Yello.Infrastructure/Persistence/Migrations/20261024164849_ApiTokens.cs
+- Yello.Infrastructure/Persistence/Migrations/20261024164849_ApiTokens.Designer.cs
+- Yello.Host/ApiTokens/ApiTokenPrincipal.cs
+- Yello.Host/ApiTokens/ApiTokenAuthenticationHandler.cs
+- Yello.Host/Endpoints/ApiTokenEndpoints.cs
+- Yello.Client/Pages/AccountSettings.razor
+- Yello.Client/Components/ApiTokenRow.razor
+
+Renamed:
+- Yello.Host/Spaces/SessionSpaceRequestEstablishment.cs -> Yello.Host/Spaces/SpaceRequestEstablishment.cs
+
+Modified:
+- Yello.Domain/Memberships/Capability.cs
+- Yello.Contracts/ProblemTypes.cs
+- Yello.Infrastructure/AccountScopedReads.cs
+- Yello.Infrastructure/InfrastructureServices.cs
+- Yello.Infrastructure/Persistence/AccountSpaceDirectory.cs
+- Yello.Infrastructure/Persistence/Configurations/MembershipConfiguration.cs
+- Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs
+- Yello.Infrastructure/Persistence/SchemaNames.cs
+- Yello.Infrastructure/Persistence/YelloDbContext.cs
+- Yello.Host/Program.cs
+- Yello.Host/Sessions/AntiforgeryRequirement.cs
+- Yello.Host/Spaces/AccountScopedResolution.cs
+- Yello.Host/Spaces/AccountScopedSurface.cs
+- Yello.Host/Spaces/ActiveSpaceResolution.cs
+- Yello.Host/Spaces/ISpaceRequestEstablishment.cs
+- Yello.Client/Components/ContextBar.razor
+- Yello.Client/Layout/MainLayout.razor
+- Yello.Client/Localisation/ClientCopy.resx
+- Yello.Client/Pages/ClientRoutes.cs
+- Yello.Client/wwwroot/css/components.css
+- tests/TESTING-CONVENTIONS.md
+- tests/Yello.Tests.Architecture/ApiTokenGateTests.cs
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs
+- tests/Yello.Tests.Client/AccountSettingsTests.cs
+- tests/Yello.Tests.Client/FakeYelloApi.cs
+- tests/Yello.Tests.Slices/Accounts/RegisterAccount/SpaceIsolationSchemaTests.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.Switcher.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.Tokens.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/SpaceBoundaryPipelineTests.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/SpaceBoundaryRouteTests.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/SpaceIsolationLayerTests.cs
+- _bmad-output/implementation-artifacts/deferred-work.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- _bmad-output/implementation-artifacts/1-8-issue-an-api-token-scoped-to-one-space.md
 
 ## Change Log
 
 - 2026-10-24: Story created (create-story). Status -> ready-for-dev.
+- 2026-10-24: Implemented (dev-story). Added the ApiToken table with a cascading composite FK to Membership; SHA-256-hashed `yello_pat_` secrets; a Token scheme behind a bearer-selecting policy scheme, looked up on every request with no cache and confined to Space-scoped routes; the bound-Space mismatch refused as the boundary 404; the issue, list and revoke endpoints; the Account settings page with show-once display; the anti-forgery exemption for Token requests; and four gates. Activated the 35 ATDD scaffolds (2 corrected) and added one FK case. All 19 plants were caught. Lee chose option (a) for AC9's sign-out clause; AC9 amended. Status -> review.

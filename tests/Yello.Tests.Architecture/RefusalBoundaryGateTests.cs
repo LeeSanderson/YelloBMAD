@@ -326,8 +326,9 @@ public sealed class RefusalBoundaryGateTests
     /// <para>
     /// An Account-scoped endpoint reads across Spaces under the <c>AccountId</c> key, so a third one
     /// is an amendment to AD-24 rather than a code change: adding one fails here until this gate's
-    /// expected set is edited, which is where the argument belongs. Account settings (stories 1.8 and
-    /// 5.4) is the other surface AD-24 names and has no endpoint yet.
+    /// expected set is edited, which is where the argument belongs. Account settings is the other
+    /// surface AD-24 names; story 1.8 gives it the API Token list and revocation, and 5.4 adds
+    /// deletion.
     /// </para>
     /// <para>
     /// Read from the real route table. <b>Vacuity guard:</b> the switcher is found marked, and its
@@ -349,7 +350,13 @@ public sealed class RefusalBoundaryGateTests
                 Surface: pair.Marker!.GetType().GetProperty("Surface")?.GetValue(pair.Marker)?.ToString()))
             .ToList();
 
-        Assert.Equal([(Yello.Contracts.Spaces.SpaceRoutes.Directory, "SpaceSwitcher")], marked);
+        Assert.Equal(
+            [
+                (Yello.Contracts.ApiTokens.ApiTokenRoutes.List, "AccountSettings"),
+                (Yello.Contracts.ApiTokens.ApiTokenRoutes.Revoke, "AccountSettings"),
+                (Yello.Contracts.Spaces.SpaceRoutes.Directory, "SpaceSwitcher"),
+            ],
+            marked.OrderBy(entry => entry.Route, StringComparer.Ordinal));
 
         Assert.All(marked, entry => Assert.Contains(entry.Surface, Enum.GetNames<Yello.Host.Spaces.AccountScopedSurface>()));
     }
@@ -403,6 +410,97 @@ public sealed class RefusalBoundaryGateTests
             $"{string.Join(", ", offenders)} refer to {space}, which carries no policy - so a reader of it "
             + "could name any Space. The switcher reaches Space names only through its Membership join.");
     }
+
+    /// <summary>
+    /// Story 1.8 AC9 / CAP-35 / AD-24 - the endpoints marked unreachable with an API Token, by the
+    /// Session-only marker or by an AD-24 surface, are exactly Token issue, the Token list, Token
+    /// revocation and the switcher - so a new Token-management route cannot be added without one.
+    /// </summary>
+    /// <remarks>
+    /// A Token authenticates only on a Space-scoped route without <c>SessionOnlyEndpoint</c>; every
+    /// other route answers it as no credential by its shape. The two markers name the exceptions a
+    /// shape cannot decide. Read from the real route table; <b>vacuity guard:</b> the issue route is
+    /// found carrying <c>{spaceId}</c>, so the marker is doing work its shape would not.
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "FR-36")]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "AD-24")]
+    public void The_endpoints_marked_unreachable_with_a_Token_are_exactly_Token_management_and_the_switcher()
+    {
+        var table = RouteTable();
+
+        var issue = Assert.Single(table, endpoint => endpoint.RoutePattern.RawText == Yello.Contracts.ApiTokens.ApiTokenRoutes.Issue);
+        Assert.True(CarriesSpaceId(issue), "The issue route no longer carries {spaceId}.");
+
+        var marked = table
+            .Where(endpoint => endpoint.Metadata.Any(item =>
+                item.GetType().FullName is SessionOnlyMarkerName or AccountScopedMarkerName))
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.Equal(
+            [
+                Yello.Contracts.ApiTokens.ApiTokenRoutes.List,
+                Yello.Contracts.ApiTokens.ApiTokenRoutes.Revoke,
+                Yello.Contracts.Spaces.SpaceRoutes.Directory,
+                Yello.Contracts.ApiTokens.ApiTokenRoutes.Issue,
+            ],
+            marked);
+    }
+
+    /// <summary>
+    /// Story 1.8 AC4 / AC10 / NFR-6 - only the Token store and the table's configuration read
+    /// <c>ApiToken.SecretHash</c>: nothing else can compare, return or log a Token's hash.
+    /// </summary>
+    /// <remarks>
+    /// Expression-tree reads count (an <c>ldtoken</c> of the getter), which is how the store's lookup
+    /// and the configuration reach it. <b>Vacuity guard:</b> the store is found among the readers.
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "NFR-6")]
+    [Trait("Requirement", "AD-6")]
+    public void Only_the_Token_store_and_its_configuration_read_a_Token_hash()
+    {
+        var readers = RoleReaders("Yello.Domain.ApiTokens.ApiToken", "get_SecretHash");
+
+        Assert.Equal(
+            [
+                "Yello.Infrastructure.Persistence.ApiTokenStore",
+                "Yello.Infrastructure.Persistence.Configurations.ApiTokenConfiguration",
+            ],
+            readers);
+    }
+
+    /// <summary>
+    /// Story 1.8 AC6 / AD-4 - only the request establishment, the Token scheme and the anti-forgery
+    /// filter depend on the Token principal, so no endpoint, handler or slice can learn which surface
+    /// called it.
+    /// </summary>
+    /// <remarks>
+    /// <b>Vacuity guard:</b> the establishment is found among the dependents.
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "FR-36")]
+    [Trait("Requirement", "AD-4")]
+    public void Only_the_establishment_the_Token_scheme_and_anti_forgery_read_the_Token_principal()
+    {
+        const string principal = "Yello.Host.ApiTokens.ApiTokenPrincipal";
+
+        var dependents = DependentsOf(principal);
+
+        Assert.Equal(
+            [
+                "Yello.Host.ApiTokens.ApiTokenAuthenticationHandler",
+                principal,
+                "Yello.Host.Sessions.AntiforgeryRequirement",
+                "Yello.Host.Spaces.SpaceRequestEstablishment",
+            ],
+            dependents);
+    }
+
+    private const string SessionOnlyMarkerName = "Yello.Host.ApiTokens.SessionOnlyEndpoint";
 
     private const string AccountScopedMarkerName = "Yello.Host.Spaces.AccountScopedEndpoint";
 

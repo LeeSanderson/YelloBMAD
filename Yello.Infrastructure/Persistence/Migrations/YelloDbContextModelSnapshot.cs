@@ -95,6 +95,44 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.ToTable("Account", (string)null);
                 });
 
+            modelBuilder.Entity("Yello.Domain.ApiTokens.ApiToken", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("BoundSpaceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<byte[]>("SecretHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varbinary(32)")
+                        .IsFixedLength(false);
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AccountId");
+
+                    b.HasIndex("SecretHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_ApiToken_SecretHash");
+
+                    b.HasIndex("BoundSpaceId", "AccountId");
+
+                    b.ToTable("ApiToken", (string)null);
+                });
+
             modelBuilder.Entity("Yello.Domain.Memberships.Membership", b =>
                 {
                     b.Property<Guid>("Id")
@@ -125,9 +163,6 @@ namespace Yello.Infrastructure.Persistence.Migrations
                         .IsUnique()
                         .HasDatabaseName("UX_Membership_SpaceId_Owner")
                         .HasFilter("[Role] = N'Owner'");
-
-                    b.HasIndex("SpaceId", "AccountId")
-                        .IsUnique();
 
                     b.ToTable("Membership", (string)null);
                 });
@@ -193,6 +228,16 @@ namespace Yello.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("StatusDefinition", (string)null);
+                });
+
+            modelBuilder.Entity("Yello.Domain.ApiTokens.ApiToken", b =>
+                {
+                    b.HasOne("Yello.Domain.Memberships.Membership", null)
+                        .WithMany()
+                        .HasForeignKey("BoundSpaceId", "AccountId")
+                        .HasPrincipalKey("SpaceId", "AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Yello.Domain.Memberships.Membership", b =>

@@ -145,4 +145,13 @@ public static class ProblemTypes
     /// surface for it.
     /// </remarks>
     public static string RateLimited => "urn:yello:problem:rate-limited";
+
+    /// <summary>
+    /// An API Token issuance whose name is not 1-100 characters once trimmed. Answered <c>400</c>.
+    /// Story 1.8, open question 8.
+    /// </summary>
+    /// <remarks>
+    /// The client renders its own words for it, keyed on this <c>type</c> (AR-34).
+    /// </remarks>
+    public static string InvalidApiToken => "urn:yello:problem:invalid-api-token";
 }

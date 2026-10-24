@@ -336,7 +336,7 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
     /// <c>SpaceId</c> is what keeps <see cref="Every_table_with_a_SpaceId_column_is_covered_by_the_policy"/>
     /// from demanding a predicate the authentication lookup could never satisfy.
     /// </remarks>
-    [Fact(Skip = "red: story 1.8 AC5 - the ApiToken table and its cascading composite FK do not exist (Task 2)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "NFR-6")]
     [Trait("Requirement", "AD-6")]
@@ -363,7 +363,7 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
             await ReadNamesAsync(
                 connection,
                 """
-                SELECT rt.name + N':' + fk.delete_referential_action_desc
+                SELECT rt.name COLLATE DATABASE_DEFAULT + N':' + fk.delete_referential_action_desc COLLATE DATABASE_DEFAULT
                 FROM sys.foreign_keys fk
                 JOIN sys.tables t ON t.object_id = fk.parent_object_id
                 JOIN sys.tables rt ON rt.object_id = fk.referenced_object_id
@@ -426,6 +426,59 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
                 """,
                 apiToken,
                 ct));
+    }
+
+    /// <summary>
+    /// Story 1.8 AC1 / AC5, Task 2's "verify on the real engine" - the composite foreign key admits an
+    /// <c>ApiToken</c> row only for a pair that is a real <c>Membership</c>: inserted under the Space's
+    /// session context, a row matching the seeded Membership is accepted and one naming the same Space
+    /// with another Account is refused with the foreign-key error (547). Rolled back either way.
+    /// </summary>
+    /// <remarks>
+    /// The insert runs under the Space's context, where the issue route writes it, so the case also
+    /// shows the foreign-key check is not hidden by <c>Membership</c>'s row-level security.
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "FR-36")]
+    [Trait("Requirement", "AD-6")]
+    public async Task An_ApiToken_row_is_admitted_only_for_a_real_Membership()
+    {
+        var database = Available();
+        var ct = TestContext.Current.CancellationToken;
+        var member = Spaces.ResolveActiveSpace.SpaceSeeding.NewAccount();
+        var spaceId = Guid.NewGuid();
+
+        await Spaces.ResolveActiveSpace.SpaceSeeding.SeedAsync(database, spaceId, context =>
+        {
+            context.Accounts.Add(member);
+            context.Spaces.Add(Spaces.ResolveActiveSpace.SpaceSeeding.NewSpace(spaceId));
+            context.Memberships.Add(Spaces.ResolveActiveSpace.SpaceSeeding.NewMembership(spaceId, member.Id, Domain.Memberships.Role.Viewer));
+        }, ct);
+
+        await using var connection = await database.OpenForSpaceAsync(spaceId, ct);
+        await using var transaction = await connection.BeginTransactionAsync(ct);
+
+        async Task<int> InsertAsync(Guid accountId)
+        {
+            await using System.Data.Common.DbCommand command = connection.CreateCommand();
+            command.Transaction = transaction;
+            command.CommandText = """
+                INSERT INTO dbo.[ApiToken] (Id, AccountId, BoundSpaceId, Name, SecretHash, CreatedAt)
+                VALUES (NEWID(), @account, @space, N'probe', CRYPT_GEN_RANDOM(32), SYSDATETIMEOFFSET())
+                """;
+            command.Parameters.Add(new SqlParameter("@account", accountId));
+            command.Parameters.Add(new SqlParameter("@space", spaceId));
+
+            return await command.ExecuteNonQueryAsync(ct);
+        }
+
+        Assert.Equal(1, await InsertAsync(member.Id));
+
+        var refused = await Assert.ThrowsAsync<SqlException>(() => InsertAsync(Guid.NewGuid()));
+
+        Assert.Equal(547, refused.Number);
+
+        await transaction.RollbackAsync(ct);
     }
 
     private RegistrationDatabase Available()

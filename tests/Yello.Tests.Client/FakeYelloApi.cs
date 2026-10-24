@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.Playwright;
 using Yello.Contracts;
+using Yello.Contracts.ApiTokens;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Spaces;
 
@@ -192,17 +193,15 @@ internal sealed class FakeYelloApi
             case ("GET", var path) when path == SpaceRoutes.Directory:
                 return (200, JsonSerializer.Serialize(Switcher.Select(space => new SpaceIdentityResponse(space.Id, space.Name)), JsonOptions));
 
-            // Story 1.8 - the Account-settings Token routes, written by its ATDD run. The bodies are
-            // anonymous objects until Task 6 writes the contract types; serialise those on activation,
-            // and replace these literal paths with the ApiTokenRoutes constants.
-            case ("GET", ApiTokenListPath):
+            // Story 1.8 - the Account-settings Token routes, answered with the contract types.
+            case ("GET", var path) when path == ApiTokenRoutes.List:
                 return (200, JsonSerializer.Serialize(ApiTokens.Select(TokenRow), JsonOptions));
 
             case ("POST", var path) when TryIssue(path, out var issueSpace):
                 return Issue(issueSpace, request.Body);
 
-            case ("DELETE", var path) when path.StartsWith(ApiTokenListPath + "/", StringComparison.Ordinal)
-                && Guid.TryParse(path[(ApiTokenListPath.Length + 1)..], out var revoked):
+            case ("DELETE", var path) when path.StartsWith(ApiTokenRoutes.List + "/", StringComparison.Ordinal)
+                && Guid.TryParse(path[(ApiTokenRoutes.List.Length + 1)..], out var revoked):
                 _ = ApiTokens.Remove(ApiTokens.FirstOrDefault(token => token.Id == revoked) ?? FakeApiToken.None);
                 return (noContent, string.Empty);
 
@@ -228,8 +227,6 @@ internal sealed class FakeYelloApi
         }
     }
 
-    private const string ApiTokenListPath = "/api/v1/account/api-tokens";
-
     private (int Status, string Body) Issue(Guid spaceId, string? body)
     {
         var listed = Switcher.FirstOrDefault(space => space.Id == spaceId);
@@ -239,43 +236,33 @@ internal sealed class FakeYelloApi
             return (404, Problem(ProblemTypes.NotAvailable));
         }
 
-        using var submitted = JsonDocument.Parse(body ?? "{}");
-        var name = submitted.RootElement.TryGetProperty("name", out var value) ? value.GetString() ?? string.Empty : string.Empty;
+        var name = JsonSerializer.Deserialize<IssueApiTokenRequest>(body ?? "{}", JsonOptions)?.Name ?? string.Empty;
 
         var token = new FakeApiToken(Guid.NewGuid(), name, spaceId, listed.Name, DateTimeOffset.UtcNow);
         ApiTokens.Add(token);
 
-        var issued = new
-        {
-            id = token.Id,
-            name = token.Name,
-            space = new { id = token.SpaceId, name = token.SpaceName },
-            createdAt = token.CreatedAt,
-            token = IssuedSecret,
-        };
+        var issued = new IssuedApiTokenResponse(
+            token.Id,
+            token.Name,
+            new SpaceIdentityResponse(token.SpaceId, token.SpaceName),
+            token.CreatedAt,
+            IssuedSecret);
 
         return (201, JsonSerializer.Serialize(issued, JsonOptions));
     }
 
-    private static object TokenRow(FakeApiToken token) =>
-        new
-        {
-            id = token.Id,
-            name = token.Name,
-            space = new { id = token.SpaceId, name = token.SpaceName },
-            createdAt = token.CreatedAt,
-        };
+    private static ApiTokenResponse TokenRow(FakeApiToken token) =>
+        new(token.Id, token.Name, new SpaceIdentityResponse(token.SpaceId, token.SpaceName), token.CreatedAt);
 
     private static bool TryIssue(string path, out Guid spaceId)
     {
-        const string suffix = "/api-tokens";
         var prefix = SpaceRoutes.Directory + "/";
 
         spaceId = Guid.Empty;
 
         return path.StartsWith(prefix, StringComparison.Ordinal)
-            && path.EndsWith(suffix, StringComparison.Ordinal)
-            && Guid.TryParse(path[prefix.Length..^suffix.Length], out spaceId);
+            && Guid.TryParse(path[prefix.Length..].Split('/')[0], out spaceId)
+            && path == ApiTokenRoutes.IssueIn(spaceId);
     }
 
     private static bool TryActiveSpace(string path, out Guid spaceId)

@@ -6,12 +6,11 @@ namespace Yello.Host.Spaces;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>A seam for story 1.8, built before 1.8 needs it.</b> Its acceptance criterion
-/// (<c>epics.md:868-871</c>) requires a Token request and a browser request to "differ only in how
-/// <c>AccountId</c> and <c>SpaceId</c> are established" and thereafter to traverse the identical
-/// pipeline. Everything after <see cref="Establish"/> - the Membership read, the session context,
-/// the refusal - is <see cref="ActiveSpaceResolution"/>'s, and is shared by construction. Only the
-/// Session half exists today; the Token half is 1.8's.
+/// <b>Built by story 1.5 for story 1.8.</b> Its acceptance criterion (<c>epics.md:868-871</c>)
+/// requires a Token request and a browser request to "differ only in how <c>AccountId</c> and
+/// <c>SpaceId</c> are established" and thereafter to traverse the identical pipeline. Everything
+/// after <see cref="Establish"/> - the Membership read, the session context, the refusal - is
+/// <see cref="ActiveSpaceResolution"/>'s, and is shared by construction.
 /// </para>
 /// <para>
 /// <b>What comes back is a claim to be verified, never a grant.</b> Neither value is trusted by
@@ -37,4 +36,8 @@ internal interface ISpaceRequestEstablishment
 /// </summary>
 /// <param name="AccountId">The acting Account, or <c>null</c> when none is authenticated.</param>
 /// <param name="SpaceId">The requested Space, or <c>null</c> when the request names none it can parse.</param>
-internal readonly record struct EstablishedSpaceRequest(Guid? AccountId, Guid? SpaceId);
+/// <param name="BoundSpaceId">
+/// The one Space an API Token is bound to, or <c>null</c> for a Session. A Token whose bound Space is
+/// not <paramref name="SpaceId"/> is refused exactly as a non-member is.
+/// </param>
+internal readonly record struct EstablishedSpaceRequest(Guid? AccountId, Guid? SpaceId, Guid? BoundSpaceId = null);

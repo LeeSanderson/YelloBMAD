@@ -83,8 +83,12 @@ internal sealed class MembershipConfiguration(YelloDbContext context) : IEntityT
         // An Account may hold at most one Membership in a Space. Without this a second
         // Membership at a different Role is a legal row, and every Role check downstream would
         // have to decide which of the two wins.
-        builder.HasIndex(membership => new { membership.SpaceId, membership.AccountId })
-            .IsUnique();
+        //
+        // A key rather than a unique index since story 1.8: an API Token's composite foreign key
+        // (BoundSpaceId, AccountId) targets this pair and cascades from it, which is how removing a
+        // Membership invalidates its Tokens in the same statement (AD-6). The key's own unique
+        // index replaces the one that stood here, so the pair is not indexed twice.
+        builder.HasAlternateKey(membership => new { membership.SpaceId, membership.AccountId });
 
         // Deleting a Space takes its Memberships with it: a Membership in no Space cannot exist
         // (see the non-nullable column above), so cascade is the only behaviour that leaves the

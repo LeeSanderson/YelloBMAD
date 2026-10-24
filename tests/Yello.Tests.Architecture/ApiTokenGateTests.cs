@@ -5,7 +5,9 @@ using System.Security.Cryptography;
 using System.Text;
 using Mono.Cecil;
 using Xunit;
+using Yello.Domain.ApiTokens;
 using Yello.Domain.Memberships;
+using Yello.Host.ApiTokens;
 using Yello.Host.Sessions;
 
 namespace Yello.Tests.Architecture;
@@ -16,13 +18,10 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 1.8 ATDD run on 2026-10-24.</b> The types are
-/// Tasks 2-4's and do not exist yet, so the scaffolds reach them <b>by name</b> through reflection
-/// and fail at run time with a message naming the task. On activation, replace each lookup with a
-/// typed reference so a rename becomes a compile error. The names are the story's
-/// (<c>ApiTokenPrincipal</c>, <c>ApiToken</c>, <c>ApiTokenSecret</c>, the three claim types and the
-/// <c>Yello.ApiToken</c> authentication type); a different choice in dev-story is corrected here and
-/// recorded in the Debug Log.
+/// <b>Written as red-phase scaffolds by the story 1.8 ATDD run on 2026-10-24, activated by its
+/// dev-story run.</b> <c>ApiTokenPrincipal</c> and <c>ApiToken</c> are typed references, so a rename
+/// is a compile error. <c>ApiTokenSecret</c> is internal to <c>Yello.Infrastructure</c>, which grants
+/// this project no internals, so it is still reached by name and its two methods by shape.
 /// </para>
 /// <para>
 /// <b>No container.</b> Like <see cref="SessionContractTests"/>, these answer on a machine with the
@@ -62,21 +61,16 @@ public sealed class ApiTokenGateTests
     /// and sign-out, which read only <see cref="SessionPrincipal.AccountIdOf"/>, answer it <c>401</c>
     /// with no further code. No Role claim.
     /// </summary>
-    [Fact(Skip = "red: AC9 - ApiTokenPrincipal does not exist (Task 4)")]
+    [Fact]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "AR-4")]
     [Trait("Requirement", "AD-1")]
     [Trait("Requirement", "AD-24")]
     public void The_Token_principal_carries_exactly_its_three_claims_and_not_the_Session_claim()
     {
-        var factory = TokenPrincipalFactory();
         var (tokenId, accountId, spaceId) = (Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid());
 
-        var arguments = factory.GetParameters()
-            .Select(object (parameter) => Of(parameter.Name ?? string.Empty, tokenId, accountId, spaceId))
-            .ToArray();
-
-        var principal = Assert.IsType<ClaimsPrincipal>(factory.Invoke(null, arguments));
+        var principal = ApiTokenPrincipal.For(tokenId, accountId, spaceId);
 
         Assert.Equal(
             [TokenAccountClaim, TokenIdClaim, TokenSpaceClaim],
@@ -85,6 +79,10 @@ public sealed class ApiTokenGateTests
         Assert.Equal(accountId.ToString(), principal.FindFirst(TokenAccountClaim)?.Value, ignoreCase: true);
         Assert.Equal(spaceId.ToString(), principal.FindFirst(TokenSpaceClaim)?.Value, ignoreCase: true);
         Assert.Equal(tokenId.ToString(), principal.FindFirst(TokenIdClaim)?.Value, ignoreCase: true);
+
+        Assert.Equal(
+            [TokenAccountClaim, TokenSpaceClaim, TokenIdClaim, TokenAuthenticationType],
+            [ApiTokenPrincipal.AccountIdClaimType, ApiTokenPrincipal.BoundSpaceIdClaimType, ApiTokenPrincipal.TokenIdClaimType, ApiTokenPrincipal.AuthenticationType]);
 
         Assert.Equal(TokenAuthenticationType, principal.Identity?.AuthenticationType);
         Assert.True(principal.Identity?.IsAuthenticated);
@@ -100,14 +98,12 @@ public sealed class ApiTokenGateTests
     /// construction, and the entity stores no Role: capability is the current Membership's, read per
     /// request.
     /// </summary>
-    [Fact(Skip = "red: AC1/AC3 - Yello.Domain.ApiTokens.ApiToken does not exist (Task 2)")]
+    [Fact]
     [Trait("Requirement", "AR-4")]
     [Trait("Requirement", "AD-1")]
     public void The_ApiToken_entity_stores_no_Role_and_its_bound_Space_cannot_be_reassigned()
     {
-        var entity = global::Yello.Domain.AssemblyMarker.Assembly.GetType("Yello.Domain.ApiTokens.ApiToken");
-
-        Assert.True(entity is not null, "Yello.Domain.ApiTokens.ApiToken does not exist (story 1.8 Task 2).");
+        var entity = typeof(ApiToken);
 
         var properties = entity.GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
@@ -161,7 +157,7 @@ public sealed class ApiTokenGateTests
     /// plaintext (<c>Token</c>, <c>Secret</c> or <c>Plaintext</c>), and it is the issuance response in
     /// the API Token contracts. Finds its subject first, so it cannot pass over nothing.
     /// </summary>
-    [Fact(Skip = "red: AC10 - the issuance response does not exist (Task 6)")]
+    [Fact]
     [Trait("Requirement", "NFR-6")]
     [Trait("Requirement", "AR-34")]
     public void Only_the_issuance_response_carries_a_Token_secret()
@@ -188,7 +184,7 @@ public sealed class ApiTokenGateTests
     /// The two methods are found by shape - a static <c>string ()</c> and a static
     /// <c>byte[] (string)</c> on <c>ApiTokenSecret</c> - because their names are Task 3's.
     /// </remarks>
-    [Fact(Skip = "red: AC4 - Yello.Infrastructure.ApiTokens.ApiTokenSecret does not exist (Task 3)")]
+    [Fact]
     [Trait("Requirement", "NFR-6")]
     public void A_Token_secret_is_256_random_bits_behind_a_prefix_and_is_stored_as_its_SHA_256()
     {
@@ -215,37 +211,5 @@ public sealed class ApiTokenGateTests
         var stored = Assert.IsType<byte[]>(hash.Invoke(null, [first]));
 
         Assert.Equal(SHA256.HashData(Encoding.UTF8.GetBytes(first)), stored);
-    }
-
-    /// <summary>
-    /// The Token principal's factory on <c>Yello.Host.ApiTokens.ApiTokenPrincipal</c>: the one static
-    /// method that returns a <see cref="ClaimsPrincipal"/> from three <see cref="Guid"/>s.
-    /// </summary>
-    private static MethodInfo TokenPrincipalFactory()
-    {
-        var type = ProductionAssemblies.Host.GetType("Yello.Host.ApiTokens.ApiTokenPrincipal");
-
-        Assert.True(type is not null, "Yello.Host.ApiTokens.ApiTokenPrincipal does not exist (story 1.8 Task 4).");
-
-        return Assert.Single(
-            type.GetMethods(Everything),
-            method => method.IsStatic
-                && method.ReturnType == typeof(ClaimsPrincipal)
-                && method.GetParameters().Length == 3
-                && Array.TrueForAll(method.GetParameters(), parameter => parameter.ParameterType == typeof(Guid)));
-    }
-
-    /// <summary>
-    /// Maps a factory parameter to the value it should receive, by its name - so the case does not
-    /// depend on the order Task 4 chooses.
-    /// </summary>
-    private static Guid Of(string parameterName, Guid tokenId, Guid accountId, Guid spaceId)
-    {
-        if (parameterName.Contains("account", StringComparison.OrdinalIgnoreCase))
-        {
-            return accountId;
-        }
-
-        return parameterName.Contains("space", StringComparison.OrdinalIgnoreCase) ? spaceId : tokenId;
     }
 }

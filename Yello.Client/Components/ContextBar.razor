@@ -38,6 +38,9 @@
     announcement is purged with everything else. A first arrival - after sign-in, or a deep link - is
     a navigation, not a switch: the page's own heading takes focus then.
 
+    ACCOUNT (story 1.8) leads to Account settings, where API Tokens are issued and revoked - after
+    the switcher and before Sign out, so the bar is three tab stops.
+
     SIGN OUT asks the server to end the Session (which refuses every copy of the cookie from then
     on), then runs the same purge an expired Session does and lands on sign-in with no reason.
 *@
@@ -64,7 +67,10 @@
         }
     </div>
 
-    <button type="button" class="context-bar__sign-out" @onclick="SignOutAsync">@Localizer["SignOutLabel"]</button>
+    <div class="context-bar__account-controls">
+        <a class="context-bar__account" href="@ClientRoutes.AccountSettings">@Localizer["AccountSettingsLink"]</a>
+        <button type="button" class="context-bar__sign-out" @onclick="SignOutAsync">@Localizer["SignOutLabel"]</button>
+    </div>
 
     @if (_open && _spaces is { } spaces)
     {

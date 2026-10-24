@@ -266,11 +266,10 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     /// <c>CrossSpace</c> refusal against B, the route's Space. Anchored on the same Token served at A.
     /// </summary>
     /// <remarks>
-    /// The establishment returns <c>EstablishedSpaceRequest(AccountId, SpaceId, BoundSpaceId)</c>,
-    /// built by reflection because the third member is Task 5's. On activation, replace
-    /// <see cref="EstablishedWithBoundSpace"/> with the constructor call.
+    /// The establishment returns <c>EstablishedSpaceRequest(AccountId, SpaceId, BoundSpaceId)</c>, as
+    /// the Token branch of <c>SpaceRequestEstablishment</c> does.
     /// </remarks>
-    [Fact(Skip = "red: story 1.8 AC2 - EstablishedSpaceRequest has no BoundSpaceId and ResolveCoreAsync no mismatch branch (Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AD-6")]
     [Trait("Requirement", "AD-20")]
@@ -319,7 +318,7 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     /// Story 1.8 AC2 / AD-3 - the mismatch branch costs what a non-member resolution costs, by the B3
     /// method: a Token bound to A met at B, against an Account with no Membership in B.
     /// </summary>
-    [Fact(Skip = "red: story 1.8 AC2 - the mismatch branch does not exist; it must still call the resolver for the route Space (Task 5, Q2a)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AR-10")]
     public async Task A_Token_mismatch_and_a_non_member_take_the_same_time_to_refuse()
@@ -365,22 +364,14 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     }
 
     /// <summary>
-    /// An establishment that reports a bound Space beside the route's, as story 1.8's Token branch
-    /// will. Reflection until Task 5 adds the member; it fails here, by name, until then.
+    /// An establishment that reports a bound Space beside the route's, as the Token branch does.
     /// </summary>
-    private static PreparedEstablishment EstablishedWithBoundSpace(Guid accountId, Guid spaceId, Guid boundSpaceId)
-    {
-        var constructor = typeof(EstablishedSpaceRequest).GetConstructor([typeof(Guid?), typeof(Guid?), typeof(Guid?)]);
-
-        Assert.True(constructor is not null, "EstablishedSpaceRequest(Guid? AccountId, Guid? SpaceId, Guid? BoundSpaceId) does not exist (story 1.8 Task 5).");
-
-        return new PreparedEstablishment(Assert.IsType<EstablishedSpaceRequest>(
-            constructor.Invoke([accountId, spaceId, boundSpaceId])));
-    }
+    private static PreparedEstablishment EstablishedWithBoundSpace(Guid accountId, Guid spaceId, Guid boundSpaceId) =>
+        new(new EstablishedSpaceRequest(accountId, spaceId, boundSpaceId));
 
     /// <summary>
     /// A second Membership for an existing Account, in a Space that already exists, under that
-    /// Space's context (<c>IX_Membership_SpaceId_AccountId</c>: the Account holds none there yet;
+    /// Space's context (<c>AK_Membership_SpaceId_AccountId</c>: the Account holds none there yet;
     /// <c>UX_Membership_SpaceId_Owner</c>: not an Owner, the Space has one).
     /// </summary>
     private static Task AddMembershipAsync(RegistrationDatabase database, Guid spaceId, Guid accountId, Role role) =>

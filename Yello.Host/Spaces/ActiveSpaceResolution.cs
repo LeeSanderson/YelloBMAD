@@ -155,6 +155,21 @@ internal static class ActiveSpaceResolution
             .BeginAsync(accountId, spaceId, request.CancellationToken)
             .ConfigureAwait(false);
 
+        if (established.BoundSpaceId is { } boundSpaceId && boundSpaceId != spaceId)
+        {
+            // AN API TOKEN BOUND TO ANOTHER SPACE (story 1.8, AC2; open question 2). Refused exactly as
+            // an Account with no Membership here is - even where it holds one, even where it owns the
+            // Space - with the same work, the same record against the ROUTE's Space and the same
+            // bytes. The Membership was read above all the same, and whatever it found is discarded
+            // unused, so the refusal costs what a non-member's does (AD-3).
+            if (unitOfWork is not null)
+            {
+                await unitOfWork.DisposeAsync().ConfigureAwait(false);
+            }
+
+            unitOfWork = null;
+        }
+
         if (unitOfWork is null)
         {
             SpaceLog.SpaceNotResolved(logger, spaceId);

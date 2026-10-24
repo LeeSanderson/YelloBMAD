@@ -651,7 +651,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
     /// references it (<c>FK_Membership_Account_AccountId</c>), the <c>Space</c> before both its
     /// <c>Membership</c> and <c>StatusDefinition</c> rows (<c>FK_Membership_Space_SpaceId</c>,
     /// <c>FK_StatusDefinition_Space_SpaceId</c>), one Membership per Account
-    /// (<c>IX_Membership_SpaceId_AccountId</c>, unique), random addresses
+    /// (<c>AK_Membership_SpaceId_AccountId</c>, unique), random addresses
     /// (<c>NormalizedEmailAddress</c>, unique).
     /// </summary>
     /// <returns>The seeded Accounts' ids, not including the signed-in one.</returns>

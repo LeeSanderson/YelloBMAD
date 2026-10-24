@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Yello.Application.ApiTokens;
 using Yello.Application.Spaces;
 using Yello.Infrastructure.Persistence;
 
@@ -23,7 +24,9 @@ internal static class AccountScopedReads
     internal static IServiceCollection AddAccountScopedReads(this IServiceCollection services)
     {
         services.AddScoped<AccountScope>();
-        services.AddScoped<IAccountSpaceDirectory, AccountSpaceDirectory>();
+        services.AddScoped<AccountSpaceDirectory>();
+        services.AddScoped<IAccountSpaceDirectory>(provider => provider.GetRequiredService<AccountSpaceDirectory>());
+        services.AddScoped<IAccountApiTokenDirectory>(provider => provider.GetRequiredService<AccountSpaceDirectory>());
         services.AddScoped<IActiveSpaceNameReader, ActiveSpaceNameReader>();
 
         return services;

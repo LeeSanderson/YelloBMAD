@@ -53,7 +53,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// before any Token is generated the page says it will be shown once. Nothing has been issued when
     /// the sentence is read.
     /// </summary>
-    [Fact(Skip = "red: AC4/AC11 - the Account link, the /account page and its copy do not exist (Task 7)")]
+    [Fact]
     public async Task Account_settings_says_a_Token_is_shown_once_before_any_is_generated()
     {
         var api = TwoSpaces();
@@ -74,7 +74,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// primary action and focus on the plaintext; leaving the page and coming back does not show it
     /// again.
     /// </summary>
-    [Fact(Skip = "red: AC4/AC11 - the issue form and the display-once field do not exist (Task 7, Q10a)")]
+    [Fact]
     public async Task Generating_shows_the_plaintext_once_with_Copy_as_the_primary_action()
     {
         var api = TwoSpaces();
@@ -115,7 +115,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// AC11 / Q10 (a) - <c>Esc</c> never dismisses the plaintext: pressed on the field and on the page,
     /// the Token is still shown.
     /// </summary>
-    [Fact(Skip = "red: AC11 - the display-once field does not exist (Task 7, Q10a)")]
+    [Fact]
     [Trait("Requirement", "UX-DR40")]
     public async Task Esc_does_not_dismiss_the_Token()
     {
@@ -138,7 +138,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// AC4 / AC11 - dismissing is a confirmed act: Done asks first, Keep showing keeps it, and only
     /// Dismiss removes the plaintext from the page - from the DOM, not merely from view.
     /// </summary>
-    [Fact(Skip = "red: AC4/AC11 - the confirmed dismissal does not exist (Task 7, Q10a)")]
+    [Fact]
     public async Task Dismissing_the_Token_asks_for_confirmation_and_only_then_removes_it()
     {
         var api = TwoSpaces();
@@ -175,7 +175,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// it is in <c>localStorage</c>, <c>sessionStorage</c> or IndexedDB; and signing out purges it, so
     /// the page after sign-out holds no trace of it.
     /// </summary>
-    [Fact(Skip = "red: AC11 - the display-once field and its purge registration do not exist (Task 7)")]
+    [Fact]
     [Trait("Requirement", "AD-7")]
     [Trait("Requirement", "FR-2")]
     public async Task The_plaintext_reaches_no_web_storage_and_is_purged_by_sign_out()
@@ -203,7 +203,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// AC7 / AR-29 - the Token list shows each Token's name and its Space's name, and no Role: no chip
     /// and no Role word inside the page body (the context bar's own chip is outside it).
     /// </summary>
-    [Fact(Skip = "red: AC7 - the Token list does not exist (Task 7)")]
+    [Fact]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-24")]
     public async Task The_Token_list_shows_names_and_Spaces_and_no_Role()
@@ -236,7 +236,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// AC11 / UJ-7 / AD-24 - the Space a Token is bound to is chosen from exactly the Spaces the
     /// switcher lists, by name.
     /// </summary>
-    [Fact(Skip = "red: AC11 - the Space picker does not exist (Task 7)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "AD-24")]
     public async Task The_Space_picker_offers_exactly_the_switcher_Spaces_by_name()
@@ -248,7 +248,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
         {
             await OpenAccountSettingsAsync(api, page);
 
-            var options = (await page.GetByLabel("Space").Locator("option").AllInnerTextsAsync())
+            var options = (await page.Locator(Main).GetByLabel("Space").Locator("option").AllInnerTextsAsync())
                 .Select(text => text.Trim())
                 .Where(text => text.Length > 0)
                 .ToList();
@@ -261,7 +261,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// Q3 (a) - revoking asks for confirmation in place, Cancel sends nothing, and Revoke sends the
     /// <c>DELETE</c> with the anti-forgery token and removes the row.
     /// </summary>
-    [Fact(Skip = "red: Q3 - revocation in Account settings does not exist (Task 7)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "AR-14")]
     public async Task Revoking_asks_for_confirmation_and_then_sends_the_DELETE()
@@ -327,8 +327,9 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
 
     private static async Task GenerateAsync(IPage page, string name, string spaceName)
     {
-        await page.GetByLabel("Name").FillAsync(name);
-        await page.GetByLabel("Space").SelectOptionAsync(new SelectOptionValue { Label = spaceName });
+        // Scoped to <main>: the context bar's own accessible name ("Your Spaces") also matches "Space".
+        await page.Locator(Main).GetByLabel("Name").FillAsync(name);
+        await page.Locator(Main).GetByLabel("Space").SelectOptionAsync(new SelectOptionValue { Label = spaceName });
         await Button(page, "Generate").ClickAsync();
 
         await page.Locator("input[readonly]").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });

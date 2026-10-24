@@ -248,6 +248,92 @@
     <value>Sign out</value>
     <comment>The button in the context bar that ends the Session - on every device the Account is signed in on, which is how the server ends it.</comment>
   </data>
+
+  <!-- Story 1.8: Account settings and its API Token section. -->
+  <data name="AccountSettingsLink" xml:space="preserve">
+    <value>Account</value>
+    <comment>The context bar's link to Account settings, after the Space switcher and before Sign out (story 1.8, EXPERIENCE.md:55).</comment>
+  </data>
+  <data name="AccountSettingsHeading" xml:space="preserve">
+    <value>Account settings</value>
+    <comment>The heading of Account settings.</comment>
+  </data>
+  <data name="ApiTokensHeading" xml:space="preserve">
+    <value>API Tokens</value>
+    <comment>The heading of the API Token section of Account settings.</comment>
+  </data>
+  <data name="ApiTokenShownOnce" xml:space="preserve">
+    <value>A Token is shown once, when it is generated. Copy it then: you will not be able to see it again.</value>
+    <comment>Said before any Token is generated (story 1.8, AC4; EXPERIENCE.md:274). Must say the Token is shown once and cannot be retrieved. Names no Role.</comment>
+  </data>
+  <data name="ApiTokenNameLabel" xml:space="preserve">
+    <value>Name</value>
+    <comment>The label of the Token's name field.</comment>
+  </data>
+  <data name="ApiTokenSpaceLabel" xml:space="preserve">
+    <value>Space</value>
+    <comment>The label of the picker choosing the one Space a Token reaches. Its options are the Space switcher's, by name.</comment>
+  </data>
+  <data name="ApiTokenGenerate" xml:space="preserve">
+    <value>Generate</value>
+    <comment>The button that issues a Token.</comment>
+  </data>
+  <data name="ApiTokenNameInvalid" xml:space="preserve">
+    <value>Enter a name of 1 to 100 characters.</value>
+    <comment>A Token name the Host refused (urn:yello:problem:invalid-api-token).</comment>
+  </data>
+  <data name="ApiTokenShownNow" xml:space="preserve">
+    <value>This Token is shown once. Copy it now: you will not be able to see it again.</value>
+    <comment>Shown above the plaintext, the only time it is shown.</comment>
+  </data>
+  <data name="ApiTokenPlaintextLabel" xml:space="preserve">
+    <value>Your new Token</value>
+    <comment>The label of the read-only field holding the plaintext.</comment>
+  </data>
+  <data name="ApiTokenCopy" xml:space="preserve">
+    <value>Copy</value>
+    <comment>The primary action while the plaintext is shown: copies it to the clipboard.</comment>
+  </data>
+  <data name="ApiTokenCopied" xml:space="preserve">
+    <value>Copied.</value>
+    <comment>Announced once the plaintext is on the clipboard.</comment>
+  </data>
+  <data name="ApiTokenCopyFailed" xml:space="preserve">
+    <value>Copying did not work. Select the Token and copy it.</value>
+    <comment>Announced when the browser refused the clipboard. Focus moves to the field so it can be selected.</comment>
+  </data>
+  <data name="ApiTokenDone" xml:space="preserve">
+    <value>Done</value>
+    <comment>Asks to stop showing the plaintext. Never dismisses it on its own: a confirmation follows.</comment>
+  </data>
+  <data name="ApiTokenDismissWarning" xml:space="preserve">
+    <value>You will not be able to see this Token again.</value>
+    <comment>The confirmation before the plaintext is dismissed - the only copy (story 1.8, AC4).</comment>
+  </data>
+  <data name="ApiTokenDismiss" xml:space="preserve">
+    <value>Dismiss</value>
+    <comment>Confirms dismissing the plaintext.</comment>
+  </data>
+  <data name="ApiTokenKeepShowing" xml:space="preserve">
+    <value>Keep showing</value>
+    <comment>Declines dismissing the plaintext.</comment>
+  </data>
+  <data name="ApiTokenListEmpty" xml:space="preserve">
+    <value>No Tokens yet.</value>
+    <comment>The Token list when the Account holds none.</comment>
+  </data>
+  <data name="ApiTokenRevoke" xml:space="preserve">
+    <value>Revoke</value>
+    <comment>Revokes a Token: asks first, then confirms.</comment>
+  </data>
+  <data name="ApiTokenRevokeWarning" xml:space="preserve">
+    <value>Scripts using this Token will stop working.</value>
+    <comment>The confirmation before a Token is revoked.</comment>
+  </data>
+  <data name="ApiTokenCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Declines revoking a Token.</comment>
+  </data>
   <data name="SpaceHomeHeading" xml:space="preserve">
     <value>Projects</value>
     <comment>The heading of a Space's home. It does not name the Space - the context bar does. "Project" is Glossary vocabulary.</comment>

@@ -66,6 +66,17 @@ public static class SchemaNames
     public static string AccessRefusalTable => "AccessRefusal";
 
     /// <summary>
+    /// The ApiToken table. <b>Not</b> Space-scoped: its Space column is <c>BoundSpaceId</c>, and it
+    /// carries no predicate - see <c>ApiTokenConfiguration</c>.
+    /// </summary>
+    public static string ApiTokenTable => "ApiToken";
+
+    /// <summary>
+    /// The unique index a Token is authenticated through: one seek by the hash of what was presented.
+    /// </summary>
+    public static string ApiTokenSecretHashUniqueIndex => "UX_ApiToken_SecretHash";
+
+    /// <summary>
     /// The column every Space-scoped table carries, and the one the security predicate reads.
     /// </summary>
     public static string SpaceIdColumn => "SpaceId";

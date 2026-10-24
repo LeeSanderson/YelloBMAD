@@ -1,5 +1,7 @@
 using Microsoft.EntityFrameworkCore;
+using Yello.Application.ApiTokens;
 using Yello.Application.Spaces;
+using Yello.Domain.ApiTokens;
 
 namespace Yello.Infrastructure.Persistence;
 
@@ -37,7 +39,7 @@ namespace Yello.Infrastructure.Persistence;
 /// <param name="dbContext">The request's unit of work.</param>
 /// <param name="accountScope">The request's Account scope, which <c>Membership</c>'s filter reads.</param>
 internal sealed class AccountSpaceDirectory(YelloDbContext dbContext, AccountScope accountScope)
-    : IAccountSpaceDirectory
+    : IAccountSpaceDirectory, IAccountApiTokenDirectory
 {
     /// <inheritdoc />
     public Task<IReadOnlyList<SpaceIdentity>> ListAsync(
@@ -47,10 +49,73 @@ internal sealed class AccountSpaceDirectory(YelloDbContext dbContext, AccountSco
         ArgumentNullException.ThrowIfNull(context);
 
         // Split from the body below because S4457 requires the argument check to run eagerly.
-        return ListCoreAsync(context.AccountId, cancellationToken);
+        return InAccountScopeAsync(context.AccountId, ListSpacesAsync, cancellationToken);
     }
 
-    private async Task<IReadOnlyList<SpaceIdentity>> ListCoreAsync(Guid accountId, CancellationToken cancellationToken)
+    /// <inheritdoc />
+    /// <remarks>
+    /// <para>
+    /// <b>The Account-settings Token list (story 1.8, AC7), in the same unit of work.</b>
+    /// <c>ApiToken</c> carries no policy, so it is narrowed to the Account by a <c>WHERE</c>; each
+    /// Token's Space is then named through a join from the Account's own <c>Membership</c> row - the
+    /// one its composite foreign key points at - so the read reaches <c>Space</c> only as the switcher
+    /// does. Nothing but the Token's id, name and issue instant and the Space's id and name is
+    /// projected: no Role, no hash.
+    /// </para>
+    /// </remarks>
+    public Task<IReadOnlyList<ApiTokenListing>> ListApiTokensAsync(
+        AccountScopedContext context,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var accountId = context.AccountId;
+
+        return InAccountScopeAsync(accountId, ct => ListTokensAsync(accountId, ct), cancellationToken);
+    }
+
+    private async Task<IReadOnlyList<ApiTokenListing>> ListTokensAsync(Guid accountId, CancellationToken cancellationToken) =>
+        await dbContext.Set<ApiToken>()
+            .AsNoTracking()
+            .Where(token => token.AccountId == accountId)
+            .Join(
+                dbContext.Memberships.AsNoTracking(),
+                token => new { SpaceId = token.BoundSpaceId, token.AccountId },
+                membership => new { membership.SpaceId, membership.AccountId },
+                (token, membership) => new { token.Id, token.Name, token.CreatedAt, membership.SpaceId })
+            .Join(
+                dbContext.Spaces.AsNoTracking(),
+                row => row.SpaceId,
+                space => space.Id,
+                (row, space) => new { row.Id, row.Name, row.CreatedAt, SpaceId = space.Id, SpaceName = space.Name })
+            .OrderBy(row => row.CreatedAt)
+            .ThenBy(row => row.Id)
+            .Select(row => new ApiTokenListing(row.Id, row.Name, new SpaceIdentity(row.SpaceId, row.SpaceName), row.CreatedAt))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    private async Task<IReadOnlyList<SpaceIdentity>> ListSpacesAsync(CancellationToken cancellationToken) =>
+        await dbContext.Memberships
+            .AsNoTracking()
+            .Join(
+                dbContext.Spaces.AsNoTracking(),
+                membership => membership.SpaceId,
+                space => space.Id,
+                (_, space) => new { space.Id, space.Name })
+            .OrderBy(space => space.Name)
+            .ThenBy(space => space.Id)
+            .Select(space => new SpaceIdentity(space.Id, space.Name))
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <summary>
+    /// Runs one read under an Account-scoped unit of work: a transaction holding the connection, the
+    /// <c>AccountId</c> session key, and <see cref="AccountScope"/> narrowed to the same Account.
+    /// </summary>
+    private async Task<T> InAccountScopeAsync<T>(
+        Guid accountId,
+        Func<CancellationToken, Task<T>> read,
+        CancellationToken cancellationToken)
     {
         var transaction = await dbContext.Database
             .BeginTransactionAsync(cancellationToken)
@@ -66,18 +131,7 @@ internal sealed class AccountSpaceDirectory(YelloDbContext dbContext, AccountSco
 
                 accountScope.Narrow(accountId);
 
-                return await dbContext.Memberships
-                    .AsNoTracking()
-                    .Join(
-                        dbContext.Spaces.AsNoTracking(),
-                        membership => membership.SpaceId,
-                        space => space.Id,
-                        (_, space) => new { space.Id, space.Name })
-                    .OrderBy(space => space.Name)
-                    .ThenBy(space => space.Id)
-                    .Select(space => new SpaceIdentity(space.Id, space.Name))
-                    .ToListAsync(cancellationToken)
-                    .ConfigureAwait(false);
+                return await read(cancellationToken).ConfigureAwait(false);
             }
             finally
             {

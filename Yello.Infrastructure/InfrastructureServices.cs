@@ -6,6 +6,7 @@ using Yello.Domain;
 using Yello.Domain.Accounts;
 using Yello.Domain.Spaces;
 using Yello.Domain.Statuses;
+using Yello.Infrastructure.ApiTokens;
 using Yello.Infrastructure.Identity;
 using Yello.Infrastructure.Localisation;
 using Yello.Infrastructure.Persistence;
@@ -79,6 +80,10 @@ public static class InfrastructureServices
         // Where sign-out ends an Account's Sessions, and where every presented ticket is checked
         // against that (story 1.7, Lee's decision (a)). Scoped with the request's unit of work.
         services.AddScoped<IAccountSessionStore, AccountSessionStore>();
+
+        // Where API Tokens are issued, found on every Token request, and revoked (story 1.8) - split
+        // out only to keep this class's dependencies within S1200's limit.
+        services.AddApiTokenStore();
 
         // SPACE RESOLUTION, FROM STORY 1.5. Every registration below is SCOPED, and that is AC7 and
         // NFR-2 rather than a default: the Role on an ActiveSpaceContext is the value the Membership

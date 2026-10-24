@@ -715,7 +715,7 @@ public sealed class SpaceIsolationLayerTests(MigratedDatabaseFixture fixture)
     /// shared Space and Owner of one of its own. Every Membership's Account is added before it
     /// (<c>FK_Membership_Account_AccountId</c>), every Space in the block that first writes into it
     /// (<c>FK_Membership_Space_SpaceId</c>), one Owner per Space (<c>UX_Membership_SpaceId_Owner</c>),
-    /// one Membership per Account per Space (<c>IX_Membership_SpaceId_AccountId</c>), and a Status in
+    /// one Membership per Account per Space (<c>AK_Membership_SpaceId_AccountId</c>), and a Status in
     /// each Space so a widening that leaked beyond <c>Membership</c> has a row to show.
     /// </summary>
     private static async Task<(Account A, Account B, Guid Shared, Guid OnlyA, Guid OnlyB)> SeedTwoAccountsSharingASpaceAsync(

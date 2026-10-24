@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Yello.Contracts;
+using Yello.Host.ApiTokens;
 
 namespace Yello.Host.Sessions;
 
@@ -103,7 +104,15 @@ internal static class AntiforgeryRequirement
         // Not async, so that S4457's argument check runs eagerly rather than on the first await of
         // a state machine - the same split SessionEndpoints makes, for the same rule. A safe method
         // is handed straight to the endpoint without entering the validating path at all.
+        //
+        // So is a request an API Token authenticated (story 1.8, AC12): a bearer header is not an
+        // ambient credential, so a third-party page has nothing to ride, and a script has no
+        // anti-forgery cookie to pair a token with. The exemption is exactly the Token's - a
+        // principal only ApiTokenAuthenticationHandler builds, and only on a Space-scoped route that
+        // admits Tokens. A request carrying the Session cookie is validated as before, whatever else
+        // it carries; one carrying a bearer as well is authenticated by the bearer alone.
         return SafeMethods.Contains(context.HttpContext.Request.Method)
+            || ApiTokenPrincipal.IsToken(context.HttpContext.User)
             ? next(context)
             : ValidateAsync(context, next);
     }

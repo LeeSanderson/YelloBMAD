@@ -58,6 +58,12 @@ public static class ClientRoutes
     public static string Register => "/register";
 
     /// <summary>
+    /// Account settings - AD-24's second Account-scoped surface, reached from the context bar. Story
+    /// 1.8 gives it the API Token section.
+    /// </summary>
+    public static string AccountSettings => "/account";
+
+    /// <summary>
     /// The query-string key the sign-in surface reads its reason from.
     /// </summary>
     /// <remarks>

@@ -1,0 +1,69 @@
+@using System.Globalization
+@using Yello.Contracts.ApiTokens
+@using Yello.Contracts.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    ONE API TOKEN IN ACCOUNT SETTINGS' LIST. Story 1.8, AC7 and open question 3.
+
+    Its name, its Space's name and when it was made - no Role, no chip, nothing per-Space but
+    identity (AR-29). Revoke asks first, in place: the warning, Revoke as the danger action, Cancel.
+    Each Revoke button is described by the Token's name, so a list of them is not a list of
+    identical controls to a screen reader.
+*@
+
+<li class="api-token-list__row">
+    <span class="api-token-list__name" id="@NameId">@Token.Name</span>
+    <span class="api-token-list__space">@Token.Space.Name</span>
+    <time class="api-token-list__created type-meta" datetime="@CreatedInstant">@CreatedDate</time>
+
+    @if (Confirming)
+    {
+        <span class="api-token-confirm">
+            <span>@Localizer["ApiTokenRevokeWarning"]</span>
+            <button type="button" class="button-danger" aria-describedby="@NameId" @onclick="RevokeAsync">@Localizer["ApiTokenRevoke"]</button>
+            <button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["ApiTokenCancel"]</button>
+        </span>
+    }
+
+    @if (!Confirming)
+    {
+        <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="AskAsync">@Localizer["ApiTokenRevoke"]</button>
+    }
+</li>
+
+@code {
+    /// <summary>The Token.</summary>
+    [Parameter]
+    [EditorRequired]
+    public ApiTokenResponse Token { get; set; } = new(Guid.Empty, string.Empty, new SpaceIdentityResponse(Guid.Empty, string.Empty), DateTimeOffset.MinValue);
+
+    /// <summary>Whether the revocation is being confirmed.</summary>
+    [Parameter]
+    public bool Confirming { get; set; }
+
+    /// <summary>Raised by the first Revoke, with the Token's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnAskToRevoke { get; set; }
+
+    /// <summary>Raised by the confirming Revoke, with the Token's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnRevoke { get; set; }
+
+    /// <summary>Raised by Cancel.</summary>
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private string NameId => $"api-token-{Token.Id:N}";
+
+    private string CreatedInstant => Token.CreatedAt.ToString("O", CultureInfo.InvariantCulture);
+
+    private string CreatedDate => Token.CreatedAt.ToLocalTime().ToString("d", CultureInfo.CurrentCulture);
+
+    private Task AskAsync() => OnAskToRevoke.InvokeAsync(Token.Id);
+
+    private Task RevokeAsync() => OnRevoke.InvokeAsync(Token.Id);
+
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+}

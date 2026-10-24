@@ -45,7 +45,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// (<c>FK_Membership_Account_AccountId</c>); every <c>Space</c> is added in the block that first
 /// writes a <c>Membership</c> into it (<c>FK_Membership_Space_SpaceId</c>); at most one Owner per
 /// Space (<c>UX_Membership_SpaceId_Owner</c>, filtered unique); one Membership per Account per
-/// Space (<c>IX_Membership_SpaceId_AccountId</c>, unique); each block runs under its own Space's
+/// Space (<c>AK_Membership_SpaceId_AccountId</c>, unique); each block runs under its own Space's
 /// session context, which the AFTER INSERT BLOCK predicate on <c>Membership</c> requires.
 /// </para>
 /// </remarks>
