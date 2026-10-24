@@ -26,4 +26,18 @@ namespace Yello.Contracts;
 /// The failed rules, by their stable codes. The client uses each code as a resource key, so the
 /// server never sends wording and a new locale needs no server change.
 /// </param>
-public sealed record ProblemResponse(string? Type, IReadOnlyList<string>? Errors);
+/// <param name="Capability">
+/// On <see cref="ProblemTypes.InsufficientRole"/>: the stable code of the capability refused, which
+/// the client uses as a resource key.
+/// </param>
+/// <param name="Bound">
+/// On <see cref="ProblemTypes.BoundReached"/>: the stable code of the bound reached, used as a
+/// resource key.
+/// </param>
+/// <param name="Limit">On <see cref="ProblemTypes.BoundReached"/>: the bound's value.</param>
+public sealed record ProblemResponse(
+    string? Type,
+    IReadOnlyList<string>? Errors,
+    string? Capability = null,
+    string? Bound = null,
+    int? Limit = null);

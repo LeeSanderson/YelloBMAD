@@ -1,14 +1,17 @@
 using Microsoft.AspNetCore.Routing.Patterns;
 using Yello.Application.Spaces;
-using Yello.Contracts;
 using Yello.Contracts.Spaces;
+using Yello.Domain;
+using Yello.Domain.AccessRefusals;
+using Yello.Domain.Bounds;
+using Yello.Domain.Memberships;
 
 namespace Yello.Host.Spaces;
 
 /// <summary>
-/// Space resolution, as the pipeline behaviour AR-3 requires it to be: the one place a request's
-/// <see cref="ActiveSpaceContext"/> is established, before anything else about the request is
-/// decided. AD-1, AD-2 / AR-5, AR-6; FR-15.
+/// Space resolution and the Space boundary, as the pipeline behaviour AR-3 requires them to be: the
+/// one place a request's <see cref="ActiveSpaceContext"/> is established, its capability checked,
+/// its bound consulted and its refusal recorded. AD-1, AD-2, AD-3, AD-20, AD-25; FR-15, FR-16.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -16,22 +19,29 @@ namespace Yello.Host.Spaces;
 /// route pattern carries <c>{spaceId}</c> is resolved, because of what it is rather than because a
 /// list names it - the same rule the anti-forgery filter beside it follows, for the reason recorded
 /// there: a list of protected routes rots quietly, because forgetting to add to it looks like
-/// nothing at all.
+/// nothing at all. The Host refuses to start with a <c>{spaceId}</c> route mapped anywhere else
+/// (<see cref="SpaceScopedRouteCheck"/>).
 /// </para>
 /// <para>
-/// <b>Three answers, in this order.</b> No authenticated Account: <c>401</c>, at the authentication
-/// boundary, before resolution begins - a caller with no Session never learns anything about a
-/// Space. No Membership in the named Space, or no such Space: one <c>404</c> for both, never a
-/// <c>403</c> and never distinguished (AD-3). Otherwise the endpoint runs inside the unit of work
-/// the resolution opened. That unit commits only once the endpoint has returned, only when it
-/// returned a success, and only when what it returned has already been read.
+/// <b>The answers, in this order.</b> No authenticated Account: <c>401</c>, at the authentication
+/// boundary, before anything about a Space is read, and not recorded. No Membership in the named
+/// Space, or no such Space: one <c>404</c> for both, never a <c>403</c>, never distinguished (AD-3),
+/// and recorded as <c>CrossSpace</c>. A member whose Role the matrix denies the endpoint's declared
+/// capability: <c>403</c>, capability-shaped, recorded as <c>InsufficientRole</c>. A member who
+/// would exceed the Space's concurrent-presence bound: <c>409</c>, raised inside the resolution
+/// transaction and not recorded. Otherwise the endpoint runs inside the unit of work the resolution
+/// opened, which commits only once the endpoint has returned, only when it returned a success, and
+/// only when what it returned has already been read.
 /// </para>
 /// <para>
-/// <b>What story 1.6 hangs on this.</b> <see cref="Refuse"/> is the single refusal point, so the
-/// <c>AccessRefusal</c> record and the refusal's full contract attach here rather than being
-/// re-derived per endpoint. It is also the natural counting seam for NFR-8's "50 concurrent active
-/// Sessions per Space" (<c>deferred-work.md:127</c>): every active Space resolution passes through
-/// <see cref="ResolveCoreAsync"/>.
+/// <b>The two refusal points never convert into each other.</b> The <c>404</c> is produced only
+/// where resolution finds no Membership, and the <c>403</c> only where the matrix denies a member;
+/// nothing downstream rewrites either.
+/// </para>
+/// <para>
+/// <b>Recorded synchronously, before the response, on a unit of work of its own.</b> Both
+/// boundary-<c>404</c> causes therefore do identical work - resolve, find nothing, roll back,
+/// record - which is what keeps them indistinguishable in duration as well as in body.
 /// </para>
 /// </remarks>
 internal static class ActiveSpaceResolution
@@ -41,6 +51,37 @@ internal static class ActiveSpaceResolution
     /// <c>ILogger&lt;T&gt;</c>.
     /// </summary>
     private static readonly string LoggerCategory = typeof(ActiveSpaceResolution).FullName!;
+
+    /// <summary>
+    /// Refuses a Space-scoped request that carries no authenticated Account, ahead of every other
+    /// filter on the group, and passes every other request straight through.
+    /// </summary>
+    /// <remarks>
+    /// Registered <i>before</i> the anti-forgery filter, so an unauthenticated state-changing
+    /// request to a Space-scoped route is answered <c>401</c> - the authentication boundary - rather
+    /// than with the anti-forgery <c>400</c> (story 1.6, decision 11). <see cref="ResolveAsync"/>
+    /// keeps the same check, so neither filter depends on the other's presence.
+    /// </remarks>
+    /// <param name="context">The request.</param>
+    /// <param name="next">The rest of the pipeline.</param>
+    /// <returns>The refusal, or whatever the rest of the pipeline returns.</returns>
+    internal static ValueTask<object?> RequireAccountAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var httpContext = context.HttpContext;
+
+        if (IsSpaceScoped(httpContext)
+            && httpContext.RequestServices.GetRequiredService<ISpaceRequestEstablishment>()
+                .Establish(httpContext).AccountId is null)
+        {
+            return ValueTask.FromResult<object?>(BoundaryProblems.Unauthenticated());
+        }
+
+        return next(context);
+    }
 
     /// <summary>
     /// Resolves the active Space for a Space-scoped endpoint, and passes every other one straight
@@ -71,7 +112,12 @@ internal static class ActiveSpaceResolution
         httpContext.GetEndpoint() is RouteEndpoint { RoutePattern: var pattern }
         && CarriesSpaceId(pattern);
 
-    private static bool CarriesSpaceId(RoutePattern pattern) =>
+    /// <summary>
+    /// Whether a route pattern carries <c>{spaceId}</c>.
+    /// </summary>
+    /// <param name="pattern">The pattern.</param>
+    /// <returns><c>true</c> when it does.</returns>
+    internal static bool CarriesSpaceId(RoutePattern pattern) =>
         pattern.GetParameter(SpaceRoutes.SpaceIdParameter) is not null;
 
     private static async ValueTask<object?> ResolveCoreAsync(
@@ -80,108 +126,121 @@ internal static class ActiveSpaceResolution
     {
         var httpContext = context.HttpContext;
         var services = httpContext.RequestServices;
-        var cancellationToken = httpContext.RequestAborted;
 
         var established = services.GetRequiredService<ISpaceRequestEstablishment>().Establish(httpContext);
 
         if (established.AccountId is not { } accountId)
         {
             // The authentication boundary, and the same answer GET /api/v1/sessions/current gives.
-            // Nothing about the named Space is read on this path.
-            return Results.Problem(
-                statusCode: StatusCodes.Status401Unauthorized,
-                type: ProblemTypes.AuthenticationFailed,
-                title: "Authentication did not succeed.");
+            // Nothing about the named Space is read on this path, and nothing is recorded: AD-3 draws
+            // the refusal line at the Space boundary and nowhere else.
+            return BoundaryProblems.Unauthenticated();
         }
 
-        var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(LoggerCategory);
+        // Read before anything else so a Space-scoped endpoint that declares no capability fails
+        // closed whoever calls it, and so a boundary refusal can record what was attempted.
+        var capability = RequiredCapabilityExtensions.Of(httpContext.GetEndpoint());
 
         if (established.SpaceId is not { } spaceId)
         {
             // Unreachable through the guid-constrained routes in SpaceRoutes, and answered as a
-            // refusal anyway: failing closed costs nothing, and a later route without the
-            // constraint must not turn an unparseable segment into a default.
-            return Refuse();
+            // refusal anyway: failing closed costs nothing. Not recorded - no Space was named.
+            return BoundaryProblems.NotAvailable();
         }
 
+        var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(LoggerCategory);
+        var request = new BoundaryRequest(services, logger, accountId, spaceId, capability, httpContext.RequestAborted);
+
         var unitOfWork = await services.GetRequiredService<IActiveSpaceResolver>()
-            .BeginAsync(accountId, spaceId, cancellationToken)
+            .BeginAsync(accountId, spaceId, request.CancellationToken)
             .ConfigureAwait(false);
 
         if (unitOfWork is null)
         {
             SpaceLog.SpaceNotResolved(logger, spaceId);
-            return Refuse();
+            await RecordAsync(request, AccessRefusalKind.CrossSpace).ConfigureAwait(false);
+
+            return BoundaryProblems.NotAvailable();
         }
 
         await using (unitOfWork.ConfigureAwait(false))
         {
-            SpaceLog.SpaceResolved(logger, spaceId);
-
-            var result = await next(context).ConfigureAwait(false);
-
-            EnsureMaterialised(result);
-
-            if (IsFailure(result))
+            // The Role off the Membership row on this request (AD-1), against the matrix. A
+            // Qualified cell passes the Role gate; its target constraint is the owning slice's.
+            if (RoleCapabilityMatrix.Decide(unitOfWork.Context.Role, capability) != CapabilityDecision.Denied)
             {
-                // Disposed without completing, so it rolls back: an endpoint that wrote and then
-                // answered with a problem leaves nothing behind, exactly as one that threw does.
-                return result;
+                return await ServeAsync(context, next, unitOfWork, request).ConfigureAwait(false);
             }
+        }
 
-            // Not the request's token. The endpoint has finished, so a client that disconnects now
-            // must not decide whether its completed work is kept.
-            await unitOfWork.CompleteAsync(CancellationToken.None).ConfigureAwait(false);
+        // Denied, and the unit of work disposed without completing - rolled back - before the
+        // refusal is recorded on a unit of its own.
+        SpaceLog.CapabilityRefused(logger, spaceId, StableCode.Of(capability));
+        await RecordAsync(request, AccessRefusalKind.InsufficientRole).ConfigureAwait(false);
 
+        return BoundaryProblems.InsufficientRole(capability);
+    }
+
+    /// <summary>
+    /// A permitted member: consult the presence bound inside the unit of work, then run the
+    /// endpoint and commit only a materialised success.
+    /// </summary>
+    private static async ValueTask<object?> ServeAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next,
+        IActiveSpaceUnitOfWork unitOfWork,
+        BoundaryRequest request)
+    {
+        var bound = BoundRegistry.For(Bound.ConcurrentActiveSessionsPerSpace);
+
+        var admitted = await request.Services.GetRequiredService<ISpacePresenceRegister>()
+            .TryEnterAsync(request.AccountId, request.SpaceId, bound.Limit, request.CancellationToken)
+            .ConfigureAwait(false);
+
+        if (!admitted)
+        {
+            // Raised inside the resolution transaction, which the caller disposes without
+            // completing: nothing is written for the refused Account (AC7).
+            SpaceLog.BoundReached(request.Logger, request.SpaceId, StableCode.Of(bound.Bound), bound.Limit);
+
+            return BoundaryProblems.BoundReached(bound);
+        }
+
+        SpaceLog.SpaceResolved(request.Logger, request.SpaceId);
+
+        var result = await next(context).ConfigureAwait(false);
+
+        UnitOfWorkResults.EnsureMaterialised(result);
+
+        if (UnitOfWorkResults.IsFailure(result))
+        {
+            // Disposed without completing, so it rolls back: an endpoint that wrote and then
+            // answered with a problem leaves nothing behind, exactly as one that threw does.
             return result;
         }
+
+        // Not the request's token. The endpoint has finished, so a client that disconnects now
+        // must not decide whether its completed work is kept.
+        await unitOfWork.CompleteAsync(CancellationToken.None).ConfigureAwait(false);
+
+        return result;
     }
 
     /// <summary>
-    /// Whether the endpoint answered with an error, which the unit of work must not commit.
+    /// Writes the refusal record. The request pipeline is its only writer (AR-3).
     /// </summary>
-    /// <param name="result">What the endpoint returned.</param>
-    /// <returns><c>true</c> for a <c>4xx</c> or <c>5xx</c> result.</returns>
-    internal static bool IsFailure(object? result) =>
-        result is IStatusCodeHttpResult { StatusCode: >= StatusCodes.Status400BadRequest };
+    private static Task RecordAsync(BoundaryRequest request, AccessRefusalKind kind) =>
+        request.Services.GetRequiredService<IAccessRefusalRecorder>()
+            .RecordAsync(request.AccountId, request.SpaceId, request.Capability, kind, request.CancellationToken);
 
     /// <summary>
-    /// Refuses a result that would do its work after the unit of work has closed.
+    /// What a Space-boundary decision needs about the request, gathered once.
     /// </summary>
-    /// <remarks>
-    /// ASP.NET Core executes what an endpoint returns only after this filter has returned, and by then
-    /// the transaction is committed and disposed. A query that runs at that point runs on a reopened
-    /// connection with no session context, where row-level security fails closed and answers with
-    /// nothing, silently. So a Space-scoped endpoint returns data it has already read; one that
-    /// returns an <see cref="IQueryable"/> or an <see cref="IAsyncEnumerable{T}"/> fails loudly here,
-    /// inside the unit of work, and is rolled back.
-    /// </remarks>
-    /// <param name="result">What the endpoint returned.</param>
-    /// <exception cref="InvalidOperationException">The result is not materialised.</exception>
-    internal static void EnsureMaterialised(object? result)
-    {
-        var value = result is IValueHttpResult { Value: var carried } ? carried : result;
-
-        if (value is IQueryable || IsAsyncEnumerable(value))
-        {
-            throw new InvalidOperationException(
-                $"A Space-scoped endpoint returned {value!.GetType().Name}, which would be enumerated after "
-                + "its unit of work has closed. Materialise it before returning.");
-        }
-    }
-
-    private static bool IsAsyncEnumerable(object? value) =>
-        value is not null
-        && Array.Exists(value.GetType().GetInterfaces(), type =>
-            type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IAsyncEnumerable<>));
-
-    /// <summary>
-    /// The one refusal for a Space this request cannot act in.
-    /// </summary>
-    /// <returns>A <c>404</c> problem response.</returns>
-    private static IResult Refuse() =>
-        Results.Problem(
-            statusCode: StatusCodes.Status404NotFound,
-            type: ProblemTypes.SpaceNotFound,
-            title: "The Space was not found.");
+    private sealed record BoundaryRequest(
+        IServiceProvider Services,
+        ILogger Logger,
+        Guid AccountId,
+        Guid SpaceId,
+        Capability Capability,
+        CancellationToken CancellationToken);
 }

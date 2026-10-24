@@ -80,8 +80,9 @@ public static class ProblemTypes
     public static string AntiforgeryTokenMissing => "urn:yello:problem:antiforgery-token-missing";
 
     /// <summary>
-    /// The request named a Space it cannot act in. <b>One type for both causes</b>: a Space that
-    /// does not exist and a Space the caller holds no Membership in. AD-3.
+    /// What was asked for is not available to this caller. <b>One type for every <c>404</c> the
+    /// product answers</b>: a Space that does not exist, a Space the caller holds no Membership in,
+    /// and an <c>/api</c> path that matches no route. AD-3; FR-15.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -89,12 +90,59 @@ public static class ProblemTypes
     /// (<c>ARCHITECTURE-SPINE.md:75</c>): "A request whose Space context cannot be resolved - no
     /// such Space, or no Membership in it - is refused with 404 (AD-3), never defaulted and never
     /// distinguished." Answering differently for the two would tell a caller which Space ids exist.
+    /// The bodies are byte-identical, and the two causes take indistinguishable time.
     /// </para>
     /// <para>
-    /// Story 1.5 refuses with this type; story 1.6 owns the refusal's full contract - the identical
-    /// bodies across the two causes, their timing, and the <c>AccessRefusal</c> row every
-    /// Space-boundary 404 records.
+    /// <b>Not "space not found", deliberately.</b> Story 1.5 answered with a Space-specific type.
+    /// Story 1.6 made it the one not-found type for everything, so that a future not-found inside
+    /// the caller's own Space - a Task id that matches nothing - cannot differ in body from a
+    /// boundary refusal (AC1's "an identifier matching no resource at all").
+    /// </para>
+    /// <para>
+    /// The client renders "Not available." from its own resources, the same page for every cause.
     /// </para>
     /// </remarks>
-    public static string SpaceNotFound => "urn:yello:problem:space-not-found";
+    public static string NotAvailable => "urn:yello:problem:not-available";
+
+    /// <summary>
+    /// The caller is a member of the Space, and its Role does not permit what the endpoint does.
+    /// Carries a <c>capability</c> extension: the stable code of the capability refused. FR-16;
+    /// AD-3.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Capability-shaped, never object-shaped.</b> The client renders "Viewers cannot edit
+    /// Tasks." from a resource keyed on the capability code, never "you do not have permission to
+    /// view this Task", which would confirm the Task exists. The body carries no resource id, no
+    /// title and no Space name.
+    /// </para>
+    /// <para>
+    /// <b>Produced only at the capability check, and never converted.</b> A <c>404</c> is produced
+    /// only at Space resolution; no handler turns one into the other.
+    /// </para>
+    /// </remarks>
+    public static string InsufficientRole => "urn:yello:problem:insufficient-role";
+
+    /// <summary>
+    /// An NFR-8 bound was reached. Carries a <c>bound</c> extension (the bound's stable code) and a
+    /// <c>limit</c> extension (its value). AD-25 / AR-30.
+    /// </summary>
+    /// <remarks>
+    /// A <c>409</c>, because <c>403</c> and <c>404</c> are reserved by AD-3 for the Space boundary.
+    /// A bound degrades visibly, never silently: the client states the number plainly. Not an
+    /// <c>AccessRefusal</c>; AD-20 records exactly two kinds and this is neither.
+    /// </remarks>
+    public static string BoundReached => "urn:yello:problem:bound-reached";
+
+    /// <summary>
+    /// Too many requests to a password-hashing endpoint. Answered <c>429</c> with
+    /// <c>Retry-After</c>. AD-18.
+    /// </summary>
+    /// <remarks>
+    /// <b>Uniform, like the answers it protects.</b> The limiter never partitions on the submitted
+    /// address, and the body is identical for a known and an unknown one - a limiter that refused
+    /// them differently would reintroduce the oracle AD-23 closed. API only; there is no browser
+    /// surface for it.
+    /// </remarks>
+    public static string RateLimited => "urn:yello:problem:rate-limited";
 }

@@ -5,8 +5,9 @@ namespace Yello.Host;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>EventIds start at 1016.</b> 1000-1007 belong to <see cref="StartupLog"/>, 1008-1009 to
-/// <see cref="RegistrationLog"/> and 1010-1015 to <see cref="SessionLog"/>.
+/// <b>EventIds 1016-1020.</b> 1000-1007 belong to <see cref="StartupLog"/>, 1008-1009 to
+/// <see cref="RegistrationLog"/> and 1010-1015 to <see cref="SessionLog"/>; 1021 onwards to
+/// <see cref="RateLimitLog"/>.
 /// </para>
 /// <para>
 /// <b>The Space's id, never its name</b> (AR-34): a Space name is something a person typed, and a
@@ -32,4 +33,22 @@ internal static partial class SpaceLog
         Level = LogLevel.Information,
         Message = "Active Space could not be resolved for {SpaceId}; the request was refused.")]
     internal static partial void SpaceNotResolved(ILogger logger, Guid spaceId);
+
+    [LoggerMessage(
+        EventId = 1018,
+        Level = LogLevel.Information,
+        Message = "The Role held in {SpaceId} does not permit {Capability}; the request was refused.")]
+    internal static partial void CapabilityRefused(ILogger logger, Guid spaceId, string capability);
+
+    [LoggerMessage(
+        EventId = 1019,
+        Level = LogLevel.Warning,
+        Message = "{SpaceId} is at its {Bound} bound of {Limit}; the request was refused.")]
+    internal static partial void BoundReached(ILogger logger, Guid spaceId, string bound, int limit);
+
+    [LoggerMessage(
+        EventId = 1020,
+        Level = LogLevel.Warning,
+        Message = "The refusal-record retention purge failed; it is not retried until tomorrow.")]
+    internal static partial void RefusalPurgeFailed(ILogger logger, Exception exception);
 }

@@ -10,8 +10,9 @@ namespace Yello.Application;
 /// <remarks>
 /// The pipeline behaviours -- authorisation, Space resolution, refusal recording, idempotency,
 /// NFR-8 bound checks -- live in the request pipeline, never in a slice; AR-3 makes a slice that
-/// re-implements any of them a defect. Space resolution exists (its port is
-/// <c>Spaces.IActiveSpaceResolver</c>); the rest are story 1.6's.
+/// re-implements any of them a defect. The ports the pipeline calls are declared here, in
+/// <c>Spaces</c>: <c>IActiveSpaceResolver</c>, <c>IAccessRefusalRecorder</c> and
+/// <c>ISpacePresenceRegister</c>. Idempotency is story 2.1's.
 /// </remarks>
 public static class AssemblyMarker
 {

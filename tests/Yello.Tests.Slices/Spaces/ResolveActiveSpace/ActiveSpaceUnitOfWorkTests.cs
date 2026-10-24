@@ -142,6 +142,7 @@ public sealed class ActiveSpaceUnitOfWorkTests
             .AddSingleton<ILoggerFactory>(NullLoggerFactory.Instance)
             .AddSingleton<ISpaceRequestEstablishment>(new FixedEstablishment())
             .AddSingleton<IActiveSpaceResolver>(new FixedResolver(unitOfWork))
+            .AddSingleton<ISpacePresenceRegister>(new AdmittingPresence())
             .BuildServiceProvider();
 
         return ActiveSpaceResolution.ResolveAsync(
@@ -157,7 +158,7 @@ public sealed class ActiveSpaceUnitOfWorkTests
             _ => Task.CompletedTask,
             RoutePatternFactory.Parse(route),
             order: 0,
-            EndpointMetadataCollection.Empty,
+            new EndpointMetadataCollection(new RequiredCapability(Capability.ReadProjectsAndTasks)),
             displayName: route));
 
         return httpContext;
@@ -183,6 +184,16 @@ public sealed class ActiveSpaceUnitOfWorkTests
             Guid spaceId,
             CancellationToken cancellationToken) =>
             Task.FromResult<IActiveSpaceUnitOfWork?>(unitOfWork);
+    }
+
+    /// <summary>
+    /// Story 1.6's presence bound, always admitting: these cases are about the unit of work, and a
+    /// member reading its own Space is under every bound.
+    /// </summary>
+    private sealed class AdmittingPresence : ISpacePresenceRegister
+    {
+        public Task<bool> TryEnterAsync(Guid accountId, Guid spaceId, int limit, CancellationToken cancellationToken) =>
+            Task.FromResult(true);
     }
 
     private sealed class RecordingUnitOfWork : IActiveSpaceUnitOfWork

@@ -22,6 +22,40 @@ namespace Yello.Infrastructure.Persistence.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("Yello.Domain.AccessRefusals.AccessRefusal", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Capability")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
+
+                    b.Property<DateTimeOffset>("OccurredAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<int>("Outcome")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("TargetSpaceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("OccurredAt");
+
+                    b.ToTable("AccessRefusal", (string)null);
+                });
+
             modelBuilder.Entity("Yello.Domain.Accounts.Account", b =>
                 {
                     b.Property<Guid>("Id")
@@ -113,6 +147,23 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.ToTable("Space", (string)null);
                 });
 
+            modelBuilder.Entity("Yello.Domain.Spaces.SpacePresence", b =>
+                {
+                    b.Property<Guid>("SpaceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("SpaceId");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("SpaceId", "AccountId");
+
+                    b.ToTable("SpacePresence", (string)null);
+                });
+
             modelBuilder.Entity("Yello.Domain.Statuses.StatusDefinition", b =>
                 {
                     b.Property<Guid>("Id")
@@ -149,6 +200,15 @@ namespace Yello.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
+                    b.HasOne("Yello.Domain.Spaces.Space", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Yello.Domain.Spaces.SpacePresence", b =>
+                {
                     b.HasOne("Yello.Domain.Spaces.Space", null)
                         .WithMany()
                         .HasForeignKey("SpaceId")

@@ -15,8 +15,8 @@ namespace Yello.Application.Statuses.ListStatuses;
 /// </para>
 /// <para>
 /// <b>Nothing cross-cutting is re-implemented here</b> (AR-3). No Space resolution and no Membership
-/// check: the pipeline has done both before this runs, and every Role may read a Space's Statuses,
-/// so there is no capability to check either. The FR-16 matrix is story 1.6's.
+/// check, and no capability check: the pipeline has done all three before this runs, against the
+/// read capability the endpoint declares - which every Role holds.
 /// </para>
 /// </remarks>
 /// <param name="reader">Reads the Statuses of the Space the unit of work is scoped to.</param>

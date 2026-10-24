@@ -1,0 +1,48 @@
+@using Yello.Client.Refusals
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    THE REFUSAL SURFACE. AC9; UX-DR32, UX-DR35; EXPERIENCE.md:122-147.
+
+    A PAGE, NEVER A TOAST. A toast implies a transient fault and a refusal is a final answer, so this
+    is a whole surface with an <h1>, which App.razor's FocusOnNavigate moves focus to.
+
+    ONE PAGE FOR EVERY NOT-FOUND. A Space the Account is not in, a Space that does not exist and an
+    address that matches nothing render this component with the same key, the same words, the same
+    layout and the same focus. There is no parameter that could distinguish them, because RefusalCopy
+    resolves every one of them to the same resource.
+
+    THE CLIENT OWNS EVERY STRING. Nothing here renders a value the server sent except the bound's
+    number, which is data. No `danger` colour: a refusal is not an error (DESIGN.md:501).
+
+    THE ROUTE BACK IS HOME, never a remembered last Space - which may itself be the one refused.
+    Story 1.7 points home at a Space drawn from the switcher.
+*@
+
+<div class="auth-surface">
+    <div class="auth-panel">
+        <h1 class="type-dialog-title auth-panel__heading">@Heading</h1>
+        <p class="auth-panel__aside"><a href="@ClientRoutes.Home">@Localizer[RefusalCopy.RouteBackKey]</a></p>
+    </div>
+</div>
+
+@code {
+    /// <summary>
+    /// The problem the refusal arrived with, or <c>null</c> for an address the client cannot route.
+    /// </summary>
+    [Parameter]
+    public ProblemResponse? Problem { get; set; }
+
+    private string Heading
+    {
+        get
+        {
+            var message = RefusalCopy.For(Problem);
+
+            return message.Limit is { } limit
+                ? Localizer[message.Key, limit]
+                : Localizer[message.Key];
+        }
+    }
+}

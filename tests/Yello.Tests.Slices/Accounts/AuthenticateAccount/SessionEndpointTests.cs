@@ -765,9 +765,9 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Red-phase scaffold, ATDD run 2026-10-24.</b> The configuration key is the scaffold's guess
-    /// at Task 9's "configuration key with the resolved value logged unconditionally"; correct it
-    /// here if dev-story names it differently, and record the correction.
+    /// <b>The limit is configured low for this case only.</b> <c>HostProcess</c> raises it out of the
+    /// way for every other wire test, which sign in far more than ten times from one address; this
+    /// case sets <c>RateLimiting__PermitsPerWindow</c> back down to reach it in a few requests.
     /// </para>
     /// <para>
     /// <b>The partition may never include the submitted address</b> (AD-23). So the limit is reached
@@ -776,7 +776,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
     /// refusing everything cannot pass.
     /// </para>
     /// </remarks>
-    [Fact(Skip = "red: ledger (high) - no rate limiter on the PBKDF2 endpoints (story 1.6 Task 9)")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "AD-18")]
     public async Task Sign_in_past_the_limit_is_refused_with_429_alike_for_a_known_and_an_unknown_address()

@@ -23,15 +23,17 @@ using Yello.Infrastructure;
 // way that does not assume HTTP only, because ARCHITECTURE-SPINE.md:323-325 has that socket
 // crossing the same origin boundary with the same cookie.
 //
-// SPACE RESOLUTION is the first of the request pipeline's cross-cutting behaviours, from story 1.5:
-// ActiveSpaceResolution, attached to the route group below, resolves the active Space from the
-// Membership row for every route whose pattern carries {spaceId}, and scopes that request's unit of
-// work to it in the database. Refusal recording, the FR-16 capability checks, idempotency, rate
-// limiting and the NFR-8 bound checks are story 1.6's and do not exist yet; AR-3 makes a slice that
-// re-implements any of them a defect. There is still no AddAuthorization, no UseAuthorization and no
-// policy anywhere in this file: AD-1 makes every authorisation decision a per-request
-// (Account, Space) resolution, and the Role it reads comes off the Membership row on each request,
-// never off a principal a policy could inspect.
+// THE SPACE BOUNDARY is the request pipeline's, from stories 1.5 and 1.6: ActiveSpaceResolution,
+// attached to the route group below, resolves the active Space from the Membership row for every
+// route whose pattern carries {spaceId}, scopes that request's unit of work to it in the database,
+// checks the endpoint's declared capability against the FR-16 Role matrix, consults NFR-8's
+// concurrent-presence bound, and records every 403 and every boundary 404 as an AccessRefusal. The
+// two password-hashing endpoints are rate-limited by named policy. AR-3 makes a slice that
+// re-implements any of these a defect. Idempotency (AR-25) is not here yet: it is story 2.1's, the
+// first endpoint that creates something a client could retry. There is still no AddAuthorization,
+// no UseAuthorization and no authorization policy anywhere in this file: AD-1 makes every
+// authorisation decision a per-request (Account, Space) resolution, and the Role it reads comes off
+// the Membership row on each request, never off a principal a policy could inspect.
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -114,6 +116,16 @@ builder.Services.AddAntiforgery(options =>
     options.Cookie.SameSite = SameSiteMode.None;
 });
 
+// THE RATE LIMIT ON THE TWO PASSWORD-HASHING ENDPOINTS. Both spend a deliberate ~273 ms of CPU on any
+// well-formed body, unauthenticated - see CredentialHashingRateLimit for the two limits and why the
+// partition is never the submitted address. The per-client permits are configurable so the wire
+// tests can run fast, and the resolved value is logged below unconditionally.
+var permitsSetting = CredentialHashingRateLimit.ReadPermitsSetting(
+    builder.Configuration[CredentialHashingRateLimit.PermitsPerWindowConfigurationKey]);
+
+builder.Services.AddRateLimiter(options =>
+    CredentialHashingRateLimit.Configure(options, permitsSetting.PermitsPerWindow));
+
 // The clock, injected rather than read statically, so a test can assert that every row one
 // registration writes carries the same instant. The local-time properties on the date types are
 // banned APIs at build in any case; this resolves to the UTC one.
@@ -180,7 +192,23 @@ if (sessionSetting.Problem is { } lifetimeProblem)
 
 SessionLog.SessionLifetimeResolved(startupLogger, sessionLifetime);
 
+if (permitsSetting.Problem is { } permitsProblem)
+{
+    RateLimitLog.PermitsUnusable(
+        startupLogger, CredentialHashingRateLimit.PermitsPerWindowConfigurationKey, permitsProblem);
+}
+
+RateLimitLog.PermitsResolved(startupLogger, permitsSetting.PermitsPerWindow, CredentialHashingRateLimit.Window);
+
 app.UseAuthentication();
+
+// After routing (which WebApplication places first) so the named policy on the two endpoints is
+// visible, and after authentication; before any endpoint runs, so a refused request costs no hash.
+app.UseRateLimiter();
+
+// THE REFUSAL RECORDS' RETENTION PURGE, triggered by request traffic and at most once a day - never
+// by a timer, so an idle database is never woken (AD-10). See RefusalRetentionTrigger.
+app.Use(RefusalRetentionTrigger.InvokeAsync);
 
 // AC4's check lives in StartupConnectivityCheck rather than here so that a test can reach it.
 // Two review passes found that nothing asserted this code at all: deleting the call, inverting
@@ -216,19 +244,21 @@ app.Services.WarmPasswordHashing();
 // which is how Lee settled question 5 at that review. There is no exception list to keep.
 //
 // SPACE RESOLUTION IS ATTACHED THE SAME WAY, by the shape of the route: every endpoint whose pattern
-// carries {spaceId} is resolved because of what it is. It runs after anti-forgery, so a forged
-// state change is refused before any Space is read, and after UseAuthentication above, so a request
-// with no Session is answered 401 before resolution begins.
-var api = app.MapGroup(string.Empty)
-    .AddEndpointFilter(AntiforgeryRequirement.ValidateStateChangingAsync)
-    .AddEndpointFilter(ActiveSpaceResolution.ResolveAsync);
+// carries {spaceId} is resolved because of what it is. A Space-scoped request with no Session is
+// answered 401 FIRST, before anti-forgery - the authentication boundary, not a malformed request
+// (story 1.6, decision 11). Resolution itself runs after anti-forgery, so a forged state change is
+// refused before any Space is read. The group stamps every endpoint it maps, and the Host refuses to
+// start with a {spaceId} route that lacks the stamp - one mapped on `app` would skip all of this.
+// ApiRouteGroup holds the order, so a test can hold it too.
+var api = app.MapApiGroup();
 
 // POST /api/v1/accounts. 204 on both the new-address and the already-registered paths - see
-// RegisterAccountEndpoint for why the handler it calls returns nothing at all.
-api.MapRegisterAccount();
+// RegisterAccountEndpoint for why the handler it calls returns nothing at all. Rate-limited.
+api.MapRegisterAccount().RequireRateLimiting(CredentialHashingRateLimit.PolicyName);
 
 // POST /api/v1/sessions. 204 with the Session cookie, or ONE 401 for every failure cause.
-api.MapAuthenticate();
+// Rate-limited, under the same policy and the same uniform 429.
+api.MapAuthenticate().RequireRateLimiting(CredentialHashingRateLimit.PolicyName);
 
 // GET /api/v1/sessions/current. 204 or 401 - and no anti-forgery token, because it changes no state
 // and the factory above attaches nothing to a safe method.
@@ -238,8 +268,18 @@ api.MapCurrentSession();
 api.MapAntiforgeryToken();
 
 // GET /api/v1/spaces/{spaceId}/statuses. The first Space-scoped route: 200, 401, or one 404 for a
-// Space that does not exist and a Space the caller is not a member of alike.
+// Space that does not exist and a Space the caller is not a member of alike. Declares the read
+// capability, which every Role holds.
 api.MapListStatuses();
+
+// Every other /api path - a malformed {spaceId} included - answers the same not-available body a
+// boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has
+// anything to say about a path that matches no route.
+app.MapUnmatchedApi();
+
+// The route table is complete. Refuse to start with a Space-scoped route the pipeline would not
+// protect - see SpaceScopedRouteCheck.
+SpaceScopedRouteCheck.EnsureEveryRouteIsResolved(app);
 
 // RunAsync, not Run: this file is already an async entry point (the connectivity check above
 // awaits), and the blocking overload would park the entry-point thread for the process

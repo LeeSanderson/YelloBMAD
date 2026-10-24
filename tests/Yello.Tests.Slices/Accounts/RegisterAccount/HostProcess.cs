@@ -128,6 +128,13 @@ internal static class HostProcess
         // the certificate's existence is required.
         startInfo.Environment["ASPNETCORE_URLS"] = "https://127.0.0.1:0";
 
+        // THE PASSWORD-HASHING RATE LIMIT, RAISED OUT OF THE WAY BY DEFAULT, FROM STORY 1.6. The
+        // product's default is ten attempts a minute per client address, and every Host these tests
+        // start is called from one address - the duration comparison alone signs in more than forty
+        // times. A test that is about the limit sets its own value through `settings`, which is
+        // applied after this and wins.
+        startInfo.Environment["RateLimiting__PermitsPerWindow"] = "1000000";
+
         foreach (var (key, value) in settings)
         {
             startInfo.Environment[key] = value;

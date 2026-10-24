@@ -55,6 +55,17 @@ public static class SchemaNames
     public static string StatusDefinitionTable => "StatusDefinition";
 
     /// <summary>
+    /// The SpacePresence table - who is live in a Space, for NFR-8's concurrent-Sessions bound.
+    /// </summary>
+    public static string SpacePresenceTable => "SpacePresence";
+
+    /// <summary>
+    /// The AccessRefusal table. <b>Not</b> Space-scoped: its target column is <c>TargetSpaceId</c>,
+    /// and it carries no predicate - see <c>AccessRefusalConfiguration</c>.
+    /// </summary>
+    public static string AccessRefusalTable => "AccessRefusal";
+
+    /// <summary>
     /// The column every Space-scoped table carries, and the one the security predicate reads.
     /// </summary>
     public static string SpaceIdColumn => "SpaceId";
@@ -104,5 +115,5 @@ public static class SchemaNames
     /// reader would have acted on.
     /// </remarks>
     public static IReadOnlyList<string> SpaceScopedTables { get; } =
-        [MembershipTable, StatusDefinitionTable];
+        [MembershipTable, StatusDefinitionTable, SpacePresenceTable];
 }

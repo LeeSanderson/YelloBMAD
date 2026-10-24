@@ -68,6 +68,15 @@ public sealed class YelloDbContext(DbContextOptions<YelloDbContext> options, Spa
     public DbSet<StatusDefinition> StatusDefinitions => Set<StatusDefinition>();
 
     /// <summary>
+    /// Live presences, per Space - what NFR-8's concurrent-active-Sessions bound counts.
+    /// </summary>
+    /// <remarks>
+    /// The <c>AccessRefusal</c> record has no set here, deliberately: it is write-only, and only its
+    /// recorder and its purge reach it, through <c>Set&lt;T&gt;()</c>.
+    /// </remarks>
+    public DbSet<SpacePresence> SpacePresences => Set<SpacePresence>();
+
+    /// <summary>
     /// The Space every global query filter compares against, read from this context's
     /// <see cref="SpaceScope"/> each time a query runs.
     /// </summary>
@@ -103,6 +112,8 @@ public sealed class YelloDbContext(DbContextOptions<YelloDbContext> options, Spa
         modelBuilder.ApplyConfiguration(new SpaceConfiguration());
         modelBuilder.ApplyConfiguration(new MembershipConfiguration(this));
         modelBuilder.ApplyConfiguration(new StatusDefinitionConfiguration(this));
+        modelBuilder.ApplyConfiguration(new SpacePresenceConfiguration(this));
+        modelBuilder.ApplyConfiguration(new AccessRefusalConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }

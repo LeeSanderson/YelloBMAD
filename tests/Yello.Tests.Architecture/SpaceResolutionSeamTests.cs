@@ -257,8 +257,9 @@ public sealed class SpaceResolutionSeamTests
     /// <para>
     /// <b>Read from the compiled IL, not the source</b>, so a dependency taken through a
     /// constructor, a field, a local or a <c>GetRequiredService&lt;T&gt;</c> call is seen alike, and
-    /// compiler-generated state machines are attributed to the type that wrote the code. The rest of
-    /// A-12 - authorisation, refusal recording, idempotency - has nothing to scan until story 1.6.
+    /// compiler-generated state machines are attributed to the type that wrote the code. A-12's
+    /// authorisation, refusal-recording and bound clauses are in <c>RefusalBoundaryGateTests</c>;
+    /// its idempotency clause waits for story 2.1, the first endpoint that has one.
     /// </para>
     /// </remarks>
     [Fact]

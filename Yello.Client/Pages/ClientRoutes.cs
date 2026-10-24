@@ -29,6 +29,17 @@ public static class ClientRoutes
     public static string SignIn => "/sign-in";
 
     /// <summary>
+    /// The product's home: where the refusal surface's one link goes. Sign-in today; story 1.7
+    /// repoints it at a Space drawn from the switcher, never at a remembered last Space.
+    /// </summary>
+    public static string Home => "/";
+
+    /// <summary>
+    /// The refusal surface, at a route of its own.
+    /// </summary>
+    public static string NotAvailable => "/not-available";
+
+    /// <summary>
     /// The registration surface.
     /// </summary>
     public static string Register => "/register";

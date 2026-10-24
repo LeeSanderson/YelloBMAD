@@ -52,7 +52,7 @@ namespace Yello.Host.Sessions;
 /// <c>AccessRefusal</c> to "every 403 and every Space-boundary 404" with exactly two kinds,
 /// <c>CrossSpace</c> and <c>InsufficientRole</c>; a request that never reached a Space boundary is
 /// neither, and inventing a third kind to record this would put an enumeration artifact in the
-/// audit store. The pipeline that writes those rows is story 1.6's and does not exist.
+/// audit store. <c>ActiveSpaceResolution</c> writes those rows, and never for this.
 /// </para>
 /// </remarks>
 internal static class AntiforgeryRequirement

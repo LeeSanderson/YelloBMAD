@@ -97,7 +97,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
         Assert.NotNull(noSuchSpace);
 
         Assert.Equal(HttpStatusCode.NotFound, notAMember.StatusCode);
-        Assert.Equal(ProblemTypes.SpaceNotFound, ProblemType(notAMember));
+        Assert.Equal(ProblemTypes.NotAvailable, ProblemType(notAMember));
 
         // Never distinguished (AD-3): status, body, content type and header names all identical, so
         // nothing in the answer says whether the Space exists.
@@ -234,18 +234,17 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
     }
 
     // ---------------------------------------------------------------------------------------------
-    // Story 1.6 - red-phase scaffolds, added by the ATDD run on 2026-10-24. Each is skipped with
-    // the acceptance criterion it waits on. They live in this class rather than a new one because
-    // a container-backed class is one more SQL Server engine on a full run, and the cost is per
-    // class, not per case. Table and column names are the story's (Tasks 4 and 6); a different name
-    // chosen in dev-story is corrected here and recorded in the Debug Log.
+    // Story 1.6 - the refusal contract, the refusal record, the presence bound and retention, over
+    // the wire. Written as red-phase scaffolds by the ATDD run on 2026-10-24 and activated by the
+    // story. They live in this class rather than a new one because a container-backed class is one
+    // more SQL Server engine on a full run, and the cost is per class, not per case.
     // ---------------------------------------------------------------------------------------------
 
     /// <summary>
     /// AC1 / AC6 / I-5 - both boundary 404s answer RFC 9457 <c>not-available</c>, byte-identical,
     /// carrying no Space name, no Status and no identifier the URL did not already hold.
     /// </summary>
-    [Fact(Skip = "red: AC1/AC6 - the boundary 404 still answers space-not-found (story 1.6 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "AR-10")]
     [Trait("Requirement", "AR-34")]
@@ -302,7 +301,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
     /// pipeline with the acting Account, the target Space, the capability and the outcome; a served
     /// request writes none.
     /// </summary>
-    [Fact(Skip = "red: AC4 - no AccessRefusal table and no recorder (story 1.6 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "NFR-7")]
@@ -346,7 +345,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
     /// AC4 - a request refused at the authentication boundary is not a Space-boundary refusal, and
     /// is not recorded.
     /// </summary>
-    [Fact(Skip = "red: AC4 - no AccessRefusal table to read (story 1.6 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "AD-20")]
     public async Task A_request_refused_at_authentication_records_no_refusal()
@@ -383,7 +382,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
     /// Open question 8 - a <c>{spaceId}</c> that is not a GUID never reaches a Space, so it is
     /// answered with the same body a boundary 404 has, and records nothing.
     /// </summary>
-    [Fact(Skip = "red: AC1/AC6 - an unmatched /api route still answers an empty bare 404 (story 1.6 Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-10")]
     public async Task A_non_GUID_spaceId_is_answered_as_a_boundary_404_is_and_records_nothing()
     {
@@ -418,7 +417,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
     /// AC7 - with 50 distinct Accounts present in a Space, the 51st is refused with the bound, in
     /// the resolution transaction, so nothing is written for it.
     /// </summary>
-    [Fact(Skip = "red: AC7 - no presence table and no Sessions-per-Space bound (story 1.6 Task 6)")]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
@@ -464,7 +463,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
     /// AC7 - an Account already present is served when the Space is at the bound; the bound counts
     /// distinct Accounts, so it refuses newcomers only.
     /// </summary>
-    [Fact(Skip = "red: AC7 - no presence table and no Sessions-per-Space bound (story 1.6 Task 6)")]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "AR-30")]
     public async Task An_Account_already_present_is_served_when_the_Space_is_at_the_bound()
@@ -494,7 +493,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
     /// AC7 / AD-27 - an expired presence frees its slot, because expiry is evaluated in the counting
     /// statement's own <c>WHERE</c>, never by a timer.
     /// </summary>
-    [Fact(Skip = "red: AC7 - no presence table and no Sessions-per-Space bound (story 1.6 Task 6)")]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "AD-27")]
     public async Task An_expired_presence_frees_a_slot_under_the_bound()
@@ -532,7 +531,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
     /// - waiting on the condition, never on the clock. "At most daily" is asserted where a fake
     /// <see cref="TimeProvider"/> can reach it, in dev-story's unit case, not here.
     /// </remarks>
-    [Fact(Skip = "red: AC4 - no AccessRefusal table and no purge (story 1.6 Task 7)")]
+    [Fact]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-10")]

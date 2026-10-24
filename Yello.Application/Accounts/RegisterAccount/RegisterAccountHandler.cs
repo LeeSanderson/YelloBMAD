@@ -32,8 +32,8 @@ namespace Yello.Application.Accounts.RegisterAccount;
 /// resolution, no refusal recording, no idempotency and no bound check. Those belong to the
 /// request pipeline. Registration is unauthenticated and its route carries no <c>{spaceId}</c>, so
 /// Space resolution never runs for it, and
-/// there is nothing for authorisation to decide; and no NFR-8 bound applies - the bound registry
-/// is built in 1.6 and assigns Spaces-per-Account to story 3.1.
+/// there is nothing for authorisation to decide; and no NFR-8 bound applies - <c>BoundRegistry</c>
+/// assigns Spaces-per-Account to story 3.1, which creates a Space beyond the first.
 /// </para>
 /// </remarks>
 /// <param name="passwordHasher">Turns the password into the only form Yello stores.</param>

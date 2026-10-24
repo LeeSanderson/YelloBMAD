@@ -1,5 +1,7 @@
 using Yello.Application.Statuses.ListStatuses;
 using Yello.Contracts.Spaces;
+using Yello.Domain.Memberships;
+using Yello.Host.Spaces;
 
 namespace Yello.Host.Endpoints;
 
@@ -27,8 +29,13 @@ public static class SpaceStatusEndpoints
     /// </summary>
     /// <param name="endpoints">The route builder.</param>
     /// <returns>The registered route, for further configuration.</returns>
+    /// <remarks>
+    /// Declares <see cref="Capability.ReadProjectsAndTasks"/>, which every Role holds: Statuses are
+    /// the columns Tasks are read in. The pipeline checks it; this endpoint never sees a Role.
+    /// </remarks>
     public static RouteHandlerBuilder MapListStatuses(this IEndpointRouteBuilder endpoints) =>
-        endpoints.MapGet(SpaceRoutes.Statuses, ListAsync);
+        endpoints.MapGet(SpaceRoutes.Statuses, ListAsync)
+            .RequiresCapability(Capability.ReadProjectsAndTasks);
 
     /// <summary>
     /// Lists the active Space's Statuses.

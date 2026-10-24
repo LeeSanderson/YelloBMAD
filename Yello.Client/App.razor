@@ -1,5 +1,3 @@
-@inject IStringLocalizer<ClientCopy> Localizer
-
 @*
     The application shell.
 
@@ -15,13 +13,10 @@
         <FocusOnNavigate RouteData="@routeData" Selector="h1" />
     </Found>
     <NotFound>
+        @* The same refusal surface every not-found renders (story 1.6, AC9): no address shape
+           produces a different refusal, and nothing offers a way back to "where you were". *@
         <LayoutView Layout="@typeof(MainLayout)">
-            <div class="auth-surface">
-                <div class="auth-panel">
-                    <h1 class="type-dialog-title auth-panel__heading">@Localizer["NotFoundHeading"]</h1>
-                    <p class="auth-panel__intro">@Localizer["NotFoundBody"]</p>
-                </div>
-            </div>
+            <RefusalSurface />
         </LayoutView>
     </NotFound>
 </Router>

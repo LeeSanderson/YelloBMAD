@@ -4,7 +4,7 @@ baseline_commit: 54d50a9
 
 # Story 1.6: Refuse at the Space boundary, and record every refusal
 
-Status: ready-for-dev
+Status: review
 
 Epic: 1 — An Account, a Space of your own, and a boundary that holds
 Story key: `1-6-refuse-at-the-space-boundary-and-record-every-refusal`
@@ -109,95 +109,95 @@ AC1–AC9 are reproduced **verbatim** from `epics.md:734-790` (`status: final`),
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Read the open questions first, and record each decision before the code that depends on it** (AC: all)
-  - [ ] Fourteen questions are listed at the end of the Dev Notes, each with a recommended decision. Take each as a **reversible, recorded decision** in the Completion Notes: which option, why, and what it costs a later story. The orchestrator has no human in the loop for this phase; do not stop to ask.
-  - [ ] Questions 1 (what "active Session in a Space" counts), 2 (where `AccessRefusal` lives) and 4 (how a 403 is produced when no endpoint requires more than Viewer) shape the design. Settle them before Task 3.
+- [x] **Task 1 — Read the open questions first, and record each decision before the code that depends on it** (AC: all)
+  - [x] Fourteen questions are listed at the end of the Dev Notes, each with a recommended decision. Take each as a **reversible, recorded decision** in the Completion Notes: which option, why, and what it costs a later story. The orchestrator has no human in the loop for this phase; do not stop to ask.
+  - [x] Questions 1 (what "active Session in a Space" counts), 2 (where `AccessRefusal` lives) and 4 (how a 403 is produced when no endpoint requires more than Viewer) shape the design. Settle them before Task 3.
 
-- [ ] **Task 2 — The capability vocabulary and the matrix, as data** (AC: 2, 3)
-  - [ ] `Yello.Domain/Memberships/Capability.cs` (enum) and `RoleCapabilityMatrix.cs` (a static table `Role × Capability → Allowed | Denied | Qualified`). Source: `_bmad-output/specs/spec-yello/role-capability-matrix.md:9-28` (question 5). One enum member per **Role-decided** row; the Ownership-Offer acceptance row is **not** a Role decision (AD-26 / AR-13 — "the only capability in Yello decided outside the FR-16 Role matrix"), so it is either absent or explicitly marked row-identity and never consulted by the Role check.
-  - [ ] Qualified cells ("Member ↔ Viewer only", "Members and Viewers only") are **Allowed-at-the-Role-gate** for Admin, with the target constraint owned by stories 4.4 / 4.5. Mark them `Qualified` so the later story cannot mistake an unconditional ✔ for the whole rule.
-  - [ ] `Yello.Domain` may reference nothing. No ASP.NET Core type, no EF type.
-  - [ ] **Never call it a policy, never use `[Authorize(Roles=…)]`, `RequireRole`, `IsInRole`.** Gate C (`RoleApiBanTests`) fails the build. `[Authorize]` with a policy is allowed but is not the mechanism here: AD-1 makes every decision a per-request `(Account, Space)` resolution off the Membership row.
+- [x] **Task 2 — The capability vocabulary and the matrix, as data** (AC: 2, 3)
+  - [x] `Yello.Domain/Memberships/Capability.cs` (enum) and `RoleCapabilityMatrix.cs` (a static table `Role × Capability → Allowed | Denied | Qualified`). Source: `_bmad-output/specs/spec-yello/role-capability-matrix.md:9-28` (question 5). One enum member per **Role-decided** row; the Ownership-Offer acceptance row is **not** a Role decision (AD-26 / AR-13 — "the only capability in Yello decided outside the FR-16 Role matrix"), so it is either absent or explicitly marked row-identity and never consulted by the Role check.
+  - [x] Qualified cells ("Member ↔ Viewer only", "Members and Viewers only") are **Allowed-at-the-Role-gate** for Admin, with the target constraint owned by stories 4.4 / 4.5. Mark them `Qualified` so the later story cannot mistake an unconditional ✔ for the whole rule.
+  - [x] `Yello.Domain` may reference nothing. No ASP.NET Core type, no EF type.
+  - [x] **Never call it a policy, never use `[Authorize(Roles=…)]`, `RequireRole`, `IsInRole`.** Gate C (`RoleApiBanTests`) fails the build. `[Authorize]` with a policy is allowed but is not the mechanism here: AD-1 makes every decision a per-request `(Account, Space)` resolution off the Membership row.
 
-- [ ] **Task 3 — Every Space-scoped endpoint declares its capability; the pipeline checks it** (AC: 2, 3, 4)
-  - [ ] Endpoint metadata, e.g. `.RequiresCapability(Capability.ReadProjectsAndTasks)` → a `RequiredCapability` metadata record read by the pipeline. `GET /api/v1/spaces/{spaceId}/statuses` declares the read capability.
-  - [ ] In `ActiveSpaceResolution.ResolveCoreAsync`, after the unit of work resolves the context and **before** `next`: look up the metadata, consult `RoleCapabilityMatrix` with `ActiveSpaceContext.Role`, and on `Denied` return the 403 problem (Task 5). The 403 returns through `IsFailure`, so the unit of work rolls back — keep that.
-  - [ ] **A Space-scoped endpoint with no declared capability fails closed** (refuse, or throw at startup) — and an architecture gate asserts every `{spaceId}` endpoint declares exactly one (Task 8). Do not default to "read".
-  - [ ] No handler, endpoint or slice inspects `Role`. A-12's authorisation clause (Task 8) gates it.
-  - [ ] **No handler converts a 403 into a 404 or the reverse** (AC2). The 404 is produced only at resolution; the 403 only at the capability check. Assert both directions over the wire where possible.
+- [x] **Task 3 — Every Space-scoped endpoint declares its capability; the pipeline checks it** (AC: 2, 3, 4)
+  - [x] Endpoint metadata, e.g. `.RequiresCapability(Capability.ReadProjectsAndTasks)` → a `RequiredCapability` metadata record read by the pipeline. `GET /api/v1/spaces/{spaceId}/statuses` declares the read capability.
+  - [x] In `ActiveSpaceResolution.ResolveCoreAsync`, after the unit of work resolves the context and **before** `next`: look up the metadata, consult `RoleCapabilityMatrix` with `ActiveSpaceContext.Role`, and on `Denied` return the 403 problem (Task 5). The 403 returns through `IsFailure`, so the unit of work rolls back — keep that.
+  - [x] **A Space-scoped endpoint with no declared capability fails closed** (refuse, or throw at startup) — and an architecture gate asserts every `{spaceId}` endpoint declares exactly one (Task 8). Do not default to "read".
+  - [x] No handler, endpoint or slice inspects `Role`. A-12's authorisation clause (Task 8) gates it.
+  - [x] **No handler converts a 403 into a 404 or the reverse** (AC2). The 404 is produced only at resolution; the 403 only at the capability check. Assert both directions over the wire where possible.
 
-- [ ] **Task 4 — `AccessRefusal`: entity, table, migration, writer** (AC: 4)
-  - [ ] Fields: `Id` (app-generated via `IIdentifierGenerator`; `No_key_is_generated_by_the_database`), `AccountId`, target Space id, `Capability` (string, as `Role` is), `Outcome` (`404`/`403`), `Kind` (`CrossSpace` | `InsufficientRole`, stored as name), `OccurredAt` (`DateTimeOffset` UTC from the injected `TimeProvider`). Shape is AD-20 / AR-11 verbatim (`ARCHITECTURE-SPINE.md:198`, `epics.md:199`).
-  - [ ] **Kind mapping**: every Space-boundary 404 is `CrossSpace` (non-member *and* no-such-Space — never distinguished, AD-3); every 403 is `InsufficientRole`. NFR-7 (`prd.md:730-734`) requires the two to be distinguishable in the record.
-  - [ ] **Storage — question 2. Recommended:** the target column is **not** named `SpaceId` (e.g. `TargetSpaceId`), has **no FK** to `Space` (a refusal for a Space that does not exist is still recorded — `.memlog.md:68`), and the table carries **no RLS policy and no query filter**. Detection of "Space-scoped" is purely by a column/property literally named `SpaceId` (`SpaceIsolationSchemaTests.Every_table_with_a_SpaceId_column_is_covered_by_the_policy`, `PersistenceModelGateTests`), so this shape is **outside** `SchemaNames.SpaceScopedTables` by construction. State the variance from the spine's ER (`SPACE ||--o{ ACCESS_REFUSAL`, `ARCHITECTURE-SPINE.md:377`) in the Completion Notes. Add a gate that nothing outside the recorder and the purge (both in Infrastructure) references the `AccessRefusal` entity or `DbSet` — it is write-only from the product's point of view; there is no read surface (AD-24 allows exactly two Account-scoped surfaces).
-  - [ ] **The write needs its own unit of work.** At `Refuse()` the resolution transaction is already rolled back and disposed; a 403 is rolled back by `IsFailure`. `deferred-work.md:246` (owner 1.6): a `DbContext` reused after a refusal runs on a fresh pooled connection with no session context. Use a fresh scope/`DbContext` (or `IDbContextFactory`) for the insert — never `SpaceSessionContext.SetAsync` a second time on the same connection (error **15664**, verified in 1.5).
-  - [ ] **Synchronous, before the response** (question 7). Both boundary-404 arms then do identical work, which is what AC10 measures.
-  - [ ] The writer lives in `Yello.Infrastructure/Persistence/` behind a port in `Yello.Application` (e.g. `IAccessRefusalRecorder`). The pipeline (`Yello.Host/Spaces/ActiveSpaceResolution`) is its only caller.
-  - [ ] Migration via the pinned tool (`dotnet tool restore`; `dotnet-ef` **10.0.11**), then the **hand-editing pass** (`TESTING-CONVENTIONS.md:269-282`): file-scoped namespace, real XML docs, composite index columns in static fields, no method over 80 lines, **no `// <auto-generated />`**. Literal object names in the migration, not `SchemaNames`. Add an index on `OccurredAt` for the purge.
-  - [ ] Add the configuration to **both** `Configurations/` and `YelloDbContext.OnModelCreating`'s explicit list (`Every_entity_configuration_reaches_the_model`; table named exactly the CLR type name).
+- [x] **Task 4 — `AccessRefusal`: entity, table, migration, writer** (AC: 4)
+  - [x] Fields: `Id` (app-generated via `IIdentifierGenerator`; `No_key_is_generated_by_the_database`), `AccountId`, target Space id, `Capability` (string, as `Role` is), `Outcome` (`404`/`403`), `Kind` (`CrossSpace` | `InsufficientRole`, stored as name), `OccurredAt` (`DateTimeOffset` UTC from the injected `TimeProvider`). Shape is AD-20 / AR-11 verbatim (`ARCHITECTURE-SPINE.md:198`, `epics.md:199`).
+  - [x] **Kind mapping**: every Space-boundary 404 is `CrossSpace` (non-member *and* no-such-Space — never distinguished, AD-3); every 403 is `InsufficientRole`. NFR-7 (`prd.md:730-734`) requires the two to be distinguishable in the record.
+  - [x] **Storage — question 2. Recommended:** the target column is **not** named `SpaceId` (e.g. `TargetSpaceId`), has **no FK** to `Space` (a refusal for a Space that does not exist is still recorded — `.memlog.md:68`), and the table carries **no RLS policy and no query filter**. Detection of "Space-scoped" is purely by a column/property literally named `SpaceId` (`SpaceIsolationSchemaTests.Every_table_with_a_SpaceId_column_is_covered_by_the_policy`, `PersistenceModelGateTests`), so this shape is **outside** `SchemaNames.SpaceScopedTables` by construction. State the variance from the spine's ER (`SPACE ||--o{ ACCESS_REFUSAL`, `ARCHITECTURE-SPINE.md:377`) in the Completion Notes. Add a gate that nothing outside the recorder and the purge (both in Infrastructure) references the `AccessRefusal` entity or `DbSet` — it is write-only from the product's point of view; there is no read surface (AD-24 allows exactly two Account-scoped surfaces).
+  - [x] **The write needs its own unit of work.** At `Refuse()` the resolution transaction is already rolled back and disposed; a 403 is rolled back by `IsFailure`. `deferred-work.md:246` (owner 1.6): a `DbContext` reused after a refusal runs on a fresh pooled connection with no session context. Use a fresh scope/`DbContext` (or `IDbContextFactory`) for the insert — never `SpaceSessionContext.SetAsync` a second time on the same connection (error **15664**, verified in 1.5).
+  - [x] **Synchronous, before the response** (question 7). Both boundary-404 arms then do identical work, which is what AC10 measures.
+  - [x] The writer lives in `Yello.Infrastructure/Persistence/` behind a port in `Yello.Application` (e.g. `IAccessRefusalRecorder`). The pipeline (`Yello.Host/Spaces/ActiveSpaceResolution`) is its only caller.
+  - [x] Migration via the pinned tool (`dotnet tool restore`; `dotnet-ef` **10.0.11**), then the **hand-editing pass** (`TESTING-CONVENTIONS.md:269-282`): file-scoped namespace, real XML docs, composite index columns in static fields, no method over 80 lines, **no `// <auto-generated />`**. Literal object names in the migration, not `SchemaNames`. Add an index on `OccurredAt` for the purge.
+  - [x] Add the configuration to **both** `Configurations/` and `YelloDbContext.OnModelCreating`'s explicit list (`Every_entity_configuration_reaches_the_model`; table named exactly the CLR type name).
 
-- [ ] **Task 5 — The refusal contract: problem types, bodies, routes** (AC: 1, 2, 6)
-  - [ ] `Yello.Contracts/ProblemTypes.cs` — keep the `urn:yello:problem:<kebab>` scheme. Question 6: **recommended** replace `SpaceNotFound` with one `NotAvailable` (`urn:yello:problem:not-available`) used for **every** 404 the product answers, so a future in-Space not-found (a Task id missing inside the caller's own Space) cannot differ in body from a boundary 404 (AC1's "identifier matching no resource at all"). Add `InsufficientRole` (403) and `BoundReached`. Each gets the same remarks discipline as the existing constants.
-  - [ ] **403 body**: `type` = insufficient-role, plus a machine-readable `capability` extension (stable code) so the client can render "Viewers cannot edit Tasks." from its own resources. Nothing object-shaped: no resource id, no title, no Space name.
-  - [ ] **404 body**: identical bytes for both causes. Today's title "The Space was not found." — replace with a neutral title (e.g. "Not available."), the same constant on every 404. The title is not the contract; the client never reads it (`ProblemResponse` drops it).
-  - [ ] **Do not register `AddProblemDetails()` casually.** 1.5's `ActiveSpaceEndpointTests` compares raw bodies byte-for-byte and they match today, so no per-request `traceId` is emitted. The default problem-details writer can add a `traceId` that differs per request and would make every "identical body" assertion fail — or tempt someone to normalise it away. Verify before adopting; if adopted, strip or pin it and assert the bodies still match raw.
-  - [ ] **Non-GUID `{spaceId}`** (`deferred-work.md` 1.5 section; question 8): routing's `:guid` constraint currently answers an empty bare 404. Recommended: keep the constraint and give unmatched `/api/…` requests the same `not-available` problem body (e.g. a fallback endpoint on the `api` prefix, or status-code handling scoped to `/api`), writing **no** `AccessRefusal` because no Space boundary was reached. Assert body equality with a boundary 404.
-  - [ ] **Filter order** (`deferred-work.md` 1.5 review): a Space-scoped `POST` with no Session currently gets the anti-forgery `400`, not `401`. Recommended: a Space-scoped request with no Account is answered `401` before anti-forgery (question 11). Keep: no Session → **401** before any Space is read; 401 is **not** recorded and is **not** a 404 (AD-3 draws the line at the Space boundary and nowhere else). The anti-forgery 400 is not recorded either (`ProblemTypes.cs:73-79`, `AntiforgeryRequirement.cs:51-55`).
+- [x] **Task 5 — The refusal contract: problem types, bodies, routes** (AC: 1, 2, 6)
+  - [x] `Yello.Contracts/ProblemTypes.cs` — keep the `urn:yello:problem:<kebab>` scheme. Question 6: **recommended** replace `SpaceNotFound` with one `NotAvailable` (`urn:yello:problem:not-available`) used for **every** 404 the product answers, so a future in-Space not-found (a Task id missing inside the caller's own Space) cannot differ in body from a boundary 404 (AC1's "identifier matching no resource at all"). Add `InsufficientRole` (403) and `BoundReached`. Each gets the same remarks discipline as the existing constants.
+  - [x] **403 body**: `type` = insufficient-role, plus a machine-readable `capability` extension (stable code) so the client can render "Viewers cannot edit Tasks." from its own resources. Nothing object-shaped: no resource id, no title, no Space name.
+  - [x] **404 body**: identical bytes for both causes. Today's title "The Space was not found." — replace with a neutral title (e.g. "Not available."), the same constant on every 404. The title is not the contract; the client never reads it (`ProblemResponse` drops it).
+  - [x] **Do not register `AddProblemDetails()` casually.** 1.5's `ActiveSpaceEndpointTests` compares raw bodies byte-for-byte and they match today, so no per-request `traceId` is emitted. The default problem-details writer can add a `traceId` that differs per request and would make every "identical body" assertion fail — or tempt someone to normalise it away. Verify before adopting; if adopted, strip or pin it and assert the bodies still match raw.
+  - [x] **Non-GUID `{spaceId}`** (`deferred-work.md` 1.5 section; question 8): routing's `:guid` constraint currently answers an empty bare 404. Recommended: keep the constraint and give unmatched `/api/…` requests the same `not-available` problem body (e.g. a fallback endpoint on the `api` prefix, or status-code handling scoped to `/api`), writing **no** `AccessRefusal` because no Space boundary was reached. Assert body equality with a boundary 404.
+  - [x] **Filter order** (`deferred-work.md` 1.5 review): a Space-scoped `POST` with no Session currently gets the anti-forgery `400`, not `401`. Recommended: a Space-scoped request with no Account is answered `401` before anti-forgery (question 11). Keep: no Session → **401** before any Space is read; 401 is **not** recorded and is **not** a 404 (AD-3 draws the line at the Space boundary and nowhere else). The anti-forgery 400 is not recorded either (`ProblemTypes.cs:73-79`, `AntiforgeryRequirement.cs:51-55`).
 
-- [ ] **Task 6 — The NFR-8 bound registry, and the one bound this story enforces** (AC: 7, 8)
-  - [ ] One declaration, e.g. `Yello.Domain/Bounds/BoundRegistry.cs`: six entries, each `(Bound id, value, consulting operation)`, values exactly as AC8's table. Story 2.1/2.2/3.1/4.3/7.3 consult it; none declares its own limit.
-  - [ ] **Concurrent active Sessions per Space = 50 — question 1. Recommended definition:** distinct Accounts with a live presence row in the Space. A Space-scoped table (`SpacePresence` or similar — it **does** carry `SpaceId`, so it needs FILTER + BLOCK predicates, a query filter from application state, and an entry in `SchemaNames.SpaceScopedTables`), keyed `(SpaceId, AccountId)`, `ExpiresAt` set to now + a stated window on each resolution. Inside the resolution transaction, already under the Space's session context: count rows `WHERE ExpiresAt > @now` (AD-27: expiry evaluated in the guarded statement's own `WHERE`, never by a timer); if the caller has no live row and the count is ≥ 50, refuse; otherwise upsert the caller's row. That is "raised inside the same transaction as the creation it refuses".
-    - [ ] **Do not put a `SpaceId` on the Session** (`deferred-work.md` 1.4 section; `SessionContractTests` plants one). Do not use an in-process counter (`No_production_code_introduces_a_cache`; NFR-2).
-    - [ ] Accounts, not cookies, are counted (a Session has no server-side identity — `SessionCookiePolicy` is a plain cookie ticket with no table). Record that simplification.
-    - [ ] Write amplification: an upsert per Space-scoped request. Only rewrite `ExpiresAt` when it is past half its window, and say so.
-    - [ ] Note the rollback interaction: `IsFailure` rolls back the presence upsert on any 4xx. Acceptable; record it.
-  - [ ] Refusal: status per question 9 (recommended **409**), `type` = bound-reached, extensions `bound` (stable id) and `limit` (the number). Not recorded as an `AccessRefusal` (AD-20 has exactly two kinds).
-  - [ ] Copy (UX-DR35): no UX string exists for this bound; the only exemplar is "This Space has 100 Memberships, the maximum." (`EXPERIENCE.md:276`). Add a client resource in that voice, keyed on the bound id, stating the number plainly.
+- [x] **Task 6 — The NFR-8 bound registry, and the one bound this story enforces** (AC: 7, 8)
+  - [x] One declaration, e.g. `Yello.Domain/Bounds/BoundRegistry.cs`: six entries, each `(Bound id, value, consulting operation)`, values exactly as AC8's table. Story 2.1/2.2/3.1/4.3/7.3 consult it; none declares its own limit.
+  - [x] **Concurrent active Sessions per Space = 50 — question 1. Recommended definition:** distinct Accounts with a live presence row in the Space. A Space-scoped table (`SpacePresence` or similar — it **does** carry `SpaceId`, so it needs FILTER + BLOCK predicates, a query filter from application state, and an entry in `SchemaNames.SpaceScopedTables`), keyed `(SpaceId, AccountId)`, `ExpiresAt` set to now + a stated window on each resolution. Inside the resolution transaction, already under the Space's session context: count rows `WHERE ExpiresAt > @now` (AD-27: expiry evaluated in the guarded statement's own `WHERE`, never by a timer); if the caller has no live row and the count is ≥ 50, refuse; otherwise upsert the caller's row. That is "raised inside the same transaction as the creation it refuses".
+    - [x] **Do not put a `SpaceId` on the Session** (`deferred-work.md` 1.4 section; `SessionContractTests` plants one). Do not use an in-process counter (`No_production_code_introduces_a_cache`; NFR-2).
+    - [x] Accounts, not cookies, are counted (a Session has no server-side identity — `SessionCookiePolicy` is a plain cookie ticket with no table). Record that simplification.
+    - [x] Write amplification: an upsert per Space-scoped request. Only rewrite `ExpiresAt` when it is past half its window, and say so.
+    - [x] Note the rollback interaction: `IsFailure` rolls back the presence upsert on any 4xx. Acceptable; record it.
+  - [x] Refusal: status per question 9 (recommended **409**), `type` = bound-reached, extensions `bound` (stable id) and `limit` (the number). Not recorded as an `AccessRefusal` (AD-20 has exactly two kinds).
+  - [x] Copy (UX-DR35): no UX string exists for this bound; the only exemplar is "This Space has 100 Memberships, the maximum." (`EXPERIENCE.md:276`). Add a client resource in that voice, keyed on the bound id, stating the number plainly.
 
-- [ ] **Task 7 — Retention: a purge that never wakes an idle database** (AC: 4)
-  - [ ] Delete `AccessRefusal` rows with `OccurredAt < now − 90 days`. **90 days is PRD §12 assumption 11, † hardened, unconfirmed** (`prd.md:902`, `SPEC.md:277`) — tag its test `[Trait("Assumption","PRD-12-11")]`.
-  - [ ] **AD-10 / AR-33** (`ARCHITECTURE-SPINE.md:136`, `epics.md:221`): "No component queries the database on a fixed interval … Cleanup jobs run at most daily." Story 1.10's AC (`epics.md:951`) adds "so an idle database is never woken". Question 3, **recommended:** opportunistic — triggered by inbound request traffic, at most once per 24h per process (an in-process last-run instant via `TimeProvider`, not a cache of Space data), never by a `PeriodicTimer`, `Timer` or `BackgroundService` loop. Running it off the request path is fine; running it on a schedule is not.
-  - [ ] An architecture gate: no `BackgroundService`/`IHostedService`/`PeriodicTimer`/`System.Threading.Timer` in production code except where named (A-9, `test-design-qa.md:307`). AD-27's "scheduled component writing a terminal expiry state" ban is about writes, not deletes — the purge is not caught by it and must not be argued as an exception to it.
-  - [ ] Tests use a fake `TimeProvider` and rows at 91 and 89 days. **No `Task.Delay`.** **No delete statements for cleanup** — container disposal only.
+- [x] **Task 7 — Retention: a purge that never wakes an idle database** (AC: 4)
+  - [x] Delete `AccessRefusal` rows with `OccurredAt < now − 90 days`. **90 days is PRD §12 assumption 11, † hardened, unconfirmed** (`prd.md:902`, `SPEC.md:277`) — tag its test `[Trait("Assumption","PRD-12-11")]`.
+  - [x] **AD-10 / AR-33** (`ARCHITECTURE-SPINE.md:136`, `epics.md:221`): "No component queries the database on a fixed interval … Cleanup jobs run at most daily." Story 1.10's AC (`epics.md:951`) adds "so an idle database is never woken". Question 3, **recommended:** opportunistic — triggered by inbound request traffic, at most once per 24h per process (an in-process last-run instant via `TimeProvider`, not a cache of Space data), never by a `PeriodicTimer`, `Timer` or `BackgroundService` loop. Running it off the request path is fine; running it on a schedule is not.
+  - [x] An architecture gate: no `BackgroundService`/`IHostedService`/`PeriodicTimer`/`System.Threading.Timer` in production code except where named (A-9, `test-design-qa.md:307`). AD-27's "scheduled component writing a terminal expiry state" ban is about writes, not deletes — the purge is not caught by it and must not be argued as an exception to it.
+  - [x] Tests use a fake `TimeProvider` and rows at 91 and 89 days. **No `Task.Delay`.** **No delete statements for cleanup** — container disposal only.
 
-- [ ] **Task 8 — Architecture gates** (AC: 3, 4, 5, 8)
-  - [ ] **AC5 / A-4**: enumerate the real route table — the `Map*` extensions are public static, so map them onto a throwaway `WebApplication` and read `EndpointDataSource`. Fail any endpoint whose handler reaches `Task`, `Project`, `Label` or `StatusDefinition` (or their readers/ports — IL reachability, the `ReferencesType` technique at `SpaceResolutionSeamTests.cs:302-330`) without `{spaceId}` in its pattern. Only `StatusDefinition` exists today: add a **vacuity guard** (the statuses endpoint must be found and classified) and name the other three by type name so they are covered the day they exist.
-  - [ ] **Every `{spaceId}` route is mapped through the group carrying `ActiveSpaceResolution`** (`deferred-work.md` 1.5 review, owner 1.6) — today a route mapped on `app` skips resolution and answers an empty `200`.
-  - [ ] **Every `{spaceId}` endpoint declares exactly one capability** (Task 3).
-  - [ ] **AC8 / A-7**: the registry has exactly the six bounds with AC8's values and operations.
-  - [ ] **A-12, the remaining three clauses** (`deferred-work.md` 1.5 section; `SpaceResolutionSeamTests.cs:261`): no type but the pipeline depends on `RoleCapabilityMatrix`, the refusal recorder, or the bound registry's enforcement path. Extend `Only_the_pipeline_depends_on_the_Space_resolver`'s permitted list (l.269-275) for any new pipeline type. Idempotency's clause stays open if question 10 is taken as recommended.
-  - [ ] Plant every gate (Task 11).
+- [x] **Task 8 — Architecture gates** (AC: 3, 4, 5, 8)
+  - [x] **AC5 / A-4**: enumerate the real route table — the `Map*` extensions are public static, so map them onto a throwaway `WebApplication` and read `EndpointDataSource`. Fail any endpoint whose handler reaches `Task`, `Project`, `Label` or `StatusDefinition` (or their readers/ports — IL reachability, the `ReferencesType` technique at `SpaceResolutionSeamTests.cs:302-330`) without `{spaceId}` in its pattern. Only `StatusDefinition` exists today: add a **vacuity guard** (the statuses endpoint must be found and classified) and name the other three by type name so they are covered the day they exist.
+  - [x] **Every `{spaceId}` route is mapped through the group carrying `ActiveSpaceResolution`** (`deferred-work.md` 1.5 review, owner 1.6) — today a route mapped on `app` skips resolution and answers an empty `200`.
+  - [x] **Every `{spaceId}` endpoint declares exactly one capability** (Task 3).
+  - [x] **AC8 / A-7**: the registry has exactly the six bounds with AC8's values and operations.
+  - [x] **A-12, the remaining three clauses** (`deferred-work.md` 1.5 section; `SpaceResolutionSeamTests.cs:261`): no type but the pipeline depends on `RoleCapabilityMatrix`, the refusal recorder, or the bound registry's enforcement path. Extend `Only_the_pipeline_depends_on_the_Space_resolver`'s permitted list (l.269-275) for any new pipeline type. Idempotency's clause stays open if question 10 is taken as recommended.
+  - [x] Plant every gate (Task 11).
 
-- [ ] **Task 9 — Rate limiting on the two unauthenticated PBKDF2 endpoints** (ledger, severity **high**, Lee 2026-09-10)
-  - [ ] `POST /api/v1/accounts` and `POST /api/v1/sessions` each spend ~273 ms of CPU on any well-formed body. Use ASP.NET Core's built-in rate limiter (`AddRateLimiter` / `UseRateLimiter` / `RequireRateLimiting`, `Microsoft.AspNetCore.RateLimiting` in the shared framework since .NET 7 — **no package**, so `Directory.Packages.props` and `PackageVersionPinTests` are untouched).
-  - [ ] Question 12, **recommended**: a global concurrency limiter shared by the two endpoints (permits ≈ processor count, small queue) **plus** a per-client-IP fixed window. Attach by endpoint (a named policy on the two routes) or by group shape, never inside a slice (AR-3).
-  - [ ] **The 429 must be uniform**: the partition key may never include the submitted address, and the response may not differ for a known versus unknown address (AD-23). `application/problem+json` with a `rate-limited` type and `Retry-After` (AD-18). Not an `AccessRefusal`.
-  - [ ] Anti-forgery is **not** a rate limit (a token costs one `GET` total).
-  - [ ] Tests: drive past the limit over the wire with `HostProcess`; assert 429, `Retry-After`, identical bodies for known and unknown addresses. Configure limits so the test is fast — a configuration key with the resolved value **logged unconditionally** (`Program.cs:169-181` precedent).
+- [x] **Task 9 — Rate limiting on the two unauthenticated PBKDF2 endpoints** (ledger, severity **high**, Lee 2026-09-10)
+  - [x] `POST /api/v1/accounts` and `POST /api/v1/sessions` each spend ~273 ms of CPU on any well-formed body. Use ASP.NET Core's built-in rate limiter (`AddRateLimiter` / `UseRateLimiter` / `RequireRateLimiting`, `Microsoft.AspNetCore.RateLimiting` in the shared framework since .NET 7 — **no package**, so `Directory.Packages.props` and `PackageVersionPinTests` are untouched).
+  - [x] Question 12, **recommended**: a global concurrency limiter shared by the two endpoints (permits ≈ processor count, small queue) **plus** a per-client-IP fixed window. Attach by endpoint (a named policy on the two routes) or by group shape, never inside a slice (AR-3).
+  - [x] **The 429 must be uniform**: the partition key may never include the submitted address, and the response may not differ for a known versus unknown address (AD-23). `application/problem+json` with a `rate-limited` type and `Retry-After` (AD-18). Not an `AccessRefusal`.
+  - [x] Anti-forgery is **not** a rate limit (a token costs one `GET` total).
+  - [x] Tests: drive past the limit over the wire with `HostProcess`; assert 429, `Retry-After`, identical bodies for known and unknown addresses. Configure limits so the test is fast — a configuration key with the resolved value **logged unconditionally** (`Program.cs:169-181` precedent).
 
-- [ ] **Task 10 — The refusal surface in the browser** (AC: 1, 2, 7, 9)
-  - [ ] A routed page component (not a toast, not an inline region) rendering for `not-available`: heading **"Not available."** (`EXPERIENCE.md:130-134`), the **same** page, words, layout and focus for both causes — **no client-side branch** on which occurred (UX-DR32). For `insufficient-role`: the capability statement, e.g. "Viewers cannot edit Tasks.", from resources keyed by capability code. For `bound-reached`: the bound copy.
-  - [ ] All strings in `Yello.Client/Localisation/ClientCopy.resx` (sentence case; gates `No_user_visible_string_literal_appears_in_a_component` and its `@code` sibling). Never render `title`/`detail` from the server (`ProblemResponse` deliberately omits them).
-  - [ ] `document.title` stays fixed `Yello` (UX-DR33). Focus lands on the `h1` (`App.razor`'s `FocusOnNavigate`). No `danger` colour token for a refusal (`DESIGN.md:501`).
-  - [ ] **Route back — question 13.** The switcher is story 1.7. Recommended: a link to the authenticated home route, which 1.7 repoints to a switcher-sourced Space; never a remembered last Space (UX-DR32, `EXPERIENCE.md:142`). Ledger the "drawn from the switcher" clause to 1.7.
-  - [ ] Converge the client's own unknown-route `<NotFound>` (`App.razor`, `ClientCopy.resx` `NotFoundHeading`/`NotFoundBody` — "There is nothing here" / "go back to where you were") onto the same surface and copy, so no URL shape produces a different refusal, and "go back to where you were" (a remembered location) disappears.
-  - [ ] Client logic tests go in `Yello.Tests.Architecture` (the only suite referencing `Yello.Client`; `SessionSeamTests` precedent). A browser case in `Yello.Tests.Client` needs either a Host or Playwright `page.RouteAsync` fakes — neither exists. Recommended: a `RouteAsync`-faked case for the two 404s rendering identically, with a plant; if that is too large, ledger it.
+- [x] **Task 10 — The refusal surface in the browser** (AC: 1, 2, 7, 9)
+  - [x] A routed page component (not a toast, not an inline region) rendering for `not-available`: heading **"Not available."** (`EXPERIENCE.md:130-134`), the **same** page, words, layout and focus for both causes — **no client-side branch** on which occurred (UX-DR32). For `insufficient-role`: the capability statement, e.g. "Viewers cannot edit Tasks.", from resources keyed by capability code. For `bound-reached`: the bound copy.
+  - [x] All strings in `Yello.Client/Localisation/ClientCopy.resx` (sentence case; gates `No_user_visible_string_literal_appears_in_a_component` and its `@code` sibling). Never render `title`/`detail` from the server (`ProblemResponse` deliberately omits them).
+  - [x] `document.title` stays fixed `Yello` (UX-DR33). Focus lands on the `h1` (`App.razor`'s `FocusOnNavigate`). No `danger` colour token for a refusal (`DESIGN.md:501`).
+  - [x] **Route back — question 13.** The switcher is story 1.7. Recommended: a link to the authenticated home route, which 1.7 repoints to a switcher-sourced Space; never a remembered last Space (UX-DR32, `EXPERIENCE.md:142`). Ledger the "drawn from the switcher" clause to 1.7.
+  - [x] Converge the client's own unknown-route `<NotFound>` (`App.razor`, `ClientCopy.resx` `NotFoundHeading`/`NotFoundBody` — "There is nothing here" / "go back to where you were") onto the same surface and copy, so no URL shape produces a different refusal, and "go back to where you were" (a remembered location) disappears.
+  - [x] Client logic tests go in `Yello.Tests.Architecture` (the only suite referencing `Yello.Client`; `SessionSeamTests` precedent). A browser case in `Yello.Tests.Client` needs either a Host or Playwright `page.RouteAsync` fakes — neither exists. Recommended: a `RouteAsync`-faked case for the two 404s rendering identically, with a plant; if that is too large, ledger it.
 
-- [ ] **Task 11 — Tests, and the plants that prove them** (AC: all)
-  - [ ] **AC1 / I-5 / I-13** — extend `ActiveSpaceEndpointTests` (do not replace `A_member_is_served_and_a_non_member_is_refused_exactly_as_a_missing_Space_is`): bodies byte-identical, no Space name, no id beyond the URL, both write one `CrossSpace` row.
-  - [ ] **AC2/AC3** — matrix exhaustively as data (every `Role × Capability`, against a table transcribed independently from `role-capability-matrix.md`, so the test is a restatement the matrix can disagree with). The pipeline's 403 path with **seeded** Memberships at all four Roles through the real resolver and database: invoke the filter directly with a fake endpoint declaring a write capability, as `ActiveSpaceUnitOfWorkTests` already does — do **not** add a product endpoint just to produce a 403 (question 4). Non-member → 404 for every capability.
-  - [ ] **AC4** — one row per refusal with each field; `CrossSpace` vs `InsufficientRole`; retention; purge cadence.
-  - [ ] **AC10 / I-6** — `DurationIndistinguishability`, plus a permanent planted oracle (one arm skips the record write) that must be told apart. **A class that needs no database takes no fixture**; this one does.
-  - [ ] **AC7** — the 51st distinct Account is refused, the 50 already present are not, an expired presence frees a slot (fake `TimeProvider`), and the refusal is in the resolution transaction (nothing written for the refused Account).
-  - [ ] **`ActiveSpaceUnitOfWorkTests` will break** the moment `ResolveCoreAsync` calls `GetRequiredService` for a new service (it builds a bare `ServiceCollection`, l.141-145). Register fakes there; keep its 409-rolls-back assertion.
-  - [ ] Every absence assertion gets a **planted violation, fired by name, recorded in a table** (1.5's P1–P15 shape). Suggested plants: a 403 for a member converted to 404; a 404 body carrying the Space name; a slice reading `Role`; a `{spaceId}`-less endpoint reading `StatusDefinition`; a `{spaceId}` route mapped on `app`; a Space-scoped endpoint with no capability; a registry with five bounds; a refusal path that skips the record; a record written by the slice; a purge on a `PeriodicTimer`; a rate-limit partition keyed on the email; a client branch on 404 cause.
-  - [ ] **Never `git checkout --` / `git restore` / `git reset` to revert a plant.** Hold the original in memory; restore in a `finally`.
+- [x] **Task 11 — Tests, and the plants that prove them** (AC: all)
+  - [x] **AC1 / I-5 / I-13** — extend `ActiveSpaceEndpointTests` (do not replace `A_member_is_served_and_a_non_member_is_refused_exactly_as_a_missing_Space_is`): bodies byte-identical, no Space name, no id beyond the URL, both write one `CrossSpace` row.
+  - [x] **AC2/AC3** — matrix exhaustively as data (every `Role × Capability`, against a table transcribed independently from `role-capability-matrix.md`, so the test is a restatement the matrix can disagree with). The pipeline's 403 path with **seeded** Memberships at all four Roles through the real resolver and database: invoke the filter directly with a fake endpoint declaring a write capability, as `ActiveSpaceUnitOfWorkTests` already does — do **not** add a product endpoint just to produce a 403 (question 4). Non-member → 404 for every capability.
+  - [x] **AC4** — one row per refusal with each field; `CrossSpace` vs `InsufficientRole`; retention; purge cadence.
+  - [x] **AC10 / I-6** — `DurationIndistinguishability`, plus a permanent planted oracle (one arm skips the record write) that must be told apart. **A class that needs no database takes no fixture**; this one does.
+  - [x] **AC7** — the 51st distinct Account is refused, the 50 already present are not, an expired presence frees a slot (fake `TimeProvider`), and the refusal is in the resolution transaction (nothing written for the refused Account).
+  - [x] **`ActiveSpaceUnitOfWorkTests` will break** the moment `ResolveCoreAsync` calls `GetRequiredService` for a new service (it builds a bare `ServiceCollection`, l.141-145). Register fakes there; keep its 409-rolls-back assertion.
+  - [x] Every absence assertion gets a **planted violation, fired by name, recorded in a table** (1.5's P1–P15 shape). Suggested plants: a 403 for a member converted to 404; a 404 body carrying the Space name; a slice reading `Role`; a `{spaceId}`-less endpoint reading `StatusDefinition`; a `{spaceId}` route mapped on `app`; a Space-scoped endpoint with no capability; a registry with five bounds; a refusal path that skips the record; a record written by the slice; a purge on a `PeriodicTimer`; a rate-limit partition keyed on the email; a client branch on 404 cause.
+  - [x] **Never `git checkout --` / `git restore` / `git reset` to revert a plant.** Hold the original in memory; restore in a `finally`.
 
-- [ ] **Task 12 — Housekeeping** (AC: all)
-  - [ ] Rewrite every comment that predicts this story so it describes what exists: `Program.cs:26-34`, `ActiveSpaceResolution.cs:30-34`, `ProblemTypes.cs:94-96`, `ListStatusesHandler.cs:19`, `Yello.Application/AssemblyMarker.cs:12-14`, `AuthenticateAccountHandler.cs:35,100`, `SpaceResolutionSeamTests.cs:261`, and any others a repository grep for `1.6` finds.
-  - [ ] Close or rewrite the `deferred-work.md` entries this story owns; add new entries with owners for what it defers (at least: the switcher-sourced route back → 1.7; the boundary-vs-in-Space duration comparison → 1.9 / 2.2; idempotency if deferred).
-  - [ ] **Do not add review narration to source files** (owned by Lee, project-wide). Do not tick this unless the diff holds it.
-  - [ ] Logs: `[LoggerMessage]` partials only (CA1848/CA1873). Continue `SpaceLog` EventIds after 1017. `SpaceId` as a field, never a Space name, never the email, never the cookie (AR-34).
+- [x] **Task 12 — Housekeeping** (AC: all)
+  - [x] Rewrite every comment that predicts this story so it describes what exists: `Program.cs:26-34`, `ActiveSpaceResolution.cs:30-34`, `ProblemTypes.cs:94-96`, `ListStatusesHandler.cs:19`, `Yello.Application/AssemblyMarker.cs:12-14`, `AuthenticateAccountHandler.cs:35,100`, `SpaceResolutionSeamTests.cs:261`, and any others a repository grep for `1.6` finds.
+  - [x] Close or rewrite the `deferred-work.md` entries this story owns; add new entries with owners for what it defers (at least: the switcher-sourced route back → 1.7; the boundary-vs-in-Space duration comparison → 1.9 / 2.2; idempotency if deferred).
+  - [x] **Do not add review narration to source files** (owned by Lee, project-wide). Do not tick this unless the diff holds it.
+  - [x] Logs: `[LoggerMessage]` partials only (CA1848/CA1873). Continue `SpaceLog` EventIds after 1017. `SpaceId` as a field, never a Space name, never the email, never the cookie (AR-34).
 
 ## Dev Notes
 
@@ -360,10 +360,161 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (`claude-opus-5-5`), dev-story run unattended by the story-cycle orchestrator, 2026-10-24.
+
 ### Debug Log References
+
+- **AC10 oracle activated first, as directed.** Red: the fixture threw `PendingModelChangesWarning` (no `AccessRefusal` table yet). Green after the recorder and migration. Measured over five isolated runs: the oracle's arms differed by **44-48%** (6.4-6.5 ms vs 3.4-3.6 ms) against the 20% tolerance; the real pair by **1-4%**. The B3 method sees a skipped single-row insert because the insert is about half a boundary refusal's cost. **No blocker.**
+- **Activation order** followed the ATDD checklist. The oracle was the only scaffold confirmed red before its implementation existed. The others were activated after their implementation had landed, so their red evidence is the plant table below.
+- **The plant run was stopped by the harness for low system memory** (Claude Code reaps idle background shells under memory pressure, with an instruction not to restart them unasked). Three plants finished. The fourth, P7 (CrossSpace record skipped), was mid-run, and **its edit to `ActiveSpaceResolution.cs` survived the kill**: the runner's `finally` never ran. Found by comparing file hashes against a pre-run snapshot. Restored by hand from known content and confirmed byte-identical to the snapshot (md5 `5c78ed96…`). No other file differed, and no planted file was left behind. A runner bug was also found: a plant whose build failed (P3, an `internal` helper the analysers refused) was not written to the results file. Both P3 and the bug are fixed in the runner. The remaining plants were re-run later in the foreground, with Lee's approval relayed by the orchestrator; see the plant table.
+- **Full suite run project by project in the foreground,** not as one `dotnet test Yello.slnx`, because of memory pressure. It was run once after the reap and again after the plants. Results are under Completion Notes.
+- **Scaffold corrections: none for wrong assertions.** As the checklist directed, every by-name reflection lookup became a typed reference (`SpaceBoundaryPipelineTests`, `RefusalBoundaryGateTests`), and the transcription cells became `CapabilityDecision` values. Every name the scaffolds guessed matched: `RequiredCapability`, the 15 capabilities, the 6 bounds and operations, `TargetSpaceId`, `SpacePresence`, and `RateLimiting__PermitsPerWindow`. One gate was **extended** rather than corrected: A-12 now also covers the presence-bound port `ISpacePresenceRegister`. One 1.5 assertion moved from `SpaceNotFound` to `NotAvailable`, as the checklist predicted. `HostProcess` now raises the rate limit to 1,000,000 by default, so other wire tests are unaffected. Stale "red-phase / skipped" remarks were rewritten.
+- Analyser fixes on the way: MA0211, MA0181, S4040 (pragma: lower case is the code's form), S109, S1200 (registrations split into `SpaceBoundaryLimits`; pipeline helpers into `BoundaryProblems`, `UnitOfWorkResults`, `RequiredCapabilityExtensions.Of`), S2221, S2302, S8969/CS8602.
+- Migration `20261024121107_SpaceBoundaryRefusals`: scaffolded with the pinned `dotnet-ef` 10.0.11, then given the hand-editing pass (file-scoped namespace, real docs, no auto-generated marker on the migration, literal names). It extends `SpaceIsolationPolicy` with FILTER and BLOCK AFTER INSERT predicates on `SpacePresence`.
+- Temporary files `C:\tmp\b1.txt` and `C:\tmp\b2.txt` were created by mistake outside the scratchpad and deleted.
+
+#### Planted violations
+
+Every plant was run in the foreground, one at a time: one build plus one targeted test. The original was held in memory and restored in a `finally`. After each plant, md5 sums of every `.cs`, `.razor` and `.resx` under the production and test projects were compared with a snapshot taken before the run: identical every time. No git command was used to restore anything.
+
+The first run, on 2026-10-24, was stopped by the harness for low memory after P1, P2 and P4. Its leftover P7 edit was restored by hand, and the rest were re-run with Lee's approval relayed by the orchestrator. Five plants failed to *compile* on their first attempt because of the analysers: P3 and P9 (S4261 and access modifiers), P5 (an unused `using` once the declaration was removed), P6 (an unused constant) and P16 (S109). Each was reshaped to plant the same violation in a form that compiles, then run.
+
+| # | Plant | Caught by | Result |
+|---|---|---|---|
+| P1 | 403 converted to 404 in the pipeline | `SpaceBoundaryPipelineTests.The_matrix_decides_whether_a_member_reaches_the_endpoint` | caught (8 of 20 rows) |
+| P2 | 404 body carries an id beyond the URL (`detail` = Account id) | `ActiveSpaceEndpointTests.Both_boundary_404s_answer_not_available_and_carry_nothing_beyond_the_URL` | caught |
+| P3 | an Application type reads `ActiveSpaceContext.Role` | `RefusalBoundaryGateTests.Nothing_but_the_pipeline_reads_the_Role_off_the_active_Space_context` | caught |
+| P4 | `{spaceId}` route mapped on `app`, around the group | Host startup check; `ActiveSpaceEndpointTests.A_member_is_served_and_a_non_member_is_refused_exactly_as_a_missing_Space_is` | caught (Host refused to start) |
+| P5 | the statuses endpoint declares two capabilities | `RefusalBoundaryGateTests.Every_spaceId_endpoint_declares_exactly_one_capability` | caught. The zero-capability case is held by `SpaceBoundaryRouteTests.A_spaceId_route_outside_the_resolving_group_or_without_a_capability_is_reported` |
+| P6 | registry with five bounds | `RefusalBoundaryGateTests.The_bound_registry_declares_all_six_bounds_with_their_values_and_operations` | caught |
+| P7 | boundary 404 skips the `CrossSpace` record | `ActiveSpaceEndpointTests.Each_boundary_404_records_one_CrossSpace_refusal_and_a_served_request_records_none` | caught |
+| P8 | 403 skips the `InsufficientRole` record | `SpaceBoundaryPipelineTests.A_403_records_one_InsufficientRole_refusal` | caught |
+| P9 | an Application type calls `IAccessRefusalRecorder` | `RefusalBoundaryGateTests.Only_the_pipeline_depends_on_the_capability_matrix_and_the_refusal_recorder` | caught |
+| P10 | a Host type reads `AccessRefusal` | `RefusalBoundaryGateTests.Only_the_recorder_and_the_purge_refer_to_the_refusal_record` | caught |
+| P11 | a `PeriodicTimer` in Infrastructure | `RefusalBoundaryGateTests.No_production_code_runs_on_a_timer_or_as_a_hosted_service` | caught |
+| P12 | purge interval one hour, not one day | `SpaceBoundaryRouteTests.The_refusal_purge_reaches_for_the_database_at_most_once_a_day` | caught |
+| P13 | rate-limit partition keyed per submission | `SessionEndpointTests.Sign_in_past_the_limit_is_refused_with_429_alike_for_a_known_and_an_unknown_address` | caught |
+| P14 | client branches on the not-found cause (unroutable vs `not-available`) | `RefusalCopyTests.Every_not_found_cause_renders_the_same_refusal` | caught |
+| P15 | anti-forgery filter before the 401 filter | `SpaceBoundaryRouteTests.An_unauthenticated_state_change_to_a_Space_scoped_route_is_answered_401_before_anti_forgery` | caught |
+| P16 | presence bound never refuses (`live > 2 x limit`) | `ActiveSpaceEndpointTests.The_51st_distinct_Account_in_a_Space_is_refused_with_the_bound` | caught |
+| P17 | matrix cell flipped (Viewer may manage Tasks) | `RefusalBoundaryGateTests.The_capability_matrix_agrees_with_the_transcription_in_every_cell` | caught |
+| P18 | the `/api` fallback removed | `ActiveSpaceEndpointTests.A_non_GUID_spaceId_is_answered_as_a_boundary_404_is_and_records_nothing` | caught |
+| P19 | 403 record written fire-and-forget, after the response | `SpaceBoundaryPipelineTests.A_403_records_one_InsufficientRole_refusal` | caught. This catch depends on timing: the record races the read, so a slower read could miss it. Recorded as a weak plant, not as a gate guarantee. |
+| AC10 | one arm skips the record (permanent oracle) | `SpaceBoundaryPipelineTests.The_duration_method_tells_a_refusal_that_skips_its_record_from_one_that_writes_it` | caught, 44-48% vs 20% |
+| ATDD | bare statuses route; `PeriodicTimer` | A-4, A-9 | caught (ATDD run) |
+
+**19 of 19 caught. No gate needed fixing.**
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
+**Implemented.** Each item below is in place and tested, and every planted violation was caught (table above).
+
+- **Capability vocabulary and matrix as data:** `Capability` (15 Role-decided rows), `CapabilityDecision`, `RoleCapabilityMatrix.Decide`.
+- **Declared capability, checked by the pipeline:** `RequiresCapability` metadata. `ActiveSpaceResolution` checks it after resolution and before the endpoint, and answers `403 insufficient-role` with a `capability` code. It fails closed with no declaration, and the Host refuses to start with an undeclared `{spaceId}` route.
+- **The refusal record:** `AccessRefusal`, written for every boundary 404 (`CrossSpace`) and every 403 (`InsufficientRole`). It is written synchronously, on its own context, after rollback.
+- **Retention:** 90-day purge, triggered by request traffic, at most once a day per process, off the request path.
+- **The registry and the one bound this story enforces:** `BoundRegistry` holds all six NFR-8 bounds. The concurrent-active-Sessions bound is enforced through `SpacePresence`, inside the resolution transaction, refusing with `409 bound-reached`.
+- **One 404 for everything:** `not-available` for every 404, including unmatched `/api` paths.
+- **Filter order:** 401 before anti-forgery on Space-scoped routes.
+- **Rate limit:** on both PBKDF2 endpoints, with a uniform 429.
+- **The browser refusal page:** one page for every not-found, the client's own copy, and the unknown-route page converged onto it.
+- **Housekeeping:** comments that predicted this story were rewritten, and the ledger was updated.
+
+**Tests.** Build: 0 warnings, 0 errors. Run project by project in the foreground: Architecture 144/144; Slices 172 (171 passed, 0 failed, 1 skipped); Client 8/8; Isolation, Revocation and Merge 0. **Total 324: 323 passed, 0 failed, 1 skipped.** The baseline was 298 total (275 passed, 23 skipped): the 22 red scaffolds now pass, the theory counts as 20, and new cases were added. A combined `dotnet test Yello.slnx` was not run because of memory pressure. Its suite now starts 13 SQL Server engines (+1, `SpaceBoundaryPipelineTests`).
+
+**Variance from the spine:** the ER (`ARCHITECTURE-SPINE.md:377`) shows `SPACE ||--o{ ACCESS_REFUSAL`. This story built `AccessRefusal` with `TargetSpaceId`, no FK to Space and no FK to Account, and no RLS or query filter.
+
+**Decisions** (each reversible; cut any line to revisit it):
+
+- Q1: "Active Session in a Space" means a distinct Account with a live `SpacePresence` row, on a 15-minute window, rewritten only once less than half the window remains. Accounts are counted, not cookies. Any 4xx from the endpoint rolls back that request's presence upsert.
+- Q2: `AccessRefusal` is not Space-scoped: `TargetSpaceId`, no FKs, no RLS, write-only. A gate allows only the recorder, the purge, the context and its configuration to refer to it.
+- Q3: The purge runs on request traffic, at most once per 24 hours per process, and is not awaited by the request. There is no startup trigger.
+- Q4: The matrix is proved as data and through the real filter with seeded Memberships. The over-the-wire 403 is ledgered to story 2.1.
+- Q5: The SPEC companion matrix wins. The Ownership-Offer acceptance row is absent from `Capability` (AD-26).
+- Q6: `not-available` replaces `space-not-found` for every 404, with the neutral title "Not available.".
+- Q7: The record is written synchronously. The two boundary causes are timed. The boundary vs in-Space comparison is ledgered to 2.2 and 1.9.
+- Q8: `:guid` stays. An `/api/{**path}` fallback answers `not-available` and records nothing. Side effect: a POST to a GET-only route answers 404, not 405 (ledgered to 2.1).
+- Q9: A bound refusal is `409 bound-reached`, with `bound` (kebab code) and `limit`.
+- Q10: Idempotency is deferred to 2.1, and the ledger entry is re-owned. A-12's idempotency clause stays open.
+- Q11: A 401 comes before anti-forgery on `{spaceId}` routes (`RequireAccountAsync` first in `ApiRouteGroup`).
+- Q12: The rate limit is a concurrency limiter (ProcessorCount permits, queue of 2×) plus a 10-per-minute window per client IP. The key is `RateLimiting:PermitsPerWindow`, logged at startup. Behind a proxy the per-client window is ledgered to 1.10.
+- Q13: The route back is `ClientRoutes.Home` ("/"). The switcher-sourced clause is ledgered to 1.7.
+- Q14: The copy is "Not available.". The SPEC line at `acceptance-criteria.md:161` is flagged as a restatement defect and ledgered to 1.7.
+- Wire codes are the kebab-case form of enum names (`StableCode`) and are used directly as client resource keys. A test fails the build on any capability or bound code without copy.
+- `ProblemResponse` gained optional `Capability`, `Bound` and `Limit`.
+- The 403 copy names the Roles the matrix denies, for example "Viewers cannot edit Tasks." or "Only Owners and Admins can manage Labels.". No Role travels on the wire.
+- Known limit: two newcomers racing at the presence bound can both be admitted. Ledgered to 2.9.
 
 ### File List
+
+**Added:**
+
+- `Yello.Domain/StableCode.cs`
+- `Yello.Domain/Memberships/Capability.cs`
+- `Yello.Domain/Memberships/CapabilityDecision.cs`
+- `Yello.Domain/Memberships/RoleCapabilityMatrix.cs`
+- `Yello.Domain/Bounds/BoundRegistry.cs`
+- `Yello.Domain/AccessRefusals/AccessRefusal.cs`
+- `Yello.Domain/AccessRefusals/AccessRefusalKind.cs`
+- `Yello.Domain/Spaces/SpacePresence.cs`
+- `Yello.Application/Spaces/IAccessRefusalRecorder.cs`
+- `Yello.Application/Spaces/ISpacePresenceRegister.cs`
+- `Yello.Application/Spaces/IRefusalRetention.cs`
+- `Yello.Infrastructure/SpaceBoundaryLimits.cs`
+- `Yello.Infrastructure/Persistence/AccessRefusalRecorder.cs`
+- `Yello.Infrastructure/Persistence/AccessRefusalPurge.cs`
+- `Yello.Infrastructure/Persistence/RefusalPurgeSchedule.cs`
+- `Yello.Infrastructure/Persistence/SpacePresenceRegister.cs`
+- `Yello.Infrastructure/Persistence/Configurations/AccessRefusalConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Configurations/SpacePresenceConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261024121107_SpaceBoundaryRefusals.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261024121107_SpaceBoundaryRefusals.Designer.cs`
+- `Yello.Host/ApiRouteGroup.cs`
+- `Yello.Host/RateLimitLog.cs`
+- `Yello.Host/Endpoints/UnmatchedApiEndpoint.cs`
+- `Yello.Host/Sessions/CredentialHashingRateLimit.cs`
+- `Yello.Host/Spaces/BoundaryProblems.cs`
+- `Yello.Host/Spaces/RefusalRetentionTrigger.cs`
+- `Yello.Host/Spaces/RequiredCapability.cs`
+- `Yello.Host/Spaces/SpaceScopedRouteCheck.cs`
+- `Yello.Host/Spaces/UnitOfWorkResults.cs`
+- `Yello.Client/Components/RefusalSurface.razor`
+- `Yello.Client/Pages/NotAvailable.razor`
+- `Yello.Client/Refusals/RefusalCopy.cs`
+- `tests/Yello.Tests.Architecture/RefusalCopyTests.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/SpaceBoundaryRouteTests.cs`
+
+**Modified:**
+
+- `Yello.Application/AssemblyMarker.cs`
+- `Yello.Application/Accounts/AuthenticateAccount/AuthenticateAccountHandler.cs`
+- `Yello.Application/Accounts/RegisterAccount/RegisterAccountHandler.cs`
+- `Yello.Application/Statuses/ListStatuses/ListStatusesHandler.cs`
+- `Yello.Infrastructure/InfrastructureServices.cs`
+- `Yello.Infrastructure/Persistence/SchemaNames.cs`
+- `Yello.Infrastructure/Persistence/YelloDbContext.cs`
+- `Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs`
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Contracts/ProblemResponse.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Host/SpaceLog.cs`
+- `Yello.Host/Endpoints/SpaceStatusEndpoints.cs`
+- `Yello.Host/Sessions/AntiforgeryRequirement.cs`
+- `Yello.Host/Spaces/ActiveSpaceResolution.cs`
+- `Yello.Client/App.razor`
+- `Yello.Client/Pages/ClientRoutes.cs`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs`
+- `tests/Yello.Tests.Architecture/SpaceResolutionSeamTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/SessionEndpointTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/HostProcess.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceUnitOfWorkTests.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/SpaceBoundaryPipelineTests.cs`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/1-6-refuse-at-the-space-boundary-and-record-every-refusal.md`
+
+### Change Log
+
+- 2026-10-24: implemented story 1.6. Added the refusal contract, the capability matrix, the `AccessRefusal` record and its purge, the bound registry and the presence bound, and the rate limit. Activated all 24 ATDD scaffolds. 2026-10-24: planted violations P3 and P5-P19 run in the foreground; all 19 caught. Status set to review.

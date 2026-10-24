@@ -6,7 +6,10 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Mono.Cecil;
 using Xunit;
+using Yello.Application.Spaces;
 using Yello.Contracts;
+using Yello.Domain.AccessRefusals;
+using Yello.Domain.Bounds;
 using Yello.Domain.Memberships;
 
 namespace Yello.Tests.Architecture;
@@ -18,13 +21,11 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds, written by the ATDD run on 2026-10-24 before any of story 1.6 existed.</b>
-/// Every case naming a type the story has not written yet reaches it <i>by name, through
-/// reflection</i>, because a scaffold that referenced a missing type would break the build - and
-/// with it every gate in this suite. On activation, replace each by-name lookup with the typed
-/// reference it stands for; the names below are the story's Task 2, Task 6 and Task 4 names, and a
-/// different name chosen in dev-story is a correction recorded in the Debug Log, not a reason to
-/// delete the case.
+/// <b>Written as red-phase scaffolds by the ATDD run on 2026-10-24, before any of story 1.6
+/// existed, and activated by the story.</b> The scaffolds reached the story's types by name through
+/// reflection so they could compile first; each lookup is now the typed reference it stood for, so a
+/// rename is a compile error. Every gate here was planted; the results are in the story's Dev Agent
+/// Record.
 /// </para>
 /// <para>
 /// <b>The matrix and the registry are transcribed here independently</b>, from
@@ -33,10 +34,10 @@ namespace Yello.Tests.Architecture;
 /// the product's own table would agree with any table at all.
 /// </para>
 /// <para>
-/// <b>Two cases are green today and stay active</b>, as standing regression gates rather than red
-/// assertions: <see cref="No_endpoint_without_spaceId_in_its_path_reaches_a_Space_scoped_entity"/>
-/// (A-4 / AC5) and <see cref="No_production_code_runs_on_a_timer_or_as_a_hosted_service"/> (A-9).
-/// Both were planted on 2026-10-24; the results are in the ATDD checklist.
+/// <b>Two cases were green before the story and were left active</b>, as standing gates:
+/// <see cref="No_endpoint_without_spaceId_in_its_path_reaches_a_Space_scoped_entity"/> (A-4 / AC5)
+/// and <see cref="No_production_code_runs_on_a_timer_or_as_a_hosted_service"/> (A-9). Both were
+/// planted by the ATDD run; the results are in its checklist.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Architecture")]
@@ -50,26 +51,26 @@ namespace Yello.Tests.Architecture;
 [Trait("Requirement", "NFR-8")]
 public sealed class RefusalBoundaryGateTests
 {
-    private const string MatrixTypeName = "Yello.Domain.Memberships.RoleCapabilityMatrix";
-    private const string CapabilityTypeName = "Yello.Domain.Memberships.Capability";
-    private const string BoundRegistryTypeName = "Yello.Domain.Bounds.BoundRegistry";
-    private const string RecorderPortName = "Yello.Application.Spaces.IAccessRefusalRecorder";
-    private const string AccessRefusalTypeName = "Yello.Domain.AccessRefusals.AccessRefusal";
     private const string PipelineTypeName = "Yello.Host.Spaces.ActiveSpaceResolution";
+
+    private static readonly string MatrixTypeName = typeof(RoleCapabilityMatrix).FullName!;
+    private static readonly string RecorderPortName = typeof(IAccessRefusalRecorder).FullName!;
+    private static readonly string PresencePortName = typeof(ISpacePresenceRegister).FullName!;
+    private static readonly string AccessRefusalTypeName = typeof(AccessRefusal).FullName!;
 
     /// <summary>
     /// The Ownership-Offer row, which is decided by row identity and never by Role (AD-26 / AR-13).
     /// </summary>
     private const string OfferAcceptance = "AcceptOrDeclineOwnershipOffer";
 
-    private const string Allowed = "Allowed";
-    private const string Denied = "Denied";
-    private const string Qualified = "Qualified";
+    private const CapabilityDecision Allowed = CapabilityDecision.Allowed;
+    private const CapabilityDecision Denied = CapabilityDecision.Denied;
+    private const CapabilityDecision Qualified = CapabilityDecision.Qualified;
 
     /// <summary>
     /// <c>role-capability-matrix.md:9-28</c>, transcribed by hand: Owner, Admin, Member, Viewer.
     /// </summary>
-    private static readonly (string Capability, string Owner, string Admin, string Member, string Viewer)[] Matrix =
+    private static readonly (string Capability, CapabilityDecision Owner, CapabilityDecision Admin, CapabilityDecision Member, CapabilityDecision Viewer)[] Matrix =
     [
         ("ReadProjectsAndTasks", Allowed, Allowed, Allowed, Allowed),
         ("ManageProjects", Allowed, Allowed, Allowed, Denied),
@@ -116,26 +117,23 @@ public sealed class RefusalBoundaryGateTests
     /// <summary>
     /// AC3 - the product's matrix agrees with the transcribed one in every Role x capability cell.
     /// </summary>
-    [Fact(Skip = "red: AC3 - RoleCapabilityMatrix and Capability do not exist yet (story 1.6 Task 2)")]
+    [Fact]
     public void The_capability_matrix_agrees_with_the_transcription_in_every_cell()
     {
-        var capability = PlannedType(ProductionAssemblies.Domain, CapabilityTypeName, "Task 2");
-        var lookup = MatrixLookup(capability);
-
         var disagreements = new List<string>();
 
         foreach (var row in Matrix)
         {
-            var value = Enum.Parse(capability, row.Capability);
+            var value = Enum.Parse<Capability>(row.Capability);
 
             foreach (var (role, expected) in new[]
             {
                 (Role.Owner, row.Owner), (Role.Admin, row.Admin), (Role.Member, row.Member), (Role.Viewer, row.Viewer),
             })
             {
-                var actual = lookup.Invoke(null, [role, value])?.ToString();
+                var actual = RoleCapabilityMatrix.Decide(role, value);
 
-                if (!string.Equals(actual, expected, StringComparison.Ordinal))
+                if (actual != expected)
                 {
                     disagreements.Add($"{role} x {row.Capability}: matrix says {actual}, transcription says {expected}");
                 }
@@ -153,12 +151,10 @@ public sealed class RefusalBoundaryGateTests
     /// AC3 - the capability vocabulary has one member per Role-decided row, and nothing else but
     /// the Ownership-Offer row, which AD-26 decides by row identity.
     /// </summary>
-    [Fact(Skip = "red: AC3 - Capability does not exist yet (story 1.6 Task 2)")]
+    [Fact]
     public void The_capability_vocabulary_is_exactly_the_Role_decided_rows()
     {
-        var capability = PlannedType(ProductionAssemblies.Domain, CapabilityTypeName, "Task 2");
-
-        var declared = Enum.GetNames(capability).Where(name => name != OfferAcceptance).Order(StringComparer.Ordinal);
+        var declared = Enum.GetNames<Capability>().Where(name => name != OfferAcceptance).Order(StringComparer.Ordinal);
         var transcribed = Matrix.Select(row => row.Capability).Order(StringComparer.Ordinal);
 
         Assert.Equal(transcribed, declared);
@@ -173,12 +169,10 @@ public sealed class RefusalBoundaryGateTests
     /// entry is dev-story's to choose: an entry matches a row when its values include the bound's
     /// name, its number and its operation's name.
     /// </remarks>
-    [Fact(Skip = "red: AC8 - BoundRegistry does not exist yet (story 1.6 Task 6)")]
+    [Fact]
     public void The_bound_registry_declares_all_six_bounds_with_their_values_and_operations()
     {
-        var registry = PlannedType(ProductionAssemblies.Domain, BoundRegistryTypeName, "Task 6");
-
-        var entries = registry
+        var entries = typeof(BoundRegistry)
             .GetMembers(BindingFlags.Public | BindingFlags.Static)
             .Select(member => member switch
             {
@@ -250,10 +244,10 @@ public sealed class RefusalBoundaryGateTests
     /// Task 3 - every <c>{spaceId}</c> endpoint declares exactly one required capability, so no
     /// Space-scoped endpoint is ever checked against a default.
     /// </summary>
-    [Fact(Skip = "red: AC2/AC3 - no endpoint declares a capability yet (story 1.6 Task 3)")]
+    [Fact]
     public void Every_spaceId_endpoint_declares_exactly_one_capability()
     {
-        var capability = PlannedType(ProductionAssemblies.Domain, CapabilityTypeName, "Task 2");
+        var capability = typeof(Capability);
 
         var spaceScoped = RouteTable().Where(CarriesSpaceId).ToList();
 
@@ -273,7 +267,7 @@ public sealed class RefusalBoundaryGateTests
     /// <summary>
     /// A-12 - nothing but the pipeline depends on the capability matrix or the refusal recorder.
     /// </summary>
-    [Fact(Skip = "red: AC2/AC4 - the matrix and the recorder do not exist yet (story 1.6 Tasks 2, 4)")]
+    [Fact]
     [Trait("Priority", "P1")]
     public void Only_the_pipeline_depends_on_the_capability_matrix_and_the_refusal_recorder()
     {
@@ -287,6 +281,13 @@ public sealed class RefusalBoundaryGateTests
                 "Yello.Infrastructure.Persistence.AccessRefusalRecorder",
                 "Yello.Infrastructure.InfrastructureServices",
             }),
+            (PresencePortName, new[]
+            {
+                PresencePortName,
+                PipelineTypeName,
+                "Yello.Infrastructure.Persistence.SpacePresenceRegister",
+                "Yello.Infrastructure.SpaceBoundaryLimits",
+            }),
         })
         {
             var dependents = DependentsOf(target);
@@ -297,16 +298,72 @@ public sealed class RefusalBoundaryGateTests
 
             Assert.True(
                 offenders.Count == 0,
-                $"{string.Join(", ", offenders)} depend on {target}. Authorisation and refusal "
-                + "recording are the pipeline's (AR-3); a slice that re-implements either is a defect.");
+                $"{string.Join(", ", offenders)} depend on {target}. Authorisation, refusal recording "
+                + "and bound checks are the pipeline's (AR-3); a slice that re-implements one is a defect.");
         }
+    }
+
+    /// <summary>
+    /// A-12, the authorisation clause - nothing but the pipeline reads the Role off the resolved
+    /// <see cref="ActiveSpaceContext"/>, so no handler, endpoint or slice decides anything by Role.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A slice that read the Role would be re-implementing the capability check AR-3 puts in the
+    /// pipeline - and would be the place a <c>403</c> could quietly become a <c>404</c>, or the
+    /// reverse. Read from the IL as a call to the property's getter, so a read through a local, a
+    /// lambda or a state machine is seen alike; constructing a context (which the resolver does) is
+    /// not a read.
+    /// </para>
+    /// <para>
+    /// <b>Vacuity guard:</b> the pipeline itself reads it, and must be found doing so.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    [Trait("Priority", "P1")]
+    [Trait("Requirement", "AD-1")]
+    public void Nothing_but_the_pipeline_reads_the_Role_off_the_active_Space_context()
+    {
+        var context = typeof(ActiveSpaceContext).FullName!;
+        var getter = "get_" + nameof(ActiveSpaceContext.Role);
+
+        var readers = new SortedSet<string>(StringComparer.Ordinal);
+
+        foreach (var assembly in RuntimeAssemblies())
+        {
+            using var module = ModuleDefinition.ReadModule(assembly.Location);
+
+            foreach (var type in module.GetTypes())
+            {
+                var reads = type.Methods.Any(method => method.HasBody && method.Body.Instructions.Any(instruction =>
+                    instruction.Operand is MethodReference called
+                    && called.Name == getter
+                    && called.DeclaringType.FullName == context));
+
+                if (reads)
+                {
+                    readers.Add(OutermostOf(type).FullName);
+                }
+            }
+        }
+
+        Assert.Contains(PipelineTypeName, readers);
+
+        // The record's own compiler-generated members (Equals, ToString, Deconstruct) read it too.
+        var offenders = readers.Where(name => name != PipelineTypeName && name != context).ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            $"{string.Join(", ", offenders)} read the Role off the active Space context. The pipeline "
+            + "checks the endpoint's declared capability against the matrix (AR-3); nothing else may "
+            + "decide by Role.");
     }
 
     /// <summary>
     /// Task 4 - the refusal record is write-only: nothing outside the recorder and the purge refers
     /// to it, so no read surface over it can appear.
     /// </summary>
-    [Fact(Skip = "red: AC4 - AccessRefusal does not exist yet (story 1.6 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "AD-20")]
     public void Only_the_recorder_and_the_purge_refer_to_the_refusal_record()
@@ -374,7 +431,7 @@ public sealed class RefusalBoundaryGateTests
     /// AC6 - every refusal the product answers has a stable machine-readable <c>type</c>, and one
     /// <c>not-available</c> type serves every 404.
     /// </summary>
-    [Fact(Skip = "red: AC6 - ProblemTypes still carries SpaceNotFound and lacks the 1.6 types (story 1.6 Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     public void The_refusal_problem_types_are_declared_and_one_type_serves_every_404()
     {
@@ -395,7 +452,7 @@ public sealed class RefusalBoundaryGateTests
     /// AC9 / UX-DR32 / UX-DR35 - the refusal surface's copy is the client's own, in the UX voice,
     /// and the unknown-route page no longer sends anyone back "to where you were".
     /// </summary>
-    [Fact(Skip = "red: AC9 - the refusal copy is not in ClientCopy.resx yet (story 1.6 Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     [Trait("Requirement", "UX-DR35")]
     public void The_refusal_copy_is_the_clients_own_and_names_no_remembered_location()
@@ -412,29 +469,6 @@ public sealed class RefusalBoundaryGateTests
 
         // A remembered location is exactly what UX-DR32 forbids as the route back.
         Assert.DoesNotContain(values, value => value.Contains("where you were", StringComparison.OrdinalIgnoreCase));
-    }
-
-    private static Type PlannedType(Assembly assembly, string fullName, string task)
-    {
-        var type = assembly.GetType(fullName);
-
-        Assert.True(type is not null, $"{fullName} is not in {assembly.GetName().Name} - story 1.6 {task} writes it.");
-
-        return type;
-    }
-
-    private static MethodInfo MatrixLookup(Type capability)
-    {
-        var matrix = PlannedType(ProductionAssemblies.Domain, MatrixTypeName, "Task 2");
-
-        var lookup = Array.Find(
-            matrix.GetMethods(BindingFlags.Public | BindingFlags.Static),
-            method => method.GetParameters().Select(parameter => parameter.ParameterType)
-                .SequenceEqual([typeof(Role), capability]));
-
-        Assert.True(lookup is not null, $"{MatrixTypeName} has no public static (Role, Capability) lookup.");
-
-        return lookup;
     }
 
     private static bool Describes(object entry, (string Bound, int Limit, string Operation) bound)

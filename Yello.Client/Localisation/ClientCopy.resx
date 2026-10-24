@@ -159,13 +159,117 @@
     <comment>Shown when a person is returned here because their Session expired or stopped being valid. It names the Session and NOTHING else - no Space name, no Membership information, and never "you were removed": this is the cold path, where the person is not in a Space and must not be told anything about one. "Session" is Glossary vocabulary and is capitalised in every language, per rule 2 at the top of this file.</comment>
   </data>
 
-  <data name="NotFoundHeading" xml:space="preserve">
-    <value>There is nothing here</value>
-    <comment>Heading of the page shown for an address that matches no route. No full stop: it is a heading, not a sentence.</comment>
+  <!--
+    THE REFUSAL SURFACE, from story 1.6. A page, never a toast: a refusal is a final answer. One
+    heading for every not-found - a Space the Account is not in, a Space that does not exist, and an
+    address that matches nothing - so there is no way to tell them apart from the page. The client
+    owns every string; nothing the server sends is rendered.
+  -->
+  <data name="NotAvailable" xml:space="preserve">
+    <value>Not available.</value>
+    <comment>The heading of the refusal page for every not-found, whatever the cause - a Space with no Membership, a Space that does not exist, or an address that matches nothing (UX-DR32, EXPERIENCE.md:131-133). Identical for every cause by design: nothing on the page may distinguish them.</comment>
   </data>
-  <data name="NotFoundBody" xml:space="preserve">
-    <value>Check the address, or go back to where you were.</value>
-    <comment>Body of the not-found page. Deliberately offers no link: there is only one page in the product so far, and a link to it would read as a suggestion rather than a route.</comment>
+  <data name="RefusalRouteBack" xml:space="preserve">
+    <value>Back to Yello.</value>
+    <comment>The one link on the refusal page. It goes to the product's home, never to a remembered last Space, which may itself be unavailable (EXPERIENCE.md:142). Story 1.7 points home at a Space drawn from the switcher.</comment>
+  </data>
+  <data name="RoleDoesNotPermit" xml:space="preserve">
+    <value>Your Role in this Space does not permit this.</value>
+    <comment>A capability refusal (403) that arrived without a capability code the client knows. Still capability-shaped: it names no object.</comment>
+  </data>
+
+  <!--
+    Below: one entry per capability code a 403 can carry. The code IS the key, as for failure codes.
+    Every capability has one, including the two every Role holds, so a later matrix change cannot
+    surface a bare code.
+  -->
+  <data name="read-projects-and-tasks" xml:space="preserve">
+    <value>Only members of this Space can read its Projects and Tasks.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="manage-projects" xml:space="preserve">
+    <value>Viewers cannot create, edit or delete Projects.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="manage-tasks" xml:space="preserve">
+    <value>Viewers cannot edit Tasks.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="edit-task-description-collaboratively" xml:space="preserve">
+    <value>Viewers cannot edit Task descriptions.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="assign-task" xml:space="preserve">
+    <value>Viewers cannot assign Tasks.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="configure-space-default-statuses" xml:space="preserve">
+    <value>Only Owners and Admins can change the Space's default Statuses.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="configure-project-status-delta" xml:space="preserve">
+    <value>Only Owners and Admins can change a Project's Statuses.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="manage-labels" xml:space="preserve">
+    <value>Only Owners and Admins can manage Labels.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="issue-and-revoke-invitations" xml:space="preserve">
+    <value>Only Owners and Admins can issue or revoke Invitations.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="change-membership-role" xml:space="preserve">
+    <value>Only Owners and Admins can change a Role.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="remove-membership" xml:space="preserve">
+    <value>Only Owners and Admins can remove a Membership.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="rename-space" xml:space="preserve">
+    <value>Only Owners and Admins can rename the Space.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="offer-ownership-transfer" xml:space="preserve">
+    <value>Only the Owner can offer to transfer ownership.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="delete-space" xml:space="preserve">
+    <value>Only the Owner can delete the Space.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+  <data name="issue-api-token-for-oneself" xml:space="preserve">
+    <value>Only members of this Space can issue an API Token.</value>
+    <comment>A capability refusal (403), keyed on the capability code the Host sends. Capability-shaped, never object-shaped (EXPERIENCE.md:104): it names what a Role cannot do, never the thing it was refused on. It names the Roles the matrix denies, so it is true for whoever sees it.</comment>
+  </data>
+
+  <!--
+    Below: one entry per NFR-8 bound code a 409 can carry. {0} is the limit from the response.
+  -->
+  <data name="concurrent-active-sessions-per-space" xml:space="preserve">
+    <value>This Space has {0} people active at once, the maximum.</value>
+    <comment>A bound refusal (409), keyed on the bound code the Host sends. States the bound plainly (UX-DR35, EXPERIENCE.md:276); {0} is the number, from the response's limit.</comment>
+  </data>
+  <data name="projects-per-space" xml:space="preserve">
+    <value>This Space has {0} Projects, the maximum.</value>
+    <comment>A bound refusal (409), keyed on the bound code the Host sends. States the bound plainly (UX-DR35, EXPERIENCE.md:276); {0} is the number, from the response's limit.</comment>
+  </data>
+  <data name="tasks-per-project" xml:space="preserve">
+    <value>This Project has {0} Tasks, the maximum.</value>
+    <comment>A bound refusal (409), keyed on the bound code the Host sends. States the bound plainly (UX-DR35, EXPERIENCE.md:276); {0} is the number, from the response's limit.</comment>
+  </data>
+  <data name="spaces-per-account" xml:space="preserve">
+    <value>This Account has {0} Spaces, the maximum.</value>
+    <comment>A bound refusal (409), keyed on the bound code the Host sends. States the bound plainly (UX-DR35, EXPERIENCE.md:276); {0} is the number, from the response's limit.</comment>
+  </data>
+  <data name="memberships-per-space" xml:space="preserve">
+    <value>This Space has {0} Memberships, the maximum.</value>
+    <comment>A bound refusal (409), keyed on the bound code the Host sends. States the bound plainly (UX-DR35, EXPERIENCE.md:276); {0} is the number, from the response's limit.</comment>
+  </data>
+  <data name="concurrent-editors-per-task" xml:space="preserve">
+    <value>This Task has {0} people editing it, the maximum.</value>
+    <comment>A bound refusal (409), keyed on the bound code the Host sends. States the bound plainly (UX-DR35, EXPERIENCE.md:276); {0} is the number, from the response's limit.</comment>
   </data>
 
   <!--

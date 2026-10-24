@@ -32,8 +32,9 @@ namespace Yello.Application.Accounts.AuthenticateAccount;
 /// <para>
 /// <b>Nothing cross-cutting is re-implemented here</b> (AR-3). No authorisation, no Space
 /// resolution, no refusal recording, no idempotency, no rate limit and no bound check. The request
-/// pipeline owns them - Space resolution exists, the rest are story 1.6's; a limiter bolted into
-/// this slice is precisely what that rule forbids, and <c>deferred-work.md</c> records the exposure against 1.6 by name.
+/// pipeline owns them. The rate limit that bounds this slice's deliberate PBKDF2 cost is a named
+/// policy on the endpoint (<c>CredentialHashingRateLimit</c> in <c>Yello.Host</c>), uniform for a
+/// known and an unknown address; a limiter bolted into this slice is precisely what AR-3 forbids.
 /// </para>
 /// </remarks>
 /// <param name="passwordHasher">Checks the credential, and makes the upgraded hash when one is due.</param>
@@ -97,7 +98,7 @@ public sealed class AuthenticateAccountHandler(
             //
             // Swallowed rather than logged because Yello.Application references Yello.Domain and
             // nothing else - the ring gate's exact-equality table would refuse a logging package
-            // here, and AR-3 puts cross-cutting concerns in the pipeline story 1.6 builds. The
+            // here, and AR-3 puts cross-cutting concerns in the request pipeline. The
             // consequence of swallowing is bounded and self-correcting: the hash stays at its old
             // work factor and the next successful sign-in tries the upgrade again.
             try

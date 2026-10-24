@@ -7,6 +7,7 @@ using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Yello.Contracts.Spaces;
+using Yello.Application.Spaces;
 using Yello.Domain.Accounts;
 using Yello.Domain.Memberships;
 using Yello.Host.Spaces;
@@ -22,10 +23,8 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds, written by the ATDD run on 2026-10-24.</b> Every case is skipped with
-/// the acceptance criterion it waits on. One container-backed class holds all of them, so the cost
-/// on a full run is one engine, paid only once a case is activated - xunit does not build the class
-/// fixture for a class whose every case is statically skipped.
+/// <b>Written as red-phase scaffolds by the ATDD run on 2026-10-24, activated by story 1.6.</b> One
+/// container-backed class holds all of them, so the cost on a full run is one engine.
 /// </para>
 /// <para>
 /// <b>Driven directly, not over the wire - story open question 4.</b> The product has one
@@ -33,12 +32,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// called as <c>ActiveSpaceUnitOfWorkTests</c> calls it, but with the production services behind it
 /// and an endpoint whose metadata declares the capability under test. No product endpoint is added
 /// to manufacture a 403.
-/// </para>
-/// <para>
-/// <b>Story 1.6 types are reached by name.</b> <c>RequiredCapability</c>, <c>Capability</c> and
-/// <c>IAccessRefusalRecorder</c> do not exist yet, and a scaffold naming them would break the
-/// build. On activation, replace each by-name lookup with the typed reference; a different name
-/// chosen in dev-story is a correction recorded in the Debug Log.
 /// </para>
 /// <para>
 /// <b>Seeded Memberships, on purpose</b> (<c>implementation-readiness-report-2026-08-22.md:964-968</c>):
@@ -55,10 +48,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     : IClassFixture<MigratedDatabaseFixture>
 {
-    private const string RequiredCapabilityTypeName = "Yello.Host.Spaces.RequiredCapability";
-    private const string CapabilityTypeName = "Yello.Domain.Memberships.Capability";
-    private const string RecorderPortName = "Yello.Application.Spaces.IAccessRefusalRecorder";
-
     private const string InsufficientRole = "urn:yello:problem:insufficient-role";
     private const string NotAvailable = "urn:yello:problem:not-available";
 
@@ -84,7 +73,7 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     /// The Admin rows marked "Member and Viewer only" are allowed at the Role gate; the target
     /// constraint is stories 4.4 and 4.5's, so <c>ChangeMembershipRole</c> passes here for Admin.
     /// </remarks>
-    [Theory(Skip = "red: AC2/AC3 - no capability check in the pipeline (story 1.6 Tasks 2, 3)")]
+    [Theory]
     [InlineData(Role.Owner, "ReadProjectsAndTasks", true)]
     [InlineData(Role.Admin, "ReadProjectsAndTasks", true)]
     [InlineData(Role.Member, "ReadProjectsAndTasks", true)]
@@ -140,7 +129,7 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     /// AC3 / I-1 - every capability is refused for an Account holding no Membership in the Space,
     /// with the boundary's one 404 and never a 403 that would disclose the Space exists.
     /// </summary>
-    [Fact(Skip = "red: AC3 - no capability metadata, and the 404 is still space-not-found (story 1.6 Tasks 3, 5)")]
+    [Fact]
     public async Task Every_capability_is_refused_with_the_boundary_404_for_a_non_member()
     {
         var database = Available();
@@ -171,7 +160,7 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     /// AC4 - a 403 writes one <c>InsufficientRole</c> refusal carrying the Account, the target Space,
     /// the capability attempted and the outcome.
     /// </summary>
-    [Fact(Skip = "red: AC4 - no capability check and no AccessRefusal recorder (story 1.6 Tasks 3, 4)")]
+    [Fact]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "NFR-7")]
@@ -211,11 +200,11 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     /// </summary>
     /// <remarks>
     /// Server-side, interleaved, 21 samples per arm, medians, 20% of the slower median -
-    /// <see cref="DurationIndistinguishability"/>, and no second method. Activate together with the
-    /// oracle below: on its own, before the refusal record exists, both arms do identical work and
-    /// this passes without proving anything.
+    /// <see cref="DurationIndistinguishability"/>, and no second method. It means something only
+    /// beside the oracle below, which proves the method can see the one piece of work a broken arm
+    /// would skip.
     /// </remarks>
-    [Fact(Skip = "red: AC10 - activate with its oracle once the AccessRefusal write exists (story 1.6 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AR-10")]
     public async Task A_missing_Space_and_a_Space_without_Membership_take_the_same_time_to_refuse()
     {
@@ -236,12 +225,13 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     /// method cannot see a skipped record write at all.
     /// </summary>
     /// <remarks>
-    /// <b>This is the case to activate first</b>, before any story 1.6 design is built on the
-    /// assumption that the B3 method can see the effect. It was built for a ~270 ms missing hash;
-    /// a skipped single-row insert on its own connection is a much smaller effect, and if the method
-    /// cannot see it, AC10's second clause is not satisfiable as written and needs a decision.
+    /// <b>Activated first, before the design was built on it.</b> The B3 method was built for a
+    /// ~270 ms missing hash, and a skipped single-row insert on its own connection is a much smaller
+    /// effect. Measured on activation (2026-10-24, five runs): about 6.5 ms against 3.5 ms, a 44-48%
+    /// gap against the 20% tolerance, while the real pair differed by 1-4%. The insert is about half
+    /// of a boundary refusal's cost, which is what makes it visible.
     /// </remarks>
-    [Fact(Skip = "red: AC10 - no AccessRefusal recorder to skip (story 1.6 Task 4); activate FIRST")]
+    [Fact]
     [Trait("Requirement", "AR-10")]
     public async Task The_duration_method_tells_a_refusal_that_skips_its_record_from_one_that_writes_it()
     {
@@ -309,9 +299,7 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
 
         if (skipRecord)
         {
-            var port = PlannedType(ProductionAssemblyOf(RecorderPortName), RecorderPortName);
-            var skipping = DispatchProxy.Create(port, typeof(SkippingRecorder));
-            services.AddScoped(port, _ => skipping);
+            services.AddScoped(_ => DispatchProxy.Create<IAccessRefusalRecorder, SkippingRecorder>());
         }
 
         await using var provider = services.BuildServiceProvider();
@@ -335,27 +323,8 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
             });
     }
 
-    private static object RequiredCapability(string capability)
-    {
-        var capabilityType = PlannedType(typeof(Role).Assembly, CapabilityTypeName);
-        var metadataType = PlannedType(typeof(ActiveSpaceResolution).Assembly, RequiredCapabilityTypeName);
-
-        return Activator.CreateInstance(metadataType, Enum.Parse(capabilityType, capability))!;
-    }
-
-    private static Assembly ProductionAssemblyOf(string typeName) =>
-        typeName.StartsWith("Yello.Application.", StringComparison.Ordinal)
-            ? typeof(Yello.Application.Spaces.IActiveSpaceResolver).Assembly
-            : typeof(Role).Assembly;
-
-    private static Type PlannedType(Assembly assembly, string fullName)
-    {
-        var type = assembly.GetType(fullName);
-
-        Assert.True(type is not null, $"{fullName} is not in {assembly.GetName().Name} - story 1.6 writes it.");
-
-        return type;
-    }
+    private static RequiredCapability RequiredCapability(string capability) =>
+        new(Enum.Parse<Capability>(capability));
 
     private static int? StatusOf(object? result) => (result as IStatusCodeHttpResult)?.StatusCode;
 

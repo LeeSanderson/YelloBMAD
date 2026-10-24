@@ -95,6 +95,15 @@ public static class InfrastructureServices
 
         services.AddScoped<IStatusDefinitionReader, StatusDefinitionReader>();
 
+        // THE SPACE BOUNDARY'S REFUSAL RECORD, FROM STORY 1.6. The request pipeline is its only
+        // caller (AR-3). Scoped, and it builds a context of its own for each record - see
+        // AccessRefusalRecorder for why it never reuses the request's.
+        services.AddScoped<IAccessRefusalRecorder, AccessRefusalRecorder>();
+
+        // Its bound and its retention, registered beside it - split out only to keep this class's
+        // dependencies within S1200's limit.
+        services.AddSpaceBoundaryLimits();
+
         return services;
     }
 
