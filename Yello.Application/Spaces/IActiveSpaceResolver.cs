@@ -16,8 +16,7 @@ namespace Yello.Application.Spaces;
 /// row-level security policy it unlocks, so the implementation scopes the connection to the
 /// requested Space <i>first</i> and then reads the Account's Membership under that scope. The read
 /// can only ever see Memberships in that one Space: a row there means the Account is a member, and
-/// no row means the request is refused. Recorded as story 1.5's decision on the bootstrap problem
-/// in its Completion Notes.
+/// no row means the request is refused.
 /// </para>
 /// </remarks>
 public interface IActiveSpaceResolver
@@ -43,8 +42,10 @@ public interface IActiveSpaceResolver
 /// One request's Space-scoped unit of work, which owns its connection from open to close.
 /// </summary>
 /// <remarks>
-/// Disposing without <see cref="CompleteAsync"/> rolls everything back. That is the path a failed
-/// or cancelled request takes, and it leaves nothing half-written.
+/// Disposing without <see cref="CompleteAsync"/> rolls everything back. That is the path a request
+/// takes when its endpoint throws, is cancelled, or answers with a <c>4xx</c> or <c>5xx</c> result,
+/// and it leaves nothing half-written. The unit closes before the endpoint's result is executed, so
+/// a Space-scoped endpoint returns data it has already read, never a query still to be run.
 /// </remarks>
 public interface IActiveSpaceUnitOfWork : IAsyncDisposable
 {
@@ -57,7 +58,10 @@ public interface IActiveSpaceUnitOfWork : IAsyncDisposable
     /// <summary>
     /// Commits the unit of work.
     /// </summary>
-    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <param name="cancellationToken">
+    /// Cancels the commit. The pipeline passes <see cref="CancellationToken.None"/>, because by the
+    /// time it commits the work is finished and a disconnected client should not undo it.
+    /// </param>
     /// <returns>A task that completes once the work is durable.</returns>
     Task CompleteAsync(CancellationToken cancellationToken);
 }

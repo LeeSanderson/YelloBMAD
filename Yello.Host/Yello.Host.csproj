@@ -15,6 +15,16 @@
     <PackageReference Include="Microsoft.Data.SqlClient" />
   </ItemGroup>
 
+  <!--
+    The same one-project grant Yello.Infrastructure makes, for the same reason: the Space-resolution
+    filter is internal, and the rules it applies to an endpoint's result (roll back a failure, refuse
+    a query still to be run) are only reachable over the wire through a Space-scoped endpoint that
+    writes or streams, which the product does not have. The slice tests drive the filter directly.
+  -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Yello.Tests.Slices" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Yello.Domain\Yello.Domain.csproj" />
     <ProjectReference Include="..\Yello.Application\Yello.Application.csproj" />

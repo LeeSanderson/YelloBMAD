@@ -151,8 +151,10 @@ public sealed class ActiveSpaceEndpointTests(MigratedDatabaseFixture fixture)
     /// </summary>
     /// <remarks>
     /// Story 1.4 recorded this clause as not proved, because "there is no Space-scoped surface for it
-    /// to fail to grant access to until story 1.5". The Host is started with a negative lifetime, so
-    /// the ticket is born expired; the Membership row is present and current.
+    /// to fail to grant access to until story 1.5". The same Account is first served its Space by a
+    /// Host issuing ordinary Sessions, so the Membership demonstrably resolves; a second Host is then
+    /// started with a negative lifetime, so the ticket it issues is born expired, against the same
+    /// Membership row, still present and current.
     /// </remarks>
     [Fact]
     public async Task An_expired_Session_grants_nothing_in_a_Space_the_Account_is_still_a_member_of()
@@ -161,18 +163,32 @@ public sealed class ActiveSpaceEndpointTests(MigratedDatabaseFixture fixture)
         var address = RandomAddress();
         var spaceId = Guid.NewGuid();
 
-        WireResponse? response = null;
+        WireResponse? served = null;
+        WireResponse? expired = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, AlreadyExpired, async client =>
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             await SeedSpaceAsync(database, spaceId, "Alpha", await AccountIdOfAsync(database, address));
 
-            response = await session.GetAsync(SpaceRoutes.StatusesOf(spaceId));
+            served = await session.GetAsync(SpaceRoutes.StatusesOf(spaceId));
         });
 
-        Assert.NotNull(response);
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        await HostProcess.RunAsync(fixture.ConnectionString!, AlreadyExpired, async client =>
+        {
+            var session = await SignedInWithoutRegisteringAsync(client, address);
+
+            expired = await session.GetAsync(SpaceRoutes.StatusesOf(spaceId));
+        });
+
+        Assert.NotNull(served);
+        Assert.Equal(HttpStatusCode.OK, served.StatusCode);
+        Assert.Equal(["Alpha"], StatusNames(served));
+
+        Assert.NotNull(expired);
+        Assert.Equal(HttpStatusCode.Unauthorized, expired.StatusCode);
+        Assert.Equal(ProblemTypes.AuthenticationFailed, ProblemType(expired));
+        Assert.DoesNotContain("Alpha", expired.Body, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -225,6 +241,19 @@ public sealed class ActiveSpaceEndpointTests(MigratedDatabaseFixture fixture)
             new RegisterAccountRequest("Ravi-" + Guid.NewGuid().ToString("N"), address, Password));
 
         Assert.Equal(HttpStatusCode.NoContent, registered.StatusCode);
+
+        var signedIn = await session.SignInAsync(address, Password);
+
+        Assert.Equal(HttpStatusCode.NoContent, signedIn.StatusCode);
+
+        return session;
+    }
+
+    private static async Task<WireSession> SignedInWithoutRegisteringAsync(HttpClient client, string address)
+    {
+        var session = new WireSession(client);
+
+        await session.FetchAntiforgeryTokenAsync();
 
         var signedIn = await session.SignInAsync(address, Password);
 

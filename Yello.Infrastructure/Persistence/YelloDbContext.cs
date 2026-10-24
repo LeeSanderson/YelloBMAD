@@ -97,7 +97,7 @@ public sealed class YelloDbContext(DbContextOptions<YelloDbContext> options, Spa
         // below cannot fall behind the directory beside it.
         //
         // The Space-scoped configurations take this context so their query filters can close over
-        // ScopedSpaceId. PersistenceModelGateTests.Every_Space_scoped_entity_has_a_query_filter
+        // ScopedSpaceId. PersistenceModelGateTests.Every_Space_scoped_entity_has_a_query_filter_from_application_state
         // fails the build on one that does not.
         modelBuilder.ApplyConfiguration(new AccountConfiguration());
         modelBuilder.ApplyConfiguration(new SpaceConfiguration());

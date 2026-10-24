@@ -1,5 +1,6 @@
 using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Xunit;
 using Yello.Infrastructure.Persistence;
 
@@ -211,14 +212,15 @@ public sealed class PersistenceModelGateTests
                 var shape = new FilterShape();
                 shape.Visit(filter.Expression);
 
-                if (!shape.ReadsSpaceId || !shape.ReadsContextState || shape.CallsAMethod)
+                var isEquality = filter.Expression is { } expression && IsSpaceIdEqualToContextState(expression);
+
+                if (!isEquality || shape.CallsAMethod)
                 {
                     problems.Add(
                         $"{entity.ClrType.Name}'s query filter `{filter.Expression}` is not the "
-                        + $"application-state shape: it must compare {SchemaNames.SpaceIdColumn} with a "
-                        + "member of YelloDbContext and call nothing. "
-                        + $"(reads SpaceId: {shape.ReadsSpaceId}, reads context state: "
-                        + $"{shape.ReadsContextState}, calls a method: {shape.CallsAMethod})");
+                        + $"application-state shape: its whole body must be {SchemaNames.SpaceIdColumn} == a "
+                        + "member of YelloDbContext, and it must call nothing. "
+                        + $"(is that equality: {isEquality}, calls a method: {shape.CallsAMethod})");
                 }
             }
         }
@@ -240,10 +242,10 @@ public sealed class PersistenceModelGateTests
     /// </para>
     /// <para>
     /// <b>No such reference exists yet</b> - the first is FR-21's Assignee in story 4.6 - so this
-    /// passes today by having nothing to inspect, and was failed on purpose with a planted
-    /// single-column reference before it was trusted (story 1.5's plant table). A reference to
+    /// passes today by having nothing to inspect. A reference to
     /// <c>Space</c> itself is outside it: <c>Space</c> is the Space, and its key already is the
-    /// <c>SpaceId</c>.
+    /// <c>SpaceId</c>. Held against a single-column reference and a mis-paired composite one before
+    /// it was trusted.
     /// </para>
     /// </remarks>
     [Fact]
@@ -263,9 +265,7 @@ public sealed class PersistenceModelGateTests
             .Where(foreignKey =>
                 foreignKey.DeclaringEntityType.FindProperty(SchemaNames.SpaceIdColumn) is not null
                 && foreignKey.PrincipalEntityType.FindProperty(SchemaNames.SpaceIdColumn) is not null)
-            .Where(foreignKey =>
-                !foreignKey.Properties.Any(property => property.Name == SchemaNames.SpaceIdColumn)
-                || !foreignKey.PrincipalKey.Properties.Any(property => property.Name == SchemaNames.SpaceIdColumn))
+            .Where(foreignKey => !PairsSpaceIdWithSpaceId(foreignKey))
             .Select(foreignKey =>
                 $"{foreignKey.DeclaringEntityType.ClrType.Name}({string.Join(", ", foreignKey.Properties.Select(p => p.Name))}) → "
                 + $"{foreignKey.PrincipalEntityType.ClrType.Name}({string.Join(", ", foreignKey.PrincipalKey.Properties.Select(p => p.Name))})")
@@ -312,30 +312,64 @@ public sealed class PersistenceModelGateTests
     }
 
     /// <summary>
-    /// What a query filter's expression touches.
+    /// Whether a foreign key maps the dependent's <c>SpaceId</c> onto the principal's <c>SpaceId</c>.
+    /// </summary>
+    /// <remarks>
+    /// By position, because a composite key pairs its columns in order: <c>SpaceId</c> present on
+    /// both sides is not enough, since <c>(AssigneeId, SpaceId) → (SpaceId, Id)</c> carries it on both
+    /// and maps it onto <c>Id</c>.
+    /// </remarks>
+    private static bool PairsSpaceIdWithSpaceId(IReadOnlyForeignKey foreignKey)
+    {
+        var dependent = foreignKey.Properties.Select(property => property.Name).ToList().IndexOf(SchemaNames.SpaceIdColumn);
+        var principal = foreignKey.PrincipalKey.Properties.Select(property => property.Name).ToList().IndexOf(SchemaNames.SpaceIdColumn);
+
+        return dependent >= 0 && dependent == principal;
+    }
+
+    /// <summary>
+    /// Whether a filter's entire body is <c>entity.SpaceId == context.Member</c>, in either order.
+    /// </summary>
+    /// <remarks>
+    /// The body as a whole, not a part of it: a filter that merely mentions both sides admits
+    /// <c>!=</c>, and <c>... || context.ScopedSpaceId == null</c>, which returns every Space's rows
+    /// when no Space is in scope - the opposite of failing closed.
+    /// </remarks>
+    private static bool IsSpaceIdEqualToContextState(LambdaExpression filter)
+    {
+        if (StripConversions(filter.Body) is not BinaryExpression { NodeType: ExpressionType.Equal } equality)
+        {
+            return false;
+        }
+
+        var spaceIdFirst = IsEntitySpaceId(equality.Left) && IsContextState(equality.Right);
+        var contextFirst = IsContextState(equality.Left) && IsEntitySpaceId(equality.Right);
+
+        return spaceIdFirst || contextFirst;
+    }
+
+    private static bool IsEntitySpaceId(Expression side) =>
+        StripConversions(side) is MemberExpression { Expression: ParameterExpression } member
+        && member.Member.Name == SchemaNames.SpaceIdColumn;
+
+    private static bool IsContextState(Expression side) =>
+        StripConversions(side) is MemberExpression member
+        && member.Member.DeclaringType == typeof(YelloDbContext);
+
+    /// <summary>
+    /// Removes the conversion C# inserts when a <c>Guid</c> column is compared with a <c>Guid?</c>.
+    /// </summary>
+    private static Expression StripConversions(Expression expression) =>
+        expression is UnaryExpression { NodeType: ExpressionType.Convert } conversion
+            ? StripConversions(conversion.Operand)
+            : expression;
+
+    /// <summary>
+    /// Whether a query filter's expression calls anything.
     /// </summary>
     private sealed class FilterShape : ExpressionVisitor
     {
-        public bool ReadsSpaceId { get; private set; }
-
-        public bool ReadsContextState { get; private set; }
-
         public bool CallsAMethod { get; private set; }
-
-        protected override Expression VisitMember(MemberExpression node)
-        {
-            if (node.Member.Name == SchemaNames.SpaceIdColumn && node.Expression is ParameterExpression)
-            {
-                ReadsSpaceId = true;
-            }
-
-            if (node.Member.DeclaringType == typeof(YelloDbContext))
-            {
-                ReadsContextState = true;
-            }
-
-            return base.VisitMember(node);
-        }
 
         protected override Expression VisitMethodCall(MethodCallExpression node)
         {

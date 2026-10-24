@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Mono.Cecil;
 using Xunit;
 using Yello.Application.Spaces;
 using Yello.Infrastructure;
@@ -13,10 +14,9 @@ namespace Yello.Tests.Architecture;
 /// <remarks>
 /// <para>
 /// <b>Every gate here is an absence assertion, and each was failed on purpose before it was
-/// trusted</b> - <c>TESTING-CONVENTIONS.md:111</c> requires it, and the plants are recorded in story
-/// 1.5's Completion Notes. They were planted against the <i>scanner</i>, by editing production
-/// source and running the gate, not against a helper the scanner calls; story 1.4's review found a
-/// plant that validated the predicate instead of the scan and therefore proved nothing.
+/// trusted</b> - <c>TESTING-CONVENTIONS.md:111</c> requires it. They are planted against the
+/// <i>scanner</i>, by editing production source and running the gate, not against a helper the
+/// scanner calls: a plant that validates the predicate instead of the scan proves nothing.
 /// </para>
 /// <para>
 /// <b>Globbed, never a file list.</b> A gate naming files that do not exist yet passes vacuously,
@@ -73,18 +73,26 @@ public sealed class SpaceResolutionSeamTests
         // Comment lines are removed before matching. The statement is discussed in prose across the
         // codebase - AccountCredentialStore explains why it does NOT set one - and a scan that
         // counted those mentions would report files that execute nothing.
-        var offenders = ProductionSourceFiles()
-            .Where(file => CodeLinesOf(file).Any(line => line.Contains(SessionContextProcedure, StringComparison.Ordinal)))
-            .Select(RepositoryLayout.RelativePath)
+        // Lines, not files: a second copy inside the file that already holds the first is still a
+        // second setter on the unit of work.
+        var callSites = ProductionSourceFiles()
+            .SelectMany(file => CodeLinesOf(file)
+                .Where(line => line.Contains(SessionContextProcedure, StringComparison.Ordinal))
+                .Select(_ => RepositoryLayout.RelativePath(file)))
             .OrderBy(path => path, StringComparer.Ordinal)
             .ToList();
 
         Assert.True(
-            offenders.Count == ExpectedSessionContextCallSites,
-            $"Expected exactly {ExpectedSessionContextCallSites} production file to execute "
-            + $"{SessionContextProcedure}, found {offenders.Count}: {string.Join(", ", offenders)}. "
+            callSites.Count == ExpectedSessionContextCallSites,
+            $"Expected exactly {ExpectedSessionContextCallSites} production line to execute "
+            + $"{SessionContextProcedure}, found {callSites.Count}: {string.Join(", ", callSites)}. "
             + "AD-2 puts this statement in Infrastructure and AR-3 forbids a slice re-implementing "
             + "Space resolution; a second copy is the shape both exist to prevent.");
+
+        Assert.All(callSites, path => Assert.True(
+            path.StartsWith("Yello.Infrastructure/", StringComparison.Ordinal),
+            $"{path} executes {SessionContextProcedure}. AD-2 puts the statement in Infrastructure, "
+            + "and a copy anywhere else is one the query-filter bypass gate cannot see."));
     }
 
     /// <summary>
@@ -101,8 +109,15 @@ public sealed class SpaceResolutionSeamTests
     /// <para>
     /// <c>IgnoreQueryFilters</c> is included deliberately: it is the sanctioned way to disarm the
     /// layer, which makes it exactly the call that must not appear outside the ring that owns the
-    /// decision. Inside <c>Infrastructure</c> it is permitted and is how AC4's own layer-isolation
-    /// test will disarm the filter to prove row-level security holds alone.
+    /// decision. Inside <c>Infrastructure</c> it is permitted; the tests that prove row-level
+    /// security holds alone use it too, from <c>tests/</c>, which this scan does not read.
+    /// </para>
+    /// <para>
+    /// <b>Every way in, not only EF's named raw-SQL methods.</b> The entries are prefixes, so
+    /// <c>FromSql</c> also covers <c>FromSqlRaw</c> and <c>FromSqlInterpolated</c>, and
+    /// <c>ExecuteSql</c> covers its variants and their async forms. The ADO.NET entries catch the
+    /// route past EF altogether: <c>Yello.Host</c> references the SQL driver for its startup
+    /// connectivity check, which opens a connection and runs no command.
     /// </para>
     /// </remarks>
     [Fact]
@@ -110,11 +125,13 @@ public sealed class SpaceResolutionSeamTests
     {
         string[] bypasses =
         [
-            "FromSqlRaw",
-            "FromSqlInterpolated",
-            "ExecuteSqlRaw",
-            "ExecuteSqlInterpolated",
+            "FromSql",
+            "SqlQuery",
+            "ExecuteSql",
             "IgnoreQueryFilters",
+            "GetDbConnection",
+            "SqlCommand",
+            "CreateCommand",
         ];
 
         var offenders = ProductionSourceFiles()
@@ -206,10 +223,10 @@ public sealed class SpaceResolutionSeamTests
             "HybridCache",
             "AddMemoryCache",
             "AddDistributedMemoryCache",
-            "AddOutputCache",
+            "OutputCache",
             "CacheOutput",
-            "AddResponseCaching",
-            "UseResponseCaching",
+            "ResponseCache",
+            "ResponseCaching",
         ];
 
         var offenders = ProductionSourceFiles()
@@ -227,6 +244,102 @@ public sealed class SpaceResolutionSeamTests
     }
 
     /// <summary>
+    /// AR-3 / test id <b>A-12</b>, for Space resolution: nothing but the pipeline asks for the
+    /// resolver.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="IActiveSpaceResolver"/> is public, because it is a port declared in
+    /// <c>Yello.Application</c> and implemented in <c>Yello.Infrastructure</c>. A slice that takes it
+    /// and resolves a Space for itself is re-implementing Space resolution, which AR-3 names as the
+    /// defect: its unit of work would be a second one, beside the pipeline's, on the same connection.
+    /// </para>
+    /// <para>
+    /// <b>Read from the compiled IL, not the source</b>, so a dependency taken through a
+    /// constructor, a field, a local or a <c>GetRequiredService&lt;T&gt;</c> call is seen alike, and
+    /// compiler-generated state machines are attributed to the type that wrote the code. The rest of
+    /// A-12 - authorisation, refusal recording, idempotency - has nothing to scan until story 1.6.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void Only_the_pipeline_depends_on_the_Space_resolver()
+    {
+        var port = typeof(IActiveSpaceResolver).FullName!;
+
+        string[] permitted =
+        [
+            port,
+            "Yello.Host.Spaces.ActiveSpaceResolution",
+            "Yello.Infrastructure.Persistence.MembershipActiveSpaceResolver",
+            "Yello.Infrastructure.InfrastructureServices",
+        ];
+
+        var dependents = new SortedSet<string>(StringComparer.Ordinal);
+
+        foreach (var assembly in ProductionAssemblies.All)
+        {
+            using var module = ModuleDefinition.ReadModule(assembly.Location);
+
+            foreach (var type in module.GetTypes().Where(type => ReferencesType(type, port)))
+            {
+                dependents.Add(OutermostOf(type).FullName);
+            }
+        }
+
+        // Vacuity guard: the pipeline is a known dependent, so a scan that cannot see it is not
+        // reading what it claims to.
+        Assert.Contains("Yello.Host.Spaces.ActiveSpaceResolution", dependents);
+
+        var offenders = dependents.Where(name => !permitted.Contains(name, StringComparer.Ordinal)).ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            $"{string.Join(", ", offenders)} depend on {nameof(IActiveSpaceResolver)}. Space resolution "
+            + "is the pipeline's (AR-3): a slice reads ActiveSpaceContext, and never opens a unit of "
+            + "work of its own.");
+    }
+
+    private static bool ReferencesType(TypeDefinition type, string fullName)
+    {
+        bool Names(TypeReference? candidate) =>
+            candidate is not null
+            && (candidate.FullName == fullName
+                || (candidate is GenericInstanceType generic && generic.GenericArguments.Any(Names)));
+
+        bool InOperand(object? operand) => operand switch
+        {
+            GenericInstanceMethod method => Names(method.DeclaringType) || method.GenericArguments.Any(Names),
+            MethodReference method => Names(method.DeclaringType) || Names(method.ReturnType),
+            FieldReference field => Names(field.FieldType) || Names(field.DeclaringType),
+            TypeReference reference => Names(reference),
+            _ => false,
+        };
+
+        bool InSignature(MethodDefinition method) =>
+            Names(method.ReturnType) || method.Parameters.Any(parameter => Names(parameter.ParameterType));
+
+        bool InBody(MethodDefinition method) =>
+            method.HasBody
+            && (method.Body.Variables.Any(variable => Names(variable.VariableType))
+                || method.Body.Instructions.Any(instruction => InOperand(instruction.Operand)));
+
+        var inDeclaration = type.Interfaces.Any(implemented => Names(implemented.InterfaceType))
+            || type.Fields.Any(field => Names(field.FieldType));
+
+        return inDeclaration || type.Methods.Any(method => InSignature(method) || InBody(method));
+    }
+
+    private static TypeDefinition OutermostOf(TypeDefinition type) =>
+        type.DeclaringType is null ? type : OutermostOf(type.DeclaringType);
+
+    /// <summary>
+    /// A file's lines, less those that are wholly a comment.
+    /// </summary>
+    private static IEnumerable<string> CodeLinesOf(FileInfo file) =>
+        File.ReadLines(file.FullName)
+            .Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal));
+
+    /// <summary>
     /// Every <c>.cs</c> file belonging to a production project.
     /// </summary>
     /// <remarks>
@@ -234,10 +347,6 @@ public sealed class SpaceResolutionSeamTests
     /// project is covered without anyone extending this class - and a project that disappears
     /// cannot leave a gate silently scanning nothing.
     /// </remarks>
-    private static IEnumerable<string> CodeLinesOf(FileInfo file) =>
-        File.ReadLines(file.FullName)
-            .Where(line => !line.TrimStart().StartsWith("//", StringComparison.Ordinal));
-
     private static IEnumerable<FileInfo> ProductionSourceFiles() =>
         RepositoryLayout.AllProjectFiles
             .Where(project => !RepositoryLayout.IsUnderTestsDirectory(project))

@@ -23,7 +23,8 @@ namespace Yello.Host.Spaces;
 /// boundary, before resolution begins - a caller with no Session never learns anything about a
 /// Space. No Membership in the named Space, or no such Space: one <c>404</c> for both, never a
 /// <c>403</c> and never distinguished (AD-3). Otherwise the endpoint runs inside the unit of work
-/// the resolution opened, and that unit commits only once the endpoint has returned.
+/// the resolution opened. That unit commits only once the endpoint has returned, only when it
+/// returned a success, and only when what it returned has already been read.
 /// </para>
 /// <para>
 /// <b>What story 1.6 hangs on this.</b> <see cref="Refuse"/> is the single refusal point, so the
@@ -119,11 +120,60 @@ internal static class ActiveSpaceResolution
 
             var result = await next(context).ConfigureAwait(false);
 
-            await unitOfWork.CompleteAsync(cancellationToken).ConfigureAwait(false);
+            EnsureMaterialised(result);
+
+            if (IsFailure(result))
+            {
+                // Disposed without completing, so it rolls back: an endpoint that wrote and then
+                // answered with a problem leaves nothing behind, exactly as one that threw does.
+                return result;
+            }
+
+            // Not the request's token. The endpoint has finished, so a client that disconnects now
+            // must not decide whether its completed work is kept.
+            await unitOfWork.CompleteAsync(CancellationToken.None).ConfigureAwait(false);
 
             return result;
         }
     }
+
+    /// <summary>
+    /// Whether the endpoint answered with an error, which the unit of work must not commit.
+    /// </summary>
+    /// <param name="result">What the endpoint returned.</param>
+    /// <returns><c>true</c> for a <c>4xx</c> or <c>5xx</c> result.</returns>
+    internal static bool IsFailure(object? result) =>
+        result is IStatusCodeHttpResult { StatusCode: >= StatusCodes.Status400BadRequest };
+
+    /// <summary>
+    /// Refuses a result that would do its work after the unit of work has closed.
+    /// </summary>
+    /// <remarks>
+    /// ASP.NET Core executes what an endpoint returns only after this filter has returned, and by then
+    /// the transaction is committed and disposed. A query that runs at that point runs on a reopened
+    /// connection with no session context, where row-level security fails closed and answers with
+    /// nothing, silently. So a Space-scoped endpoint returns data it has already read; one that
+    /// returns an <see cref="IQueryable"/> or an <see cref="IAsyncEnumerable{T}"/> fails loudly here,
+    /// inside the unit of work, and is rolled back.
+    /// </remarks>
+    /// <param name="result">What the endpoint returned.</param>
+    /// <exception cref="InvalidOperationException">The result is not materialised.</exception>
+    internal static void EnsureMaterialised(object? result)
+    {
+        var value = result is IValueHttpResult { Value: var carried } ? carried : result;
+
+        if (value is IQueryable || IsAsyncEnumerable(value))
+        {
+            throw new InvalidOperationException(
+                $"A Space-scoped endpoint returned {value!.GetType().Name}, which would be enumerated after "
+                + "its unit of work has closed. Materialise it before returning.");
+        }
+    }
+
+    private static bool IsAsyncEnumerable(object? value) =>
+        value is not null
+        && Array.Exists(value.GetType().GetInterfaces(), type =>
+            type.IsGenericType && type.GetGenericTypeDefinition() == typeof(IAsyncEnumerable<>));
 
     /// <summary>
     /// The one refusal for a Space this request cannot act in.
