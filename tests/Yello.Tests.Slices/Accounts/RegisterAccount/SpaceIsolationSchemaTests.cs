@@ -322,6 +322,112 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
         Assert.Equal(0, filtered);
     }
 
+    /// <summary>
+    /// Story 1.8 AC5 / Q4 - <c>ApiToken</c> is invalidated by construction and sits outside the
+    /// policy on purpose: its one foreign key is the composite <c>(BoundSpaceId, AccountId) -&gt;
+    /// Membership(SpaceId, AccountId)</c> with <c>ON DELETE CASCADE</c> (no second cascade path from
+    /// <c>Space</c> or <c>Account</c>, which SQL Server refuses - error 1785); it carries no security
+    /// predicate, anchored on <c>Membership</c> carrying some; its secret is a unique
+    /// <c>varbinary(32)</c> hash; and it has no <c>Role</c> and no <c>SpaceId</c> column.
+    /// </summary>
+    /// <remarks>
+    /// Written by the story 1.8 ATDD run. The column list is Task 2's; a different name chosen in
+    /// dev-story is corrected here and recorded in the Debug Log. <c>BoundSpaceId</c> rather than
+    /// <c>SpaceId</c> is what keeps <see cref="Every_table_with_a_SpaceId_column_is_covered_by_the_policy"/>
+    /// from demanding a predicate the authentication lookup could never satisfy.
+    /// </remarks>
+    [Fact(Skip = "red: story 1.8 AC5 - the ApiToken table and its cascading composite FK do not exist (Task 2)")]
+    [Trait("Requirement", "FR-36")]
+    [Trait("Requirement", "NFR-6")]
+    [Trait("Requirement", "AD-6")]
+    public async Task ApiToken_cascades_from_its_Membership_and_is_outside_the_policy_by_design()
+    {
+        var database = Available();
+        const string apiToken = "ApiToken";
+        var ct = TestContext.Current.CancellationToken;
+
+        await using var connection = await database.OpenWithoutSpaceContextAsync(ct);
+
+        Assert.Equal(1, await ScalarAsync(connection, "SELECT COUNT(*) FROM sys.tables WHERE name = @name", apiToken, ct));
+
+        Assert.Equal(
+            ["AccountId", "BoundSpaceId", "CreatedAt", "Id", "Name", "SecretHash"],
+            await ReadNamesAsync(
+                connection,
+                "SELECT c.name FROM sys.columns c JOIN sys.tables t ON t.object_id = c.object_id WHERE t.name = @name ORDER BY c.name",
+                apiToken,
+                ct));
+
+        Assert.Equal(
+            ["Membership:CASCADE"],
+            await ReadNamesAsync(
+                connection,
+                """
+                SELECT rt.name + N':' + fk.delete_referential_action_desc
+                FROM sys.foreign_keys fk
+                JOIN sys.tables t ON t.object_id = fk.parent_object_id
+                JOIN sys.tables rt ON rt.object_id = fk.referenced_object_id
+                WHERE t.name = @name
+                """,
+                apiToken,
+                ct));
+
+        Assert.Equal(
+            ["AccountId->AccountId", "BoundSpaceId->SpaceId"],
+            await ReadNamesAsync(
+                connection,
+                """
+                SELECT pc.name + N'->' + rc.name
+                FROM sys.foreign_key_columns fkc
+                JOIN sys.tables t ON t.object_id = fkc.parent_object_id
+                JOIN sys.columns pc ON pc.object_id = fkc.parent_object_id AND pc.column_id = fkc.parent_column_id
+                JOIN sys.columns rc ON rc.object_id = fkc.referenced_object_id AND rc.column_id = fkc.referenced_column_id
+                WHERE t.name = @name
+                ORDER BY 1
+                """,
+                apiToken,
+                ct));
+
+        const string predicates = """
+            SELECT COUNT(*) FROM sys.security_predicates p
+            JOIN sys.tables t ON t.object_id = p.target_object_id
+            WHERE t.name = @name
+            """;
+
+        Assert.True(await ScalarAsync(connection, predicates, SchemaNames.MembershipTable, ct) > 0, "The anchor failed: Membership carries no predicate.");
+        Assert.Equal(0, await ScalarAsync(connection, predicates, apiToken, ct));
+
+        Assert.Equal(
+            1,
+            await ScalarAsync(
+                connection,
+                """
+                SELECT CAST(i.is_unique AS int)
+                FROM sys.indexes i
+                JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id AND ic.key_ordinal = 1
+                JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+                JOIN sys.tables t ON t.object_id = i.object_id
+                WHERE t.name = @name AND c.name = N'SecretHash'
+                  AND (SELECT COUNT(*) FROM sys.index_columns k WHERE k.object_id = i.object_id AND k.index_id = i.index_id AND k.key_ordinal > 0) = 1
+                """,
+                apiToken,
+                ct));
+
+        Assert.Equal(
+            32,
+            await ScalarAsync(
+                connection,
+                """
+                SELECT CAST(c.max_length AS int)
+                FROM sys.columns c
+                JOIN sys.types ty ON ty.user_type_id = c.user_type_id
+                JOIN sys.tables t ON t.object_id = c.object_id
+                WHERE t.name = @name AND c.name = N'SecretHash' AND ty.name = N'varbinary'
+                """,
+                apiToken,
+                ct));
+    }
+
     private RegistrationDatabase Available()
     {
         Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? string.Empty);

@@ -253,6 +253,143 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
             "The planted arm skips the refusal record and the method could not tell: " + verdict.Describe());
     }
 
+    // ---------------------------------------------------------------------------------------------
+    // Story 1.8 - a Token bound to one Space, met at the route of another. Written by the story 1.8
+    // ATDD run on 2026-10-24. Driven through the production filter, as the cases above are, because
+    // the mismatch branch and its duration are decided inside ActiveSpaceResolution and a planted
+    // early return cannot be put into a separate Host process. No new engine: this class's.
+    // ---------------------------------------------------------------------------------------------
+
+    /// <summary>
+    /// Story 1.8 AC2 / AD-20 - a Token bound to Space A, met at Space B's route where its Account is
+    /// also a member, is refused with the boundary 404 exactly as a non-member is, and recorded as one
+    /// <c>CrossSpace</c> refusal against B, the route's Space. Anchored on the same Token served at A.
+    /// </summary>
+    /// <remarks>
+    /// The establishment returns <c>EstablishedSpaceRequest(AccountId, SpaceId, BoundSpaceId)</c>,
+    /// built by reflection because the third member is Task 5's. On activation, replace
+    /// <see cref="EstablishedWithBoundSpace"/> with the constructor call.
+    /// </remarks>
+    [Fact(Skip = "red: story 1.8 AC2 - EstablishedSpaceRequest has no BoundSpaceId and ResolveCoreAsync no mismatch branch (Task 5)")]
+    [Trait("Requirement", "FR-36")]
+    [Trait("Requirement", "AD-6")]
+    [Trait("Requirement", "AD-20")]
+    public async Task A_Token_bound_elsewhere_is_refused_with_the_boundary_404_and_recorded_against_the_route_Space()
+    {
+        var database = Available();
+        var owner = SpaceSeeding.NewAccount();
+        var bound = Guid.NewGuid();
+        var other = Guid.NewGuid();
+
+        await SeedSpaceWithMemberAsync(database, bound, owner, Role.Owner);
+        await SeedSpaceWithMemberAsync(database, other, SpaceSeeding.NewAccount(), Role.Owner);
+
+        // The Token's Account IS a member of B too: AC2's "including for Spaces that same Account
+        // owns" - the refusal must come from the binding, not from a missing Membership.
+        await AddMembershipAsync(database, other, owner.Id, Role.Admin);
+
+        var servedReached = false;
+        var served = await ResolveAsync(EstablishedWithBoundSpace(owner.Id, bound, bound), "ReadProjectsAndTasks", () => servedReached = true);
+
+        Assert.True(servedReached);
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(served));
+
+        var refusedReached = false;
+        var refused = await ResolveAsync(EstablishedWithBoundSpace(owner.Id, other, bound), "ReadProjectsAndTasks", () => refusedReached = true);
+
+        Assert.False(refusedReached, "A Token bound to another Space reached the endpoint.");
+        Assert.Equal(StatusCodes.Status404NotFound, StatusOf(refused));
+        Assert.Equal(NotAvailable, Assert.IsType<ProblemHttpResult>(refused).ProblemDetails.Type);
+
+        await using var connection = await database.OpenWithoutSpaceContextAsync(TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT TargetSpaceId, Kind FROM dbo.[AccessRefusal] WHERE AccountId = @account";
+        command.Parameters.Add(new SqlParameter("@account", owner.Id));
+
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(await reader.ReadAsync(TestContext.Current.CancellationToken), "The mismatch wrote no refusal record.");
+        Assert.Equal(other, reader.GetGuid(0));
+        Assert.Equal("CrossSpace", reader.GetString(1));
+        Assert.False(await reader.ReadAsync(TestContext.Current.CancellationToken), "More than one refusal was recorded.");
+    }
+
+    /// <summary>
+    /// Story 1.8 AC2 / AD-3 - the mismatch branch costs what a non-member resolution costs, by the B3
+    /// method: a Token bound to A met at B, against an Account with no Membership in B.
+    /// </summary>
+    [Fact(Skip = "red: story 1.8 AC2 - the mismatch branch does not exist; it must still call the resolver for the route Space (Task 5, Q2a)")]
+    [Trait("Requirement", "FR-36")]
+    [Trait("Requirement", "AR-10")]
+    public async Task A_Token_mismatch_and_a_non_member_take_the_same_time_to_refuse()
+    {
+        var database = Available();
+        var (caller, otherSpace) = await SeedCallerAndForeignSpaceAsync(database);
+        var tokenHolder = SpaceSeeding.NewAccount();
+        var bound = Guid.NewGuid();
+
+        await SeedSpaceWithMemberAsync(database, bound, tokenHolder, Role.Owner);
+
+        var verdict = await DurationIndistinguishability.CompareAsync(
+            () => ResolveAsync(EstablishedWithBoundSpace(tokenHolder.Id, otherSpace, bound), "ReadProjectsAndTasks", () => { }).AsTask(),
+            () => ResolveAsync(caller, otherSpace, "ReadProjectsAndTasks", () => { }).AsTask());
+
+        Assert.True(verdict.AreIndistinguishable, verdict.Describe());
+    }
+
+    /// <summary>
+    /// Story 1.8's permanent planted oracle - one arm's resolver answers "no Membership" without
+    /// reading <c>Membership</c>, which is exactly what a mismatch branch that skipped the resolver
+    /// would do, and the method must tell the two apart. Without this, the comparison above could pass
+    /// because the method cannot see a skipped Membership read at all.
+    /// </summary>
+    /// <remarks>
+    /// <b>Active today:</b> it needs nothing story 1.8 builds - both arms are non-member refusals of
+    /// the same Space, one of them with the read planted out.
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "AR-10")]
+    public async Task The_duration_method_tells_a_refusal_that_skips_the_Membership_read_from_one_that_makes_it()
+    {
+        var database = Available();
+        var (caller, otherSpace) = await SeedCallerAndForeignSpaceAsync(database);
+
+        var verdict = await DurationIndistinguishability.CompareAsync(
+            () => ResolveAsync(caller, otherSpace, "ReadProjectsAndTasks", () => { }).AsTask(),
+            () => ResolveAsync(new FixedEstablishment(caller, otherSpace), "ReadProjectsAndTasks", () => { }, skipResolver: true).AsTask());
+
+        Assert.False(
+            verdict.AreIndistinguishable,
+            "The planted arm skips the Membership read and the method could not tell: " + verdict.Describe());
+    }
+
+    /// <summary>
+    /// An establishment that reports a bound Space beside the route's, as story 1.8's Token branch
+    /// will. Reflection until Task 5 adds the member; it fails here, by name, until then.
+    /// </summary>
+    private static PreparedEstablishment EstablishedWithBoundSpace(Guid accountId, Guid spaceId, Guid boundSpaceId)
+    {
+        var constructor = typeof(EstablishedSpaceRequest).GetConstructor([typeof(Guid?), typeof(Guid?), typeof(Guid?)]);
+
+        Assert.True(constructor is not null, "EstablishedSpaceRequest(Guid? AccountId, Guid? SpaceId, Guid? BoundSpaceId) does not exist (story 1.8 Task 5).");
+
+        return new PreparedEstablishment(Assert.IsType<EstablishedSpaceRequest>(
+            constructor.Invoke([accountId, spaceId, boundSpaceId])));
+    }
+
+    /// <summary>
+    /// A second Membership for an existing Account, in a Space that already exists, under that
+    /// Space's context (<c>IX_Membership_SpaceId_AccountId</c>: the Account holds none there yet;
+    /// <c>UX_Membership_SpaceId_Owner</c>: not an Owner, the Space has one).
+    /// </summary>
+    private static Task AddMembershipAsync(RegistrationDatabase database, Guid spaceId, Guid accountId, Role role) =>
+        SpaceSeeding.SeedAsync(
+            database,
+            spaceId,
+            context => context.Memberships.Add(SpaceSeeding.NewMembership(spaceId, accountId, role)),
+            TestContext.Current.CancellationToken);
+
     /// <summary>
     /// The caller, and a Space owned by someone else. The caller is given a Space of their own so
     /// their <c>Account</c> row is written in a B2 block; it is never requested here.
@@ -289,22 +426,39 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     /// One request through the production pipeline filter, with the production services behind it,
     /// to an endpoint declaring <paramref name="capability"/>.
     /// </summary>
-    private async ValueTask<object?> ResolveAsync(
+    private ValueTask<object?> ResolveAsync(
         Guid accountId,
         Guid spaceId,
         string capability,
         Action onEndpoint,
-        bool skipRecord = false)
+        bool skipRecord = false) =>
+        ResolveAsync(new FixedEstablishment(accountId, spaceId), capability, onEndpoint, skipRecord);
+
+    /// <summary>
+    /// The same, with the establishment supplied - story 1.8's bound-Space cases and the planted
+    /// skipped Membership read.
+    /// </summary>
+    private async ValueTask<object?> ResolveAsync(
+        ISpaceRequestEstablishment establishment,
+        string capability,
+        Action onEndpoint,
+        bool skipRecord = false,
+        bool skipResolver = false)
     {
         var services = new ServiceCollection()
             .AddLogging()
             .AddSingleton(TimeProvider.System)
             .AddYelloInfrastructure(fixture.ConnectionString)
-            .AddSingleton<ISpaceRequestEstablishment>(new FixedEstablishment(accountId, spaceId));
+            .AddSingleton(establishment);
 
         if (skipRecord)
         {
             services.AddScoped(_ => DispatchProxy.Create<IAccessRefusalRecorder, SkippingRecorder>());
+        }
+
+        if (skipResolver)
+        {
+            services.AddScoped(_ => DispatchProxy.Create<IActiveSpaceResolver, SkippingResolver>());
         }
 
         await using var provider = services.BuildServiceProvider();
@@ -343,6 +497,23 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     private sealed class FixedEstablishment(Guid accountId, Guid spaceId) : ISpaceRequestEstablishment
     {
         public EstablishedSpaceRequest Establish(HttpContext httpContext) => new(accountId, spaceId);
+    }
+
+    private sealed class PreparedEstablishment(EstablishedSpaceRequest established) : ISpaceRequestEstablishment
+    {
+        public EstablishedSpaceRequest Establish(HttpContext httpContext) => established;
+    }
+
+    /// <summary>
+    /// Story 1.8's planted defect for the duration oracle: a resolver that answers "no Membership"
+    /// without reading anything - the shape of a mismatch branch that returns before the resolver.
+    /// Public and unsealed because <see cref="DispatchProxy"/> derives from it at run time.
+    /// </summary>
+    public class SkippingResolver : DispatchProxy
+    {
+        /// <inheritdoc />
+        protected override object? Invoke(MethodInfo? targetMethod, object?[]? args) =>
+            Task.FromResult<IActiveSpaceUnitOfWork?>(null);
     }
 
     /// <summary>

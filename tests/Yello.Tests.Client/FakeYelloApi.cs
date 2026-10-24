@@ -1,4 +1,6 @@
+using System.Buffers.Text;
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.Playwright;
 using Yello.Contracts;
@@ -68,6 +70,17 @@ internal sealed class FakeYelloApi
     public IDictionary<Guid, string> Roles { get; } = new Dictionary<Guid, string>();
 
     /// <summary>
+    /// The Account's API Tokens as the Account-settings list serves them. Story 1.8.
+    /// </summary>
+    public IList<FakeApiToken> ApiTokens { get; } = new List<FakeApiToken>();
+
+    /// <summary>
+    /// The plaintext the next issuance answers with - Q9's format, unique per instance, so a case can
+    /// look for exactly this string in the DOM and in storage. Story 1.8.
+    /// </summary>
+    public string IssuedSecret { get; } = "yello_pat_" + Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
+
+    /// <summary>
     /// Every request seen, in order.
     /// </summary>
     public IReadOnlyCollection<FakeRequest> Requests => _requests;
@@ -123,7 +136,7 @@ internal sealed class FakeYelloApi
         var request = route.Request;
         var headers = await request.AllHeadersAsync().ConfigureAwait(false);
         var path = new Uri(request.Url).AbsolutePath;
-        var seen = new FakeRequest(request.Method, path, headers);
+        var seen = new FakeRequest(request.Method, path, headers, request.PostData);
 
         _requests.Enqueue(seen);
 
@@ -179,6 +192,20 @@ internal sealed class FakeYelloApi
             case ("GET", var path) when path == SpaceRoutes.Directory:
                 return (200, JsonSerializer.Serialize(Switcher.Select(space => new SpaceIdentityResponse(space.Id, space.Name)), JsonOptions));
 
+            // Story 1.8 - the Account-settings Token routes, written by its ATDD run. The bodies are
+            // anonymous objects until Task 6 writes the contract types; serialise those on activation,
+            // and replace these literal paths with the ApiTokenRoutes constants.
+            case ("GET", ApiTokenListPath):
+                return (200, JsonSerializer.Serialize(ApiTokens.Select(TokenRow), JsonOptions));
+
+            case ("POST", var path) when TryIssue(path, out var issueSpace):
+                return Issue(issueSpace, request.Body);
+
+            case ("DELETE", var path) when path.StartsWith(ApiTokenListPath + "/", StringComparison.Ordinal)
+                && Guid.TryParse(path[(ApiTokenListPath.Length + 1)..], out var revoked):
+                _ = ApiTokens.Remove(ApiTokens.FirstOrDefault(token => token.Id == revoked) ?? FakeApiToken.None);
+                return (noContent, string.Empty);
+
             case ("GET", var path) when TryActiveSpace(path, out var spaceId):
                 if (_held.TryGetValue(spaceId, out var held))
                 {
@@ -199,6 +226,56 @@ internal sealed class FakeYelloApi
             default:
                 return (404, Problem(ProblemTypes.NotAvailable));
         }
+    }
+
+    private const string ApiTokenListPath = "/api/v1/account/api-tokens";
+
+    private (int Status, string Body) Issue(Guid spaceId, string? body)
+    {
+        var listed = Switcher.FirstOrDefault(space => space.Id == spaceId);
+
+        if (listed.Id != spaceId)
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        using var submitted = JsonDocument.Parse(body ?? "{}");
+        var name = submitted.RootElement.TryGetProperty("name", out var value) ? value.GetString() ?? string.Empty : string.Empty;
+
+        var token = new FakeApiToken(Guid.NewGuid(), name, spaceId, listed.Name, DateTimeOffset.UtcNow);
+        ApiTokens.Add(token);
+
+        var issued = new
+        {
+            id = token.Id,
+            name = token.Name,
+            space = new { id = token.SpaceId, name = token.SpaceName },
+            createdAt = token.CreatedAt,
+            token = IssuedSecret,
+        };
+
+        return (201, JsonSerializer.Serialize(issued, JsonOptions));
+    }
+
+    private static object TokenRow(FakeApiToken token) =>
+        new
+        {
+            id = token.Id,
+            name = token.Name,
+            space = new { id = token.SpaceId, name = token.SpaceName },
+            createdAt = token.CreatedAt,
+        };
+
+    private static bool TryIssue(string path, out Guid spaceId)
+    {
+        const string suffix = "/api-tokens";
+        var prefix = SpaceRoutes.Directory + "/";
+
+        spaceId = Guid.Empty;
+
+        return path.StartsWith(prefix, StringComparison.Ordinal)
+            && path.EndsWith(suffix, StringComparison.Ordinal)
+            && Guid.TryParse(path[prefix.Length..^suffix.Length], out spaceId);
     }
 
     private static bool TryActiveSpace(string path, out Guid spaceId)
@@ -222,7 +299,8 @@ internal sealed class FakeYelloApi
 /// <param name="Method">The HTTP method.</param>
 /// <param name="Path">The path, without the query.</param>
 /// <param name="Headers">Every header, lower-cased by the browser.</param>
-internal sealed record FakeRequest(string Method, string Path, IReadOnlyDictionary<string, string> Headers)
+/// <param name="Body">The request body, or <c>null</c>.</param>
+internal sealed record FakeRequest(string Method, string Path, IReadOnlyDictionary<string, string> Headers, string? Body = null)
 {
     /// <summary>
     /// A header's value by name, ignoring case, or <c>null</c>.
@@ -231,4 +309,20 @@ internal sealed record FakeRequest(string Method, string Path, IReadOnlyDictiona
     /// <returns>The value.</returns>
     public string? Header(string name) =>
         Headers.FirstOrDefault(header => string.Equals(header.Key, name, StringComparison.OrdinalIgnoreCase)).Value;
+}
+
+/// <summary>
+/// One API Token as the fake's Account-settings list holds it. Story 1.8.
+/// </summary>
+/// <param name="Id">The Token's id.</param>
+/// <param name="Name">Its name.</param>
+/// <param name="SpaceId">The Space it is bound to.</param>
+/// <param name="SpaceName">That Space's name.</param>
+/// <param name="CreatedAt">When it was issued.</param>
+internal sealed record FakeApiToken(Guid Id, string Name, Guid SpaceId, string SpaceName, DateTimeOffset CreatedAt)
+{
+    /// <summary>
+    /// Matches no Token, for a revoke of an id that is not held.
+    /// </summary>
+    public static FakeApiToken None { get; } = new(Guid.Empty, string.Empty, Guid.Empty, string.Empty, DateTimeOffset.MinValue);
 }

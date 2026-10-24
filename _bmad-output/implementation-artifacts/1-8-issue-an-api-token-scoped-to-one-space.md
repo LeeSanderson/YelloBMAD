@@ -309,6 +309,43 @@ The dev phase takes these as **reversible, recorded decisions** in the Completio
 12. **Idempotency vs display-once.** AD-18's replay "returns the original response", which would show the plaintext twice. (a) No `Idempotency-Key` on issuance now; ledger to 2.1 that issuance must replay without the secret or be exempt. **Recommend (a).**
 13. **`epics.md:351` cites AR-6** (EF query filters) for this story; it means AD-6. (a) Record the correction in the Completion Notes as a divergence and leave `epics.md` alone (`status: final`). **Recommend (a).**
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-1-8-issue-an-api-token-scoped-to-one-space.md`. It holds the scenario map, the seed constraints checked, the plants and the activation order. Suite after the ATDD run: **427 total, 394 passed, 0 failed, 33 skipped**, against a baseline of 392/391/1. That is +35 cases: 3 active, 32 skipped `red: AC<n> - <why> (Task n)`. No new container-backed class.
+
+| File | Cases | ACs | Green today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.Tokens.cs` (new partial of the existing class) | 16 wire cases | AC1-AC5, AC7-AC10, AC12, Q8, Q11; I-12, I-11 Token half, V-3, I-17 | none |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/SpaceBoundaryPipelineTests.cs` | +3 | AC2 (mismatch 404 + record, duration) | **`The_duration_method_tells_a_refusal_that_skips_the_Membership_read_from_one_that_makes_it`**, a permanent planted oracle |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/SpaceBoundaryRouteTests.cs` (no container) | +2 | AC12 | **`A_Session_authenticated_state_change_without_an_anti_forgery_token_is_refused_400`**, a standing gate (planted: caught) |
+| `tests/Yello.Tests.Slices/Accounts/RegisterAccount/SpaceIsolationSchemaTests.cs` | +1 | AC5, AC4, Q4 (cascading composite FK, no policy, `varbinary(32)` unique hash) | none |
+| `tests/Yello.Tests.Architecture/ApiTokenGateTests.cs` (new, no container) | 5 | AC1, AC3, AC4, AC6, AC9, AC10 | **`No_Application_type_references_claims_HTTP_or_the_Host`**, a standing gate (planted: caught) |
+| `tests/Yello.Tests.Client/AccountSettingsTests.cs` (new, existing collection, no container) | 8 browser cases | AC4, AC7, AC11, Q3 | none |
+| `tests/Yello.Tests.Slices/WireSession.cs`, `tests/Yello.Tests.Client/FakeYelloApi.cs` | helpers | bearer requests that attach no cookie; fake list/issue/revoke routes | n/a |
+
+Stand-ins to replace on activation:
+
+- Types are reached by reflection: `ApiTokenPrincipal`, `ApiToken`, `ApiTokenSecret`, and the three-argument `EstablishedSpaceRequest`.
+- Routes are string literals: `/api/v1/spaces/{id}/api-tokens` and `/api/v1/account/api-tokens[/{id}]`.
+- The fake's Token bodies are anonymous objects.
+- Browser selectors and copy are proposals.
+
+Replace each with the typed reference, the `ApiTokenRoutes` constant or the contract type.
+
+**Activation order** (riskiest assumption first):
+
+1. **`SpaceIsolationSchemaTests.ApiToken_cascades_from_its_Membership_and_is_outside_the_policy_by_design`**. It tests whether SQL Server accepts a composite FK to Membership's alternate key, with CASCADE, beside `Space -> Membership` cascade, without error 1785.
+2. Then `Removing_the_Membership_invalidates_its_Token_in_the_same_statement`, `Deleting_the_Space_invalidates_its_Tokens` and `Deleting_the_Account_with_its_Memberships_invalidates_its_Tokens`. These prove the cascade fires under RLS on the real engine.
+3. Then `ApiTokenGateTests` ARCH-002 and ARCH-005 (entity, secret).
+4. Then ARCH-001 (principal), the issue case, the five-cause `401` byte-identity case, and cookie-plus-bearer.
+5. Then the pipeline mismatch and duration cases, then I-12 and the wire duration case. Keep the oracle green throughout.
+6. Then the remaining wire cases, `A_Token_authenticated_state_change_is_not_refused_for_anti_forgery` and ARCH-004.
+7. Then the browser cases, dismissal (`Dismissing_the_Token_asks_for_confirmation_and_only_then_removes_it`) first.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
+**One finding for dev:** AC9 lists `DELETE /api/v1/sessions` among the Token `401`s. But story 1.7 made credential-less sign-out idempotent (Q4), and anti-forgery answers a credential-less `DELETE` first, so "exactly as no credential" is likely `400` there. `A_Token_reaches_none_of_the_Session_only_surfaces` compares sign-out with the no-credential answer and asserts nothing is stamped, rather than asserting `401`. Record what the wire gives. Making it `401` would change 1.7's decision and needs Lee.
+
 ## Dev Agent Record
 
 ### Agent Model Used

@@ -238,6 +238,66 @@ internal sealed class WireSession(HttpClient client)
     }
 
     /// <summary>
+    /// Gets a route as a script would: <c>Authorization: Bearer</c> and <b>no cookie</b>, whatever is
+    /// held. Added by the story 1.8 ATDD run.
+    /// </summary>
+    /// <param name="route">The route.</param>
+    /// <param name="token">The bearer value, sent exactly as given - malformed values included.</param>
+    /// <returns>The response, with its body already read.</returns>
+    public Task<WireResponse> GetWithTokenAsync(string route, string token) =>
+        SendWithTokenAsync(HttpMethod.Get, route, token, content: null, attachCookies: false);
+
+    /// <summary>
+    /// Posts to a route with a bearer Token and no cookie and no anti-forgery header - a script has
+    /// neither.
+    /// </summary>
+    /// <param name="route">The route.</param>
+    /// <param name="content">The body.</param>
+    /// <param name="token">The bearer value.</param>
+    /// <returns>The response, with its body already read.</returns>
+    public Task<WireResponse> PostWithTokenAsync(string route, HttpContent content, string token) =>
+        SendWithTokenAsync(HttpMethod.Post, route, token, content, attachCookies: false);
+
+    /// <summary>
+    /// Sends a <c>DELETE</c> with a bearer Token and no cookie and no anti-forgery header.
+    /// </summary>
+    /// <param name="route">The route.</param>
+    /// <param name="token">The bearer value.</param>
+    /// <returns>The response, with its body already read.</returns>
+    public Task<WireResponse> DeleteWithTokenAsync(string route, string token) =>
+        SendWithTokenAsync(HttpMethod.Delete, route, token, content: null, attachCookies: false);
+
+    /// <summary>
+    /// Gets a route carrying <b>both</b> the held cookies and a bearer Token - the request story 1.8's
+    /// open question 5 decides is authenticated by the Token alone.
+    /// </summary>
+    /// <param name="route">The route.</param>
+    /// <param name="token">The bearer value.</param>
+    /// <returns>The response, with its body already read.</returns>
+    public Task<WireResponse> GetWithTokenAndCookiesAsync(string route, string token) =>
+        SendWithTokenAsync(HttpMethod.Get, route, token, content: null, attachCookies: true);
+
+    private async Task<WireResponse> SendWithTokenAsync(
+        HttpMethod method,
+        string route,
+        string token,
+        HttpContent? content,
+        bool attachCookies)
+    {
+        using var request = new HttpRequestMessage(method, new Uri(route, UriKind.Relative))
+        {
+            Content = content,
+        };
+
+        // Without validation, so a malformed value reaches the Host exactly as written.
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + token);
+
+        using var response = await SendAsync(request, attachCookies).ConfigureAwait(false);
+
+        return await WireResponse.ReadAsync(response).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Sends a CORS preflight for a sign-in from a given origin.
     /// </summary>
     /// <param name="origin">The origin to claim.</param>

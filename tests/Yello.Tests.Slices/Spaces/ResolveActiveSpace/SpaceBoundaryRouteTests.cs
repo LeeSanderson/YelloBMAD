@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -6,6 +7,7 @@ using Xunit;
 using Yello.Application.Spaces;
 using Yello.Domain.Memberships;
 using Yello.Host;
+using Yello.Host.Sessions;
 using Yello.Host.Spaces;
 using Yello.Infrastructure;
 
@@ -55,6 +57,70 @@ public sealed class SpaceBoundaryRouteTests
 
         Assert.Equal(StatusCodes.Status400BadRequest, await PostAsync(app, UnscopedProbe, routeValues: null));
         Assert.Equal(StatusCodes.Status401Unauthorized, await PostAsync(app, SpaceScopedProbe, Guid.NewGuid()));
+    }
+
+    /// <summary>
+    /// Story 1.8 AC12 / AD-7 - a state-changing request authenticated by an API Token carries no
+    /// ambient credential a third-party page could ride, so it is not refused for anti-forgery.
+    /// </summary>
+    /// <remarks>
+    /// Through the real group, on the route that is not Space-scoped so no database is needed. The
+    /// principal is the one Task 4 builds: authentication type <c>Yello.ApiToken</c> and the three
+    /// Token claims, written here as literals until <c>ApiTokenPrincipal</c> exists - replace them
+    /// with it on activation. The Session-authenticated case below is the same request with a Session
+    /// principal, still refused, so the exemption is shown to be exactly the Token's.
+    /// </remarks>
+    [Fact(Skip = "red: story 1.8 AC12 - AntiforgeryRequirement does not exempt a Token-authenticated request (Task 4)")]
+    [Trait("Priority", "P0")]
+    [Trait("Requirement", "FR-36")]
+    [Trait("Requirement", "AR-14")]
+    [Trait("Requirement", "AD-7")]
+    public async Task A_Token_authenticated_state_change_is_not_refused_for_anti_forgery()
+    {
+        await using var app = ProbeApplication(app =>
+        {
+            var api = app.MapApiGroup();
+
+            api.MapPost(UnscopedProbe, () => Results.NoContent());
+        });
+
+        var token = new ClaimsPrincipal(new ClaimsIdentity(
+            [
+                new Claim("urn:yello:claim:token-account-id", Guid.NewGuid().ToString()),
+                new Claim("urn:yello:claim:token-space-id", Guid.NewGuid().ToString()),
+                new Claim("urn:yello:claim:token-id", Guid.NewGuid().ToString()),
+            ],
+            authenticationType: "Yello.ApiToken"));
+
+        Assert.Equal(StatusCodes.Status204NoContent, await PostAsync(app, UnscopedProbe, routeValues: null, token));
+    }
+
+    /// <summary>
+    /// Story 1.8 AC12 / AD-7 - a state-changing request carrying a Session, with no anti-forgery token,
+    /// is still refused <c>400</c>: the Token's exemption must not widen to every authenticated
+    /// request.
+    /// </summary>
+    /// <remarks>
+    /// <b>Active today - a standing gate.</b> It passes before story 1.8 and must keep passing after;
+    /// planted on 2026-10-24 by exempting every authenticated request in
+    /// <c>AntiforgeryRequirement</c>, and caught.
+    /// </remarks>
+    [Fact]
+    [Trait("Priority", "P0")]
+    [Trait("Requirement", "AR-14")]
+    [Trait("Requirement", "AD-7")]
+    public async Task A_Session_authenticated_state_change_without_an_anti_forgery_token_is_refused_400()
+    {
+        await using var app = ProbeApplication(app =>
+        {
+            var api = app.MapApiGroup();
+
+            api.MapPost(UnscopedProbe, () => Results.NoContent());
+        });
+
+        Assert.Equal(
+            StatusCodes.Status400BadRequest,
+            await PostAsync(app, UnscopedProbe, routeValues: null, SessionPrincipal.For(Guid.NewGuid())));
     }
 
     /// <summary>
@@ -187,7 +253,10 @@ public sealed class SpaceBoundaryRouteTests
         return app;
     }
 
-    private static async Task<int> PostAsync(WebApplication app, string pattern, Guid? routeValues)
+    private static Task<int> PostAsync(WebApplication app, string pattern, Guid? routeValues) =>
+        PostAsync(app, pattern, routeValues, user: null);
+
+    private static async Task<int> PostAsync(WebApplication app, string pattern, Guid? routeValues, ClaimsPrincipal? user)
     {
         IEndpointRouteBuilder routes = app;
 
@@ -201,6 +270,11 @@ public sealed class SpaceBoundaryRouteTests
         var httpContext = new DefaultHttpContext { RequestServices = scope.ServiceProvider };
         httpContext.Request.Method = HttpMethods.Post;
         httpContext.SetEndpoint(endpoint);
+
+        if (user is not null)
+        {
+            httpContext.User = user;
+        }
 
         if (routeValues is { } spaceId)
         {
