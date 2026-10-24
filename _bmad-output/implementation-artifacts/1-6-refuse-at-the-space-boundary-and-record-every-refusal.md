@@ -331,6 +331,31 @@ The dev phase takes these as **reversible, recorded decisions** in the Completio
 13. **Route back without a switcher.** **Recommend** a link to the authenticated home route that 1.7 repoints; ledger the switcher-sourced clause to 1.7.
 14. **Copy conflict** — SPEC "this isn't available to you…" vs UX/epics "Not available.". **Recommend "Not available."** (the AC's own source and UX-DR32); flag the SPEC line as a restatement defect for Lee.
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-1-6-refuse-at-the-space-boundary-and-record-every-refusal.md` (scenario ids, seed-data constraints checked, plant results, what was deliberately not scaffolded and why).
+
+Story 1.6's types (`Capability`, `RoleCapabilityMatrix`, `RequiredCapability`, `BoundRegistry`, `IAccessRefusalRecorder`, `AccessRefusal`) are reached **by name, through reflection**, so the scaffolds compile before the types exist. Tables and columns (`AccessRefusal`: `Id, AccountId, TargetSpaceId, Capability, Outcome, Kind, OccurredAt`; `SpacePresence`: `SpaceId, AccountId, ExpiresAt`), the 15 capability names, the six bound/operation names, `RequiredCapability` and the rate-limit key `RateLimiting__PermitsPerWindow` are the scaffolds' contract. Where dev-story chooses a different name, correct the scaffold. On activation, replace each by-name lookup with the typed reference.
+
+| File | Cases | ACs | Green today? |
+|---|---|---|---|
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs` (new, no container) | 10 | AC3, AC4, AC5, AC6, AC8, AC9; A-4, A-7, A-9, A-12 | **2 active**: `No_endpoint_without_spaceId_in_its_path_reaches_a_Space_scoped_entity` (A-4) and `No_production_code_runs_on_a_timer_or_as_a_hosted_service` (A-9). Both are standing gates, both planted on 2026-10-24 and caught. 8 skipped |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.cs` (existing class, +8; now `partial`) | 8 | AC1, AC4, AC6, AC7 (boundary 404 body, `CrossSpace` record, 401 not recorded, non-GUID 404, 51st Account, present Account, expired presence, 90-day purge) | all skipped |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/SpaceBoundaryPipelineTests.cs` (new container class, +1 engine on activation) | 5, one a 20-row theory | AC2, AC3, AC4, AC10 (Role matrix through the real filter, non-member 404 for every capability, `InsufficientRole` record, duration pair, planted oracle) | all skipped |
+| `tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/SessionEndpointTests.cs` (existing class, +1) | 1 | Task 9 rate limit (uniform 429, `Retry-After`, partition not on the address) | skipped |
+
+**Activation order:**
+1. `SpaceBoundaryPipelineTests.The_duration_method_tells_a_refusal_that_skips_its_record_from_one_that_writes_it` goes first. It tests the riskiest assumption: that the B3 method, built for a ~270 ms effect, can see a skipped single-row insert. If it cannot, AC10's oracle clause needs a decision before anything is built on it. Then activate its pair, `A_missing_Space_and_a_Space_without_Membership_take_the_same_time_to_refuse`.
+2. The record write: `Each_boundary_404_records_one_CrossSpace_refusal_and_a_served_request_records_none`, `A_request_refused_at_authentication_records_no_refusal`, `A_403_records_one_InsufficientRole_refusal`.
+3. The matrix: `The_capability_matrix_agrees_with_the_transcription_in_every_cell` and `The_capability_vocabulary_is_exactly_the_Role_decided_rows`. Then the pipeline: `The_matrix_decides_whether_a_member_reaches_the_endpoint` and `Every_capability_is_refused_with_the_boundary_404_for_a_non_member`. Then `Every_spaceId_endpoint_declares_exactly_one_capability` and `Only_the_pipeline_depends_on_the_capability_matrix_and_the_refusal_recorder`.
+4. The contract: `The_refusal_problem_types_are_declared_and_one_type_serves_every_404`, `Both_boundary_404s_answer_not_available_and_carry_nothing_beyond_the_URL` and `A_non_GUID_spaceId_is_answered_as_a_boundary_404_is_and_records_nothing`. Removing `ProblemTypes.SpaceNotFound` breaks the 1.5 case that asserts it. Update that case in the same change.
+5. The bound: `The_bound_registry_declares_all_six_bounds_with_their_values_and_operations`, then the three presence cases.
+6. Retention: `Refusal_records_past_90_days_are_purged_by_request_traffic_and_younger_ones_kept` and `Only_the_recorder_and_the_purge_refer_to_the_refusal_record`. Also write the "at most daily" unit case with a hand-written `TimeProvider`.
+7. Rate limit: `Sign_in_past_the_limit_is_refused_with_429_alike_for_a_known_and_an_unknown_address`. Raise the limit for every other wire test first. `SessionEndpointTests.The_two_failure_causes_take_the_same_time_over_the_wire` signs in 44 times on one Host from one IP.
+8. Client copy: `The_refusal_copy_is_the_clients_own_and_names_no_remembered_location`.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

@@ -758,6 +758,76 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         Assert.Equal(["email-address-required", "password-required"], problem.Errors);
     }
 
+    /// <summary>
+    /// Story 1.6 Task 9 - the two PBKDF2 endpoints are rate-limited, and the 429 is uniform: a known
+    /// and an unknown address are refused alike, as <c>application/problem+json</c> with a stable
+    /// type and a <c>Retry-After</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Red-phase scaffold, ATDD run 2026-10-24.</b> The configuration key is the scaffold's guess
+    /// at Task 9's "configuration key with the resolved value logged unconditionally"; correct it
+    /// here if dev-story names it differently, and record the correction.
+    /// </para>
+    /// <para>
+    /// <b>The partition may never include the submitted address</b> (AD-23). So the limit is reached
+    /// with one address and then asserted with another: a limiter partitioned on the address would
+    /// serve the second one, and fail here. Anchored on a first sign-in answered 401, so a limiter
+    /// refusing everything cannot pass.
+    /// </para>
+    /// </remarks>
+    [Fact(Skip = "red: ledger (high) - no rate limiter on the PBKDF2 endpoints (story 1.6 Task 9)")]
+    [Trait("Requirement", "AR-25")]
+    [Trait("Requirement", "AD-18")]
+    public async Task Sign_in_past_the_limit_is_refused_with_429_alike_for_a_known_and_an_unknown_address()
+    {
+        var connectionString = Available();
+        var known = RandomAddress();
+
+        var limited = new Dictionary<string, string>(Configured, StringComparer.Ordinal)
+        {
+            ["RateLimiting__PermitsPerWindow"] = "3",
+        };
+
+        WireResponse? first = null;
+        WireResponse? knownRefused = null;
+        WireResponse? unknownRefused = null;
+
+        await HostProcess.RunAsync(connectionString, limited, async client =>
+        {
+            var session = new WireSession(client);
+
+            await RegisterAsync(session, known);
+
+            first = await session.SignInAsync(known, WrongPassword);
+
+            // Bounded: a limiter that never refuses fails on the assertion below, not by hanging.
+            for (var attempt = 0; attempt < 10 && knownRefused?.StatusCode != HttpStatusCode.TooManyRequests; attempt++)
+            {
+                knownRefused = await session.SignInAsync(known, WrongPassword);
+            }
+
+            unknownRefused = await session.SignInAsync(RandomAddress(), WrongPassword);
+        });
+
+        Assert.NotNull(first);
+        Assert.Equal(HttpStatusCode.Unauthorized, first.StatusCode);
+
+        Assert.NotNull(knownRefused);
+        Assert.NotNull(unknownRefused);
+
+        Assert.Equal(HttpStatusCode.TooManyRequests, knownRefused.StatusCode);
+        Assert.Equal(HttpStatusCode.TooManyRequests, unknownRefused.StatusCode);
+
+        Assert.Equal(knownRefused.Body, unknownRefused.Body);
+        Assert.Equal(knownRefused.HeaderNames, unknownRefused.HeaderNames);
+        Assert.StartsWith("application/problem+json", knownRefused.ContentType, StringComparison.Ordinal);
+        Assert.NotNull(knownRefused.Header("Retry-After"));
+        Assert.Equal(
+            "urn:yello:problem:rate-limited",
+            JsonSerializer.Deserialize<ProblemResponse>(knownRefused.Body, JsonOptions)?.Type);
+    }
+
     private string Available()
     {
         Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? string.Empty);

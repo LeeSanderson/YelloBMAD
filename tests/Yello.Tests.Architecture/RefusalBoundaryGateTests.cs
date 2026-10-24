@@ -1,0 +1,596 @@
+using System.Collections;
+using System.Reflection;
+using System.Xml.Linq;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Mono.Cecil;
+using Xunit;
+using Yello.Contracts;
+using Yello.Domain.Memberships;
+
+namespace Yello.Tests.Architecture;
+
+/// <summary>
+/// Story 1.6's structural gates: the Role capability matrix as data, the NFR-8 bound registry,
+/// <c>{spaceId}</c> in every Space-scoped path, the refusal contract's stable types, and the
+/// purge that must never run on a timer. AC3, AC5, AC6, AC8, AC9; A-4, A-7, A-9, A-12.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Red-phase scaffolds, written by the ATDD run on 2026-10-24 before any of story 1.6 existed.</b>
+/// Every case naming a type the story has not written yet reaches it <i>by name, through
+/// reflection</i>, because a scaffold that referenced a missing type would break the build - and
+/// with it every gate in this suite. On activation, replace each by-name lookup with the typed
+/// reference it stands for; the names below are the story's Task 2, Task 6 and Task 4 names, and a
+/// different name chosen in dev-story is a correction recorded in the Debug Log, not a reason to
+/// delete the case.
+/// </para>
+/// <para>
+/// <b>The matrix and the registry are transcribed here independently</b>, from
+/// <c>role-capability-matrix.md:9-28</c> and AC8's table. That is the point of AC3's second clause:
+/// a restatement the product's matrix can disagree with. A test that read its expectations from
+/// the product's own table would agree with any table at all.
+/// </para>
+/// <para>
+/// <b>Two cases are green today and stay active</b>, as standing regression gates rather than red
+/// assertions: <see cref="No_endpoint_without_spaceId_in_its_path_reaches_a_Space_scoped_entity"/>
+/// (A-4 / AC5) and <see cref="No_production_code_runs_on_a_timer_or_as_a_hosted_service"/> (A-9).
+/// Both were planted on 2026-10-24; the results are in the ATDD checklist.
+/// </para>
+/// </remarks>
+[Trait("Suite", "Architecture")]
+[Trait("Priority", "P0")]
+[Trait("Requirement", "FR-16")]
+[Trait("Requirement", "AR-3")]
+[Trait("Requirement", "AR-9")]
+[Trait("Requirement", "AR-30")]
+[Trait("Requirement", "AD-3")]
+[Trait("Requirement", "AD-25")]
+[Trait("Requirement", "NFR-8")]
+public sealed class RefusalBoundaryGateTests
+{
+    private const string MatrixTypeName = "Yello.Domain.Memberships.RoleCapabilityMatrix";
+    private const string CapabilityTypeName = "Yello.Domain.Memberships.Capability";
+    private const string BoundRegistryTypeName = "Yello.Domain.Bounds.BoundRegistry";
+    private const string RecorderPortName = "Yello.Application.Spaces.IAccessRefusalRecorder";
+    private const string AccessRefusalTypeName = "Yello.Domain.AccessRefusals.AccessRefusal";
+    private const string PipelineTypeName = "Yello.Host.Spaces.ActiveSpaceResolution";
+
+    /// <summary>
+    /// The Ownership-Offer row, which is decided by row identity and never by Role (AD-26 / AR-13).
+    /// </summary>
+    private const string OfferAcceptance = "AcceptOrDeclineOwnershipOffer";
+
+    private const string Allowed = "Allowed";
+    private const string Denied = "Denied";
+    private const string Qualified = "Qualified";
+
+    /// <summary>
+    /// <c>role-capability-matrix.md:9-28</c>, transcribed by hand: Owner, Admin, Member, Viewer.
+    /// </summary>
+    private static readonly (string Capability, string Owner, string Admin, string Member, string Viewer)[] Matrix =
+    [
+        ("ReadProjectsAndTasks", Allowed, Allowed, Allowed, Allowed),
+        ("ManageProjects", Allowed, Allowed, Allowed, Denied),
+        ("ManageTasks", Allowed, Allowed, Allowed, Denied),
+        ("EditTaskDescriptionCollaboratively", Allowed, Allowed, Allowed, Denied),
+        ("AssignTask", Allowed, Allowed, Allowed, Denied),
+        ("ConfigureSpaceDefaultStatuses", Allowed, Allowed, Denied, Denied),
+        ("ConfigureProjectStatusDelta", Allowed, Allowed, Denied, Denied),
+        ("ManageLabels", Allowed, Allowed, Denied, Denied),
+        ("IssueAndRevokeInvitations", Allowed, Allowed, Denied, Denied),
+        ("ChangeMembershipRole", Allowed, Qualified, Denied, Denied),
+        ("RemoveMembership", Allowed, Qualified, Denied, Denied),
+        ("RenameSpace", Allowed, Allowed, Denied, Denied),
+        ("OfferOwnershipTransfer", Allowed, Denied, Denied, Denied),
+        ("DeleteSpace", Allowed, Denied, Denied, Denied),
+        ("IssueApiTokenForOneself", Allowed, Allowed, Allowed, Allowed),
+    ];
+
+    /// <summary>
+    /// AC8's table, transcribed by hand: bound, value, the creation operation that consults it.
+    /// </summary>
+    private static readonly (string Bound, int Limit, string Operation)[] Bounds =
+    [
+        ("ConcurrentActiveSessionsPerSpace", 50, "EstablishSessionInSpace"),
+        ("ProjectsPerSpace", 50, "CreateProject"),
+        ("TasksPerProject", 5000, "CreateTask"),
+        ("SpacesPerAccount", 50, "CreateSpace"),
+        ("MembershipsPerSpace", 100, "AcceptInvitation"),
+        ("ConcurrentEditorsPerTask", 10, "EstablishTaskSyncLease"),
+    ];
+
+    /// <summary>
+    /// The entities AC5 names. Only <c>StatusDefinition</c> exists today; the other three are named
+    /// so the gate covers them the day they are written.
+    /// </summary>
+    private static readonly string[] SpaceScopedEntities =
+    [
+        "Yello.Domain.Statuses.StatusDefinition",
+        "Yello.Domain.Tasks.Task",
+        "Yello.Domain.Projects.Project",
+        "Yello.Domain.Labels.Label",
+    ];
+
+    /// <summary>
+    /// AC3 - the product's matrix agrees with the transcribed one in every Role x capability cell.
+    /// </summary>
+    [Fact(Skip = "red: AC3 - RoleCapabilityMatrix and Capability do not exist yet (story 1.6 Task 2)")]
+    public void The_capability_matrix_agrees_with_the_transcription_in_every_cell()
+    {
+        var capability = PlannedType(ProductionAssemblies.Domain, CapabilityTypeName, "Task 2");
+        var lookup = MatrixLookup(capability);
+
+        var disagreements = new List<string>();
+
+        foreach (var row in Matrix)
+        {
+            var value = Enum.Parse(capability, row.Capability);
+
+            foreach (var (role, expected) in new[]
+            {
+                (Role.Owner, row.Owner), (Role.Admin, row.Admin), (Role.Member, row.Member), (Role.Viewer, row.Viewer),
+            })
+            {
+                var actual = lookup.Invoke(null, [role, value])?.ToString();
+
+                if (!string.Equals(actual, expected, StringComparison.Ordinal))
+                {
+                    disagreements.Add($"{role} x {row.Capability}: matrix says {actual}, transcription says {expected}");
+                }
+            }
+        }
+
+        Assert.True(
+            disagreements.Count == 0,
+            "Where a restatement disagrees with the matrix the matrix is correct and the restatement "
+            + "is a defect (AC3) - so decide which one this is before changing either:\n"
+            + string.Join('\n', disagreements));
+    }
+
+    /// <summary>
+    /// AC3 - the capability vocabulary has one member per Role-decided row, and nothing else but
+    /// the Ownership-Offer row, which AD-26 decides by row identity.
+    /// </summary>
+    [Fact(Skip = "red: AC3 - Capability does not exist yet (story 1.6 Task 2)")]
+    public void The_capability_vocabulary_is_exactly_the_Role_decided_rows()
+    {
+        var capability = PlannedType(ProductionAssemblies.Domain, CapabilityTypeName, "Task 2");
+
+        var declared = Enum.GetNames(capability).Where(name => name != OfferAcceptance).Order(StringComparer.Ordinal);
+        var transcribed = Matrix.Select(row => row.Capability).Order(StringComparer.Ordinal);
+
+        Assert.Equal(transcribed, declared);
+    }
+
+    /// <summary>
+    /// AC8 / A-7 - the registry declares all six NFR-8 bounds, each with its value and the creation
+    /// operation that must consult it, and nothing else.
+    /// </summary>
+    /// <remarks>
+    /// Matched on the entry's property <i>values</i>, not its property names, so the shape of an
+    /// entry is dev-story's to choose: an entry matches a row when its values include the bound's
+    /// name, its number and its operation's name.
+    /// </remarks>
+    [Fact(Skip = "red: AC8 - BoundRegistry does not exist yet (story 1.6 Task 6)")]
+    public void The_bound_registry_declares_all_six_bounds_with_their_values_and_operations()
+    {
+        var registry = PlannedType(ProductionAssemblies.Domain, BoundRegistryTypeName, "Task 6");
+
+        var entries = registry
+            .GetMembers(BindingFlags.Public | BindingFlags.Static)
+            .Select(member => member switch
+            {
+                PropertyInfo property => property.GetValue(null),
+                FieldInfo field => field.GetValue(null),
+                _ => null,
+            })
+            .OfType<IEnumerable>()
+            .Where(candidate => candidate is not string)
+            .SelectMany(candidate => candidate.Cast<object>())
+            .ToList();
+
+        Assert.Equal(Bounds.Length, entries.Count);
+
+        var unmatched = Bounds
+            .Where(bound => !entries.Exists(entry => Describes(entry, bound)))
+            .Select(bound => $"{bound.Bound} = {bound.Limit}, consulted by {bound.Operation}")
+            .ToList();
+
+        Assert.True(
+            unmatched.Count == 0,
+            "The registry is missing, or misstates, these NFR-8 bounds - and an unenforced bound is a "
+            + "defect, not a relaxation:\n" + string.Join('\n', unmatched));
+    }
+
+    /// <summary>
+    /// AC5 / A-4 - no endpoint whose path lacks <c>{spaceId}</c> reaches a <c>Task</c>,
+    /// <c>Project</c>, <c>Label</c> or <c>StatusDefinition</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Green today, and a standing gate.</b> The route table is the real one: every public
+    /// <c>Map*</c> extension in <c>Yello.Host</c> is mapped onto a throwaway application and its
+    /// <see cref="EndpointDataSource"/> read, so a route added tomorrow is covered without anyone
+    /// extending a list.
+    /// </para>
+    /// <para>
+    /// <b>Vacuity guard:</b> the statuses endpoint must be found and classified as reaching
+    /// <c>StatusDefinition</c>, so a scan that cannot see the one Space-scoped route there is fails
+    /// rather than passing.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "AR-9")]
+    [Trait("Assumption", "PRD-12-8")]
+    public void No_endpoint_without_spaceId_in_its_path_reaches_a_Space_scoped_entity()
+    {
+        var endpoints = RouteTable();
+
+        var reaching = endpoints
+            .Where(endpoint => HandlerReachesSpaceScopedEntity(endpoint))
+            .ToList();
+
+        Assert.Contains(reaching, endpoint => CarriesSpaceId(endpoint));
+
+        var offenders = reaching
+            .Where(endpoint => !CarriesSpaceId(endpoint))
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            $"{string.Join(", ", offenders)} reach a Space-scoped entity without {{spaceId}} in the "
+            + "path. A bare-id route is what would make a record-writing boundary refusal separable by "
+            + "duration from an ordinary not-found (AC5).");
+    }
+
+    /// <summary>
+    /// Task 3 - every <c>{spaceId}</c> endpoint declares exactly one required capability, so no
+    /// Space-scoped endpoint is ever checked against a default.
+    /// </summary>
+    [Fact(Skip = "red: AC2/AC3 - no endpoint declares a capability yet (story 1.6 Task 3)")]
+    public void Every_spaceId_endpoint_declares_exactly_one_capability()
+    {
+        var capability = PlannedType(ProductionAssemblies.Domain, CapabilityTypeName, "Task 2");
+
+        var spaceScoped = RouteTable().Where(CarriesSpaceId).ToList();
+
+        Assert.NotEmpty(spaceScoped);
+
+        var offenders = spaceScoped
+            .Where(endpoint => endpoint.Metadata.Count(item => DeclaresCapability(item, capability)) != 1)
+            .Select(endpoint => endpoint.RoutePattern.RawText)
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            $"{string.Join(", ", offenders)} declare no capability, or more than one. A Space-scoped "
+            + "endpoint fails closed, never defaults to read.");
+    }
+
+    /// <summary>
+    /// A-12 - nothing but the pipeline depends on the capability matrix or the refusal recorder.
+    /// </summary>
+    [Fact(Skip = "red: AC2/AC4 - the matrix and the recorder do not exist yet (story 1.6 Tasks 2, 4)")]
+    [Trait("Priority", "P1")]
+    public void Only_the_pipeline_depends_on_the_capability_matrix_and_the_refusal_recorder()
+    {
+        foreach (var (target, permitted) in new[]
+        {
+            (MatrixTypeName, new[] { MatrixTypeName, PipelineTypeName }),
+            (RecorderPortName, new[]
+            {
+                RecorderPortName,
+                PipelineTypeName,
+                "Yello.Infrastructure.Persistence.AccessRefusalRecorder",
+                "Yello.Infrastructure.InfrastructureServices",
+            }),
+        })
+        {
+            var dependents = DependentsOf(target);
+
+            Assert.Contains(PipelineTypeName, dependents);
+
+            var offenders = dependents.Where(name => !permitted.Contains(name, StringComparer.Ordinal)).ToList();
+
+            Assert.True(
+                offenders.Count == 0,
+                $"{string.Join(", ", offenders)} depend on {target}. Authorisation and refusal "
+                + "recording are the pipeline's (AR-3); a slice that re-implements either is a defect.");
+        }
+    }
+
+    /// <summary>
+    /// Task 4 - the refusal record is write-only: nothing outside the recorder and the purge refers
+    /// to it, so no read surface over it can appear.
+    /// </summary>
+    [Fact(Skip = "red: AC4 - AccessRefusal does not exist yet (story 1.6 Task 4)")]
+    [Trait("Requirement", "AR-11")]
+    [Trait("Requirement", "AD-20")]
+    public void Only_the_recorder_and_the_purge_refer_to_the_refusal_record()
+    {
+        string[] permitted =
+        [
+            AccessRefusalTypeName,
+            "Yello.Infrastructure.Persistence.AccessRefusalRecorder",
+            "Yello.Infrastructure.Persistence.AccessRefusalPurge",
+            "Yello.Infrastructure.Persistence.YelloDbContext",
+            "Yello.Infrastructure.Persistence.Configurations.AccessRefusalConfiguration",
+        ];
+
+        var dependents = DependentsOf(AccessRefusalTypeName);
+
+        Assert.Contains("Yello.Infrastructure.Persistence.AccessRefusalRecorder", dependents);
+
+        // Migrations and the model snapshot name the table, not the CLR type, so they are not here.
+        var offenders = dependents.Where(name => !permitted.Contains(name, StringComparer.Ordinal)).ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            $"{string.Join(", ", offenders)} refer to {AccessRefusalTypeName}. The refusal log is "
+            + "write-only and has no surface (AD-24).");
+    }
+
+    /// <summary>
+    /// A-9 - nothing in production runs on a timer or as a hosted service, so the refusal purge
+    /// cannot become a schedule that wakes an idle database (AD-10 / AR-33).
+    /// </summary>
+    /// <remarks>
+    /// <b>Green today, and a standing gate.</b> Its vacuity guard is that the same scan does find
+    /// <see cref="TimeProvider"/>, which <c>Program.cs</c> registers - so a scanner that reads
+    /// nothing fails rather than passing.
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "AR-33")]
+    [Trait("Requirement", "AD-10")]
+    public void No_production_code_runs_on_a_timer_or_as_a_hosted_service()
+    {
+        string[] banned =
+        [
+            "Microsoft.Extensions.Hosting.BackgroundService",
+            "Microsoft.Extensions.Hosting.IHostedService",
+            "Microsoft.Extensions.Hosting.IHostedLifecycleService",
+            "System.Threading.PeriodicTimer",
+            "System.Threading.Timer",
+            "System.Timers.Timer",
+        ];
+
+        Assert.Contains(PipelineTypeName, DependentsOf("Microsoft.AspNetCore.Http.EndpointFilterInvocationContext"));
+        Assert.NotEmpty(DependentsOf(typeof(TimeProvider).FullName!));
+
+        var offenders = banned
+            .SelectMany(name => DependentsOf(name).Select(dependent => $"{dependent} uses {name}"))
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            "No component queries the database on a fixed interval (AD-10); the refusal purge is "
+            + "triggered by request traffic, at most daily:\n" + string.Join('\n', offenders));
+    }
+
+    /// <summary>
+    /// AC6 - every refusal the product answers has a stable machine-readable <c>type</c>, and one
+    /// <c>not-available</c> type serves every 404.
+    /// </summary>
+    [Fact(Skip = "red: AC6 - ProblemTypes still carries SpaceNotFound and lacks the 1.6 types (story 1.6 Task 5)")]
+    [Trait("Requirement", "AR-34")]
+    public void The_refusal_problem_types_are_declared_and_one_type_serves_every_404()
+    {
+        var declared = typeof(ProblemTypes)
+            .GetProperties(BindingFlags.Public | BindingFlags.Static)
+            .ToDictionary(property => property.Name, property => property.GetValue(null) as string, StringComparer.Ordinal);
+
+        Assert.Equal("urn:yello:problem:not-available", declared.GetValueOrDefault("NotAvailable"));
+        Assert.Equal("urn:yello:problem:insufficient-role", declared.GetValueOrDefault("InsufficientRole"));
+        Assert.Equal("urn:yello:problem:bound-reached", declared.GetValueOrDefault("BoundReached"));
+        Assert.Equal("urn:yello:problem:rate-limited", declared.GetValueOrDefault("RateLimited"));
+
+        Assert.DoesNotContain("SpaceNotFound", declared.Keys);
+        Assert.All(declared.Values, value => Assert.StartsWith("urn:yello:problem:", value, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// AC9 / UX-DR32 / UX-DR35 - the refusal surface's copy is the client's own, in the UX voice,
+    /// and the unknown-route page no longer sends anyone back "to where you were".
+    /// </summary>
+    [Fact(Skip = "red: AC9 - the refusal copy is not in ClientCopy.resx yet (story 1.6 Task 10)")]
+    [Trait("Requirement", "UX-DR32")]
+    [Trait("Requirement", "UX-DR35")]
+    public void The_refusal_copy_is_the_clients_own_and_names_no_remembered_location()
+    {
+        var resx = new FileInfo(Path.Combine(RepositoryLayout.Root.FullName, "Yello.Client", "Localisation", "ClientCopy.resx"));
+
+        var values = XDocument.Load(resx.FullName)
+            .Descendants("data")
+            .Select(data => data.Element("value")?.Value ?? string.Empty)
+            .ToList();
+
+        Assert.Contains("Not available.", values);
+        Assert.Contains("Viewers cannot edit Tasks.", values);
+
+        // A remembered location is exactly what UX-DR32 forbids as the route back.
+        Assert.DoesNotContain(values, value => value.Contains("where you were", StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static Type PlannedType(Assembly assembly, string fullName, string task)
+    {
+        var type = assembly.GetType(fullName);
+
+        Assert.True(type is not null, $"{fullName} is not in {assembly.GetName().Name} - story 1.6 {task} writes it.");
+
+        return type;
+    }
+
+    private static MethodInfo MatrixLookup(Type capability)
+    {
+        var matrix = PlannedType(ProductionAssemblies.Domain, MatrixTypeName, "Task 2");
+
+        var lookup = Array.Find(
+            matrix.GetMethods(BindingFlags.Public | BindingFlags.Static),
+            method => method.GetParameters().Select(parameter => parameter.ParameterType)
+                .SequenceEqual([typeof(Role), capability]));
+
+        Assert.True(lookup is not null, $"{MatrixTypeName} has no public static (Role, Capability) lookup.");
+
+        return lookup;
+    }
+
+    private static bool Describes(object entry, (string Bound, int Limit, string Operation) bound)
+    {
+        var values = entry.GetType()
+            .GetProperties(BindingFlags.Public | BindingFlags.Instance)
+            .Select(property => property.GetValue(entry)?.ToString())
+            .ToList();
+
+        return values.Contains(bound.Bound, StringComparer.Ordinal)
+            && values.Contains(bound.Limit.ToString(System.Globalization.CultureInfo.InvariantCulture), StringComparer.Ordinal)
+            && values.Contains(bound.Operation, StringComparer.Ordinal);
+    }
+
+    private static bool DeclaresCapability(object metadata, Type capability) =>
+        Array.Exists(
+            metadata.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance),
+            property => property.PropertyType == capability);
+
+    private static bool CarriesSpaceId(RouteEndpoint endpoint) =>
+        endpoint.RoutePattern.GetParameter(Yello.Contracts.Spaces.SpaceRoutes.SpaceIdParameter) is not null;
+
+    /// <summary>
+    /// Every endpoint the Host maps, built through the framework's own data source.
+    /// </summary>
+    /// <remarks>
+    /// The handlers' parameters are inferred when the data source builds them, and a service type
+    /// this throwaway application never registered would be inferred as a request body - which a
+    /// <c>GET</c> refuses. So every Yello class and interface outside <c>Yello.Contracts</c> is
+    /// registered with a factory that throws; nothing is resolved, only classified. Registering a
+    /// replacement <see cref="IServiceProviderIsService"/> instead does not work - the container
+    /// answers that service itself and ignores the registration.
+    /// </remarks>
+    private static List<RouteEndpoint> RouteTable()
+    {
+        var builder = WebApplication.CreateSlimBuilder();
+        builder.Services.AddAntiforgery();
+
+        var services = ProductionAssemblies.All
+            .Where(assembly => assembly != ProductionAssemblies.Contracts && assembly != ProductionAssemblies.AppHost)
+            .SelectMany(assembly => assembly.GetTypes())
+            .Where(type => type.Namespace?.StartsWith("Yello.", StringComparison.Ordinal) == true)
+            .Where(type => !type.IsGenericTypeDefinition && !type.IsValueType)
+            .Where(type => !(type.IsAbstract && type.IsSealed) && !typeof(Delegate).IsAssignableFrom(type));
+
+        foreach (var service in services)
+        {
+            builder.Services.AddScoped(service, _ => throw new InvalidOperationException("Classified, never resolved."));
+        }
+
+        var app = builder.Build();
+
+        var maps = ProductionAssemblies.Host.GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.Static))
+            .Where(method => method.Name.StartsWith("Map", StringComparison.Ordinal)
+                && method.GetParameters() is [{ ParameterType: var only }]
+                && only == typeof(IEndpointRouteBuilder))
+            .ToList();
+
+        Assert.NotEmpty(maps);
+
+        foreach (var map in maps)
+        {
+            map.Invoke(null, [app]);
+        }
+
+        IEndpointRouteBuilder routes = app;
+
+        return [.. routes.DataSources
+            .SelectMany(source => source.Endpoints)
+            .OfType<RouteEndpoint>()];
+    }
+
+    private static bool HandlerReachesSpaceScopedEntity(RouteEndpoint endpoint)
+    {
+        var handler = endpoint.Metadata.GetMetadata<MethodInfo>();
+
+        Assert.True(handler is not null, $"{endpoint.RoutePattern.RawText} carries no handler method.");
+
+        using var module = ModuleDefinition.ReadModule(handler.Module.Assembly.Location);
+
+        var declaring = module.GetType(handler.DeclaringType!.FullName!.Replace('+', '/'));
+
+        // The handler itself, and the state machine an async handler's body is compiled into.
+        var bodies = declaring.Methods.Where(method => method.Name == handler.Name)
+            .Concat(declaring.NestedTypes
+                .Where(nested => nested.Name.StartsWith($"<{handler.Name}>", StringComparison.Ordinal))
+                .SelectMany(nested => nested.Methods));
+
+        return bodies.Any(method => Array.Exists(SpaceScopedEntities, entity => MethodReferences(method, entity)));
+    }
+
+    private static SortedSet<string> DependentsOf(string fullName)
+    {
+        var dependents = new SortedSet<string>(StringComparer.Ordinal);
+
+        foreach (var assembly in RuntimeAssemblies())
+        {
+            using var module = ModuleDefinition.ReadModule(assembly.Location);
+
+            foreach (var type in module.GetTypes().Where(type => TypeReferences(type, fullName)))
+            {
+                dependents.Add(OutermostOf(type).FullName);
+            }
+        }
+
+        return dependents;
+    }
+
+    /// <summary>
+    /// The assemblies that run in production. The AppHost orchestrates local development and is
+    /// not one of them.
+    /// </summary>
+    private static IEnumerable<Assembly> RuntimeAssemblies() =>
+        ProductionAssemblies.All.Where(assembly => assembly != ProductionAssemblies.AppHost);
+
+    private static bool Names(TypeReference? candidate, string fullName) => candidate switch
+    {
+        null => false,
+        _ when candidate.FullName == fullName => true,
+        GenericInstanceType generic when generic.GenericArguments.Any(argument => Names(argument, fullName)) => true,
+        TypeSpecification specification => Names(specification.ElementType, fullName),
+        _ => false,
+    };
+
+    private static bool TypeReferences(TypeDefinition type, string fullName) =>
+        Names(type.BaseType, fullName)
+        || type.Interfaces.Any(implemented => Names(implemented.InterfaceType, fullName))
+        || type.Fields.Any(field => Names(field.FieldType, fullName))
+        || type.Methods.Any(method => MethodReferences(method, fullName));
+
+    private static bool MethodReferences(MethodDefinition method, string fullName)
+    {
+        bool InOperand(object? operand) => operand switch
+        {
+            GenericInstanceMethod generic => Names(generic.DeclaringType, fullName)
+                || Names(generic.ReturnType, fullName)
+                || generic.GenericArguments.Any(argument => Names(argument, fullName)),
+            MethodReference reference => Names(reference.DeclaringType, fullName)
+                || Names(reference.ReturnType, fullName)
+                || reference.Parameters.Any(parameter => Names(parameter.ParameterType, fullName)),
+            FieldReference field => Names(field.FieldType, fullName) || Names(field.DeclaringType, fullName),
+            TypeReference reference => Names(reference, fullName),
+            _ => false,
+        };
+
+        bool InBody() =>
+            method.HasBody
+            && (method.Body.Variables.Any(variable => Names(variable.VariableType, fullName))
+                || method.Body.Instructions.Any(instruction => InOperand(instruction.Operand)));
+
+        return Names(method.ReturnType, fullName)
+            || method.Parameters.Any(parameter => Names(parameter.ParameterType, fullName))
+            || InBody();
+    }
+
+    private static TypeDefinition OutermostOf(TypeDefinition type) =>
+        type.DeclaringType is null ? type : OutermostOf(type.DeclaringType);
+}
