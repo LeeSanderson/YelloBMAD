@@ -256,7 +256,10 @@ internal static class IsolationCases
     private static async Task<CaseRequest> TokenBoundElsewhereAsync(IsolationWorld world)
     {
         var owner = await world.NewActorAsync("Cy");
-        var second = await world.Database.AddOwnedSpaceAsync(owner.AccountId, $"{owner.DisplayName} second");
+        var secondName = $"{owner.DisplayName} second";
+        var second = await world.Database.AddOwnedSpaceAsync(owner.AccountId, secondName);
+
+        owner.HoldsSpaceNamed(secondName);
 
         return new CaseRequest(owner, HttpMethod.Get, [new(SpaceRoutes.ActiveOf(second), SpaceRoutes.ActiveOf(Guid.NewGuid()))], second);
     }

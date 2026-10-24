@@ -71,25 +71,39 @@ internal static class HostRouteTable
             TaskCreationOptions.LongRunning,
             TaskScheduler.Default);
 
-        var host = await Task.WhenAny(built.Task, run) == built.Task
-            ? await built.Task.WaitAsync(Window)
+        // Bounded: an entry point that neither builds a host nor returns must fail the gate, not hang it.
+        var host = await Task.WhenAny(built.Task, run).WaitAsync(Window) == built.Task
+            ? await built.Task
             : throw new InvalidOperationException("Yello.Host's entry point returned before it built a host.", run.Exception);
 
         var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
-        var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        List<(string Method, string Pattern)> routes;
 
-        using (lifetime.ApplicationStarted.Register(() => started.TrySetResult()))
+        try
         {
-            await started.Task.WaitAsync(Window);
+            var started = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            using (lifetime.ApplicationStarted.Register(() => started.TrySetResult()))
+            {
+                if (await Task.WhenAny(started.Task, run).WaitAsync(Window) != started.Task)
+                {
+                    throw new InvalidOperationException("Yello.Host's entry point returned before the application started.", run.Exception);
+                }
+            }
+
+            routes = host.Services.GetRequiredService<EndpointDataSource>().Endpoints
+                .OfType<RouteEndpoint>()
+                .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? ["*"])
+                    .Select(method => (Method: method, Pattern: endpoint.RoutePattern.RawText ?? string.Empty)))
+                .ToList();
+        }
+        finally
+        {
+            // Stopped whatever happened above, so a failed read never leaves a Host running in the
+            // test process.
+            lifetime.StopApplication();
         }
 
-        var routes = host.Services.GetRequiredService<EndpointDataSource>().Endpoints
-            .OfType<RouteEndpoint>()
-            .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<IHttpMethodMetadata>()?.HttpMethods ?? ["*"])
-                .Select(method => (Method: method, Pattern: endpoint.RoutePattern.RawText ?? string.Empty)))
-            .ToList();
-
-        lifetime.StopApplication();
         await run.WaitAsync(Window);
 
         return routes;

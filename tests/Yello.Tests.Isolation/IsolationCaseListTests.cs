@@ -1,4 +1,5 @@
 using Xunit;
+using Yello.Contracts.Accounts;
 using Yello.Contracts.Spaces;
 using Yello.Tests.Shared;
 
@@ -44,20 +45,43 @@ public sealed class IsolationCaseListTests
     }
 
     /// <summary>
-    /// 1.9-GATE-002 / AC8 - every Space-scoped and Account-scoped route the real Host maps is named by
-    /// at least one case, so a route added without an isolation row fails the suite. The anonymous and
-    /// session routes are the Revocation suite's <c>401</c> cases, and are not isolation rows.
+    /// The <c>/api</c> routes that are not isolation rows, each with why. They carry no Space and read
+    /// nothing Account-wide: they establish or end a credential, or are the unmatched fallback, which is
+    /// outside the route group and named by <c>ISO-UNMATCHED-UNDER-SPACE</c> on the paths it answers.
+    /// Anything else under <c>/api</c> - a Space route whatever its parameter is called, an Account route
+    /// wherever it lives - needs a row.
+    /// </summary>
+    private static readonly Dictionary<(string Method, string Pattern), string> NotIsolationRoutes = new()
+    {
+        [("POST", AccountRoutes.Register)] = "anonymous registration; carries no credential",
+        [("POST", SessionRoutes.Authenticate)] = "sign-in; establishes the credential",
+        [("DELETE", SessionRoutes.Authenticate)] = "sign-out; Lee's decisions 1 and 2 are Revocation rows",
+        [("GET", SessionRoutes.Current)] = "the caller's own Session; carries no Space",
+        [("GET", SessionRoutes.AntiforgeryToken)] = "an anti-forgery token for any caller",
+        [("*", IsolationCases.UnmatchedApi)] = "the unmatched fallback; does no resolution",
+    };
+
+    /// <summary>
+    /// 1.9-GATE-002 / AC8 - every <c>/api</c> route the real Host maps, other than the named
+    /// credential-establishing routes and the unmatched fallback, is named by at least one case, so a
+    /// route added without an isolation row fails the suite whatever its parameter is called and
+    /// wherever it lives.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
-    public async Task Every_Space_scoped_and_Account_scoped_route_the_Host_maps_is_named_by_a_case()
+    public async Task Every_api_route_the_Host_maps_but_the_named_credential_routes_is_named_by_a_case()
     {
-        var mapped = (await HostRouteTable.ReadAsync())
-            .Where(route => IsSpaceScoped(route.Pattern) || IsAccountScoped(route.Pattern))
+        var all = await HostRouteTable.ReadAsync();
+        var mapped = all
+            .Where(route => route.Pattern.StartsWith("/api/", StringComparison.Ordinal) && !NotIsolationRoutes.ContainsKey(route))
             .ToList();
 
         // Vacuity guard: the comparison set must hold a route known to exist before anything is asserted.
         Assert.Contains(mapped, route => route.Pattern == SpaceRoutes.Active && route.Method == HttpMethod.Get.Method);
+
+        // The exclusions are routes the Host still maps, so a renamed route cannot leave a stale
+        // exclusion behind while its new pattern slips past.
+        Assert.Equal([], NotIsolationRoutes.Keys.Where(route => !all.Contains(route)).Select(route => $"{route.Method} {route.Pattern}"));
 
         Assert.Equal([], Uncovered(mapped, IsolationCases.All));
     }
@@ -161,12 +185,6 @@ public sealed class IsolationCaseListTests
             .Where(route => !named.Contains((route.Method, route.Pattern)))
             .Select(route => $"{route.Method} {route.Pattern}")];
     }
-
-    private static bool IsSpaceScoped(string pattern) =>
-        pattern.Contains("{" + SpaceRoutes.SpaceIdParameter, StringComparison.Ordinal);
-
-    private static bool IsAccountScoped(string pattern) =>
-        pattern == SpaceRoutes.Directory || pattern.StartsWith("/api/v1/account/", StringComparison.Ordinal);
 
     /// <summary>
     /// <c>development_status</c> of <c>sprint-status.yaml</c>, as story key to status.

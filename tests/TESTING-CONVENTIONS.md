@@ -485,10 +485,12 @@ generated as `cases x surfaces`, each row named "case id / surface". A case neve
 surface; it reads its expectation from the row.
 
 **Three gates hold the list.** A row with no expectation for a surface fails as a gap
-(`SurfaceGaps`, both suites). A Space-scoped or Account-scoped route the real Host maps with no row
-fails as a gap - **so a new `{spaceId}` route needs an isolation row on both surfaces before the
-suite goes green**; the route table is read from the Host's own endpoint data source, in process,
-not from a hand list. A row pending a later story names that story, and fails the suite once the
+(`SurfaceGaps`, both suites). Any `/api` route the real Host maps with no row fails as a gap,
+except a short named list (registration, sign-in, sign-out, the current Session, the anti-forgery
+token, the unmatched fallback), each with its reason, and each still mapped - **so a new Space or
+Account route needs an isolation row on both surfaces before the suite goes green**, whatever its
+parameter is called. The route table is read from the Host's own endpoint data source, in process,
+not from a hand list, and a row must send a request on the route it names. A row pending a later story names that story, and fails the suite once the
 story leaves `backlog`.
 
 **The harness is shared, and seeds through the product.** `HostProcess` and `WireSession` moved from

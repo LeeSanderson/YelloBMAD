@@ -83,9 +83,21 @@ public sealed class RealHostBrowserTests(RealHostFixture world)
             await page.Locator(Heading, new PageLocatorOptions { HasText = "Not available." })
                 .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
+            // The slice is read only after the page has gone quiet and a sentinel request sent after it
+            // has its own line, so a request for B's Space still in flight cannot fall outside it.
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+            var sentinel = $"/api/sentinel-{Guid.NewGuid():N}";
+
+            using (await world.Host.Client.GetAsync(new Uri(sentinel, UriKind.Relative), TestContext.Current.CancellationToken))
+            {
+                // Only the Host's line for it matters.
+            }
+
             var log = await world.Host.WaitForLogAsync(
                 cursor,
-                slice => slice.Contains("Request finished", StringComparison.Ordinal) && slice.Contains(switcher, StringComparison.Ordinal));
+                slice => slice.Contains(switcher, StringComparison.Ordinal)
+                    && Array.Exists(slice.Split('\n'), line => line.Contains("Request finished", StringComparison.Ordinal) && line.Contains(sentinel, StringComparison.Ordinal)));
 
             Assert.DoesNotContain(world.B.SpaceId.ToString("D"), log, StringComparison.OrdinalIgnoreCase);
         }
@@ -135,10 +147,17 @@ public sealed class RealHostBrowserTests(RealHostFixture world)
 
             Assert.True(await page.EvaluateAsync<bool>("() => window.__inApp === true"), "The navigation reloaded the page, so it was not the running client's session-end path.");
 
-            // The 401 was the real Host's: its log holds a refused request from this navigation.
-            await world.Host.WaitForLogAsync(cursor, slice => slice.Contains(" - 401 ", StringComparison.Ordinal));
+            // The 401 was the real Host's, for the Space this navigation asked for.
+            var refused = other.ToString("D");
 
-            Assert.Contains("reason=", page.Url, StringComparison.Ordinal);
+            await world.Host.WaitForLogAsync(
+                cursor,
+                slice => Array.Exists(slice.Split('\n'), line =>
+                    line.Contains("Request finished", StringComparison.Ordinal)
+                    && line.Contains(refused, StringComparison.OrdinalIgnoreCase)
+                    && line.Contains(" - 401 ", StringComparison.Ordinal)));
+
+            Assert.Contains("reason=session-ended", page.Url, StringComparison.Ordinal);
             Assert.Equal(0, await page.Locator(SpaceName).CountAsync());
             Assert.DoesNotContain(actor.SpaceName, await page.Locator("#app").InnerTextAsync(), StringComparison.Ordinal);
         }

@@ -59,12 +59,20 @@ internal sealed class RevocationWorld : IAsyncDisposable
     {
         var connectionString = await engine.CreateDatabaseAsync(TestContext.Current.CancellationToken);
 
-        await using (var context = new YelloDbContext(new DbContextOptionsBuilder<YelloDbContext>().UseSqlServer(connectionString).Options))
+        try
         {
-            await context.Database.MigrateAsync(TestContext.Current.CancellationToken);
-        }
+            await using (var context = new YelloDbContext(new DbContextOptionsBuilder<YelloDbContext>().UseSqlServer(connectionString).Options))
+            {
+                await context.Database.MigrateAsync(TestContext.Current.CancellationToken);
+            }
 
-        return new RevocationWorld(engine, await RunningHost.StartAsync(connectionString), new WireDatabase(connectionString));
+            return new RevocationWorld(engine, await RunningHost.StartAsync(connectionString), new WireDatabase(connectionString));
+        }
+        catch
+        {
+            await engine.DropDatabaseAsync(connectionString);
+            throw;
+        }
     }
 
     /// <summary>
@@ -92,8 +100,14 @@ internal sealed class RevocationWorld : IAsyncDisposable
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        await Host.DisposeAsync();
-        await _engine.DropDatabaseAsync(Database.ConnectionString);
+        try
+        {
+            await Host.DisposeAsync();
+        }
+        finally
+        {
+            await _engine.DropDatabaseAsync(Database.ConnectionString);
+        }
     }
 }
 

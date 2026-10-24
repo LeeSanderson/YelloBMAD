@@ -145,7 +145,22 @@ public sealed partial class RunningHost : IAsyncDisposable
         try
         {
             using var deadline = new CancellationTokenSource(StartupWindow);
-            host.Address = new Uri(await listening.Task.WaitAsync(deadline.Token).ConfigureAwait(false));
+
+            // A Host that exits during startup fails now, not at the end of the window.
+            var exited = process.WaitForExitAsync(deadline.Token);
+
+            if (await Task.WhenAny(listening.Task, exited).WaitAsync(deadline.Token).ConfigureAwait(false) != listening.Task)
+            {
+                // The exit wait ends cancelled when the window closes; that is the timeout, not an exit.
+                deadline.Token.ThrowIfCancellationRequested();
+
+                await host._pump.ConfigureAwait(false);
+
+                throw new InvalidOperationException(
+                    $"The Host exited with code {process.ExitCode} before it reported an address. Its output:{Environment.NewLine}{host.Log}");
+            }
+
+            host.Address = new Uri(await listening.Task.ConfigureAwait(false));
         }
         catch (OperationCanceledException)
         {
@@ -155,6 +170,12 @@ public sealed partial class RunningHost : IAsyncDisposable
 
             throw new InvalidOperationException(
                 $"The Host did not report an address within {StartupWindow.TotalSeconds:F0}s. Its output:{Environment.NewLine}{log}");
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or UriFormatException)
+        {
+            await host.DisposeAsync().ConfigureAwait(false);
+
+            throw;
         }
 
         host.Client.Dispose();
@@ -278,9 +299,16 @@ public sealed partial class RunningHost : IAsyncDisposable
         Client.Dispose();
         _handler.Dispose();
 
-        if (!_process.HasExited)
+        try
         {
-            _process.Kill(entireProcessTree: true);
+            if (!_process.HasExited)
+            {
+                _process.Kill(entireProcessTree: true);
+            }
+        }
+        catch (InvalidOperationException)
+        {
+            // It exited between the check and the kill: what the kill was for.
         }
 
         await _pump.ConfigureAwait(false);
@@ -362,11 +390,15 @@ public sealed partial class RunningHost : IAsyncDisposable
 
         public long Sent => Interlocked.Read(ref _sent);
 
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        // Counted once answered: a request that never reached the Host writes no line, and counting it
+        // would make every later read wait out its window for a line that cannot come.
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
+
             Interlocked.Increment(ref _sent);
 
-            return base.SendAsync(request, cancellationToken);
+            return response;
         }
     }
 }

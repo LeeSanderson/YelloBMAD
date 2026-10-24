@@ -1,5 +1,5 @@
 # generated: 2026-08-22 13:10
-# last_updated: 2026-10-24
+# last_updated: 2026-10-25
 # project: YelloBMAD
 # project_key: NOKEY
 # tracking_system: file-system
@@ -64,7 +64,7 @@
 #   - issues 8, 9: PRD §7's stale sentence; missing `status` fields
 
 generated: 2026-08-22 13:10
-last_updated: 2026-10-24
+last_updated: 2026-10-25
 project: YelloBMAD
 project_key: NOKEY
 tracking_system: file-system
@@ -81,7 +81,7 @@ development_status:
   1-6-refuse-at-the-space-boundary-and-record-every-refusal: done
   1-7-list-and-switch-between-the-spaces-you-belong-to: done
   1-8-issue-an-api-token-scoped-to-one-space: done
-  1-9-prove-isolation-on-both-surfaces: review
+  1-9-prove-isolation-on-both-surfaces: done
   1-10-ship-it-to-azure-with-migrations-as-an-explicit-step: backlog
   epic-1-retrospective: optional
 

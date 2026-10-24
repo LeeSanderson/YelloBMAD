@@ -66,8 +66,10 @@ public sealed class RevocationCaseTests(RevocationWorldFixture fixture) : IClass
 
         Assert.True(@case.Expectations.TryGetValue(surface, out var step), $"{caseId} has no expectation for {surface}: a gap, not a choice.");
 
-        var context = new RevocationContext(world, await world.NewActorAsync());
+        // The cursor comes first, so the slice holds the fresh Account's registration, sign-in and Token
+        // issue - the requests that carry the password, the cookie and the plaintext AC10 is about.
         var cursor = await world.Host.LogCursorAsync();
+        var context = new RevocationContext(world, await world.NewActorAsync());
 
         // The anchor: the same credential succeeds on the same request first.
         var before = await context.Actor.SendAsync(surface, HttpMethod.Get, SpaceRoutes.ActiveOf(context.Actor.SpaceId));

@@ -79,6 +79,16 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// The number of refusals recorded for <paramref name="accountId"/>, against any Space.
+    /// </summary>
+    /// <param name="accountId">The acting Account.</param>
+    /// <returns>The count.</returns>
+    public async Task<int> RefusalCountAsync(Guid accountId) =>
+        Convert.ToInt32(
+            await ScalarAsync("SELECT COUNT(*) FROM dbo.[AccessRefusal] WHERE AccountId = @account", ("@account", accountId)).ConfigureAwait(false),
+            System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
     /// The number of Tokens <paramref name="accountId"/> holds bound to <paramref name="boundSpaceId"/>.
     /// </summary>
     /// <param name="accountId">The Account.</param>

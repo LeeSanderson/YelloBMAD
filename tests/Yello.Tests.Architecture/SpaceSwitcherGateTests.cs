@@ -428,7 +428,7 @@ public sealed partial class SpaceSwitcherGateTests
     // Both word orders since story 1.9 (deferred-work.md:344): "lastSpace" and "spaceHistory", with the
     // words the first version missed - prior, history, lastUsed, mru.
     [GeneratedRegex(
-        @"\b_?(last|previous|prior|recent|remembered|mru)[-_]?(visited|active|used)?[-_]?spaces?(id)?\b|\b_?spaces?[-_]?(history|previous|prior|last|recent|mru)",
+        @"\b_?(last|previous|prior|recent|remembered|mru)[-_]?(visited|active|used)?[-_]?spaces?(id)?\b|\b_?spaces?[-_]?(history|previous|prior|last|recent|mru)(id|ids)?\b",
         RegexOptions.IgnoreCase,
         1000)]
     private static partial Regex RemembersASpace { get; }

@@ -118,8 +118,15 @@ public sealed class RealHostFixture(SqlServerEngine engine) : IAsyncLifetime
     /// </summary>
     /// <param name="actor">The owner.</param>
     /// <returns>The Space's id.</returns>
-    internal Task<Guid> AddSecondSpaceAsync(ProductActor actor) =>
-        (_database ?? throw NotStarted()).AddOwnedSpaceAsync(actor.AccountId, actor.DisplayName + " second");
+    internal async Task<Guid> AddSecondSpaceAsync(ProductActor actor)
+    {
+        var name = actor.DisplayName + " second";
+        var id = await (_database ?? throw NotStarted()).AddOwnedSpaceAsync(actor.AccountId, name);
+
+        actor.HoldsSpaceNamed(name);
+
+        return id;
+    }
 
     /// <summary>
     /// A fresh browser context whose client talks to the real Host, signed in as
@@ -137,47 +144,83 @@ public sealed class RealHostFixture(SqlServerEngine engine) : IAsyncLifetime
             IgnoreHTTPSErrors = true,
         });
 
-        var page = await context.NewPageAsync();
-
-        // The one fake: where the Host is.
-        await page.RouteAsync("**/appsettings.Development.json", route => route.FulfillAsync(new RouteFulfillOptions
+        try
         {
-            Status = 200,
-            ContentType = "application/json",
-            Body = JsonSerializer.Serialize(new Dictionary<string, string>(StringComparer.Ordinal) { ["HostBaseAddress"] = Host.Address.GetLeftPart(UriPartial.Authority) }),
-        }));
+            var page = await context.NewPageAsync();
 
-        await page.GotoAsync(new Uri(ClientAddress, "sign-in").ToString());
-        await page.Locator("#email-address").FillAsync(actor.EmailAddress, new LocatorFillOptions { Timeout = 30_000 });
-        await page.Locator("#password").FillAsync(actor.Password);
-        await page.Locator("form button[type=submit]").ClickAsync();
+            // The one fake: where the Host is.
+            await page.RouteAsync("**/appsettings.Development.json", route => route.FulfillAsync(new RouteFulfillOptions
+            {
+                Status = 200,
+                ContentType = "application/json",
+                Body = JsonSerializer.Serialize(new Dictionary<string, string>(StringComparer.Ordinal) { ["HostBaseAddress"] = Host.Address.GetLeftPart(UriPartial.Authority) }),
+            }));
 
-        return (context, page);
+            await page.GotoAsync(new Uri(ClientAddress, "sign-in").ToString());
+            await page.Locator("#email-address").FillAsync(actor.EmailAddress, new LocatorFillOptions { Timeout = 30_000 });
+            await page.Locator("#password").FillAsync(actor.Password);
+            await page.Locator("form button[type=submit]").ClickAsync();
+
+            return (context, page);
+        }
+        catch
+        {
+            // The caller only owns the context once it is returned.
+            await context.DisposeAsync();
+            throw;
+        }
     }
 
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        if (_browser is not null)
+        // Each teardown runs whatever the one before it did: one failed dispose must not leave the
+        // Host, the database or the dev server behind.
+        try
         {
-            await _browser.DisposeAsync();
+            if (_browser is not null)
+            {
+                await _browser.DisposeAsync();
+            }
+
+            _playwright?.Dispose();
         }
-
-        _playwright?.Dispose();
-
-        if (_host is not null)
+        finally
         {
-            await _host.DisposeAsync();
+            await DisposeHostAndAfterAsync();
         }
+    }
 
-        if (_connectionString is not null)
+    private async Task DisposeHostAndAfterAsync()
+    {
+        try
         {
-            await engine.DropDatabaseAsync(_connectionString);
+            if (_host is not null)
+            {
+                await _host.DisposeAsync();
+            }
         }
-
-        if (_server is not null)
+        finally
         {
-            await _server.DisposeAsync();
+            await DisposeDatabaseAndServerAsync();
+        }
+    }
+
+    private async Task DisposeDatabaseAndServerAsync()
+    {
+        try
+        {
+            if (_connectionString is not null)
+            {
+                await engine.DropDatabaseAsync(_connectionString);
+            }
+        }
+        finally
+        {
+            if (_server is not null)
+            {
+                await _server.DisposeAsync();
+            }
         }
     }
 

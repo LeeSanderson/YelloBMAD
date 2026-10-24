@@ -169,6 +169,9 @@ public sealed class SpaceScopedFirstLoadTests(ClientSurfaceFixture surface)
             await page.Locator(SpaceName, new PageLocatorOptions { HasText = "Northwind Redesign" })
                 .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
+            // Quiet first, so a prefetch fired just after the name rendered is in the log being read.
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
             Assert.True(api.WasRequested(Northwind), "Anchor: the landing Space was requested.");
             Assert.False(api.WasRequested(Harbour), "Harbour Ops was requested while Northwind Redesign was shown.");
 

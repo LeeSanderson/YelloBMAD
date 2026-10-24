@@ -109,9 +109,26 @@ internal sealed record BoundaryNotFound() : Expectation("404 = the absent-Space 
 
         var after = await world.Database.RefusalKindsAsync(request.Actor.AccountId, target);
 
-        Assert.Equal(before.Count + request.Paths.Count, after.Count);
-        Assert.All(after.Skip(before.Count), kind => Assert.Equal(IsolationCases.CrossSpace, kind));
-        Assert.DoesNotContain(IsolationCases.InsufficientRole, after);
+        AssertAddedOnlyCrossSpace(before, after, request.Paths.Count);
+    }
+
+    /// <summary>
+    /// The case added exactly <paramref name="added"/> rows, every one <c>CrossSpace</c>. Counted per
+    /// kind rather than by position: rows written in the same instant tie on <c>OccurredAt</c> and their
+    /// <c>Id</c> order is random.
+    /// </summary>
+    /// <param name="before">The kinds before the case.</param>
+    /// <param name="after">The kinds after it.</param>
+    /// <param name="added">How many rows the case should have added.</param>
+    internal static void AssertAddedOnlyCrossSpace(IReadOnlyList<string> before, IReadOnlyList<string> after, int added)
+    {
+        Assert.Equal(before.Count + added, after.Count);
+        Assert.Equal(
+            before.Count(kind => kind == IsolationCases.CrossSpace) + added,
+            after.Count(kind => kind == IsolationCases.CrossSpace));
+        Assert.Equal(
+            before.Count(kind => kind == IsolationCases.InsufficientRole),
+            after.Count(kind => kind == IsolationCases.InsufficientRole));
     }
 }
 
@@ -146,9 +163,9 @@ internal sealed record SameAsAnchor(HttpStatusCode Status, string? ExpectedType 
     /// <inheritdoc />
     protected override async Task VerifyCoreAsync(IsolationWorld world, CaseRequest request, IsolationSurface surface)
     {
-        var before = request.TargetSpaceId is { } target
-            ? (await world.Database.RefusalKindsAsync(request.Actor.AccountId, target)).Count
-            : 0;
+        // The actor's refusals against any Space, so "nothing recorded" holds for a row with no Space in
+        // its route as well.
+        var before = await world.Database.RefusalCountAsync(request.Actor.AccountId);
 
         foreach (var (path, anchorPath) in request.Paths)
         {
@@ -165,10 +182,7 @@ internal sealed record SameAsAnchor(HttpStatusCode Status, string? ExpectedType 
             }
         }
 
-        if (request.TargetSpaceId is { } space)
-        {
-            Assert.Equal(before, (await world.Database.RefusalKindsAsync(request.Actor.AccountId, space)).Count);
-        }
+        Assert.Equal(before, await world.Database.RefusalCountAsync(request.Actor.AccountId));
     }
 }
 
@@ -217,8 +231,7 @@ internal sealed record SameAsNonMember() : Expectation("404 = a non-member Sessi
 
         var after = await world.Database.RefusalKindsAsync(request.Actor.AccountId, target);
 
-        Assert.Equal(before.Count + request.Paths.Count, after.Count);
-        Assert.All(after.Skip(before.Count), kind => Assert.Equal(IsolationCases.CrossSpace, kind));
+        BoundaryNotFound.AssertAddedOnlyCrossSpace(before, after, request.Paths.Count);
     }
 }
 
@@ -241,7 +254,7 @@ internal sealed record IndistinguishableFromAbsent() : Expectation("indistinguis
 
             var verdict = await DurationIndistinguishability.CompareMeasuredAsync(
                 () => world.Host.ServerDurationOfAsync(() => request.Actor.SendAsync(surface, request.Method, path)),
-                () => world.Host.ServerDurationOfAsync(() => request.Actor.SendAsync(surface, request.Method, SpaceRoutes.ActiveOf(Guid.NewGuid()))));
+                () => world.Host.ServerDurationOfAsync(() => request.Actor.SendAsync(surface, request.Method, anchorPath)));
 
             TimingRecord.Add($"boundary vs absent / {surface}: {verdict.Describe()}");
             Assert.True(verdict.AreIndistinguishable, $"{surface}: {verdict.Describe()}");
@@ -287,8 +300,8 @@ internal sealed record EachSeesOnlyItsOwnOnOneConnection() : Expectation("altern
     /// <inheritdoc />
     protected override async Task VerifyCoreAsync(IsolationWorld world, CaseRequest request, IsolationSurface surface)
     {
-        var aOwn = IsolationCases.Ids((await world.A.SendAsync(surface, HttpMethod.Get, SpaceRoutes.StatusesOf(world.A.SpaceId))).Body);
-        var bOwn = IsolationCases.Ids((await world.B.SendAsync(surface, HttpMethod.Get, SpaceRoutes.StatusesOf(world.B.SpaceId))).Body);
+        var aOwn = IdsOf(await world.A.SendAsync(surface, HttpMethod.Get, SpaceRoutes.StatusesOf(world.A.SpaceId)));
+        var bOwn = IdsOf(await world.B.SendAsync(surface, HttpMethod.Get, SpaceRoutes.StatusesOf(world.B.SpaceId)));
 
         Assert.Equal(3, aOwn.Count);
         Assert.Equal(3, bOwn.Count);
@@ -299,8 +312,8 @@ internal sealed record EachSeesOnlyItsOwnOnOneConnection() : Expectation("altern
             var a = await world.A.SendAsync(surface, HttpMethod.Get, SpaceRoutes.StatusesOf(world.A.SpaceId));
             var b = await world.B.SendAsync(surface, HttpMethod.Get, SpaceRoutes.StatusesOf(world.B.SpaceId));
 
-            Assert.Equal(aOwn.Order(), IsolationCases.Ids(a.Body).Order());
-            Assert.Equal(bOwn.Order(), IsolationCases.Ids(b.Body).Order());
+            Assert.Equal(aOwn.Order(), IdsOf(a).Order());
+            Assert.Equal(bOwn.Order(), IdsOf(b).Order());
         }
 
         // Concurrent requests for both Spaces as well. A pool that is not pinned opens a second
@@ -312,12 +325,20 @@ internal sealed record EachSeesOnlyItsOwnOnOneConnection() : Expectation("altern
 
         for (var index = 0; index < concurrent.Length; index++)
         {
-            Assert.Equal(index % 2 == 0 ? aOwn.Order() : bOwn.Order(), IsolationCases.Ids(concurrent[index].Body).Order());
+            Assert.Equal(index % 2 == 0 ? aOwn.Order() : bOwn.Order(), IdsOf(concurrent[index]).Order());
         }
 
         // The anchor is one, not zero: zero would mean the side query cannot see the Host's sessions,
         // and the case would have passed having observed nothing.
         Assert.Equal(1, await world.HostSessionCountAsync());
+    }
+
+    // A pool of one under concurrent load can time out; that must read as a status, not as a parse error.
+    private static List<Guid> IdsOf(WireResponse answer)
+    {
+        Assert.True(answer.StatusCode == HttpStatusCode.OK, $"{answer.StatusCode} {answer.Body}");
+
+        return IsolationCases.Ids(answer.Body);
     }
 }
 

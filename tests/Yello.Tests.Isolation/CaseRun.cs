@@ -28,8 +28,15 @@ internal static class CaseRun
         // this, rather than throwing a bare KeyNotFoundException.
         Assert.True(@case.Expectations.TryGetValue(surface, out var expectation), $"{@case.Id} has no expectation for {surface}: a gap, not a choice.");
 
-        var request = await @case.Prepare(world);
+        // The cursor comes first, so the slice holds whatever the row's preparation sent too - a fresh
+        // Account's registration, sign-in and Token issue carry the very secrets AC10 is about.
         var cursor = await world.Host.LogCursorAsync();
+        var request = await @case.Prepare(world);
+
+        // The row's route is the gap gate's key, so it must be a route the row actually sends.
+        Assert.True(
+            request.Paths.Any(path => RouteMatches(@case.Route, path.Path)),
+            $"{@case.Id} names {@case.Route} but sends none of it: {string.Join(", ", request.Paths.Select(path => path.Path))}.");
 
         // Every absence is anchored on a presence: the actor reads its own Space on this surface first,
         // so a refusal below cannot be a credential that never worked.
@@ -66,6 +73,43 @@ internal static class CaseRun
         var leaked = world.Secrets.Count(secret => slice.Contains(secret, StringComparison.Ordinal));
 
         Assert.True(leaked == 0, $"The Host logged {leaked} secret(s) for this case (AC10, spine :274).");
+    }
+
+    /// <summary>
+    /// Whether <paramref name="path"/> is a request on the route <paramref name="pattern"/>: literal
+    /// segments equal, each <c>{parameter}</c> one non-empty segment, a <c>{**catch-all}</c> the rest.
+    /// </summary>
+    /// <param name="pattern">A route pattern, for example <c>/api/v1/spaces/{spaceId:guid}</c>.</param>
+    /// <param name="path">A request path.</param>
+    /// <returns>Whether it matches.</returns>
+    internal static bool RouteMatches(string pattern, string path)
+    {
+        var expected = pattern.Split('/');
+        var actual = path.Split('?')[0].Split('/');
+
+        for (var index = 0; index < expected.Length; index++)
+        {
+            if (expected[index].StartsWith("{**", StringComparison.Ordinal))
+            {
+                return actual.Length > index;
+            }
+
+            if (index >= actual.Length)
+            {
+                return false;
+            }
+
+            var matches = expected[index].StartsWith('{')
+                ? actual[index].Length > 0
+                : string.Equals(expected[index], actual[index], StringComparison.OrdinalIgnoreCase);
+
+            if (!matches)
+            {
+                return false;
+            }
+        }
+
+        return expected.Length == actual.Length;
     }
 
     private static async Task AssertReadsOwnSpaceAsync(ProductActor actor, IsolationSurface surface)

@@ -36,6 +36,8 @@ public sealed class ProductActor
 
     private readonly WireSession _script;
 
+    private readonly List<string> _otherSpaceNames = [];
+
     private ProductActor(WireSession session, WireSession script)
     {
         Session = session;
@@ -101,9 +103,21 @@ public sealed class ProductActor
         Password,
         TokenPlaintext,
         SessionCookieValue,
-        SpaceName,
-        JsonEncodedText.Encode(SpaceName, JavaScriptEncoder.Default).ToString(),
+        .. new[] { SpaceName }.Concat(_otherSpaceNames)
+            .SelectMany(name => new[] { name, JsonEncodedText.Encode(name, JavaScriptEncoder.Default).ToString() }),
     ];
+
+    /// <summary>
+    /// Adds the name of a further Space this actor holds (one a case wrote by SQL) to
+    /// <see cref="Secrets"/>, so the log check looks for it too.
+    /// </summary>
+    /// <param name="spaceName">The Space's name.</param>
+    public void HoldsSpaceNamed(string spaceName)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(spaceName);
+
+        _otherSpaceNames.Add(spaceName);
+    }
 
     /// <summary>
     /// Registers, signs in, reads the Personal Space and issues a Token - all through the product.
@@ -122,6 +136,7 @@ public sealed class ProductActor
 
     private static async Task<ProductActor> RegisterCoreAsync(RunningHost host, WireDatabase database, string label)
     {
+        var cursor = await host.LogCursorAsync().ConfigureAwait(false);
         var suffix = Guid.NewGuid().ToString("N")[..12];
         var actor = new ProductActor(new WireSession(host.Client), new WireSession(host.Client))
         {
@@ -157,7 +172,21 @@ public sealed class ProductActor
         actor.TokenPlaintext = issued.Plaintext;
         actor.AccountId = await database.AccountIdOfAsync(actor.EmailAddress).ConfigureAwait(false);
 
-        return actor;
+        // AC10 for the seeding itself: these requests carry the password, set the cookie and return the
+        // plaintext, so they are where a leak would most likely be. Anchored on the Host's own lines.
+        var slice = await host.LogSinceAsync(cursor).ConfigureAwait(false);
+
+        if (!slice.Contains("Request finished", StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException("The Host logged no request-finished line for the seeding requests, so its log cannot be checked.");
+        }
+
+        // Counted, never printed: a message that quoted the secret would be the leak.
+        var leaked = actor.Secrets.Count(secret => secret.Length > 0 && slice.Contains(secret, StringComparison.Ordinal));
+
+        return leaked == 0
+            ? actor
+            : throw new InvalidOperationException($"The Host logged {leaked} secret(s) while seeding an Account through the product (AC10, spine :274).");
     }
 
     /// <summary>

@@ -156,7 +156,14 @@ internal static class RevocationCases
 
             Assert.Equal(anchor.ContentType, next.ContentType);
             Assert.Equal(anchor.Body, next.Body);
-            Assert.Equal(anchor.HeaderNames, next.HeaderNames.Except(CookieClearingHeaders, StringComparer.OrdinalIgnoreCase));
+            Assert.Equal(
+                anchor.HeaderNames.Except(CookieClearingHeaders, StringComparer.OrdinalIgnoreCase),
+                next.HeaderNames.Except(CookieClearingHeaders, StringComparer.OrdinalIgnoreCase));
+
+            foreach (var header in CookieClearingHeaders)
+            {
+                Assert.True(next.Headers.ContainsKey(header), $"The dead-cookie 401 should carry {header}; it carries {string.Join(", ", next.HeaderNames)}.");
+            }
 
             var cleared = Assert.Single(next.Headers["Set-Cookie"]);
 
@@ -174,7 +181,7 @@ internal static class RevocationCases
     {
         public override async Task VerifyAsync(RevocationContext context, IsolationSurface surface)
         {
-            var before = (await context.World.Database.RefusalKindsAsync(context.Actor.AccountId, context.Actor.SpaceId)).Count;
+            var before = await context.World.Database.RefusalKindsAsync(context.Actor.AccountId, context.Actor.SpaceId);
             var next = await context.Actor.SendAsync(surface, HttpMethod.Get, SpaceRoutes.ActiveOf(context.Actor.SpaceId));
             var anchor = await context.Actor.SendAsync(surface, HttpMethod.Get, SpaceRoutes.ActiveOf(Guid.NewGuid()));
 
@@ -183,8 +190,9 @@ internal static class RevocationCases
 
             var kinds = await context.World.Database.RefusalKindsAsync(context.Actor.AccountId, context.Actor.SpaceId);
 
-            Assert.Equal(before + 1, kinds.Count);
-            Assert.Equal(CrossSpace, kinds[^1]);
+            // Counted per kind, not by position: rows written in the same instant tie on OccurredAt.
+            Assert.Equal(before.Count + 1, kinds.Count);
+            Assert.Equal(before.Count(kind => kind == CrossSpace) + 1, kinds.Count(kind => kind == CrossSpace));
             Assert.True((await context.Actor.Session.GetAsync(SessionRoutes.Current)).StatusCode is HttpStatusCode.OK or HttpStatusCode.NoContent, "The Session should still be valid for the Account.");
         }
     }

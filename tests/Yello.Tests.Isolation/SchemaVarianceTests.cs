@@ -33,11 +33,14 @@ public sealed class SchemaVarianceTests(SqlServerEngine engine)
         ["ApiToken.BoundSpaceId"] = "looked up by hash before any Space is known; story 1.8 Q4",
     };
 
+    // Per column, not per table: a filter predicate covers a column only when it names that column
+    // (bracketed or bare, delimited), so a second *SpaceId column on a covered table is judged alone.
     private const string SpaceIdColumnsAndTheirPolicy = """
         SELECT t.name, c.name,
                CASE WHEN EXISTS (
                    SELECT 1 FROM sys.security_predicates p
-                   WHERE p.target_object_id = t.object_id AND p.predicate_type_desc = 'FILTER')
+                   WHERE p.target_object_id = t.object_id AND p.predicate_type_desc = 'FILTER'
+                     AND PATINDEX('%[^A-Za-z0-9_]' + c.name + '[^A-Za-z0-9_]%', p.predicate_definition) > 0)
                THEN 'covered' ELSE 'uncovered' END
         FROM sys.tables t
         JOIN sys.columns c ON c.object_id = t.object_id

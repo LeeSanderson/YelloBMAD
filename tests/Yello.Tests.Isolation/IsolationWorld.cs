@@ -84,18 +84,28 @@ internal sealed class IsolationWorld : IAsyncDisposable
     private static async Task<IsolationWorld> StartCoreAsync(SqlServerEngine engine, int? maxPoolSize)
     {
         var connectionString = await engine.CreateDatabaseAsync(TestContext.Current.CancellationToken);
+        RunningHost host;
 
-        await MigrateAsync(connectionString);
-
-        var forHost = new SqlConnectionStringBuilder(connectionString) { ApplicationName = HostProgramName };
-
-        if (maxPoolSize is { } size)
+        try
         {
-            forHost.Pooling = true;
-            forHost.MaxPoolSize = size;
+            await MigrateAsync(connectionString);
+
+            var forHost = new SqlConnectionStringBuilder(connectionString) { ApplicationName = HostProgramName };
+
+            if (maxPoolSize is { } size)
+            {
+                forHost.Pooling = true;
+                forHost.MaxPoolSize = size;
+            }
+
+            host = await RunningHost.StartAsync(forHost.ConnectionString);
+        }
+        catch
+        {
+            await engine.DropDatabaseAsync(connectionString);
+            throw;
         }
 
-        var host = await RunningHost.StartAsync(forHost.ConnectionString);
         var world = new IsolationWorld(engine, host, new WireDatabase(connectionString));
 
         try
@@ -145,8 +155,14 @@ internal sealed class IsolationWorld : IAsyncDisposable
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        await Host.DisposeAsync();
-        await _engine.DropDatabaseAsync(Database.ConnectionString);
+        try
+        {
+            await Host.DisposeAsync();
+        }
+        finally
+        {
+            await _engine.DropDatabaseAsync(Database.ConnectionString);
+        }
     }
 
     /// <summary>

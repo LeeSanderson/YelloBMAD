@@ -64,13 +64,16 @@ public sealed class MigratedDatabaseFixture(SqlServerEngine engine) : IAsyncLife
         var connectionString = await engine.CreateDatabaseAsync(TestContext.Current.CancellationToken);
         var database = new RegistrationDatabase(connectionString);
 
+        // Held before migrating, so a failed migration still drops the database on disposal.
+        // IsAvailable reads Database, which is set only once the schema is there.
+        ConnectionString = connectionString;
+
         // The schema comes from the migrations, so every assertion in this class is an assertion
         // about what the migration produces rather than about what the model would have produced.
         // Those are different things, and the row-level security policy exists only in the first.
         await database.MigrateAsync(TestContext.Current.CancellationToken);
 
         Database = database;
-        ConnectionString = connectionString;
     }
 
     /// <inheritdoc />
