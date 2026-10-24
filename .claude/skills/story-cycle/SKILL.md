@@ -81,9 +81,9 @@ iteration is not. Read `development_status` top to bottom and take the **first**
 The last two conditions make a resumed run skip ATDD instead of repeating it.
 
 **ATDD trigger (`--atdd=auto`).** Read the story's acceptance criteria and Dev Notes. The trigger is met when
-they cite any of these: an isolation or security NFR (in this repo, NFR-1 or NFR-6); a timing or enumeration
-invariant (AD-23); a test the test design marks **P0**; or a security architecture rule (AR-14 and its
-neighbours). These are the stories where a wrong assumption costs a redesign, so testing it before any code
+they cite any of these: an isolation or security NFR; a timing or enumeration
+invariant; a test the test design marks **P0**; or a security architecture rule. 
+These are the stories where a wrong assumption costs a redesign, so testing it before any code
 exists pays for itself. CRUD-shaped stories that cite none of them go straight to Develop. Tell the user in one
 line which way you decided and why.
 
