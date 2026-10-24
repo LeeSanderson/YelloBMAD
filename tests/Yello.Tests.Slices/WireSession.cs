@@ -55,6 +55,14 @@ internal sealed class WireSession(HttpClient client)
     public IReadOnlyDictionary<string, string> Cookies => _cookies;
 
     /// <summary>
+    /// Holds a cookie as though a response had set it - for the cases that replay a copy taken
+    /// earlier, such as a Session cookie from before sign-out (story 1.7).
+    /// </summary>
+    /// <param name="name">The cookie's name.</param>
+    /// <param name="value">Its value, exactly as it was set.</param>
+    public void HoldCookie(string name, string value) => _cookies[name] = value;
+
+    /// <summary>
     /// Fetches the anti-forgery request token and keeps the cookie half that pairs with it.
     /// </summary>
     public async Task FetchAntiforgeryTokenAsync()

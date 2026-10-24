@@ -10,8 +10,7 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written by the ATDD run on 2026-10-24, before any of story 1.7's client existed.</b> Every case
-/// but one is a red-phase scaffold, skipped with the AC it waits on. The API is
+/// The API is
 /// <see cref="FakeYelloApi"/>, at the network edge (open question 5) - no Host, no database, no
 /// container, so this class adds no engine.
 /// </para>
@@ -48,6 +47,16 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     private const string Heading = "#app h1";
 
     private const string EnglishLocale = "en-GB";
+
+    /// <summary>
+    /// The languages <c>base.css</c> withholds the uppercase transform from.
+    /// </summary>
+    private static readonly string[] LossyCasingLanguages = ["tr", "az", "el"];
+
+    /// <summary>
+    /// The sign-in surface's path.
+    /// </summary>
+    private const string ClientSignInPath = "/sign-in";
 
     private static readonly Guid Northwind = Guid.NewGuid();
     private static readonly Guid Harbour = Guid.NewGuid();
@@ -91,7 +100,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     /// The first browser-driven sign-in (<c>deferred-work.md:153</c>), faked at the network edge - so
     /// it does not prove the real cookie across origins or the real preflight (re-owned by 1.9).
     /// </remarks>
-    [Theory(Skip = "red: AC11 - sign-in does not navigate yet, and no Space home or context bar exists (story 1.7 Tasks 6 and 7)")]
+    [Theory]
     [InlineData("en-GB")]
     [InlineData("tr-TR")]
     [Trait("Requirement", "FR-2")]
@@ -109,7 +118,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
 
             await SubmitSignInAsync(page);
 
-            await page.WaitForURLAsync($"**/spaces/{Northwind:D}", new PageWaitForURLOptions { Timeout = Timeout });
+            await WaitForPathAsync(page, $"/spaces/{Northwind:D}");
             await page.Locator(RoleChip).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             Assert.Contains("Northwind Redesign", await page.Locator(ContextBar).InnerTextAsync(), StringComparison.Ordinal);
@@ -121,7 +130,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     /// AC1 / AC2 - the switcher lists exactly the Spaces served, in the order served, each row the
     /// Space name and nothing else; only <c>aria-current</c> marks the active one.
     /// </summary>
-    [Fact(Skip = "red: AC1/AC2 - the switcher does not exist yet (story 1.7 Task 7)")]
+    [Fact]
     public async Task The_switcher_lists_exactly_the_served_Spaces_by_name_only()
     {
         var api = TwoSpaces();
@@ -143,7 +152,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     /// AC4 / UX-DR39 - choosing a Space moves focus to the context bar and announces the
     /// destination's name and Role, politely, and nothing of the departed Space.
     /// </summary>
-    [Fact(Skip = "red: AC4 - the switcher, the bar's focus move and its live region do not exist yet (story 1.7 Task 7)")]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     [Trait("Requirement", "UX-DR38")]
     public async Task Choosing_a_Space_moves_focus_to_the_context_bar_and_announces_the_destination()
@@ -158,7 +167,13 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
             var rows = await OpenSwitcherAsync(page);
             await rows.Nth(1).ClickAsync();
 
-            await page.WaitForURLAsync($"**/spaces/{Harbour:D}", new PageWaitForURLOptions { Timeout = Timeout });
+            // Waited on the destination's answer reaching the bar rather than on the URL: Playwright's
+            // URL wait intermittently never resolved for this history-API navigation even with the
+            // page already there (observed with the address and the DOM both on the destination).
+            await page.Locator(ContextBar, new PageLocatorOptions { HasText = "Harbour Ops" })
+                .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.EndsWith($"/spaces/{Harbour:D}", new Uri(page.Url).AbsolutePath, StringComparison.Ordinal);
 
             // The final focus owner after FocusOnNavigate has run - the bar must win (Task 7's conflict).
             await page.WaitForFunctionAsync(
@@ -179,7 +194,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     /// AC7 - Back purges the departed Space before any render: while the destination's answer is
     /// held, nothing of the departed Space is in the bar.
     /// </summary>
-    [Fact(Skip = "red: AC7 - ActiveSpaceState and its purge-before-render do not exist yet (story 1.7 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR30")]
     public async Task Back_navigation_purges_the_departed_Space_before_the_destination_answers()
     {
@@ -214,7 +229,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     /// AC10 - a Space id the switcher did not list renders the refusal page, and no Space-scoped
     /// request for it is ever issued.
     /// </summary>
-    [Fact(Skip = "red: AC10 - the Space home and its check against the switcher response do not exist yet (story 1.7 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task A_Space_id_the_switcher_did_not_list_renders_the_refusal_page_and_is_never_requested()
     {
@@ -230,7 +245,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
                 .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             // Anchor: the switcher was asked, so the check had something to check against.
-            Assert.Contains(api.Requests, request => request.Path == "/api/v1/spaces");
+            Assert.Contains(api.Requests, request => request.Path == Contracts.Spaces.SpaceRoutes.Directory);
             Assert.False(api.WasRequested(Unlisted), "The client requested a Space the switcher did not list.");
         }
     }
@@ -239,7 +254,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     /// AC9 - the two 404 causes - a listed Space the server now refuses, and a Space never listed -
     /// render the same page, words and focus, with no client-side branch between them.
     /// </summary>
-    [Fact(Skip = "red: AC9 - the Space home's refusal flow does not exist yet (story 1.7 Task 6; deferred-work.md:270)")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task A_refused_listed_Space_and_an_unlisted_one_render_the_same_refusal_page()
     {
@@ -265,7 +280,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     /// current answer, never a remembered last Space: having last visited the second Space, Back to
     /// Yello lands on the first listed.
     /// </summary>
-    [Fact(Skip = "red: AC9 - the entry resolver at / does not exist yet (story 1.7 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task The_refusal_pages_route_back_lands_on_a_switcher_Space()
     {
@@ -279,19 +294,32 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
             await page.GotoAsync(Address($"spaces/{Unlisted:D}"));
             await page.GetByRole(AriaRole.Link, new PageGetByRoleOptions { Name = "Back to Yello." }).ClickAsync();
 
-            await page.WaitForURLAsync($"**/spaces/{Northwind:D}", new PageWaitForURLOptions { Timeout = Timeout });
+            await WaitForPathAsync(page, $"/spaces/{Northwind:D}");
+
+            // The first listed Space - not the one last visited (Harbour Ops), which is what a
+            // remembered route back would have chosen.
+            Assert.EndsWith($"/spaces/{Northwind:D}", new Uri(page.Url).AbsolutePath, StringComparison.Ordinal);
+            Assert.DoesNotContain(Harbour.ToString("D"), page.Url, StringComparison.OrdinalIgnoreCase);
         }
     }
 
     /// <summary>
     /// AC5 / X-8 - the Role chip is a bordered, display-only span outside the tab order, uppercase by
-    /// <c>text-transform</c> - and not uppercased in Turkish, where <c>base.css</c> withholds it.
+    /// <c>text-transform</c> - and not uppercased where the DOCUMENT is Turkish, Azeri or Greek, where
+    /// <c>base.css</c> withholds it.
     /// </summary>
-    [Theory(Skip = "red: AC5 - the Role chip does not exist yet (story 1.7 Task 7)")]
-    [InlineData("en-GB", "uppercase")]
-    [InlineData("tr-TR", "none")]
+    /// <remarks>
+    /// <b>The expectation follows the document's language, not the browser's.</b> The exclusion keys
+    /// on the document's <c>lang</c>, which is the culture the client resolved -
+    /// and with one supported culture (<c>en</c>), a Turkish browser is served English, correctly
+    /// uppercased. The expectation is now derived from the document's language, so the day a
+    /// Turkish translation lands this case asserts <c>none</c> without being edited.
+    /// </remarks>
+    [Theory]
+    [InlineData("en-GB")]
+    [InlineData("tr-TR")]
     [Trait("Priority", "P1")]
-    public async Task The_Role_chip_is_bordered_and_outside_the_tab_order(string locale, string expectedTransform)
+    public async Task The_Role_chip_is_bordered_and_outside_the_tab_order(string locale)
     {
         var api = TwoSpaces();
         var (context, page) = await surface.OpenAsync(locale);
@@ -301,6 +329,12 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
             await OpenSpaceAsync(api, page, Northwind);
 
             var chip = page.Locator(RoleChip);
+
+            var documentLanguage = await page.EvaluateAsync<string>("() => document.documentElement.lang");
+            var expectedTransform = Array.Exists(LossyCasingLanguages, lossy =>
+                documentLanguage == lossy || documentLanguage.StartsWith(lossy + "-", StringComparison.Ordinal))
+                ? "none"
+                : "uppercase";
 
             Assert.Equal("SPAN", await chip.EvaluateAsync<string>("e => e.tagName"));
             Assert.Equal(-1, await chip.EvaluateAsync<int>("e => e.tabIndex"));
@@ -314,7 +348,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     /// AC8 / UX-DR33 - on a Space route the document title is still the fixed <c>Yello</c>, and scroll
     /// restoration is manual.
     /// </summary>
-    [Fact(Skip = "red: AC8 - no Space route exists and index.html does not set scrollRestoration yet (story 1.7 Tasks 6 and 7)")]
+    [Fact]
     [Trait("Requirement", "UX-DR33")]
     public async Task A_Space_route_keeps_the_fixed_title_and_manual_scroll_restoration()
     {
@@ -338,7 +372,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     /// The runtime half of <c>ClientStorageBanTests</c>, which bans the mechanism in the IL; this sees
     /// what the browser actually holds after a real switch.
     /// </remarks>
-    [Fact(Skip = "red: AC7 - no Space route exists yet to visit (story 1.7 Task 6)")]
+    [Fact]
     [Trait("Requirement", "AD-7")]
     public async Task No_Space_scoped_content_reaches_web_storage()
     {
@@ -361,7 +395,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     /// AC11 / Q4 - Sign out ends the Session on the server and lands on sign-in with no
     /// <c>reason</c>: the person chose it, nothing ended under them.
     /// </summary>
-    [Fact(Skip = "red: AC11 - the Sign out control does not exist yet (story 1.7 Tasks 5 and 7)")]
+    [Fact]
     [Trait("Requirement", "FR-2")]
     public async Task Signing_out_lands_on_sign_in_with_no_reason()
     {
@@ -378,7 +412,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
 
             Assert.Equal(api.IssuedToken, signOut.Header(Contracts.Accounts.Antiforgery.HeaderName));
 
-            await page.WaitForURLAsync("**/sign-in", new PageWaitForURLOptions { Timeout = Timeout });
+            await WaitForPathAsync(page, ClientSignInPath);
 
             Assert.DoesNotContain("reason=", page.Url, StringComparison.Ordinal);
             Assert.Equal(0, await page.Locator(ContextBar).CountAsync());
@@ -389,7 +423,7 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
     /// AC11 / Q6 / UX-DR35 - an Account holding no Membership arriving at <c>/</c> is told so, and no
     /// Space is created for it.
     /// </summary>
-    [Fact(Skip = "red: AC11 - the entry resolver and the no-Space state do not exist yet (story 1.7 Task 6, open question 6)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "UX-DR35")]
     [Trait("Requirement", "FR-7")]
@@ -405,8 +439,8 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
 
             await page.Locator(Heading).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
-            Assert.Contains(api.Requests, request => request.Path == "/api/v1/spaces");
-            Assert.DoesNotContain(api.Requests, request => request.Method == "POST" && request.Path.StartsWith("/api/v1/spaces", StringComparison.Ordinal));
+            Assert.Contains(api.Requests, request => request.Path == Contracts.Spaces.SpaceRoutes.Directory);
+            Assert.DoesNotContain(api.Requests, request => request.Method == "POST" && request.Path.StartsWith(Contracts.Spaces.SpaceRoutes.Directory, StringComparison.Ordinal));
             Assert.DoesNotContain("sign-in", page.Url, StringComparison.Ordinal);
             Assert.Equal(0, await page.Locator(RoleChip).CountAsync());
         }
@@ -427,6 +461,21 @@ public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
 
         return api;
     }
+
+    /// <summary>
+    /// Waits until the page's own <c>location.pathname</c> is <paramref name="path"/>.
+    /// </summary>
+    /// <remarks>
+    /// <b>Not Playwright's URL wait.</b> Its default waits for a <c>load</c> event a history-API
+    /// navigation never fires; with <c>Commit</c> instead it still hung intermittently on a navigation
+    /// that had already happened (the address and the DOM both on the destination). Polling the page's
+    /// own location has no such gap - see <c>TESTING-CONVENTIONS.md</c>.
+    /// </remarks>
+    private static Task WaitForPathAsync(IPage page, string path) =>
+        page.WaitForFunctionAsync(
+            "path => location.pathname === path",
+            path,
+            new PageWaitForFunctionOptions { Timeout = Timeout });
 
     private string Address(string path) => new Uri(surface.BaseAddress, path).ToString();
 

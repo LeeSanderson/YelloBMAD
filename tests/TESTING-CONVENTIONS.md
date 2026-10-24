@@ -151,8 +151,9 @@ machine happened to have.
 
 **No container.** `Yello.Client` is a standalone WebAssembly application with its own dev server,
 so this suite starts one process, needs no SQL Server, and belongs in the **PR tier** despite
-being a browser suite. The whole suite runs in about 14 seconds. Cases that need a signed-in
-Session or real data will need more, and arrive with the stories that build them.
+being a browser suite. Cases that need a signed-in Session drive the API **faked at the network
+edge** - see "Signed-in cases: the API faked at the network edge" below - so they still start no
+Host and no engine.
 
 The suite serves the real build output and launches it with `--no-build`, so
 `dotnet build Yello.slnx` has to have run first. It says so by name rather than timing out.
@@ -167,6 +168,28 @@ second translation moves the expectation on its own.
 **Per locale, not once.** `SupportedCultures.All` has one entry, so iterating it would run each
 case once under `en` — which is exactly the run that misses culture-conditioned startup defects.
 The four locales are browser inputs chosen for the paths they take, not Yello's resource set.
+
+### Signed-in cases: the API faked at the network edge
+
+Story 1.7 (open question 5, option a). `FakeYelloApi` answers every `/api/v1/**` request the page
+makes with `page.RouteAsync`, on any origin, with the CORS headers a credentialed cross-origin
+request needs - so the WebAssembly client signs in, lists its Spaces, switches and signs out in a
+real Chromium with **no Host, no database and no container**. The rules:
+
+- **Bodies are `Yello.Contracts` types, paths are contract routes.** A contract change breaks the
+  fake as well as the Host, rather than leaving a fake that answers a shape nobody serves.
+- **Every request is recorded**, so a case can assert a request was *never* made (AC10: no
+  Space-scoped request for an id the switcher did not list).
+- **Hold an answer with a `TaskCompletionSource`, never with `Task.Delay`** (`HoldAsync` /
+  `Release`), to assert what is on screen while a response is outstanding.
+- **What it does not prove**, stated in its remarks: the real Session cookie across origins, the
+  real preflight, and anything the Host decides. Those are story 1.9's.
+- **Never wait for a client-side navigation with Playwright's URL wait.** Its default waits for
+  the `load` event, which a history-API navigation never fires, and even with `WaitUntil = Commit`
+  it hung intermittently on navigations that had already happened (story 1.7 measured it: the
+  address and the DOM both on the destination, the wait still pending at 30 s). Poll the page's own
+  `location.pathname` (`SpaceSwitchingTests.WaitForPathAsync`), or wait on what the destination
+  renders.
 
 ### Why it exists
 
@@ -464,16 +487,8 @@ shape.
 
 ## Not yet decided
 
-No E2E / browser project exists. Blocker **B5** — Playwright for .NET versus a separate
-TypeScript project — is open, and is decided at the `bmad-testarch-framework` run. That run
-halted at preflight on 2026-08-22 because nothing was built; story 1.1 removes that blocker, so
-it can be re-run now. Note `tea_use_playwright_utils` is off because those helpers are
-TypeScript against a .NET stack, and that flip did *not* unblock TF — the empty repository did.
-
-**B5 is now live rather than pending.** Story 1.3 shipped the product's first rendered surface —
-the registration page — and NFR-9 names registration *first* among the five gated flows. Three
-`deferred-work.md` entries are owned by "the first story with a rendered surface" and were waiting
-on exactly this: AC13's text-spacing and 200%-zoom measurement, AC11's two unmeasurable clauses,
-and the `em`-relative-length parser gap. All three are now actionable the moment the binding is
-decided. What story 1.3 discharged is the *constructive* half — no fixed widths or heights, a
-maximum in `rem`, internal padding in `rem` — and none of the measurement.
+**The browser binding (blocker B5) is decided** - Playwright for .NET, `Yello.Tests.Client`; see
+"The browser level" above. This section used to say no browser project existed and B5 was open,
+which contradicted that section from 2026-09-07 on; corrected by story 1.7. What remains open from
+it is measurement rather than binding: AC13's text-spacing and 200%-zoom measurement, AC11's two
+unmeasurable clauses and the `em`-relative-length parser gap, each owned in `deferred-work.md`.

@@ -1,4 +1,3 @@
-@page "/"
 @page "/sign-in"
 
 @using System.Text.Json
@@ -8,6 +7,7 @@
 @inject HttpClient Http
 @inject SessionState Session
 @inject AntiforgeryTokenSource Antiforgery
+@inject NavigationManager Navigation
 
 @*
     THE SIGN-IN SURFACE. FR-2, AC1, AC3, AC4, AC6.
@@ -75,10 +75,10 @@
 
         @if (_phase == SignInPhase.Complete)
         {
-            @* Announced politely, and focused - so a keyboard or screen-reader user is left at the
-               message rather than on a submit button that has just vanished. There is nowhere to
-               navigate to: story 1.7 owns the Space home somebody would arrive at. *@
-            <p class="form-status" role="status" tabindex="-1" @ref="_completion">
+            @* Announced politely for the moment before the entry point takes over: a completed
+               sign-in navigates to "/", which lands on the first Space the switcher lists (story
+               1.7, AC11), and that page's heading takes focus. *@
+            <p class="form-status" role="status">
                 @Localizer["SignInComplete"]
             </p>
         }
@@ -110,8 +110,8 @@
                 <PrimaryButton Disabled="@IsBusy">@Localizer["SignInSubmitLabel"]</PrimaryButton>
             </form>
 
-            @* Registration stays reachable now that "/" is this surface. Without it UJ-1 - the
-               journey this whole epic exists for - would be reachable only by typing a path. *@
+            @* Registration stays reachable from here. Without it UJ-1 - the journey this whole
+               epic exists for - would be reachable only by typing a path. *@
             <p class="auth-panel__aside">
                 <a class="text-link" href="@ClientRoutes.Register">@Localizer["SignInToRegisterLink"]</a>
             </p>
@@ -127,8 +127,6 @@
     private IReadOnlyList<string> _messages = [];
     private string? _notice;
     private int _attempt;
-    private bool _announceCompletion;
-    private ElementReference _completion;
 
     private string _emailAddress = string.Empty;
     private string _password = string.Empty;
@@ -293,7 +291,6 @@
     private void Complete()
     {
         _phase = SignInPhase.Complete;
-        _announceCompletion = true;
 
         // This drops the anti-forgery token as well as recording the Session, and that is required
         // rather than tidy: the token is bound to the identity it was issued to, so the one this
@@ -305,6 +302,10 @@
         // the string is still in the managed heap until it is collected - but keeping it in a live
         // field on a rendered component for no reason is worse.
         _password = string.Empty;
+
+        // Signing in lands somewhere (story 1.7, AC11): the entry point asks the Space switcher and
+        // goes to the first Space it lists, or says the Account belongs to none.
+        Navigation.NavigateTo(ClientRoutes.Home);
     }
 
     private static async Task<ProblemResponse?> ReadProblemAsync(HttpResponseMessage response)
@@ -326,15 +327,5 @@
             candidate => candidate.StartsWith(field, StringComparison.Ordinal));
 
         return code is null ? null : Localizer[code].Value;
-    }
-
-    /// <inheritdoc />
-    protected override async Task OnAfterRenderAsync(bool firstRender)
-    {
-        if (_announceCompletion)
-        {
-            _announceCompletion = false;
-            await _completion.FocusAsync();
-        }
     }
 }

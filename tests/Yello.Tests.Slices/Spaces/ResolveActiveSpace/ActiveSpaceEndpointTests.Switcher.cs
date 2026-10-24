@@ -18,10 +18,9 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the ATDD run on 2026-10-24, before any of story 1.7
-/// existed.</b> Every case is skipped with the AC it waits on. Today both routes fall through to
+/// <b>Every case anchors on a success first.</b> Without the routes both paths fall through to
 /// <c>UnmatchedApiEndpoint</c> and answer <c>404 not-available</c>, so each case fails on its first
-/// success anchor - which is the failure to confirm on activation.
+/// anchor rather than passing an absence assertion over nothing.
 /// </para>
 /// <para>
 /// <b>In this class rather than a new one</b>, as a second partial file: a container-backed class is
@@ -52,8 +51,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </remarks>
 public sealed partial class ActiveSpaceEndpointTests
 {
-    private const string SwitcherRoute = "/api/v1/spaces";
-
     private static readonly string[] IdentityProperties = ["id", "name"];
     private static readonly string[] ActiveSpaceProperties = ["id", "name", "role"];
 
@@ -61,7 +58,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// AC1 / AC2 / I-11 - the switcher lists exactly the Spaces the Account holds a Membership in,
     /// each as an id and a name and nothing else, and another Account's Space is not among them.
     /// </summary>
-    [Fact(Skip = "red: AC1/AC2 - GET /api/v1/spaces does not exist yet (story 1.7 Task 3); today it falls through to UnmatchedApiEndpoint's 404")]
+    [Fact]
     [Trait("Requirement", "FR-9")]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-24")]
@@ -88,7 +85,7 @@ public sealed partial class ActiveSpaceEndpointTests
             await SeedNamedSpaceAsync(database, s1, "Alpha " + Suffix(), accountA, Role.Owner);
             await SeedNamedSpaceAsync(database, s2, "Beta " + Suffix(), accountA, Role.Viewer);
 
-            listedForA = await sessionA.GetAsync(SwitcherRoute);
+            listedForA = await sessionA.GetAsync(SpaceRoutes.Directory);
 
             var sessionB = await RegisteredAndSignedInAsync(client, addressB, nameB);
             var accountB = await AccountIdOfAsync(database, addressB);
@@ -96,7 +93,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
             await SeedNamedSpaceAsync(database, s3, "Gamma " + Suffix(), accountB, Role.Owner);
 
-            listedForB = await sessionB.GetAsync(SwitcherRoute);
+            listedForB = await sessionB.GetAsync(SpaceRoutes.Directory);
         });
 
         // The success anchor first: A is answered, and the answer holds A's Spaces.
@@ -132,7 +129,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Epic 1 is to remove it - done here under that Space's own session context, as leaving a Space
     /// will do in epic 3. The anchor is the same Account being listed its Personal Space first.
     /// </remarks>
-    [Fact(Skip = "red: AC1 - GET /api/v1/spaces does not exist yet (story 1.7 Task 3); the empty-list answer is open question 6")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "FR-9")]
     [Trait("Requirement", "AR-29")]
@@ -153,11 +150,11 @@ public sealed partial class ActiveSpaceEndpointTests
             accountId = await AccountIdOfAsync(database, address);
             personal = await PersonalSpaceOfAsync(database, name);
 
-            before = await session.GetAsync(SwitcherRoute);
+            before = await session.GetAsync(SpaceRoutes.Directory);
 
             await RemoveMembershipAsync(database, personal, accountId);
 
-            after = await session.GetAsync(SwitcherRoute);
+            after = await session.GetAsync(SpaceRoutes.Directory);
         });
 
         Assert.NotNull(before);
@@ -184,7 +181,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// - so the expectation is computed with <see cref="SqlGuid"/>. If dev-story orders in memory
     /// instead, correct this scaffold and record it in the Debug Log.
     /// </remarks>
-    [Fact(Skip = "red: AC1 - GET /api/v1/spaces does not exist yet (story 1.7 Task 2 orders the directory by Name, then Id)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "FR-9")]
     [Trait("Requirement", "AR-29")]
@@ -210,7 +207,7 @@ public sealed partial class ActiveSpaceEndpointTests
             await SeedNamedSpaceAsync(database, first, "Alpha " + Suffix(), accountId, Role.Member);
             await SeedNamedSpaceAsync(database, twinB, twinName, accountId, Role.Member);
 
-            listed = await session.GetAsync(SwitcherRoute);
+            listed = await session.GetAsync(SpaceRoutes.Directory);
         });
 
         Assert.NotNull(listed);
@@ -227,7 +224,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// at the authentication boundary - <c>401 authentication-failed</c>, never the Space boundary's
     /// 404 - and is not recorded as a refusal.
     /// </summary>
-    [Fact(Skip = "red: AC3 - the Account-scoped marker and its 401 filter do not exist yet (story 1.7 Task 3); today the route answers the unmatched 404")]
+    [Fact]
     [Trait("Requirement", "AR-3")]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-24")]
@@ -245,12 +242,12 @@ public sealed partial class ActiveSpaceEndpointTests
             var session = await RegisteredAndSignedInAsync(client, address, name);
             accountId = await AccountIdOfAsync(database, address);
 
-            served = await session.GetAsync(SwitcherRoute);
+            served = await session.GetAsync(SpaceRoutes.Directory);
 
             // One recorded boundary 404, so the table is shown to be written to.
             Assert.Equal(HttpStatusCode.NotFound, (await session.GetAsync(SpaceRoutes.StatusesOf(Guid.NewGuid()))).StatusCode);
 
-            anonymous = await session.GetAnonymouslyAsync(SwitcherRoute);
+            anonymous = await session.GetAnonymouslyAsync(SpaceRoutes.Directory);
         });
 
         Assert.NotNull(served);
@@ -271,7 +268,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Account that is Owner in one Space and Viewer in another is told exactly that as it moves
     /// between them, on one Session, with no carry-over in either direction.
     /// </summary>
-    [Fact(Skip = "red: AC4 - GET /api/v1/spaces/{spaceId} does not exist yet (story 1.7 Task 4)")]
+    [Fact]
     [Trait("Requirement", "FR-9")]
     [Trait("Requirement", "NFR-2")]
     [Trait("Requirement", "AR-4")]
@@ -298,7 +295,7 @@ public sealed partial class ActiveSpaceEndpointTests
             // CAP-2: one Session throughout, never re-authenticated.
             foreach (var space in new[] { owned, viewed, owned, viewed })
             {
-                answers.Add((space, await session.GetAsync(ActiveSpaceRoute(space))));
+                answers.Add((space, await session.GetAsync(SpaceRoutes.ActiveOf(space))));
             }
         });
 
@@ -321,7 +318,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// AC4 / AD-1 - the Role comes from the Membership row as it is on this request: a Role changed
     /// between two requests reaches the second answer, with no re-authentication.
     /// </summary>
-    [Fact(Skip = "red: AC4 - GET /api/v1/spaces/{spaceId} does not exist yet (story 1.7 Task 4)")]
+    [Fact]
     [Trait("Requirement", "NFR-2")]
     [Trait("Requirement", "AR-4")]
     [Trait("Requirement", "AD-1")]
@@ -346,7 +343,7 @@ public sealed partial class ActiveSpaceEndpointTests
                 context.Memberships.Add(membership);
             }, TestContext.Current.CancellationToken);
 
-            before = await session.GetAsync(ActiveSpaceRoute(spaceId));
+            before = await session.GetAsync(SpaceRoutes.ActiveOf(spaceId));
 
             await SpaceSeeding.SeedAsync(database, spaceId, context =>
             {
@@ -354,7 +351,7 @@ public sealed partial class ActiveSpaceEndpointTests
                 membership.Role = Role.Admin;
             }, TestContext.Current.CancellationToken);
 
-            after = await session.GetAsync(ActiveSpaceRoute(spaceId));
+            after = await session.GetAsync(SpaceRoutes.ActiveOf(spaceId));
         });
 
         Assert.NotNull(before);
@@ -371,7 +368,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Account is not in and one that does not exist are refused with the same boundary 404, and
     /// each is recorded as one <c>CrossSpace</c> refusal. No new refusal code.
     /// </summary>
-    [Fact(Skip = "red: AC4 - GET /api/v1/spaces/{spaceId} does not exist yet (story 1.7 Task 4); its refusals must be the pipeline's")]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "AR-10")]
     [Trait("Requirement", "AR-11")]
@@ -407,9 +404,9 @@ public sealed partial class ActiveSpaceEndpointTests
                 context.Memberships.Add(SpaceSeeding.NewMembership(otherSpace, stranger.Id, Role.Owner));
             }, TestContext.Current.CancellationToken);
 
-            served = await session.GetAsync(ActiveSpaceRoute(memberSpace));
-            notAMember = await session.GetAsync(ActiveSpaceRoute(otherSpace));
-            noSuchSpace = await session.GetAsync(ActiveSpaceRoute(missingSpace));
+            served = await session.GetAsync(SpaceRoutes.ActiveOf(memberSpace));
+            notAMember = await session.GetAsync(SpaceRoutes.ActiveOf(otherSpace));
+            noSuchSpace = await session.GetAsync(SpaceRoutes.ActiveOf(missingSpace));
         });
 
         Assert.NotNull(served);
@@ -435,12 +432,6 @@ public sealed partial class ActiveSpaceEndpointTests
             Assert.Equal(nameof(Capability.ReadProjectsAndTasks), row.Capability);
         });
     }
-
-    /// <summary>
-    /// The active Space's answer for one Space. Story 1.7 Task 4's route; a constant in
-    /// <c>SpaceRoutes</c> once it exists - replace this on activation.
-    /// </summary>
-    private static string ActiveSpaceRoute(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}";
 
     private static string DisplayName() => "Ravi-" + Guid.NewGuid().ToString("N");
 

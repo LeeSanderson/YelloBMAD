@@ -87,4 +87,12 @@ internal static partial class SessionLog
         Level = LogLevel.Information,
         Message = "Sessions are issued for {Lifetime}.")]
     internal static partial void SessionLifetimeResolved(ILogger logger, TimeSpan lifetime);
+
+    // 1023: story 1.7's sign-out. No field, for the reason SignInProcessed has none.
+
+    [LoggerMessage(
+        EventId = 1023,
+        Level = LogLevel.Information,
+        Message = "Sign-out request processed.")]
+    internal static partial void SignOutProcessed(ILogger logger);
 }

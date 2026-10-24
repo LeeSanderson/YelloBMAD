@@ -227,3 +227,133 @@
     padding-inline-start: var(--space-5);
     color: var(--text-muted);
 }
+
+/*
+    THE CONTEXT BAR, from story 1.7. DESIGN.md:162-168, :427, :454, :500; UX-DR9, UX-DR41.
+
+    It never scrolls away, collapses or hides behind a menu. Sticky to the top of the page rather
+    than fixed, so it takes its own space in the flow and covers nothing. At a narrow width its
+    contents WRAP - nothing is hidden, and the Role chip survives every width (UX-DR41) - so there is
+    no breakpoint here at all, and no hamburger.
+
+    surface-card on a hairline border at radius-md, as DESIGN.md draws it.
+*/
+.context-bar {
+    position: sticky;
+    inset-block-start: 0;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    margin: var(--space-3);
+    padding-block: var(--space-2);
+    padding-inline: var(--space-4);
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+}
+
+.context-bar__space {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+/*
+    The two controls in the bar: the switcher's trigger and Sign out. Quiet buttons on the card -
+    the bar is chrome, not an action surface - with the 24px floor from base.css's `button` rule.
+*/
+.context-bar__switcher,
+.context-bar__sign-out {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    appearance: none;
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    padding-block: var(--space-1);
+    padding-inline: var(--space-3);
+    font-family: var(--type-body-family);
+    font-size: var(--type-body-size);
+    line-height: var(--type-body-line-height);
+    cursor: pointer;
+}
+
+.context-bar__switch-label {
+    color: var(--text-muted);
+}
+
+/*
+    THE ROLE CHIP. DESIGN.md:169-174, :455; X-8.
+
+    The --role-chip fill sits at 1.05 against the bar, so the hairline border is what draws it.
+    radius-sm, the 2px chip radius. Its type, and its uppercase, come from `.type-role-label` in
+    base.css, which withholds the transform in Turkish, Azeri and Greek - this rule sets neither.
+    Display-only: no cursor, no hover, no focus treatment, because it is never a control.
+*/
+.role-chip {
+    display: inline-flex;
+    align-items: center;
+    background-color: var(--role-chip);
+    color: var(--role-chip-on);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-sm);
+    padding-block: 0;
+    padding-inline: var(--space-2);
+}
+
+/*
+    THE SPACE SWITCHER'S LIST - a row per Space, the name and nothing else. It opens as a full-width
+    row of the bar, under the controls, rather than as a floating panel: nothing to position, nothing
+    to clip at 320px. Each row's link meets the 24px target floor in both axes, which `a` does not
+    acquire from base.css (a link in prose is exempt from 2.5.8; these are not in prose).
+*/
+.space-switcher {
+    flex-basis: 100%;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-block-start: var(--border-hairline-width) solid var(--border-hairline);
+}
+
+.space-switcher__row {
+    margin: 0;
+}
+
+.space-switcher__link {
+    display: flex;
+    align-items: center;
+    min-height: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding-block: var(--space-1);
+    padding-inline: var(--space-2);
+    color: var(--text-primary);
+    text-decoration: underline;
+}
+
+/*
+    A Space's home. Its heading only, until story 2.1 brings Projects.
+*/
+.space-home {
+    padding-block: var(--space-5);
+    padding-inline: var(--space-4);
+}
+
+/*
+    Text for assistive technology only - the context bar's polite announcement after a switch. Out
+    of the layout and clipped to nothing, but still in the accessibility tree, which `display: none`
+    and `visibility: hidden` would both remove it from.
+*/
+.visually-hidden {
+    position: absolute;
+    overflow: hidden;
+    white-space: nowrap;
+    clip-path: inset(50%);
+}

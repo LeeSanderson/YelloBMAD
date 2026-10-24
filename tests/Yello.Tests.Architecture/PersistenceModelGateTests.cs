@@ -2,6 +2,7 @@ using System.Linq.Expressions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Xunit;
+using Yello.Domain.Memberships;
 using Yello.Infrastructure.Persistence;
 
 namespace Yello.Tests.Architecture;
@@ -178,8 +179,17 @@ public sealed class PersistenceModelGateTests
     /// is held to it without anyone extending this gate. Behaviour is asserted separately, against a
     /// real database, by <c>SpaceIsolationLayerTests.The_query_filter_alone_excludes_another_Spaces_rows</c>.
     /// </para>
+    /// <para>
+    /// <b>One widening, on one entity, and nothing else (story 1.7, AD-24).</b> <c>Membership</c>'s
+    /// filter may be exactly <c>SpaceId == a context member || AccountId == a context member</c> - the
+    /// application-state restatement of its database predicate - because the Space switcher reads it
+    /// by Account. Any other entity with a disjunction, a third disjunct, a constant
+    /// (<c>true || ...</c>) or the halves swapped onto the wrong columns is refused.
+    /// </para>
     /// </remarks>
     [Fact]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "AD-24")]
     public void Every_Space_scoped_entity_has_a_query_filter_from_application_state()
     {
         using var context = new YelloDbContextFactory().CreateDbContext([]);
@@ -212,15 +222,18 @@ public sealed class PersistenceModelGateTests
                 var shape = new FilterShape();
                 shape.Visit(filter.Expression);
 
-                var isEquality = filter.Expression is { } expression && IsSpaceIdEqualToContextState(expression);
+                var isEquality = filter.Expression is { } expression
+                    && (IsSpaceIdEqualToContextState(expression.Body)
+                        || (entity.ClrType == typeof(Membership) && IsSpaceOrAccountFromContextState(expression.Body)));
 
                 if (!isEquality || shape.CallsAMethod)
                 {
                     problems.Add(
                         $"{entity.ClrType.Name}'s query filter `{filter.Expression}` is not the "
                         + $"application-state shape: its whole body must be {SchemaNames.SpaceIdColumn} == a "
-                        + "member of YelloDbContext, and it must call nothing. "
-                        + $"(is that equality: {isEquality}, calls a method: {shape.CallsAMethod})");
+                        + "member of YelloDbContext (Membership alone may add exactly one "
+                        + $"`|| {SchemaNames.AccountIdColumn} == a member of YelloDbContext`), and it must call "
+                        + $"nothing. (is that shape: {isEquality}, calls a method: {shape.CallsAMethod})");
                 }
             }
         }
@@ -335,22 +348,33 @@ public sealed class PersistenceModelGateTests
     /// <c>!=</c>, and <c>... || context.ScopedSpaceId == null</c>, which returns every Space's rows
     /// when no Space is in scope - the opposite of failing closed.
     /// </remarks>
-    private static bool IsSpaceIdEqualToContextState(LambdaExpression filter)
+    private static bool IsSpaceIdEqualToContextState(Expression body) =>
+        IsColumnEqualToContextState(body, SchemaNames.SpaceIdColumn);
+
+    /// <summary>
+    /// <c>SpaceId == context || AccountId == context</c>, in that order, with nothing else in it.
+    /// </summary>
+    private static bool IsSpaceOrAccountFromContextState(Expression body) =>
+        StripConversions(body) is BinaryExpression { NodeType: ExpressionType.OrElse } either
+        && IsColumnEqualToContextState(either.Left, SchemaNames.SpaceIdColumn)
+        && IsColumnEqualToContextState(either.Right, SchemaNames.AccountIdColumn);
+
+    private static bool IsColumnEqualToContextState(Expression body, string column)
     {
-        if (StripConversions(filter.Body) is not BinaryExpression { NodeType: ExpressionType.Equal } equality)
+        if (StripConversions(body) is not BinaryExpression { NodeType: ExpressionType.Equal } equality)
         {
             return false;
         }
 
-        var spaceIdFirst = IsEntitySpaceId(equality.Left) && IsContextState(equality.Right);
-        var contextFirst = IsContextState(equality.Left) && IsEntitySpaceId(equality.Right);
+        var columnFirst = IsEntityColumn(equality.Left, column) && IsContextState(equality.Right);
+        var contextFirst = IsContextState(equality.Left) && IsEntityColumn(equality.Right, column);
 
-        return spaceIdFirst || contextFirst;
+        return columnFirst || contextFirst;
     }
 
-    private static bool IsEntitySpaceId(Expression side) =>
+    private static bool IsEntityColumn(Expression side, string column) =>
         StripConversions(side) is MemberExpression { Expression: ParameterExpression } member
-        && member.Member.Name == SchemaNames.SpaceIdColumn;
+        && member.Member.Name == column;
 
     private static bool IsContextState(Expression side) =>
         StripConversions(side) is MemberExpression member

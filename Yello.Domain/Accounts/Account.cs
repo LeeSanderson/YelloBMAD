@@ -107,4 +107,25 @@ public sealed class Account
     /// API at build; the value comes from <see cref="TimeProvider"/> so a test can control it.
     /// </remarks>
     public required DateTimeOffset CreatedAt { get; init; }
+
+    /// <summary>
+    /// The instant before which every Session this Account was issued is ended - set by signing
+    /// out, and <c>null</c> until the Account first does. FR-2; story 1.7, Lee's decision (a) of
+    /// 2026-10-24.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why a Session can be ended at all.</b> A Session is an encrypted cookie ticket with no row
+    /// of its own (story 1.4), so expiring the browser's cookie leaves any copy of it valid until its
+    /// lifetime runs out - and FR-2 says "a Session that has expired or been invalidated grants
+    /// access to nothing". This one instant per Account is what makes sign-out an invalidation: a
+    /// ticket issued before it is refused on every request, and one issued after it is served.
+    /// </para>
+    /// <para>
+    /// <b>Per Account, not per Session, and that is an accepted consequence:</b> signing out on one
+    /// device ends the Account's Sessions on every device. Evaluated on read, in the request that
+    /// presents the ticket - never swept, never on a timer (AD-27, AD-10).
+    /// </para>
+    /// </remarks>
+    public DateTimeOffset? SessionsValidAfter { get; set; }
 }

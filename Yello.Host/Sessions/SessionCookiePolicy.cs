@@ -35,8 +35,16 @@ namespace Yello.Host.Sessions;
 /// for. Read against AD-1, where authorisation is a per-request <c>(Account, Space)</c> decision
 /// and "Role is never read from a cookie, a claim, an API Token payload, or any cache outliving the
 /// request", a revocation list would be a second mechanism for something the first already
-/// achieves. If one is ever genuinely needed it is <c>ExpiresAt</c>-shaped and evaluated on read,
-/// per AD-27.
+/// achieves.
+/// </para>
+/// <para>
+/// <b>Sign-out is the case that did need one, and it is <c>ExpiresAt</c>-shaped, as predicted.</b>
+/// Story 1.7 built sign-out, and a ticket the browser was told to drop would otherwise have kept
+/// working wherever a copy of it survived - an invalidated Session still granting access. Lee's
+/// decision (a) of 2026-10-24: one instant per Account (<c>Account.SessionsValidAfter</c>), stamped
+/// at sign-out and compared on read with the ticket's issue instant - see
+/// <see cref="SessionRevocation"/>. Still no row per Session, no sweeper and no timer; it ends the
+/// Account's Sessions on every device, which is the accepted cost.
 /// </para>
 /// <para>
 /// <b>Not <c>AddIdentityCookies</c>, and not <c>AddIdentity</c>.</b>
@@ -174,6 +182,11 @@ public static class SessionCookiePolicy
         // in place would mean the first story to write [Authorize] inherits a 302 nobody chose.
         options.Events.OnRedirectToLogin = RefuseWithStatusCodeAsync;
         options.Events.OnRedirectToAccessDenied = RefuseWithStatusCodeAsync;
+
+        // SIGN-OUT ENDS THE SESSION ON THE SERVER (story 1.7, Lee's decision (a) of 2026-10-24).
+        // Every presented ticket is compared with its Account's SessionsValidAfter, on read - see
+        // SessionRevocation. Configured here because it is part of what a Session IS.
+        options.Events.OnValidatePrincipal = SessionRevocation.ValidateAsync;
     }
 
     /// <summary>

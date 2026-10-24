@@ -31,11 +31,11 @@ namespace Yello.Client.Sessions;
 /// it held a Session, is the event AC3 describes.
 /// </para>
 /// <para>
-/// <b>What is honest to claim about that path today.</b> No surface in this client yet makes an
-/// authenticated request: the Host has a Space-scoped endpoint, but no client surface calls it
-/// until story 1.7 builds the chrome that knows which Space is active - so the branch below is a
-/// seam that tests drive directly rather than a path a person can currently take. Recorded as such
-/// rather than described as covered.
+/// <b>What is honest to claim about that path.</b> Since story 1.7 the client makes authenticated
+/// requests - the Space switcher and a Space's own answer - so a Session that ends under a person
+/// reaches this branch from a real surface. The seam tests drive it directly; the browser suite
+/// fakes the API at the network edge and so does not drive a real 401 from the Host (re-owned by
+/// story 1.9 with the real-Host browser sign-in).
 /// </para>
 /// </remarks>
 /// <param name="session">The client's Session state, and the purge seam.</param>

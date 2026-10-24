@@ -120,7 +120,8 @@ A full run starts **thirteen** engines today. Every container-backed case goes i
 | `1.7-INT-005` | 4 | INT (wire) | P0 | `GET /api/v1/spaces/{id}` answers `{id, name, role}`: owner -> viewer -> owner -> viewer on one Session (I-10, request path) | `ActiveSpaceEndpointTests.Switcher.cs` |
 | `1.7-INT-006` | 4 | INT (wire) | P0 | A Role changed between two requests reaches the next answer (AD-1) | `ActiveSpaceEndpointTests.Switcher.cs` |
 | `1.7-INT-007` | 4 | INT (wire) | P0 | That endpoint's non-member and missing-Space 404s are identical and each records one `CrossSpace` row | `ActiveSpaceEndpointTests.Switcher.cs` |
-| `1.7-INT-008` | 11 | INT (wire) | P0 | Sign-out: `204`, the cookie expired with its attributes, the next request `401` | `SessionEndpointTests.cs` |
+| `1.7-INT-008` | 11 | INT (wire) | P0 | Sign-out: `204`, the cookie expired with its attributes, the next request `401`, and a replayed copy of the pre-sign-out cookie `401` (corrected 2026-10-24, Lee's decision (a)) | `SessionEndpointTests.cs` |
+| `1.7-INT-011` | 11 | INT (wire) | P0 | A Session issued after sign-out is served, while the pre-sign-out cookie replayed beside it is refused (added 2026-10-24) | `SessionEndpointTests.cs` |
 | `1.7-INT-009` | 11 | INT (wire) | P0 | Sign-out without an anti-forgery token: `400`, Session survives; with it: `204` | `SessionEndpointTests.cs` |
 | `1.7-INT-010` | 11 | INT (wire) | P1 | Sign-out with no Session: `204` (idempotent, Q4) | `SessionEndpointTests.cs` |
 | `1.7-LAYER-001` | 3 | INT (db) | P0 | Under the `AccountId` key, RLS alone admits exactly that Account's Memberships - not another Account's in a shared Space | `SpaceIsolationLayerTests.cs` |
@@ -172,7 +173,7 @@ A full run starts **thirteen** engines today. Every container-backed case goes i
 | `ActiveSpaceState` purge semantics as a unit (every registration runs, cancel first, survives a throw, runs on Space change and leaving Space routes, not on same-Space navigation), the accessible name for all four Roles, the switcher row renders the name only | The type's shape is Task 6's design; reflection over a purge registry would be fiction. The browser cases E2E-003/004/010 hold the behaviour | Task 10, in `Yello.Tests.Architecture` (`SessionSeamTests` precedent) |
 | `SessionState` sign-out shares the purge and differs only in destination | Same - a seam whose API Task 5 designs | Task 5 / Task 10 |
 | A Token request to `GET /api/v1/spaces` is refused (CAP-35, I-11's API half) | Tokens are story 1.8's (Q9) | Ledger to 1.8 |
-| Replaying a copy of the pre-sign-out cookie is refused | The Session is a stateless cookie ticket; nothing on the server remembers it, so this would require a ticket store - FR-34 / SM-2 territory. `1.7-INT-008` asserts what Q4 builds | **Decision for dev-story to record** (Q4's cost), and a ledger entry |
+| Replaying a copy of the pre-sign-out cookie is refused | *Superseded 2026-10-24.* This run read the Session as a stateless cookie ticket and left the replay unrefused. The dev phase raised that as a contradiction with FR-2 / CAP-2 / story 1.4 AC3 ("an invalidated Session grants access to nothing"), and **Lee chose option (a)**: `Account.SessionsValidAfter`, stamped at sign-out and compared on every request. The replay **is refused** (`401`) - asserted in `1.7-INT-008`, with `1.7-INT-011` (a Session issued after sign-out is served) added beside it | Written in dev-story |
 | `autocomplete="off"` + non-reusable name on Space-name inputs | No Space-name input exists until story 3.1; a gate over zero inputs passes vacuously (the story says not to write one) | Ledger to 3.1 |
 | The real-Host browser sign-in (cookie across origins, real preflight) | Q5 option a; `FakeYelloApi`'s remarks say what it does not prove | Ledger to 1.9 |
 
@@ -284,7 +285,7 @@ Plants were written into the file under test, the case run, and the original res
 2. **Plant LAYER-004** as soon as the widening exists (both halves, see above).
 3. **ARCH-001, ARCH-002, ARCH-011** with the port, the DTO and the Account-scoped marker (Tasks 2-3); then **INT-001 to INT-004** over the wire. Replace the `/api/v1/spaces` literal with the `SpaceRoutes` constant.
 4. **INT-005 to INT-007** - the active-Space endpoint (Task 4); add it to A-12's permitted list.
-5. **INT-008 to INT-010** - sign-out (Task 5). Record the stateless-cookie decision (replay not refused) in the Completion Notes and the ledger.
+5. **INT-008 to INT-010** - sign-out (Task 5). *Corrected 2026-10-24:* a replayed pre-sign-out cookie is **refused** (Lee's decision (a), `Account.SessionsValidAfter`); INT-008 asserts it, and INT-011 asserts a Session issued after sign-out is served.
 6. **E2E-000 stays green throughout**; then the client in this order: **E2E-005** (no request for an unlisted id) and **E2E-004** (purge before render on Back - the client's riskiest assumption: that `RegisterLocationChangingHandler` runs before the router renders for browser Back), then E2E-001, 002, 003, 006, 007, 010, 011, 012. Serialise the switcher and active-Space fakes from the new contract types.
 7. **ARCH-005, ARCH-006, ARCH-007, ARCH-008, E2E-008, E2E-009** - copy, chip and browser-owned surfaces (Task 7).
 

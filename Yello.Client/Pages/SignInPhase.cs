@@ -19,10 +19,9 @@ namespace Yello.Client.Pages;
 /// <c>type</c> and no <c>errors</c> extension.
 /// </para>
 /// <para>
-/// <b><see cref="Complete"/> exists but is barely occupied.</b> A successful sign-in has nowhere
-/// to go: there is no Space home until story 1.7 and no Board until epic 2. So this story states
-/// completion and stops, exactly as story 1.3's registration surface does, rather than inventing a
-/// destination.
+/// <b><see cref="Complete"/> is occupied for a moment only.</b> Since story 1.7 a successful sign-in
+/// navigates to the entry point, which lands on the first Space the switcher lists; the completion
+/// copy is announced on the way.
 /// </para>
 /// </remarks>
 public enum SignInPhase

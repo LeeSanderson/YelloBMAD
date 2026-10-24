@@ -2,6 +2,8 @@ using System.Globalization;
 using Microsoft.AspNetCore.Localization;
 using Yello.Application.Accounts.AuthenticateAccount;
 using Yello.Application.Accounts.RegisterAccount;
+using Yello.Application.Accounts.SignOut;
+using Yello.Application.Spaces.ListSpaces;
 using Yello.Application.Statuses.ListStatuses;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Localisation;
@@ -73,7 +75,12 @@ builder.Services.AddYelloInfrastructure(connectionString);
 // its ring does not carry and its per-ring package ban would then have to be reasoned about.
 builder.Services.AddScoped<RegisterAccountHandler>();
 builder.Services.AddScoped<AuthenticateAccountHandler>();
+builder.Services.AddScoped<SignOutHandler>();
 builder.Services.AddScoped<ListStatusesHandler>();
+builder.Services.AddScoped<ListSpacesHandler>();
+
+// The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
+builder.Services.AddAccountScopedResolution();
 
 // How a Space-scoped request establishes its Account and its Space. The Session half only; story
 // 1.8 adds the API Token half behind the same interface, so the two surfaces differ in this one
@@ -260,6 +267,11 @@ api.MapRegisterAccount().RequireRateLimiting(CredentialHashingRateLimit.PolicyNa
 // Rate-limited, under the same policy and the same uniform 429.
 api.MapAuthenticate().RequireRateLimiting(CredentialHashingRateLimit.PolicyName);
 
+// DELETE /api/v1/sessions. Sign-out: ends the Account's Sessions on the server (SessionsValidAfter)
+// and expires the cookie. 204 with a Session or without one; anti-forgery required, as on every
+// state-changing request.
+api.MapSignOut();
+
 // GET /api/v1/sessions/current. 204 or 401 - and no anti-forgery token, because it changes no state
 // and the factory above attaches nothing to a safe method.
 api.MapCurrentSession();
@@ -271,6 +283,15 @@ api.MapAntiforgeryToken();
 // Space that does not exist and a Space the caller is not a member of alike. Declares the read
 // capability, which every Role holds.
 api.MapListStatuses();
+
+// GET /api/v1/spaces/{spaceId}. The active Space's own answer for the context bar - its name and the
+// caller's Role, as the pipeline resolved them on this request. Space-scoped like the route above.
+api.MapActiveSpace();
+
+// GET /api/v1/spaces. The Space switcher - AD-24's first Account-scoped surface: 200 with the caller's
+// Spaces as identity only (an empty list included), or 401 without a Session. Never a refusal
+// surface, and never reachable with an API Token (CAP-35; story 1.8).
+api.MapListSpaces();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

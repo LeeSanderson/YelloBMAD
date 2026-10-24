@@ -45,18 +45,23 @@ public sealed class SpaceResolutionSeamTests
     private const string SessionContextProcedure = "sp_set_session_context";
 
     /// <summary>
-    /// After story 1.5 there is exactly one shared implementation that sets the Space session
-    /// context, and every caller goes through it.
+    /// After story 1.5 there is exactly one shared implementation that sets a session-context key,
+    /// and every caller goes through it - for <c>SpaceId</c> and, since story 1.7, <c>AccountId</c>.
     /// </summary>
     private const int ExpectedSessionContextCallSites = 1;
 
     /// <summary>
-    /// AC2 - one seam sets the session context, not two.
+    /// AC2 - one seam sets the session context, not two - and that one line sets both of the keys
+    /// the spine names.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The one call site is <c>SpaceSessionContext</c>, which both registration and the per-request
-    /// resolver go through. The hazard is a <i>second</i> copy of the same statement: two places
+    /// <b>Both keys, one line.</b> The line sets the <c>AccountId</c> key as well as <c>SpaceId</c>
+    /// (AD-24), so the name says "a session context key"; the count is one line.
+    /// </para>
+    /// <para>
+    /// The one call site is <c>SpaceSessionContext</c>, which registration, the per-request resolver
+    /// and the Space switcher's directory all go through. The hazard is a <i>second</i> copy of the same statement: two places
     /// writing the key, two places to get the parameter types wrong, and two places a later story
     /// has to remember when the key changes.
     /// </para>
@@ -68,7 +73,7 @@ public sealed class SpaceResolutionSeamTests
     /// </para>
     /// </remarks>
     [Fact]
-    public void Exactly_one_production_call_site_sets_the_Space_session_context()
+    public void Exactly_one_production_line_sets_a_session_context_key()
     {
         // Comment lines are removed before matching. The statement is discussed in prose across the
         // codebase - AccountCredentialStore explains why it does NOT set one - and a scan that
@@ -174,6 +179,8 @@ public sealed class SpaceResolutionSeamTests
         Type[] requestScoped =
         [
             typeof(SpaceScope),
+            typeof(AccountScope),
+            typeof(IAccountSpaceDirectory),
             typeof(ActiveSpaceContext),
             typeof(IActiveSpaceResolver),
             typeof(YelloDbContext),

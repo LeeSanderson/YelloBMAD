@@ -1,9 +1,9 @@
 using System.Data;
 using System.Globalization;
-using System.Reflection;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
+using Yello.Application.Spaces;
 using Yello.Domain.Accounts;
 using Yello.Domain.Memberships;
 using Yello.Infrastructure.Persistence;
@@ -490,14 +490,11 @@ public sealed class SpaceIsolationLayerTests(MigratedDatabaseFixture fixture)
 
     // ---------------------------------------------------------------------------------------------
     // Story 1.7 - the Account-scoped context (AD-24 / AR-29): a second session-context key,
-    // `AccountId`, that widens exactly one table's filter - `Membership` - in both layers. Written by
-    // the ATDD run on 2026-10-24. Three are red-phase scaffolds; one is green today and is left
-    // active as a standing gate (see its remarks).
+    // `AccountId`, that widens exactly one table's filter - `Membership` - in both layers.
     //
-    // The key is set here by a raw `sp_set_session_context`, in TEST code, because the product's
-    // entry point for it does not exist yet. `SpaceResolutionSeamTests` counts production call sites
-    // under Yello.Infrastructure only, so these do not count against it. On activation, prefer the
-    // product's Account-scoped entry point where one is reachable.
+    // The key is set here by a raw `sp_set_session_context`, in TEST code, so the policy is exercised
+    // on a raw connection with no query filter in the way. `SpaceResolutionSeamTests` counts
+    // production call sites under Yello.Infrastructure only, so these do not count against it.
     // ---------------------------------------------------------------------------------------------
 
     /// <summary>
@@ -510,7 +507,7 @@ public sealed class SpaceIsolationLayerTests(MigratedDatabaseFixture fixture)
     /// thing deciding. Two Accounts with different ids, sharing a Space, so a predicate that admitted
     /// by Space rather than by Account would show the other Account's row.
     /// </remarks>
-    [Fact(Skip = "red: AC3 - Membership's filter predicate does not read SESSION_CONTEXT('AccountId') yet (story 1.7 Task 2, open question 1)")]
+    [Fact]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-24")]
     public async Task Under_the_AccountId_key_row_level_security_alone_admits_exactly_that_Accounts_Memberships()
@@ -543,7 +540,7 @@ public sealed class SpaceIsolationLayerTests(MigratedDatabaseFixture fixture)
     /// Anchored on the widening itself: the same connection does see the Account's Memberships, so
     /// the two empty reads are the other policies holding rather than a connection that sees nothing.
     /// </remarks>
-    [Fact(Skip = "red: AC3 - Membership's filter predicate does not read SESSION_CONTEXT('AccountId') yet, so the anchor read is empty (story 1.7 Task 2)")]
+    [Fact]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-24")]
     public async Task Under_the_AccountId_key_no_other_Space_scoped_table_is_visible()
@@ -583,12 +580,8 @@ public sealed class SpaceIsolationLayerTests(MigratedDatabaseFixture fixture)
     /// Accounts' Memberships of it, while the application state names Account A and no Space. Only
     /// the filter can exclude B's row. The same connection with the filter disarmed is read first.
     /// </para>
-    /// <para>
-    /// <b>Reached by name.</b> <c>AccountScope</c> and the three-argument <see cref="YelloDbContext"/>
-    /// constructor are story 1.7 Task 2's; on activation replace both lookups with typed references.
-    /// </para>
     /// </remarks>
-    [Fact(Skip = "red: AC3 - AccountScope and the Membership filter's AccountId disjunct do not exist yet (story 1.7 Task 2)")]
+    [Fact]
     [Trait("Requirement", "AR-7")]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-24")]
@@ -625,19 +618,14 @@ public sealed class SpaceIsolationLayerTests(MigratedDatabaseFixture fixture)
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <b>Green today, and left active as a standing gate.</b> Today both layers are keyed on
-    /// <c>SpaceId</c> alone, so this holds trivially. It is the regression gate for story 1.7's
-    /// widening: if a Space-scoped unit of work ever also set the <c>AccountId</c> key, or narrowed
-    /// <c>AccountScope</c>, the widened predicate and filter would admit the Account's Memberships
-    /// in every other Space - and this fails, in whichever layer leaked.
+    /// <b>A standing gate.</b> It is the regression gate for story 1.7's widening: if a Space-scoped
+    /// unit of work ever also set the <c>AccountId</c> key, the widened predicate would admit the
+    /// Account's Memberships in every other Space - and this fails.
     /// </para>
     /// <para>
-    /// <b>Not plantable before the widening, and that is recorded rather than papered over.</b> While
-    /// both layers are keyed on <c>SpaceId</c> alone, no leak of this shape can be constructed: a filter
-    /// planted to admit the Account everywhere is masked by the policy, and the policy cannot be
-    /// planted without a migration. Story 1.7 plants it once the widening exists - "a Space-scoped
-    /// unit of work also sets <c>AccountId</c>" (RLS half) and "<c>AccountScope</c> narrowed in a
-    /// Space-scoped unit of work" (filter half) - and records both in its plant table.
+    /// <b>Only the row-level-security half is visible here.</b> With the policy narrowed to the
+    /// requested Space, a filter leak is masked by it. The filter half is
+    /// <see cref="In_a_Space_scoped_unit_of_work_the_query_filter_alone_admits_no_other_Membership_of_the_Account"/>.
     /// </para>
     /// </remarks>
     [Fact]
@@ -672,6 +660,54 @@ public sealed class SpaceIsolationLayerTests(MigratedDatabaseFixture fixture)
             Assert.Equal([shared], throughRowLevelSecurityAlone);
             Assert.DoesNotContain(onlyA, throughBothLayers);
         }
+    }
+
+    /// <summary>
+    /// AC3 / Task 2 "one key per unit of work", the filter half - in a Space-scoped unit of work the
+    /// query filter alone admits none of the Account's Memberships in any other Space, even where row-
+    /// level security does.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why the case above cannot see this half.</b> There, row-level security is narrowed to the
+    /// requested Space, so a filter that also admitted the Account's other Memberships would be masked
+    /// by the policy and the case would stay green. Here the two layers are set to disagree, as in
+    /// <see cref="The_query_filter_alone_excludes_another_Spaces_rows"/>: the application state is a
+    /// resolved Space-scoped context for the shared Space, while the session context names Account A's
+    /// own Space, which the policy therefore admits. Only the filter can exclude that row - and a filter
+    /// whose Account half followed the resolved context (an <c>AccountScope</c> narrowed by a
+    /// Space-scoped unit of work) would let it through.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "AR-7")]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "AD-24")]
+    public async Task In_a_Space_scoped_unit_of_work_the_query_filter_alone_admits_no_other_Membership_of_the_Account()
+    {
+        var database = Available();
+        var (a, _, shared, onlyA, _) = await SeedTwoAccountsSharingASpaceAsync(database);
+
+        var scope = new SpaceScope();
+        scope.Resolve(new ActiveSpaceContext(a.Id, shared, Role.Member));
+
+        await using var context = database.CreateContext(scope);
+        await using var transaction = await context.Database.BeginTransactionAsync(TestContext.Current.CancellationToken);
+
+        await SpaceSessionContext.SetAsync(context.Database, onlyA, TestContext.Current.CancellationToken);
+
+        var admittedByRowLevelSecurity = await context.Memberships
+            .IgnoreQueryFilters()
+            .Select(membership => membership.SpaceId)
+            .ToListAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal([onlyA], admittedByRowLevelSecurity);
+
+        var visible = await context.Memberships
+            .Select(membership => membership.SpaceId)
+            .ToListAsync(TestContext.Current.CancellationToken);
+
+        Assert.Empty(visible);
     }
 
     /// <summary>
@@ -760,47 +796,16 @@ public sealed class SpaceIsolationLayerTests(MigratedDatabaseFixture fixture)
     }
 
     /// <summary>
-    /// A request-shaped context whose application state names an Account and no Space. Reached by
-    /// name because <c>AccountScope</c> is story 1.7's; the failure message says which part is
-    /// missing.
+    /// A request-shaped context whose application state names an Account and no Space.
     /// </summary>
     private YelloDbContext ContextScopedToAccount(Guid accountId)
     {
-        const string accountScopeName = "Yello.Infrastructure.Persistence.AccountScope";
-
-        var accountScopeType = typeof(SpaceScope).Assembly.GetType(accountScopeName, throwOnError: false);
-
-        Assert.True(accountScopeType is not null, $"{accountScopeName} is not in Yello.Infrastructure - story 1.7 Task 2 writes it.");
-
-        var accountScope = Activator.CreateInstance(accountScopeType)!;
-
-        var narrow = accountScopeType.GetMethod("Narrow", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-
-        Assert.True(narrow is not null, $"{accountScopeName} has no Narrow(Guid) - story 1.7 Task 2 mirrors SpaceScope.");
-
-        narrow.Invoke(accountScope, [accountId]);
-
-        var constructor = Array.Find(
-            typeof(YelloDbContext).GetConstructors(),
-            candidate => Array.Exists(candidate.GetParameters(), parameter => parameter.ParameterType == accountScopeType));
-
-        Assert.True(constructor is not null, "YelloDbContext takes no AccountScope - story 1.7 Task 2 adds it to the constructor.");
+        var accountScope = new AccountScope();
+        accountScope.Narrow(accountId);
 
         var options = new DbContextOptionsBuilder<YelloDbContext>().UseSqlServer(fixture.ConnectionString!).Options;
 
-        object? ArgumentFor(ParameterInfo parameter)
-        {
-            if (parameter.ParameterType == accountScopeType)
-            {
-                return accountScope;
-            }
-
-            return parameter.ParameterType == typeof(DbContextOptions<YelloDbContext>) ? options : null;
-        }
-
-        var arguments = constructor.GetParameters().Select(ArgumentFor).ToArray();
-
-        return Assert.IsType<YelloDbContext>(constructor.Invoke(arguments));
+        return new YelloDbContext(options, new SpaceScope(), accountScope);
     }
 
     private static (YelloDbContext Context, SpaceScope Scope) Request(RegistrationDatabase database)

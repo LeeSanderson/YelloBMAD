@@ -76,6 +76,10 @@ public static class InfrastructureServices
         services.AddScoped<IAccountRegistrationStore, AccountRegistrationStore>();
         services.AddScoped<IAccountCredentialStore, AccountCredentialStore>();
 
+        // Where sign-out ends an Account's Sessions, and where every presented ticket is checked
+        // against that (story 1.7, Lee's decision (a)). Scoped with the request's unit of work.
+        services.AddScoped<IAccountSessionStore, AccountSessionStore>();
+
         // SPACE RESOLUTION, FROM STORY 1.5. Every registration below is SCOPED, and that is AC7 and
         // NFR-2 rather than a default: the Role on an ActiveSpaceContext is the value the Membership
         // row held when this request read it, and a singleton or a cache here would be a Role
@@ -94,6 +98,10 @@ public static class InfrastructureServices
                 "Membership."));
 
         services.AddScoped<IStatusDefinitionReader, StatusDefinitionReader>();
+
+        // STORY 1.7: the Account-scoped context (AD-24), the active Space's name, and the Session
+        // revocation instant - split out only to keep this class's dependencies within S1200's limit.
+        services.AddAccountScopedReads();
 
         // THE SPACE BOUNDARY'S REFUSAL RECORD, FROM STORY 1.6. The request pipeline is its only
         // caller (AR-3). Scoped, and it builds a context of its own for each record - see

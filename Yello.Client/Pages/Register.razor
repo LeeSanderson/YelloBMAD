@@ -26,14 +26,12 @@
     THIS PAGE STILL DOES NOT SIGN ANYONE IN AND STILL DOES NOT NAVIGATE. Story 1.4 built
     authentication and deliberately did not wire registration into it: signing a new Account in
     automatically is a decision no acceptance criterion asks for, and AC6's obligation ends at
-    "completion is announced", which is where it ends. Story 1.7 owns the context bar somebody
-    would arrive at. Confirmed by Lee on 2026-08-28.
+    "completion is announced", which is where it ends. Confirmed by Lee on 2026-08-28. A person who
+    has registered signs in, and sign-in lands on their Space (story 1.7).
 
-    ROUTED AT "/register" ONLY. It held "/" as well until story 1.4, and its comment here said the
-    root was provisional - "stories 1.4 and 1.7 decide what belongs there once a Session and a
-    context bar exist". 1.4 decided the first half: "/" is the sign-in surface, because after the
-    first week returning is the common case. 1.7 decides the second half, repointing "/" at the
-    Space home. The sign-in surface carries a link here so this route stays reachable.
+    ROUTED AT "/register" ONLY. It held "/" until story 1.4 moved sign-in there; story 1.7 then made
+    "/" the entry point, which sends a signed-out person to sign-in and a signed-in one to the first
+    Space the switcher lists. The sign-in surface carries a link here so this route stays reachable.
 
     IT SENDS AN ANTI-FORGERY TOKEN NOW. AR-14 requires one on EVERY state-changing request, and
     this is one. It is unauthenticated, so the token protects against nothing an attacker wants -

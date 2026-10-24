@@ -16,8 +16,9 @@ namespace Yello.Client;
 /// casing exclusions reachable at all.
 /// </para>
 /// <para>
-/// Still absent, and owned elsewhere: task cards, columns, dialogs and pickers are epic 2 onward;
-/// the context bar, the Space switcher and the Role chip are story 1.7's.
+/// Story 1.7 added the context bar, the Space switcher, the Role chip, a Space's home and the entry
+/// point at <c>/</c>. Still absent, and owned elsewhere: task cards, columns, dialogs and pickers are
+/// epic 2 onward.
 /// </para>
 /// </remarks>
 public static class AssemblyMarker

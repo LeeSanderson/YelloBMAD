@@ -77,6 +77,26 @@ public static class SchemaNames
     public static string SpaceIdSessionKey => "SpaceId";
 
     /// <summary>
+    /// The second <c>SESSION_CONTEXT</c> key, which an Account-scoped unit of work sets in place of
+    /// <see cref="SpaceIdSessionKey"/> (AD-24 / AR-29). Read by <c>Membership</c>'s filter predicate
+    /// alone; no other table's predicate mentions it.
+    /// </summary>
+    public static string AccountIdSessionKey => "AccountId";
+
+    /// <summary>
+    /// The column <c>Membership</c>'s Account-scoped predicate compares with
+    /// <see cref="AccountIdSessionKey"/>.
+    /// </summary>
+    public static string AccountIdColumn => "AccountId";
+
+    /// <summary>
+    /// The predicate function <c>Membership</c>'s FILTER uses since story 1.7: its Space, or its
+    /// Account. Its BLOCK predicate stays <see cref="SpacePredicateFunction"/> - the switcher never
+    /// writes.
+    /// </summary>
+    public static string MembershipVisibilityFunction => "fn_MembershipVisibilityPredicate";
+
+    /// <summary>
     /// The inline table-valued predicate function the policy is built from.
     /// </summary>
     public static string SpacePredicateFunction => "fn_SpaceIsolationPredicate";

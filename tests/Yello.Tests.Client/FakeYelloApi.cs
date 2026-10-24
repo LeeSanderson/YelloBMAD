@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Playwright;
 using Yello.Contracts;
 using Yello.Contracts.Accounts;
+using Yello.Contracts.Spaces;
 
 namespace Yello.Tests.Client;
 
@@ -19,12 +20,10 @@ namespace Yello.Tests.Client;
 /// Host answers, and anything the Host decides. Those are re-owned by story 1.9.
 /// </para>
 /// <para>
-/// <b>The answers are the Host's shapes.</b> Where a <c>Yello.Contracts</c> type exists it is what is
-/// serialised (<see cref="AntiforgeryTokenResponse"/>, <see cref="ProblemResponse"/>), so a contract
-/// change breaks the fake as well. The switcher row and the active Space's answer have no contract
-/// type yet - story 1.7 Tasks 3 and 4 write them - so they are anonymous objects with the property
-/// names the story fixes (<c>id</c>, <c>name</c>; <c>id</c>, <c>name</c>, <c>role</c>). <b>On
-/// activation, serialise the contract types instead.</b>
+/// <b>The answers are the Host's shapes.</b> Every body is a <c>Yello.Contracts</c> type
+/// (<see cref="AntiforgeryTokenResponse"/>, <see cref="ProblemResponse"/>,
+/// <see cref="SpaceIdentityResponse"/>, <see cref="ActiveSpaceResponse"/>) and every path is a
+/// contract route, so a contract change breaks the fake as well.
 /// </para>
 /// <para>
 /// <b>Every request is recorded</b>, so a case can assert that a request was never made - AC10's
@@ -167,8 +166,8 @@ internal sealed class FakeYelloApi
                 _signOutSeen.TrySetResult(request);
                 return (noContent, string.Empty);
 
-            case ("GET", "/api/v1/spaces"):
-                return (200, JsonSerializer.Serialize(Switcher.Select(space => new { id = space.Id, name = space.Name }), JsonOptions));
+            case ("GET", var path) when path == SpaceRoutes.Directory:
+                return (200, JsonSerializer.Serialize(Switcher.Select(space => new SpaceIdentityResponse(space.Id, space.Name)), JsonOptions));
 
             case ("GET", var path) when TryActiveSpace(path, out var spaceId):
                 if (_held.TryGetValue(spaceId, out var held))
@@ -184,7 +183,7 @@ internal sealed class FakeYelloApi
                 var listed = Switcher.FirstOrDefault(space => space.Id == spaceId);
 
                 return Roles.TryGetValue(spaceId, out var role) && listed.Id == spaceId
-                    ? (200, JsonSerializer.Serialize(new { id = spaceId, name = listed.Name, role }, JsonOptions))
+                    ? (200, JsonSerializer.Serialize(new ActiveSpaceResponse(spaceId, listed.Name, role), JsonOptions))
                     : (404, Problem(ProblemTypes.NotAvailable));
 
             default:
@@ -194,12 +193,13 @@ internal sealed class FakeYelloApi
 
     private static bool TryActiveSpace(string path, out Guid spaceId)
     {
-        const string prefix = "/api/v1/spaces/";
+        var prefix = SpaceRoutes.Directory + "/";
 
         spaceId = Guid.Empty;
 
         return path.StartsWith(prefix, StringComparison.Ordinal)
-            && Guid.TryParse(path[prefix.Length..], out spaceId);
+            && Guid.TryParse(path[prefix.Length..], out spaceId)
+            && path == SpaceRoutes.ActiveOf(spaceId);
     }
 
     private static string Problem(string type) =>

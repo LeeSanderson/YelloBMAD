@@ -33,7 +33,16 @@ namespace Yello.Infrastructure.Persistence;
 /// the request's <see cref="SpaceScope"/> - application state, never read from the session
 /// context - so either layer alone still excludes another Space's rows (AD-2, AC4).
 /// <c>Account</c> and <c>Space</c> carry neither: the spine states no predicate for them, and
-/// choosing one belongs to the AD-24 amendment due before Epic 3 (<c>deferred-work.md:90</c>).
+/// choosing one belongs to the AD-24 amendment due before Epic 3.
+/// </para>
+/// <para>
+/// <b>One table is readable across Spaces, and only by Account.</b> Since story 1.7,
+/// <c>Membership</c>'s policy and filter both admit a row by its Space <i>or</i> by its Account
+/// (<c>SESSION_CONTEXT('AccountId')</c> in the database, <see cref="ScopedAccountId"/> here), which is
+/// how the Space switcher lists an Account's Spaces. A unit of work sets exactly one of the two keys,
+/// so a Space-scoped request still sees one Space's Memberships and nothing more. <c>Space</c>'s
+/// names reach the switcher only through a join from that read - see
+/// <c>AccountSpaceDirectory</c>.
 /// </para>
 /// </remarks>
 /// <param name="options">Provider and connection configuration, supplied by DI.</param>
@@ -42,10 +51,19 @@ namespace Yello.Infrastructure.Persistence;
 /// factory, a test - still constructs; such a context has no Space in scope and its query filters
 /// match no Space-scoped row.
 /// </param>
-public sealed class YelloDbContext(DbContextOptions<YelloDbContext> options, SpaceScope? spaceScope = null)
+/// <param name="accountScope">
+/// The request's Account scope, which only <c>Membership</c>'s filter reads (story 1.7, AD-24).
+/// Optional for the same reason, and fails closed the same way.
+/// </param>
+public sealed class YelloDbContext(
+    DbContextOptions<YelloDbContext> options,
+    SpaceScope? spaceScope = null,
+    AccountScope? accountScope = null)
     : DbContext(options)
 {
     private readonly SpaceScope _spaceScope = spaceScope ?? new SpaceScope();
+
+    private readonly AccountScope _accountScope = accountScope ?? new AccountScope();
 
     /// <summary>
     /// Accounts. One row per registered email address.
@@ -86,6 +104,13 @@ public sealed class YelloDbContext(DbContextOptions<YelloDbContext> options, Spa
     /// filters see that request's scope, never the first one's.
     /// </remarks>
     internal Guid? ScopedSpaceId => _spaceScope.SpaceId;
+
+    /// <summary>
+    /// The Account <c>Membership</c>'s filter admits alongside <see cref="ScopedSpaceId"/>, read from
+    /// this context's <see cref="AccountScope"/> each time a query runs. <c>null</c> - matching
+    /// nothing - except inside the Account-scoped adapter's unit of work.
+    /// </summary>
+    internal Guid? ScopedAccountId => _accountScope.AccountId;
 
     /// <inheritdoc />
     protected override void OnModelCreating(ModelBuilder modelBuilder)

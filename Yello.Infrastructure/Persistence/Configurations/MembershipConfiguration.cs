@@ -41,7 +41,15 @@ internal sealed class MembershipConfiguration(YelloDbContext context) : IEntityT
         // AD-2's second layer: the request's Space, from application state. Independent of the
         // row-level security policy by construction - it never reads SESSION_CONTEXT - so a
         // session context set to the wrong Space still returns nothing from another one.
-        builder.HasQueryFilter(membership => membership.SpaceId == context.ScopedSpaceId);
+        //
+        // WIDENED BY STORY 1.7, ON THIS TABLE ALONE (AD-24): the request's Account as well, which is
+        // how the Space switcher lists every Space an Account belongs to. It restates the database
+        // predicate's disjunction from application state, so each layer still holds alone. A unit of
+        // work narrows exactly one of the two scopes, so this admits one Space's Memberships or one
+        // Account's - never both. PersistenceModelGateTests permits this one disjunction on this one
+        // entity and refuses any other shape.
+        builder.HasQueryFilter(membership =>
+            membership.SpaceId == context.ScopedSpaceId || membership.AccountId == context.ScopedAccountId);
 
         // AD-2's composite-key rule, enabled rather than exercised. A reference to a Membership
         // from another Space-scoped row - the first is FR-21's Assignee in story 4.6 - has to be

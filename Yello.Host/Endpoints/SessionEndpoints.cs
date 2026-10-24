@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Mvc;
 using Yello.Application.Accounts.AuthenticateAccount;
 using Yello.Contracts;
 using Yello.Contracts.Accounts;
@@ -9,8 +10,10 @@ namespace Yello.Host.Endpoints;
 
 /// <summary>
 /// The Session resource: <c>POST /api/v1/sessions</c> to establish one,
-/// <c>GET /api/v1/sessions/current</c> to ask whether the caller still holds one, and
-/// <c>GET /api/v1/antiforgery/token</c> for the token the first of those must carry.
+/// <c>DELETE /api/v1/sessions</c> to end it (story 1.7, <see cref="SignOutEndpoints"/>),
+/// <c>GET /api/v1/sessions/current</c> to ask
+/// whether the caller still holds one, and <c>GET /api/v1/antiforgery/token</c> for the token the
+/// state-changing two must carry.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -74,6 +77,9 @@ public static class SessionEndpoints
     /// </param>
     /// <param name="handler">The authentication slice.</param>
     /// <param name="httpContext">The request, which the cookie is written onto.</param>
+    /// <param name="clock">
+    /// The clock the ticket's issue instant is read from - the instant sign-out is compared with.
+    /// </param>
     /// <param name="logger">Structured output. Carries no address, and no outcome.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns><c>204</c> with a <c>Set-Cookie</c>, <c>401</c>, or <c>400</c>.</returns>
@@ -81,21 +87,23 @@ public static class SessionEndpoints
         SignInRequest? request,
         AuthenticateAccountHandler handler,
         HttpContext httpContext,
+        [FromServices] TimeProvider clock,
         ILogger<SessionEndpointMarker> logger,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(httpContext);
+        ArgumentNullException.ThrowIfNull(clock);
 
         // Split from the body below because S4457 requires an argument check to run eagerly rather
         // than on the first await of a state machine. It is the framework that supplies this
         // argument, so the guard is a rule's price rather than a live risk.
-        return HandleAuthenticateAsync(request, handler, httpContext, logger, cancellationToken);
+        return HandleAuthenticateAsync(request, handler, new SignInContext(httpContext, clock), logger, cancellationToken);
     }
 
     private static async Task<IResult> HandleAuthenticateAsync(
         SignInRequest? request,
         AuthenticateAccountHandler handler,
-        HttpContext httpContext,
+        SignInContext signIn,
         ILogger<SessionEndpointMarker> logger,
         CancellationToken cancellationToken)
     {
@@ -139,10 +147,12 @@ public static class SessionEndpoints
                 title: "Authentication did not succeed.");
         }
 
-        await httpContext.SignInAsync(
+        // The issue instant is stamped onto the ticket at full precision: it is what sign-out's
+        // SessionsValidAfter is compared with on every later request (story 1.7, Lee's decision (a)).
+        await signIn.HttpContext.SignInAsync(
                 SessionCookiePolicy.SchemeName,
                 SessionPrincipal.For(authenticated.AccountId),
-                new AuthenticationProperties { IsPersistent = true })
+                SessionRevocation.Stamp(new AuthenticationProperties { IsPersistent = true }, signIn.Clock.GetUtcNow()))
             .ConfigureAwait(false);
 
         // The same line the failure path writes, deliberately. See SessionLog: nothing in this
@@ -205,6 +215,13 @@ public static class SessionEndpoints
         return Results.Ok(new AntiforgeryTokenResponse(tokens.RequestToken!));
     }
 }
+
+/// <summary>
+/// What sign-in writes the Session onto: the request, and the clock its issue instant comes from.
+/// </summary>
+/// <param name="HttpContext">The request.</param>
+/// <param name="Clock">The injected clock.</param>
+internal sealed record SignInContext(HttpContext HttpContext, TimeProvider Clock);
 
 /// <summary>
 /// The category <see cref="SessionEndpoints"/>' logger is named for.

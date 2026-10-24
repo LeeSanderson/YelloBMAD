@@ -167,7 +167,9 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
 
     /// <summary>
     /// Every predicate in the policy filters on <c>SESSION_CONTEXT('SpaceId')</c>, through the
-    /// Space-scoped table's own <c>SpaceId</c> column. AC3 of story 1.5.
+    /// Space-scoped table's own <c>SpaceId</c> column - and <c>Membership</c>'s FILTER, alone, also on
+    /// <c>SESSION_CONTEXT('AccountId')</c> through its <c>AccountId</c>. AC3 of story 1.5; AC3 of
+    /// story 1.7 (AD-24).
     /// </summary>
     /// <remarks>
     /// <para>
@@ -178,12 +180,21 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
     /// <c>SESSION_CONTEXT('SpaceId')</c>", which is a statement about the predicate's content.
     /// </para>
     /// <para>
+    /// <b>Widened by story 1.7, not loosened.</b> Every predicate still carries the <c>SpaceId</c>
+    /// clause. Exactly one - <c>Membership</c>'s FILTER - is bound to the Account-scoped function,
+    /// whose body carries both clauses; its BLOCK, and both predicates on every other table, stay on
+    /// the Space-only function. A second table reading the <c>AccountId</c> key, or the BLOCK moving
+    /// with the FILTER, fails here.
+    /// </para>
+    /// <para>
     /// Read from <c>sys.security_predicates.predicate_definition</c> and <c>sys.sql_modules</c>, as the
     /// engine normalises them, rather than from the migration's text - the migration is what was
     /// asked for, and this is what the database holds.
     /// </para>
     /// </remarks>
     [Fact]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "AD-24")]
     public async Task Every_predicate_filters_on_the_SpaceId_session_context()
     {
         var database = Available();
@@ -191,10 +202,10 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
         await using var connection = await database.OpenWithoutSpaceContextAsync(
             TestContext.Current.CancellationToken);
 
-        var definitions = await ReadNamesAsync(
+        var predicates = await ReadNamesAsync(
             connection,
             """
-            SELECT sp.predicate_definition
+            SELECT CONCAT(OBJECT_NAME(sp.target_object_id) COLLATE DATABASE_DEFAULT, N'|', sp.predicate_type_desc COLLATE DATABASE_DEFAULT, N'|', sp.predicate_definition COLLATE DATABASE_DEFAULT)
             FROM sys.security_predicates sp
             JOIN sys.security_policies p ON p.object_id = sp.object_id
             WHERE p.name = @name
@@ -202,25 +213,40 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
             SchemaNames.SpaceIsolationPolicy,
             TestContext.Current.CancellationToken);
 
-        Assert.NotEmpty(definitions);
+        Assert.NotEmpty(predicates);
 
-        var expected = $"([dbo].[{SchemaNames.SpacePredicateFunction}]([{SchemaNames.SpaceIdColumn}]))";
+        var spaceOnly = $"([dbo].[{SchemaNames.SpacePredicateFunction}]([{SchemaNames.SpaceIdColumn}]))";
+        var spaceOrAccount =
+            $"([dbo].[{SchemaNames.MembershipVisibilityFunction}]([{SchemaNames.SpaceIdColumn}],[{SchemaNames.AccountIdColumn}]))";
+        var widened = $"{SchemaNames.MembershipTable}|FILTER|";
 
-        Assert.All(definitions, definition => Assert.Equal(expected, definition));
+        // Exactly one predicate is the widened one, and it is Membership's FILTER.
+        Assert.Equal([widened + spaceOrAccount], predicates.Where(row => row.EndsWith(spaceOrAccount, StringComparison.Ordinal)));
 
-        var function = await ReadNamesAsync(
+        Assert.All(
+            predicates.Where(row => !row.StartsWith(widened, StringComparison.Ordinal)),
+            row => Assert.EndsWith("|" + spaceOnly, row, StringComparison.Ordinal));
+
+        var spaceClause = $"CAST(SESSION_CONTEXT(N'{SchemaNames.SpaceIdSessionKey}') AS uniqueidentifier)";
+        var accountClause = $"CAST(SESSION_CONTEXT(N'{SchemaNames.AccountIdSessionKey}') AS uniqueidentifier)";
+
+        var spaceFunction = Assert.Single(await FunctionBodyAsync(connection, SchemaNames.SpacePredicateFunction));
+
+        Assert.Contains(spaceClause, spaceFunction, StringComparison.Ordinal);
+        Assert.DoesNotContain(accountClause, spaceFunction, StringComparison.Ordinal);
+
+        var membershipFunction = Assert.Single(await FunctionBodyAsync(connection, SchemaNames.MembershipVisibilityFunction));
+
+        Assert.Contains(spaceClause, membershipFunction, StringComparison.Ordinal);
+        Assert.Contains(accountClause, membershipFunction, StringComparison.Ordinal);
+    }
+
+    private static Task<List<string>> FunctionBodyAsync(SqlConnection connection, string function) =>
+        ReadNamesAsync(
             connection,
             "SELECT m.definition FROM sys.sql_modules m WHERE m.object_id = OBJECT_ID(N'dbo.' + @name)",
-            SchemaNames.SpacePredicateFunction,
+            function,
             TestContext.Current.CancellationToken);
-
-        var body = Assert.Single(function);
-
-        Assert.Contains(
-            $"CAST(SESSION_CONTEXT(N'{SchemaNames.SpaceIdSessionKey}') AS uniqueidentifier)",
-            body,
-            StringComparison.Ordinal);
-    }
 
     /// <summary>
     /// AD-5 / AR-12's filtered unique index exists, is unique, and is actually filtered.

@@ -246,7 +246,7 @@ public sealed class SessionContractTests
     /// This is also the honest half of AC2. Nothing on the Session stores the active Space, so a
     /// Space change cannot touch it. What is asserted here is the property that makes AC2 true;
     /// one Session served from two Spaces in turn is asserted by <c>ActiveSpaceEndpointTests</c>,
-    /// and a switch through the product waits for story 1.7's switcher.
+    /// including story 1.7's switch through the active Space's own answer with no re-authentication.
     /// </para>
     /// </remarks>
     [Fact]

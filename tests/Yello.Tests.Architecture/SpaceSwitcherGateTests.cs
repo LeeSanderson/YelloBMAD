@@ -2,9 +2,15 @@ using System.Globalization;
 using System.Reflection;
 using System.Resources;
 using System.Text.RegularExpressions;
+using Mono.Cecil;
 using Xunit;
+using Yello.Application.Spaces;
 using Yello.Client.Localisation;
+using Yello.Client.Spaces;
+using Yello.Contracts.Spaces;
+using Yello.Domain;
 using Yello.Domain.Memberships;
+using Yello.Host.Spaces;
 
 namespace Yello.Tests.Architecture;
 
@@ -15,14 +21,8 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the ATDD run on 2026-10-24, before any of story 1.7
-/// existed.</b> The story's new types are reached <b>by name</b>, so this class compiles today; on
-/// activation replace each lookup with the typed reference it stands for, so a rename becomes a
-/// compile error. The names are the story's own where it gives one (<c>SpaceIdentity</c>,
-/// <c>AccountScopedSurface</c>, <c>RoleChip.razor</c>, <c>RoleOwner</c>,
-/// <c>ContextBarAccessibleName</c>) and this run's where it does not
-/// (<c>SpaceIdentityResponse</c>, the four <c>RolePermits*</c> keys). A different name chosen in
-/// dev-story is corrected here and recorded in the Debug Log.
+/// <b>Types are typed references, so a rename is a compile error.</b> Copy keys stay resource
+/// names, because that is what they are.
 /// </para>
 /// <para>
 /// <b>Two gates are green today and are left active</b> as standing gates, each with a permanent
@@ -39,10 +39,6 @@ namespace Yello.Tests.Architecture;
 [Trait("Requirement", "AD-24")]
 public sealed partial class SpaceSwitcherGateTests
 {
-    private const string SwitcherResponseName = "Yello.Contracts.Spaces.SpaceIdentityResponse";
-    private const string SpaceIdentityName = "Yello.Application.Spaces.SpaceIdentity";
-    private const string AccountScopedSurfaceName = "Yello.Host.Spaces.AccountScopedSurface";
-
     private static readonly ResourceManager Copy = new(ClientCopy.ResourceName, typeof(ClientCopy).Assembly);
 
     private static readonly DirectoryInfo ClientRoot = new(Path.Combine(RepositoryLayout.Root.FullName, "Yello.Client"));
@@ -54,20 +50,12 @@ public sealed partial class SpaceSwitcherGateTests
     /// exactly an id and a name. Nothing else may ever be added: this surface returns Space identity
     /// only (AD-24).
     /// </summary>
-    [Fact(Skip = "red: AC2 - SpaceIdentityResponse and SpaceIdentity do not exist yet (story 1.7 Tasks 2 and 3)")]
+    [Fact]
     [Trait("Requirement", "UX-DR9")]
     public void The_switcher_response_and_the_Space_identity_carry_exactly_an_id_and_a_name()
     {
-        foreach (var (assembly, name) in new[]
+        foreach (var type in new[] { typeof(SpaceIdentityResponse), typeof(SpaceIdentity) })
         {
-            (ProductionAssemblies.Contracts, SwitcherResponseName),
-            (ProductionAssemblies.Application, SpaceIdentityName),
-        })
-        {
-            var type = assembly.GetType(name, throwOnError: false);
-
-            Assert.True(type is not null, $"{name} is not in {assembly.GetName().Name} - story 1.7 writes it.");
-
             var members = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
                 .Select(property => (property.Name, property.PropertyType))
                 .OrderBy(member => member.Name, StringComparer.Ordinal)
@@ -81,16 +69,13 @@ public sealed partial class SpaceSwitcherGateTests
     /// AC3 / AD-24 - there are exactly two Account-scoped surfaces, the switcher and Account
     /// settings. A third is an amendment to AD-24, not a code change.
     /// </summary>
-    [Fact(Skip = "red: AC3 - AccountScopedSurface does not exist yet (story 1.7 Task 3)")]
+    [Fact]
     [Trait("Requirement", "AR-3")]
     public void The_Account_scoped_surfaces_are_exactly_the_two_AD_24_names()
     {
-        var surface = ProductionAssemblies.Host.GetType(AccountScopedSurfaceName, throwOnError: false);
-
-        Assert.True(surface is not null, $"{AccountScopedSurfaceName} is not in Yello.Host - story 1.7 Task 3 writes it.");
-        Assert.True(surface.IsEnum, $"{AccountScopedSurfaceName} must be a closed enum.");
-
-        Assert.Equal(["AccountSettings", "SpaceSwitcher"], Enum.GetNames(surface).Order(StringComparer.Ordinal));
+        Assert.Equal(
+            ["AccountSettings", "SpaceSwitcher"],
+            Enum.GetNames<AccountScopedSurface>().Order(StringComparer.Ordinal));
     }
 
     /// <summary>
@@ -148,7 +133,7 @@ public sealed partial class SpaceSwitcherGateTests
     /// AC8 / Q10 - scroll restoration is disabled, once, by an inline statement in the host page that
     /// runs before the WebAssembly runtime loads - so it holds on every Space-scoped route.
     /// </summary>
-    [Fact(Skip = "red: AC8 - index.html does not set history.scrollRestoration yet (story 1.7 Task 7, open question 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR33")]
     public void The_host_page_disables_scroll_restoration_before_the_runtime_loads()
     {
@@ -165,13 +150,13 @@ public sealed partial class SpaceSwitcherGateTests
     /// AC5 / X-8 (static half) - the Role chip is display-only: a <c>span</c>, with no handler, no
     /// link, no button and no tab stop.
     /// </summary>
-    [Fact(Skip = "red: AC5 - RoleChip.razor does not exist yet (story 1.7 Task 7)")]
+    [Fact]
     [Trait("Requirement", "UX-DR28")]
     public void The_Role_chip_is_never_interactive()
     {
         var chip = new FileInfo(Path.Combine(ClientRoot.FullName, "Components", "RoleChip.razor"));
 
-        Assert.True(chip.Exists, $"{chip.FullName} does not exist - story 1.7 Task 7 writes it.");
+        Assert.True(chip.Exists, $"{chip.FullName} does not exist.");
 
         var markup = RazorComment.Replace(File.ReadAllText(chip.FullName), string.Empty);
 
@@ -189,7 +174,7 @@ public sealed partial class SpaceSwitcherGateTests
     /// uppercase is <c>text-transform</c>'s, so a screen reader does not spell the Role out letter by
     /// letter and the Turkish, Azeri and Greek exclusions in <c>base.css</c> can withhold it.
     /// </summary>
-    [Fact(Skip = "red: AC5/AC6 - the Role copy (RoleOwner, RoleAdmin, RoleMember, RoleViewer) does not exist yet (story 1.7 Task 7)")]
+    [Fact]
     [Trait("Requirement", "UX-DR28")]
     [Trait("Requirement", "UX-DR37")]
     public void Every_Role_has_its_name_in_sentence_case_in_the_client_copy()
@@ -212,7 +197,7 @@ public sealed partial class SpaceSwitcherGateTests
     /// "read only" admits <see cref="Capability.IssueApiTokenForOneself"/>, which is the Account's own
     /// credential rather than anything in the Space.
     /// </remarks>
-    [Fact(Skip = "red: AC6 - the permit phrases and ContextBarAccessibleName do not exist yet (story 1.7 Task 7, open question 3)")]
+    [Fact]
     [Trait("Requirement", "UX-DR28")]
     [Trait("Requirement", "NFR-9")]
     public void Every_permit_phrase_agrees_with_the_capability_matrix()
@@ -307,6 +292,103 @@ public sealed partial class SpaceSwitcherGateTests
         Assert.DoesNotMatch(RemembersASpace, "// never a remembered last Space");
         Assert.DoesNotMatch(RemembersASpace, "var activeSpace = directory.First();");
     }
+
+    /// <summary>
+    /// AC5 / AC6 / UX-DR37 - every Role the server can send, as its stable code, has a name and a
+    /// permit phrase in the client copy, so the chip and the accessible name never render a bare
+    /// code. The style of story 1.6's "every capability code has copy".
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "UX-DR28")]
+    [Trait("Requirement", "UX-DR37")]
+    public void Every_Role_stable_code_has_a_name_and_a_permit_phrase()
+    {
+        var keys = Enum.GetValues<Role>()
+            .Select(StableCode.Of)
+            .SelectMany(code => new[] { RoleCopy.NameKey(code), RoleCopy.PermitsKey(code) })
+            .ToList();
+
+        Assert.Equal(8, keys.Count);
+
+        var missing = keys
+            .Where(key => string.IsNullOrEmpty(Copy.GetString(key, CultureInfo.InvariantCulture)))
+            .ToList();
+
+        Assert.True(
+            missing.Count == 0,
+            "A Role the server can answer with has no copy, so its code would render as itself: "
+            + string.Join(", ", missing));
+    }
+
+    /// <summary>
+    /// AC3 / AD-24 - only the Space switcher's directory sets the <c>AccountId</c> session key, and no
+    /// type that sets <c>SpaceId</c> also sets <c>AccountId</c>: a unit of work sets exactly one key.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why it matters.</b> <c>Membership</c>'s filter admits a row by Space <i>or</i> by Account, so
+    /// a connection carrying both keys would show a Space-scoped request the Account's Memberships -
+    /// and Roles - in every other Space. Read from the compiled IL as calls to the two entry points
+    /// of <c>SpaceSessionContext</c>, attributed to the outermost type that makes them.
+    /// </para>
+    /// <para>
+    /// <b>Vacuity guard:</b> each entry point is found called, by the resolver and the directory
+    /// respectively.
+    /// The wire half is <c>SpaceIsolationLayerTests.A_Space_scoped_unit_of_work_sees_only_its_own_Membership_of_an_Account_in_several_Spaces</c>.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "AR-6")]
+    [Trait("Requirement", "AD-2")]
+    public void No_caller_sets_both_session_context_keys()
+    {
+        var spaceKeySetters = CallersOf(SessionContextTypeName, "SetAsync");
+        var accountKeySetters = CallersOf(SessionContextTypeName, "SetAccountAsync");
+
+        Assert.Contains("Yello.Infrastructure.Persistence.MembershipActiveSpaceResolver", spaceKeySetters);
+        Assert.Contains(AccountDirectoryTypeName, accountKeySetters);
+
+        Assert.Equal([AccountDirectoryTypeName], accountKeySetters);
+        Assert.Empty(spaceKeySetters.Intersect(accountKeySetters, StringComparer.Ordinal));
+    }
+
+    private const string SessionContextTypeName = "Yello.Infrastructure.Persistence.SpaceSessionContext";
+
+    private const string AccountDirectoryTypeName = "Yello.Infrastructure.Persistence.AccountSpaceDirectory";
+
+    /// <summary>
+    /// Every production type whose IL calls a static method of a type, by its outermost type name.
+    /// </summary>
+    private static List<string> CallersOf(string declaringType, string method)
+    {
+        var callers = new SortedSet<string>(StringComparer.Ordinal);
+
+        foreach (var assembly in ProductionAssemblies.All.Where(assembly => assembly != ProductionAssemblies.AppHost))
+        {
+            using var module = ModuleDefinition.ReadModule(assembly.Location);
+
+            foreach (var type in module.GetTypes())
+            {
+                var calls = type.Methods.Any(candidate => candidate.HasBody && candidate.Body.Instructions.Any(instruction =>
+                    instruction.Operand is MethodReference called
+                    && called.Name == method
+                    && called.DeclaringType.FullName == declaringType));
+
+                if (calls)
+                {
+                    callers.Add(OutermostOf(type).FullName);
+                }
+            }
+        }
+
+        // The entry points delegate to one private method on the seam itself; it is not a caller.
+        callers.Remove(declaringType);
+
+        return [.. callers];
+    }
+
+    private static TypeDefinition OutermostOf(TypeDefinition type) =>
+        type.DeclaringType is null ? type : OutermostOf(type.DeclaringType);
 
     private static string? Permits(Role role) =>
         Copy.GetString("RolePermits" + role, CultureInfo.InvariantCulture);

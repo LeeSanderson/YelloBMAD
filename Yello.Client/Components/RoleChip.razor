@@ -1,0 +1,30 @@
+@using Yello.Client.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    THE ROLE CHIP. AC5; UX-DR28; DESIGN.md:169-174, :455; test-design X-8.
+
+    DISPLAY-ONLY, AND NEVER A CONTROL. A <span> with no handler, no link, no button and no tab stop.
+    A Role is changed by an Owner or Admin on the Members surface (epic 4), never from here, and a
+    chip that looked operable would be a promise the product does not keep.
+    SpaceSwitcherGateTests.The_Role_chip_is_never_interactive holds the markup to that.
+
+    BORDERED. The --role-chip fill sits at 1.05 against the bar without its hairline (X-8), so the
+    border is what makes it a chip rather than a tint.
+
+    THE ROLE VERBATIM, IN SENTENCE CASE. "Owner", "Admin", "Member", "Viewer" from the resources;
+    the uppercase is .type-role-label's text-transform, which base.css withholds in Turkish, Azeri
+    and Greek - so a screen reader hears the word, not its letters.
+*@
+
+<span class="role-chip type-role-label">@Localizer[RoleCopy.NameKey(Role)]</span>
+
+@code {
+    /// <summary>
+    /// The Role's stable code, as the server answered it for this Space on this load.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public string Role { get; set; } = string.Empty;
+}

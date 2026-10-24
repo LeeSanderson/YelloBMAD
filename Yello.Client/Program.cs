@@ -8,6 +8,7 @@ using Yello.Client;
 using Yello.Client.Localisation;
 using Yello.Client.Pages;
 using Yello.Client.Sessions;
+using Yello.Client.Spaces;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Localisation;
 
@@ -106,6 +107,12 @@ builder.Services.AddScoped(services =>
 
 builder.Services.AddScoped<AntiforgeryTokenSource>();
 
+// THE SPACE STATE, from story 1.7: the switcher's last answer (Account-scoped identity, kept across
+// a Space switch) and the active Space's own answer with its purge (Space-scoped, discarded on
+// every departure). Both in fields, never in browser storage, and per tab.
+builder.Services.AddScoped<SpaceDirectory>();
+builder.Services.AddScoped<ActiveSpaceState>();
+
 var host = builder.Build();
 
 // WHAT HAPPENS WHEN A SESSION ENDS, wired once. AC3, UX-DR30.
@@ -125,6 +132,39 @@ sessionState.AnnounceSessionEndWith(() =>
     navigation.NavigateTo(ClientRoutes.SignInAfterSessionEnd);
 
     return Task.CompletedTask;
+});
+
+// WHERE A SIGN-OUT LANDS (story 1.7, open question 4): sign-in, with no reason - the person chose
+// it, and nothing ended under them. The purge before it is the one above, not a second one.
+sessionState.AnnounceSignOutWith(() =>
+{
+    navigation.NavigateTo(ClientRoutes.SignIn);
+
+    return Task.CompletedTask;
+});
+
+// WHAT A SESSION'S END PURGES, beyond what components register for themselves: the active Space's
+// state (and through it everything epic 2 will register there), and the switcher's list.
+var activeSpace = host.Services.GetRequiredService<ActiveSpaceState>();
+var spaceDirectory = host.Services.GetRequiredService<SpaceDirectory>();
+
+sessionState.RegisterPurge(() =>
+{
+    activeSpace.Purge();
+    spaceDirectory.Forget();
+
+    return Task.CompletedTask;
+});
+
+// THE SYNCHRONOUS PURGE ON LEAVING A SPACE (story 1.7, AC7). A location-changing handler runs BEFORE
+// the router renders the new location - for a link, a NavigateTo, and browser Back or Forward alike
+// - so the departed Space is gone before anything of the destination is drawn. A navigation within
+// one Space purges nothing. Registered for the life of the application; the handle is not disposed.
+_ = navigation.RegisterLocationChangingHandler(context =>
+{
+    activeSpace.Navigating(ClientRoutes.SpaceIn(navigation.ToBaseRelativePath(context.TargetLocation)));
+
+    return ValueTask.CompletedTask;
 });
 
 // WHETHER THIS BROWSER ALREADY HOLDS A SESSION, ASKED ONCE, BEFORE ANYTHING RENDERS.

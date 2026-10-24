@@ -116,7 +116,7 @@ public sealed class PooledConnectionIsolationTests(MigratedDatabaseFixture fixtu
     /// <see cref="MembershipActiveSpaceResolver"/>.
     /// </para>
     /// </remarks>
-    [Fact(Skip = "red: AC3 - Membership's filter predicate does not read SESSION_CONTEXT('AccountId') yet (story 1.7 Task 2), so the Account-scoped anchor read is empty")]
+    [Fact]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-24")]
     public async Task A_reused_connection_carries_no_Account_key_into_a_Space_scoped_read_or_the_reverse()

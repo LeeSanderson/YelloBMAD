@@ -1,0 +1,64 @@
+@using Yello.Contracts.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    THE SPACE SWITCHER'S LIST. FR-9; AC1, AC2; UX-DR9; EXPERIENCE.md:202-203; DESIGN.md:230-237.
+
+    THE ONLY LIST OF SPACES IN THE PRODUCT, AND A ROW IS A NAME. One row per Space the server
+    listed, in the order it listed them, each a link to that Space's home carrying the name and
+    nothing else - no count, no Role, no badge (AC2). The active row is marked by
+    aria-current="page" alone; there is no visual "current" badge (open question 8).
+
+    A NON-MODAL DISCLOSURE (open question 8, option a). The context bar's trigger opens it; Esc
+    closes it and returns focus to the trigger; choosing a row navigates. Rows are links, so a
+    middle-click opens a Space in a new tab, which holds its own context (EXPERIENCE.md:93).
+
+    CHOOSING A ROW HAS NO CLICK HANDLER OF ITS OWN, deliberately. The list closes because the
+    navigation happens - the bar closes it when the location changes. A handler that closed it on
+    the click removed the link from the page during the click, before the router's link
+    interception had read it, and the navigation intermittently never happened.
+*@
+
+<ul class="space-switcher" id="@ListId" aria-label="@Localizer["SpaceSwitcherListLabel"]">
+    @foreach (var space in Spaces)
+    {
+        <li class="space-switcher__row">
+            <a class="space-switcher__link type-space-name"
+               href="@ClientRoutes.SpaceHome(space.Id)"
+               aria-current="@(space.Id == ActiveSpaceId ? "page" : null)"
+               @onkeydown="KeyDownAsync">@space.Name</a>
+        </li>
+    }
+</ul>
+
+@code {
+    /// <summary>
+    /// The list's element id, which the trigger names in <c>aria-controls</c>.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public string ListId { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The switcher's answer, in the order served.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public IReadOnlyList<SpaceIdentityResponse> Spaces { get; set; } = [];
+
+    /// <summary>
+    /// The Space the tab is in, whose row carries <c>aria-current</c>.
+    /// </summary>
+    [Parameter]
+    public Guid? ActiveSpaceId { get; set; }
+
+    /// <summary>
+    /// Raised on Esc, so the bar can close the list and return focus to its trigger.
+    /// </summary>
+    [Parameter]
+    public EventCallback OnDismissed { get; set; }
+
+    private Task KeyDownAsync(KeyboardEventArgs key) =>
+        string.Equals(key.Key, "Escape", StringComparison.Ordinal) ? OnDismissed.InvokeAsync() : Task.CompletedTask;
+}

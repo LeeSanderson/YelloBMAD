@@ -15,13 +15,14 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>THE PURGE IS VERY NEARLY EMPTY TODAY, AND NOTHING HERE PRETENDS OTHERWISE.</b> There is no
-/// replica, no cached Board, no filter state and no Space-scoped client state of any kind - the
-/// client holds a handful of fields in two components. A test asserting "everything Space-scoped is
-/// purged" would pass against a system with nothing to purge, which is the vacuous-gate defect this
-/// repository keeps rediscovering (<c>deferred-work.md:30</c>). So what is asserted below is what
-/// the seam <i>does</i> - registrations run, they run before the announcement, a failing one does
-/// not strand the rest - and not what it will one day cover. Stories 1.7 and epic 2 extend it.
+/// <b>THE PURGE IS STILL NEARLY EMPTY, AND NOTHING HERE PRETENDS OTHERWISE.</b> Story 1.7 registered
+/// the active Space's state and the switcher's list with it; there is still no replica, no cached
+/// Board and no filter state. A test asserting "everything Space-scoped is purged" would pass against
+/// a system with nothing to purge, which is the vacuous-gate defect this repository keeps
+/// rediscovering. So what is asserted below is what the seam <i>does</i> - registrations run, they
+/// run before the announcement, a failing one does not strand the rest - and not what it will one day
+/// cover. Story 1.7's sign-out entry and the active Space's purge are asserted in
+/// <c>ActiveSpaceStateTests</c>; epic 2 extends it with the Board.
 /// </para>
 /// <para>
 /// <b>In the architecture suite because it is the only suite that can see <c>Yello.Client</c>.</b>

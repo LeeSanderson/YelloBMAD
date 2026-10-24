@@ -152,7 +152,7 @@
   </data>
   <data name="SignInToRegisterLink" xml:space="preserve">
     <value>No Account yet? Create one.</value>
-    <comment>Link to the registration surface, below the sign-in form. It exists because "/" is now sign-in and registration would otherwise be reachable only by typing a path. It is NOT a response to a failed sign-in and must never be shown as one - that would say the address is unknown. "Account" is Glossary vocabulary.</comment>
+    <comment>Link to the registration surface, below the sign-in form. It exists because registration would otherwise be reachable only by typing a path. It is NOT a response to a failed sign-in and must never be shown as one - that would say the address is unknown. "Account" is Glossary vocabulary.</comment>
   </data>
   <data name="SessionEnded" xml:space="preserve">
     <value>Your Session ended. Sign in to continue.</value>
@@ -171,13 +171,95 @@
   </data>
   <data name="RefusalRouteBack" xml:space="preserve">
     <value>Back to Yello.</value>
-    <comment>The one link on the refusal page. It goes to the product's home, never to a remembered last Space, which may itself be unavailable (EXPERIENCE.md:142). Story 1.7 points home at a Space drawn from the switcher.</comment>
+    <comment>The one link on the refusal page. It goes to the product's entry point, which lands on the first Space the switcher currently lists - never on a remembered last Space, which may itself be unavailable (EXPERIENCE.md:142, UX-DR32).</comment>
   </data>
   <data name="RoleDoesNotPermit" xml:space="preserve">
     <value>Your Role in this Space does not permit this.</value>
     <comment>A capability refusal (403) that arrived without a capability code the client knows. Still capability-shaped: it names no object.</comment>
   </data>
 
+
+  <!--
+    THE CONTEXT BAR, THE ROLE CHIP AND THE SPACE SWITCHER, from story 1.7 (UX-DR9, UX-DR28, UX-DR39).
+
+    ROLE NAMES ARE SENTENCE CASE, ALWAYS. The chip shows them uppercase by CSS text-transform, which
+    is withheld in Turkish, Azeri and Greek; a value typed in capitals is read out letter by letter.
+    Owner, Admin, Member and Viewer are Glossary words: translate consistently, never substitute.
+
+    THE PERMIT PHRASES complete the context bar's accessible name - "{Space} - {Role}, {phrase}" - so
+    each starts in lower case and is true of the capability matrix. Admin's and Viewer's are the
+    specification's own words; Owner's and Member's were derived for story 1.7 (open question 3). A
+    test holds every phrase to the matrix, so a translation that changes what a Role may do fails
+    the build.
+  -->
+  <data name="RoleOwner" xml:space="preserve">
+    <value>Owner</value>
+    <comment>The Role chip for an Owner. Glossary word, sentence case; uppercased by CSS.</comment>
+  </data>
+  <data name="RoleAdmin" xml:space="preserve">
+    <value>Admin</value>
+    <comment>The Role chip for an Admin. Glossary word, sentence case; uppercased by CSS.</comment>
+  </data>
+  <data name="RoleMember" xml:space="preserve">
+    <value>Member</value>
+    <comment>The Role chip for a Member. Glossary word, sentence case; uppercased by CSS.</comment>
+  </data>
+  <data name="RoleViewer" xml:space="preserve">
+    <value>Viewer</value>
+    <comment>The Role chip for a Viewer. Glossary word, sentence case; uppercased by CSS.</comment>
+  </data>
+  <data name="RolePermitsOwner" xml:space="preserve">
+    <value>can manage everything in this Space, including ownership</value>
+    <comment>What an Owner may do, ending the context bar's accessible name. Derived (story 1.7, open question 3): only an Owner may offer ownership or delete the Space.</comment>
+  </data>
+  <data name="RolePermitsAdmin" xml:space="preserve">
+    <value>can manage Members and settings</value>
+    <comment>What an Admin may do, ending the context bar's accessible name. Verbatim from the specification (epics.md:826, EXPERIENCE.md:83).</comment>
+  </data>
+  <data name="RolePermitsMember" xml:space="preserve">
+    <value>can create and edit Projects and Tasks</value>
+    <comment>What a Member may do, ending the context bar's accessible name. Derived (story 1.7, open question 3).</comment>
+  </data>
+  <data name="RolePermitsViewer" xml:space="preserve">
+    <value>read only in this Space</value>
+    <comment>What a Viewer may do, ending the context bar's accessible name. Verbatim from the specification (epics.md:826, EXPERIENCE.md:83).</comment>
+  </data>
+  <data name="ContextBarAccessibleName" xml:space="preserve">
+    <value>{0} — {1}, {2}</value>
+    <comment>The context bar's accessible name. {0} is the Space's name, {1} the Role (RoleOwner and its siblings), {2} what the Role permits (RolePermitsOwner and its siblings). Example: "Northwind Redesign — Admin, can manage Members and settings". Keep the order if your language allows it; the em dash may be your language's equivalent separator.</comment>
+  </data>
+  <data name="SpaceSwitchAnnouncement" xml:space="preserve">
+    <value>{0} — {1}, {2}</value>
+    <comment>Announced politely after the person switches Space: the destination's name {0}, Role {1} and what it permits {2}. Never names the Space they left (UX-DR38).</comment>
+  </data>
+  <data name="ContextBarShellName" xml:space="preserve">
+    <value>Your Spaces</value>
+    <comment>The context bar's accessible name when no Space is active - on the refusal page and when the Account belongs to no Space. Names no Space.</comment>
+  </data>
+  <data name="SwitchSpaceLabel" xml:space="preserve">
+    <value>Switch Space</value>
+    <comment>The label on the button that opens the Space switcher, after the active Space's name.</comment>
+  </data>
+  <data name="SpaceSwitcherListLabel" xml:space="preserve">
+    <value>Your Spaces</value>
+    <comment>The accessible name of the switcher's list. Each row in it is a Space's name and nothing else.</comment>
+  </data>
+  <data name="SignOutLabel" xml:space="preserve">
+    <value>Sign out</value>
+    <comment>The button in the context bar that ends the Session - on every device the Account is signed in on, which is how the server ends it.</comment>
+  </data>
+  <data name="SpaceHomeHeading" xml:space="preserve">
+    <value>Projects</value>
+    <comment>The heading of a Space's home. It does not name the Space - the context bar does. "Project" is Glossary vocabulary.</comment>
+  </data>
+  <data name="NoSpaceHeading" xml:space="preserve">
+    <value>No Spaces yet</value>
+    <comment>Heading shown to an Account that belongs to no Space. A valid state, not an error (UX-DR35); nothing is created for the person.</comment>
+  </data>
+  <data name="NoSpaceBody" xml:space="preserve">
+    <value>You do not belong to any Space yet.</value>
+    <comment>The sentence under NoSpaceHeading. Creating a Space arrives with story 3.1; until then there is nothing to offer here.</comment>
+  </data>
   <!--
     Below: one entry per capability code a 403 can carry. The code IS the key, as for failure codes.
     Every capability has one, including the two every Role holds, so a later matrix change cannot

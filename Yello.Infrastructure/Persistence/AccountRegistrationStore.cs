@@ -49,7 +49,8 @@ namespace Yello.Infrastructure.Persistence;
 /// registration-while-accepting non-atomic across the two Spaces, or it reaches for the exemption
 /// AD-24 exists to forbid. That is a real design question for 4.3 and it is recorded in
 /// <c>deferred-work.md</c> rather than answered here - the ledger previously carried only the
-/// <i>read</i> consequence of this context (story 1.7's Space switcher), not the write one.
+/// <i>read</i> consequence of this context (the Space switcher, which story 1.7 built under its own
+/// <c>AccountId</c> key), not the write one.
 /// </para>
 /// </para>
 /// </remarks>

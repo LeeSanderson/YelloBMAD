@@ -1,0 +1,176 @@
+@page "/spaces/{SpaceId:guid}"
+
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Sessions
+@using Yello.Client.Spaces
+@using Yello.Contracts.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+@inject SessionState Session
+@inject SpaceDirectory Directory
+@inject ActiveSpaceState ActiveSpace
+@inject NavigationManager Navigation
+
+@*
+    A SPACE'S HOME - THE FIRST SPACE-SCOPED CLIENT ROUTE. AC4, AC9, AC10; UX-DR31, UX-DR32.
+
+    NOTHING IS ASKED ABOUT A SPACE THE SWITCHER DID NOT LIST (AC10). The route's id is checked
+    against the switcher's current answer before any Space-scoped request is made; an id it did not
+    list renders the refusal surface in place and the server is never asked about it.
+
+    NOTHING IS RENDERED BEFORE THE SERVER HAS ANSWERED (UX-DR31: optimistic rendering never precedes
+    authorisation on the first read of a Space). Until the active Space's own answer arrives this
+    page renders nothing, and the context bar renders its shell.
+
+    BOTH 404 CAUSES RENDER ONE PAGE (AC9). A listed Space the server now refuses and an id never
+    listed both render the same RefusalSurface, with the same words, layout and focus; a 403 or 409
+    renders through the same surface with RefusalCopy's own words. A 401 is YelloApiHandler's: the
+    Session has ended, and the purge and the sign-in page follow.
+
+    THE HEADING DOES NOT NAME THE SPACE - the context bar does, and the name lives in one place.
+    Projects arrive with story 2.1; until then the page is its heading.
+*@
+
+@if (_refused)
+{
+    <RefusalSurface Problem="@_problem" />
+}
+
+@* Neither yet: waiting for the server's answer, and nothing Space-scoped renders before it. *@
+@if (_arrived && !_refused)
+{
+    <div class="space-home">
+        <h1 class="type-dialog-title" tabindex="-1" @ref="_heading">@Localizer["SpaceHomeHeading"]</h1>
+    </div>
+}
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private ElementReference _heading;
+    private bool _refused;
+    private bool _arrived;
+    private bool _focusHeading;
+    private ProblemResponse? _problem;
+
+    /// <summary>
+    /// The Space this route names.
+    /// </summary>
+    [Parameter]
+    public Guid SpaceId { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnParametersSetAsync()
+    {
+        _refused = false;
+        _arrived = false;
+        _problem = null;
+
+        if (!Session.IsSignedIn)
+        {
+            Navigation.NavigateTo(ClientRoutes.SignIn, replace: true);
+            return;
+        }
+
+        // Normally done already, before this render, by the location-changing hook; a first load of
+        // this address has no navigation to hook, so it is done here too. Idempotent for one Space.
+        ActiveSpace.Navigating(SpaceId);
+
+        var token = ActiveSpace.Token;
+
+        if (Directory.Current is null && await Directory.RefreshAsync(token) is null)
+        {
+            Refuse(problem: null);
+            return;
+        }
+
+        if (!Directory.Lists(SpaceId))
+        {
+            Refuse(problem: null);
+            return;
+        }
+
+        await AskAsync(token);
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusHeading)
+        {
+            _focusHeading = false;
+            await _heading.FocusAsync();
+        }
+    }
+
+    private async Task AskAsync(CancellationToken token)
+    {
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(SpaceRoutes.ActiveOf(SpaceId), UriKind.Relative), token);
+
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                await ArriveAsync(response, token);
+                return;
+            }
+
+            if (response.StatusCode != HttpStatusCode.Unauthorized)
+            {
+                Refuse(await ReadProblemAsync(response));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way. Both
+            // purges have already run; there is nothing to render.
+        }
+        catch (HttpRequestException)
+        {
+            Refuse(problem: null);
+        }
+        catch (JsonException)
+        {
+            Refuse(problem: null);
+        }
+    }
+
+    private async Task ArriveAsync(HttpResponseMessage response, CancellationToken token)
+    {
+        var answer = await response.Content.ReadFromJsonAsync<ActiveSpaceResponse>(JsonOptions, token);
+
+        if (answer is null || token.IsCancellationRequested || !ActiveSpace.Arrive(answer))
+        {
+            return;
+        }
+
+        _arrived = true;
+
+        // A first arrival is a navigation, and its heading takes focus as FocusOnNavigate would have
+        // given it had the heading existed when that ran. After a switch the context bar takes it.
+        _focusHeading = !ActiveSpace.LastArrivalWasSwitch;
+    }
+
+    private void Refuse(ProblemResponse? problem)
+    {
+        _refused = true;
+        _problem = problem;
+    }
+
+    private static async Task<ProblemResponse?> ReadProblemAsync(HttpResponseMessage response)
+    {
+        if (response.Content.Headers.ContentType?.MediaType is not "application/problem+json")
+        {
+            return null;
+        }
+
+        return await response.Content.ReadFromJsonAsync<ProblemResponse>(JsonOptions);
+    }
+}

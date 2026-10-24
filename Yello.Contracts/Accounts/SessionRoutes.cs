@@ -12,13 +12,12 @@ namespace Yello.Contracts.Accounts;
 /// <c>POST</c> establishes one; <c>GET .../current</c> asks whether the caller holds one.
 /// </para>
 /// <para>
-/// <b>There is no <c>DELETE</c>, and its absence is deliberate.</b> No FR, CAP, journey or
-/// acceptance criterion anywhere in the artifact set asks for sign-out - yet UX-DR31 names it as
-/// one of the five purge triggers, which presupposes it exists. Story 1.4's own scope line assigns
-/// the purge seam's extension "to Space switch and sign-out" to story <b>1.7</b>, which is also the
-/// story that builds the context bar a sign-out control would live in. Recorded as question 8 for
-/// Lee rather than built here, because building an endpoint no requirement asks for is how a
-/// product grows a surface nobody chose.
+/// <b><c>DELETE</c> on <see cref="Authenticate"/> signs out</b> (story 1.7, open question 4). No FR
+/// names sign-out, but UX-DR31 names it as a purge trigger and story 1.7's AC11 requires a control
+/// that "ends the Session on the server". It does: the Account's <c>SessionsValidAfter</c> is
+/// stamped, so every copy of the cookie issued before it is refused (FR-2; Lee's decision (a) of
+/// 2026-10-24) - on every device. Answers <c>204</c> with a Session or without one, and requires the
+/// anti-forgery token like every state-changing request.
 /// </para>
 /// <para>
 /// <b>The version segment is in the path, not in a header</b>, for the reason

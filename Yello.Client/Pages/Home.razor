@@ -1,0 +1,74 @@
+@page "/"
+
+@using Yello.Client.Sessions
+@using Yello.Client.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject SessionState Session
+@inject SpaceDirectory Directory
+@inject NavigationManager Navigation
+
+@*
+    THE ENTRY POINT. AC9, AC11; UX-DR32, UX-DR35; open question 6.
+
+    WHERE SIGN-IN LANDS, AND WHERE THE REFUSAL PAGE'S ROUTE BACK GOES. Signed out, it goes to
+    sign-in. Signed in, it asks the Space switcher again and lands on the first Space listed, in the
+    order served - never on a remembered last Space, because nothing remembers one (UX-DR32).
+
+    BELONGING TO NO SPACE IS A VALID STATE (UX-DR35, FR-7). An Account holding no Membership is told
+    so here and nothing is created for it: creating a Space is story 3.1's, and its offer arrives
+    with it. Epic 1 cannot reach this state - registration always provisions a Space - but the entry
+    point has to answer an empty list honestly.
+*@
+
+@if (_noSpace)
+{
+    <div class="auth-surface">
+        <div class="auth-panel">
+            <h1 class="type-dialog-title auth-panel__heading">@Localizer["NoSpaceHeading"]</h1>
+            <p class="auth-panel__intro">@Localizer["NoSpaceBody"]</p>
+        </div>
+    </div>
+}
+
+@* Otherwise on its way to sign-in or to a Space, with nothing to render meanwhile. *@
+@if (_unavailable)
+{
+    <RefusalSurface />
+}
+
+@code {
+    private bool _noSpace;
+    private bool _unavailable;
+
+    /// <inheritdoc />
+    protected override async Task OnParametersSetAsync()
+    {
+        _noSpace = false;
+        _unavailable = false;
+
+        if (!Session.IsSignedIn)
+        {
+            Navigation.NavigateTo(ClientRoutes.SignIn, replace: true);
+            return;
+        }
+
+        var spaces = await Directory.RefreshAsync(CancellationToken.None);
+
+        if (spaces is null)
+        {
+            // The switcher could not be asked. A 401 has already ended the Session and is on its way
+            // to sign-in; anything else is reported as the one refusal page rather than guessed at.
+            _unavailable = Session.IsSignedIn;
+            return;
+        }
+
+        if (spaces.Count == 0)
+        {
+            _noSpace = true;
+            return;
+        }
+
+        Navigation.NavigateTo(ClientRoutes.SpaceHome(spaces[0].Id), replace: true);
+    }
+}

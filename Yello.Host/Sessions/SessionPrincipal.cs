@@ -22,8 +22,8 @@ namespace Yello.Host.Sessions;
 /// <c>{spaceId}</c> route segment. There is therefore nothing here for a Space change to alter,
 /// which makes AC2 a property of this method rather than a behaviour to implement. Requests for
 /// two different Spaces on one Session are served each from their own Space
-/// (<c>ActiveSpaceEndpointTests</c>); what is not yet exercised is a switch through the product,
-/// because no Space switcher exists until story 1.7.
+/// (<c>ActiveSpaceEndpointTests</c>), and story 1.7's switcher moves through them on one Session
+/// with the Role read afresh in each.
 /// </para>
 /// <para>
 /// <b>A Yello-owned claim type rather than <c>ClaimTypes.NameIdentifier</c>.</b> The framework's

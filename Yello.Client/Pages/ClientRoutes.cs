@@ -6,31 +6,42 @@ namespace Yello.Client.Pages;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>What <c>/</c> is, and the decision behind it.</b> Story 1.3 routed registration at both
-/// <c>/</c> and <c>/register</c> and recorded the root as provisional: "stories 1.4 and 1.7 decide
-/// what belongs there once a Session and a context bar exist". This story is half of that
-/// decision, and it takes <c>/</c> for <b>sign-in</b>: after the first week, returning is the
-/// common case, and a product whose landing page asks a returning person to register is asking the
-/// wrong question. Story 1.7 repoints <c>/</c> at the Space home once a context bar exists, which
-/// is the other half.
+/// <b>What <c>/</c> is.</b> Story 1.3 routed registration there and called it provisional; story
+/// 1.4 took it for sign-in; story 1.7 made it the <b>entry point</b>, which is what it was waiting
+/// for. Signed out, it goes to sign-in. Signed in, it asks the Space switcher and lands on the first
+/// Space listed, in the order served - or, for an Account holding no Membership, says so and creates
+/// nothing (UX-DR35). Sign-in itself lives at <c>/sign-in</c> alone.
 /// </para>
 /// <para>
-/// <b>Registration stays reachable, by a link on the sign-in surface.</b> Moving <c>/</c> without
-/// one would leave UJ-1 - the journey the whole epic exists for - reachable only by typing a path,
-/// which is not a decision any document authorises and is not what "decide what <c>/</c> becomes"
-/// can reasonably mean.
+/// <b>Never a remembered last Space</b> (UX-DR32). Nothing records which Space was visited last:
+/// the refusal page's route back is <see cref="Home"/>, and <see cref="Home"/> draws its Space from
+/// the switcher's current answer. <c>SpaceSwitcherGateTests.No_client_code_remembers_a_last_Space</c>
+/// holds it.
+/// </para>
+/// <para>
+/// <b>Registration stays reachable, by a link on the sign-in surface.</b>
 /// </para>
 /// </remarks>
 public static class ClientRoutes
 {
     /// <summary>
-    /// The sign-in surface, which is also the application's root.
+    /// The first segment of every Space-scoped client route.
+    /// </summary>
+    private const string SpacesSegment = "spaces";
+
+    /// <summary>
+    /// What ends a route's path: its query, or its fragment.
+    /// </summary>
+    private static readonly char[] PathEnds = ['?', '#'];
+
+    /// <summary>
+    /// The sign-in surface.
     /// </summary>
     public static string SignIn => "/sign-in";
 
     /// <summary>
-    /// The product's home: where the refusal surface's one link goes. Sign-in today; story 1.7
-    /// repoints it at a Space drawn from the switcher, never at a remembered last Space.
+    /// The entry point: where sign-in lands and where the refusal surface's one link goes. Resolves
+    /// to a Space drawn from the switcher, never to a remembered one.
     /// </summary>
     public static string Home => "/";
 
@@ -55,15 +66,14 @@ public static class ClientRoutes
     public static string ReasonQueryKey => "reason";
 
     /// <summary>
-    /// The one reason value this story defines: the Session ended.
+    /// The one reason value: the Session ended.
     /// </summary>
     /// <remarks>
     /// <b>It names the Session and nothing else.</b> UJ-6 tells a <i>live</i> participant that
     /// access ended, because that connection was already authorised for the Space; UJ-4's cold
-    /// path must not, and UX-DR38 keeps the Space name out of the copy "in any case". An expired
-    /// Session is the cold case - so there is no Space name here, no Membership information, and
-    /// no "you were removed". There is deliberately only one value: a second would be a vocabulary
-    /// in which those distinctions could be drawn.
+    /// path must not, and UX-DR38 keeps the Space name out of the copy "in any case". There is
+    /// deliberately only one value. A sign-out lands on <see cref="SignIn"/> with no reason at all:
+    /// the person chose it, and nothing ended under them.
     /// </remarks>
     public static string SessionEndedReason => "session-ended";
 
@@ -72,4 +82,45 @@ public static class ClientRoutes
     /// </summary>
     public static string SignInAfterSessionEnd =>
         $"{SignIn}?{ReasonQueryKey}={SessionEndedReason}";
+
+    /// <summary>
+    /// A Space's home, the first Space-scoped route.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The path.</returns>
+    public static string SpaceHome(Guid spaceId) => $"/spaces/{spaceId:D}";
+
+    /// <summary>
+    /// The Space a client route is in, or <c>null</c> for a route outside every Space.
+    /// </summary>
+    /// <param name="relativePath">
+    /// The path relative to the base address, as <c>NavigationManager.ToBaseRelativePath</c> gives
+    /// it - with or without a query or fragment.
+    /// </param>
+    /// <returns>The Space id in the route's first two segments, if they are <c>spaces/{id}</c>.</returns>
+    public static Guid? SpaceIn(string? relativePath)
+    {
+        var path = PathOf(relativePath);
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        return segments is [SpacesSegment, var id, ..] && Guid.TryParseExact(id, "D", out var spaceId)
+            ? spaceId
+            : null;
+    }
+
+    /// <summary>
+    /// Whether a client route is one a person reaches without a Session - sign-in or registration -
+    /// where the context bar is never drawn.
+    /// </summary>
+    /// <param name="relativePath">The path relative to the base address.</param>
+    /// <returns><c>true</c> for sign-in and registration, with or without a query.</returns>
+    public static bool IsReachedWithoutASession(string? relativePath)
+    {
+        var path = PathOf(relativePath);
+
+        return path == SignIn.TrimStart('/') || path == Register.TrimStart('/');
+    }
+
+    private static string PathOf(string? relativePath) =>
+        (relativePath ?? string.Empty).Split(PathEnds)[0].Trim('/');
 }

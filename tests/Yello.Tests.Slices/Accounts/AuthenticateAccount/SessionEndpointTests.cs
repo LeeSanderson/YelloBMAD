@@ -4,6 +4,7 @@ using System.Text.Json;
 using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.Accounts;
+using Yello.Contracts.Spaces;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
 
@@ -43,6 +44,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
     private const string WrongPassword = "a-different-password-entirely-2?";
     private const string ClientOrigin = "https://client.yello.test";
     private const string OtherOrigin = "https://attacker.example.test";
+    private const string SessionCookie = "yello_session";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -890,24 +892,25 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
     }
 
     // ---------------------------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------------------------
     // Story 1.7 - sign-out (open question 4: DELETE /api/v1/sessions, 204, anti-forgery required,
-    // idempotent). Written as red-phase scaffolds by the ATDD run on 2026-10-24; today the route has
-    // no DELETE handler. In this class rather than a new one: a container-backed class is one more
-    // SQL Server engine on a full run.
+    // idempotent). In this class rather than a new one: a container-backed class is one more SQL
+    // Server engine on a full run.
     //
-    // NOT ASSERTED, AND WHY: that a copy of the pre-sign-out cookie is refused when replayed. The
-    // Session is a stateless cookie ticket (no ticket store), so SignOutAsync expires the cookie in
-    // the browser and nothing on the server remembers the ticket. AC11's "ends the Session on the
-    // server" is read here as "the server answers the sign-out and instructs the browser to drop the
-    // cookie"; server-side revocation is FR-34's (SM-2) and is recorded in the checklist as a
-    // decision for dev-story to record, not invented here.
+    // SIGN-OUT ENDS THE SESSION ON THE SERVER. FR-2 / CAP-2 / story 1.4 AC3: "a Session that has
+    // expired or been invalidated grants access to nothing". Lee's decision (a) of 2026-10-24: sign-out
+    // stamps the Account's SessionsValidAfter, and every authenticated request compares it with the
+    // ticket's issue instant. So a replayed pre-sign-out cookie is refused (401), and a Session issued
+    // after sign-out is served. Sign-out ends the Account's Sessions on every device - an accepted
+    // consequence of the same decision.
     // ---------------------------------------------------------------------------------------------
 
     /// <summary>
     /// AC11 / Q4 - signing out answers <c>204</c>, expires the Session cookie, and the next request
-    /// carrying what the browser now holds is refused.
+    /// carrying what the browser now holds is refused - and so is a copy of the cookie taken before
+    /// sign-out, replayed (FR-2: an invalidated Session grants access to nothing).
     /// </summary>
-    [Fact(Skip = "red: AC11 - DELETE /api/v1/sessions does not exist yet (story 1.7 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-2")]
     [Trait("Requirement", "UX-DR31")]
     public async Task Sign_out_ends_the_Session_and_expires_its_cookie()
@@ -918,6 +921,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? before = null;
         WireResponse? signOut = null;
         WireResponse? after = null;
+        WireResponse? replayed = null;
         string? expiry = null;
 
         await HostProcess.RunAsync(connectionString, Configured, async client =>
@@ -929,14 +933,19 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
 
             before = await session.CurrentSessionAsync();
 
+            // A copy of the Session cookie as it stood before sign-out - what an attacker who lifted
+            // it, or a second browser holding the same Session, would replay.
+            var copied = session.Cookies[SessionCookie];
+
             // A token minted while anonymous is refused once a Session exists
             // (TESTING-CONVENTIONS.md:227-233), so it is re-fetched after sign-in.
             await session.FetchAntiforgeryTokenAsync();
 
             signOut = await session.DeleteAsync(SessionRoutes.Authenticate);
-            expiry = session.SetCookieFor("yello_session");
+            expiry = session.SetCookieFor(SessionCookie);
 
             after = await session.CurrentSessionAsync();
+            replayed = await session.CurrentSessionAsync($"{SessionCookie}={copied}");
         });
 
         Assert.NotNull(before);
@@ -953,13 +962,80 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
 
         Assert.NotNull(after);
         Assert.Equal(HttpStatusCode.Unauthorized, after.StatusCode);
+
+        // The server ended the Session, not only the browser's copy of it (Lee's decision (a)).
+        Assert.NotNull(replayed);
+        Assert.Equal(HttpStatusCode.Unauthorized, replayed.StatusCode);
+    }
+
+    /// <summary>
+    /// AC11 / FR-2 - signing out ends the Sessions issued before it, and only those: a fresh sign-in
+    /// after sign-out is served, on a Session-only route and on the Space switcher alike, while the
+    /// pre-sign-out cookie replayed beside it is still refused.
+    /// </summary>
+    /// <remarks>
+    /// The other half of <see cref="Sign_out_ends_the_Session_and_expires_its_cookie"/>: a revocation
+    /// that refused every later Session too would pass that case and lock the Account out. Both
+    /// cookies are presented on the same Host in the same minute, so the comparison is the ticket's
+    /// issue instant against the Account's <c>SessionsValidAfter</c> and nothing coarser.
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "FR-2")]
+    [Trait("Requirement", "AD-27")]
+    public async Task A_Session_issued_after_sign_out_is_served_and_the_one_before_is_not()
+    {
+        var connectionString = Available();
+        var address = RandomAddress();
+
+        WireResponse? fresh = null;
+        WireResponse? freshSwitcher = null;
+        WireResponse? replayed = null;
+        WireResponse? replayedSwitcher = null;
+
+        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        {
+            var session = new WireSession(client);
+
+            await RegisterAsync(session, address);
+            Assert.Equal(HttpStatusCode.NoContent, (await session.SignInAsync(address, Password)).StatusCode);
+
+            var copied = session.Cookies[SessionCookie];
+
+            await session.FetchAntiforgeryTokenAsync();
+            Assert.Equal(HttpStatusCode.NoContent, (await session.DeleteAsync(SessionRoutes.Authenticate)).StatusCode);
+
+            // Anonymous again, so the token minted for the signed-in identity is refused; re-fetched.
+            await session.FetchAntiforgeryTokenAsync();
+            Assert.Equal(HttpStatusCode.NoContent, (await session.SignInAsync(address, Password)).StatusCode);
+
+            fresh = await session.CurrentSessionAsync();
+            freshSwitcher = await session.GetAsync(SpaceRoutes.Directory);
+
+            replayed = await session.CurrentSessionAsync($"{SessionCookie}={copied}");
+
+            var replay = new WireSession(client);
+            replay.HoldCookie(SessionCookie, copied);
+            replayedSwitcher = await replay.GetAsync(SpaceRoutes.Directory);
+        });
+
+        Assert.NotNull(fresh);
+        Assert.Equal(HttpStatusCode.NoContent, fresh.StatusCode);
+
+        Assert.NotNull(freshSwitcher);
+        Assert.Equal(HttpStatusCode.OK, freshSwitcher.StatusCode);
+
+        Assert.NotNull(replayed);
+        Assert.Equal(HttpStatusCode.Unauthorized, replayed.StatusCode);
+
+        Assert.NotNull(replayedSwitcher);
+        Assert.Equal(HttpStatusCode.Unauthorized, replayedSwitcher.StatusCode);
     }
 
     /// <summary>
     /// AC11 / AR-14 - sign-out is state-changing, so without an anti-forgery token it is refused and
     /// the Session survives; the same request with the token then succeeds.
     /// </summary>
-    [Fact(Skip = "red: AC11 - DELETE /api/v1/sessions does not exist yet (story 1.7 Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-14")]
     public async Task Sign_out_without_an_antiforgery_token_is_refused_and_the_Session_survives()
     {
@@ -998,7 +1074,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
     /// Q4 - sign-out is idempotent: a caller holding no Session is answered <c>204</c>, not
     /// <c>401</c>, so a double press is harmless.
     /// </summary>
-    [Fact(Skip = "red: AC11 - DELETE /api/v1/sessions does not exist yet (story 1.7 Task 5; idempotence is open question 4)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "AR-14")]
     public async Task Sign_out_without_a_Session_answers_204()

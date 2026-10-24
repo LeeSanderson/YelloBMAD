@@ -111,6 +111,14 @@
         <button type="button" class="dismiss" aria-label="Dismiss this error">&times;</button>
     </div>
 
+    <!--
+        SCROLL RESTORATION IS DISABLED, globally, before the runtime loads (story 1.7, AC8 / UX-DR33,
+        open question 10). A browser restoring a scroll position on Back is the browser carrying a
+        Space-scoped surface's state across a navigation the client has just purged; manual means
+        the client decides, and it decides nothing. Global covers every Space-scoped route and costs
+        nothing on the three that are not. Inline, so no script file is added for one statement.
+    -->
+    <script>history.scrollRestoration = 'manual';</script>
     <script src="_framework/blazor.webassembly#[.{fingerprint}].js"></script>
 </body>
 

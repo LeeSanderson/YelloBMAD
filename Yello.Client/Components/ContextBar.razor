@@ -1,0 +1,218 @@
+@using Yello.Client.Sessions
+@using Yello.Client.Spaces
+@using Yello.Contracts.Spaces
+
+@implements IDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceDirectory Directory
+@inject SessionState Session
+@inject AntiforgeryTokenSource Antiforgery
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+@*
+    THE CONTEXT BAR. AC4, AC5, AC6, AC11; UX-DR9, UX-DR28, UX-DR39; DESIGN.md:162-168, :454;
+    EXPERIENCE.md:48, :202, :279.
+
+    ALWAYS PRESENT ONCE AUTHENTICATED, AND NEVER HIDDEN. MainLayout renders it above <main> on every
+    authenticated surface. It is sticky to the top, has no menu to hide behind and no breakpoint that
+    removes anything: at a narrow width its contents wrap, and the Role chip survives every width
+    (UX-DR41).
+
+    THE SHELL BEFORE THE CONTENTS, AND NEVER A NAME THAT DID NOT COME FROM THE SERVER ON THIS LOAD.
+    The Space name and the Role chip render from ActiveSpaceState.Current - the active Space's own
+    answer for this Space on this load - and from nothing else (AC10, EXPERIENCE.md:279). Before it
+    arrives, after a purge, and on an authenticated surface outside any Space (the refusal page, the
+    no-Space state) the bar is its shell: the switcher trigger and Sign out, no name and no chip
+    (open question 7).
+
+    ITS ACCESSIBLE NAME STATES WHAT THE ROLE PERMITS (AC6): "{Space} - {Role}, {permits}", composed
+    from the resources with the name as an argument. A <nav> with tabindex="-1", so focus can be
+    moved to it after a switch and it stays out of the tab order.
+
+    AFTER A SWITCH, FOCUS MOVES HERE AND THE DESTINATION IS ANNOUNCED POLITELY (AC4, UX-DR39) - only
+    the destination's name and Role, never the departed Space (UX-DR38). The departed Space's
+    announcement is purged with everything else. A first arrival - after sign-in, or a deep link - is
+    a navigation, not a switch: the page's own heading takes focus then.
+
+    SIGN OUT asks the server to end the Session (which refuses every copy of the cookie from then
+    on), then runs the same purge an expired Session does and lands on sign-in with no reason.
+*@
+
+<nav class="context-bar" tabindex="-1" aria-label="@AccessibleName" @ref="_bar">
+    <div class="context-bar__space">
+        <button type="button"
+                class="context-bar__switcher"
+                aria-expanded="@(_open ? "true" : "false")"
+                aria-controls="@ListId"
+                @onclick="ToggleAsync"
+                @ref="_trigger">
+            @if (ActiveSpace.Current is { } current)
+            {
+                <span class="type-space-name context-bar__space-name">@current.Name</span>
+            }
+            <span class="context-bar__switch-label">@Localizer["SwitchSpaceLabel"]</span>
+        </button>
+
+        @if (ActiveSpace.Current is { } held)
+        {
+            <RoleChip Role="@held.Role" />
+        }
+    </div>
+
+    <button type="button" class="context-bar__sign-out" @onclick="SignOutAsync">@Localizer["SignOutLabel"]</button>
+
+    @if (_open && _spaces is { } spaces)
+    {
+        <SpaceSwitcher ListId="@ListId"
+                       Spaces="@spaces"
+                       ActiveSpaceId="@ActiveSpace.SpaceId"
+                       OnDismissed="Dismiss" />
+    }
+
+    <p class="visually-hidden" role="status">@_announcement</p>
+</nav>
+
+@code {
+    private const string ListId = "space-switcher-list";
+
+    private ElementReference _bar;
+    private ElementReference _trigger;
+
+    private bool _open;
+    private bool _focusBar;
+    private bool _focusTrigger;
+    private int _arrivalsSeen;
+    private string _announcement = string.Empty;
+    private IReadOnlyList<SpaceIdentityResponse>? _spaces;
+
+    private string AccessibleName => ActiveSpace.Current is { } current
+        ? RoleCopy.Compose(Copy, RoleCopy.AccessibleNameKey, current.Name, current.Role)
+        : Localizer["ContextBarShellName"].Value;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        _arrivalsSeen = ActiveSpace.Arrivals;
+        ActiveSpace.Changed += OnActiveSpaceChanged;
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        ActiveSpace.Changed -= OnActiveSpaceChanged;
+        Navigation.LocationChanged -= OnLocationChanged;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusBar)
+        {
+            _focusBar = false;
+            await _bar.FocusAsync();
+        }
+        else if (_focusTrigger)
+        {
+            _focusTrigger = false;
+            await _trigger.FocusAsync();
+        }
+        else
+        {
+            // Nothing asked for focus on this render; it stays where the person put it.
+        }
+    }
+
+    private string Copy(string key) => Localizer[key].Value;
+
+    private void OnActiveSpaceChanged(object? sender, EventArgs args)
+    {
+        if (ActiveSpace.Current is not { } current)
+        {
+            // A purge: the departed Space's announcement goes with it, and the list closes.
+            _announcement = string.Empty;
+            _open = false;
+        }
+        else if (ActiveSpace.Arrivals != _arrivalsSeen)
+        {
+            _arrivalsSeen = ActiveSpace.Arrivals;
+
+            if (ActiveSpace.LastArrivalWasSwitch)
+            {
+                _announcement = RoleCopy.Compose(Copy, RoleCopy.SwitchAnnouncementKey, current.Name, current.Role);
+                _focusBar = true;
+            }
+        }
+        else
+        {
+            // A redraw with nothing new to announce.
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task ToggleAsync()
+    {
+        if (_open)
+        {
+            _open = false;
+            return;
+        }
+
+        // Open at once on what is held, then asked again: a Membership may have changed since the
+        // last look, and the list redraws with the fresh answer when it arrives.
+        _spaces = Directory.Current ?? [];
+        _open = true;
+
+        StateHasChanged();
+
+        if (await Directory.RefreshAsync(CancellationToken.None) is { } fresh)
+        {
+            _spaces = fresh;
+        }
+    }
+
+    /// <summary>
+    /// Any navigation closes the list - choosing a row included, which is how a row closes it.
+    /// </summary>
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (_open)
+        {
+            _open = false;
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void Dismiss()
+    {
+        _open = false;
+        _focusTrigger = true;
+    }
+
+    private async Task SignOutAsync()
+    {
+        // The server first, so every copy of the cookie is refused from now on - then the purge.
+        // A sign-out the server never heard of still purges this client: the person asked to leave.
+        if (await Antiforgery.EnsureTokenAsync())
+        {
+            try
+            {
+                using var response = await Http.DeleteAsync(new Uri(SessionRoutes.Authenticate, UriKind.Relative));
+            }
+            catch (HttpRequestException)
+            {
+                // Unreachable server: the purge below still runs.
+            }
+            catch (OperationCanceledException)
+            {
+                // Timed out: the purge below still runs.
+            }
+        }
+
+        await Session.SignedOutAsync();
+    }
+}

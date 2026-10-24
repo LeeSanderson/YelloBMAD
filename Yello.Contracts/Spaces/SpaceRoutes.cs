@@ -26,6 +26,32 @@ public static class SpaceRoutes
     public static string SpaceIdParameter => "spaceId";
 
     /// <summary>
+    /// <c>GET</c> here for the Space switcher: every Space the caller holds a Membership in, as
+    /// <see cref="SpaceIdentityResponse"/> rows ordered by name then id. Answers <c>200</c> - an empty
+    /// list included - or <c>401</c> without a Session.
+    /// </summary>
+    /// <remarks>
+    /// <b>Account-scoped, not Space-scoped</b> (AD-24): it carries no <c>{spaceId}</c>, so Space
+    /// resolution never runs on it and it is never a refusal surface. It is one of exactly two such
+    /// surfaces; Account settings is the other.
+    /// </remarks>
+    public static string Directory => "/api/v1/spaces";
+
+    /// <summary>
+    /// <c>GET</c> here for the active Space's own answer - its name and the caller's Role in it, read
+    /// on this request - as an <see cref="ActiveSpaceResponse"/>. <c>404</c> for a Space the caller
+    /// holds no Membership in or that does not exist, exactly as every Space-scoped route answers.
+    /// </summary>
+    public static string Active => "/api/v1/spaces/{spaceId:guid}";
+
+    /// <summary>
+    /// The active Space's path for one Space, as a client calls it.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The path.</returns>
+    public static string ActiveOf(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}";
+
+    /// <summary>
     /// <c>GET</c> here for the active Space's Statuses, in Board order. Answers <c>200</c> with the
     /// list, <c>401</c> without a Session, and <c>404</c> for a Space the caller holds no Membership
     /// in or that does not exist.

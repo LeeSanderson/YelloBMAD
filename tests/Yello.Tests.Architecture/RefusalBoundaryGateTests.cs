@@ -285,11 +285,10 @@ public sealed class RefusalBoundaryGateTests
     /// reach <c>Membership</c> and <c>Space</c>, and only for identity.
     /// </summary>
     /// <remarks>
-    /// <b>Red-phase scaffold, ATDD run 2026-10-24.</b> Today no <c>GET /api/v1/spaces</c> endpoint is
-    /// mapped, so the first assertion fails. Vacuity guard: the same walk must find the statuses
-    /// endpoint reaching <c>StatusDefinition</c>, so a walk that reads nothing cannot pass.
+    /// Vacuity guard: the same walk must find the statuses endpoint reaching
+    /// <c>StatusDefinition</c>, so a walk that reads nothing cannot pass.
     /// </remarks>
-    [Fact(Skip = "red: AC3 - GET /api/v1/spaces is not mapped yet (story 1.7 Task 3)")]
+    [Fact]
     [Trait("Requirement", "FR-9")]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-24")]
@@ -304,10 +303,10 @@ public sealed class RefusalBoundaryGateTests
 
         var endpoints = RouteTable();
 
-        var switcher = endpoints.SingleOrDefault(endpoint => endpoint.RoutePattern.RawText == "/api/v1/spaces"
+        var switcher = endpoints.SingleOrDefault(endpoint => endpoint.RoutePattern.RawText == Yello.Contracts.Spaces.SpaceRoutes.Directory
             && endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()?.HttpMethods.Contains("GET") == true);
 
-        Assert.True(switcher is not null, "No GET /api/v1/spaces endpoint is mapped - story 1.7 Task 3 maps it.");
+        Assert.True(switcher is not null, "No GET /api/v1/spaces endpoint is mapped.");
 
         using var graph = new CallGraph();
 
@@ -318,6 +317,94 @@ public sealed class RefusalBoundaryGateTests
             "The Space switcher reaches Space-scoped content. AD-24: an Account-scoped surface returns "
             + "Space identity (id, name) and nothing else - no count, no Role, no Status, no record.");
     }
+
+    /// <summary>
+    /// Story 1.7 / AD-24 - every endpoint the pipeline establishes an Account-scoped context for names
+    /// one of AD-24's two surfaces, and the set of such endpoints is exactly the one this story maps.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// An Account-scoped endpoint reads across Spaces under the <c>AccountId</c> key, so a third one
+    /// is an amendment to AD-24 rather than a code change: adding one fails here until this gate's
+    /// expected set is edited, which is where the argument belongs. Account settings (stories 1.8 and
+    /// 5.4) is the other surface AD-24 names and has no endpoint yet.
+    /// </para>
+    /// <para>
+    /// Read from the real route table. <b>Vacuity guard:</b> the switcher is found marked, and its
+    /// surface is <c>SpaceSwitcher</c>.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "AD-24")]
+    public void Every_Account_scoped_endpoint_names_an_AD_24_surface()
+    {
+        var marked = RouteTable()
+            .Select(endpoint => (
+                Endpoint: endpoint,
+                Marker: endpoint.Metadata.FirstOrDefault(item => item.GetType().FullName == AccountScopedMarkerName)))
+            .Where(pair => pair.Marker is not null)
+            .Select(pair => (
+                Route: pair.Endpoint.RoutePattern.RawText,
+                Surface: pair.Marker!.GetType().GetProperty("Surface")?.GetValue(pair.Marker)?.ToString()))
+            .ToList();
+
+        Assert.Equal([(Yello.Contracts.Spaces.SpaceRoutes.Directory, "SpaceSwitcher")], marked);
+
+        Assert.All(marked, entry => Assert.Contains(entry.Surface, Enum.GetNames<Yello.Host.Spaces.AccountScopedSurface>()));
+    }
+
+    /// <summary>
+    /// Story 1.7 / AD-24 - <c>Space</c>, which carries no row-level security policy, is read only by
+    /// the types named here: the switcher's directory (through a join from the policy-protected
+    /// <c>Membership</c> read), the active Space's name reader (for the Space resolved on that request),
+    /// and registration (which creates one).
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Why a gate rather than a policy.</b> <c>Space</c> stays policy-free by Lee's decision at story
+    /// 1.5, pending the AD-24 amendment, so any type reading it could name any Space in the database.
+    /// The model configurations and the context refer to the type without reading anything.
+    /// </para>
+    /// <para>
+    /// <b>Vacuity guard:</b> the directory is found among the dependents.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "AD-24")]
+    public void Space_is_read_only_where_named()
+    {
+        const string space = "Yello.Domain.Spaces.Space";
+
+        string[] permitted =
+        [
+            space,
+            "Yello.Infrastructure.Persistence.AccountSpaceDirectory",
+            "Yello.Infrastructure.Persistence.ActiveSpaceNameReader",
+            "Yello.Application.Accounts.RegisterAccount.RegisterAccountHandler",
+            "Yello.Domain.Accounts.AccountRegistration",
+            "Yello.Infrastructure.Persistence.AccountRegistrationStore",
+            "Yello.Infrastructure.Persistence.YelloDbContext",
+            "Yello.Infrastructure.Persistence.Configurations.SpaceConfiguration",
+            "Yello.Infrastructure.Persistence.Configurations.MembershipConfiguration",
+            "Yello.Infrastructure.Persistence.Configurations.StatusDefinitionConfiguration",
+            "Yello.Infrastructure.Persistence.Configurations.SpacePresenceConfiguration",
+        ];
+
+        var dependents = DependentsOf(space);
+
+        Assert.Contains("Yello.Infrastructure.Persistence.AccountSpaceDirectory", dependents);
+
+        var offenders = dependents.Where(name => !permitted.Contains(name, StringComparer.Ordinal)).ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            $"{string.Join(", ", offenders)} refer to {space}, which carries no policy - so a reader of it "
+            + "could name any Space. The switcher reaches Space names only through its Membership join.");
+    }
+
+    private const string AccountScopedMarkerName = "Yello.Host.Spaces.AccountScopedEndpoint";
 
     /// <summary>
     /// A-12 - nothing but the pipeline depends on the capability matrix or the refusal recorder.
@@ -387,7 +474,12 @@ public sealed class RefusalBoundaryGateTests
         Assert.Contains(PipelineTypeName, readers);
 
         // The record's own compiler-generated members (Equals, ToString, Deconstruct) read it too.
-        var offenders = readers.Where(name => name != PipelineTypeName && name != context).ToList();
+        // Story 1.7 names one more: the active Space's own answer, which REPORTS the pipeline's
+        // resolution to the context bar and decides nothing by Role. It lives in the pipeline's
+        // namespace for that reason, and is named here rather than let in by a looser predicate.
+        string[] permitted = [PipelineTypeName, context, "Yello.Host.Spaces.ActiveSpaceEndpoints"];
+
+        var offenders = readers.Where(name => !permitted.Contains(name, StringComparer.Ordinal)).ToList();
 
         Assert.True(
             offenders.Count == 0,

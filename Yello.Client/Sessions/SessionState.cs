@@ -6,14 +6,13 @@ namespace Yello.Client.Sessions;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>THE PURGE THIS CLASS PERFORMS IS VERY NEARLY EMPTY TODAY, AND THAT MUST BE READ AS A SEAM
-/// RATHER THAN AS COVERAGE.</b> There is no replica, no cached Board, no filter state, no Space
-/// switcher and no Space-scoped client state of any kind - the client holds three fields in one
-/// component. A test asserting "everything Space-scoped is purged" would pass against a system with
-/// nothing to purge, which is the vacuous-gate defect this repository keeps rediscovering. What is
-/// asserted instead is what this seam <i>does</i>: that registrations run, that they run before the
-/// announcement, and that a failing one does not strand the rest. Stories 1.7 and epic 2 extend it
-/// to Space switch, sign-out and the Board.
+/// <b>THE PURGE THIS CLASS PERFORMS IS STILL NEARLY EMPTY, AND THAT MUST BE READ AS A SEAM RATHER
+/// THAN AS COVERAGE.</b> Since story 1.7 two things register with it: the active Space's state
+/// (<c>ActiveSpaceState</c>, which holds the context bar's name and Role and is where epic 2's Board
+/// will register), and the Space switcher's list (<c>SpaceDirectory</c>). There is still no replica,
+/// no cached Board and no filter state. What is asserted is what this seam <i>does</i>: that
+/// registrations run, that they run before the announcement, and that a failing one does not strand
+/// the rest - for a Session that ends under the person and for one they end themselves.
 /// </para>
 /// <para>
 /// <b>Purge before announce (UX-DR30), and the order is the point.</b> Reversing it renders a
@@ -48,6 +47,8 @@ public sealed class SessionState : IDisposable
     private readonly List<Registration> _purges = [];
 
     private Func<Task>? _announce;
+
+    private Func<Task>? _announceSignOut;
 
     /// <summary>
     /// Cancelled when the Session ends, so that requests already on the wire do not deliver
@@ -94,6 +95,15 @@ public sealed class SessionState : IDisposable
     /// Returns the User to sign-in with the reason stated. Runs strictly after every purge.
     /// </param>
     public void AnnounceSessionEndWith(Func<Task> announce) => _announce = announce;
+
+    /// <summary>
+    /// Wires where a sign-out lands - in the composition root, once. Story 1.7, open question 4.
+    /// </summary>
+    /// <param name="announce">
+    /// Returns the person to sign-in with no reason stated: they chose this, and nothing ended under
+    /// them. Runs strictly after every purge, exactly as <see cref="AnnounceSessionEndWith"/>'s does.
+    /// </param>
+    public void AnnounceSignOutWith(Func<Task> announce) => _announceSignOut = announce;
 
     /// <summary>
     /// Records that a sign-in succeeded - and drops the anti-forgery token, deliberately.
@@ -166,7 +176,21 @@ public sealed class SessionState : IDisposable
     /// where it was would be strictly worse than either outcome: it is the state UX-DR30 describes,
     /// with Space-scoped content still on screen.
     /// </remarks>
-    public async Task SessionEndedAsync()
+    public Task SessionEndedAsync() => EndAsync(_announce);
+
+    /// <summary>
+    /// Ends the Session on this client because the person signed out: the same purge as
+    /// <see cref="SessionEndedAsync"/>, differing only in where it lands. AC7, AC11.
+    /// </summary>
+    /// <remarks>
+    /// Called after the server has been asked to end the Session (<c>DELETE /api/v1/sessions</c>), so
+    /// a lifted copy of the cookie is refused too. One purge implementation for both, deliberately: a
+    /// second would be a second place to forget a registration.
+    /// </remarks>
+    /// <returns>A task that completes once everything is purged and the landing is announced.</returns>
+    public Task SignedOutAsync() => EndAsync(_announceSignOut);
+
+    private async Task EndAsync(Func<Task>? announce)
     {
         IsSignedIn = false;
         AntiforgeryRequestToken = null;
@@ -223,9 +247,9 @@ public sealed class SessionState : IDisposable
             // surface. Reaching it only when every purge returned normally made the announcement
             // conditional on the thing most likely to fail - so the one case that needed the
             // navigation most was the one that skipped it.
-            if (_announce is not null)
+            if (announce is not null)
             {
-                await _announce().ConfigureAwait(false);
+                await announce().ConfigureAwait(false);
             }
         }
     }
