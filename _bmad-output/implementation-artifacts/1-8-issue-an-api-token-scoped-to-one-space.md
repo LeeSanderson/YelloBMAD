@@ -4,7 +4,7 @@ baseline_commit: e074c55fe80e68ae495deb7fa07ba177d5995332
 
 # Story 1.8: Issue an API Token scoped to one Space
 
-Status: review
+Status: done
 
 Epic: 1 — An Account, a Space of your own, and a boundary that holds
 Story key: `1-8-issue-an-api-token-scoped-to-one-space`
@@ -169,6 +169,34 @@ AC1–AC7 are reproduced **verbatim** from `epics.md:846-875` (`status: final`),
   - [x] Add ledger entries: to **3.3**, **4.5** and **5.4** — "the Token is invalidated by the `ApiToken → Membership` cascade; your slice must delete the Membership row (5.4: before the Account row) inside its own transaction, and add V-3's case for your event"; to **2.1** — Idempotency-Key on issuance must never replay the plaintext, and the first Space-scoped write must show a Viewer's Token refused `403` (V-1); to **8.3** — partition by the `token-id` claim; to **1.9** — lift I-12, the Token half of I-11 and V-3 into the Isolation/Revocation suites on both surfaces; and any Q-decision whose cost lands on a later story.
   - [x] Update `tests/TESTING-CONVENTIONS.md` with the bearer helpers and the "a Token request attaches no cookie" rule.
   - [x] **Do not add review narration to source files** (owned by Lee, project-wide). Do not tick this unless the diff holds it.
+
+### Review Findings
+
+Code review 2026-10-24, diff `5fb808a..HEAD` (ATDD scaffolds `104fd92` and develop `3cb7f43`), review_mode full. Three layers: 39 raw findings (Blind Hunter 15, Edge Case Hunter 12, Acceptance Auditor 12), 31 after dedup: 0 decision-needed, 17 patch (all applied), 4 defer, 10 dismissed.
+
+- [x] [Review][Patch] The issue body was bound before the pipeline ran: a malformed body or wrong content type got a framework `400`/`415` ahead of the `401`, the boundary `404` and its `CrossSpace` record. The body is now read in the handler, after the pipeline. New wire case `A_malformed_issue_body_is_answered_by_the_boundary_first` [Yello.Host/Endpoints/ApiTokenEndpoints.cs:IssueAsync]
+- [x] [Review][Patch] Every `400` on issue showed "Enter a name of 1 to 100 characters.", whatever its type, and the wire test pinned only the `urn:yello:problem:` prefix. The client now keys on `invalid-api-token`, reads the problem body once and hands it back from `SendStateChangeAsync`. The wire test pins the type and the trim boundary, and a new browser case covers the refusal [Yello.Client/Pages/AccountSettings.razor:ShowIssueRefusalAsync]
+- [x] [Review][Patch] Leaving the page during the Space refresh threw `ObjectDisposedException` from `OnInitializedAsync`. `LoadTokensAsync` now returns when the generation has moved [Yello.Client/Pages/AccountSettings.razor:LoadTokensAsync]
+- [x] [Review][Patch] A refused revoke was silent, and a malformed problem body escaped the click handler. The refusal is now shown in place, and `JsonException` is caught [Yello.Client/Pages/AccountSettings.razor:RevokeAsync]
+- [x] [Review][Patch] Overlapping list reads could put an older list over a newer one. Only the latest read is used [Yello.Client/Pages/AccountSettings.razor:LoadTokensAsync]
+- [x] [Review][Patch] The purge and `Dispose` left the focus flags set, so a render could focus an element that was gone [Yello.Client/Pages/AccountSettings.razor:PurgeAsync]
+- [x] [Review][Patch] After a `404` on issue, the Space that had gone stayed in the picker. The picker is now re-read [Yello.Client/Pages/AccountSettings.razor:ShowIssueRefusalAsync]
+- [x] [Review][Patch] The anti-forgery remark said a cookie request "is validated as before, whatever else it carries". That is false when the request also carries a valid bearer. The remark now states what the code does [Yello.Host/Sessions/AntiforgeryRequirement.cs]
+- [x] [Review][Patch] `An_ApiToken_row_is_admitted_only_for_a_real_Membership` claimed to show the FK is not hidden by RLS, but its two inserts could not show it. It now inserts the real pair under another Space's context, with the Membership anchored as invisible there, and the insert is accepted. This corrects Debug Log (i) [tests/Yello.Tests.Slices/Accounts/RegisterAccount/SpaceIsolationSchemaTests.cs]
+- [x] [Review][Patch] Stale ATDD remarks read as current state: "Every case is skipped", "their names are Task 3's", and "corrected in dev-story" [tests/Yello.Tests.Client/AccountSettingsTests.cs, tests/Yello.Tests.Architecture/ApiTokenGateTests.cs, SpaceIsolationSchemaTests.cs, ActiveSpaceEndpointTests.Tokens.cs]
+- [x] [Review][Patch] No duration case covered AC2's owned-Space branch, where the resolver opens a unit of work that the mismatch discards. Added `A_Token_mismatch_in_a_Space_its_Account_belongs_to_takes_as_long_to_refuse_as_a_non_member` (green) [SpaceBoundaryPipelineTests.cs]
+- [x] [Review][Patch] The member-mismatch branch left the request's `SpaceScope` resolved to the refused Space. A unit of work disposed without completing now clears the scope [Yello.Infrastructure/Persistence/MembershipActiveSpaceResolver.cs:UnitOfWork]
+- [x] [Review][Patch] The ledger was missing Q5's cost to 8.1 and Q4's cost to 1.9. Both are added [deferred-work.md]
+- [x] [Review][Patch] The browser list test found Space names in the picker, not the list. It now pairs each row's name with its Space [tests/Yello.Tests.Client/AccountSettingsTests.cs:The_Token_list_shows_names_and_Spaces_and_no_Role]
+- [x] [Review][Patch] ARCH-004 asserted the carrier's namespace, not its type. It now asserts `IssuedApiTokenResponse` [tests/Yello.Tests.Architecture/ApiTokenGateTests.cs]
+- [x] [Review][Patch] Cookie-plus-bearer was tested only with an unknown bearer. It now also uses a valid bearer bound elsewhere, with the cookie's Account a member of the route's Space: the answer is the `404`, with an anchor on the bound Space [ActiveSpaceEndpointTests.Tokens.cs]
+- [x] [Review][Patch] The fake never refused a name, and it served `400` as `application/json`. It now applies Q8 and serves every refusal as `application/problem+json`, as the Host does [tests/Yello.Tests.Client/FakeYelloApi.cs]
+- [x] [Review][Defer] A Membership removed between resolution and insert makes issuance a `500` [Yello.Infrastructure/Persistence/ApiTokenStore.cs:IssueAsync] — deferred to story 4.5, which builds Membership removal
+- [x] [Review][Defer] The AC12 exemption is proved only through the filter with a hand-set principal [SpaceBoundaryRouteTests.cs] — deferred to story 2.1, the first Space-scoped write a Token can reach
+- [x] [Review][Defer] Any caller can cost one indexed read per well-formed guess [ApiTokenAuthenticationHandler.cs] — deferred to story 2.9, the rate limiter
+- [x] [Review][Defer] The I-17 log check covers one Host run, not every Token path [ActiveSpaceEndpointTests.Tokens.cs] — deferred to story 1.9, which lifts the Token cases into the suites
+
+Dismissed (10): multiple `Authorization` values (joined, malformed, answered as no credential); alternate-key immutability (nothing changes a Membership's pair); empty picker with no explanation (story 3.3 already owns the no-Space state); name length in UTF-16 units; the purge-versus-disposal blind spot (already recorded in the Debug Log); "Copied." and focus-on-dismiss lack browser cases, and `Esc` asserts with no render wait (plant 15 caught it); a demoted Token refused `403` (V-1, already ledgered to 2.1); `.SessionOnly()` as metadata (recorded under Q5); Token traffic counted in presence (story 1.6 decision 1 counts Accounts); and the names-only secret gate (merged into the ARCH-004 patch).
 
 ## Dev Notes
 
@@ -487,3 +515,4 @@ Modified:
 
 - 2026-10-24: Story created (create-story). Status -> ready-for-dev.
 - 2026-10-24: Implemented (dev-story). Added the ApiToken table with a cascading composite FK to Membership; SHA-256-hashed `yello_pat_` secrets; a Token scheme behind a bearer-selecting policy scheme, looked up on every request with no cache and confined to Space-scoped routes; the bound-Space mismatch refused as the boundary 404; the issue, list and revoke endpoints; the Account settings page with show-once display; the anti-forgery exemption for Token requests; and four gates. Activated the 35 ATDD scaffolds (2 corrected) and added one FK case. All 19 plants were caught. Lee chose option (a) for AC9's sign-out clause; AC9 amended. Status -> review.
+- 2026-10-24: Code review (bmad-code-review). 39 raw findings, 31 triaged: 17 patches applied, 4 deferred (4.5, 2.1, 2.9, 1.9), 10 dismissed. The issue body is now read after the pipeline. Build clean; 434 total, 433 passed, 1 skipped. Status -> done.

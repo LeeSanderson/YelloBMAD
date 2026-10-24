@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Yello.Application.ApiTokens.IssueApiToken;
 using Yello.Application.ApiTokens.ListApiTokens;
 using Yello.Application.ApiTokens.RevokeApiToken;
@@ -61,23 +62,26 @@ public static class ApiTokenEndpoints
     /// <summary>
     /// Issues a Token bound to the active Space.
     /// </summary>
-    /// <param name="request">The body: the Token's name.</param>
     /// <param name="handler">The slice.</param>
     /// <param name="httpContext">
     /// The request, whose services hold the context the pipeline resolved - read at execution, because
-    /// minimal APIs bind arguments before the pipeline's filters have resolved anything.
+    /// minimal APIs bind arguments before the pipeline's filters have resolved anything. The body is
+    /// read here too, not bound as a parameter: a body the framework failed to bind would be answered
+    /// <c>400</c> or <c>415</c> before the pipeline ran, so a caller with no credential would not get
+    /// the <c>401</c>, and a non-member would get neither the boundary <c>404</c> nor its record.
     /// </param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>
     /// <c>201</c> with the Token and its plaintext - the only response that ever carries it - or
-    /// <c>400</c> for a name that is not 1-100 characters.
+    /// <c>400 invalid-api-token</c> for a body that is not JSON naming a Token of 1-100 characters.
     /// </returns>
     public static async Task<IResult> IssueAsync(
-        IssueApiTokenRequest? request,
         IssueApiTokenHandler handler,
         HttpContext httpContext,
         CancellationToken cancellationToken)
     {
+        var request = await ReadRequestAsync(httpContext.Request, cancellationToken).ConfigureAwait(false);
+
         if (!ApiTokenName.TryNormalise(request?.Name, out var name))
         {
             return Results.Problem(
@@ -101,6 +105,26 @@ public static class ApiTokenEndpoints
                 issued.Token.CreatedAt,
                 issued.Token.Plaintext),
             statusCode: StatusCodes.Status201Created);
+    }
+
+    /// <summary>
+    /// Reads the issue body, or <c>null</c> for one that is not JSON or does not parse.
+    /// </summary>
+    private static async Task<IssueApiTokenRequest?> ReadRequestAsync(HttpRequest request, CancellationToken cancellationToken)
+    {
+        if (!request.HasJsonContentType())
+        {
+            return null;
+        }
+
+        try
+        {
+            return await request.ReadFromJsonAsync<IssueApiTokenRequest>(cancellationToken).ConfigureAwait(false);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     /// <summary>

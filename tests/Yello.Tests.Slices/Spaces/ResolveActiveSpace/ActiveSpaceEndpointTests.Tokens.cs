@@ -748,7 +748,8 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <summary>
     /// AC12 / Q5 (a) - a request carrying a valid Session cookie <b>and</b> a bearer is authenticated by
     /// the bearer alone: with an invalid bearer it is <c>401</c>, though the same cookie alone is
-    /// served.
+    /// served; and with a valid bearer bound to another Space it is the boundary <c>404</c>, though
+    /// the cookie's Account is a member of the route's Space - the cookie is never consulted.
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-36")]
@@ -760,16 +761,27 @@ public sealed partial class ActiveSpaceEndpointTests
         var (address, name) = (RandomAddress(), DisplayName());
         var spaceId = Guid.NewGuid();
 
+        var otherSpaceId = Guid.NewGuid();
+
         WireResponse? cookieOnly = null;
         WireResponse? cookieAndBadBearer = null;
+        WireResponse? boundBearerServed = null;
+        WireResponse? cookieAndBearerBoundElsewhere = null;
 
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
-            await SeedNamedSpaceAsync(database, spaceId, "Alpha " + Suffix(), await AccountIdOfAsync(database, address), Role.Member);
+            var accountId = await AccountIdOfAsync(database, address);
+            await SeedNamedSpaceAsync(database, spaceId, "Alpha " + Suffix(), accountId, Role.Member);
+            await SeedNamedSpaceAsync(database, otherSpaceId, "Beta " + Suffix(), accountId, Role.Owner);
 
             cookieOnly = await session.GetAsync(SpaceRoutes.ActiveOf(spaceId));
             cookieAndBadBearer = await session.GetWithTokenAndCookiesAsync(SpaceRoutes.ActiveOf(spaceId), WellFormedUnknownToken());
+
+            var boundElsewhere = IssuedToken(await IssueAsync(session, otherSpaceId, "bound to Beta")).Plaintext;
+
+            boundBearerServed = await session.GetWithTokenAsync(SpaceRoutes.ActiveOf(otherSpaceId), boundElsewhere);
+            cookieAndBearerBoundElsewhere = await session.GetWithTokenAndCookiesAsync(SpaceRoutes.ActiveOf(spaceId), boundElsewhere);
         });
 
         Assert.NotNull(cookieOnly);
@@ -778,6 +790,14 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.NotNull(cookieAndBadBearer);
         Assert.Equal(HttpStatusCode.Unauthorized, cookieAndBadBearer.StatusCode);
         Assert.Equal(ProblemTypes.AuthenticationFailed, ProblemType(cookieAndBadBearer));
+
+        // Anchor: the bearer is valid where it is bound.
+        Assert.NotNull(boundBearerServed);
+        Assert.Equal(HttpStatusCode.OK, boundBearerServed.StatusCode);
+
+        Assert.NotNull(cookieAndBearerBoundElsewhere);
+        Assert.Equal(HttpStatusCode.NotFound, cookieAndBearerBoundElsewhere.StatusCode);
+        Assert.Equal(ProblemTypes.NotAvailable, ProblemType(cookieAndBearerBoundElsewhere));
     }
 
     /// <summary>
@@ -895,8 +915,8 @@ public sealed partial class ActiveSpaceEndpointTests
 
     /// <summary>
     /// Q8 - a Token's name is required, trimmed, 1-100 characters: an empty and a 101-character name are
-    /// <c>400</c> with a problem <c>type</c> the client can branch on, and nothing is written; a
-    /// 100-character name is issued.
+    /// <c>400 invalid-api-token</c>, the type the client branches on, and nothing is written; a
+    /// 100-character name is issued, and so is one padded with spaces beyond 100, which is trimmed.
     /// </summary>
     [Fact]
     [Trait("Priority", "P1")]
@@ -910,6 +930,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var accountId = Guid.Empty;
 
         WireResponse? longest = null;
+        WireResponse? padded = null;
         WireResponse? empty = null;
         WireResponse? tooLong = null;
 
@@ -920,6 +941,7 @@ public sealed partial class ActiveSpaceEndpointTests
             await SeedNamedSpaceAsync(database, spaceId, "Alpha " + Suffix(), accountId, Role.Member);
 
             longest = await IssueAsync(session, spaceId, new string('n', 100));
+            padded = await IssueAsync(session, spaceId, "  " + new string('p', 100) + "  ");
             empty = await IssueAsync(session, spaceId, "   ");
             tooLong = await IssueAsync(session, spaceId, new string('n', 101));
         });
@@ -927,19 +949,87 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.NotNull(longest);
         Assert.Equal(HttpStatusCode.Created, longest.StatusCode);
 
+        Assert.NotNull(padded);
+        Assert.Equal(HttpStatusCode.Created, padded.StatusCode);
+
+        using (var paddedBody = JsonDocument.Parse(padded.Body))
+        {
+            Assert.Equal(new string('p', 100), paddedBody.RootElement.GetProperty("name").GetString());
+        }
+
         foreach (var refused in new[] { empty, tooLong })
         {
             Assert.NotNull(refused);
             Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
-
-            var type = ProblemType(refused);
-
-            Assert.StartsWith("urn:yello:problem:", type, StringComparison.Ordinal);
-            Assert.NotEqual(ProblemTypes.AntiforgeryTokenMissing, type);
+            Assert.Equal(ProblemTypes.InvalidApiToken, ProblemType(refused));
         }
 
-        Assert.Single(await TokenRowsOfAsync(database, accountId));
+        Assert.Equal(2, (await TokenRowsOfAsync(database, accountId)).Count);
     }
+
+    /// <summary>
+    /// A body that is not JSON is read after the pipeline, not bound before it: with no credential it
+    /// is the authentication boundary's <c>401</c>, identical to a well-formed body with no
+    /// credential; from a non-member it is the boundary <c>404</c>, recorded; and from a member it is
+    /// <c>400 invalid-api-token</c>. Code review of story 1.8.
+    /// </summary>
+    [Fact]
+    [Trait("Priority", "P1")]
+    [Trait("Requirement", "FR-36")]
+    [Trait("Requirement", "AD-3")]
+    [Trait("Requirement", "AD-20")]
+    public async Task A_malformed_issue_body_is_answered_by_the_boundary_first()
+    {
+        var database = Available();
+        var (address, name) = (RandomAddress(), DisplayName());
+        var spaceId = Guid.NewGuid();
+        var foreign = Guid.NewGuid();
+        var accountId = Guid.Empty;
+
+        WireResponse? anonymousMalformed = null;
+        WireResponse? anonymousWellFormed = null;
+        WireResponse? nonMember = null;
+        WireResponse? member = null;
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            var anonymous = new WireSession(client);
+            anonymousMalformed = await anonymous.PostAsync(ApiTokenRoutes.IssueIn(spaceId), MalformedBody(), withAntiforgeryToken: false);
+            anonymousWellFormed = await anonymous.PostAsync(ApiTokenRoutes.IssueIn(spaceId), NameBody("script"), withAntiforgeryToken: false);
+
+            var session = await RegisteredAndSignedInAsync(client, address, name);
+            accountId = await AccountIdOfAsync(database, address);
+            await SeedNamedSpaceAsync(database, spaceId, "Alpha " + Suffix(), accountId, Role.Member);
+            await SeedForeignSpaceAsync(database, foreign, "Beta " + Suffix());
+
+            await session.FetchAntiforgeryTokenAsync();
+            nonMember = await session.PostAsync(ApiTokenRoutes.IssueIn(foreign), MalformedBody());
+            member = await session.PostAsync(ApiTokenRoutes.IssueIn(spaceId), MalformedBody());
+        });
+
+        Assert.NotNull(anonymousMalformed);
+        Assert.NotNull(anonymousWellFormed);
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousMalformed.StatusCode);
+        Assert.Equal(anonymousWellFormed.StatusCode, anonymousMalformed.StatusCode);
+        Assert.Equal(anonymousWellFormed.Body, anonymousMalformed.Body);
+        Assert.Equal(anonymousWellFormed.ContentType, anonymousMalformed.ContentType);
+
+        Assert.NotNull(nonMember);
+        Assert.Equal(HttpStatusCode.NotFound, nonMember.StatusCode);
+        Assert.Equal(ProblemTypes.NotAvailable, ProblemType(nonMember));
+
+        Assert.NotNull(member);
+        Assert.Equal(HttpStatusCode.BadRequest, member.StatusCode);
+        Assert.Equal(ProblemTypes.InvalidApiToken, ProblemType(member));
+
+        var refusal = Assert.Single(await RefusalsOfAsync(database, accountId));
+        Assert.Equal(foreign, refusal.TargetSpaceId);
+        Assert.Equal("CrossSpace", refusal.Kind);
+
+        Assert.Empty(await TokenRowsOfAsync(database, accountId));
+    }
+
+    private static StringContent MalformedBody() => new("{ not json", System.Text.Encoding.UTF8, "application/json");
 
     private static JsonContent NameBody(string name) => JsonContent.Create(new IssueApiTokenRequest(name), options: JsonOptions);
 
@@ -995,8 +1085,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
     /// <summary>
     /// The Account's <c>ApiToken</c> rows. The table carries no policy (Q4), so no session context is
-    /// needed - which is itself what Task 2 decides; if dev-story puts it under a policy, this read
-    /// and Q4's record change together.
+    /// needed; were it ever put under one, this read and Q4's record would change together.
     /// </summary>
     private static async Task<IReadOnlyList<TokenRow>> TokenRowsOfAsync(RegistrationDatabase database, Guid accountId)
     {

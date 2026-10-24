@@ -148,7 +148,7 @@ internal sealed class FakeYelloApi
         await route.FulfillAsync(new RouteFulfillOptions
         {
             Status = status,
-            ContentType = status == 404 || status == 401 ? "application/problem+json" : "application/json",
+            ContentType = status >= 400 ? "application/problem+json" : "application/json",
             Body = body,
             Headers = new Dictionary<string, string>(StringComparer.Ordinal)
             {
@@ -236,7 +236,13 @@ internal sealed class FakeYelloApi
             return (404, Problem(ProblemTypes.NotAvailable));
         }
 
-        var name = JsonSerializer.Deserialize<IssueApiTokenRequest>(body ?? "{}", JsonOptions)?.Name ?? string.Empty;
+        var name = (JsonSerializer.Deserialize<IssueApiTokenRequest>(body ?? "{}", JsonOptions)?.Name ?? string.Empty).Trim();
+
+        // The Host's Q8 rule, as the Host answers it.
+        if (name.Length is < 1 or > 100)
+        {
+            return (400, Problem(ProblemTypes.InvalidApiToken));
+        }
 
         var token = new FakeApiToken(Guid.NewGuid(), name, spaceId, listed.Name, DateTimeOffset.UtcNow);
         ApiTokens.Add(token);

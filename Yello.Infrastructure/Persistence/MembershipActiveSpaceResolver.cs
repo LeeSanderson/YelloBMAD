@@ -83,7 +83,7 @@ internal sealed class MembershipActiveSpaceResolver(YelloDbContext dbContext, Sp
             var context = new ActiveSpaceContext(accountId, spaceId, membership.Role);
             spaceScope.Resolve(context);
 
-            return new UnitOfWork(transaction, context);
+            return new UnitOfWork(transaction, context, spaceScope);
         }
         catch
         {
@@ -98,17 +98,35 @@ internal sealed class MembershipActiveSpaceResolver(YelloDbContext dbContext, Sp
     /// </summary>
     /// <param name="transaction">The transaction the unit of work runs in.</param>
     /// <param name="context">The resolved context.</param>
-    private sealed class UnitOfWork(IDbContextTransaction transaction, ActiveSpaceContext context)
+    /// <param name="spaceScope">
+    /// The request's Space scope, returned to matching nothing when the unit of work is disposed
+    /// without completing - a refusal after resolution (a Token bound to another Space, story 1.8, or
+    /// a denied capability) leaves no resolved Space behind, as a non-member's refusal does not.
+    /// </param>
+    private sealed class UnitOfWork(IDbContextTransaction transaction, ActiveSpaceContext context, SpaceScope spaceScope)
         : IActiveSpaceUnitOfWork
     {
+        private bool _completed;
+
         /// <inheritdoc />
         public ActiveSpaceContext Context => context;
 
         /// <inheritdoc />
-        public Task CompleteAsync(CancellationToken cancellationToken) =>
-            transaction.CommitAsync(cancellationToken);
+        public async Task CompleteAsync(CancellationToken cancellationToken)
+        {
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            _completed = true;
+        }
 
         /// <inheritdoc />
-        public ValueTask DisposeAsync() => transaction.DisposeAsync();
+        public ValueTask DisposeAsync()
+        {
+            if (!_completed)
+            {
+                spaceScope.Clear();
+            }
+
+            return transaction.DisposeAsync();
+        }
     }
 }

@@ -172,7 +172,7 @@ public sealed class ApiTokenGateTests
 
         var carrier = Assert.Single(carriers);
 
-        Assert.Equal("Yello.Contracts.ApiTokens", carrier.Namespace);
+        Assert.Equal(typeof(Yello.Contracts.ApiTokens.IssuedApiTokenResponse), carrier);
     }
 
     /// <summary>
@@ -182,7 +182,8 @@ public sealed class ApiTokenGateTests
     /// </summary>
     /// <remarks>
     /// The two methods are found by shape - a static <c>string ()</c> and a static
-    /// <c>byte[] (string)</c> on <c>ApiTokenSecret</c> - because their names are Task 3's.
+    /// <c>byte[] (string)</c> on <c>ApiTokenSecret</c> - because the type is internal to
+    /// <c>Yello.Infrastructure</c>, which grants this project no internals.
     /// </remarks>
     [Fact]
     [Trait("Requirement", "NFR-6")]

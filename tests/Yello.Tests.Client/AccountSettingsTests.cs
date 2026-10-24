@@ -10,18 +10,17 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds, written by the story 1.8 ATDD run on 2026-10-24.</b> Every case is skipped
-/// with the AC it waits for. The API is <see cref="FakeYelloApi"/> at the network edge - no Host, no
-/// database, no container - so this class adds no engine.
+/// <b>Written by the story 1.8 ATDD run on 2026-10-24 and active since its dev-story run.</b> The API
+/// is <see cref="FakeYelloApi"/> at the network edge - no Host, no database, no container - so this
+/// class adds no engine.
 /// </para>
 /// <para>
-/// <b>The selectors and copy are the story's</b> (Task 7 and its suggested copy): an <c>Account</c>
-/// link in <c>nav.context-bar</c> leading to <c>/account</c>; a <c>Name</c> field and a <c>Space</c>
-/// picker, labelled; a <c>Generate</c> button; the plaintext in a read-only field; <c>Copy</c> as the
-/// <c>button-primary</c>; <c>Done</c> asking "You will not be able to see this Token again." with
-/// <c>Dismiss</c> / <c>Keep showing</c>; <c>Revoke</c> asking "Scripts using this Token will stop
-/// working." No copy is specified anywhere in the planning set, so these are proposals: a different
-/// choice in dev-story is corrected here and recorded in the Debug Log.
+/// <b>The selectors and copy are the story's</b> (Task 7 and the copy in <c>ClientCopy.resx</c>): an
+/// <c>Account</c> link in <c>nav.context-bar</c> leading to <c>/account</c>; a <c>Name</c> field and a
+/// <c>Space</c> picker, labelled; a <c>Generate</c> button; the plaintext in a read-only field;
+/// <c>Copy</c> as the <c>button-primary</c>; <c>Done</c> asking "You will not be able to see this
+/// Token again." with <c>Dismiss</c> / <c>Keep showing</c>; <c>Revoke</c> asking "Scripts using this
+/// Token will stop working."
 /// </para>
 /// </remarks>
 [Trait("Suite", "Client")]
@@ -44,6 +43,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     private const string ShownOnce = "shown once";
     private const string DismissWarning = "You will not be able to see this Token again.";
     private const string RevokeWarning = "Scripts using this Token will stop working.";
+    private const string NameInvalid = "Enter a name of 1 to 100 characters.";
 
     private static readonly Guid Northwind = Guid.NewGuid();
     private static readonly Guid Harbour = Guid.NewGuid();
@@ -221,14 +221,52 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
 
             var body = await page.Locator(Main).InnerTextAsync();
 
-            Assert.Contains("nightly export", body, StringComparison.Ordinal);
-            Assert.Contains("Harbour Ops", body, StringComparison.Ordinal);
+            // Read off the list's rows, not the page: the Space picker holds the same Space names, so
+            // a page-wide search would pass with no Space in the list at all.
+            var rows = (await page.Locator($"{Main} .api-token-list__row").AllAsync()).ToList();
+            var named = new List<(string Name, string Space)>();
+
+            foreach (var row in rows)
+            {
+                named.Add((
+                    (await row.Locator(".api-token-list__name").InnerTextAsync()).Trim(),
+                    (await row.Locator(".api-token-list__space").InnerTextAsync()).Trim()));
+            }
+
+            Assert.Equal([("nightly export", "Northwind Redesign"), ("board sync", "Harbour Ops")], named);
             Assert.Equal(0, await page.Locator($"{Main} .role-chip").CountAsync());
 
             foreach (var role in new[] { "Owner", "Admin", "Member", "Viewer" })
             {
                 Assert.DoesNotContain(role, body, StringComparison.OrdinalIgnoreCase);
             }
+        }
+    }
+
+    /// <summary>
+    /// Q8 - a name the Host refuses (<c>400 invalid-api-token</c>) is answered beside the name field,
+    /// and no plaintext is shown. Added at code review of story 1.8: the message is keyed on the
+    /// problem type, not on the status alone.
+    /// </summary>
+    [Fact]
+    [Trait("Priority", "P1")]
+    public async Task A_refused_name_is_answered_beside_the_field_and_shows_no_Token()
+    {
+        var api = TwoSpaces();
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenAccountSettingsAsync(api, page);
+
+            await page.Locator(Main).GetByLabel("Name").FillAsync("   ");
+            await Button(page, "Generate").ClickAsync();
+
+            await page.Locator(Main).GetByText(NameInvalid).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Single(api.Requests, request => request.Method == "POST" && request.Path.EndsWith(IssueRouteSuffix, StringComparison.Ordinal));
+            Assert.Equal(0, await page.Locator("input[readonly]").CountAsync());
+            Assert.False(await HoldsAsync(page, api.IssuedSecret));
         }
     }
 

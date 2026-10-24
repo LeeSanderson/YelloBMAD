@@ -109,8 +109,11 @@ internal static class AntiforgeryRequirement
         // ambient credential, so a third-party page has nothing to ride, and a script has no
         // anti-forgery cookie to pair a token with. The exemption is exactly the Token's - a
         // principal only ApiTokenAuthenticationHandler builds, and only on a Space-scoped route that
-        // admits Tokens. A request carrying the Session cookie is validated as before, whatever else
-        // it carries; one carrying a bearer as well is authenticated by the bearer alone.
+        // admits Tokens. A request carrying the Session cookie and no bearer is validated as before.
+        // One carrying a valid bearer as well is authenticated by the bearer alone (open question 5),
+        // so it is exempt too: its cookie grants it nothing, and a third-party page cannot attach a
+        // bearer, since CORS admits one origin. One carrying an invalid bearer has no principal, so it
+        // is answered exactly as a request with no credential is.
         return SafeMethods.Contains(context.HttpContext.Request.Method)
             || ApiTokenPrincipal.IsToken(context.HttpContext.User)
             ? next(context)

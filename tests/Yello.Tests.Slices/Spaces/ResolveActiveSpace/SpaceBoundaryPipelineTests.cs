@@ -338,6 +338,32 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     }
 
     /// <summary>
+    /// Story 1.8 AC2 / AD-3 - the mismatch branch where the Token's Account IS a member of the route's
+    /// Space ("including for Spaces that same Account owns") costs what a non-member resolution costs:
+    /// there the resolver opens a unit of work that the branch then discards, a different path from a
+    /// non-member's rollback. Added at code review of story 1.8.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "FR-36")]
+    [Trait("Requirement", "AR-10")]
+    public async Task A_Token_mismatch_in_a_Space_its_Account_belongs_to_takes_as_long_to_refuse_as_a_non_member()
+    {
+        var database = Available();
+        var (caller, otherSpace) = await SeedCallerAndForeignSpaceAsync(database);
+        var tokenHolder = SpaceSeeding.NewAccount();
+        var bound = Guid.NewGuid();
+
+        await SeedSpaceWithMemberAsync(database, bound, tokenHolder, Role.Owner);
+        await AddMembershipAsync(database, otherSpace, tokenHolder.Id, Role.Admin);
+
+        var verdict = await DurationIndistinguishability.CompareAsync(
+            () => ResolveAsync(EstablishedWithBoundSpace(tokenHolder.Id, otherSpace, bound), "ReadProjectsAndTasks", () => { }).AsTask(),
+            () => ResolveAsync(caller, otherSpace, "ReadProjectsAndTasks", () => { }).AsTask());
+
+        Assert.True(verdict.AreIndistinguishable, verdict.Describe());
+    }
+
+    /// <summary>
     /// Story 1.8's permanent planted oracle - one arm's resolver answers "no Membership" without
     /// reading <c>Membership</c>, which is exactly what a mismatch branch that skipped the resolver
     /// would do, and the method must tell the two apart. Without this, the comparison above could pass

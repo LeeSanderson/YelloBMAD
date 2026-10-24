@@ -414,7 +414,8 @@
 }
 
 .api-token-reveal__status,
-.api-token-form__refusal {
+.api-token-form__refusal,
+.api-token-list__refusal {
     margin-block: 0;
     color: var(--text-muted);
 }

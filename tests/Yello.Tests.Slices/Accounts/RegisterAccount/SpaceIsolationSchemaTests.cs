@@ -331,8 +331,7 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
     /// <c>varbinary(32)</c> hash; and it has no <c>Role</c> and no <c>SpaceId</c> column.
     /// </summary>
     /// <remarks>
-    /// Written by the story 1.8 ATDD run. The column list is Task 2's; a different name chosen in
-    /// dev-story is corrected here and recorded in the Debug Log. <c>BoundSpaceId</c> rather than
+    /// Written by the story 1.8 ATDD run; the column list is Task 2's. <c>BoundSpaceId</c> rather than
     /// <c>SpaceId</c> is what keeps <see cref="Every_table_with_a_SpaceId_column_is_covered_by_the_policy"/>
     /// from demanding a predicate the authentication lookup could never satisfy.
     /// </remarks>
@@ -435,8 +434,10 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
     /// with another Account is refused with the foreign-key error (547). Rolled back either way.
     /// </summary>
     /// <remarks>
-    /// The insert runs under the Space's context, where the issue route writes it, so the case also
-    /// shows the foreign-key check is not hidden by <c>Membership</c>'s row-level security.
+    /// The inserts run under the Space's context, where the issue route writes them. A third insert,
+    /// of the real pair under <b>another</b> Space's context - where <c>Membership</c>'s filter hides
+    /// the row - is accepted too, which is what shows the foreign-key check is not hidden by
+    /// row-level security. (Code review of story 1.8: the two inserts alone could not show it.)
     /// </remarks>
     [Fact]
     [Trait("Requirement", "FR-36")]
@@ -479,6 +480,35 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
         Assert.Equal(547, refused.Number);
 
         await transaction.RollbackAsync(ct);
+
+        // Under another Space's context the Membership is invisible to a read - anchored here - and
+        // the foreign key still finds it.
+        await using var elsewhere = await database.OpenForSpaceAsync(Guid.NewGuid(), ct);
+        await using var elsewhereTransaction = await elsewhere.BeginTransactionAsync(ct);
+
+        await using (System.Data.Common.DbCommand visible = elsewhere.CreateCommand())
+        {
+            visible.Transaction = elsewhereTransaction;
+            visible.CommandText = "SELECT COUNT(*) FROM dbo.[Membership] WHERE SpaceId = @space";
+            visible.Parameters.Add(new SqlParameter("@space", spaceId));
+
+            Assert.Equal(0, Convert.ToInt32(await visible.ExecuteScalarAsync(ct), System.Globalization.CultureInfo.InvariantCulture));
+        }
+
+        await using (System.Data.Common.DbCommand insert = elsewhere.CreateCommand())
+        {
+            insert.Transaction = elsewhereTransaction;
+            insert.CommandText = """
+                INSERT INTO dbo.[ApiToken] (Id, AccountId, BoundSpaceId, Name, SecretHash, CreatedAt)
+                VALUES (NEWID(), @account, @space, N'probe', CRYPT_GEN_RANDOM(32), SYSDATETIMEOFFSET())
+                """;
+            insert.Parameters.Add(new SqlParameter("@account", member.Id));
+            insert.Parameters.Add(new SqlParameter("@space", spaceId));
+
+            Assert.Equal(1, await insert.ExecuteNonQueryAsync(ct));
+        }
+
+        await elsewhereTransaction.RollbackAsync(ct);
     }
 
     private RegistrationDatabase Available()

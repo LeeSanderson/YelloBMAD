@@ -119,6 +119,11 @@
             </form>
         }
 
+        @if (_revokeRefusal is { } revokeRefusal)
+        {
+            <p class="api-token-list__refusal" role="status">@revokeRefusal</p>
+        }
+
         @if (_tokens.Count == 0)
         {
             <p class="api-token-list__empty">@Localizer["ApiTokenListEmpty"]</p>
@@ -168,6 +173,13 @@
     private Guid _spaceId;
 
     private Guid? _confirmingRevoke;
+    private string? _revokeRefusal;
+
+    /// <summary>
+    /// Bumped by every list read. Only the latest read's answer is used, so two reads that overlap
+    /// cannot put an older list over a newer one.
+    /// </summary>
+    private int _listRead;
 
     private IReadOnlyList<SpaceIdentityResponse> _spaces = [];
     private IReadOnlyList<ApiTokenResponse> _tokens = [];
@@ -216,6 +228,8 @@
     {
         _generation++;
         _plaintext = null;
+        _focusPlaintext = false;
+        _focusHeading = false;
         _purgeRegistration?.Dispose();
         _disposal.Cancel();
         _disposal.Dispose();
@@ -238,13 +252,22 @@
 
     private async Task LoadTokensAsync(int generation)
     {
+        // A purge or the page's disposal since the caller started: nothing to load, and the
+        // disposal's token source may already be gone.
+        if (generation != _generation)
+        {
+            return;
+        }
+
+        var read = ++_listRead;
+
         try
         {
             using var linked = Session.LinkToSession(_disposal.Token);
 
             var tokens = await Http.GetFromJsonAsync<List<ApiTokenResponse>>(ApiTokenRoutes.List, JsonOptions, linked.Token);
 
-            if (tokens is not null && generation == _generation)
+            if (tokens is not null && generation == _generation && read == _listRead)
             {
                 _tokens = tokens;
             }
@@ -283,7 +306,7 @@
             var spaceId = _spaceId;
             var request = new IssueApiTokenRequest(_name);
 
-            using var response = await SendStateChangeAsync(
+            using var answer = await SendStateChangeAsync(
                 () => Http.PostAsJsonAsync(ApiTokenRoutes.IssueIn(spaceId), request, JsonOptions, linked.Token),
                 linked.Token);
 
@@ -292,23 +315,16 @@
                 return;
             }
 
-            if (response.StatusCode == HttpStatusCode.Created
-                && await response.Content.ReadFromJsonAsync<IssuedApiTokenResponse>(JsonOptions, linked.Token) is { } issued
+            if (answer.StatusCode == HttpStatusCode.Created
+                && await answer.Response.Content.ReadFromJsonAsync<IssuedApiTokenResponse>(JsonOptions, linked.Token) is { } issued
                 && generation == _generation)
             {
                 Reveal(issued.Token);
                 await LoadTokensAsync(generation);
             }
-            else if (response.StatusCode == HttpStatusCode.BadRequest)
+            else if (answer.StatusCode != HttpStatusCode.Unauthorized && generation == _generation)
             {
-                _nameMessage = Localizer["ApiTokenNameInvalid"];
-            }
-            else if (response.StatusCode != HttpStatusCode.Unauthorized && generation == _generation)
-            {
-                // The chosen Space has gone from under the person, or a refusal of another kind: the
-                // refusal surface's own words, in place.
-                var problem = await ReadProblemAsync(response, linked.Token);
-                _issueRefusal = Localizer[RefusalCopy.For(problem, key => !Localizer[key].ResourceNotFound).Key];
+                await ShowIssueRefusalAsync(answer, generation, linked.Token);
             }
             else
             {
@@ -331,6 +347,25 @@
         {
             _issuing = false;
         }
+    }
+
+    /// <summary>
+    /// A refused issuance: a name the Host refuses is answered beside the field, keyed on the problem
+    /// type; anything else - the chosen Space gone from under the person, say - in the refusal
+    /// surface's own words, in place, with the picker re-read so a Space that has gone is no longer
+    /// offered.
+    /// </summary>
+    private async Task ShowIssueRefusalAsync(StateChangeAnswer answer, int generation, CancellationToken token)
+    {
+        if (answer.StatusCode == HttpStatusCode.BadRequest && answer.Problem?.Type == ProblemTypes.InvalidApiToken)
+        {
+            _nameMessage = Localizer["ApiTokenNameInvalid"];
+
+            return;
+        }
+
+        _issueRefusal = Localizer[RefusalCopy.For(answer.Problem, key => !Localizer[key].ResourceNotFound).Key];
+        UseSpaces(await Directory.RefreshAsync(token), generation);
     }
 
     private void Reveal(string plaintext)
@@ -384,19 +419,32 @@
     private async Task RevokeAsync(Guid tokenId)
     {
         _confirmingRevoke = null;
+        _revokeRefusal = null;
 
         var generation = _generation;
 
         try
         {
             using var linked = Session.LinkToSession(_disposal.Token);
-            using var response = await SendStateChangeAsync(
+            using var answer = await SendStateChangeAsync(
                 () => Http.DeleteAsync(new Uri(ApiTokenRoutes.RevokeOf(tokenId), UriKind.Relative), linked.Token),
                 linked.Token);
+
+            if (generation == _generation
+                && answer.StatusCode is not HttpStatusCode.NoContent and not HttpStatusCode.Unauthorized)
+            {
+                // Refused, so the Token may still work: say so rather than leave the list to imply
+                // it. A 401 is YelloApiHandler's: the Session has ended and the purge has run.
+                _revokeRefusal = Localizer[RefusalCopy.For(answer.Problem, key => !Localizer[key].ResourceNotFound).Key];
+            }
         }
         catch (HttpRequestException)
         {
-            // The list below is the server's answer either way.
+            _revokeRefusal = Localizer[RefusalCopy.NotAvailableKey];
+        }
+        catch (JsonException)
+        {
+            _revokeRefusal = Localizer[RefusalCopy.NotAvailableKey];
         }
         catch (OperationCanceledException)
         {
@@ -415,7 +463,12 @@
         _plaintext = null;
         _copyStatus = null;
         _confirmingDismissal = false;
+        _focusPlaintext = false;
+        _focusHeading = false;
         _confirmingRevoke = null;
+        _revokeRefusal = null;
+        _issueRefusal = null;
+        _nameMessage = null;
         _tokens = [];
         _spaces = [];
 
@@ -427,32 +480,55 @@
     /// once more if the held one is refused - it is bound to the identity it was minted for, which a
     /// sign-in since may have replaced.
     /// </summary>
-    private async Task<HttpResponseMessage> SendStateChangeAsync(Func<Task<HttpResponseMessage>> send, CancellationToken token)
+    /// <remarks>
+    /// A refusal's problem body is read here, once, and handed back beside the response: the body can
+    /// be read only once, and both the retry and the caller need its type.
+    /// </remarks>
+    private async Task<StateChangeAnswer> SendStateChangeAsync(Func<Task<HttpResponseMessage>> send, CancellationToken token)
     {
         await Antiforgery.EnsureTokenAsync();
 
-        var response = await send();
+        var answer = await AnswerOfAsync(await send(), token);
 
-        if (response.StatusCode != HttpStatusCode.BadRequest
-            || (await ReadProblemAsync(response, token))?.Type != ProblemTypes.AntiforgeryTokenMissing)
+        if (answer.Response.StatusCode != HttpStatusCode.BadRequest
+            || answer.Problem?.Type != ProblemTypes.AntiforgeryTokenMissing)
         {
-            return response;
+            return answer;
         }
 
-        response.Dispose();
+        answer.Dispose();
         Antiforgery.Invalidate();
         await Antiforgery.EnsureTokenAsync();
 
-        return await send();
+        return await AnswerOfAsync(await send(), token);
     }
 
-    private static async Task<ProblemResponse?> ReadProblemAsync(HttpResponseMessage response, CancellationToken token)
+    private static async Task<StateChangeAnswer> AnswerOfAsync(HttpResponseMessage response, CancellationToken token)
     {
-        if (response.Content.Headers.ContentType?.MediaType is not "application/problem+json")
+        if (response.IsSuccessStatusCode
+            || response.Content.Headers.ContentType?.MediaType is not "application/problem+json")
         {
-            return null;
+            return new StateChangeAnswer(response, Problem: null);
         }
 
-        return await response.Content.ReadFromJsonAsync<ProblemResponse>(JsonOptions, token);
+        try
+        {
+            return new StateChangeAnswer(response, await response.Content.ReadFromJsonAsync<ProblemResponse>(JsonOptions, token));
+        }
+        catch
+        {
+            response.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// A state-changing request's response, and its problem body when it was refused with one.
+    /// </summary>
+    private sealed record StateChangeAnswer(HttpResponseMessage Response, ProblemResponse? Problem) : IDisposable
+    {
+        public HttpStatusCode StatusCode => Response.StatusCode;
+
+        public void Dispose() => Response.Dispose();
     }
 }
