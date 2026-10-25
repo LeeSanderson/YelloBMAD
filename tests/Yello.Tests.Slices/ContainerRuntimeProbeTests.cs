@@ -1,3 +1,4 @@
+using System.Reflection;
 using Xunit;
 using Yello.Tests.Shared;
 
@@ -62,5 +63,55 @@ public sealed class ContainerRuntimeProbeTests
         Assert.SkipUnless(SqlServerContainerFixture.IsContainerRuntimeAvailable(), "No container runtime is configured on this machine.");
 
         Assert.Null(await SqlServerContainerFixture.ProbeContainerRuntimeAsync(Deadline));
+    }
+
+    /// <summary>
+    /// 1.10-UNIT-005 - on a CI agent (<c>YELLO_REQUIRE_CONTAINER_RUNTIME=1</c>) an unconfigured runtime is
+    /// a failure, not a skip, so SM-1 cannot pass vacuously in CI. Story 1.10 AC10; Task 9, Q19 (a).
+    /// </summary>
+    /// <remarks>
+    /// <b>Red-phase scaffold, ATDD run 2026-10-25.</b> The decision is reached through a seam proposed by
+    /// name, <c>SqlServerEngine.UnavailableReasonFor(bool runtimeConfigured, bool runtimeRequired)</c>,
+    /// so the case can state both values without setting a process-wide environment variable while
+    /// container-backed classes run in parallel. On activation, replace the reflection with the typed
+    /// call and record the shape the seam took.
+    /// </remarks>
+    [Fact(Skip = "red: AC10 - an unconfigured runtime always skips; nothing reads YELLO_REQUIRE_CONTAINER_RUNTIME (Task 9, Q19 (a))")]
+    [Trait("Priority", "P0")]
+    [Trait("Requirement", "NFR-1")]
+    public void When_ci_requires_the_runtime_an_unconfigured_one_fails_rather_than_skips()
+    {
+        var decide = UnavailableReasonFor();
+
+        var failure = Assert.Throws<TargetInvocationException>(() => decide.Invoke(null, [false, true]));
+
+        var inner = Assert.IsType<InvalidOperationException>(failure.InnerException);
+        Assert.Contains("YELLO_REQUIRE_CONTAINER_RUNTIME", inner.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// 1.10-UNIT-006 - anchor: without the requirement, an unconfigured runtime still skips with a
+    /// reason (story 1.9 Q1, unchanged locally), and a configured one is available either way.
+    /// </summary>
+    [Fact(Skip = "red: AC10 - the runtime-requirement seam does not exist yet (Task 9, Q19 (a))")]
+    public void Without_the_requirement_an_unconfigured_runtime_still_skips()
+    {
+        var decide = UnavailableReasonFor();
+
+        Assert.False(string.IsNullOrWhiteSpace(decide.Invoke(null, [false, false]) as string));
+        Assert.Null(decide.Invoke(null, [true, false]));
+        Assert.Null(decide.Invoke(null, [true, true]));
+    }
+
+    private static MethodInfo UnavailableReasonFor()
+    {
+        var method = typeof(SqlServerEngine).GetMethod(
+            "UnavailableReasonFor",
+            BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic,
+            [typeof(bool), typeof(bool)]);
+
+        Assert.True(method is not null, "SqlServerEngine.UnavailableReasonFor(bool runtimeConfigured, bool runtimeRequired) does not exist (story 1.10 Task 9).");
+
+        return method;
     }
 }

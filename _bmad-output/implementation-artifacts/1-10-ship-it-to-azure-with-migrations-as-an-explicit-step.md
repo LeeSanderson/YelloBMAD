@@ -463,6 +463,43 @@ The dev phase takes these as **reversible, recorded decisions** in the Completio
 19. **An unconfigured container runtime in CI.** (a) `YELLO_REQUIRE_CONTAINER_RUNTIME=1` turns the skip into a failure, set only in CI. (b) Rely on `ubuntu-latest` having Docker: a runner change would then skip SM-1 silently. **Recommend (a).**
 20. **AC17, if only an Aspire bump would clear the remaining advisories.** That is an AR-1 edit. (a) Keep the suppression and record the check. Lee decides the Aspire move separately. (b) Bump Aspire within this story. **Recommend (a).**
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-1-10-ship-it-to-azure-with-migrations-as-an-explicit-step.md` (scenario ids, failure evidence, plants, proposed seam names, and the Azure-only manual checks tied to P1-P7). Written by the ATDD run on 2026-10-25: **44 cases, 6 active and green today, 38 skipped** with `red: AC<n> - <why> (Task n)`. Full run after it: 548 total, 509 passed, 39 skipped. No new project, package, fixture type or engine.
+
+| File | Cases | ACs | Green today |
+|---|---|---|---|
+| `tests/Yello.Tests.Architecture/MigrationAtStartupGateTests.cs` | 1 | 15, 2 | ARCH-001 (no production `Migrate`/`EnsureCreated`/`IMigrator`) - planted, caught |
+| `tests/Yello.Tests.Architecture/ProbeGateTests.cs` | 2 | 6 | ARCH-002 (no `AddHealthChecks`) - planted, caught |
+| `tests/Yello.Tests.Architecture/SecretHygieneTests.cs` | 3 | 3 | ARCH-004 (no credential shape in config/IaC/workflows), ARCH-005 (no `ConnectionStrings` in the Host's appsettings) - both planted, caught |
+| `tests/Yello.Tests.Architecture/DeploymentShapeTests.cs` | 10 | 1, 4, 5, 6, 10, 11, 13, 15 | none |
+| `tests/Yello.Tests.Architecture/OperationsRecordTests.cs` | 5 | 7, 8, 9 | none |
+| `tests/Yello.Tests.Slices/Deployment/MigrationBundleEquivalenceTests.cs` | 2 | 2, 15 | none |
+| `tests/Yello.Tests.Slices/Deployment/DatabaseIdentityTests.cs` | 1 | 15 | SLC-003 (a `db_datareader`+`db_datawriter` identity cannot disable the policy or change `MAXDOP`) - not yet planted |
+| `tests/Yello.Tests.Slices/Deployment/ProbeTests.cs` | 1 | 6 | none |
+| `tests/Yello.Tests.Slices/Deployment/ForwardedHeadersTests.cs` | 5 | 11 | none |
+| `tests/Yello.Tests.Slices/Deployment/RateLimitPartitionTests.cs` | 3 | 11 | UNIT-003 (IPv4 keys as itself; a missing address keeps the shared partition) - not yet planted |
+| `tests/Yello.Tests.Slices/Deployment/DataProtectionPersistenceTests.cs` | 2 | 12 | none |
+| `tests/Yello.Tests.Slices/Deployment/DatabaseUnavailableTests.cs` | 4 | 14, 12, 6 | none |
+| `tests/Yello.Tests.Slices/Deployment/SqlServerEngineFailFastTests.cs` | 1 | 16 | none |
+| `tests/Yello.Tests.Slices/Deployment/RunningHostCursorTests.cs` | 1 | 16 | none |
+| `tests/Yello.Tests.Slices/ContainerRuntimeProbeTests.cs` (2 cases added) | 2 | 10 | none |
+| `tests/Yello.Tests.Client/StaticHostFallbackTests.cs` | 1 | 13 | none |
+
+`tests/Yello.Tests.Slices/Deployment/DeploymentHosts.cs` is the shared helper (behind-ingress settings, an unreachable connection string, an empty per-process user profile). Names the scaffolds reach by reflection or assume (`SessionRevocation.IssueInstant`, `SqlServerEngine.UnavailableReasonFor`, the engine's probe/factory constructor, `urn:yello:problem:service-unavailable`, the `RefusalPurgeClaimed` log marker, `dbo.DataProtectionKeys`) are proposals; correct them on activation and record the correction.
+
+Activation order:
+
+1. **SLC-013, then SLC-010 and SLC-011 - the riskiest assumption first** (Q7 (a)): the key ring can live in the application database and fail honestly when it is paused (a `503`, never a fresh in-memory key). They run behind ingress, so they first fail for F3's reason: implement Q10 (activating SLC-005 and SLC-006), confirm they then fail for F1's reason, then persist the ring. If the EF store cannot fail honestly, revisit Q7 before building on it.
+2. SLC-001, SLC-002 (the bundle; build it for the local runtime and set `YELLO_MIGRATION_BUNDLE`), then ARCH-016 (AppHost migration).
+3. SLC-012, SLC-014, UNIT-004; then SLC-004 and ARCH-003 (the probe's log slice is clean only once the purge trigger has moved).
+4. SLC-007 to SLC-009, UNIT-001, UNIT-002.
+5. UNIT-005, UNIT-006, UNIT-007, SLC-015 (a race today; confirm red over several runs).
+6. ARCH-006 to ARCH-011 (Bicep), ARCH-012 to ARCH-014 (workflows), ARCH-015 and E2E-001 (static host), ARCH-017 to ARCH-021 (`docs/operations.md`).
+7. Keep ARCH-001, ARCH-002, ARCH-004, ARCH-005, SLC-003 and UNIT-003 green throughout.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used
