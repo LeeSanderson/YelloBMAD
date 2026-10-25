@@ -35,13 +35,12 @@ namespace Yello.Host.Endpoints;
 /// to prevent" is to hand a caller the fact and trust it not to use it.
 /// </para>
 /// <para>
-/// <b>Idempotency (AR-25) is NOT implemented here, and no story in Epic 1 owns it.</b> Every
-/// state-changing endpoint is meant to accept an <c>Idempotency-Key</c> and return the original
-/// response on replay, and AR-3 forbids a slice implementing that itself - but no Epic 1 story
-/// row builds the pipeline that would, and this is the product's first state-changing endpoint.
-/// Recorded in <c>deferred-work.md</c> rather than improvised. The gap is unusually cheap here:
-/// with no body and no identifier in the response, a replayed registration is already
-/// indistinguishable from the original.
+/// <b>Idempotency (AR-25) does not reach this endpoint.</b> The request pipeline honours an
+/// <c>Idempotency-Key</c> on Space-scoped state-changing requests only (story 2.1, open question 6),
+/// because its records live under the Space policy and registration has no Space yet. AR-3 forbids
+/// this slice from implementing it itself. The gap is unusually cheap here: with no body and no
+/// identifier in the response, a replayed registration is already indistinguishable from the
+/// original.
 /// </para>
 /// </remarks>
 public static class RegisterAccountEndpoint

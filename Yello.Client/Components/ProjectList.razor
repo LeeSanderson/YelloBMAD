@@ -31,8 +31,9 @@
 
     NEITHER IS OPTIMISTIC. Create cannot be - the id is the server's - and rename keeps its field open,
     holding the new name, until the server answers, so a row never shows a name the server has not taken.
-    Each attempt carries a fresh Idempotency-Key, and the
-    one resend after a refused anti-forgery token reuses it.
+    Each attempt carries a fresh Idempotency-Key. The one resend after a refused anti-forgery token
+    reuses it, and so does a creation of the same name sent again after an attempt that got no answer,
+    because that attempt may have been applied.
 
     A Project name is rendered as text, never in the document title and never in a URL, and every name
     field is autocomplete="off" with a field name autofill would never match (UX-DR33).
@@ -44,6 +45,13 @@
 {
     <div class="project-list project-list--loading" aria-busy="true">
         <p class="visually-hidden">@Localizer["ProjectsLoading"]</p>
+
+        @* Skeleton rows in the list's own shape, holding no text (UX-DR35 cold load, UX-DR31). *@
+        <ul class="project-list__skeleton" aria-hidden="true">
+            <li class="project-list__skeleton-row"></li>
+            <li class="project-list__skeleton-row"></li>
+            <li class="project-list__skeleton-row"></li>
+        </ul>
     </div>
 }
 
@@ -139,6 +147,7 @@
     private string _newName = string.Empty;
     private string? _createMessage;
     private string? _createRefusal;
+    private UnansweredCreate? _unanswered;
 
     private Guid? _renaming;
     private string _renameName = string.Empty;
@@ -196,6 +205,7 @@
         _newName = string.Empty;
         _createMessage = null;
         _createRefusal = null;
+        _unanswered = null;
         _renaming = null;
         _renameName = string.Empty;
         _renameMessage = null;
@@ -222,6 +232,7 @@
                 if (projects is not null && generation == _generation)
                 {
                     _projects = projects;
+                    _announcement = Localizer["ProjectsLoaded"];
                 }
 
                 return;
@@ -290,11 +301,25 @@
 
         var generation = _generation;
         var request = new CreateProjectRequest(_newName);
-        var key = Guid.NewGuid().ToString("D");
+
+        // An attempt that never got an answer may still have been applied: sending the same name again
+        // is a retry of that attempt and reuses its key, so the server replays it rather than creating a
+        // second Project. Any answer ends the attempt.
+        var key = _unanswered is { } unanswered && string.Equals(unanswered.Name, _newName, StringComparison.Ordinal)
+            ? unanswered.Key
+            : Guid.NewGuid().ToString("D");
+
+        _unanswered = new UnansweredCreate(_newName, key);
 
         try
         {
             using var answer = await SendAsync(HttpMethod.Post, ProjectRoutes.ListIn(SpaceId), request, key);
+
+            // In flight means the first use of this key has not finished: a resend must still reuse it.
+            if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
+            {
+                _unanswered = null;
+            }
 
             if (generation != _generation)
             {
@@ -359,6 +384,13 @@
 
     private void StartRename(ProjectResponse project)
     {
+        // One rename at a time: its answer closes the field it was sent from, so another row's field
+        // must not open while it is on its way.
+        if (_renameInFlight)
+        {
+            return;
+        }
+
         _renaming = project.Id;
         _renameName = project.Name;
         _renameMessage = null;
@@ -488,7 +520,9 @@
     }
 
     /// <summary>
-    /// The server's order: by name, then by id (open question 8).
+    /// By name, then by id (open question 8). This is close to the server's order but not identical: the
+    /// server compares names by the column's collation and ids as SQL Server orders them. A reload shows
+    /// the server's order.
     /// </summary>
     private void Order() =>
         _projects?.Sort((left, right) =>
@@ -580,4 +614,9 @@
     /// Why a row's rename was refused, shown on that row.
     /// </summary>
     private sealed record RowRefusal(Guid ProjectId, string Text);
+
+    /// <summary>
+    /// A creation sent with no answer yet: its name, exactly as sent, and its Idempotency-Key.
+    /// </summary>
+    private sealed record UnansweredCreate(string Name, string Key);
 }

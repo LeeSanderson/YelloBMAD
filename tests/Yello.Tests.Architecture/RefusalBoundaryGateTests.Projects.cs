@@ -14,18 +14,14 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 2.1 ATDD run on 2026-10-25.</b> The types these gates
-/// are about do not exist yet, so each reaches its subject <b>by name</b> - the names the story calls
-/// indicative (<c>IBoundCounter</c>, <c>IIdempotencyStore</c>, <c>BoundCounter</c>,
-/// <c>IdempotencyStore</c>, a client predicate named for <c>ManageProjects</c>). On activation, replace
-/// each name with a typed reference to the type dev-story actually wrote, correct the permitted lists to
-/// the real adapter and registration names, and record any rename in the Debug Log.
+/// <b>Each gate reaches its subject by a typed reference</b> (the ports, the routes, <c>Project</c>), so a
+/// rename breaks the build rather than emptying the gate. The permitted lists name the ports' adapters
+/// and <c>SpaceBoundaryLimits</c>, where they are registered.
 /// </para>
 /// <para>
-/// <b>One gate is green today and is left active</b>:
-/// <see cref="Nothing_but_the_pipeline_reads_the_bound_registry"/>. Only <c>ActiveSpaceResolution</c>
-/// reads <c>BoundRegistry</c> now, and the story requires that to stay true when the creation bound
-/// arrives. It was planted by the ATDD run; the result is in the checklist.
+/// <b>Each was planted</b> (story 2.1's Debug Log): a handler injecting either port, a client predicate
+/// that shows the controls to a Viewer, and - for <see cref="Nothing_but_the_pipeline_reads_the_bound_registry"/>
+/// - the ATDD run's own plant.
 /// </para>
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
@@ -158,6 +154,22 @@ public sealed partial class RefusalBoundaryGateTests
 
         Assert.NotNull(setter);
         Assert.Contains(typeof(IsExternalInit), setter.ReturnParameter.GetRequiredCustomModifiers());
+    }
+
+    /// <summary>
+    /// AC7, Task 11 layer (2) - the one production type whose IL writes <c>Project.SpaceId</c> is the
+    /// store's create path, which takes the Space from the pipeline's context. An <c>init</c> accessor
+    /// still lets any object initialiser choose a Space; this gate holds that choice to one place.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "FR-17")]
+    [Trait("Requirement", "AD-2")]
+    public void Only_the_create_path_writes_a_Projects_Space()
+    {
+        var writers = RoleReaders(typeof(Yello.Domain.Projects.Project).FullName!, "set_" + nameof(Yello.Domain.Projects.Project.SpaceId));
+
+        // Vacuity guard: the create path is found writing it, so the scan reads the setter's call sites.
+        Assert.Equal(["Yello.Infrastructure.Persistence.ProjectStore"], writers);
     }
 
     /// <summary>

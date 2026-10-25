@@ -37,10 +37,11 @@ using Yello.Infrastructure;
 // attached to the route group below, resolves the active Space from the Membership row for every
 // route whose pattern carries {spaceId}, scopes that request's unit of work to it in the database,
 // checks the endpoint's declared capability against the FR-16 Role matrix, consults NFR-8's
-// concurrent-presence bound, and records every 403 and every boundary 404 as an AccessRefusal. The
-// two password-hashing endpoints are rate-limited by named policy. AR-3 makes a slice that
-// re-implements any of these a defect. Idempotency (AR-25) is not here yet: it is story 2.1's, the
-// first endpoint that creates something a client could retry. There is still no AddAuthorization,
+// concurrent-presence bound, and records every 403 and every boundary 404 as an AccessRefusal. Story
+// 2.1 adds two more, in that pipeline: an Idempotency-Key on a state-changing request is replayed
+// from its record (AR-25), and a creation endpoint's declared bound is counted before it runs
+// (AR-30). The two password-hashing endpoints are rate-limited by named policy. AR-3 makes a slice
+// that re-implements any of these a defect. There is still no AddAuthorization,
 // no UseAuthorization and no authorization policy anywhere in this file: AD-1 makes every
 // authorisation decision a per-request (Account, Space) resolution, and the Role it reads comes off
 // the Membership row on each request, never off a principal a policy could inspect.

@@ -61,9 +61,9 @@ internal static class IdempotentResponses
     }
 
     /// <summary>
-    /// What identifies a request for its key: the method, the path and the SHA-256 of the body, hashed
-    /// together - so the same key on another Project's rename is a different request. The body is
-    /// buffered, so the endpoint can still read it.
+    /// What identifies a request for its key: the method, the path, the query string and the SHA-256 of
+    /// the body, hashed together - so the same key on another Project's rename is a different request.
+    /// The body is buffered, so the endpoint can still read it.
     /// </summary>
     /// <param name="httpRequest">The request.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
@@ -80,6 +80,7 @@ internal static class IdempotentResponses
             '\n',
             httpRequest.Method.ToUpperInvariant(),
             httpRequest.Path.Value?.ToUpperInvariant() ?? string.Empty,
+            httpRequest.QueryString.Value ?? string.Empty,
             Convert.ToHexString(bodyHash));
 
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(identity)));
@@ -166,6 +167,11 @@ internal static class IdempotentResponses
     /// <summary>
     /// The body with the secret property removed, so the record never holds it (NFR-6).
     /// </summary>
+    /// <remarks>
+    /// <b>Fails closed.</b> A declared name that the serialised body does not carry - a naming policy
+    /// or a <c>[JsonPropertyName]</c> that drifted from the declaration - would otherwise store the
+    /// secret as it stands. It throws instead, so the request fails and nothing is recorded.
+    /// </remarks>
     private static string Without(string body, string property, JsonSerializerOptions options)
     {
         if (JsonNode.Parse(body) is not JsonObject json)
@@ -173,7 +179,11 @@ internal static class IdempotentResponses
             throw new InvalidOperationException("A response declared to carry a secret is not a JSON object.");
         }
 
-        json.Remove(property);
+        if (!json.Remove(property))
+        {
+            throw new InvalidOperationException(
+                $"The response has no '{property}' to remove: the secret it declares cannot be kept out of its record.");
+        }
 
         return json.ToJsonString(options);
     }

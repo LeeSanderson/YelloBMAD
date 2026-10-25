@@ -43,6 +43,9 @@ internal sealed class FakeYelloApi
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _arrived = new();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _heldProjects = new();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _arrivedProjects = new();
+    private readonly ConcurrentDictionary<string, string> _createdByKey = new(StringComparer.Ordinal);
+    private TaskCompletionSource? _heldRename;
+    private TaskCompletionSource? _arrivedRename;
     private readonly TaskCompletionSource<FakeRequest> _signInSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<FakeRequest> _signOutSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -86,9 +89,8 @@ internal sealed class FakeYelloApi
 
     /// <summary>
     /// Each Space's Projects, as the list route serves them. Story 2.1; the routes are
-    /// <c>Yello.Contracts.Projects</c>' ones, and the bodies
-    /// are <see cref="FakeProject"/>, shaped as story 2.1 Task 4's <c>ProjectResponse</c> - replace both on
-    /// activation.
+    /// <c>Yello.Contracts.Projects</c>' ones, and the bodies are <see cref="FakeProject"/>, shaped as
+    /// <c>ProjectResponse</c>.
     /// </summary>
     public IDictionary<Guid, List<FakeProject>> Projects { get; } = new Dictionary<Guid, List<FakeProject>>();
 
@@ -97,6 +99,13 @@ internal sealed class FakeYelloApi
     /// 50, as the Host refuses the 51st. Story 2.1.
     /// </summary>
     public bool ProjectBoundReached { get; set; }
+
+    /// <summary>
+    /// Whether the next Project creation is applied and its answer then lost - the connection dropped
+    /// after the server committed. A creation repeating an <c>Idempotency-Key</c> already applied is
+    /// answered with the first answer, as the Host replays it. Story 2.1.
+    /// </summary>
+    public bool LoseNextProjectCreateAnswer { get; set; }
 
     /// <summary>
     /// Every request seen, in order.
@@ -165,6 +174,23 @@ internal sealed class FakeYelloApi
     }
 
     /// <summary>
+    /// Holds the next Project rename answer until <see cref="ReleaseRename"/>. Story 2.1.
+    /// </summary>
+    /// <returns>A task that completes when the held rename has arrived and is waiting.</returns>
+    public Task HoldRenameAsync()
+    {
+        _heldRename = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _arrivedRename = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        return _arrivedRename.Task;
+    }
+
+    /// <summary>
+    /// Lets a held rename answer go.
+    /// </summary>
+    public void ReleaseRename() => _heldRename?.TrySetResult();
+
+    /// <summary>
     /// Whether any request named <paramref name="spaceId"/> in its path.
     /// </summary>
     public bool WasRequested(Guid spaceId) =>
@@ -187,6 +213,13 @@ internal sealed class FakeYelloApi
         var origin = headers.TryGetValue("origin", out var value) ? value : "*";
 
         var (status, body) = await DecideAsync(seen).ConfigureAwait(false);
+
+        if (LoseNextProjectCreateAnswer && seen.Method == "POST" && TryProjects(seen.Path, out _))
+        {
+            LoseNextProjectCreateAnswer = false;
+            await route.AbortAsync("connectionreset").ConfigureAwait(false);
+            return;
+        }
 
         await route.FulfillAsync(new RouteFulfillOptions
         {
@@ -253,9 +286,16 @@ internal sealed class FakeYelloApi
                 return await ListProjectsAsync(listSpace).ConfigureAwait(false);
 
             case ("POST", var path) when TryProjects(path, out var createSpace):
-                return CreateProject(createSpace, request.Body);
+                return CreateProject(createSpace, request);
 
             case ("PATCH", var path) when TryProject(path, out var renameSpace, out var renamed):
+                if (_heldRename is { } heldRename)
+                {
+                    _arrivedRename?.TrySetResult();
+                    await heldRename.Task.ConfigureAwait(false);
+                    _heldRename = null;
+                }
+
                 return RenameProject(renameSpace, renamed, request.Body);
 
             case ("GET", var path) when TryActiveSpace(path, out var spaceId):
@@ -327,8 +367,17 @@ internal sealed class FakeYelloApi
             : (200, "[]");
     }
 
-    private (int Status, string Body) CreateProject(Guid spaceId, string? body)
+    private (int Status, string Body) CreateProject(Guid spaceId, FakeRequest request)
     {
+        var key = request.Header(Idempotency.HeaderName);
+
+        if (key is not null && _createdByKey.TryGetValue(key, out var replayed))
+        {
+            return (201, replayed);
+        }
+
+        var body = request.Body;
+
         if (ProjectBoundReached)
         {
             return (409, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.BoundReached, Errors: null, Bound: "projects-per-space", Limit: 50), JsonOptions));
@@ -349,7 +398,14 @@ internal sealed class FakeYelloApi
 
         projects.Add(project);
 
-        return (201, JsonSerializer.Serialize(project, JsonOptions));
+        var created = JsonSerializer.Serialize(project, JsonOptions);
+
+        if (key is not null)
+        {
+            _createdByKey[key] = created;
+        }
+
+        return (201, created);
     }
 
     private (int Status, string Body) RenameProject(Guid spaceId, Guid projectId, string? body)

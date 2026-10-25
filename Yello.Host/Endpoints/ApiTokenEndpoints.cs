@@ -109,7 +109,8 @@ public static class ApiTokenEndpoints
     }
 
     /// <summary>
-    /// Reads the issue body, or <c>null</c> for one that is not JSON or does not parse.
+    /// Reads the issue body, or <c>null</c> for one that is not JSON, does not parse, or names a charset
+    /// the runtime does not know (an <see cref="InvalidOperationException"/>).
     /// </summary>
     private static async Task<IssueApiTokenRequest?> ReadRequestAsync(HttpRequest request, CancellationToken cancellationToken)
     {
@@ -123,6 +124,10 @@ public static class ApiTokenEndpoints
             return await request.ReadFromJsonAsync<IssueApiTokenRequest>(cancellationToken).ConfigureAwait(false);
         }
         catch (JsonException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
         {
             return null;
         }

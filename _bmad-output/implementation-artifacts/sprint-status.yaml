@@ -87,7 +87,7 @@ development_status:
 
   # Epic 2: Track your own work on a Board
   epic-2: in-progress
-  2-1-create-a-project-and-see-what-is-in-your-space: review
+  2-1-create-a-project-and-see-what-is-in-your-space: done
   2-2-add-tasks-and-see-them-on-a-board: backlog
   2-3-edit-a-tasks-title-status-and-due-date: backlog
   2-4-define-and-apply-labels: backlog

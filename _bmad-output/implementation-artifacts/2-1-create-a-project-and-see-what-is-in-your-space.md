@@ -3,7 +3,7 @@ baseline_commit: 311d1d50632b7ec192c27dac270179c0e84c0ce3
 ---
 # Story 2.1: Create a Project and see what is in your Space
 
-Status: review
+Status: done
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-1-create-a-project-and-see-what-is-in-your-space`
@@ -199,6 +199,28 @@ AC1–AC7 are reproduced **verbatim** from `epics.md:983-1013` (`status: final`)
   - [x] Ledger (`deferred-work.md`): CLOSE with dated notes `:78-83`, `:253-256`, `:293`, `:300`, `:319`, `:372`, `:374`, `:388`, `:411`; UPDATE `:291` (rename is the first in-Space lookup; the timing arm stays with 2.2 unless Q13 (b)); RE-OWN `:338` (skip link) to **2.2** with its reason unless you implement it; ADD anything this story defers, each with an owner.
   - [x] `sprint-status.yaml`: `review` at the end of the dev phase. Under Task 1's rule, the suite fails at `review` if `ISO-RECORD-KIND-INSUFFICIENT-ROLE` is still pending — that is the gate working.
   - [x] **Do not add review narration to source files.**
+
+### Review Findings
+
+Code review 2026-10-25, commit range `945d189..HEAD`, review mode full (Blind Hunter, Edge Case Hunter, Acceptance Auditor). 48 raw findings, 34 after merging duplicates: 13 patch, 4 defer, 17 dismissed. Seven plants that the dev phase did not prove (P4, P5, P7-P11) were run in this review, one at a time, and all were caught (see the Debug Log).
+
+- [x] [Review][Patch] The issuance record strips its secret by name and fails open when the name does not match: `JsonObject.Remove` returning `false` is ignored, so a naming-policy drift would store and replay the plaintext (NFR-6) [Yello.Host/Spaces/IdempotentResponses.cs:169]
+- [x] [Review][Patch] The client creates a new `Idempotency-Key` on every Create press, so after a lost response (`HttpRequestException`) a second press of the same name creates a duplicate Project. The key is meant for exactly this case [Yello.Client/Components/ProjectList.razor:293]
+- [x] [Review][Patch] A rename answer lands on whichever row is open: `StartRename` is not guarded while a rename is in flight [Yello.Client/Components/ProjectList.razor:360]
+- [x] [Review][Patch] A JSON body with an unknown charset answers `500`: `ReadAsync` catches only `JsonException`, not the `InvalidOperationException` that `ReadFromJsonAsync` throws [Yello.Host/Endpoints/ProjectEndpoints.cs:168]
+- [x] [Review][Patch] The fingerprint leaves out the query string, so two requests that differ only in their query replay each other [Yello.Host/Spaces/IdempotentResponses.cs:79]
+- [x] [Review][Patch] `Program.cs` still says idempotency "is not here yet", and `RegisterAccountEndpoint` still says no story owns it [Yello.Host/Program.cs:42]
+- [x] [Review][Patch] AC7 layer (2) has no gate: nothing holds the writes of `Project.SpaceId` to the create path (Task 11) [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Projects.cs]
+- [x] [Review][Patch] Idempotency wire cases (`422`, replay after rename, other Account, over-length key) run on the Session surface only, and no case covers a concurrent first use of one key (AD-4, Task 11, Q7) [tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.Idempotency.cs]
+- [x] [Review][Patch] The Viewer rename case does not assert its `InsufficientRole` records (Task 11) [tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.cs:324]
+- [x] [Review][Patch] Cold load has no skeleton matching the list, and completion is not announced (UX-DR35, Task 10) [Yello.Client/Components/ProjectList.razor:43]
+- [x] [Review][Patch] Test-file headers still describe red-phase scaffolds ("skipped", "by name") [tests/Yello.Tests.Client/SpaceHomeProjectsTests.cs, tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.cs, tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Projects.cs]
+- [x] [Review][Patch] Not recorded: the plants that remained unproved; Account-scoped writes left outside AD-18 with no ledger owner; and the variance in `ISO-RECORD-KIND-INSUFFICIENT-ROLE` (a Viewer demoted in its own Personal Space, not a second Account in A's Space) [_bmad-output/implementation-artifacts/deferred-work.md]
+- [x] [Review][Patch] The client's sort comment claims "the server's order", but the client sorts by the current culture and the server sorts by the database collation [Yello.Client/Components/ProjectList.razor:491]
+- [x] [Review][Defer] The idempotency record captures a body only from a value result, captures `Location` only from response headers, answers `500` for a non-`IResult` only when a key is sent, and reports any duplicate-key error in its save as in flight. Latent: every Space-scoped write today returns a JSON value result and sets `Location` itself [Yello.Host/Spaces/IdempotentResponses.cs:97] — deferred to story 2.2, the next Space-scoped write endpoints
+- [x] [Review][Defer] The bound count's `UPDLOCK, HOLDLOCK` range lock reaches the next key, which is the adjacent Space's first row, and reaches the whole table under a scan plan. Creations in neighbouring Spaces can then wait on each other [Yello.Infrastructure/Persistence/BoundCounter.cs:43] — deferred to story 2.9 (load)
+- [x] [Review][Defer] Two concurrent creates with the same key at limit-1: the second waits at the count, counts the first's row, and answers `409 bound-reached` instead of replaying [Yello.Host/Spaces/ActiveSpaceResolution.cs:233] — deferred to story 2.9 (load and concurrency)
+- [x] [Review][Defer] Space home re-arriving for the same Space (same URL) unmounts the Project list and loses an open create or rename [Yello.Client/Pages/SpaceHome.razor:45] — deferred to story 2.2, whose Board holds more state on the page
 
 ## Dev Notes
 
@@ -419,7 +441,31 @@ Claude Opus 5.5 (dev-story, unattended story cycle), 2026-10-25.
 | P6 | issuance's `CarriesSecretInResponse` removed | IDM-006 | **yes** |
 | P7-P11 | Viewer offered controls; `sessionStorage`; `document.title`; `AFTER UPDATE` removed; count without `UPDLOCK, HOLDLOCK` | ARCH-007/E2E-003, `ClientStorageBanTests`, title gate, SCH-002, BND-002 | not run (memory) |
 
+**Plants finished by the code review (2026-10-25)**, one at a time with the same script (`scratchpad/review/plants-review.ps1`), each restored in a `finally` with the tree hash matched:
+
+| # | Plant | Gate | Caught |
+|---|---|---|---|
+| P4 | create handler injects `IBoundCounter` (plant fixed: `<param>` tag, and the parameter optional so the handler's unit test compiles) | `Only_the_pipeline_depends_on_the_bound_count_port` | **yes** |
+| P5 | rename handler injects `IIdempotencyStore` (plant fixed: `<param>` tag) | `Only_the_pipeline_depends_on_the_idempotency_port` | **yes** |
+| P7 | client predicate admits `viewer` | ARCH-007 and `A_Viewer_sees_the_Projects_and_no_create_or_rename_control` | **yes**, both |
+| P8 | the list written to `sessionStorage` | `ClientStorageBanTests.No_client_code_reaches_browser_storage` | **yes** |
+| P9 | `document.title` set from the list | `No_client_code_sets_the_document_title` | **yes** |
+| P10 | `AFTER UPDATE` block predicate removed | `Moving_a_Project_to_another_Space_is_refused_by_the_database` | **yes** |
+| P11 | bound count without `UPDLOCK, HOLDLOCK`, three runs | BND-002 | **yes**, 2 of 3 (the race raced twice) |
+| R1 | the declared secret name drifts (`Token`, not `token`) | IDM-006, now failing closed | **yes** |
+| R2 | a second production type writes `Project.SpaceId` | `Only_the_create_path_writes_a_Projects_Space` | **yes** |
+| R3 | every Create press takes a fresh key | `A_creation_resent_after_a_lost_answer_reuses_its_key_and_appears_once` | **yes** |
+| R4 | `StartRename` unguarded while a rename is in flight | `No_second_rename_opens_while_one_is_on_its_way` | **yes** |
+| R5 | an unknown charset unhandled | `A_body_in_an_unknown_charset_is_refused_400_not_500` | **yes** |
+| R6 | cold-load skeleton removed | `The_Project_list_renders_only_after_the_server_answers` | **yes** |
+| R7 | completion not announced | the same | **yes** |
+| R8 | a concurrent first use not recognised (duplicate-key match broken), three runs | `A_concurrent_first_use_of_one_key_is_applied_once_and_the_loser_answered_409` | **yes**, 3 of 3. A first version of the case relied on timing and missed all three runs. The case now holds the bound-count lock itself and waits until both requests queue on it (`LCK_M_RS_U`). |
+
+**Variance recorded by the review: `ISO-RECORD-KIND-INSUFFICIENT-ROLE`'s actor.** Task 9 asked for a Viewer in A's Space (a second Account's Membership). The row instead demotes a fresh Account to Viewer in its own Personal Space, which leaves that Space with no Owner, a state the product cannot reach. The row is kept as it is because the isolation world's actors carry a Token bound to their own Space, and the `403` path does not read who else holds the Space. The slice cases (`A_Viewer_is_refused_403_on_create...`, `...on_rename...`) cover a Viewer added to an Owner's Space on both surfaces, each with its `InsufficientRole` records.
+
 **Runs.** Full suite before `review`: `dotnet build Yello.slnx` 0 warnings, 0 errors; `dotnet test Yello.slnx` **624 total, 621 passed, 0 failed, 3 skipped** (2m 36s in the runner, 2m 55s wall; `YELLO_MIGRATION_BUNDLE` unset, so the two bundle cases skip). Four SQL engines, unchanged. After setting `review` (GATE-003 reads it): 0 warnings, 0 errors; **624 total, 621 passed, 0 failed, 3 skipped** (2m 25s).
+
+**Review run (2026-10-25), after every patch:** `dotnet build Yello.slnx` 0 warnings, 0 errors; `dotnet test Yello.slnx --no-build` **633 total, 630 passed, 0 failed, 3 skipped** (2m 36s wall; `YELLO_MIGRATION_BUNDLE` unset). The 9 new cases: four idempotency cases now also run on the Token surface, the concurrent first use, the unknown charset, the AC7 writer gate, and two browser cases (a resend after a lost answer, one rename at a time).
 
 ### Completion Notes List
 
@@ -501,6 +547,7 @@ Claude Opus 5.5 (dev-story, unattended story cycle), 2026-10-25.
 - tests/Yello.Tests.Client/SpaceHomeProjectsTests.cs
 - tests/Yello.Tests.Client/FakeYelloApi.cs
 - tests/Yello.Tests.Shared/ProjectRouteScaffold.cs (deleted)
+- Yello.Host/Endpoints/RegisterAccountEndpoint.cs (review)
 - tests/TESTING-CONVENTIONS.md
 - _bmad-output/implementation-artifacts/deferred-work.md
 - _bmad-output/implementation-artifacts/sprint-status.yaml
@@ -509,3 +556,4 @@ Claude Opus 5.5 (dev-story, unattended story cycle), 2026-10-25.
 ### Change Log
 
 - 2026-10-25 - Dev: Projects (entity, migration with `AFTER UPDATE` block predicate, three slices and routes on both surfaces), the pipeline's Projects-per-Space bound and `Idempotency-Key`, Space home's Project list. 38 ATDD scaffolds activated, 6 isolation rows converted, 8 handler and name cases added. Ledger: 9 entries closed, 1 updated, 1 re-owned, 3 added. Status → review.
+- 2026-10-25 - Code review: 48 raw findings, 34 after merging duplicates. 13 patches applied: the secret strip fails closed; the client reuses a create's key after a lost answer; one rename at a time; an unknown charset is answered `400`; the fingerprint includes the query string; stale comments fixed; an AC7 writer gate added; idempotency cases now run on both surfaces, plus a deterministic concurrent first use; Viewer rename records asserted; a cold-load skeleton and completion announcement; scaffold headers; the ledger. 4 deferred (2.2, 2.9). Plants P4, P5 and P7-P11, and R1-R8 for the patches, all caught. Status → done.

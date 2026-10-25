@@ -152,7 +152,9 @@ public static class ProjectEndpoints
             title: "A Project's name is 1 to 100 characters.");
 
     /// <summary>
-    /// Reads a body, or <c>null</c> for one that is not JSON or does not parse.
+    /// Reads a body, or <c>null</c> for one that is not JSON, does not parse, or names a charset the
+    /// runtime does not know (which <c>ReadFromJsonAsync</c> reports as an
+    /// <see cref="InvalidOperationException"/>).
     /// </summary>
     private static async Task<object?> ReadAsync(HttpRequest request, Type type, CancellationToken cancellationToken)
     {
@@ -166,6 +168,10 @@ public static class ProjectEndpoints
             return await request.ReadFromJsonAsync(type, cancellationToken).ConfigureAwait(false);
         }
         catch (JsonException)
+        {
+            return null;
+        }
+        catch (InvalidOperationException)
         {
             return null;
         }

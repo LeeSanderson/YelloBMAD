@@ -1,5 +1,7 @@
+using System.Data.Common;
 using System.Net;
 using System.Text.Json;
+using Microsoft.Data.SqlClient;
 using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.ApiTokens;
@@ -15,10 +17,10 @@ namespace Yello.Tests.Slices.Projects;
 /// <c>:253-256</c>, <c>:372</c>.
 /// </summary>
 /// <remarks>
-/// Q6 (a) with (i) and Q7 are the recommended decisions these cases encode: records keyed
-/// <c>(SpaceId, AccountId, Key)</c>, a reused key with a different request <c>422</c>, a key over 255
-/// characters <c>400</c>, and the issuance replay stored without its <c>token</c> property. If dev-story
-/// records a different decision, correct the case and say so in the Debug Log.
+/// Q6 (a) with (i) and Q7, as decided: records keyed <c>(SpaceId, AccountId, Key)</c>, a reused key with
+/// a different request <c>422</c>, a concurrent first use <c>409</c>, a key over 255 characters
+/// <c>400</c>, and the issuance replay stored without its <c>token</c> property. Each Project case runs
+/// on both surfaces (AD-4); issuance is Session-only.
 /// </remarks>
 public sealed partial class ProjectEndpointTests
 {
@@ -67,10 +69,13 @@ public sealed partial class ProjectEndpointTests
     /// AC9, Q7 - the same key with a different request is refused <c>422 idempotency-key-reused</c> and
     /// applies nothing: a silent "new request" would defeat the guarantee.
     /// </summary>
+    /// <param name="surface">The surface both requests are sent on.</param>
     /// <returns>A task.</returns>
-    [Fact]
+    [Theory]
+    [InlineData(IsolationSurface.Session)]
+    [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AR-25")]
-    public async Task The_same_key_with_a_different_request_is_refused_422_and_applies_nothing()
+    public async Task The_same_key_with_a_different_request_is_refused_422_and_applies_nothing(IsolationSurface surface)
     {
         var database = Available();
         Actor? owner = null;
@@ -80,9 +85,10 @@ public sealed partial class ProjectEndpointTests
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
+            var token = await IssueTokenAsync(owner, owner.SpaceId);
 
-            Assert.Equal(HttpStatusCode.Created, (await CreateAsync(owner, "First", key: key)).StatusCode);
-            reused = await CreateAsync(owner, "Second", key: key);
+            Assert.Equal(HttpStatusCode.Created, (await CreateOnAsync(surface, owner, token, "First", key)).StatusCode);
+            reused = await CreateOnAsync(surface, owner, token, "Second", key);
         });
 
         Assert.NotNull(owner);
@@ -95,10 +101,13 @@ public sealed partial class ProjectEndpointTests
     /// AC9 - "returns the original response" means the original, not the current state: a create
     /// replayed after the Project was renamed still answers the name it was created with.
     /// </summary>
+    /// <param name="surface">The surface the create and its replay are sent on.</param>
     /// <returns>A task.</returns>
-    [Fact]
+    [Theory]
+    [InlineData(IsolationSurface.Session)]
+    [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AR-25")]
-    public async Task A_replay_after_a_rename_returns_the_original_response_not_the_current_state()
+    public async Task A_replay_after_a_rename_returns_the_original_response_not_the_current_state(IsolationSurface surface)
     {
         var database = Available();
         Actor? owner = null;
@@ -109,10 +118,11 @@ public sealed partial class ProjectEndpointTests
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
+            var token = await IssueTokenAsync(owner, owner.SpaceId);
 
-            original = await CreateAsync(owner, "As created", key: key);
+            original = await CreateOnAsync(surface, owner, token, "As created", key);
             Assert.Equal(HttpStatusCode.OK, (await RenameAsync(owner, owner.SpaceId, IdOf(original), "As renamed")).StatusCode);
-            replay = await CreateAsync(owner, "As created", key: key);
+            replay = await CreateOnAsync(surface, owner, token, "As created", key);
         });
 
         Assert.NotNull(owner);
@@ -125,11 +135,14 @@ public sealed partial class ProjectEndpointTests
     /// AC9 - a record is Space- and Account-scoped: another Account using the same key in its own Space is
     /// a first use there, not a replay of the first Account's record.
     /// </summary>
+    /// <param name="surface">The surface both creates are sent on.</param>
     /// <returns>A task.</returns>
-    [Fact]
+    [Theory]
+    [InlineData(IsolationSurface.Session)]
+    [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "NFR-1")]
-    public async Task A_key_used_by_another_Account_in_its_own_Space_is_not_a_replay_of_the_first()
+    public async Task A_key_used_by_another_Account_in_its_own_Space_is_not_a_replay_of_the_first(IsolationSurface surface)
     {
         var database = Available();
         Actor? first = null;
@@ -142,9 +155,11 @@ public sealed partial class ProjectEndpointTests
         {
             first = await RegisterAsync(client, database);
             second = await RegisterAsync(client, database);
+            var firstToken = await IssueTokenAsync(first, first.SpaceId);
+            var secondToken = await IssueTokenAsync(second, second.SpaceId);
 
-            firstAnswer = await CreateAsync(first, "Same body", key: key);
-            secondAnswer = await CreateAsync(second, "Same body", key: key);
+            firstAnswer = await CreateOnAsync(surface, first, firstToken, "Same body", key);
+            secondAnswer = await CreateOnAsync(surface, second, secondToken, "Same body", key);
         });
 
         Assert.NotNull(first);
@@ -160,10 +175,13 @@ public sealed partial class ProjectEndpointTests
     /// AC9, Task 7 - a key longer than 255 characters is refused <c>400</c> and nothing is written. Anchor:
     /// 255 characters is accepted.
     /// </summary>
+    /// <param name="surface">The surface both creates are sent on.</param>
     /// <returns>A task.</returns>
-    [Fact]
+    [Theory]
+    [InlineData(IsolationSurface.Session)]
+    [InlineData(IsolationSurface.ApiToken)]
     [Trait("Priority", "P1")]
-    public async Task A_key_longer_than_255_characters_is_refused_400_and_nothing_is_written()
+    public async Task A_key_longer_than_255_characters_is_refused_400_and_nothing_is_written(IsolationSurface surface)
     {
         var database = Available();
         Actor? owner = null;
@@ -173,9 +191,10 @@ public sealed partial class ProjectEndpointTests
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
+            var token = await IssueTokenAsync(owner, owner.SpaceId);
 
-            tooLong = await CreateAsync(owner, "Too long a key", key: new string('k', 256));
-            atLimit = await CreateAsync(owner, "At the limit", key: new string('k', 255));
+            tooLong = await CreateOnAsync(surface, owner, token, "Too long a key", new string('k', 256));
+            atLimit = await CreateOnAsync(surface, owner, token, "At the limit", new string('k', 255));
         });
 
         Assert.NotNull(owner);
@@ -244,6 +263,116 @@ public sealed partial class ProjectEndpointTests
 
         Assert.NotEmpty(stored);
         Assert.DoesNotContain(stored, value => value.Contains(plaintext[TokenPrefix.Length..], StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// AC9, Q7 - a concurrent first use of one key is applied once and the loser is told so. The same
+    /// Account sends the same create with the same key on its Session and on its Token while the test holds
+    /// the Space's bound-count lock. Both have looked the key up and found nothing, and both then wait at
+    /// the count. Released, one commits its Project and its record; the other counts it, creates, fails
+    /// the record's unique index, and answers <c>409 idempotency-key-in-flight</c> with no <c>Location</c>,
+    /// its Project rolled back.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AR-25")]
+    [Trait("Requirement", "AD-18")]
+    public async Task A_concurrent_first_use_of_one_key_is_applied_once_and_the_loser_answered_409()
+    {
+        var database = Available();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Actor? owner = null;
+        WireResponse[] answers = [];
+        var key = Guid.NewGuid().ToString("D");
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            owner = await RegisterAsync(client, database);
+            var token = await IssueTokenAsync(owner, owner.SpaceId);
+
+            await using var holder = await database.OpenForSpaceAsync(owner.SpaceId, cancellationToken);
+            await using var observer = await database.OpenWithoutSpaceContextAsync(cancellationToken);
+            await using var held = await holder.BeginTransactionAsync(cancellationToken);
+
+            await using (DbCommand count = holder.CreateCommand())
+            {
+                count.Transaction = held;
+                count.CommandText = "SELECT COUNT(*) FROM dbo.[Project] WITH (UPDLOCK, HOLDLOCK)";
+                await count.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            var holderSession = await SessionOfAsync(holder, held, cancellationToken);
+
+            var racing = Task.WhenAll(
+                CreateOnAsync(IsolationSurface.Session, owner, token, "Sent twice at once", key),
+                CreateOnAsync(IsolationSurface.ApiToken, owner, token, "Sent twice at once", key));
+
+            // Both requests are waiting for the count's range lock - the second queued behind the first,
+            // which waits on the holder - so both looked the key up before either can commit.
+            var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+
+            while (await WaitingForTheCountAsync(observer, cancellationToken) < 2)
+            {
+                if (DateTimeOffset.UtcNow >= deadline)
+                {
+                    Assert.Fail($"The two creations never both waited on the held bound-count lock (session {holderSession}). Waiting: {await WaitsAsync(observer, cancellationToken)}");
+                }
+
+                Assert.False(racing.IsCompleted, "A creation answered without waiting on the held bound-count lock.");
+            }
+
+            await held.RollbackAsync(cancellationToken);
+
+            answers = await racing;
+        });
+
+        Assert.NotNull(owner);
+        Assert.Equal([HttpStatusCode.Created, HttpStatusCode.Conflict], answers.Select(answer => answer.StatusCode).Order());
+
+        var loser = answers.Single(answer => answer.StatusCode == HttpStatusCode.Conflict);
+
+        Assert.Equal(ProblemTypes.IdempotencyKeyInFlight, Problem(loser)?.Type);
+        Assert.Null(loser.Header("Location"));
+        Assert.Single(await ProjectRowsAsync(database, owner.SpaceId));
+    }
+
+    private static async Task<int> SessionOfAsync(SqlConnection connection, DbTransaction transaction, CancellationToken cancellationToken)
+    {
+        await using DbCommand command = connection.CreateCommand();
+
+        command.Transaction = transaction;
+        command.CommandText = "SELECT @@SPID";
+
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
+    /// Requests waiting for a range update lock - the bound count's <c>UPDLOCK, HOLDLOCK</c>.
+    /// </summary>
+    private static async Task<int> WaitingForTheCountAsync(SqlConnection connection, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT COUNT(*) FROM sys.dm_exec_requests WHERE database_id = DB_ID() AND blocking_session_id <> 0 AND wait_type = 'LCK_M_RS_U'";
+
+        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    private static async Task<string> WaitsAsync(SqlConnection connection, CancellationToken cancellationToken)
+    {
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT session_id, blocking_session_id, wait_type, wait_resource FROM sys.dm_exec_requests WHERE database_id = DB_ID() AND blocking_session_id <> 0";
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var rows = new List<string>();
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add($"{reader.GetInt16(0)} blocked by {reader.GetInt16(1)} on {reader.GetString(2)} {reader.GetString(3)}");
+        }
+
+        return rows.Count == 0 ? "none" : string.Join("; ", rows);
     }
 
     private static Task<WireResponse> CreateOnAsync(IsolationSurface surface, Actor actor, string token, string name, string key) =>

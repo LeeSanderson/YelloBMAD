@@ -14,16 +14,14 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 2.1 ATDD run on 2026-10-25.</b> Every case is skipped
-/// with <c>red: AC&lt;n&gt;</c> until Task 10 builds the page. The API is <see cref="FakeYelloApi"/> at
-/// the network edge, extended with the three Project routes (no Host, no database, no container), and a
-/// held list answer (<see cref="FakeYelloApi.HoldProjectsAsync"/>) is what makes "before the server
-/// answers" observable.
+/// <b>The API is <see cref="FakeYelloApi"/> at the network edge</b>, with the three Project routes (no
+/// Host, no database, no container), and a held list answer (<see cref="FakeYelloApi.HoldProjectsAsync"/>)
+/// is what makes "before the server answers" observable.
 /// </para>
 /// <para>
 /// <b>Locators are by role and accessible name</b>, from the copy the story fixes ("No Projects yet.",
-/// "Create a Project", "Rename", the bound sentence). If Task 10 names a control differently, correct the
-/// locator and the copy together, and record it in the Debug Log.
+/// "Create a Project", "Rename", the bound sentence). A control renamed in the page is renamed here
+/// with its copy.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Client")]
@@ -79,7 +77,8 @@ public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC13, UX-DR31, UX-DR35 - while the list answer is held, nothing of the list renders and the region
-    /// is busy; released, the Projects appear.
+    /// is busy, with skeleton rows; released, the Projects appear, the skeleton goes, and completion is
+    /// announced politely.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -105,11 +104,17 @@ public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
             Assert.DoesNotContain("Atlas", main, StringComparison.Ordinal);
             Assert.DoesNotContain(EmptyState, main, StringComparison.Ordinal);
             Assert.True(await page.Locator("main [aria-busy='true']").CountAsync() >= 1, "Nothing in main says the list is loading.");
+            Assert.True(await page.Locator("main [aria-busy='true'] .project-list__skeleton-row").CountAsync() >= 1, "The busy region holds no skeleton.");
 
             api.ReleaseProjects(Northwind);
 
             await page.GetByText("Beacon").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             Assert.Equal(0, await page.Locator("main [aria-busy='true']").CountAsync());
+            Assert.Equal(0, await page.Locator("main .project-list__skeleton-row").CountAsync());
+
+            // Completion is announced politely, and the announcement names no Project.
+            await page.Locator("main [role='status'][aria-live='polite']", new PageLocatorOptions { HasText = "Projects loaded." })
+                .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = Timeout });
         }
     }
 
@@ -284,6 +289,92 @@ public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
 
             Assert.Single(api.Requests, request => request.Method == "PATCH");
             Assert.Equal(0, await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = "Save" }).CountAsync());
+        }
+    }
+
+    /// <summary>
+    /// AC9, Task 7 - a creation whose answer was lost may have been applied, so sending the same name
+    /// again is a retry of that attempt: it carries the same <c>Idempotency-Key</c> and is answered with
+    /// the first answer, and one row appears. Anchor: the next creation, of another name, carries a new key.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AR-25")]
+    public async Task A_creation_resent_after_a_lost_answer_reuses_its_key_and_appears_once()
+    {
+        var api = TwoSpaces();
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSpaceAsync(api, page, Northwind);
+            await page.GetByText(EmptyState).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            api.LoseNextProjectCreateAnswer = true;
+            await CreateAsync(page, "Lighthouse");
+            await page.Locator("main .project-create__refusal").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            await page.Locator("main input[type='text']").First.PressAsync("Enter");
+            await page.Locator("main li", new PageLocatorOptions { HasText = "Lighthouse" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            await page.Locator("main input[type='text']").First.FillAsync("Quay");
+            await page.Locator("main input[type='text']").First.PressAsync("Enter");
+            await page.Locator("main li", new PageLocatorOptions { HasText = "Quay" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var keys = api.Requests
+                .Where(request => request.Method == "POST" && request.Path == ProjectRoutes.ListIn(Northwind))
+                .Select(request => request.Header(Idempotency.HeaderName))
+                .ToList();
+
+            Assert.Equal(3, keys.Count);
+            Assert.All(keys, key => Assert.False(string.IsNullOrEmpty(key)));
+            Assert.Equal(keys[0], keys[1]);
+            Assert.NotEqual(keys[1], keys[2]);
+            Assert.Equal(1, await page.Locator("main li", new PageLocatorOptions { HasText = "Lighthouse" }).CountAsync());
+        }
+    }
+
+    /// <summary>
+    /// Q11 - one rename at a time: while a rename is on its way, another row's Rename control opens no
+    /// field, so the answer cannot close or mislabel a field it was not sent from. Anchor: once the answer
+    /// has landed, the other row's control opens its field.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR26")]
+    public async Task No_second_rename_opens_while_one_is_on_its_way()
+    {
+        var api = TwoSpaces();
+        Seed(api, Northwind, "Atlas", "Beacon");
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSpaceAsync(api, page, Northwind);
+
+            var atlas = page.Locator("main li", new PageLocatorOptions { HasText = "Atlas" });
+            await page.Locator("main li", new PageLocatorOptions { HasText = "Beacon" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            // By position, not by text: a row whose field is open shows its name only as the input's value.
+            // The rows sort Atlas, Beacon, and still do after Atlas becomes "Atlas two".
+            var beacon = page.Locator("main li").Nth(1);
+
+            await atlas.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction }).ClickAsync();
+            await page.Locator("main li input[type='text']").FillAsync("Atlas two");
+
+            var arrived = api.HoldRenameAsync();
+            await page.Locator("main li").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true }).First.ClickAsync();
+            await arrived.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+
+            await beacon.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction }).ClickAsync();
+            Assert.Equal(0, await beacon.Locator("input[type='text']").CountAsync());
+
+            api.ReleaseRename();
+            await page.Locator("main li", new PageLocatorOptions { HasText = "Atlas two" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            await beacon.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction }).ClickAsync();
+            await beacon.Locator("input[type='text']").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
         }
     }
 

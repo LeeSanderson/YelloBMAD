@@ -22,11 +22,8 @@ namespace Yello.Tests.Slices.Projects;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 2.1 ATDD run on 2026-10-25.</b> Every case is skipped
-/// with <c>red: AC&lt;n&gt;</c> until dev-story activates it. Routes and problem types come from
-/// <c>Yello.Contracts.Projects</c> (the scaffold constants were replaced on activation); bodies are anonymous
-/// objects and answers are read as raw JSON, so an added property cannot hide behind a DTO. On
-/// activation, replace the scaffold constants with the contract ones and keep reading raw JSON.
+/// <b>Routes and problem types come from <c>Yello.Contracts</c>; answers are read as raw JSON</b>, so an
+/// added property cannot hide behind a DTO.
 /// </para>
 /// <para>
 /// <b>One class, one database</b> on the suite's shared engine (story 1.9 Q1 (a)): no new engine. The
@@ -46,9 +43,8 @@ namespace Yello.Tests.Slices.Projects;
 /// (RLS <c>BLOCK AFTER INSERT</c> on <c>Membership</c>), for an Account the product registered, as a
 /// non-Owner, once per Space (<c>AK_Membership_SpaceId_AccountId</c>). Projects seeded by SQL
 /// (<see cref="SeedProjectsAsync"/>) are written under the Space's key into an existing Space, with the
-/// four columns Task 3 names (<c>Id</c>, <c>SpaceId</c>, <c>Name</c>, <c>CreatedAt</c>) and an id
-/// supplied by the test, because Task 3 maps <c>Id</c> with <c>ValueGeneratedNever</c>; if the migration
-/// adds a further non-nullable column without a default, correct that one statement.
+/// table's four columns (<c>Id</c>, <c>SpaceId</c>, <c>Name</c>, <c>CreatedAt</c>) and an id supplied by
+/// the test, because <c>Id</c> is mapped with <c>ValueGeneratedNever</c>.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Slices")]
@@ -234,6 +230,39 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     }
 
     /// <summary>
+    /// AC2 - a JSON body that names a charset the runtime does not know is a body that cannot be read,
+    /// refused <c>400 invalid-project-name</c> like one that does not parse, never a <c>500</c>. Anchor:
+    /// the same body with a known charset is created.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Priority", "P2")]
+    public async Task A_body_in_an_unknown_charset_is_refused_400_not_500()
+    {
+        var database = Available();
+        Actor? owner = null;
+        WireResponse? refused = null;
+        WireResponse? anchor = null;
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            owner = await RegisterAsync(client, database);
+
+            using var unknown = new StringContent("""{"name":"Odd charset"}""");
+            unknown.Headers.ContentType = System.Net.Http.Headers.MediaTypeHeaderValue.Parse("application/json; charset=no-such-charset");
+
+            refused = await owner.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectRoutes.ListIn(owner.SpaceId), unknown, NoHeaders);
+            anchor = await CreateAsync(owner, "Odd charset");
+        });
+
+        Assert.NotNull(owner);
+        Assert.True(refused?.StatusCode == HttpStatusCode.BadRequest, $"{refused?.StatusCode} {refused?.Body}");
+        Assert.Equal(ProblemTypes.InvalidProjectName, Problem(refused!)?.Type);
+        Assert.Equal(HttpStatusCode.Created, anchor?.StatusCode);
+        Assert.Single(await ProjectRowsAsync(database, owner.SpaceId));
+    }
+
+    /// <summary>
     /// AC2, AC8, V-1, NFR-7 - a Viewer's Session and a Viewer's Token creating a Project are each refused
     /// <c>403 insufficient-role</c> naming <c>manage-projects</c>, each recorded once as
     /// <c>InsufficientRole</c> and never as <c>CrossSpace</c>, and nothing is written. Anchor: the Owner
@@ -315,8 +344,8 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     }
 
     /// <summary>
-    /// AC3, AC8 - a Viewer's rename is refused <c>403 insufficient-role</c> on both surfaces and the name
-    /// is unchanged.
+    /// AC3, AC8 - a Viewer's rename is refused <c>403 insufficient-role</c> on both surfaces, each refusal
+    /// recorded once as <c>InsufficientRole</c>, and the name is unchanged.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -325,13 +354,14 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     {
         var database = Available();
         Actor? owner = null;
+        Actor? viewer = null;
         WireResponse? bySession = null;
         WireResponse? byToken = null;
 
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
-            var viewer = await RegisterAsync(client, database);
+            viewer = await RegisterAsync(client, database);
             await AddMemberAsync(database, owner.SpaceId, viewer.AccountId, "Viewer");
 
             var id = IdOf(await CreateAsync(owner, "Kept"));
@@ -342,6 +372,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         });
 
         Assert.NotNull(owner);
+        Assert.NotNull(viewer);
 
         foreach (var refused in new[] { bySession!, byToken! })
         {
@@ -349,6 +380,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
             Assert.Equal(CapabilityManageProjects, Problem(refused)?.Capability);
         }
 
+        Assert.Equal([InsufficientRoleKind, InsufficientRoleKind], await RefusalKindsAsync(database, viewer.AccountId, owner.SpaceId));
         Assert.Equal(["Kept"], (await ProjectRowsAsync(database, owner.SpaceId)).Select(row => row.Name));
     }
 

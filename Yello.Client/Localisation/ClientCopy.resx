@@ -362,6 +362,10 @@
     <value>Creating the Project.</value>
     <comment>Shown in place of the create actions while a creation is on its way, so it cannot be sent twice.</comment>
   </data>
+  <data name="ProjectsLoaded" xml:space="preserve">
+    <value>Projects loaded.</value>
+    <comment>Announced politely when a Space's Project list has arrived and replaced its skeleton (UX-DR35 cold load). Names no Project and no Space.</comment>
+  </data>
   <data name="ProjectCreated" xml:space="preserve">
     <value>{0} created.</value>
     <comment>Announced politely once a Project exists. {0} is its name, as the person typed it.</comment>
