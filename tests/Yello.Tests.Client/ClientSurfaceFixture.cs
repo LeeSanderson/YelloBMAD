@@ -54,7 +54,17 @@ public sealed class ClientSurfaceFixture : IAsyncLifetime
     /// that culture - the same input a real browser supplies.
     /// </param>
     /// <returns>The context and its page. Disposing the context closes the page with it.</returns>
-    public async Task<(IBrowserContext Context, IPage Page)> OpenAsync(string locale)
+    public Task<(IBrowserContext Context, IPage Page)> OpenAsync(string locale) => OpenAsync(locale, timezoneId: null);
+
+    /// <summary>
+    /// Opens a browser context with the given locale and time zone, and a page in it. Added by the story 2.3
+    /// ATDD run for AC7: a due date renders in the viewer's own zone, so a case sets the zone the browser
+    /// reports.
+    /// </summary>
+    /// <param name="locale">A BCP 47 tag, as <see cref="OpenAsync(string)"/> takes it.</param>
+    /// <param name="timezoneId">An IANA zone, for example <c>Asia/Tokyo</c>, or <c>null</c> for the machine's.</param>
+    /// <returns>The context and its page. Disposing the context closes the page with it.</returns>
+    public async Task<(IBrowserContext Context, IPage Page)> OpenAsync(string locale, string? timezoneId)
     {
         var browser = _browser
             ?? throw new InvalidOperationException(
@@ -63,6 +73,7 @@ public sealed class ClientSurfaceFixture : IAsyncLifetime
         var context = await browser.NewContextAsync(new BrowserNewContextOptions
         {
             Locale = locale,
+            TimezoneId = timezoneId,
         }).ConfigureAwait(false);
 
         var page = await context.NewPageAsync().ConfigureAwait(false);

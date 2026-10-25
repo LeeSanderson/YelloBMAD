@@ -8,6 +8,7 @@ using Yello.Contracts.ApiTokens;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
+using Yello.Contracts.Tasks;
 
 namespace Yello.Tests.Client;
 
@@ -38,6 +39,16 @@ internal sealed class FakeYelloApi
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    /// <summary>
+    /// The status <c>DecideAsync</c> answers when the connection must be reset rather than answered. Story 2.3.
+    /// </summary>
+    private const int AbortConnection = -1;
+
+    /// <summary>
+    /// Story 2.3's new problem type, as <c>TaskEditScaffold</c> states it until <c>ProblemTypes</c> holds it.
+    /// </summary>
+    private const string InvalidTaskStatusType = "urn:yello:problem:invalid-task-status";
+
     private readonly ConcurrentQueue<FakeRequest> _requests = new();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _held = new();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _arrived = new();
@@ -48,6 +59,8 @@ internal sealed class FakeYelloApi
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _arrivedBoards = new();
     private readonly ConcurrentDictionary<string, string> _createdTaskByKey = new(StringComparer.Ordinal);
     private TaskCompletionSource? _heldRename;
+    private TaskEditHold? _taskEditHold;
+    private TaskEditHold? _lastTaskEditHold;
     private TaskCompletionSource? _arrivedRename;
     private readonly TaskCompletionSource<FakeRequest> _signInSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<FakeRequest> _signOutSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -128,6 +141,12 @@ internal sealed class FakeYelloApi
     /// say (AC13). Cleared once used. Story 2.2.
     /// </summary>
     public (int Status, string ProblemType)? NextTaskCreateRefusal { get; set; }
+
+    /// <summary>
+    /// A refusal the next Task edit is answered with instead of being applied - <c>(status, type, capability)</c>.
+    /// Cleared once used. Story 2.3 (written by its ATDD run).
+    /// </summary>
+    public (int Status, string ProblemType, string? Capability)? NextTaskEditRefusal { get; set; }
 
     /// <summary>
     /// Every request seen, in order.
@@ -238,6 +257,61 @@ internal sealed class FakeYelloApi
     }
 
     /// <summary>
+    /// Holds the <b>next</b> Task edit (<c>PATCH …/tasks/{taskId}</c>) until it is released; later edits are
+    /// answered at once, so a case can hold one attribute's edit while another's is admitted (Q8). Story 2.3.
+    /// </summary>
+    /// <returns>A task that completes when the held edit has arrived and is waiting.</returns>
+    public Task HoldTaskEditAsync()
+    {
+        var hold = new TaskEditHold();
+
+        _taskEditHold = hold;
+        _lastTaskEditHold = hold;
+
+        return hold.Arrived.Task;
+    }
+
+    /// <summary>
+    /// Lets the held Task edit go and applies it, as the Host admits it.
+    /// </summary>
+    public void ReleaseTaskEdit() => ReleaseHeldEdit(TaskEditOutcome.Admitted);
+
+    /// <summary>
+    /// Lets the held Task edit go with a refusal instead: nothing is applied.
+    /// </summary>
+    /// <param name="status">The status code.</param>
+    /// <param name="problemType">The problem type.</param>
+    /// <param name="capability">The capability a <c>403</c> names, or <c>null</c>.</param>
+    public void ReleaseTaskEditRefused(int status, string problemType, string? capability = null) =>
+        ReleaseHeldEdit(new TaskEditOutcome(status, problemType, capability, Abort: false));
+
+    /// <summary>
+    /// Lets the held Task edit go with no answer at all - the connection reset, as a timeout or a dropped
+    /// network reaches the browser. Nothing is applied.
+    /// </summary>
+    public void ReleaseTaskEditUnanswered() => ReleaseHeldEdit(new TaskEditOutcome(0, string.Empty, Capability: null, Abort: true));
+
+    /// <summary>
+    /// The Task with <paramref name="taskId"/> as the fake holds it now, with its column, in whichever Board.
+    /// </summary>
+    /// <param name="taskId">The Task.</param>
+    /// <returns>Its column and the Task, or <c>null</c>.</returns>
+    public (FakeColumn Column, FakeTask Task)? FindTask(Guid taskId)
+    {
+        foreach (var column in Boards.Values.SelectMany(board => board.Columns))
+        {
+            var task = column.Tasks.Find(candidate => candidate.Id == taskId);
+
+            if (task is not null)
+            {
+                return (column, task);
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
     /// Whether any request named <paramref name="spaceId"/> in its path.
     /// </summary>
     public bool WasRequested(Guid spaceId) =>
@@ -260,6 +334,12 @@ internal sealed class FakeYelloApi
         var origin = headers.TryGetValue("origin", out var value) ? value : "*";
 
         var (status, body) = await DecideAsync(seen).ConfigureAwait(false);
+
+        if (status == AbortConnection)
+        {
+            await route.AbortAsync("connectionreset").ConfigureAwait(false);
+            return;
+        }
 
         if (LoseNextProjectCreateAnswer && seen.Method == "POST" && TryProjects(seen.Path, out _))
         {
@@ -327,6 +407,13 @@ internal sealed class FakeYelloApi
                 && Guid.TryParse(path[(ApiTokenRoutes.List.Length + 1)..], out var revoked):
                 _ = ApiTokens.Remove(ApiTokens.FirstOrDefault(token => token.Id == revoked) ?? FakeApiToken.None);
                 return (noContent, string.Empty);
+
+            // Story 2.3 - one Task, read and edited by id.
+            case ("GET", var path) when TryTask(path, out var readSpace, out var readTask):
+                return ViewTask(readSpace, readTask);
+
+            case ("PATCH", var path) when TryTask(path, out var editSpace, out var editTask):
+                return await EditTaskAsync(editSpace, editTask, request).ConfigureAwait(false);
 
             // Story 2.2 - the Board and Task routes.
             case ("GET", var path) when TryUnderProject(path, "board", out var boardSpace, out var boardProject):
@@ -553,6 +640,161 @@ internal sealed class FakeYelloApi
         return (201, created);
     }
 
+    private (int Status, string Body) ViewTask(Guid spaceId, Guid taskId) =>
+        FindTaskIn(spaceId, taskId) is { } found
+            ? (200, JsonSerializer.Serialize(found.Task, JsonOptions))
+            : (404, Problem(ProblemTypes.NotAvailable));
+
+    /// <summary>
+    /// The Host's Task edit as story 2.3 recommends it (Q1 (a) merge-patch, Q3 (a) append to the new column,
+    /// Q4 (a) UTC): a held edit waits for its release; a refusal applies nothing; otherwise each member sent is
+    /// applied - the title trimmed and held to 1-200, the Status held to the Board's columns (the effective set),
+    /// the due date normalised to UTC or cleared by <c>null</c> - and a Status change moves the Task to the end
+    /// of its new column, both totals following.
+    /// </summary>
+    private async Task<(int Status, string Body)> EditTaskAsync(Guid spaceId, Guid taskId, FakeRequest request)
+    {
+        var outcome = TaskEditOutcome.Admitted;
+
+        if (Interlocked.Exchange(ref _taskEditHold, null) is { } hold)
+        {
+            hold.Arrived.TrySetResult();
+            outcome = await hold.Released.Task.ConfigureAwait(false);
+        }
+        else if (NextTaskEditRefusal is { } refusal)
+        {
+            NextTaskEditRefusal = null;
+            outcome = new TaskEditOutcome(refusal.Status, refusal.ProblemType, refusal.Capability, Abort: false);
+        }
+        else
+        {
+            // Unheld and unrefused: applied below.
+        }
+
+        if (outcome.Abort)
+        {
+            return (AbortConnection, string.Empty);
+        }
+
+        if (outcome.Status != 200)
+        {
+            return (outcome.Status, JsonSerializer.Serialize(new ProblemResponse(outcome.ProblemType, Errors: null, Capability: outcome.Capability), JsonOptions));
+        }
+
+        if (FindTaskIn(spaceId, taskId) is not { } found)
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        return Apply(found.Board, found.Column, found.Task, request.Body);
+    }
+
+    private static (int Status, string Body) Apply(FakeBoard board, FakeColumn column, FakeTask task, string? body)
+    {
+        using var document = JsonDocument.Parse(string.IsNullOrEmpty(body) ? "{}" : body);
+        var members = document.RootElement;
+        var edited = task;
+
+        if (members.TryGetProperty("title", out var titleValue))
+        {
+            if (!TryTitle(titleValue, out var title))
+            {
+                return (400, Problem(ProblemTypes.InvalidTaskTitle));
+            }
+
+            edited = edited with { Title = title };
+        }
+
+        if (members.TryGetProperty("dueDate", out var dueValue))
+        {
+            edited = edited with { DueDate = dueValue.ValueKind == JsonValueKind.Null ? null : dueValue.GetDateTimeOffset().ToUniversalTime() };
+        }
+
+        var destination = column;
+
+        if (members.TryGetProperty("statusId", out var statusValue))
+        {
+            if (ColumnOf(board, statusValue) is not { } target)
+            {
+                return (400, Problem(InvalidTaskStatusType));
+            }
+
+            destination = target;
+        }
+
+        var index = column.Tasks.FindIndex(candidate => candidate.Id == task.Id);
+
+        if (destination == column)
+        {
+            column.Tasks[index] = edited;
+        }
+        else
+        {
+            column.Tasks.RemoveAt(index);
+            column.Total--;
+            edited = edited with { StatusId = destination.StatusId, PositionKey = $"z{destination.Tasks.Count:D5}" };
+            destination.Tasks.Add(edited);
+            destination.Total++;
+        }
+
+        return (200, JsonSerializer.Serialize(edited, JsonOptions));
+    }
+
+    /// <summary>
+    /// The Host's title rule for an edit: a string, trimmed, 1-200 characters; <c>null</c> is refused (Q1 (a)).
+    /// </summary>
+    private static bool TryTitle(JsonElement value, out string title)
+    {
+        title = (value.ValueKind == JsonValueKind.String ? value.GetString() ?? string.Empty : string.Empty).Trim();
+
+        return title.Length is >= 1 and <= 200;
+    }
+
+    /// <summary>
+    /// The Board column for a sent Status id - the effective set - or <c>null</c> for anything else.
+    /// </summary>
+    private static FakeColumn? ColumnOf(FakeBoard board, JsonElement value) =>
+        value.ValueKind == JsonValueKind.String && value.TryGetGuid(out var statusId)
+            ? board.Columns.FirstOrDefault(candidate => candidate.StatusId == statusId)
+            : null;
+
+    private (FakeBoard Board, FakeColumn Column, FakeTask Task)? FindTaskIn(Guid spaceId, Guid taskId)
+    {
+        foreach (var board in Boards.Where(entry => entry.Key.SpaceId == spaceId).Select(entry => entry.Value))
+        {
+            foreach (var column in board.Columns)
+            {
+                var task = column.Tasks.Find(candidate => candidate.Id == taskId);
+
+                if (task is not null)
+                {
+                    return (board, column, task);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private void ReleaseHeldEdit(TaskEditOutcome outcome) => _lastTaskEditHold?.Released.TrySetResult(outcome);
+
+    /// <summary>
+    /// Whether <paramref name="path"/> is <c>/api/v1/spaces/{s}/tasks/{t}</c> - <c>TaskRoutes.TaskOf</c>.
+    /// </summary>
+    private static bool TryTask(string path, out Guid spaceId, out Guid taskId)
+    {
+        var prefix = SpaceRoutes.Directory + "/";
+        var segments = path.StartsWith(prefix, StringComparison.Ordinal) ? path[prefix.Length..].Split('/') : [];
+
+        spaceId = Guid.Empty;
+        taskId = Guid.Empty;
+
+        return segments is [var space, "tasks", var task]
+            && Guid.TryParse(space, out spaceId)
+            && Guid.TryParse(task, out taskId)
+            && path == TaskRoutes.TaskOf(spaceId, taskId);
+    }
+
     /// <summary>
     /// Whether <paramref name="path"/> is <c>/api/v1/spaces/{s}/projects/{p}/{leaf}</c>.
     /// </summary>
@@ -629,6 +871,37 @@ internal sealed class FakeYelloApi
 
     private static string Problem(string type) =>
         JsonSerializer.Serialize(new ProblemResponse(type, Errors: null), JsonOptions);
+}
+
+/// <summary>
+/// How a held Task edit is answered. Story 2.3.
+/// </summary>
+/// <param name="Status">The status code: <c>200</c> applies the edit.</param>
+/// <param name="ProblemType">A refusal's problem type.</param>
+/// <param name="Capability">A <c>403</c>'s capability.</param>
+/// <param name="Abort">Whether the connection is reset instead of answered.</param>
+internal sealed record TaskEditOutcome(int Status, string ProblemType, string? Capability, bool Abort)
+{
+    /// <summary>
+    /// Applied, as the Host admits it.
+    /// </summary>
+    public static TaskEditOutcome Admitted { get; } = new(200, string.Empty, Capability: null, Abort: false);
+}
+
+/// <summary>
+/// One armed hold on the next Task edit. Story 2.3.
+/// </summary>
+internal sealed class TaskEditHold
+{
+    /// <summary>
+    /// Completes when the held edit has arrived.
+    /// </summary>
+    public TaskCompletionSource Arrived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// Completes with the answer the held edit is given.
+    /// </summary>
+    public TaskCompletionSource<TaskEditOutcome> Released { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
 
 /// <summary>
@@ -725,4 +998,5 @@ internal sealed class FakeColumn(Guid statusId, string name, int total, List<Fak
 /// <param name="StatusId">Its Status.</param>
 /// <param name="PositionKey">Its position key, readable and never writable.</param>
 /// <param name="CreatedAt">When it was created.</param>
-internal sealed record FakeTask(Guid Id, string Title, Guid StatusId, string PositionKey, DateTimeOffset CreatedAt);
+/// <param name="DueDate">Its due date in UTC, or <c>null</c> - story 2.3 Task 4's added field (AD-19).</param>
+internal sealed record FakeTask(Guid Id, string Title, Guid StatusId, string PositionKey, DateTimeOffset CreatedAt, DateTimeOffset? DueDate = null);

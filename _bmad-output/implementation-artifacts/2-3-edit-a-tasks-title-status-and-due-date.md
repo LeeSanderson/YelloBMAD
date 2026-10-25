@@ -406,6 +406,38 @@ The dev phase takes these as **reversible, recorded decisions** in the Completio
 13. **AC4's sibling-Project clause before 6.1.** Every Project's effective set is the Space defaults until 6.1 adds deltas (readiness report `:932-933`), so no Status is "valid in a sibling Project but absent from this one". (a) Validate against the Task's Project's effective set now (correct by construction once 6.1 adds deltas), prove it with a random id and a real foreign-Space Status id, and add a ledger entry, owner **6.1**, for the literal sibling case. (b) Fabricate a delta table now. **Recommend (a).**
 14. **Button radius.** DESIGN.md prose and UX-DR5 say buttons are 3px; the button tokens say `rounded.sm` 2px (`DESIGN.md:207, 213, 220`). Relevant only if the panel adds a button (Close, Clear due date). **Recommend:** use the existing button styles unchanged, and add a UX ledger entry for the token/prose mismatch rather than fixing it silently.
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-2-3-edit-a-tasks-title-status-and-due-date.md` (scenario map, the Q1-Q14 dependency table, every seed constraint checked). Scaffolded against each open question's recommended option; the route pattern and the two new problem types live in `tests/Yello.Tests.Shared/TaskEditScaffold.cs` until `Yello.Contracts` holds them (then delete it).
+
+| File | Cases (entries) | ACs | State |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Edit.cs` | 24 (14) | AC1, AC3, AC4, AC7, AC8, AC9, AC11 | skipped |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.EditRace.cs` | 2 (2) | AC9 | skipped |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.EditIdempotency.cs` | 6 (3) | AC10 | skipped |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.EditSchema.cs` | 1 (1) | AC7 | skipped |
+| `tests/Yello.Tests.Isolation/IsolationCases.cs` | 5 rows x 2 surfaces | AC3, AC8 | **pending on 2.3** (ISO-DIRECT-TASK, ISO-EDIT-TASK-FOREIGN-SPACE, ISO-TASK-FOREIGN-ID-IN-OWN-SPACE, ISO-EDIT-TASK-FOREIGN-ID-IN-OWN-SPACE, ISO-RECORD-KIND-TASK-EDIT-VIEWER) - GATE-003 fails at `review` if any is left |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.TaskEdit.cs` | 6 (6) | AC1, AC3, AC7, AC8, AC12 | 4 skipped; **2 green** |
+| `tests/Yello.Tests.Architecture/RefusalCopyTests.TaskEdit.cs` | 3 (3) | AC3, AC12 | 2 skipped; **1 green** |
+| `tests/Yello.Tests.Architecture/DesignFoundationGateTests.TaskDetail.cs` | 3 (3) | AC13 | skipped |
+| `tests/Yello.Tests.Client/TaskDetailTests.cs` | 23 (20) | AC1-AC3, AC5-AC7, AC12, AC14 | skipped |
+| `tests/Yello.Tests.Client/TextSpacingTests.cs` (one theory added) | 2 (1) | AC13 | skipped |
+
+Harness (active): `TaskEditWire.cs` (Slices); `FakeYelloApi` gains `GET`/`PATCH` on the Task path, `HoldTaskEditAsync` (holds the next edit only), `ReleaseTaskEdit` / `ReleaseTaskEditRefused` / `ReleaseTaskEditUnanswered`, `NextTaskEditRefusal`, `FindTask`, and `FakeTask.DueDate`; `ClientSurfaceFixture.OpenAsync(locale, timezoneId)`.
+
+**Green today, standing gates:** `No_Domain_or_Contracts_member_is_typed_DateTime_or_DateOnly` with its oracle `The_clock_type_scan_reports_a_planted_DateTime_member`, and `A_Viewers_refused_edit_renders_the_manage_tasks_copy`. Keep them green.
+
+**Two active 2.2 cases go red by design when this story lands** - widen each deliberately in the change that breaks it and record it: `RefusalBoundaryGateTests.The_Task_creation_request_carries_a_title_and_nothing_else` (Task 4) and `BoardTests.A_Task_card_is_its_title_alone_and_carries_no_shadow` (it asserts no button in a card; Q7 (a) adds one).
+
+**Activation order** (full list in the checklist):
+1. `An_edit_and_a_creation_into_one_column_take_distinct_keys` **first - the riskiest assumption**: that a Status edit's key placement is serialised against a creation into the same column, which rests on Task 6's open measurement (does creation's Project-wide range lock conflict with the edit's column range?). Then `Two_edits_into_one_column_take_distinct_keys`. Plant the lock hint's removal three times.
+2. Schema and contract shape: `The_due_date_is_a_nullable_datetimeoffset_and_no_column_holds_a_description`, the two ARCH due-date/request gates, the route gate.
+3. The edit and read cases in `TaskEndpointTests.Edit.cs`, ending with the 5,000-Task `ConsultsBound` case.
+4. The five isolation rows, one at a time (the foreign-id-in-own-Space `GET` with the two-layer plant closes `deferred-work.md:485`), then the Viewer slice case.
+5. Idempotency, then copy, then the client cases (open, focus, `Esc`, never two deep, no description, Viewer, optimistic title, no save, Status, each revert, due date, autofill, Role lowered, purge), then the design gates and text spacing.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

@@ -104,6 +104,45 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
         }
     }
 
+    /// <summary>
+    /// Story 2.3, AC13, <c>deferred-work.md:20</c>'s convention that every new surface adds its own case: the Task
+    /// detail panel, open on a long title with a due date, under 1.4.12 text spacing and 200% text-only zoom -
+    /// no text in it clipped, no sideways page scroll. Anchored: the panel's heading is on screen before the
+    /// check runs. Written red by the story 2.3 ATDD run; the opening control is Q7 (a)'s
+    /// <c>button[data-task-id]</c> in the card.
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = "red: AC13 - the Task detail panel does not exist yet (Task 9 text spacing)")]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR10")]
+    public async Task Text_spacing_and_text_only_zoom_clip_nothing_in_the_Task_detail_panel(bool zoom)
+    {
+        var api = Seeded();
+        var (column, task) = api.FindTask(api.Boards[(Northwind, Atlas)].Columns[0].Tasks[0].Id)!.Value;
+
+        column.Tasks[0] = task with { DueDate = new DateTimeOffset(2026, 11, 3, 0, 0, 0, TimeSpan.Zero) };
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/projects/{Atlas:D}").ToString());
+
+            await page.Locator($".task-card button[data-task-id='{task.Id:D}']").ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await page.Locator("[role='dialog']").GetByRole(AriaRole.Heading, new LocatorGetByRoleOptions { Name = task.Title })
+                .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+        }
+    }
+
     private static FakeYelloApi Seeded()
     {
         var api = new FakeYelloApi { SignedIn = true };

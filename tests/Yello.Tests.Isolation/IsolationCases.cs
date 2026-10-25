@@ -297,6 +297,83 @@ internal static class IsolationCases
             ViewerCreatesATaskAsync,
             Both(new RoleRefused("manage-tasks") { Then = NoTaskWrittenByTheViewerAsync })),
 
+        // Story 2.3 - the by-id Task routes (AC8, Task 8), each on both surfaces, pending until the dev phase maps
+        // them. The route constant is TaskEditScaffold.Task until Yello.Contracts holds TaskRoutes.Task. A PATCH
+        // sends ProductActor's valid body, whose title is ProductActor.CaseBodyText, so a write that landed
+        // anywhere would carry it.
+        new(
+            "ISO-DIRECT-TASK", "I-1, I-13", IsolationVector.DirectIdentifier, HttpMethod.Get, TaskEditScaffold.Task,
+            async world =>
+            {
+                var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Get,
+                    [new(TaskRoutes.TaskOf(world.B.SpaceId, foreign), TaskRoutes.TaskOf(Guid.NewGuid(), foreign))],
+                    world.B.SpaceId);
+            },
+            Both(new BoundaryNotFound()),
+            PendingUntil: "2.3",
+            PendingReason: "GET /spaces/{spaceId}/tasks/{taskId} is mapped by story 2.3 Task 5"),
+
+        new(
+            "ISO-EDIT-TASK-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Patch, TaskEditScaffold.Task,
+            async world =>
+            {
+                var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Patch,
+                    [new(TaskRoutes.TaskOf(world.B.SpaceId, foreign), TaskRoutes.TaskOf(Guid.NewGuid(), foreign))],
+                    world.B.SpaceId);
+            },
+            Both(new BoundaryNotFound { Then = NoTaskWrittenInEitherSpaceAsync }),
+            PendingUntil: "2.3",
+            PendingReason: "PATCH /spaces/{spaceId}/tasks/{taskId} is mapped by story 2.3 Task 5; a Token is admitted there, so it meets the boundary 404, not 401"),
+
+        new(
+            "ISO-TASK-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5; deferred-work.md:485", IsolationVector.DeepLink, HttpMethod.Get, TaskEditScaffold.Task,
+            async world =>
+            {
+                var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
+
+                // The first read that is not narrowed by a Project (2.2 P3): only the Task's own query filter and
+                // FILTER predicate stand between A and B's Task. The dev phase plants the drop of both (Task 8).
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Get,
+                    [new(TaskRoutes.TaskOf(world.A.SpaceId, foreign), TaskRoutes.TaskOf(world.A.SpaceId, Guid.NewGuid()))],
+                    TargetSpaceId: null);
+            },
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable)),
+            PendingUntil: "2.3",
+            PendingReason: "GET /spaces/{spaceId}/tasks/{taskId} is mapped by story 2.3 Task 5; the two-layer plant closes deferred-work.md:485"),
+
+        new(
+            "ISO-EDIT-TASK-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Patch, TaskEditScaffold.Task,
+            async world =>
+            {
+                var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Patch,
+                    [new(TaskRoutes.TaskOf(world.A.SpaceId, foreign), TaskRoutes.TaskOf(world.A.SpaceId, Guid.NewGuid()))],
+                    TargetSpaceId: null);
+            },
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = NoTaskWrittenInEitherSpaceAsync }),
+            PendingUntil: "2.3",
+            PendingReason: "PATCH /spaces/{spaceId}/tasks/{taskId} is mapped by story 2.3 Task 5"),
+
+        new(
+            "ISO-RECORD-KIND-TASK-EDIT-VIEWER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Patch, TaskEditScaffold.Task,
+            ViewerEditsATaskAsync,
+            Both(new RoleRefused("manage-tasks") { Then = TheViewersTaskIsUnchangedAsync }),
+            PendingUntil: "2.3",
+            PendingReason: "PATCH /spaces/{spaceId}/tasks/{taskId} is mapped by story 2.3 Task 5"),
+
         new(
             "ISO-TIMING-BOUNDARY", "I-6", IsolationVector.Timing, HttpMethod.Get, SpaceRoutes.Active,
             world => ForeignAsync(world, SpaceRoutes.ActiveOf),
@@ -534,6 +611,34 @@ internal static class IsolationCases
 
     private static async Task NoTaskWrittenByTheViewerAsync(IsolationWorld world, CaseRequest request) =>
         Assert.Empty(await world.Database.TasksInAsync(request.Actor.SpaceId));
+
+    /// <summary>
+    /// A fresh Account with a Project and a Task in its own Personal Space, then demoted to Viewer there, so
+    /// its Session and its Token both hold exactly the Viewer Role; the request edits that Task. Story 2.3.
+    /// </summary>
+    private static async Task<CaseRequest> ViewerEditsATaskAsync(IsolationWorld world)
+    {
+        var viewer = await world.NewActorAsync("Ve");
+        var (_, taskId) = await SeedProjectWithTaskAsync(viewer);
+
+        await world.Database.ChangeRoleAsync(viewer.SpaceId, viewer.AccountId, "viewer");
+
+        var path = TaskRoutes.TaskOf(viewer.SpaceId, taskId);
+
+        return new CaseRequest(viewer, HttpMethod.Patch, [new(path, path)], viewer.SpaceId);
+    }
+
+    /// <summary>
+    /// The Viewer's Space still holds its Task (the anchor: the seed landed), and no Task there carries the
+    /// refused edit's title. Story 2.3.
+    /// </summary>
+    private static async Task TheViewersTaskIsUnchangedAsync(IsolationWorld world, CaseRequest request)
+    {
+        var tasks = await world.Database.TasksInAsync(request.Actor.SpaceId);
+
+        Assert.NotEmpty(tasks);
+        Assert.DoesNotContain(tasks, task => string.Equals(task.Title, ProductActor.CaseBodyText, StringComparison.Ordinal));
+    }
 
     /// <summary>
     /// B's Space holds Tasks (the anchor: the seed landed), and no Task in either Space carries the refused
