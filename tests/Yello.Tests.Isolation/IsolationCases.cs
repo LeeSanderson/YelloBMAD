@@ -221,6 +221,93 @@ internal static class IsolationCases
             },
             Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = NothingWrittenInTheForeignSpaceAsync })),
 
+        // Story 2.2 - the Board and Task routes (AC9, Task 9), each on both surfaces. Written by the story 2.2
+        // ATDD run with their real preparation and expectations, and pending until dev-story maps the routes.
+        // Activation deletes the pending story and reason, and swaps the scaffold routes for the contracts.
+        new(
+            "ISO-DIRECT-BOARD", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, TaskRouteScaffold.Board,
+            async world =>
+            {
+                var (foreign, _) = await SeedProjectWithTaskAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Get,
+                    [new(TaskRouteScaffold.BoardOf(world.B.SpaceId, foreign), TaskRouteScaffold.BoardOf(Guid.NewGuid(), foreign))],
+                    world.B.SpaceId);
+            },
+            Both(new BoundaryNotFound()),
+            PendingUntil: "2.2",
+            PendingReason: TaskRoutesPending),
+
+        new(
+            "ISO-BOARD-AGGREGATE", "I-3 (includes Board column counts), FR-28", IsolationVector.Aggregate, HttpMethod.Get, TaskRouteScaffold.Board,
+            async world =>
+            {
+                var (own, _) = await SeedProjectWithTaskAsync(world.A);
+                _ = await SeedProjectWithTaskAsync(world.B);
+
+                return await OwnAsync(world, TaskRouteScaffold.BoardOf(world.A.SpaceId, own));
+            },
+            Both(new Served(HttpStatusCode.OK, BoardHoldsExactlyTheCallersTasksAsync, "200, every column's total and Tasks are A's only, none of B's ids or titles")),
+            PendingUntil: "2.2",
+            PendingReason: TaskRoutesPending),
+
+        new(
+            "ISO-WRITE-TASK", "I-2", IsolationVector.Write, HttpMethod.Post, TaskRouteScaffold.Create,
+            async world =>
+            {
+                var (foreign, _) = await SeedProjectWithTaskAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Post,
+                    [new(TaskRouteScaffold.CreateIn(world.B.SpaceId, foreign), TaskRouteScaffold.CreateIn(Guid.NewGuid(), foreign))],
+                    world.B.SpaceId);
+            },
+            Both(new BoundaryNotFound { Then = NoTaskWrittenInEitherSpaceAsync }),
+            PendingUntil: "2.2",
+            PendingReason: TaskRoutesPending),
+
+        new(
+            "ISO-BOARD-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Get, TaskRouteScaffold.Board,
+            async world =>
+            {
+                var (foreign, _) = await SeedProjectWithTaskAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Get,
+                    [new(TaskRouteScaffold.BoardOf(world.A.SpaceId, foreign), TaskRouteScaffold.BoardOf(world.A.SpaceId, Guid.NewGuid()))],
+                    TargetSpaceId: null);
+            },
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable)),
+            PendingUntil: "2.2",
+            PendingReason: TaskRoutesPending),
+
+        new(
+            "ISO-WRITE-TASK-FOREIGN-PROJECT-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Post, TaskRouteScaffold.Create,
+            async world =>
+            {
+                var (foreign, _) = await SeedProjectWithTaskAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Post,
+                    [new(TaskRouteScaffold.CreateIn(world.A.SpaceId, foreign), TaskRouteScaffold.CreateIn(world.A.SpaceId, Guid.NewGuid()))],
+                    TargetSpaceId: null);
+            },
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = NoTaskWrittenInEitherSpaceAsync }),
+            PendingUntil: "2.2",
+            PendingReason: TaskRoutesPending),
+
+        new(
+            "ISO-RECORD-KIND-TASK-VIEWER", "V-1, NFR-7", IsolationVector.RecordKind, HttpMethod.Post, TaskRouteScaffold.Create,
+            ViewerCreatesATaskAsync,
+            Both(new RoleRefused(TaskRouteScaffold.ManageTasks) { Then = NoTaskWrittenByTheViewerAsync }),
+            PendingUntil: "2.2",
+            PendingReason: TaskRoutesPending),
+
         new(
             "ISO-TIMING-BOUNDARY", "I-6", IsolationVector.Timing, HttpMethod.Get, SpaceRoutes.Active,
             world => ForeignAsync(world, SpaceRoutes.ActiveOf),
@@ -238,12 +325,23 @@ internal static class IsolationCases
             Runner: CaseRunner.Timing),
 
         new(
-            "ISO-TIMING-IN-SPACE", "I-6", IsolationVector.Timing, HttpMethod.Get, SpaceRoutes.Active,
-            world => throw new InvalidOperationException("Pending until 2.2."),
-            Both(new Pending("a boundary 404 and an in-Space not-found indistinguishable in body and duration (21 / median / 20%)")),
+            "ISO-TIMING-IN-SPACE", "I-6, AC10 (2.2)", IsolationVector.Timing, HttpMethod.Get, TaskRouteScaffold.Board,
+            async world =>
+            {
+                var (foreign, _) = await SeedProjectWithTaskAsync(world.B);
+
+                // Arm 1, the path: the boundary 404 for B's Board. Arm 2, the anchor: A's own Space and a
+                // Project id that matches nothing there - the in-Space not-found, which records nothing (AD-20).
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Get,
+                    [new(TaskRouteScaffold.BoardOf(world.B.SpaceId, foreign), TaskRouteScaffold.BoardOf(world.A.SpaceId, Guid.NewGuid()))],
+                    world.B.SpaceId);
+            },
+            Both(new IndistinguishableFromInSpaceNotFound()),
             Runner: CaseRunner.Timing,
             PendingUntil: "2.2",
-            PendingReason: "Story 2.1's rename (PATCH /projects/{projectId}) is the first in-Space lookup by id, and its not-found body is already byte-identical to the boundary 404 (ISO-RENAME-FOREIGN-ID-IN-OWN-SPACE). The duration arm stays with 2.2 (story 2.1 Q13 (a)): the in-Space not-found writes no refusal record, so equalising its work with a boundary refusal is a design decision for the story that builds the Board's by-id reads."),
+            PendingReason: "Converted to its real shape by the story 2.2 ATDD run (the Board's by-id read; story 2.1 Q13 (a)). Pending only until dev-story maps GET .../projects/{projectId}/board (Task 9): measure both medians per surface and record the gap in the Debug Log whatever it is (Q7), then remove PendingUntil and PendingReason - GATE-003 fails at review otherwise."),
 
         new(
             "ISO-POOLED", "I-8", IsolationVector.PooledConnection, HttpMethod.Get, SpaceRoutes.Statuses,
@@ -401,6 +499,95 @@ internal static class IsolationCases
         Assert.Equal(own.Select(project => project.Id).Order(), listed.Order());
         Assert.Empty(listed.Intersect(theirs.Select(project => project.Id)));
         Assert.All(theirs, project => Assert.DoesNotContain(project.Name, answer.Body, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The reason every story 2.2 row is pending.
+    /// </summary>
+    private const string TaskRoutesPending =
+        "Story 2.2 maps POST .../projects/{projectId}/tasks and GET .../projects/{projectId}/board (Tasks 3, 4, 9); the row holds its real preparation and expectation and goes live when they exist.";
+
+    /// <summary>
+    /// Creates a Project and one Task in it in <paramref name="owner"/>'s Personal Space through the product,
+    /// each named uniquely for this call, both added to the owner's secrets (I-17). Story 2.2.
+    /// </summary>
+    /// <param name="owner">The actor.</param>
+    /// <returns>The Project's and the Task's ids.</returns>
+    private static async Task<(Guid ProjectId, Guid TaskId)> SeedProjectWithTaskAsync(ProductActor owner)
+    {
+        var projectId = await SeedProjectAsync(owner);
+        var title = $"Task {Guid.NewGuid():N}";
+
+        owner.HoldsTaskTitled(title);
+
+        var created = await owner.SendAsync(
+            IsolationSurface.Session,
+            HttpMethod.Post,
+            TaskRouteScaffold.CreateIn(owner.SpaceId, projectId),
+            JsonContent.Create(new { title }, options: JsonOptions),
+            headers: null);
+
+        Assert.True(created.StatusCode == HttpStatusCode.Created, $"Seeding a Task through the product: {created.StatusCode} {created.Body}");
+
+        using var document = JsonDocument.Parse(created.Body);
+
+        return (projectId, document.RootElement.GetProperty("id").GetGuid());
+    }
+
+    /// <summary>
+    /// A fresh Account with a Project in its own Personal Space, then demoted to Viewer there, so its Session
+    /// and its Token both hold exactly the Viewer Role; the request is a Task creation in that Project.
+    /// </summary>
+    private static async Task<CaseRequest> ViewerCreatesATaskAsync(IsolationWorld world)
+    {
+        var viewer = await world.NewActorAsync("Vt");
+        var projectId = await SeedProjectAsync(viewer);
+
+        await world.Database.ChangeRoleAsync(viewer.SpaceId, viewer.AccountId, "viewer");
+
+        var path = TaskRouteScaffold.CreateIn(viewer.SpaceId, projectId);
+
+        return new CaseRequest(viewer, HttpMethod.Post, [new(path, path)], viewer.SpaceId);
+    }
+
+    private static async Task NoTaskWrittenByTheViewerAsync(IsolationWorld world, CaseRequest request) =>
+        Assert.Empty(await world.Database.TasksInAsync(request.Actor.SpaceId));
+
+    /// <summary>
+    /// B's Space holds Tasks (the anchor: the seed landed), and no Task in either Space carries the refused
+    /// request's title.
+    /// </summary>
+    private static async Task NoTaskWrittenInEitherSpaceAsync(IsolationWorld world, CaseRequest request)
+    {
+        var theirs = await world.Database.TasksInAsync(world.B.SpaceId);
+        var own = await world.Database.TasksInAsync(world.A.SpaceId);
+
+        Assert.NotEmpty(theirs);
+        Assert.DoesNotContain(theirs.Concat(own), task => string.Equals(task.Title, ProductActor.CaseBodyText, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// I-3 with Board column counts: A's Board holds exactly A's Tasks of that Project, its column totals sum to
+    /// their number, and none of B's Task ids or titles appear - anchored both ways, since both Spaces hold
+    /// Tasks.
+    /// </summary>
+    private static async Task BoardHoldsExactlyTheCallersTasksAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
+    {
+        var projectId = Guid.Parse(request.Paths[0].Path.Split('/')[^2]);
+        var own = (await world.Database.TasksInAsync(world.A.SpaceId)).Where(task => task.ProjectId == projectId).ToList();
+        var theirs = await world.Database.TasksInAsync(world.B.SpaceId);
+
+        Assert.NotEmpty(own);
+        Assert.NotEmpty(theirs);
+
+        using var document = JsonDocument.Parse(answer.Body);
+        var columns = document.RootElement.GetProperty("columns").EnumerateArray().ToList();
+        var listed = columns.SelectMany(column => column.GetProperty("tasks").EnumerateArray()).Select(task => task.GetProperty("id").GetGuid()).ToList();
+
+        Assert.Equal(own.Count, columns.Sum(column => column.GetProperty("total").GetInt32()));
+        Assert.Equal(own.Select(task => task.Id).Order(), listed.Order());
+        Assert.Empty(listed.Intersect(theirs.Select(task => task.Id)));
+        Assert.All(theirs, task => Assert.DoesNotContain(task.Title, answer.Body, StringComparison.Ordinal));
     }
 
     private static async Task NoTokenWrittenInTheForeignSpaceAsync(IsolationWorld world, CaseRequest request) =>

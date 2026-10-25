@@ -553,6 +553,41 @@ The dev phase takes these as **reversible, recorded decisions** in the Completio
 
     **Recommend (a).** State in the Completion Notes that the drag and Move halves of AC3 are vacuous until 2.6 and 2.7, and that those stories own extending the case.
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-2-2-add-tasks-and-see-them-on-a-board.md` (scenario map, the open-question dependencies, seed constraints, and what was deliberately not scaffolded). Every scaffold is written against the recommended option of Q1-Q11; the checklist's dependency table says what to correct if a decision differs.
+
+| File | Cases | ACs | State |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.cs` | 8 (5 entries) | AC2, AC3, AC9 | skipped |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Bound.cs` | 5 | AC7, AC11 | skipped |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Idempotency.cs` | 6 (3 entries) | AC2 (Task 6) | skipped |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Schema.cs` | 6 | AC2, AC8 | skipped |
+| `tests/Yello.Tests.Slices/Tasks/TaskWire.cs` | harness | - | active |
+| `tests/Yello.Tests.Slices/Boards/BoardEndpointTests.cs` | 6 | AC1, AC3, AC4, AC5, AC9 | skipped |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.Bound.cs` | 1 rewritten (2.1's BND-002) | AC11 | **active, green** |
+| `tests/Yello.Tests.Isolation/IsolationCases.cs` | 6 rows added, ISO-TIMING-IN-SPACE reshaped | AC9, AC10 | pending on 2.2 |
+| `tests/Yello.Tests.Isolation/Expectation.cs` | `IndistinguishableFromInSpaceNotFound` | AC10 | used by the pending timing row |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Tasks.cs` | 12 | AC2, AC3, AC5, AC8, AC9, AC11, AC12 | 8 skipped; **4 active, green** (the `Results.Created`/`Accepted` ban and the `IResult` rule, each with a permanent oracle) |
+| `tests/Yello.Tests.Architecture/RefusalCopyTests.Tasks.cs` | 3 | AC7, AC13 | 2 skipped; **1 active, green** (the Tasks-per-Project bound copy) |
+| `tests/Yello.Tests.Architecture/DesignFoundationGateTests.Board.cs` | 3 | AC5, AC6 | skipped |
+| `tests/Yello.Tests.Client/BoardTests.cs` | 16 (14 entries) | AC1-AC7, AC13-AC15 | skipped |
+| `tests/Yello.Tests.Shared/TaskRouteScaffold.cs`, `ProductActor.cs`, `WireDatabase.cs`; `tests/Yello.Tests.Client/FakeYelloApi.cs` | harness | - | active; `TaskRouteScaffold` is deleted on activation |
+
+**Green today, standing gates:** the rewritten 2.1 BND-002 (P11 planted, caught 3 of 3, after both Accounts are made present in the Space before the race: a first request's `SpacePresence` insert serialised the pair before the bound count, which is why P11 was caught only 2 of 3 at the 2.1 review); ARCH-009 (no `Results.Created`/`Accepted*` in the Host) and its oracle; ARCH-010 (every Space-scoped state-changing handler returns `IResult`) and its oracle; COPY-003.
+
+**Activation order** (the checklist has the detail):
+1. **ISO-TIMING-IN-SPACE first.** It tests the riskiest assumption: that the boundary `404`, which writes an `AccessRefusal`, and the in-Space not-found, which writes nothing, cannot be told apart by duration. Build only what it needs (the table, the create, the Board read, the two routes). Then measure, three runs, record both medians per surface, and decide Q7 before building further.
+2. Schema: SCH-002, SCH-003, SCH-004, SCH-001 (widen `SpaceIsolationSchemaTests` for `Task`), SCH-005, ARCH-001, ARCH-002.
+3. Create and Board: SLC-001, -002, -003, -005, BRD-001 to -004, BRD-006, SCH-006, ARCH-003 to -006. Mapping the routes turns 2.1's `No_route_moves_a_Project` red; narrow it in the same change.
+4. Isolation rows, one at a time, then SLC-004 and BRD-005.
+5. Bound: BND-001, -002, -003, ARCH-007, BND-004 (P11 three times each for Tasks and Projects), BND-005.
+6. Idempotency: IDM-001 to -003.
+7. Copy: COPY-001, -002.
+8. Client: E2E-001 to -014 with ARCH-008, then DSN-001 to -003.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

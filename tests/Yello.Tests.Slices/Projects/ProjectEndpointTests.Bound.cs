@@ -69,6 +69,18 @@ public sealed partial class ProjectEndpointTests
     /// the unit of work, so the second waits for the first to commit (story 1.6's presence race, not
     /// repeated for a bound whose whole point is the number).
     /// </summary>
+    /// <remarks>
+    /// <b>Deterministic since story 2.2 Task 7</b> (the 2.1 review's plant P11 - the count without
+    /// <c>UPDLOCK, HOLDLOCK</c> - was caught in 2 of 3 runs, because two requests fired together need not
+    /// race). The test now takes the bound's own range lock first, sends both creations, waits until both are
+    /// blocked on a lock, then commits. With the hint, both queue on the count. Without it, both counts read
+    /// 49 through the test's <c>RangeS-U</c> and both inserts wait on <c>RangeI-N</c> until it commits, so
+    /// both succeed and the case fails every time. The wait is "blocked on any lock", never one wait type,
+    /// so the plant is caught at the insert. <b>Both Accounts are present in the Space before the race</b>:
+    /// a first request inserts a <c>SpacePresence</c> row, and the other request's presence count waits on it,
+    /// serialising the pair before the bound count - which is why the old case caught P11 only sometimes.
+    /// Rewritten by the story 2.2 ATDD run; green against 2.1's product, so a standing gate.
+    /// </remarks>
     /// <returns>A task.</returns>
     [Fact]
     [Trait("Requirement", "AR-30")]
@@ -76,6 +88,7 @@ public sealed partial class ProjectEndpointTests
     public async Task Two_concurrent_creations_at_49_yield_exactly_one_201_and_one_409()
     {
         var database = Available();
+        var cancellationToken = TestContext.Current.CancellationToken;
         Actor? owner = null;
         WireResponse[] answers = [];
 
@@ -88,9 +101,32 @@ public sealed partial class ProjectEndpointTests
             await AddMemberAsync(database, owner.SpaceId, member.AccountId, "Member");
             await SeedProjectsAsync(database, owner.SpaceId, ProjectsPerSpace - 1);
 
-            answers = await Task.WhenAll(
+            // Presence first. An Account's first request in a Space inserts its SpacePresence row, and the
+            // second Account's presence count then waits on that uncommitted row - which serialises the pair
+            // before either reaches the bound count, so a missing count lock would go unseen.
+            Assert.Equal(HttpStatusCode.OK, (await owner.Session.GetAsync(Yello.Contracts.Projects.ProjectRoutes.ListIn(owner.SpaceId))).StatusCode);
+            Assert.Equal(HttpStatusCode.OK, (await member.Session.GetAsync(Yello.Contracts.Projects.ProjectRoutes.ListIn(owner.SpaceId))).StatusCode);
+
+            await using var holder = await database.OpenForSpaceAsync(owner.SpaceId, cancellationToken);
+            await using var observer = await database.OpenWithoutSpaceContextAsync(cancellationToken);
+            await using var held = await holder.BeginTransactionAsync(cancellationToken);
+
+            await using (System.Data.Common.DbCommand count = holder.CreateCommand())
+            {
+                count.Transaction = held;
+                count.CommandText = "SELECT COUNT(*) FROM dbo.[Project] WITH (UPDLOCK, HOLDLOCK)";
+                await count.ExecuteNonQueryAsync(cancellationToken);
+            }
+
+            var racing = Task.WhenAll(
                 CreateAsync(owner, "Racer one"),
                 CreateAsync(member, "Racer two", owner.SpaceId));
+
+            await Tasks.TaskWire.WaitUntilBlockedOnALockAsync(observer, 2, racing, cancellationToken);
+
+            await held.CommitAsync(cancellationToken);
+
+            answers = await racing;
         });
 
         Assert.NotNull(owner);

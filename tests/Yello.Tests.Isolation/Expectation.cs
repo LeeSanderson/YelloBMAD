@@ -263,6 +263,37 @@ internal sealed record IndistinguishableFromAbsent() : Expectation("indistinguis
 }
 
 /// <summary>
+/// AC3 / I-6, story 2.2 AC10: the boundary 404 (the path) and an in-Space not-found by id (the anchor - the
+/// same route in the actor's own Space, naming an id that matches nothing) are indistinguishable in body and
+/// in the Host's own duration (21 samples, median, 20% - the one method). The in-Space arm records nothing
+/// and the boundary arm writes an <c>AccessRefusal</c>, so this is where that work shows if it shows at all.
+/// Each verdict is written to the test output for the Debug Log, whatever the outcome. Written by the story
+/// 2.2 ATDD run for <c>ISO-TIMING-IN-SPACE</c>.
+/// </summary>
+internal sealed record IndistinguishableFromInSpaceNotFound() : Expectation("indistinguishable from an in-Space not-found in body and duration")
+{
+    /// <inheritdoc />
+    protected override async Task VerifyCoreAsync(IsolationWorld world, CaseRequest request, IsolationSurface surface)
+    {
+        foreach (var (path, anchorPath) in request.Paths)
+        {
+            var anchor = await request.Actor.SendAsync(surface, request.Method, anchorPath);
+            var answer = await request.Actor.SendAsync(surface, request.Method, path);
+
+            Assert.Equal(HttpStatusCode.NotFound, answer.StatusCode);
+            AssertSameBytes(anchor, answer, path);
+
+            var verdict = await DurationIndistinguishability.CompareMeasuredAsync(
+                () => world.Host.ServerDurationOfAsync(() => request.Actor.SendAsync(surface, request.Method, path)),
+                () => world.Host.ServerDurationOfAsync(() => request.Actor.SendAsync(surface, request.Method, anchorPath)));
+
+            TimingRecord.Add($"boundary vs in-Space not-found / {surface}: {verdict.Describe()}");
+            Assert.True(verdict.AreIndistinguishable, $"{surface}: {verdict.Describe()}");
+        }
+    }
+}
+
+/// <summary>
 /// I-12 timed: a Token bound to one owned Space, used at another, takes the same server time to refuse
 /// as a non-member Session at that Space.
 /// </summary>

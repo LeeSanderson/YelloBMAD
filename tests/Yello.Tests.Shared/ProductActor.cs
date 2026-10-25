@@ -42,11 +42,19 @@ public sealed class ProductActor
 
     private readonly List<string> _projectNames = [];
 
+    private readonly List<string> _taskTitles = [];
+
     private ProductActor(WireSession session, WireSession script)
     {
         Session = session;
         _script = script;
     }
+
+    /// <summary>
+    /// The name and title every case's write body carries: a Project or Task written by a refused request
+    /// would carry it.
+    /// </summary>
+    public static string CaseBodyText => "from an isolation case";
 
     /// <summary>
     /// The Account's id.
@@ -107,7 +115,7 @@ public sealed class ProductActor
         Password,
         TokenPlaintext,
         SessionCookieValue,
-        .. new[] { SpaceName }.Concat(_otherSpaceNames).Concat(_projectNames)
+        .. new[] { SpaceName }.Concat(_otherSpaceNames).Concat(_projectNames).Concat(_taskTitles)
             .SelectMany(name => new[] { name, JsonEncodedText.Encode(name, JavaScriptEncoder.Default).ToString() }),
     ];
 
@@ -134,6 +142,19 @@ public sealed class ProductActor
         ArgumentException.ThrowIfNullOrEmpty(projectName);
 
         _projectNames.Add(projectName);
+    }
+
+    /// <summary>
+    /// Adds the title of a Task this actor created to <see cref="Secrets"/>, so the log check looks for it
+    /// too: a Task title is Space content and never belongs in a log (I-17, spine :274). Added by the story
+    /// 2.2 ATDD run (Task 4).
+    /// </summary>
+    /// <param name="taskTitle">The Task's title.</param>
+    public void HoldsTaskTitled(string taskTitle)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(taskTitle);
+
+        _taskTitles.Add(taskTitle);
     }
 
     /// <summary>
@@ -232,8 +253,9 @@ public sealed class ProductActor
     /// <param name="path">The route.</param>
     /// <returns>The answer.</returns>
     /// <remarks>
-    /// A POST or PATCH carries a valid <c>{"name": ...}</c> body - the Token-issue body, which is also a
-    /// valid Project create and rename body (story 2.1) - so a refusal is the boundary's and never the
+    /// A POST or PATCH carries a body valid on every write route a case names - <c>name</c> for a Token
+    /// issue and a Project create or rename (story 2.1), <c>title</c> for a Task create (story 2.2); each
+    /// endpoint ignores the property it does not read - so a refusal is the boundary's and never the
     /// body's.
     /// </remarks>
     public Task<WireResponse> SendAsync(IsolationSurface surface, HttpMethod method, string path)
@@ -345,7 +367,7 @@ public sealed class ProductActor
         _script.DeleteWithTokenAsync(SessionRoutes.Authenticate, TokenPlaintext);
 
     private static JsonContent ValidBody() =>
-        JsonContent.Create(new IssueApiTokenRequest("from an isolation case"), options: JsonOptions);
+        JsonContent.Create(new { name = CaseBodyText, title = CaseBodyText }, options: JsonOptions);
 
     private static WireResponse Expect(HttpStatusCode expected, WireResponse response, string step) =>
         response.StatusCode == expected

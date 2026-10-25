@@ -130,6 +130,34 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// Every Task in <paramref name="spaceId"/>, as (id, Project, title), read under that Space's own key -
+    /// the database's view, independent of the Host's query filter. Added by the story 2.2 ATDD run; the
+    /// columns are the ones story 2.2 Task 2 names (<c>dbo.[Task].Id</c>, <c>SpaceId</c>, <c>ProjectId</c>,
+    /// <c>Title</c>). The table does not exist until 2.2's migration, so only pending rows call this.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>Its Tasks.</returns>
+    public async Task<IReadOnlyList<(Guid Id, Guid ProjectId, string Title)>> TasksInAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT Id, ProjectId, Title FROM dbo.[Task] WHERE SpaceId = @space";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+
+        var tasks = new List<(Guid Id, Guid ProjectId, string Title)>();
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            tasks.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2)));
+        }
+
+        return tasks;
+    }
+
+    /// <summary>
     /// A second Space owned by <paramref name="accountId"/>: the <c>Space</c> row, then its Owner
     /// <c>Membership</c>, under that Space's key (no endpoint creates a Space yet).
     /// </summary>

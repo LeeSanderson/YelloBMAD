@@ -25,7 +25,7 @@ namespace Yello.Tests.Architecture;
 [Trait("Requirement", "UX-DR32")]
 [Trait("Requirement", "UX-DR35")]
 [Trait("Requirement", "AR-34")]
-public sealed class RefusalCopyTests
+public sealed partial class RefusalCopyTests
 {
     private static readonly ResourceManager Copy = new(ClientCopy.ResourceName, typeof(ClientCopy).Assembly);
 

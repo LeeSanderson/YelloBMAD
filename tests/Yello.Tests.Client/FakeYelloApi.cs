@@ -8,6 +8,7 @@ using Yello.Contracts.ApiTokens;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
+using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -44,6 +45,9 @@ internal sealed class FakeYelloApi
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _heldProjects = new();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _arrivedProjects = new();
     private readonly ConcurrentDictionary<string, string> _createdByKey = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _heldBoards = new();
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _arrivedBoards = new();
+    private readonly ConcurrentDictionary<string, string> _createdTaskByKey = new(StringComparer.Ordinal);
     private TaskCompletionSource? _heldRename;
     private TaskCompletionSource? _arrivedRename;
     private readonly TaskCompletionSource<FakeRequest> _signInSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -106,6 +110,25 @@ internal sealed class FakeYelloApi
     /// answered with the first answer, as the Host replays it. Story 2.1.
     /// </summary>
     public bool LoseNextProjectCreateAnswer { get; set; }
+
+    /// <summary>
+    /// Each Project's Board, keyed by (Space, Project), as <c>GET …/projects/{projectId}/board</c> serves it.
+    /// Story 2.2; the routes are <see cref="TaskRouteScaffold"/>'s until <c>Yello.Contracts</c> states them,
+    /// and the bodies are <see cref="FakeBoard"/>, shaped as story 2.2 Task 3's <c>BoardResponse</c>.
+    /// </summary>
+    public IDictionary<(Guid SpaceId, Guid ProjectId), FakeBoard> Boards { get; } = new Dictionary<(Guid SpaceId, Guid ProjectId), FakeBoard>();
+
+    /// <summary>
+    /// Whether a Task creation is refused <c>409 bound-reached</c> for <c>tasks-per-project</c>, limit 5000, as
+    /// the Host refuses the 5,001st. Story 2.2.
+    /// </summary>
+    public bool TaskBoundReached { get; set; }
+
+    /// <summary>
+    /// A refusal the next Task creation is answered with instead of being applied - an idempotency refusal,
+    /// say (AC13). Cleared once used. Story 2.2.
+    /// </summary>
+    public (int Status, string ProblemType)? NextTaskCreateRefusal { get; set; }
 
     /// <summary>
     /// Every request seen, in order.
@@ -189,6 +212,31 @@ internal sealed class FakeYelloApi
     /// Lets a held rename answer go.
     /// </summary>
     public void ReleaseRename() => _heldRename?.TrySetResult();
+
+    /// <summary>
+    /// Holds the next Board answer for <paramref name="projectId"/> until <see cref="ReleaseBoard"/>. Story 2.2.
+    /// </summary>
+    /// <returns>A task that completes when the held request has arrived and is waiting.</returns>
+    public Task HoldBoardAsync(Guid projectId)
+    {
+        _heldBoards[projectId] = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var arrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _arrivedBoards[projectId] = arrived;
+
+        return arrived.Task;
+    }
+
+    /// <summary>
+    /// Lets a held Board answer go.
+    /// </summary>
+    public void ReleaseBoard(Guid projectId)
+    {
+        if (_heldBoards.TryRemove(projectId, out var held))
+        {
+            held.TrySetResult();
+        }
+    }
 
     /// <summary>
     /// Whether any request named <paramref name="spaceId"/> in its path.
@@ -280,6 +328,13 @@ internal sealed class FakeYelloApi
                 && Guid.TryParse(path[(ApiTokenRoutes.List.Length + 1)..], out var revoked):
                 _ = ApiTokens.Remove(ApiTokens.FirstOrDefault(token => token.Id == revoked) ?? FakeApiToken.None);
                 return (noContent, string.Empty);
+
+            // Story 2.2 - the Board and Task routes.
+            case ("GET", var path) when TryUnderProject(path, "board", out var boardSpace, out var boardProject):
+                return await BoardAsync(boardSpace, boardProject).ConfigureAwait(false);
+
+            case ("POST", var path) when TryUnderProject(path, "tasks", out var taskSpace, out var taskProject):
+                return CreateTask(taskSpace, taskProject, request);
 
             // Story 2.1 - the Project routes.
             case ("GET", var path) when TryProjects(path, out var listSpace):
@@ -428,6 +483,92 @@ internal sealed class FakeYelloApi
         return (200, JsonSerializer.Serialize(projects[index], JsonOptions));
     }
 
+    private async Task<(int Status, string Body)> BoardAsync(Guid spaceId, Guid projectId)
+    {
+        if (_heldBoards.TryGetValue(projectId, out var held))
+        {
+            if (_arrivedBoards.TryRemove(projectId, out var arrived))
+            {
+                arrived.TrySetResult();
+            }
+
+            await held.Task.ConfigureAwait(false);
+        }
+
+        return Boards.TryGetValue((spaceId, projectId), out var board)
+            ? (200, JsonSerializer.Serialize(board, JsonOptions))
+            : (404, Problem(ProblemTypes.NotAvailable));
+    }
+
+    /// <summary>
+    /// The Host's Task creation as story 2.2 specifies it: the key replays first, then the bound, then the
+    /// title rule (Q3 (a): trimmed, 1-200), then the Task is appended to the first column, whose total grows
+    /// by one.
+    /// </summary>
+    private (int Status, string Body) CreateTask(Guid spaceId, Guid projectId, FakeRequest request)
+    {
+        var key = request.Header(Idempotency.HeaderName);
+
+        if (key is not null && _createdTaskByKey.TryGetValue(key, out var replayed))
+        {
+            return (201, replayed);
+        }
+
+        if (!Boards.TryGetValue((spaceId, projectId), out var board))
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        if (NextTaskCreateRefusal is { } refusal)
+        {
+            NextTaskCreateRefusal = null;
+            return (refusal.Status, Problem(refusal.ProblemType));
+        }
+
+        if (TaskBoundReached)
+        {
+            return (409, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.BoundReached, Errors: null, Bound: TaskRouteScaffold.TasksPerProject, Limit: TaskRouteScaffold.TasksPerProjectLimit), JsonOptions));
+        }
+
+        using var document = JsonDocument.Parse(string.IsNullOrEmpty(request.Body) ? "{}" : request.Body);
+        var title = (document.RootElement.TryGetProperty("title", out var value) ? value.GetString() ?? string.Empty : string.Empty).Trim();
+
+        if (title.Length is < 1 or > 200)
+        {
+            return (400, Problem(TaskRouteScaffold.InvalidTaskTitle));
+        }
+
+        var first = board.Columns[0];
+        var task = new FakeTask(Guid.NewGuid(), title, first.StatusId, $"z{first.Tasks.Count:D5}", DateTimeOffset.UtcNow);
+
+        first.Tasks.Add(task);
+        first.Total++;
+
+        var created = JsonSerializer.Serialize(task, JsonOptions);
+
+        if (key is not null)
+        {
+            _createdTaskByKey[key] = created;
+        }
+
+        return (201, created);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="path"/> is <c>/api/v1/spaces/{s}/projects/{p}/{leaf}</c>.
+    /// </summary>
+    private static bool TryUnderProject(string path, string leaf, out Guid spaceId, out Guid projectId)
+    {
+        var segments = path.Split('/');
+
+        spaceId = Guid.Empty;
+        projectId = Guid.Empty;
+
+        return segments.Length >= 2
+            && string.Equals(segments[^1], leaf, StringComparison.Ordinal)
+            && TryProject(string.Join('/', segments[..^1]), out spaceId, out projectId);
+    }
+
     /// <summary>
     /// The Host's Q3 rule, as the Host answers it: trimmed, 1-100 characters.
     /// </summary>
@@ -533,3 +674,56 @@ internal sealed record FakeApiToken(Guid Id, string Name, Guid SpaceId, string S
 /// <param name="Name">Its name.</param>
 /// <param name="CreatedAt">When it was created.</param>
 internal sealed record FakeProject(Guid Id, string Name, DateTimeOffset CreatedAt);
+
+/// <summary>
+/// One Project's Board as the fake serves it - the shape of story 2.2 Task 3's <c>BoardResponse</c>
+/// (<c>{project, columns}</c>). Replace with the contract type on activation.
+/// </summary>
+/// <param name="Project">The Project.</param>
+/// <param name="Columns">One column per Status of the effective set, in effective order.</param>
+internal sealed record FakeBoard(FakeBoardProject Project, IReadOnlyList<FakeColumn> Columns);
+
+/// <summary>
+/// The Board's Project - <c>BoardProjectResponse</c> (<c>{id, name}</c>).
+/// </summary>
+/// <param name="Id">The Project's id.</param>
+/// <param name="Name">Its name, as this Board answer states it.</param>
+internal sealed record FakeBoardProject(Guid Id, string Name);
+
+/// <summary>
+/// One column - <c>BoardColumnResponse</c> (<c>{statusId, name, total, tasks}</c>). <see cref="Total"/> is set
+/// independently of <see cref="Tasks"/>, as the Host counts it (AC5), so a case can serve fewer rows than the
+/// total.
+/// </summary>
+internal sealed class FakeColumn(Guid statusId, string name, int total, List<FakeTask> tasks)
+{
+    /// <summary>
+    /// The Status.
+    /// </summary>
+    public Guid StatusId { get; } = statusId;
+
+    /// <summary>
+    /// The Status name.
+    /// </summary>
+    public string Name { get; } = name;
+
+    /// <summary>
+    /// The true total for the Status.
+    /// </summary>
+    public int Total { get; set; } = total;
+
+    /// <summary>
+    /// The Tasks served, by position key.
+    /// </summary>
+    public List<FakeTask> Tasks { get; } = tasks;
+}
+
+/// <summary>
+/// One Task - <c>TaskResponse</c> (<c>{id, title, statusId, positionKey, createdAt}</c>).
+/// </summary>
+/// <param name="Id">The Task's id.</param>
+/// <param name="Title">Its title.</param>
+/// <param name="StatusId">Its Status.</param>
+/// <param name="PositionKey">Its position key, readable and never writable.</param>
+/// <param name="CreatedAt">When it was created.</param>
+internal sealed record FakeTask(Guid Id, string Title, Guid StatusId, string PositionKey, DateTimeOffset CreatedAt);
