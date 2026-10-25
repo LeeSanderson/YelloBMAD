@@ -11,8 +11,7 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the ATDD run on 2026-10-25.</b> <c>docs/operations.md</c> does
-/// not exist yet, so every case is skipped.
+/// <b>Reads <c>docs/operations.md</c></b>, the operational record story 1.10 wrote.
 /// </para>
 /// <para>
 /// <b>Why a gate over prose.</b> R11's verification is that "the five prerequisites are enumerated
@@ -35,7 +34,7 @@ public sealed partial class OperationsRecordTests
     /// deployment claiming no data-protection posture, the trigger that makes the PRD non-compliant,
     /// and the five prerequisites that become live at that moment.
     /// </summary>
-    [Fact(Skip = "red: AC8 - docs/operations.md does not exist yet (Task 12 section 3)")]
+    [Fact]
     [Trait("Requirement", "PRD-6.4")]
     public void The_data_protection_gate_is_recorded_with_its_five_prerequisites()
     {
@@ -65,7 +64,7 @@ public sealed partial class OperationsRecordTests
     /// 1.10-ARCH-018 - the browser spellcheck and cloud IME egress, accepted for v1, is carried here
     /// with the reason it was parked: "against §6.4's data-protection gate".
     /// </summary>
-    [Fact(Skip = "red: AC9 - docs/operations.md does not exist yet (Task 12 section 5)")]
+    [Fact]
     [Trait("Requirement", "PRD-6.4")]
     public void The_spellcheck_and_ime_egress_travels_with_the_gate()
     {
@@ -81,7 +80,7 @@ public sealed partial class OperationsRecordTests
     /// 1.10-ARCH-019 - AR-40c's status and procedure: not confirmed, <c>MAXDOP = 1</c> in force, relaxed
     /// only by a new migration and only with the pooled-connection case green.
     /// </summary>
-    [Fact(Skip = "red: AC7 - docs/operations.md does not exist yet (Task 12 section 6)")]
+    [Fact]
     [Trait("Requirement", "AR-40c")]
     [Trait("Requirement", "AD-2")]
     public void The_session_context_defect_finding_and_the_maxdop_rule_are_recorded()
@@ -98,7 +97,7 @@ public sealed partial class OperationsRecordTests
     /// 1.10-ARCH-020 - R11's tripwire is an operator-side datastore query counting Accounts, stated as
     /// never an endpoint (§6.1 forbids an in-product aggregate spanning Spaces).
     /// </summary>
-    [Fact(Skip = "red: AC8 - docs/operations.md does not exist yet (Task 12 section 4)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "PRD-6.4")]
     public void The_tripwire_is_an_operator_query_and_never_an_endpoint()
@@ -113,7 +112,7 @@ public sealed partial class OperationsRecordTests
     /// 1.10-ARCH-021 - each of Lee's prerequisites P1-P7 carries a recorded state, and none is claimed
     /// done on Lee's behalf.
     /// </summary>
-    [Fact(Skip = "red: AC8 - docs/operations.md does not exist yet (Task 1, Task 12 section 10)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "AR-38")]
     public void Each_operator_prerequisite_carries_a_state()

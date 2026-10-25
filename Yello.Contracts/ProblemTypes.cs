@@ -154,4 +154,10 @@ public static class ProblemTypes
     /// The client renders its own words for it, keyed on this <c>type</c> (AR-34).
     /// </remarks>
     public static string InvalidApiToken => "urn:yello:problem:invalid-api-token";
+
+    /// <summary>
+    /// <c>503</c>: the database is paused, resuming or unreachable. Uniform for every route, carries
+    /// <c>Retry-After</c>, and admits nothing (story 1.10 AC14).
+    /// </summary>
+    public static string ServiceUnavailable => "urn:yello:problem:service-unavailable";
 }

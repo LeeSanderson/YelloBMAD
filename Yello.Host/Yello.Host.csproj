@@ -25,6 +25,20 @@
     <InternalsVisibleTo Include="Yello.Tests.Slices" />
   </ItemGroup>
 
+  <!--
+    THE CONTAINER IMAGE (story 1.10, Task 8). Built by the .NET SDK's own container support -
+    `dotnet publish Yello.Host -c Release -r linux-x64 /t:PublishContainer` - so there is no
+    Dockerfile and no package. The base image is pinned to the runtime patch Directory.Build.props
+    pins. The image listens on 8080 as a non-root user (the .NET 8+ default), which is the port the
+    Container App's ingress targets. The tag is the commit SHA in CI (ContainerImageTag on the
+    command line); no configuration value or secret is baked in - every one arrives as an
+    environment variable (AR-37).
+  -->
+  <PropertyGroup>
+    <ContainerRepository>yello-host</ContainerRepository>
+    <ContainerBaseImage>mcr.microsoft.com/dotnet/aspnet:$(RuntimeFrameworkVersion)</ContainerBaseImage>
+  </PropertyGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Yello.Domain\Yello.Domain.csproj" />
     <ProjectReference Include="..\Yello.Application\Yello.Application.csproj" />

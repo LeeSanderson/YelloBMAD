@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "namePrefix": { "value": "<3-12 lowercase letters, e.g. yellolee>" },
+    "operatorEmail": { "value": "<operator alert address (P1)>" },
+    "sqlEntraAdminObjectId": { "value": "<Entra object id of the SQL administrator (P2)>" },
+    "sqlEntraAdminLogin": { "value": "<display name of the SQL administrator (P2)>" },
+    "sqlAdministratorLogin": { "value": "<SQL administrator login name, not a secret>" },
+    "githubRepository": { "value": "<owner>/<repository> (P3)" },
+    "budgetStartDate": { "value": "<yyyy-MM-01, the first day of the current month>" },
+    "minReplicas": { "value": 0 },
+    "clientCustomHostname": { "value": "" },
+    "apiCustomHostname": { "value": "" }
+  }
+}

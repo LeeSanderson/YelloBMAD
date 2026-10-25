@@ -10,8 +10,8 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as a red-phase scaffold by the ATDD run on 2026-10-25.</b> There is no
-/// <c>staticwebapp.config.json</c> yet and no static host to serve the publish output.
+/// <b>Served by <see cref="PublishedClientHost"/></b>, which publishes the client and applies the
+/// published <c>staticwebapp.config.json</c>.
 /// </para>
 /// <para>
 /// <b>Not the dev server.</b> The dev server answers every client route with <c>index.html</c> on its
@@ -22,15 +22,14 @@ namespace Yello.Tests.Client;
 /// server's.
 /// </para>
 /// <para>
-/// <b>Scaffold contract.</b> <see cref="PublishedClientHost.StartAsync"/> throws naming Task 7. On
-/// activation, implement it (or replace it with a real type) and record the shape in the Debug Log. If
-/// a static server proves too heavy, the story allows testing the file's rules as data instead
-/// (<c>DeploymentShapeTests.The_static_host_falls_back_to_index_html_for_client_routes</c> does that
-/// half already); record the deviation.
+/// <b>The static host</b> is <see cref="PublishedClientHost"/>: it publishes the client, writes the
+/// <c>appsettings.Production.json</c> the deploy writes, and serves the output applying the published
+/// <c>staticwebapp.config.json</c>'s <c>navigationFallback</c> and nothing else (activated by the dev
+/// phase of story 1.10).
 /// </para>
 /// <para>
-/// <b>No collection and no fixture</b>, so this class starts nothing while it is skipped. The browser
-/// is launched in the case; on activation, move it into a collection if it shares one.
+/// <b>No collection and no fixture.</b> The browser and the static host are started in the case; move
+/// them into a collection if a second case ever shares them.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Client")]
@@ -45,10 +44,10 @@ public sealed class StaticHostFallbackTests
     /// 1.10-E2E-001 - <c>/spaces/{id}</c> loaded directly from the static host reaches the router: the
     /// application boots and renders a routed page, and the framework's error banner stays hidden.
     /// </summary>
-    [Fact(Skip = "red: AC13 - no staticwebapp.config.json and no static host for the published output (Task 7)")]
+    [Fact]
     public async Task A_deep_link_on_the_published_client_boots_and_routes()
     {
-        await using var host = await PublishedClientHost.StartAsync();
+        await using var host = await PublishedClientHost.StartAsync(TestContext.Current.CancellationToken);
 
         using var playwright = await Playwright.CreateAsync();
         await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
@@ -66,25 +65,5 @@ public sealed class StaticHostFallbackTests
         });
 
         Assert.False(await page.Locator("#blazor-error-ui").IsVisibleAsync(), "The client booted into the framework's error banner.");
-    }
-
-    /// <summary>
-    /// The published client on a static host. A scaffold contract: see the class remarks.
-    /// </summary>
-    private interface IPublishedClientHost : IAsyncDisposable
-    {
-        Uri BaseAddress { get; }
-    }
-
-    /// <summary>
-    /// Starts <see cref="IPublishedClientHost"/>. Throws until Task 7 implements it.
-    /// </summary>
-    private static class PublishedClientHost
-    {
-        public static Task<IPublishedClientHost> StartAsync() =>
-            throw new InvalidOperationException(
-                "No static host serves the published client yet (story 1.10 Task 7): publish Yello.Client, write " +
-                "appsettings.Production.json into the output, and serve it applying staticwebapp.config.json's " +
-                "navigationFallback.");
     }
 }

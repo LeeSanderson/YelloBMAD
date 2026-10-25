@@ -10,9 +10,9 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the ATDD run on 2026-10-25, before any of these files
-/// existed.</b> Every case is skipped with the AC and Task that make it real. Activate one at a time,
-/// confirm it fails for the stated reason, then write the file.
+/// <b>Each case reads the file that defines the invariant</b> - <c>infra/**/*.bicep</c>,
+/// <c>.github/workflows/*.yml</c>, <c>staticwebapp.config.json</c>, the AppHost - and each was planted
+/// once (story 1.10 Debug Log).
 /// </para>
 /// <para>
 /// <b>Text gates with anchors, by decision</b> (Q18 (a)): a new YAML or Bicep parser package would be a
@@ -40,7 +40,7 @@ public sealed partial class DeploymentShapeTests
     /// <c>Development</c>, as the ASP.NET environment name of the Local environment, is allowed and is
     /// not a deployment target. Plant (story Task 11): a second job with <c>environment: staging</c>.
     /// </remarks>
-    [Fact(Skip = "red: AC4 - no workflow exists yet, so the azure environment is not named (Tasks 9-10)")]
+    [Fact]
     public void There_is_exactly_one_deployment_environment()
     {
         var workflows = WorkflowText();
@@ -68,7 +68,7 @@ public sealed partial class DeploymentShapeTests
     /// 1.10-ARCH-008 - the Container App runs at most one replica (AD-14), in single revision mode.
     /// </summary>
     /// <remarks>Plant: <c>maxReplicas: 2</c>.</remarks>
-    [Fact(Skip = "red: AC1 - infra/ does not exist yet, so no Container App caps its replicas (Task 6)")]
+    [Fact]
     [Trait("Requirement", "AD-14")]
     public void The_container_app_runs_at_most_one_replica_in_single_revision_mode()
     {
@@ -88,7 +88,7 @@ public sealed partial class DeploymentShapeTests
     /// limit is reached, and the IaC sets no database-level collation (AD-15 sets it per column).
     /// </summary>
     /// <remarks>Plant: <c>freeLimitExhaustionBehavior: 'BillOverUsage'</c>.</remarks>
-    [Fact(Skip = "red: AC5 - infra/ does not exist yet, so the free-limit behaviour is not set (Task 6)")]
+    [Fact]
     [Trait("Requirement", "AR-39")]
     public void The_database_pauses_at_the_free_limit_rather_than_billing_overage()
     {
@@ -113,7 +113,7 @@ public sealed partial class DeploymentShapeTests
     /// the Bicep is written (story Task 6). If the unit is not vCore-seconds, correct the threshold
     /// literal here to the same 10% and record the correction in the Debug Log.
     /// </remarks>
-    [Fact(Skip = "red: AC5 - infra/ does not exist yet, so no alert watches the free vCore allowance (Task 6)")]
+    [Fact]
     [Trait("Requirement", "AR-39")]
     public void A_metric_alert_fires_at_ten_percent_of_the_free_allowance()
     {
@@ -129,7 +129,7 @@ public sealed partial class DeploymentShapeTests
     /// 1.10-ARCH-011 - the ingress the Host sits behind: https only, port 8080, both probes, and
     /// forwarded headers switched on by configuration.
     /// </summary>
-    [Fact(Skip = "red: AC6/AC11 - infra/ does not exist yet, so ingress, probes and forwarding are not declared (Task 6)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-7")]
@@ -151,7 +151,7 @@ public sealed partial class DeploymentShapeTests
     /// runs before the whole solution; and a CI agent requires both the container runtime and the
     /// migration bundle, so neither SM-1 nor the bundle test can pass by skipping.
     /// </summary>
-    [Fact(Skip = "red: AC10 - .github/workflows/ci.yml does not exist yet (Task 9)")]
+    [Fact]
     [Trait("Requirement", "AR-35")]
     [Trait("Requirement", "NFR-1")]
     public void Ci_runs_the_architecture_suite_first_then_everything_with_the_runtime_required()
@@ -184,7 +184,7 @@ public sealed partial class DeploymentShapeTests
     /// to read that trigger instead, and the correction recorded. Plant (story Task 13): drop
     /// <c>needs: migrate</c> from the promote job.
     /// </remarks>
-    [Fact(Skip = "red: AC1 - no deploy workflow exists yet, so nothing orders migrate before promote (Task 10)")]
+    [Fact]
     [Trait("Requirement", "AR-36")]
     public void The_revision_is_promoted_only_after_the_migration_job_and_only_after_green_tests()
     {
@@ -204,7 +204,7 @@ public sealed partial class DeploymentShapeTests
     /// <summary>
     /// 1.10-ARCH-014 - every third-party action is pinned to a full commit SHA.
     /// </summary>
-    [Fact(Skip = "red: AC10 - no workflow exists yet, so no action is pinned (Task 9)")]
+    [Fact]
     [Trait("Priority", "P1")]
     public void Every_third_party_action_is_pinned_to_a_commit_sha()
     {
@@ -227,7 +227,7 @@ public sealed partial class DeploymentShapeTests
     /// framework's own files, and no production client configuration is committed (the deploy writes
     /// it into the publish output from the IaC's output).
     /// </summary>
-    [Fact(Skip = "red: AC13 - Yello.Client/wwwroot/staticwebapp.config.json does not exist yet (Task 7)")]
+    [Fact]
     [Trait("Requirement", "AD-7")]
     public void The_static_host_falls_back_to_index_html_for_client_routes()
     {
@@ -254,7 +254,7 @@ public sealed partial class DeploymentShapeTests
     /// 1.10-ARCH-016 - under <c>aspire run</c> the migration runs as its own resource and the Host
     /// waits for it to complete, so the Local environment is migrated the way Azure is (Q17 (a)).
     /// </summary>
-    [Fact(Skip = "red: AC4/AC15 - the AppHost does not migrate its database yet (Task 3, Q17, Finding F4)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "AR-36")]
     public void The_apphost_runs_the_migration_before_the_host()

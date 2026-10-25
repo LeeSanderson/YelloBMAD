@@ -121,8 +121,51 @@ internal static class CredentialHashingRateLimit
     /// </summary>
     /// <param name="context">The request.</param>
     /// <returns>The partition key.</returns>
-    internal static string PartitionOf(HttpContext context) =>
-        context.Connection.RemoteIpAddress?.ToString() ?? string.Empty;
+    /// <remarks>
+    /// <para>
+    /// <b>Normalised, so one client cannot hold several windows</b> (story 1.10 AC11). An IPv4-mapped
+    /// IPv6 address keys as its IPv4 form, and an IPv6 address keys on its /64 - the prefix one
+    /// subscriber is routinely given, and inside which an address is free to change.
+    /// </para>
+    /// <para>
+    /// <b>A missing address shares the empty partition.</b> Behind ingress the address is the hop the
+    /// platform appended (<c>ForwardedHeadersPolicy</c>), so a missing one is a misconfiguration, and the
+    /// Host says so once at startup.
+    /// </para>
+    /// </remarks>
+    internal static string PartitionOf(HttpContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+
+        var address = context.Connection.RemoteIpAddress;
+
+        if (address is null)
+        {
+            return string.Empty;
+        }
+
+        if (address.IsIPv4MappedToIPv6)
+        {
+            return address.MapToIPv4().ToString();
+        }
+
+        if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetworkV6)
+        {
+            return address.ToString();
+        }
+
+        var bytes = address.GetAddressBytes();
+
+        // The /64: the first eight bytes, the interface identifier zeroed.
+        Array.Clear(bytes, Ipv6PrefixBytes, bytes.Length - Ipv6PrefixBytes);
+
+        return new System.Net.IPAddress(bytes).ToString() + "/64";
+    }
+
+    /// <summary>
+    /// The bytes of an IPv6 address that make up its /64 prefix.
+    /// </summary>
+    private const int Ipv6PrefixBytes = 8;
 
     private static bool IsCredentialHashing(HttpContext context) =>
         string.Equals(
@@ -135,6 +178,12 @@ internal static class CredentialHashingRateLimit
         var retryAfter = rejected.Lease.TryGetMetadata(MetadataName.RetryAfter, out var after)
             ? after
             : TimeSpan.FromSeconds(1);
+
+        // AR-39's second signal, for the operator's log alert (infra/modules/monitoring.bicep). The line
+        // names no address, no partition and nothing that was submitted.
+        RateLimitLog.Refused(rejected.HttpContext.RequestServices
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger(typeof(CredentialHashingRateLimit).FullName!));
 
         rejected.HttpContext.Response.Headers.RetryAfter =
             Math.Max(1L, Convert.ToInt64(Math.Ceiling(retryAfter.TotalSeconds))).ToString(CultureInfo.InvariantCulture);

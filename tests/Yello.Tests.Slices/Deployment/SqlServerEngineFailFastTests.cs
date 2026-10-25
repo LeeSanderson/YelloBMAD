@@ -12,15 +12,14 @@ namespace Yello.Tests.Slices.Deployment;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as a red-phase scaffold by the ATDD run on 2026-10-25.</b> The probe is static today
-/// (<c>SqlServerEngine.cs:184-194</c>), so a test cannot make it report dead without killing the
-/// runtime every other class in this process is using.
+/// <b>The probe is a constructor seam</b> (<c>SqlServerEngine</c>'s internal constructor), so a test can
+/// report the runtime dead without killing the one every other class in this process is using.
 /// </para>
 /// <para>
-/// <b>The seam is reached by name</b>, because it does not exist yet: a constructor taking the probe
+/// <b>The seam is reached by reflection</b>: an internal constructor taking the probe
 /// (<c>Func&lt;CancellationToken, Task&lt;string?&gt;&gt;</c>) and the container factory
-/// (<c>Func&lt;SqlServerContainerFixture&gt;</c>), used only by tests. On activation, replace the
-/// reflection with the typed call and record the shape the seam took.
+/// (<c>Func&lt;SqlServerContainerFixture&gt;</c>), used only by tests. <c>Yello.Tests.Shared</c> grants
+/// this project no internals, deliberately.
 /// </para>
 /// <para>
 /// <b>No container is started</b>: the factory counts its calls and throws if called, so a regression
@@ -38,7 +37,7 @@ public sealed class SqlServerEngineFailFastTests
     /// 1.10-UNIT-007 - a dead probe fails <c>CreateDatabaseAsync</c> with its reason, constructs no
     /// container, and the second call rethrows the cached failure without probing again.
     /// </summary>
-    [Fact(Skip = "red: AC16 - SqlServerEngine has no probe seam, so its dead-runtime path cannot be driven (Task 9 (a))")]
+    [Fact]
     public async Task A_dead_runtime_fails_fast_with_the_probes_reason_and_the_failure_is_cached()
     {
         var probes = 0;

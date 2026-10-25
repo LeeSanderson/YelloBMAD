@@ -10,10 +10,9 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the ATDD run on 2026-10-25.</b>
-/// <see cref="No_production_code_registers_the_health_check_service"/> is green today and is left
-/// active as a standing gate. <see cref="The_probe_handlers_depend_on_nothing_that_reaches_the_database"/>
-/// is skipped until Task 4 maps the probes.
+/// <b>Two gates.</b> <see cref="No_production_code_registers_the_health_check_service"/> bans the
+/// call; <see cref="The_probe_handlers_depend_on_nothing_that_reaches_the_database"/> reads the type that
+/// maps the probes (<c>HealthProbes</c>). Both are planted.
 /// </para>
 /// <para>
 /// <b>Why a gate of its own beside A-9.</b>
@@ -82,7 +81,7 @@ public sealed class ProbeGateTests
     /// their own (for example a static <c>HealthProbes.Map(app)</c>), and that type is what this gate
     /// reads. Plant (story Task 13): a probe that opens a <c>SqlConnection</c>.
     /// </remarks>
-    [Fact(Skip = "red: AC6 - the probes /health/live and /health/ready are not mapped yet (Task 4, Q15 (a))")]
+    [Fact]
     public void The_probe_handlers_depend_on_nothing_that_reaches_the_database()
     {
         using var module = ModuleDefinition.ReadModule(ProductionAssemblies.Host.Location);

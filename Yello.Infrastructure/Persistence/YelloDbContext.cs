@@ -140,6 +140,7 @@ public sealed class YelloDbContext(
         modelBuilder.ApplyConfiguration(new SpacePresenceConfiguration(this));
         modelBuilder.ApplyConfiguration(new AccessRefusalConfiguration());
         modelBuilder.ApplyConfiguration(new ApiTokenConfiguration());
+        modelBuilder.ApplyConfiguration(new DataProtectionKeyConfiguration());
 
         base.OnModelCreating(modelBuilder);
     }

@@ -3,9 +3,9 @@ using System.Reflection;
 // The local orchestration substrate (AC4): Yello.Host, Yello.Client and a SQL Server 2025
 // container, with a working connection from the Host to the container.
 //
-// Orchestration for the developer machine only. This is NOT deployment - CI/CD, Azure and
-// migrations-as-an-explicit-step are story 1.10's, and "build gates" in story 1.1 means test
-// suites that fail `dotnet build` / `dotnet test`, not a pipeline.
+// Orchestration for the developer machine only. This is NOT deployment - CI/CD and Azure live in
+// .github/workflows and infra/ (story 1.10). It does apply the migrations as an explicit step before
+// the Host starts, as the deploy does - see the `migrate` resource below.
 
 var builder = DistributedApplication.CreateBuilder(args);
 
@@ -78,9 +78,36 @@ var client = builder.AddProject<Projects.Yello_Client>("client", launchProfileNa
 // Aspire SDK marks project references ReferenceOutputAssembly=false. CrossOriginPolicy states the
 // same key on the other side, and CrossOriginConfigurationTests reads THIS assembly's IL for it,
 // so the two spellings cannot drift apart silently.
+// THE MIGRATION, AS ITS OWN STEP BEFORE THE HOST - story 1.10, question 17 (a), Finding F4.
+//
+// The Host never migrates (AR-36), and until story 1.10 nothing else did here either: `aspire run`
+// created an empty `yello` catalogue and the Local environment answered every registration with a
+// 500 until somebody migrated by hand. Azure runs the migration as a job before the revision is
+// promoted; this is the same rule locally - a resource of its own that applies the migrations to the
+// database and exits, which the Host waits for. It runs the repository's pinned `dotnet-ef` local tool
+// (`dotnet tool restore`, which run.ps1 does first) against the migrations in Yello.Infrastructure, the
+// same migrations the bundle carries (the bundle's equivalence test proves the two apply one schema).
+var repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, ".."));
+
+var migrate = builder.AddExecutable("migrate", "dotnet", repositoryRoot)
+    .WithArgs(context =>
+    {
+        context.Args.Add("ef");
+        context.Args.Add("database");
+        context.Args.Add("update");
+        context.Args.Add("--project");
+        context.Args.Add("Yello.Infrastructure");
+        context.Args.Add("--startup-project");
+        context.Args.Add("Yello.Infrastructure");
+        context.Args.Add("--connection");
+        context.Args.Add(database.Resource.ConnectionStringExpression);
+    })
+    .WaitFor(database);
+
 builder.AddProject<Projects.Yello_Host>("host", launchProfileName: "https")
     .WithReference(database)
     .WaitFor(database)
+    .WaitForCompletion(migrate)
     .WithEnvironment("ClientOrigin", client.GetEndpoint("https"));
 
 // RunAsync rather than Run (S6966): the blocking overload parks the entry-point thread for

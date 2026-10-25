@@ -230,6 +230,24 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.ToTable("StatusDefinition", (string)null);
                 });
 
+            modelBuilder.Entity("Yello.Infrastructure.Persistence.DataProtectionKey", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("FriendlyName")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("Xml")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DataProtectionKey", (string)null);
+                });
+
             modelBuilder.Entity("Yello.Domain.ApiTokens.ApiToken", b =>
                 {
                     b.HasOne("Yello.Domain.Memberships.Membership", null)

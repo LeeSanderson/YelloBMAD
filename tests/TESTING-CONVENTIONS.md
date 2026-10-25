@@ -310,6 +310,13 @@ hand-written row-level-security DDL, so claiming it is generated would be false.
 narrower lever either: this repository has no `.editorconfig` on purpose, so a per-folder
 analyser exemption would mean forking the standard.
 
+**Every migration must work with the revision before it (expand/contract, story 1.10).** The deploy
+runs the migration job while the previous revision is still serving. So add columns as nullable or
+with a default, and drop or rename only in a later release. A migration that breaks the running
+revision is a defect. Migrations are applied by the bundle in Azure and by the AppHost's `migrate`
+resource under `aspire run`. The Host never applies them: `MigrationAtStartupGateTests` fails the
+build on a production call to `Migrate`, `EnsureCreated` or `IMigrator`.
+
 ## The shared container
 
 `Yello.Tests.Shared` holds one Testcontainers SQL Server fixture. Never an EF Core in-memory
@@ -523,13 +530,74 @@ Host's address - the only fake there. Chromium keeps the Host's `SameSite=None; 
 needs the running client's session-end path navigates in-app (`Blazor.navigateTo`), because a reload
 boots a client that never held the Session.
 
-## CI tiering, for context
+## CI: the PR stage - built by story 1.10
 
-Built by **story 1.10**, not here. Three stages — PR / Nightly / Weekly — with the architecture
-suite running **first** in the PR stage, because it takes seconds and should fail before
-anything slower starts. PR target under 15 minutes. Do **not** build smoke/P0/P1 tiers; the
-test design's checklist explicitly resolved that contradiction in favour of the three-stage
-shape.
+`.github/workflows/ci.yml` runs on every push and pull request to `main`. Its `test` job runs these
+steps in order:
+
+1. `dotnet restore`, then `dotnet tool restore`.
+2. `dotnet build Yello.slnx -c Release`. Warnings are errors, and the NuGet audit runs here.
+3. `dotnet dev-certs https` creates the certificate. It is not trusted.
+4. `playwright.ps1 install chromium --with-deps`.
+5. The migration bundle is built with `dotnet ef migrations bundle ... -r linux-x64`, and its path
+   is exported as `YELLO_MIGRATION_BUNDLE`.
+6. The architecture suite runs **first**, on its own, because it takes seconds and should fail
+   before anything slower starts.
+7. `dotnet test Yello.slnx -c Release --no-build`. This is the gate. A single failing case fails the
+   run, and the deploy jobs `need` this job, so no deploy follows a red run. `--no-build` is safe
+   here only because step 2 built the same configuration. The zero-tests trap above still applies
+   anywhere else.
+
+The PR-stage target is under 15 minutes. `DeploymentShapeTests` holds the order and the
+variables, and `actionlint` 1.7.12 reports no findings on the file.
+
+**The CI environment variables.** Neither is set locally. On a developer machine an absent runtime
+and an absent bundle are local conditions, so the classes skip with a reason.
+
+| Variable | Effect |
+|---|---|
+| `YELLO_REQUIRE_CONTAINER_RUNTIME=1` | An **unconfigured** runtime FAILS every container-backed class instead of skipping. `SqlServerEngine.UnavailableReason` throws. Without this, a CI agent without Docker would pass SM-1 by skipping it. `ContainerRuntimeProbeTests` covers both settings. |
+| `YELLO_MIGRATION_BUNDLE` | The path of the migration bundle that `MigrationBundleEquivalenceTests` runs. When it is unset, the class skips and says why. To run it locally, build `dotnet ef migrations bundle --project Yello.Infrastructure --startup-project Yello.Infrastructure --self-contained -r win-x64 -o artifacts/efbundle-win-x64/efbundle.exe`. |
+| `YELLO_REQUIRE_MIGRATION_BUNDLE=1` | A missing bundle FAILS the equivalence test instead of skipping it. |
+
+**Nightly and Weekly do not exist yet.** They arrive with their first suites in story 2.9
+(`deferred-work.md`). A stage with no suites would pass without testing anything. Do **not** build
+smoke, P0 or P1 tiers. The test design's checklist settled that contradiction in favour of the
+three-stage shape.
+
+## The deployment's own tests - added by story 1.10
+
+These are wire tests in `Yello.Tests.Slices/Deployment/`. They run on the shared engine, and each
+class uses a database of its own:
+
+- **The migration bundle is equivalent to `MigrateAsync`** (`MigrationBundleEquivalenceTests`).
+  The bundle and `MigrateAsync` each migrate a fresh database. The test compares the two catalogues:
+  columns, security policies and predicates, filtered indexes, module text, `MAXDOP` and the history
+  rows. A second run of the bundle must apply nothing and exit 0. The catalogue queries cast every
+  string column to the database's collation, because `CONCAT` refuses mixed catalogue collations.
+- **The production Host shape runs on plain `http://127.0.0.1:0`.** Behind ingress, the Host learns
+  the scheme from `X-Forwarded-Proto`. `DeploymentHosts.BehindIngress` sets
+  `ForwardedHeaders__Enabled`, and `DeploymentHosts.ForwardHttps` adds the header that the platform
+  would append.
+- **A fresh profile per Host process reproduces a container.** By default, ASP.NET Core keeps its
+  key ring in the developer's profile, which every local Host process shares, so a cold start can
+  never lose it. `DeploymentHosts.InAFreshContainer` points `HOME` / `LOCALAPPDATA` at an empty
+  folder. With the key ring persisted to `dbo.DataProtectionKey`, a cookie from process 1 still
+  works in process 2 on the same database, and it is refused on another database.
+- **Probes answer from process state** (`ProbeTests`). Both probes answer `200` against an
+  unreachable server, and their log slice shows no connection attempt.
+- **Database failure is a `503`** (`DatabaseUnavailableTests`). This covers both the key-ring path
+  and the revocation-read path. The revocation-read case takes a database of its own offline in the
+  middle of the process.
+
+**`RunningHost` counts only its own requests.** Every request its client sends carries
+`yello-harness=1`, and only request-finished lines that carry the tag are counted. A browser on the
+same Host therefore cannot satisfy a harness wait (`RunningHostCursorTests`).
+
+**Counts when story 1.10 closed:** 550 cases. With `YELLO_MIGRATION_BUNDLE` set, 549 pass and 1 is
+skipped (the legacy-factor duration case). Without it, the two bundle cases skip as well. There are
+still four engines (Slices, Isolation, Revocation, Client). A full local run took about 2.5 minutes
+of wall clock on the development machine.
 
 ## Not yet decided
 

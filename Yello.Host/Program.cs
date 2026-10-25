@@ -12,6 +12,7 @@ using Yello.Contracts.Accounts;
 using Yello.Contracts.Localisation;
 using Yello.Host;
 using Yello.Host.ApiTokens;
+using Yello.Host.Deployment;
 using Yello.Host.Endpoints;
 using Yello.Host.Sessions;
 using Yello.Host.Spaces;
@@ -165,7 +166,19 @@ builder.Services.Configure<RequestLocalizationOptions>(options =>
     options.SupportedUICultures = cultures;
 });
 
+// THE HOST'S PRODUCTION SHAPE, FROM STORY 1.10. Forwarded headers are read only when the
+// infrastructure says a proxy is in front (ForwardedHeadersPolicy), and the Data Protection key ring -
+// which encrypts the Session and anti-forgery cookies - is kept in the database, so a new revision or
+// a cold start can still read what the previous process issued (PersistedKeyRing).
+var forwardedHeaders = ProductionShape.AddProductionShape(builder);
+
 var app = builder.Build();
+
+// FIRST, before anything reads the scheme or the client's address: behind ingress the request arrives
+// as http from the proxy, and everything below - CORS, the Secure cookies, anti-forgery, the rate
+// limit's partition - must see the original scheme and the client's address instead. Then HSTS outside
+// Development (NFR-6's transit clause). See ProductionShape.
+ProductionShape.UseProductionShape(app, forwardedHeaders);
 
 app.UseRequestLocalization();
 
@@ -174,6 +187,11 @@ app.UseRequestLocalization();
 // authenticate. Authentication runs before the endpoints, because that is what populates
 // HttpContext.User for GET /api/v1/sessions/current to read.
 app.UseCors(CrossOriginPolicy.PolicyName);
+
+// A database that is paused, resuming or unreachable is one uniform 503, never a 500 - for the Session
+// revocation read, the Token lookup, Space resolution and the key ring alike. After CORS, so a browser
+// can read the refusal; before authentication, which is the first thing that may reach the database.
+app.Use(DatabaseAvailability.InvokeAsync);
 
 var startupLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Yello.Host.Startup");
 
@@ -221,6 +239,8 @@ if (permitsSetting.Problem is { } permitsProblem)
 
 RateLimitLog.PermitsResolved(startupLogger, permitsSetting.PermitsPerWindow, CredentialHashingRateLimit.Window);
 
+ProductionShape.Report(startupLogger, forwardedHeaders);
+
 app.UseAuthentication();
 
 // After routing (which WebApplication places first) so the named policy on the two endpoints is
@@ -228,7 +248,9 @@ app.UseAuthentication();
 app.UseRateLimiter();
 
 // THE REFUSAL RECORDS' RETENTION PURGE, triggered by request traffic and at most once a day - never
-// by a timer, so an idle database is never woken (AD-10). See RefusalRetentionTrigger.
+// by a timer, so an idle database is never woken (AD-10). After authentication, because only an
+// authenticated request - which has already read the database - may start it. See
+// RefusalRetentionTrigger.
 app.Use(RefusalRetentionTrigger.InvokeAsync);
 
 // AC4's check lives in StartupConnectivityCheck rather than here so that a test can reach it.
@@ -319,6 +341,10 @@ api.MapRevokeApiToken();
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has
 // anything to say about a path that matches no route.
 app.MapUnmatchedApi();
+
+// The liveness and readiness probes, outside /api: answered from process state, with no database
+// round trip and nothing on a timer (AD-10). See HealthProbes.
+HealthProbes.Map(app);
 
 // The route table is complete. Refuse to start with a Space-scoped route the pipeline would not
 // protect - see SpaceScopedRouteCheck.

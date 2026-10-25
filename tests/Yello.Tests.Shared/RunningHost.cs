@@ -28,9 +28,22 @@ namespace Yello.Tests.Shared;
 /// unchanged. The line carries the method, the URL, the status and the Host's own elapsed time, and no
 /// header - so it is both the per-request anchor and the server-side duration Q5 asks for.
 /// </para>
+/// <para>
+/// <b>Only the harness's own lines are counted</b> (story 1.10 AC16, <c>deferred-work.md:400</c>). Every
+/// request <see cref="Client"/> sends carries <see cref="HarnessTag"/> in its query string, which the
+/// request-finished line repeats, and a wait counts only lines that carry it. A browser driving the same
+/// Host - the real-Host collection - writes untagged lines, so its requests can no longer satisfy a
+/// wait for the harness's before the harness's own line has arrived. The Host ignores the parameter:
+/// no endpoint binds it.
+/// </para>
 /// </remarks>
 public sealed partial class RunningHost : IAsyncDisposable
 {
+    /// <summary>
+    /// The query parameter every harness request carries, and the text a counted line must contain.
+    /// </summary>
+    public static string HarnessTag => "yello-harness=1";
+
     private static readonly TimeSpan StartupWindow = TimeSpan.FromSeconds(60);
 
     private static readonly TimeSpan LogWindow = TimeSpan.FromSeconds(20);
@@ -275,8 +288,8 @@ public sealed partial class RunningHost : IAsyncDisposable
         var lines = await LinesSinceAsync(cursor).ConfigureAwait(false);
 
         return [.. lines
+            .Where(IsHarnessRequestFinished)
             .Select(line => RequestFinished.Match(line))
-            .Where(match => match.Success)
             .Select(match => double.Parse(match.Groups["ms"].Value, CultureInfo.InvariantCulture))];
     }
 
@@ -345,7 +358,7 @@ public sealed partial class RunningHost : IAsyncDisposable
                 changed = _changed.Task;
             }
 
-            if (slice.Count(line => RequestFinished.IsMatch(line)) >= expected)
+            if (slice.Count(IsHarnessRequestFinished) >= expected)
             {
                 return slice;
             }
@@ -357,12 +370,15 @@ public sealed partial class RunningHost : IAsyncDisposable
             catch (OperationCanceledException)
             {
                 throw new InvalidOperationException(
-                    $"The Host wrote {slice.Count(line => RequestFinished.IsMatch(line))} request-finished line(s) for "
+                    $"The Host wrote {slice.Count(IsHarnessRequestFinished)} request-finished line(s) for "
                     + $"{expected} request(s) within {LogWindow.TotalSeconds:F0}s. The slice so far:{Environment.NewLine}"
                     + string.Join(Environment.NewLine, slice));
             }
         }
     }
+
+    private static bool IsHarnessRequestFinished(string line) =>
+        line.Contains(HarnessTag, StringComparison.Ordinal) && RequestFinished.IsMatch(line);
 
     private void Append(string line)
     {
@@ -394,6 +410,14 @@ public sealed partial class RunningHost : IAsyncDisposable
         // would make every later read wait out its window for a line that cannot come.
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
+            if (request.RequestUri is { IsAbsoluteUri: true } uri && !uri.Query.Contains(HarnessTag, StringComparison.Ordinal))
+            {
+                request.RequestUri = new UriBuilder(uri)
+                {
+                    Query = string.IsNullOrEmpty(uri.Query) ? HarnessTag : uri.Query[1..] + "&" + HarnessTag,
+                }.Uri;
+            }
+
             var response = await base.SendAsync(request, cancellationToken).ConfigureAwait(false);
 
             Interlocked.Increment(ref _sent);

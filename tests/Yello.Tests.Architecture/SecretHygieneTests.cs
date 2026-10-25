@@ -11,11 +11,9 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the ATDD run on 2026-10-25.</b> The credential scan and the
-/// appsettings rule are green today and are left active as standing gates: they already cover every
-/// <c>appsettings*.json</c>, <c>launchSettings.json</c> and the AppHost, and they take in
-/// <c>infra/</c> and <c>.github/</c> the moment those exist. The Key Vault reference rule is skipped
-/// until Task 6 writes the Bicep.
+/// <b>Three gates.</b> The credential scan covers every <c>appsettings*.json</c>,
+/// <c>launchSettings.json</c>, the AppHost, <c>infra/</c> and <c>.github/</c>; the appsettings rule keeps
+/// connection strings out of the Host's settings; and the Key Vault rule reads the Bicep. Each is planted.
 /// </para>
 /// <para>
 /// <b>A text gate, with anchors</b> (Q18 (a)): no Bicep or YAML parser package. Each case first finds
@@ -93,7 +91,7 @@ public sealed partial class SecretHygieneTests
     /// Plant 2 (story Task 11): <c>ConnectionStrings__yello</c> as a plain <c>value</c> in
     /// <c>main.bicep</c>.
     /// </remarks>
-    [Fact(Skip = "red: AC3 - infra/ does not exist yet, so no container env entry draws on Key Vault (Task 6)")]
+    [Fact]
     public void Every_connection_string_reaches_the_container_as_a_key_vault_secret_reference()
     {
         var bicep = BicepText();

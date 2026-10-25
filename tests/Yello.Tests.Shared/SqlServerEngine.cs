@@ -34,12 +34,28 @@ namespace Yello.Tests.Shared;
 /// engine pings the daemon with <see cref="SqlServerContainerFixture.ProbeContainerRuntimeAsync(TimeSpan)"/>
 /// and fails with its reason, rather than leaving the start to time out five minutes later.
 /// </para>
+/// <para>
+/// <b>On a CI agent an unconfigured runtime fails too</b> (story 1.10, question 19 (a)). With
+/// <c>YELLO_REQUIRE_CONTAINER_RUNTIME=1</c>, <see cref="UnavailableReason"/> throws instead of returning
+/// a skip reason, so no container-backed class - SM-1 above all - can pass in CI by skipping. The local
+/// default is unchanged.
+/// </para>
 /// </remarks>
 public sealed class SqlServerEngine : IAsyncLifetime
 {
+    /// <summary>
+    /// The environment variable that turns an unconfigured runtime from a skip into a failure. Set to
+    /// <c>1</c> by <c>.github/workflows/ci.yml</c>.
+    /// </summary>
+    public static string RequireRuntimeVariable => "YELLO_REQUIRE_CONTAINER_RUNTIME";
+
     private static readonly TimeSpan ProbeDeadline = TimeSpan.FromSeconds(15);
 
     private readonly SemaphoreSlim _gate = new(1, 1);
+
+    private readonly Func<CancellationToken, Task<string?>> _probe;
+
+    private readonly Func<SqlServerContainerFixture> _containerFactory;
 
     private SqlServerContainerFixture? _container;
 
@@ -53,14 +69,59 @@ public sealed class SqlServerEngine : IAsyncLifetime
     public int DatabasesCreated => Volatile.Read(ref _databasesCreated);
 
     /// <summary>
-    /// Why there is no engine for this process, or <c>null</c> when a runtime is configured. A
-    /// consumer skips with this; a configured runtime that is dead fails instead.
+    /// The engine every suite uses: the real daemon probe, and a real container.
     /// </summary>
+    public SqlServerEngine()
+        : this(_ => SqlServerContainerFixture.ProbeContainerRuntimeAsync(ProbeDeadline), () => new SqlServerContainerFixture())
+    {
+    }
+
+    /// <summary>
+    /// The seam story 1.10's fail-fast test drives (AC16, <c>deferred-work.md:401</c>): a probe and a
+    /// container factory of the caller's own, so a dead runtime can be reported without killing the one
+    /// every other class in the process uses.
+    /// </summary>
+    /// <param name="probe">Reports why the daemon is dead, or <c>null</c> when it answers.</param>
+    /// <param name="containerFactory">Constructs the container, once the probe has passed.</param>
+    internal SqlServerEngine(Func<CancellationToken, Task<string?>> probe, Func<SqlServerContainerFixture> containerFactory)
+    {
+        _probe = probe;
+        _containerFactory = containerFactory;
+    }
+
+    /// <summary>
+    /// Why there is no engine for this process, or <c>null</c> when a runtime is configured. A
+    /// consumer skips with this; a configured runtime that is dead fails instead, and on a CI agent
+    /// (<see cref="RequireRuntimeVariable"/>) an unconfigured one fails too.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">CI requires the runtime and none is configured.</exception>
     public static string? UnavailableReason =>
-        SqlServerContainerFixture.IsContainerRuntimeAvailable()
-            ? null
+        UnavailableReasonFor(
+            SqlServerContainerFixture.IsContainerRuntimeAvailable(),
+            string.Equals(Environment.GetEnvironmentVariable(RequireRuntimeVariable), "1", StringComparison.Ordinal));
+
+    /// <summary>
+    /// The decision behind <see cref="UnavailableReason"/>, with both inputs stated, so a test can drive
+    /// it without setting a process-wide variable while container-backed classes run in parallel.
+    /// </summary>
+    /// <param name="runtimeConfigured">Whether a container runtime is configured on this machine.</param>
+    /// <param name="runtimeRequired">Whether this run requires one (a CI agent).</param>
+    /// <returns><c>null</c> when a runtime is configured; otherwise the reason to skip.</returns>
+    /// <exception cref="InvalidOperationException">A runtime is required and none is configured.</exception>
+    internal static string? UnavailableReasonFor(bool runtimeConfigured, bool runtimeRequired)
+    {
+        if (runtimeConfigured)
+        {
+            return null;
+        }
+
+        return runtimeRequired
+            ? throw new InvalidOperationException(
+                $"{RequireRuntimeVariable}=1 but no container runtime is configured on this agent. The container-backed " +
+                "suites - SM-1's isolation proof among them - must run here, so this fails rather than skipping.")
             : "No container runtime is configured, so there is no SQL Server for this suite. This is a skip " +
               "rather than a failure because an absent Rancher Desktop is a local condition, not a defect.";
+    }
 
     /// <inheritdoc />
     /// <remarks>Nothing starts here: see the class remarks on starting at first use.</remarks>
@@ -181,7 +242,7 @@ public sealed class SqlServerEngine : IAsyncLifetime
                 return _container;
             }
 
-            var dead = await SqlServerContainerFixture.ProbeContainerRuntimeAsync(ProbeDeadline).ConfigureAwait(false);
+            var dead = await _probe(cancellationToken).ConfigureAwait(false);
 
             if (dead is not null)
             {
@@ -193,7 +254,7 @@ public sealed class SqlServerEngine : IAsyncLifetime
                 throw _failure;
             }
 
-            var container = new SqlServerContainerFixture();
+            var container = _containerFactory();
 
             try
             {

@@ -70,13 +70,12 @@ public sealed class ContainerRuntimeProbeTests
     /// a failure, not a skip, so SM-1 cannot pass vacuously in CI. Story 1.10 AC10; Task 9, Q19 (a).
     /// </summary>
     /// <remarks>
-    /// <b>Red-phase scaffold, ATDD run 2026-10-25.</b> The decision is reached through a seam proposed by
-    /// name, <c>SqlServerEngine.UnavailableReasonFor(bool runtimeConfigured, bool runtimeRequired)</c>,
-    /// so the case can state both values without setting a process-wide environment variable while
-    /// container-backed classes run in parallel. On activation, replace the reflection with the typed
-    /// call and record the shape the seam took.
+    /// The decision is reached through <c>SqlServerEngine.UnavailableReasonFor(bool runtimeConfigured,
+    /// bool runtimeRequired)</c>, so the case can state both values without setting a process-wide
+    /// environment variable while container-backed classes run in parallel. It is internal to
+    /// <c>Yello.Tests.Shared</c>, which grants this project nothing, so it is reached by reflection.
     /// </remarks>
-    [Fact(Skip = "red: AC10 - an unconfigured runtime always skips; nothing reads YELLO_REQUIRE_CONTAINER_RUNTIME (Task 9, Q19 (a))")]
+    [Fact]
     [Trait("Priority", "P0")]
     [Trait("Requirement", "NFR-1")]
     public void When_ci_requires_the_runtime_an_unconfigured_one_fails_rather_than_skips()
@@ -93,7 +92,7 @@ public sealed class ContainerRuntimeProbeTests
     /// 1.10-UNIT-006 - anchor: without the requirement, an unconfigured runtime still skips with a
     /// reason (story 1.9 Q1, unchanged locally), and a configured one is available either way.
     /// </summary>
-    [Fact(Skip = "red: AC10 - the runtime-requirement seam does not exist yet (Task 9, Q19 (a))")]
+    [Fact]
     public void Without_the_requirement_an_unconfigured_runtime_still_skips()
     {
         var decide = UnavailableReasonFor();

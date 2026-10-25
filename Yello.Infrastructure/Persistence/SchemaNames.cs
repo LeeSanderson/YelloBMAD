@@ -72,6 +72,12 @@ public static class SchemaNames
     public static string ApiTokenTable => "ApiToken";
 
     /// <summary>
+    /// The Host's Data Protection key ring. <b>Not</b> Space-scoped and carries no predicate - see
+    /// <c>DataProtectionKey</c>.
+    /// </summary>
+    public static string DataProtectionKeyTable => "DataProtectionKey";
+
+    /// <summary>
     /// The unique index a Token is authenticated through: one seek by the hash of what was presented.
     /// </summary>
     public static string ApiTokenSecretHashUniqueIndex => "UX_ApiToken_SecretHash";

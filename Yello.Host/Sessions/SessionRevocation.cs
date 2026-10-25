@@ -59,6 +59,53 @@ internal static class SessionRevocation
     }
 
     /// <summary>
+    /// The instant a new Session is issued at: now, or the Account's last sign-out if the clock has
+    /// stepped back behind it. Story 1.10 AC14; open question 12 (a); <c>deferred-work.md:334</c>.
+    /// </summary>
+    /// <param name="now">Now, from the injected clock.</param>
+    /// <param name="validAfter">The Account's <see cref="Account.SessionsValidAfter"/>, if it has one.</param>
+    /// <returns>The later of the two.</returns>
+    /// <remarks>
+    /// A Session is admitted when it was issued at or after the Account's last sign-out. A host clock
+    /// that steps back past that instant would otherwise issue a Session that is refused on its first
+    /// request. Issuing at the sign-out instant itself is admitted (the comparison is inclusive), and a
+    /// ticket issued before the sign-out is still refused.
+    /// </remarks>
+    internal static DateTimeOffset IssueInstant(DateTimeOffset now, DateTimeOffset? validAfter) =>
+        validAfter is { } after && after > now ? after : now;
+
+    /// <summary>
+    /// Issues the Session cookie for an Account that has just authenticated, stamped at
+    /// <see cref="IssueInstant(DateTimeOffset, DateTimeOffset?)"/> - which reads the Account's
+    /// <see cref="Account.SessionsValidAfter"/> by primary key.
+    /// </summary>
+    /// <param name="httpContext">The sign-in request, which the cookie is written onto.</param>
+    /// <param name="accountId">The Account that authenticated.</param>
+    /// <param name="now">Now, from the injected clock.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>A task that completes once the cookie is written.</returns>
+    /// <remarks>Called on the success path only, so the two failure causes still cost the same.</remarks>
+    internal static async Task SignInAsync(
+        HttpContext httpContext,
+        Guid accountId,
+        DateTimeOffset now,
+        CancellationToken cancellationToken)
+    {
+        var standing = await httpContext.RequestServices
+            .GetRequiredService<IAccountSessionStore>()
+            .FindAsync(accountId, cancellationToken)
+            .ConfigureAwait(false);
+
+        var issuedAt = IssueInstant(now, standing?.ValidAfter);
+
+        await httpContext.SignInAsync(
+                SessionCookiePolicy.SchemeName,
+                SessionPrincipal.For(accountId),
+                Stamp(new AuthenticationProperties { IsPersistent = true }, issuedAt))
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// The cookie handler's validation hook: refuses a ticket issued before the Account last signed
     /// out.
     /// </summary>

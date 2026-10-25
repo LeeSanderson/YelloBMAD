@@ -4,8 +4,8 @@ using Yello.Application.Spaces;
 namespace Yello.Host.Spaces;
 
 /// <summary>
-/// Gives the refusal-record purge its chance on each inbound request, off the request path. AD-10 /
-/// AR-33; AD-20.
+/// Gives the refusal-record purge its chance on a request that has already reached the database, off
+/// the request path. AD-10 / AR-33; AD-20; story 1.10 AC14.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -15,8 +15,16 @@ namespace Yello.Host.Spaces;
 /// process - and returns a completed task when it is not, which is every request but one a day.
 /// </para>
 /// <para>
+/// <b>Only after an authenticated request</b> (story 1.10, question 13). Authenticating a Session reads
+/// its Account's revocation instant, and authenticating an API Token looks the Token up, so such a
+/// request has already woken the database. An anonymous request - a scanner asking for an
+/// anti-forgery token, an unknown <c>/api</c> path, a <c>401</c> - reaches no database, and must not
+/// start a delete that would. With scale-to-zero every cold start is a new process, so a trigger on
+/// every request would purge on the first request after each one.
+/// </para>
+/// <para>
 /// <b>Not awaited by the request.</b> The one request a day that claims the purge does not wait for
-/// the delete; a failure is logged and the request is unaffected.
+/// the delete; it logs the claim, a failure is logged, and the request is unaffected.
 /// </para>
 /// </remarks>
 internal static class RefusalRetentionTrigger
@@ -24,7 +32,8 @@ internal static class RefusalRetentionTrigger
     private static readonly string LoggerCategory = typeof(RefusalRetentionTrigger).FullName!;
 
     /// <summary>
-    /// The middleware: start a purge if one is due, then carry on with the request.
+    /// The middleware: start a purge if one is due and the request is authenticated, then carry on
+    /// with the request. Placed after authentication.
     /// </summary>
     /// <param name="context">The request.</param>
     /// <param name="next">The rest of the pipeline.</param>
@@ -34,12 +43,18 @@ internal static class RefusalRetentionTrigger
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(next);
 
+        if (context.User.Identity?.IsAuthenticated != true)
+        {
+            return next(context);
+        }
+
         var services = context.RequestServices;
         var purge = services.GetRequiredService<IRefusalRetention>().PurgeIfDueAsync(CancellationToken.None);
 
         if (!purge.IsCompleted || purge.IsFaulted)
         {
             var logger = services.GetRequiredService<ILoggerFactory>().CreateLogger(LoggerCategory);
+            DeploymentLog.RefusalPurgeClaimed(logger);
             _ = ObserveAsync(purge, logger);
         }
 

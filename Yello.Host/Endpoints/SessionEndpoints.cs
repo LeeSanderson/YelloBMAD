@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Antiforgery;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Yello.Application.Accounts.AuthenticateAccount;
 using Yello.Contracts;
@@ -149,10 +148,11 @@ public static class SessionEndpoints
 
         // The issue instant is stamped onto the ticket at full precision: it is what sign-out's
         // SessionsValidAfter is compared with on every later request (story 1.7, Lee's decision (a)).
-        await signIn.HttpContext.SignInAsync(
-                SessionCookiePolicy.SchemeName,
-                SessionPrincipal.For(authenticated.AccountId),
-                SessionRevocation.Stamp(new AuthenticationProperties { IsPersistent = true }, signIn.Clock.GetUtcNow()))
+        // Never earlier than that instant, so a host clock that stepped back cannot issue a Session
+        // that is refused on its first request (story 1.10, question 12). Read on the success path
+        // only, so the two failure causes still cost the same.
+        await SessionRevocation
+            .SignInAsync(signIn.HttpContext, authenticated.AccountId, signIn.Clock.GetUtcNow(), cancellationToken)
             .ConfigureAwait(false);
 
         // The same line the failure path writes, deliberately. See SessionLog: nothing in this

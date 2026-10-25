@@ -14,7 +14,7 @@ namespace Yello.Tests.Slices.Deployment;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the ATDD run on 2026-10-25.</b> No bundle is built yet.
+/// <b>The bundle is built outside the suite</b>, by CI or by hand, and named by an environment variable.
 /// </para>
 /// <para>
 /// <b>Where the bundle comes from.</b> <c>YELLO_MIGRATION_BUNDLE</c> names the executable
@@ -50,35 +50,40 @@ public sealed class MigrationBundleEquivalenceTests(SqlServerEngine engine)
 
     private static readonly TimeSpan BundleWindow = TimeSpan.FromMinutes(5);
 
+    /// <summary>
+    /// The catalogue, one line per object. Every string column is cast to the database's collation:
+    /// the catalogue views mix collations (<c>sys.database_scoped_configurations</c> is
+    /// <c>Latin1_General_CI_AS_KS_WS</c>), and <c>CONCAT</c> refuses to combine them.
+    /// </summary>
     private static readonly string[] CatalogueQueries =
     [
         """
-        SELECT CONCAT('column|', s.name, '.', t.name, '.', c.name, '|', ty.name, '|', c.max_length, '|', c.is_nullable, '|', c.collation_name)
+        SELECT CONCAT('column|', s.name COLLATE DATABASE_DEFAULT, '.', t.name COLLATE DATABASE_DEFAULT, '.', c.name COLLATE DATABASE_DEFAULT, '|', ty.name COLLATE DATABASE_DEFAULT, '|', c.max_length, '|', c.is_nullable, '|', c.collation_name COLLATE DATABASE_DEFAULT)
         FROM sys.columns c
         JOIN sys.tables t ON t.object_id = c.object_id
         JOIN sys.schemas s ON s.schema_id = t.schema_id
         JOIN sys.types ty ON ty.user_type_id = c.user_type_id
         """,
-        "SELECT CONCAT('policy|', name, '|', is_enabled, '|', is_schema_bound) FROM sys.security_policies",
+        "SELECT CONCAT('policy|', name COLLATE DATABASE_DEFAULT, '|', is_enabled, '|', is_schema_bound) FROM sys.security_policies",
         """
-        SELECT CONCAT('predicate|', OBJECT_NAME(p.object_id), '|', OBJECT_NAME(p.target_object_id), '|', p.predicate_type_desc, '|', p.operation_desc, '|', p.predicate_definition)
+        SELECT CONCAT('predicate|', OBJECT_NAME(p.object_id) COLLATE DATABASE_DEFAULT, '|', OBJECT_NAME(p.target_object_id) COLLATE DATABASE_DEFAULT, '|', p.predicate_type_desc COLLATE DATABASE_DEFAULT, '|', p.operation_desc COLLATE DATABASE_DEFAULT, '|', p.predicate_definition COLLATE DATABASE_DEFAULT)
         FROM sys.security_predicates p
         """,
         """
-        SELECT CONCAT('index|', OBJECT_NAME(i.object_id), '|', i.name, '|', i.is_unique, '|', i.has_filter, '|', i.filter_definition)
+        SELECT CONCAT('index|', OBJECT_NAME(i.object_id) COLLATE DATABASE_DEFAULT, '|', i.name COLLATE DATABASE_DEFAULT, '|', i.is_unique, '|', i.has_filter, '|', i.filter_definition COLLATE DATABASE_DEFAULT)
         FROM sys.indexes i
         JOIN sys.tables t ON t.object_id = i.object_id
         WHERE i.name IS NOT NULL
         """,
-        "SELECT CONCAT('module|', OBJECT_NAME(object_id), '|', definition) FROM sys.sql_modules",
-        "SELECT CONCAT('scoped|', name, '|', CAST(value AS nvarchar(32))) FROM sys.database_scoped_configurations WHERE name = 'MAXDOP'",
-        "SELECT CONCAT('history|', MigrationId, '|', ProductVersion) FROM dbo.__EFMigrationsHistory",
+        "SELECT CONCAT('module|', OBJECT_NAME(object_id) COLLATE DATABASE_DEFAULT, '|', definition COLLATE DATABASE_DEFAULT) FROM sys.sql_modules",
+        "SELECT CONCAT('scoped|', name COLLATE DATABASE_DEFAULT, '|', CAST(value AS nvarchar(32)) COLLATE DATABASE_DEFAULT) FROM sys.database_scoped_configurations WHERE name = 'MAXDOP'",
+        "SELECT CONCAT('history|', MigrationId COLLATE DATABASE_DEFAULT, '|', ProductVersion COLLATE DATABASE_DEFAULT) FROM dbo.__EFMigrationsHistory",
     ];
 
     /// <summary>
     /// 1.10-SLC-001 - the bundle and <c>MigrateAsync</c> produce the same catalogue.
     /// </summary>
-    [Fact(Skip = "red: AC2/AC15 - no migration bundle is built yet (Task 3, Q3 (a))")]
+    [Fact]
     public async Task The_bundle_applies_exactly_the_schema_the_migrations_do()
     {
         var bundle = BundleOrSkip();
@@ -114,7 +119,7 @@ public sealed class MigrationBundleEquivalenceTests(SqlServerEngine engine)
     /// 1.10-SLC-002 - a second run of the bundle applies nothing and exits 0, so the deploy job can run
     /// on every push.
     /// </summary>
-    [Fact(Skip = "red: AC15 - no migration bundle is built yet (Task 3)")]
+    [Fact]
     public async Task A_second_bundle_run_applies_nothing_and_succeeds()
     {
         var bundle = BundleOrSkip();

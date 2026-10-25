@@ -14,8 +14,7 @@ namespace Yello.Tests.Slices.Deployment;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the ATDD run on 2026-10-25.</b> Nothing reads forwarded
-/// headers yet.
+/// <b>The Host reads forwarded headers only when configured</b> (<c>ForwardedHeadersPolicy</c>).
 /// </para>
 /// <para>
 /// <b>Plain http, as behind ingress</b> (<see cref="DeploymentHosts.BehindIngress"/>). The scheme case
@@ -45,7 +44,7 @@ public sealed class ForwardedHeadersTests(MigratedDatabaseFixture fixture) : ICl
     /// forwards <c>https</c>, and its cookie is <c>Secure</c>. Anchor: the same Host refuses it without
     /// the header.
     /// </summary>
-    [Fact(Skip = "red: AC11 - forwarded headers are not read yet, so no token is issued behind ingress (Task 4, Q10 (a), Finding F3)")]
+    [Fact]
     public async Task Behind_ingress_the_forwarded_scheme_lets_the_host_issue_an_antiforgery_token()
     {
         var connectionString = Available();
@@ -77,7 +76,7 @@ public sealed class ForwardedHeadersTests(MigratedDatabaseFixture fixture) : ICl
     /// 1.10-SLC-006 - with forwarding off (a local Host), <c>X-Forwarded-Proto</c> is ignored. Anchor:
     /// the same request is honoured with forwarding on.
     /// </summary>
-    [Fact(Skip = "red: AC11 - ForwardedHeaders:Enabled is not read yet, so the anchor cannot hold (Task 4, Q10 (a))")]
+    [Fact]
     public async Task With_forwarding_off_a_forwarded_scheme_is_ignored()
     {
         var connectionString = Available();
@@ -108,7 +107,7 @@ public sealed class ForwardedHeadersTests(MigratedDatabaseFixture fixture) : ICl
     /// one window with every other request the platform forwarded from the same address. Anchor: a
     /// different platform hop is not refused.
     /// </summary>
-    [Fact(Skip = "red: AC11 - the limiter keys on the socket address, not the forwarded hop (Task 4, deferred-work.md:290)")]
+    [Fact]
     public async Task A_rotated_left_hand_forwarded_address_does_not_escape_the_window()
     {
         var verdict = await BurstAsync(
@@ -122,7 +121,7 @@ public sealed class ForwardedHeadersTests(MigratedDatabaseFixture fixture) : ICl
     /// <summary>
     /// 1.10-SLC-008 - an IPv4 address and its IPv4-mapped IPv6 form share one window.
     /// </summary>
-    [Fact(Skip = "red: AC11 - PartitionOf does not normalise IPv4-mapped addresses (Task 4, deferred-work.md:304)")]
+    [Fact]
     [Trait("Priority", "P1")]
     public async Task An_ipv4_address_and_its_mapped_ipv6_form_share_one_window()
     {
@@ -137,7 +136,7 @@ public sealed class ForwardedHeadersTests(MigratedDatabaseFixture fixture) : ICl
     /// <summary>
     /// 1.10-SLC-009 - IPv6 addresses in one /64 share one window; another /64 does not.
     /// </summary>
-    [Fact(Skip = "red: AC11 - PartitionOf keys IPv6 on the whole address, not its /64 (Task 4, deferred-work.md:304)")]
+    [Fact]
     [Trait("Priority", "P1")]
     public async Task Ipv6_addresses_share_a_window_per_64_bit_prefix()
     {

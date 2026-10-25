@@ -1,0 +1,248 @@
+# Yello's pipeline (story 1.10): the PR stage of the three-stage CI shape, and on `main` the deploy.
+#
+#   test           every push and pull request to main: the architecture suite first, then every
+#                  suite in the solution. A single failing case fails the run (AC10).
+#   build-images   main only, after a green test job: the Host image and the migration image.
+#   migrate        runs the migration bundle as a Container Apps Job and waits for it to succeed.
+#   promote        only after migrate: points the Container App at the new Host image, which in
+#                  single revision mode creates and activates the new revision (AR-36, AR-38).
+#   client         publishes the client to Static Web Apps.
+#
+# Exactly one deployment target, the GitHub environment `azure` (AC4). Azure login is OIDC federation
+# to the deploy identity the infrastructure creates; no Azure secret is stored in GitHub (P3). The
+# Nightly and Weekly stages arrive with their first suites (deferred-work.md, story 2.9).
+#
+# Every third-party action is pinned to a full commit SHA, with its version in a trailing comment.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # A CI agent fails the container-backed classes rather than skipping them when the container
+      # runtime is unconfigured, and fails the bundle test rather than skipping it when the bundle is
+      # missing, so neither SM-1 nor AC15 can pass vacuously here (TESTING-CONVENTIONS.md).
+      YELLO_REQUIRE_CONTAINER_RUNTIME: '1'
+      YELLO_REQUIRE_MIGRATION_BUNDLE: '1'
+      DOTNET_NOLOGO: '1'
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: |
+          dotnet restore Yello.slnx
+          dotnet tool restore
+
+      # Warnings are errors, and the NuGet audit runs here under the one-off suppression in
+      # Directory.Build.props.
+      - name: Build
+        run: dotnet build Yello.slnx -c Release --no-restore
+
+      # Kestrel binds https in the wire suites; the certificate is created, not trusted.
+      - name: Development certificate
+        run: dotnet dev-certs https
+
+      - name: Browser for the Client suite
+        run: pwsh tests/Yello.Tests.Client/bin/Release/net10.0/playwright.ps1 install chromium --with-deps
+
+      # The one artefact that applies the schema in Azure, proved equivalent to MigrateAsync by
+      # MigrationBundleEquivalenceTests before it is ever shipped.
+      - name: Migration bundle
+        run: |
+          dotnet ef migrations bundle --project Yello.Infrastructure --startup-project Yello.Infrastructure \
+            --self-contained -r linux-x64 --configuration Release -o artifacts/efbundle/efbundle --force
+          echo "YELLO_MIGRATION_BUNDLE=$GITHUB_WORKSPACE/artifacts/efbundle/efbundle" >> "$GITHUB_ENV"
+
+      - name: Architecture suite (first, and fails fast)
+        run: dotnet test --project tests/Yello.Tests.Architecture/Yello.Tests.Architecture.csproj -c Release --no-build
+
+      - name: Every suite
+        run: dotnet test Yello.slnx -c Release --no-build -- --report-xunit-trx --results-directory "$GITHUB_WORKSPACE/TestResults"
+
+      - name: Test results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: test-results
+          path: TestResults
+          if-no-files-found: warn
+
+      - name: Keep the tested bundle
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: efbundle
+          path: artifacts/efbundle/efbundle
+          retention-days: 1
+
+  build-images:
+    needs: [test]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: azure
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+
+      - uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Registry login
+        run: az acr login --name "${{ vars.YELLO_REGISTRY_NAME }}"
+
+      # The SDK's own container support: no Dockerfile, the base image pinned in Yello.Host.csproj.
+      - name: Host image
+        run: |
+          dotnet publish Yello.Host/Yello.Host.csproj -c Release -r linux-x64 -t:PublishContainer \
+            -p:ContainerRegistry="${{ vars.YELLO_REGISTRY_NAME }}.azurecr.io" \
+            -p:ContainerImageTag="${{ github.sha }}"
+
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: efbundle
+          path: artifacts/efbundle
+
+      - name: Migration image
+        run: |
+          image="${{ vars.YELLO_REGISTRY_NAME }}.azurecr.io/yello-migrate:${{ github.sha }}"
+          docker build -f infra/migrate.Dockerfile -t "$image" artifacts/efbundle
+          docker push "$image"
+
+  migrate:
+    needs: [build-images]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: azure
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # Runs while the previous revision still serves, so every migration must be compatible with it
+      # (the expand/contract rule, docs/operations.md).
+      - name: Run the migration job and wait for it
+        run: |
+          set -euo pipefail
+          group="${{ vars.YELLO_RESOURCE_GROUP }}"
+          az containerapp job update --name yello-migrate --resource-group "$group" \
+            --image "${{ vars.YELLO_REGISTRY_NAME }}.azurecr.io/yello-migrate:${{ github.sha }}"
+          execution=$(az containerapp job start --name yello-migrate --resource-group "$group" --query name -o tsv)
+          echo "Started $execution"
+          for _ in $(seq 1 180); do
+            status=$(az containerapp job execution show --name yello-migrate --resource-group "$group" \
+              --job-execution-name "$execution" --query properties.status -o tsv)
+            echo "Migration: $status"
+            case "$status" in
+              Succeeded) exit 0 ;;
+              Failed|Stopped|Degraded) exit 1 ;;
+            esac
+            sleep 10
+          done
+          echo "The migration job did not finish within 30 minutes."
+          exit 1
+
+  promote:
+    needs: [migrate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: azure
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Promote the new Host revision
+        run: |
+          az containerapp update --name yello-host --resource-group "${{ vars.YELLO_RESOURCE_GROUP }}" \
+            --image "${{ vars.YELLO_REGISTRY_NAME }}.azurecr.io/yello-host:${{ github.sha }}"
+
+  client:
+    needs: [promote]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: azure
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4.3.1
+        with:
+          global-json-file: global.json
+
+      - uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # The API's address is deploy-time configuration, not a secret, and is never committed: it is
+      # written into the publish output only (AC13). A custom API hostname (P4) wins when it is set.
+      - name: Publish the client
+        run: |
+          set -euo pipefail
+          api="${{ vars.YELLO_API_HOSTNAME }}"
+          if [ -z "$api" ]; then
+            api=$(az containerapp show --name yello-host --resource-group "${{ vars.YELLO_RESOURCE_GROUP }}" \
+              --query properties.configuration.ingress.fqdn -o tsv)
+          fi
+          dotnet publish Yello.Client/Yello.Client.csproj -c Release -o publish/client
+          printf '{ "HostBaseAddress": "https://%s/" }\n' "$api" > publish/client/wwwroot/appsettings.Production.json
+
+      # The deployment token is read at run time with the deploy identity and masked; none is stored.
+      - name: Deployment token
+        id: swa
+        run: |
+          token=$(az staticwebapp secrets list --name yello-client --resource-group "${{ vars.YELLO_RESOURCE_GROUP }}" \
+            --query properties.apiKey -o tsv)
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - uses: Azure/static-web-apps-deploy@1a947af9992250f3bc2e68ad0754c0b0c11566c9 # v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.swa.outputs.token }}
+          action: upload
+          app_location: publish/client/wwwroot
+          skip_app_build: true
+          skip_api_build: true

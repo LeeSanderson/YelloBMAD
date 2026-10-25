@@ -1,5 +1,6 @@
 using System.Net;
 using Xunit;
+using Yello.Contracts.Accounts;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Slices.Deployment;
@@ -11,7 +12,7 @@ namespace Yello.Tests.Slices.Deployment;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as a red-phase scaffold by the ATDD run on 2026-10-25.</b> The probes do not exist yet.
+/// <b>The probes are mapped by <c>HealthProbes</c></b>, outside <c>/api</c>.
 /// </para>
 /// <para>
 /// <b>No database at all</b>, so no engine: the Host is given a server nothing listens on. The anchor
@@ -43,7 +44,7 @@ public sealed class ProbeTests
     /// body that says nothing about the database, and the Host's log for them shows no connection
     /// attempt.
     /// </summary>
-    [Fact(Skip = "red: AC6 - /health/live and /health/ready are not mapped yet (Task 4, Q15 (a))")]
+    [Fact]
     public async Task Both_probes_answer_from_process_state_with_the_database_unreachable()
     {
         var settings = new Dictionary<string, string>(StringComparer.Ordinal)
@@ -74,10 +75,10 @@ public sealed class ProbeTests
         Assert.All(ConnectionAttemptMarkers, marker => Assert.DoesNotContain(marker, probeSlice, StringComparison.Ordinal));
 
         // Anchor: the database really is unreachable - a request that must read it does not succeed.
-        var session = new WireSession(host.Client);
-        await session.FetchAntiforgeryTokenAsync();
-        var signIn = await session.SignInAsync(DeploymentHosts.RandomAddress(), DeploymentHosts.Password);
+        // Issuing an anti-forgery token reads the key ring from the database, so it is the simplest
+        // request that must fail here.
+        using var token = await host.Client.GetAsync(new Uri(SessionRoutes.AntiforgeryToken, UriKind.Relative), deadline.Token);
 
-        Assert.True(signIn.StatusCode >= HttpStatusCode.InternalServerError, $"A sign-in against an unreachable database answered {signIn.StatusCode}.");
+        Assert.True(token.StatusCode >= HttpStatusCode.InternalServerError, $"A request against an unreachable database answered {token.StatusCode}.");
     }
 }

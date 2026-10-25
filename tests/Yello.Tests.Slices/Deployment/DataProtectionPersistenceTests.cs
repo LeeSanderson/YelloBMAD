@@ -15,8 +15,8 @@ namespace Yello.Tests.Slices.Deployment;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the ATDD run on 2026-10-25.</b> Nothing persists the key ring
-/// yet, so a container start regenerates it and every Session ends.
+/// <b>The key ring lives in the database</b> (<c>PersistedKeyRing</c>), so a container start reads the
+/// keys the previous process wrote.
 /// </para>
 /// <para>
 /// <b>Each Host process gets an empty user profile of its own</b>
@@ -30,9 +30,9 @@ namespace Yello.Tests.Slices.Deployment;
 /// class's own on the shared engine, migrated, and dropped at the end.
 /// </para>
 /// <para>
-/// <b>Proposed names, to correct on activation:</b> the key table <c>dbo.DataProtectionKeys</c> is the
-/// default of <c>Microsoft.AspNetCore.DataProtection.EntityFrameworkCore</c>'s
-/// <c>IDataProtectionKeyContext</c> (Q7 (a)).
+/// <b>The key table is <c>dbo.DataProtectionKey</c></b>: the ring is kept by the Host's own key
+/// repository rather than the EF Core package (Q7 (a)), and every table here is named for its entity in
+/// the singular.
 /// </para>
 /// </remarks>
 /// <param name="fixture">This class's migrated database on the shared engine.</param>
@@ -49,13 +49,13 @@ public sealed class DataProtectionPersistenceTests(MigratedDatabaseFixture fixtu
     /// database, each with a fresh profile; the key ring is a row in the database. Anchor: a Host on a
     /// different database refuses it.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the Data Protection key ring is not persisted, so a cold start ends every Session (Task 4, Q7 (a), F1)")]
+    [Fact]
     public async Task A_session_issued_before_a_cold_start_is_honoured_after_it()
     {
         var connectionString = Available();
         var issued = await IssueSessionAsync(connectionString);
 
-        Assert.True(await KeyRowsAsync(connectionString) > 0, "No key was persisted to dbo.DataProtectionKeys.");
+        Assert.True(await KeyRowsAsync(connectionString) > 0, "No key was persisted to dbo.DataProtectionKey.");
 
         WireResponse? afterRestart = null;
 
@@ -97,7 +97,7 @@ public sealed class DataProtectionPersistenceTests(MigratedDatabaseFixture fixtu
     /// a state change (sign-out), and once signed out the replayed Session cookie is refused:
     /// <c>SessionsValidAfter</c> still rules across processes.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the Data Protection key ring is not persisted, so the previous process's anti-forgery pair is unreadable (Task 4, F1)")]
+    [Fact]
     public async Task After_a_cold_start_the_old_antiforgery_pair_still_signs_out_and_sign_out_still_ends_the_session()
     {
         var connectionString = Available();
@@ -169,7 +169,7 @@ public sealed class DataProtectionPersistenceTests(MigratedDatabaseFixture fixtu
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
         await using var command = connection.CreateCommand();
-        command.CommandText = "SELECT COUNT(*) FROM dbo.DataProtectionKeys";
+        command.CommandText = "SELECT COUNT(*) FROM dbo.DataProtectionKey";
 
         return Convert.ToInt32(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken), CultureInfo.InvariantCulture);
     }

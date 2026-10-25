@@ -12,9 +12,8 @@ namespace Yello.Tests.Slices.Deployment;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written by the ATDD run on 2026-10-25.</b> The normalisation cases are red-phase scaffolds. The
-/// third case states what must not change (Q10's sub-question: keep the shared partition for a
-/// missing address) and is green today, a standing gate.
+/// <b>Three cases.</b> The normalisation cases cover IPv4-mapped and IPv6 addresses; the third states
+/// what must not change (Q10's sub-question: keep the shared partition for a missing address).
 /// </para>
 /// <para>
 /// <b>Equality, not a format.</b> The cases assert which addresses share a key and that a key is never
@@ -30,7 +29,7 @@ public sealed class RateLimitPartitionTests
     /// <summary>
     /// 1.10-UNIT-001 - an IPv4-mapped IPv6 address keys as its IPv4 form.
     /// </summary>
-    [Fact(Skip = "red: AC11 - PartitionOf does not map IPv4-mapped addresses to IPv4 (Task 4)")]
+    [Fact]
     public void An_ipv4_mapped_address_keys_as_its_ipv4_form()
     {
         Assert.Equal(PartitionOf("203.0.113.7"), PartitionOf("::ffff:203.0.113.7"));
@@ -40,7 +39,7 @@ public sealed class RateLimitPartitionTests
     /// 1.10-UNIT-002 - IPv6 addresses key on their /64: two in one prefix share a key, one in another
     /// prefix does not, and the key is not the full address.
     /// </summary>
-    [Fact(Skip = "red: AC11 - PartitionOf keys IPv6 on the whole address (Task 4)")]
+    [Fact]
     public void Ipv6_addresses_key_on_their_64_bit_prefix()
     {
         var first = PartitionOf("2001:db8:1:2::1");

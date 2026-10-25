@@ -21,16 +21,16 @@ namespace Yello.Tests.Slices.Deployment;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the ATDD run on 2026-10-25.</b> None of the behaviour exists:
-/// today a revocation read against an unreachable database escapes as an unhandled <c>500</c>, the
-/// purge is offered on every request, and sign-in stamps <c>now</c>.
+/// <b>What answers.</b> <c>DatabaseAvailability</c> maps a database failure anywhere in the pipeline to
+/// one <c>503</c>; the refusal purge runs only after an authenticated request; and sign-in issues at
+/// <c>SessionRevocation.IssueInstant</c>, the later of now and the last sign-out.
 /// </para>
 /// <para>
-/// <b>Proposed names, to correct on activation and record in the Debug Log:</b> the problem type
-/// <c>urn:yello:problem:service-unavailable</c> (Task 5 suggests <c>ProblemTypes.ServiceUnavailable</c>);
+/// <b>The names these cases read:</b> the problem type <c>urn:yello:problem:service-unavailable</c>
+/// (<c>ProblemTypes.ServiceUnavailable</c>);
 /// the purge-claim log marker <see cref="PurgeClaimed"/>; and
 /// <c>SessionRevocation.IssueInstant(DateTimeOffset now, DateTimeOffset? validAfter)</c>, reached by
-/// name because it does not exist yet.
+/// name.
 /// </para>
 /// <para>
 /// <b>Which path the <c>503</c> case reaches.</b> Before F1 is fixed, two local Host processes share the
@@ -42,12 +42,13 @@ namespace Yello.Tests.Slices.Deployment;
 /// </para>
 /// </remarks>
 /// <param name="fixture">This class's migrated database on the shared engine.</param>
+/// <param name="engine">The process's one SQL Server, for a database this class takes offline.</param>
 [Trait("Suite", "Slices")]
 [Trait("Priority", "P0")]
 [Trait("Requirement", "AR-3")]
 [Trait("Requirement", "AR-33")]
 [Trait("Requirement", "AD-10")]
-public sealed class DatabaseUnavailableTests(MigratedDatabaseFixture fixture) : IClassFixture<MigratedDatabaseFixture>
+public sealed class DatabaseUnavailableTests(MigratedDatabaseFixture fixture, SqlServerEngine engine) : IClassFixture<MigratedDatabaseFixture>
 {
     private const string ServiceUnavailableType = "urn:yello:problem:service-unavailable";
 
@@ -64,7 +65,7 @@ public sealed class DatabaseUnavailableTests(MigratedDatabaseFixture fixture) : 
     /// with a uniform <c>503 application/problem+json</c> carrying <c>Retry-After</c>, byte-identical on
     /// two routes, and admits nothing. Anchor: with the database up, the same cookie is <c>204</c>.
     /// </summary>
-    [Fact(Skip = "red: AC14 - a failed revocation read escapes as an unhandled 500 (Task 5, Q11 (a), deferred-work.md:336)")]
+    [Fact]
     public async Task A_session_against_an_unreachable_database_is_a_uniform_503()
     {
         var connectionString = Available();
@@ -107,7 +108,7 @@ public sealed class DatabaseUnavailableTests(MigratedDatabaseFixture fixture) : 
     /// fresh key in memory and refuse the cookie as <c>401</c>, which would void every outstanding
     /// Session for the life of the process.
     /// </summary>
-    [Fact(Skip = "red: AC14/AC12 - the key ring is not loaded from the database, so a fresh process refuses as 401 (Task 5 interaction with Q7 (a))")]
+    [Fact]
     public async Task A_cold_start_that_cannot_load_the_key_ring_is_a_503_not_a_sign_out()
     {
         var connectionString = Available();
@@ -146,6 +147,52 @@ public sealed class DatabaseUnavailableTests(MigratedDatabaseFixture fixture) : 
     }
 
     /// <summary>
+    /// 1.10-SLC-016 - the revocation read itself failing: a Host that has already loaded its key ring
+    /// loses its database mid-process, and a Session it issued is answered with the same uniform
+    /// <c>503</c>, never the unhandled <c>500</c> of <c>deferred-work.md:336</c>. Anchor: the same cookie
+    /// was <c>204</c> moments before.
+    /// </summary>
+    /// <remarks>
+    /// <b>Why a database that goes away mid-process.</b> The key ring lives in the database (F1), so the
+    /// cases above fail while loading the ring and never reach the revocation read - which is the path
+    /// this case exists for (Task 5, "Interaction with Q7 (a)"). Taking a database of the class's own
+    /// offline reaches it over the wire.
+    /// </remarks>
+    [Fact]
+    public async Task A_revocation_read_against_a_database_that_went_away_is_the_same_503()
+    {
+        Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? string.Empty);
+
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var connectionString = await engine.CreateDatabaseAsync(cancellationToken);
+        var name = new SqlConnectionStringBuilder(connectionString).InitialCatalog;
+
+        try
+        {
+            await new RegistrationDatabase(connectionString).MigrateAsync(cancellationToken);
+
+            await using var host = await RunningHost.StartAsync(connectionString, new Dictionary<string, string>(StringComparer.Ordinal) { ["ClientOrigin"] = DeploymentHosts.ClientOrigin });
+
+            var session = new WireSession(host.Client);
+            await DeploymentHosts.RegisterAndSignInAsync(session, DeploymentHosts.RandomAddress());
+
+            Assert.Equal(HttpStatusCode.NoContent, (await session.CurrentSessionAsync()).StatusCode);
+
+            await SetOnlineAsync(name, online: false);
+
+            var current = await session.CurrentSessionAsync();
+            var spaces = await session.GetAsync(SpaceRoutes.Directory);
+
+            AssertUniformServiceUnavailable(current, spaces);
+        }
+        finally
+        {
+            await SetOnlineAsync(name, online: true);
+            await engine.DropDatabaseAsync(connectionString);
+        }
+    }
+
+    /// <summary>
     /// 1.10-SLC-014 - with the purge due, requests that touch no database (the anti-forgery token, the
     /// unmatched <c>/api</c> fallback, an unauthenticated <c>401</c>) claim no purge; a signed-in request
     /// claims exactly one, and the aged refusal record is deleted.
@@ -157,7 +204,7 @@ public sealed class DatabaseUnavailableTests(MigratedDatabaseFixture fixture) : 
     /// every column is non-nullable and supplied, <c>Capability</c> is the stored name of <c>Capability.ReadProjectsAndTasks</c> within <c>nvarchar(64)</c>, <c>Outcome</c> is 404 as <c>AccessRefusalRecorder</c> writes for a cross-Space refusal,
     /// <c>Kind</c> fits <c>nvarchar(32)</c> and is the stored name of <c>AccessRefusalKind.CrossSpace</c>.
     /// </remarks>
-    [Fact(Skip = "red: AC14 - the refusal purge is offered on every request, anonymous ones included (Task 5, Q13 (a), deferred-work.md:314)")]
+    [Fact]
     [Trait("Requirement", "AD-20")]
     public async Task Only_a_request_that_already_reached_the_database_starts_the_refusal_purge()
     {
@@ -203,7 +250,7 @@ public sealed class DatabaseUnavailableTests(MigratedDatabaseFixture fixture) : 
     /// <c>SessionsValidAfter</c>, is issued at <c>SessionsValidAfter</c> and admitted; the pre-sign-out
     /// ticket is still refused.
     /// </summary>
-    [Fact(Skip = "red: AC14 - sign-in stamps now, so a clock step back refuses the fresh Session (Task 5, Q12 (a), deferred-work.md:334)")]
+    [Fact]
     [Trait("Requirement", "FR-2")]
     public void A_sign_in_after_a_clock_step_back_is_issued_at_the_sign_out_instant_and_admitted()
     {
@@ -242,6 +289,23 @@ public sealed class DatabaseUnavailableTests(MigratedDatabaseFixture fixture) : 
         Assert.Equal(first.Body, second.Body);
         Assert.Equal(first.HeaderNames, second.HeaderNames);
         Assert.Equal(ServiceUnavailableType, JsonSerializer.Deserialize<JsonElement>(first.Body, JsonOptions).GetProperty("type").GetString());
+    }
+
+    private async Task SetOnlineAsync(string database, bool online)
+    {
+        var server = await engine.ServerConnectionStringAsync(TestContext.Current.CancellationToken);
+
+        await using var connection = new SqlConnection(server);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+
+        await using var command = connection.CreateCommand();
+#pragma warning disable CA2100 // Review SQL queries - the name is the engine's own yello_{guid:N}; no input reaches it.
+        command.CommandText = online
+            ? $"ALTER DATABASE [{database}] SET ONLINE"
+            : $"ALTER DATABASE [{database}] SET OFFLINE WITH ROLLBACK IMMEDIATE";
+#pragma warning restore CA2100
+
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 
     private static async Task<Guid> SeedAgedRefusalAsync(string connectionString)
