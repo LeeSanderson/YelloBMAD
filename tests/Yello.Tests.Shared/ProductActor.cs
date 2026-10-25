@@ -44,6 +44,8 @@ public sealed class ProductActor
 
     private readonly List<string> _taskTitles = [];
 
+    private readonly List<string> _labelNames = [];
+
     private ProductActor(WireSession session, WireSession script)
     {
         Session = session;
@@ -115,7 +117,7 @@ public sealed class ProductActor
         Password,
         TokenPlaintext,
         SessionCookieValue,
-        .. new[] { SpaceName }.Concat(_otherSpaceNames).Concat(_projectNames).Concat(_taskTitles)
+        .. new[] { SpaceName }.Concat(_otherSpaceNames).Concat(_projectNames).Concat(_taskTitles).Concat(_labelNames)
             .SelectMany(name => new[] { name, JsonEncodedText.Encode(name, JavaScriptEncoder.Default).ToString() }),
     ];
 
@@ -155,6 +157,18 @@ public sealed class ProductActor
         ArgumentException.ThrowIfNullOrEmpty(taskTitle);
 
         _taskTitles.Add(taskTitle);
+    }
+
+    /// <summary>
+    /// Adds the name of a Label this actor defined to <see cref="Secrets"/>, so the log check looks for it too: a Label
+    /// name is Space content and never belongs in a log (I-17, AR-34). Added by the story 2.4 ATDD run (Task 5).
+    /// </summary>
+    /// <param name="labelName">The Label's name.</param>
+    public void HoldsLabelNamed(string labelName)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(labelName);
+
+        _labelNames.Add(labelName);
     }
 
     /// <summary>

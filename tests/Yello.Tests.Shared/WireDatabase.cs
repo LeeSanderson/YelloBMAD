@@ -158,6 +158,60 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// Every Label in <paramref name="spaceId"/>, as (id, name), read under that Space's own key - the database's view,
+    /// independent of the Host's query filter. Added by the story 2.4 ATDD run; the columns are the ones story 2.4 Task 3
+    /// names (<c>dbo.[Label].Id</c>, <c>SpaceId</c>, <c>Name</c>). The table does not exist until 2.4's migration, so only
+    /// pending rows call this.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>Its Labels.</returns>
+    public async Task<IReadOnlyList<(Guid Id, string Name)>> LabelsInAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT Id, Name FROM dbo.[Label] WHERE SpaceId = @space";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+
+        var labels = new List<(Guid Id, string Name)>();
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            labels.Add((reader.GetGuid(0), reader.GetString(1)));
+        }
+
+        return labels;
+    }
+
+    /// <summary>
+    /// Every Label application in <paramref name="spaceId"/>, as (Task, Label), read under that Space's own key. Added by
+    /// the story 2.4 ATDD run; <c>dbo.[TaskLabel]</c> as story 2.4 Task 3 shapes it. Only pending rows call this.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>Its applications.</returns>
+    public async Task<IReadOnlyList<(Guid TaskId, Guid LabelId)>> ApplicationsInAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT TaskId, LabelId FROM dbo.[TaskLabel] WHERE SpaceId = @space";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+
+        var applications = new List<(Guid TaskId, Guid LabelId)>();
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            applications.Add((reader.GetGuid(0), reader.GetGuid(1)));
+        }
+
+        return applications;
+    }
+
+    /// <summary>
     /// A second Space owned by <paramref name="accountId"/>: the <c>Space</c> row, then its Owner
     /// <c>Membership</c>, under that Space's key (no endpoint creates a Space yet).
     /// </summary>

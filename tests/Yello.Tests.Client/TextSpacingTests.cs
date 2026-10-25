@@ -143,6 +143,67 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
         }
     }
 
+    /// <summary>
+    /// Story 2.4, AC13, UX-DR40, <c>deferred-work.md:20</c>'s convention that every new surface adds its own case: a Task
+    /// card carrying four long Labels (its metadata row wrapped), and the Labels section of Space settings, under 1.4.12
+    /// text spacing and 200% text-only zoom - no chip text clipped or overlapped, no sideways page scroll. Anchored: a
+    /// chip, or the Label list, is on screen before the check runs. Written red by the story 2.4 ATDD run; the locators
+    /// are its assumptions (<c>.label-chip</c>, Q7's <c>/spaces/{id}/settings</c>).
+    /// </summary>
+    /// <param name="onSettings">Whether the surface is Space settings (otherwise the Board's labelled card).</param>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = "red: AC13 - no Label chips or Labels surface yet (story 2.4 Tasks 10-11)")]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    [Trait("Requirement", "UX-DR40")]
+    public async Task Text_spacing_and_text_only_zoom_clip_no_Label_chip(bool onSettings, bool zoom)
+    {
+        var api = Seeded();
+        var names = Enumerable.Range(1, 4).Select(index => $"A rather long Label name, number {index}").ToList();
+        var labels = names.Select((name, index) => new FakeLabel(Guid.NewGuid(), name, Yello.Tests.Shared.LabelScaffold.PaletteKeys[index])).ToList();
+        var (column, task) = api.FindTask(api.Boards[(Northwind, Atlas)].Columns[0].Tasks[0].Id)!.Value;
+
+        api.Labels[Northwind] = labels;
+        column.Tasks[0] = task with { LabelIds = [.. labels.OrderBy(label => label.Name, StringComparer.OrdinalIgnoreCase).Select(label => label.Id)] };
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, onSettings ? $"spaces/{Northwind:D}/settings" : $"spaces/{Northwind:D}/projects/{Atlas:D}").ToString());
+
+            var anchor = onSettings
+                ? page.Locator("main li", new PageLocatorOptions { HasText = names[0] }).First
+                : page.Locator(".task-card .label-chip").First;
+
+            await anchor.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+            var overlappingChips = await page.EvaluateAsync<int>(
+                """
+                () => {
+                    let overlaps = 0;
+                    for (const row of document.querySelectorAll('.task-card__meta')) {
+                        const chips = [...row.querySelectorAll('.label-chip')].map(chip => chip.getBoundingClientRect());
+                        for (let a = 0; a < chips.length; a++)
+                            for (let b = a + 1; b < chips.length; b++)
+                                if (chips[a].left < chips[b].right - 1 && chips[b].left < chips[a].right - 1 && chips[a].top < chips[b].bottom - 1 && chips[b].top < chips[a].bottom - 1) overlaps++;
+                    }
+                    return overlaps;
+                }
+                """);
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+            Assert.Equal(0, overlappingChips);
+        }
+    }
+
     private static FakeYelloApi Seeded()
     {
         var api = new FakeYelloApi { SignedIn = true };

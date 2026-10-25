@@ -99,8 +99,8 @@ internal sealed record BoundaryNotFound() : Expectation("404 = the absent-Space 
 
         foreach (var (path, anchorPath) in request.Paths)
         {
-            var anchor = await request.Actor.SendAsync(surface, request.Method, anchorPath);
-            var answer = await request.Actor.SendAsync(surface, request.Method, path);
+            var anchor = await request.SendAnchorAsync(surface, anchorPath);
+            var answer = await request.SendAsync(surface, path);
 
             Assert.Equal(HttpStatusCode.NotFound, answer.StatusCode);
             AssertSameBytes(anchor, answer, path);
@@ -169,8 +169,8 @@ internal sealed record SameAsAnchor(HttpStatusCode Status, string? ExpectedType 
 
         foreach (var (path, anchorPath) in request.Paths)
         {
-            var anchor = await request.Actor.SendAsync(surface, request.Method, anchorPath);
-            var answer = await request.Actor.SendAsync(surface, request.Method, path);
+            var anchor = await request.SendAnchorAsync(surface, anchorPath);
+            var answer = await request.SendAsync(surface, path);
 
             Assert.Equal(Status, answer.StatusCode);
             AssertSameBytes(anchor, answer, path);
@@ -199,7 +199,7 @@ internal sealed record Served(HttpStatusCode Status, Func<IsolationWorld, CaseRe
     {
         foreach (var (path, _) in request.Paths)
         {
-            var answer = await request.Actor.SendAsync(surface, request.Method, path);
+            var answer = await request.SendAsync(surface, path);
 
             Assert.True(Status == answer.StatusCode, $"{path}: {answer.StatusCode} {answer.Body}");
             await Check(world, request, answer);
@@ -392,7 +392,7 @@ internal sealed record RoleRefused(string Capability) : Expectation("403 insuffi
 
         foreach (var (path, _) in request.Paths)
         {
-            var answer = await request.Actor.SendAsync(surface, request.Method, path);
+            var answer = await request.SendAsync(surface, path);
 
             Assert.True(answer.StatusCode == HttpStatusCode.Forbidden, $"{path}: {answer.StatusCode} {answer.Body}");
 

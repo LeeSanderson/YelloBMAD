@@ -363,6 +363,120 @@ internal static class IsolationCases
             ViewerEditsATaskAsync,
             Both(new RoleRefused("manage-tasks") { Then = TheViewersTaskIsUnchangedAsync })),
 
+        // Story 2.4 - the Label routes and the Task PATCH carrying labelIds (AC8, AC9, Task 8), each on both surfaces,
+        // pending until the dev phase maps them. The route constants are LabelScaffold's until Yello.Contracts holds
+        // LabelRoutes. Seeded through the product; every Label name a case writes is added to its owner's secrets.
+        new(
+            "ISO-LIST-LABELS-FOREIGN-SPACE", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, LabelScaffold.Labels,
+            async world =>
+            {
+                _ = await SeedLabelAsync(world.B);
+
+                return await ForeignAsync(world, LabelScaffold.LabelsOf);
+            },
+            Both(new BoundaryNotFound()),
+            PendingUntil: "2.4",
+            PendingReason: "GET /spaces/{spaceId}/labels is mapped by story 2.4 Task 5"),
+
+        new(
+            "ISO-LIST-LABELS-OWN-SPACE", "I-3", IsolationVector.Listing, HttpMethod.Get, LabelScaffold.Labels,
+            async world =>
+            {
+                _ = await SeedLabelAsync(world.A);
+                _ = await SeedLabelAsync(world.B);
+
+                return await OwnAsync(world, LabelScaffold.LabelsOf(world.A.SpaceId));
+            },
+            Both(new Served(HttpStatusCode.OK, ListsExactlyTheCallersLabelsAsync, "200, exactly SA's Label ids, none of SB's ids or names")),
+            PendingUntil: "2.4",
+            PendingReason: "GET /spaces/{spaceId}/labels is mapped by story 2.4 Task 5"),
+
+        new(
+            "ISO-CREATE-LABEL-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, LabelScaffold.Labels,
+            async world =>
+            {
+                _ = await SeedLabelAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Post,
+                    [new(LabelScaffold.LabelsOf(world.B.SpaceId), LabelScaffold.LabelsOf(Guid.NewGuid()))],
+                    world.B.SpaceId,
+                    Body: CaseLabelDefinition);
+            },
+            Both(new BoundaryNotFound { Then = NoLabelWrittenInEitherSpaceAsync }),
+            PendingUntil: "2.4",
+            PendingReason: "POST /spaces/{spaceId}/labels is mapped by story 2.4 Task 5; the body is a valid definition, so a write that landed would carry ProductActor.CaseBodyText"),
+
+        new(
+            "ISO-DELETE-LABEL-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Delete, LabelScaffold.Label,
+            async world =>
+            {
+                var foreign = await SeedLabelAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Delete,
+                    [new(LabelScaffold.LabelOf(world.B.SpaceId, foreign), LabelScaffold.LabelOf(Guid.NewGuid(), foreign))],
+                    world.B.SpaceId);
+            },
+            Both(new BoundaryNotFound { Then = TheForeignLabelIsStillPresentAsync }),
+            PendingUntil: "2.4",
+            PendingReason: "DELETE /spaces/{spaceId}/labels/{labelId} is mapped by story 2.4 Task 5"),
+
+        new(
+            "ISO-LABEL-FOREIGN-ID-IN-OWN-SPACE", "I-1, I-13", IsolationVector.DeepLink, HttpMethod.Delete, LabelScaffold.Label,
+            async world =>
+            {
+                var foreign = await SeedLabelAsync(world.B);
+
+                // Only the Label's own query filter and FILTER predicate stand between A and B's Label: the dev phase
+                // plants the drop of both (the row fails on both surfaces), then each alone (green) - story Task 8.
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Delete,
+                    [new(LabelScaffold.LabelOf(world.A.SpaceId, foreign), LabelScaffold.LabelOf(world.A.SpaceId, Guid.NewGuid()))],
+                    TargetSpaceId: null);
+            },
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheForeignLabelIsStillPresentAsync }),
+            PendingUntil: "2.4",
+            PendingReason: "DELETE /spaces/{spaceId}/labels/{labelId} is mapped by story 2.4 Task 5; the two-layer plant is Task 8's"),
+
+        new(
+            "ISO-APPLY-FOREIGN-LABEL", "I-2, I-13", IsolationVector.Write, HttpMethod.Patch, TaskRoutes.Task,
+            async world =>
+            {
+                var (_, own) = await SeedProjectWithTaskAsync(world.A);
+                var foreign = await SeedLabelAsync(world.B);
+                var path = TaskRoutes.TaskOf(world.A.SpaceId, own);
+
+                // The foreign id is in the body, not the path: the anchor is the same Task with a random Label id.
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Patch,
+                    [new(path, path)],
+                    TargetSpaceId: null,
+                    Body: () => LabelIdsBody(foreign),
+                    AnchorBody: () => LabelIdsBody(Guid.NewGuid()));
+            },
+            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: LabelScaffold.InvalidTaskLabels) { Then = NoLabelAppliedInEitherSpaceAsync }),
+            PendingUntil: "2.4",
+            PendingReason: "PATCH /spaces/{spaceId}/tasks/{taskId} reads labelIds from story 2.4 Task 5 on; today it ignores the member"),
+
+        new(
+            "ISO-RECORD-KIND-LABEL-DEFINE-MEMBER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Post, LabelScaffold.Labels,
+            MemberDefinesALabelAsync,
+            Both(new RoleRefused("manage-labels") { Then = NoLabelInTheActorsSpaceAsync }),
+            PendingUntil: "2.4",
+            PendingReason: "POST /spaces/{spaceId}/labels is mapped by story 2.4 Task 5 with ManageLabels"),
+
+        new(
+            "ISO-RECORD-KIND-LABEL-APPLY-VIEWER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Patch, TaskRoutes.Task,
+            ViewerClearsALabelAsync,
+            Both(new RoleRefused("manage-tasks") { Then = TheViewersLabelIsStillAppliedAsync }),
+            PendingUntil: "2.4",
+            PendingReason: "the Viewer's seeded application needs story 2.4's Label routes and labelIds member (Task 5)"),
+
         new(
             "ISO-TIMING-BOUNDARY", "I-6", IsolationVector.Timing, HttpMethod.Get, SpaceRoutes.Active,
             world => ForeignAsync(world, SpaceRoutes.ActiveOf),
@@ -643,6 +757,141 @@ internal static class IsolationCases
     }
 
     /// <summary>
+    /// Defines a Label in <paramref name="owner"/>'s Personal Space through the product (story 2.4's route), named
+    /// uniquely for this call and added to the owner's secrets (I-17: a Label name is Space content).
+    /// </summary>
+    /// <param name="owner">The actor.</param>
+    /// <returns>The Label's id.</returns>
+    private static async Task<Guid> SeedLabelAsync(ProductActor owner)
+    {
+        var name = $"Label {Guid.NewGuid():N}"[..30];
+
+        owner.HoldsLabelNamed(name);
+
+        var created = await owner.SendAsync(
+            IsolationSurface.Session,
+            HttpMethod.Post,
+            LabelScaffold.LabelsOf(owner.SpaceId),
+            JsonContent.Create(new { name, colour = LabelScaffold.PaletteKeys[0] }, options: JsonOptions),
+            headers: null);
+
+        Assert.True(created.StatusCode == HttpStatusCode.Created, $"Seeding a Label through the product: {created.StatusCode} {created.Body}");
+
+        using var document = JsonDocument.Parse(created.Body);
+
+        return document.RootElement.GetProperty("id").GetGuid();
+    }
+
+    /// <summary>
+    /// A valid Label definition whose name is <see cref="ProductActor.CaseBodyText"/>, so a Label written by a refused
+    /// request would carry it.
+    /// </summary>
+    private static HttpContent CaseLabelDefinition() =>
+        JsonContent.Create(new { name = ProductActor.CaseBodyText, colour = LabelScaffold.PaletteKeys[0] }, options: JsonOptions);
+
+    /// <summary>
+    /// A Task edit naming exactly <paramref name="labelIds"/> (story 2.4 Q1 (a)).
+    /// </summary>
+    private static HttpContent LabelIdsBody(params Guid[] labelIds) =>
+        JsonContent.Create(new { labelIds }, options: JsonOptions);
+
+    /// <summary>
+    /// A fresh Account demoted to Member in its own Personal Space, so its Session and its Token both hold exactly the
+    /// Member Role there; the request is a valid Label definition in it. Story 2.4.
+    /// </summary>
+    private static async Task<CaseRequest> MemberDefinesALabelAsync(IsolationWorld world)
+    {
+        var member = await world.NewActorAsync("Ml");
+
+        await world.Database.ChangeRoleAsync(member.SpaceId, member.AccountId, "member");
+
+        var path = LabelScaffold.LabelsOf(member.SpaceId);
+
+        return new CaseRequest(member, HttpMethod.Post, [new(path, path)], member.SpaceId, Body: CaseLabelDefinition);
+    }
+
+    /// <summary>
+    /// A fresh Account with a Project, a Task and a Label applied to it in its own Personal Space, then demoted to Viewer
+    /// there; the request clears the Task's Labels (<c>labelIds: []</c>), so an edit that landed would remove the
+    /// application. Story 2.4.
+    /// </summary>
+    private static async Task<CaseRequest> ViewerClearsALabelAsync(IsolationWorld world)
+    {
+        var viewer = await world.NewActorAsync("Vl");
+        var (_, taskId) = await SeedProjectWithTaskAsync(viewer);
+        var labelId = await SeedLabelAsync(viewer);
+        var path = TaskRoutes.TaskOf(viewer.SpaceId, taskId);
+
+        var applied = await viewer.SendAsync(IsolationSurface.Session, HttpMethod.Patch, path, LabelIdsBody(labelId), headers: null);
+
+        Assert.True(applied.StatusCode == HttpStatusCode.OK, $"Applying a Label through the product: {applied.StatusCode} {applied.Body}");
+
+        await world.Database.ChangeRoleAsync(viewer.SpaceId, viewer.AccountId, "viewer");
+
+        return new CaseRequest(viewer, HttpMethod.Patch, [new(path, path)], viewer.SpaceId, Body: () => LabelIdsBody());
+    }
+
+    /// <summary>
+    /// B's Space holds Labels (the anchor: the seed landed), and no Label in either Space carries the refused request's
+    /// name. Story 2.4.
+    /// </summary>
+    private static async Task NoLabelWrittenInEitherSpaceAsync(IsolationWorld world, CaseRequest request)
+    {
+        var theirs = await world.Database.LabelsInAsync(world.B.SpaceId);
+        var own = await world.Database.LabelsInAsync(world.A.SpaceId);
+
+        Assert.NotEmpty(theirs);
+        Assert.DoesNotContain(theirs.Concat(own), label => string.Equals(label.Name, ProductActor.CaseBodyText, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The Label the refused request named - the last segment of its path - is still in B's Space. Story 2.4.
+    /// </summary>
+    private static async Task TheForeignLabelIsStillPresentAsync(IsolationWorld world, CaseRequest request)
+    {
+        var named = Guid.Parse(request.Paths[0].Path.Split('/')[^1]);
+
+        Assert.Contains(await world.Database.LabelsInAsync(world.B.SpaceId), label => label.Id == named);
+    }
+
+    /// <summary>
+    /// Neither Space holds an application: A's Task took neither B's Label nor the random one, and B's Label is applied
+    /// nowhere. Anchored: B's Label exists. Story 2.4.
+    /// </summary>
+    private static async Task NoLabelAppliedInEitherSpaceAsync(IsolationWorld world, CaseRequest request)
+    {
+        Assert.NotEmpty(await world.Database.LabelsInAsync(world.B.SpaceId));
+        Assert.Empty(await world.Database.ApplicationsInAsync(world.A.SpaceId));
+        Assert.Empty(await world.Database.ApplicationsInAsync(world.B.SpaceId));
+    }
+
+    private static async Task NoLabelInTheActorsSpaceAsync(IsolationWorld world, CaseRequest request) =>
+        Assert.Empty(await world.Database.LabelsInAsync(request.Actor.SpaceId));
+
+    /// <summary>
+    /// The Viewer's Task still carries the Label seeded before the demotion. Story 2.4.
+    /// </summary>
+    private static async Task TheViewersLabelIsStillAppliedAsync(IsolationWorld world, CaseRequest request) =>
+        Assert.Single(await world.Database.ApplicationsInAsync(request.Actor.SpaceId));
+
+    /// <summary>
+    /// I-3 for Labels: A's list holds exactly A's Label ids, and none of B's ids or names - anchored both ways, since both
+    /// Spaces hold Labels. Story 2.4.
+    /// </summary>
+    private static async Task ListsExactlyTheCallersLabelsAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
+    {
+        var listed = Ids(answer.Body);
+        var own = await world.Database.LabelsInAsync(world.A.SpaceId);
+        var theirs = await world.Database.LabelsInAsync(world.B.SpaceId);
+
+        Assert.NotEmpty(own);
+        Assert.NotEmpty(theirs);
+        Assert.Equal(own.Select(label => label.Id).Order(), listed.Order());
+        Assert.Empty(listed.Intersect(theirs.Select(label => label.Id)));
+        Assert.All(theirs, label => Assert.DoesNotContain(label.Name, answer.Body, StringComparison.Ordinal));
+    }
+
+    /// <summary>
     /// I-3 with Board column counts: A's Board holds exactly A's Tasks of that Project, its column totals sum to
     /// their number, and none of B's Task ids or titles appear - anchored both ways, since both Spaces hold
     /// Tasks.
@@ -786,7 +1035,45 @@ internal enum CaseRunner
 /// <param name="Method">The method.</param>
 /// <param name="Paths">Each path and its anchor path.</param>
 /// <param name="TargetSpaceId">The Space in the route, for the refusal record; <c>null</c> when there is none.</param>
-internal sealed record CaseRequest(ProductActor Actor, HttpMethod Method, IReadOnlyList<CasePath> Paths, Guid? TargetSpaceId);
+/// <param name="Body">
+/// A body of the case's own for every path it sends, instead of <c>ProductActor</c>'s valid body; <c>null</c> keeps that
+/// one. A factory, because a sent <see cref="HttpContent"/> is spent. Added by the story 2.4 ATDD run: a Label definition
+/// needs a colour the default body lacks, and a <c>labelIds</c> edit is a body, not a path.
+/// </param>
+/// <param name="AnchorBody">
+/// The anchor's own body when it differs from <paramref name="Body"/> - the in-Space comparison for a foreign id carried
+/// in the body (<c>labelIds: [random]</c> against <c>labelIds: [LB]</c>) rather than in the path. Story 2.4.
+/// </param>
+internal sealed record CaseRequest(
+    ProductActor Actor,
+    HttpMethod Method,
+    IReadOnlyList<CasePath> Paths,
+    Guid? TargetSpaceId,
+    Func<HttpContent>? Body = null,
+    Func<HttpContent>? AnchorBody = null)
+{
+    /// <summary>
+    /// Sends <paramref name="path"/> as the case's actor on <paramref name="surface"/>, with the case's body if it has one.
+    /// </summary>
+    /// <param name="surface">The surface.</param>
+    /// <param name="path">The path.</param>
+    /// <returns>The answer.</returns>
+    public Task<WireResponse> SendAsync(IsolationSurface surface, string path) =>
+        Body is null
+            ? Actor.SendAsync(surface, Method, path)
+            : Actor.SendAsync(surface, Method, path, Body(), headers: null);
+
+    /// <summary>
+    /// Sends the anchor path, with the anchor's own body when the case gives one, otherwise as <see cref="SendAsync"/>.
+    /// </summary>
+    /// <param name="surface">The surface.</param>
+    /// <param name="anchorPath">The anchor path.</param>
+    /// <returns>The answer.</returns>
+    public Task<WireResponse> SendAnchorAsync(IsolationSurface surface, string anchorPath) =>
+        AnchorBody is null
+            ? SendAsync(surface, anchorPath)
+            : Actor.SendAsync(surface, Method, anchorPath, AnchorBody(), headers: null);
+}
 
 /// <summary>
 /// One path a case sends and the path its answer is compared with.

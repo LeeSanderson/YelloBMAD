@@ -372,6 +372,38 @@ Recent commits follow the cycle "Add story → Add ATDD scaffolds → implement 
 - `_bmad-output/implementation-artifacts/deferred-work.md:20, :32, :36, :103, :493, :509, :515`
 - `tests/TESTING-CONVENTIONS.md`
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+**Checklist:** `_bmad-output/test-artifacts/atdd-checklist-2-4-define-and-apply-labels.md` (scenario map, the Q-table the scaffolds rest on, seed constraints checked, full activation order). Scaffolded against the recommended Q1-Q14; if a decision differs, correct the scaffold first (`LabelScaffold` before anything) and record it. Entry run: `dotnet build Yello.slnx` 0 warnings, 0 errors; `dotnet test Yello.slnx` **920 total, 858 passed, 0 failed, 62 skipped** (+11 active, +59 skipped against 850/847/3).
+
+| File | Cases (entries) | ACs | State |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Labels.cs` | 28 (16) - LBL-001..016 | AC1, AC2, AC3, AC4, AC7, AC8, AC9, AC11 | skipped `red: AC<n>` |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.LabelsSchema.cs` | 6 (5) - SCH-001..005 | AC3, AC6 | skipped |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.LabelsRace.cs` | 3 - RACE-001..003 | AC10, AC11 | skipped |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.LabelsIdempotency.cs` | 8 (4) - IDM-001..004 | AC11 | skipped |
+| `tests/Yello.Tests.Slices/Tasks/LabelWire.cs` | harness | - | - |
+| `tests/Yello.Tests.Isolation/IsolationCases.cs` | 8 rows x 2 surfaces - the eight rows of the table above | AC8, AC9 | **pending on 2.4** (GATE-003: convert all eight before `review`) |
+| `tests/Yello.Tests.Isolation/Expectation.cs` | harness: `CaseRequest` gains optional `Body`/`AnchorBody`; existing rows unchanged | AC8 | active |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Labels.cs` | 7 - ARCH-001..007 | AC1, AC6, AC7, AC8, AC9, AC11 | skipped |
+| `tests/Yello.Tests.Architecture/CieDe2000.cs` + `LabelPaletteGateTests.cs` | 13 (13) - PAL-000 (8 published pairs), CIELAB endpoints, PAL-000-ORACLE, PAL-001..003 | AC4, AC12 | **10 green today** (the harness's known answers and the rule's oracle, a permanent plant); PAL-001..003 skipped |
+| `tests/Yello.Tests.Architecture/DesignFoundationGateTests.Labels.cs` | 4 - DSN-001..004 | AC5, AC13 | skipped |
+| `tests/Yello.Tests.Architecture/RefusalCopyTests.Labels.cs` | 6 (2) - COPY-001 (5 types), COPY-002 | AC9, AC11, AC14 | COPY-001 skipped; **COPY-002 green today** (the `manage-labels` copy exists) |
+| `tests/Yello.Tests.Client/LabelTests.cs` | 20 (15) - E2E-201..215 | AC1, AC2, AC3, AC5, AC7, AC13, AC14 | skipped |
+| `tests/Yello.Tests.Client/TextSpacingTests.cs` | 4 (1) - A11Y-001 | AC13 | skipped |
+| `tests/Yello.Tests.Client/FakeYelloApi.cs`, `tests/Yello.Tests.Shared/{LabelScaffold,ProductActor,WireDatabase}.cs` | harness (`LabelScaffold` is temporary - delete on activation) | - | active |
+
+**Green today, standing regression gates - leave active:** PAL-000 (CIEDE2000 against Sharma, Wu & Dalal 2005), the CIELAB endpoint check, PAL-000-ORACLE (the AC4 rule passes the story's eight fills and reports a fill at the accent, a fill at white, and an ink at `text-primary`), COPY-002. The palette table above was re-derived by the harness and matches exactly.
+
+**Activation order** (detail in the checklist):
+1. **RACE-002 first - the riskiest assumption**: an application racing a deletion that commits first answers `400 invalid-task-labels`, never `500`. It measures whether the edit's Label read under `UPDLOCK, HOLDLOCK` and the delete's Label-then-TaskLabel order can deadlock, and whether without the hint read-committed snapshot reads a deleted Label into a composite-FK `500`. Then RACE-001 (record whether the probe-hint plant is masked by the `NoAction` backstop), then RACE-003.
+2. Schema and wire shape: SCH-001..005, ARCH-002, ARCH-003 (remove the exclusion in `RefusalBoundaryGateTests.Tasks.cs:71`), ARCH-004, ARCH-005 and ARCH-006 (amend 2.3's two shape gates and both `TaskProperties` lists in the same change), ARCH-001.
+3. Slices: LBL-001, 015, 007, 008, 009, 010, 013, 014, 004, 005, 011, 012, 016, 002, 003, 006.
+4. Isolation rows, one at a time, ISO-LABEL-FOREIGN-ID-IN-OWN-SPACE with its two-layer plant; all eight live before `review`.
+5. IDM-001..004. 6. PAL-001..003 (with the named `--label-` exclusion in the three colour-count gates). 7. COPY-001, DSN-001..004. 8. ARCH-007, then E2E-201..215 and A11Y-001, correcting assumed locators and recording each.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

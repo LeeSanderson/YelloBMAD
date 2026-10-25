@@ -2,6 +2,7 @@ using System.Buffers.Text;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Playwright;
 using Yello.Contracts;
 using Yello.Contracts.ApiTokens;
@@ -9,6 +10,7 @@ using Yello.Contracts.Accounts;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
 using Yello.Contracts.Tasks;
+using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -57,6 +59,8 @@ internal sealed class FakeYelloApi
     private TaskEditHold? _taskEditHold;
     private TaskEditHold? _lastTaskEditHold;
     private TaskCompletionSource? _arrivedRename;
+    private TaskCompletionSource? _heldLabelCreate;
+    private TaskCompletionSource? _arrivedLabelCreate;
     private readonly TaskCompletionSource<FakeRequest> _signInSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<FakeRequest> _signOutSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -144,6 +148,13 @@ internal sealed class FakeYelloApi
     public (int Status, string ProblemType, string? Capability)? NextTaskEditRefusal { get; set; }
 
     /// <summary>
+    /// Each Space's Labels, as <c>GET …/labels</c> serves them, by name then id (story 2.4 Q12). Story 2.4 (written by
+    /// its ATDD run); the routes are <see cref="LabelScaffold"/>'s until <c>LabelRoutes</c> exists, and the bodies are
+    /// <see cref="FakeLabel"/>, shaped as story 2.4 Task 4's <c>LabelResponse</c>.
+    /// </summary>
+    public IDictionary<Guid, List<FakeLabel>> Labels { get; } = new Dictionary<Guid, List<FakeLabel>>();
+
+    /// <summary>
     /// Every request seen, in order.
     /// </summary>
     public IReadOnlyCollection<FakeRequest> Requests => _requests;
@@ -225,6 +236,24 @@ internal sealed class FakeYelloApi
     /// Lets a held rename answer go.
     /// </summary>
     public void ReleaseRename() => _heldRename?.TrySetResult();
+
+    /// <summary>
+    /// Holds the next Label definition (<c>POST …/labels</c>) until <see cref="ReleaseLabelCreate"/>, so a case can
+    /// assert the surface waits for the server (it needs the id). Story 2.4.
+    /// </summary>
+    /// <returns>A task that completes when the held definition has arrived and is waiting.</returns>
+    public Task HoldLabelCreateAsync()
+    {
+        _heldLabelCreate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _arrivedLabelCreate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        return _arrivedLabelCreate.Task;
+    }
+
+    /// <summary>
+    /// Lets a held Label definition go, applied as the Host applies it.
+    /// </summary>
+    public void ReleaseLabelCreate() => _heldLabelCreate?.TrySetResult();
 
     /// <summary>
     /// Holds the next Board answer for <paramref name="projectId"/> until <see cref="ReleaseBoard"/>. Story 2.2.
@@ -402,6 +431,16 @@ internal sealed class FakeYelloApi
                 && Guid.TryParse(path[(ApiTokenRoutes.List.Length + 1)..], out var revoked):
                 _ = ApiTokens.Remove(ApiTokens.FirstOrDefault(token => token.Id == revoked) ?? FakeApiToken.None);
                 return (noContent, string.Empty);
+
+            // Story 2.4 - the Space's Labels: list, define, delete.
+            case ("GET", var path) when TryLabels(path, out var labelSpace):
+                return (200, JsonSerializer.Serialize(LabelsIn(labelSpace), JsonOptions));
+
+            case ("POST", var path) when TryLabels(path, out var defineSpace):
+                return await DefineLabelAsync(defineSpace, request.Body).ConfigureAwait(false);
+
+            case ("DELETE", var path) when TryLabel(path, out var deleteSpace, out var deleted):
+                return DeleteLabel(deleteSpace, deleted);
 
             // Story 2.3 - one Task, read and edited by id.
             case ("GET", var path) when TryTask(path, out var readSpace, out var readTask):
@@ -681,10 +720,10 @@ internal sealed class FakeYelloApi
             return (404, Problem(ProblemTypes.NotAvailable));
         }
 
-        return Apply(found.Board, found.Column, found.Task, request.Body);
+        return Apply(found.Board, found.Column, found.Task, request.Body, LabelsIn(spaceId));
     }
 
-    private static (int Status, string Body) Apply(FakeBoard board, FakeColumn column, FakeTask task, string? body)
+    private static (int Status, string Body) Apply(FakeBoard board, FakeColumn column, FakeTask task, string? body, IReadOnlyList<FakeLabel> spaceLabels)
     {
         using var document = JsonDocument.Parse(string.IsNullOrEmpty(body) ? "{}" : body);
         var members = document.RootElement;
@@ -703,6 +742,20 @@ internal sealed class FakeYelloApi
         if (members.TryGetProperty("dueDate", out var dueValue))
         {
             edited = edited with { DueDate = dueValue.ValueKind == JsonValueKind.Null ? null : dueValue.GetDateTimeOffset().ToUniversalTime() };
+        }
+
+        // Story 2.4 Q1 (a): labelIds is the whole set; not an array is the edit's own refusal, and an id that is not a
+        // GUID, not one of the Space's Labels, or repeated is invalid-task-labels. Served in server order (Q12).
+        if (members.TryGetProperty("labelIds", out var labelsValue))
+        {
+            if (LabelsRefusal(labelsValue, spaceLabels) is { } refusal)
+            {
+                return (400, Problem(refusal));
+            }
+
+            var sent = labelsValue.EnumerateArray().Select(id => id.GetGuid()).ToList();
+
+            edited = edited with { LabelIds = [.. spaceLabels.Select(label => label.Id).Where(sent.Contains)] };
         }
 
         var destination = column;
@@ -733,6 +786,29 @@ internal sealed class FakeYelloApi
         }
 
         return (200, JsonSerializer.Serialize(edited, JsonOptions));
+    }
+
+    /// <summary>
+    /// The refusal a <c>labelIds</c> member earns, or <c>null</c>: not an array is the edit's own
+    /// <c>invalid-task-edit</c>; an element that is not a GUID, not one of the Space's Labels, or repeated is
+    /// <c>invalid-task-labels</c>. Story 2.4.
+    /// </summary>
+    private static string? LabelsRefusal(JsonElement value, IReadOnlyList<FakeLabel> spaceLabels)
+    {
+        if (value.ValueKind != JsonValueKind.Array)
+        {
+            return ProblemTypes.InvalidTaskEdit;
+        }
+
+        var sent = value.EnumerateArray()
+            .Select(id => id.ValueKind == JsonValueKind.String && id.TryGetGuid(out var labelId) ? labelId : Guid.Empty)
+            .ToList();
+
+        var valid = !sent.Contains(Guid.Empty)
+            && sent.Distinct().Count() == sent.Count
+            && sent.TrueForAll(id => spaceLabels.Any(label => label.Id == id));
+
+        return valid ? null : LabelScaffold.InvalidTaskLabels;
     }
 
     /// <summary>
@@ -769,6 +845,118 @@ internal sealed class FakeYelloApi
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The Space's Labels in server order: name (case-insensitively, as the database's collation compares), then id.
+    /// </summary>
+    private List<FakeLabel> LabelsIn(Guid spaceId) =>
+        Labels.TryGetValue(spaceId, out var labels)
+            ? [.. labels.OrderBy(label => label.Name, StringComparer.OrdinalIgnoreCase).ThenBy(label => label.Id)]
+            : [];
+
+    /// <summary>
+    /// The Host's Label definition as story 2.4 recommends it: a held definition waits for its release; then the name
+    /// rule (Q2: trimmed, 1-50), the palette (Q3) and uniqueness per Space ignoring case (Q2); then the Label is added.
+    /// </summary>
+    private async Task<(int Status, string Body)> DefineLabelAsync(Guid spaceId, string? body)
+    {
+        if (_heldLabelCreate is { } held)
+        {
+            _arrivedLabelCreate?.TrySetResult();
+            await held.Task.ConfigureAwait(false);
+            _heldLabelCreate = null;
+        }
+
+        using var document = JsonDocument.Parse(string.IsNullOrEmpty(body) ? "{}" : body);
+        var root = document.RootElement;
+        var name = (root.TryGetProperty("name", out var nameValue) && nameValue.ValueKind == JsonValueKind.String ? nameValue.GetString() ?? string.Empty : string.Empty).Trim();
+        var colour = root.TryGetProperty("colour", out var colourValue) && colourValue.ValueKind == JsonValueKind.String ? colourValue.GetString() ?? string.Empty : string.Empty;
+
+        if (name.Length < 1 || name.Length > LabelScaffold.NameMaxLength)
+        {
+            return (400, Problem(LabelScaffold.InvalidLabelName));
+        }
+
+        if (!LabelScaffold.PaletteKeys.Contains(colour, StringComparer.Ordinal))
+        {
+            return (400, Problem(LabelScaffold.InvalidLabelColour));
+        }
+
+        if (!Labels.TryGetValue(spaceId, out var labels))
+        {
+            labels = [];
+            Labels[spaceId] = labels;
+        }
+
+        if (labels.Exists(label => string.Equals(label.Name, name, StringComparison.OrdinalIgnoreCase)))
+        {
+            return (409, Problem(LabelScaffold.LabelNameTaken));
+        }
+
+        var created = new FakeLabel(Guid.NewGuid(), name, colour);
+
+        labels.Add(created);
+
+        return (201, JsonSerializer.Serialize(created, JsonOptions));
+    }
+
+    /// <summary>
+    /// The Host's Label deletion (story 2.4 AC3, Q11): absent is the not-found; applied to any Task in the Space is
+    /// <c>409 label-in-use</c>; otherwise gone.
+    /// </summary>
+    private (int Status, string Body) DeleteLabel(Guid spaceId, Guid labelId)
+    {
+        var labels = Labels.TryGetValue(spaceId, out var held) ? held : [];
+        var index = labels.FindIndex(label => label.Id == labelId);
+
+        if (index < 0)
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        var inUse = Boards
+            .Where(entry => entry.Key.SpaceId == spaceId)
+            .SelectMany(entry => entry.Value.Columns)
+            .SelectMany(column => column.Tasks)
+            .Any(task => task.LabelIds?.Contains(labelId) == true);
+
+        if (inUse)
+        {
+            return (409, Problem(LabelScaffold.LabelInUse));
+        }
+
+        labels.RemoveAt(index);
+
+        return (204, string.Empty);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="path"/> is <c>/api/v1/spaces/{s}/labels</c> - <see cref="LabelScaffold.LabelsOf"/>.
+    /// </summary>
+    private static bool TryLabels(string path, out Guid spaceId)
+    {
+        var prefix = SpaceRoutes.Directory + "/";
+
+        spaceId = Guid.Empty;
+
+        return path.StartsWith(prefix, StringComparison.Ordinal)
+            && Guid.TryParse(path[prefix.Length..].Split('/')[0], out spaceId)
+            && path == LabelScaffold.LabelsOf(spaceId);
+    }
+
+    /// <summary>
+    /// Whether <paramref name="path"/> is <c>/api/v1/spaces/{s}/labels/{l}</c> - <see cref="LabelScaffold.LabelOf"/>.
+    /// </summary>
+    private static bool TryLabel(string path, out Guid spaceId, out Guid labelId)
+    {
+        var segments = path.Split('/');
+
+        labelId = Guid.Empty;
+
+        return TryLabels(string.Join('/', segments[..^1]), out spaceId)
+            && Guid.TryParse(segments[^1], out labelId)
+            && path == LabelScaffold.LabelOf(spaceId, labelId);
     }
 
     private void ReleaseHeldEdit(TaskEditOutcome outcome) => _lastTaskEditHold?.Released.TrySetResult(outcome);
@@ -994,4 +1182,25 @@ internal sealed class FakeColumn(Guid statusId, string name, int total, List<Fak
 /// <param name="PositionKey">Its position key, readable and never writable.</param>
 /// <param name="CreatedAt">When it was created.</param>
 /// <param name="DueDate">Its due date in UTC, or <c>null</c> - story 2.3 Task 4's added field (AD-19).</param>
-internal sealed record FakeTask(Guid Id, string Title, Guid StatusId, string PositionKey, DateTimeOffset CreatedAt, DateTimeOffset? DueDate = null);
+/// <param name="LabelIds">
+/// Its Labels in server order - story 2.4 Task 4's added field (AD-19). <c>null</c> is left out of the body entirely, so
+/// every case written before 2.4 is served the bytes it always was; a Labels edit always sets it (<c>[]</c> when
+/// cleared).
+/// </param>
+internal sealed record FakeTask(
+    Guid Id,
+    string Title,
+    Guid StatusId,
+    string PositionKey,
+    DateTimeOffset CreatedAt,
+    DateTimeOffset? DueDate = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<Guid>? LabelIds = null);
+
+/// <summary>
+/// One Label as the fake serves it - the shape of story 2.4 Task 4's <c>LabelResponse</c> (<c>{id, name, colour}</c>).
+/// Replace with the contract type on activation.
+/// </summary>
+/// <param name="Id">The Label's id.</param>
+/// <param name="Name">Its name.</param>
+/// <param name="Colour">Its palette key (Q3).</param>
+internal sealed record FakeLabel(Guid Id, string Name, string Colour);
