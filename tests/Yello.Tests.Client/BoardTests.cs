@@ -368,6 +368,38 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// AC14, UX-DR27 - the Role re-read on re-arrival is applied in place: a Member made a Viewer meanwhile
+    /// loses the open Task field and every create affordance, while the Board itself stays.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR27")]
+    public async Task A_Role_lowered_since_arrival_closes_the_open_Task_creation_on_re_arrival()
+    {
+        var api = TwoSpaces();
+        Seed(api, Northwind, Atlas, "Atlas", ["Already here"]);
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenBoardAsync(api, page, Northwind, Atlas);
+            await page.Locator(Card, new PageLocatorOptions { HasText = "Already here" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            await AddTaskControls(page).First.ClickAsync();
+            await page.Locator(Column).First.Locator("input[type='text']").FillAsync("Half typed");
+
+            api.Roles[Northwind] = "viewer";
+
+            await page.EvaluateAsync("path => Blazor.navigateTo(path)", ClientBoard(Northwind, Atlas));
+            await page.Locator(Column).First.Locator("input[type='text']").WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
+
+            Assert.Equal(0, await AddTaskControls(page).CountAsync());
+            Assert.Equal(1, await page.Locator(Card, new PageLocatorOptions { HasText = "Already here" }).CountAsync());
+        }
+    }
+
+    /// <summary>
     /// AC14, <c>deferred-work.md:481</c> - choosing the Space one is already in, in the switcher, does not drop an
     /// open Project create form on Space home or its text.
     /// </summary>

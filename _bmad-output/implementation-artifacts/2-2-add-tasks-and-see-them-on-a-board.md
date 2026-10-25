@@ -4,7 +4,7 @@ baseline_commit: 1395c0a5839c146b2fc95f999721f9ee54692cb2
 
 # Story 2.2: Add Tasks and see them on a Board
 
-Status: review
+Status: done
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-2-add-tasks-and-see-them-on-a-board`
@@ -322,6 +322,42 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1023-1057` (`status: final`
     - Leave `:471` and `:477` with 2.9, but note in `:471` that the Task count's lock is narrowed by the `SpaceId`-leading index.
   - [x] `sprint-status.yaml`: set `review` at the end of the dev phase. GATE-003 then fails if `ISO-TIMING-IN-SPACE` is still pending. That is the gate working.
   - [x] **Do not add review narration to source files.**
+
+### Review Findings
+
+Code review 2026-10-25 (commit range `f37b9b2..HEAD`; Blind Hunter, Edge Case Hunter, Acceptance Auditor). 31 raw findings, 27 after deduplication: 0 decision-needed, 12 patch, 5 defer, 10 dismissed.
+
+- [x] [Review][Patch] AC12 was only half held: a Space-scoped write declared `Task<IResult>` that answered `Results.Text`/`Bytes`/`File`/`Stream` passed ARCH-010 and was replayed with an empty body. `Capture` now refuses it, with a case and a bodiless anchor [Yello.Host/Spaces/IdempotentResponses.cs:118]
+- [x] [Review][Patch] A re-arrival whose Role re-read failed (network error, timeout, `503`) replaced the page and its open form with the refusal surface, which defeated AC14. Only a `404` refuses a re-arrival now [Yello.Client/Components/SpaceArrival.razor:151]
+- [x] [Review][Patch] An `HttpClient` timeout was taken for a purge, which left the Board as a skeleton for good and the Task field silent. A timeout is now a failure; only the purge token's own cancellation is silent (also Space home's Project list load) [Yello.Client/Components/BoardView.razor:224]
+- [x] [Review][Patch] Clicking "Add" removed the focused button, so focus fell to `<body>` during rapid entry. The buttons stay while a creation is out; a second submit and Cancel/Esc are ignored until it answers [Yello.Client/Components/TaskCreate.razor:47]
+- [x] [Review][Patch] The refusal and progress live regions were inserted with their text already in them, so they could go unannounced. They are now always present, and empty ones are visually hidden [Yello.Client/Components/TaskCreate.razor:43]
+- [x] [Review][Patch] A title typed while a creation was in flight was erased by its `201`. The field now clears only if it still holds the sent title [Yello.Client/Components/TaskCreate.razor:170]
+- [x] [Review][Patch] A `201` whose body could not be read dropped its `Idempotency-Key`, so a resend could create the Task twice. The key is kept until the created Task is read [Yello.Client/Components/TaskCreate.razor:130]
+- [x] [Review][Patch] A first arrival's heading-focus request outlived a refused page and could be claimed by a later page's heading. A refusal now discards it [Yello.Client/Components/SpaceArrival.razor:225]
+- [x] [Review][Patch] The not-found floor accepted any value up to about 24 days, and its comment said the wait holds no connection. It is capped at 2 s, falling back to the default with a startup problem, and the comment is corrected [Yello.Host/Spaces/NotAvailableFloor.cs:62]
+- [x] [Review][Patch] ISO-BOARD-AGGREGATE asserted only the sum of the column totals, against the Dev Notes' "each column's `Total`". It now asserts each column [tests/Yello.Tests.Isolation/IsolationCases.cs:569]
+- [x] [Review][Patch] AC14's Role half had no case. A browser case now lowers the Role between arrivals: the open Task field and every "+" go, and the Board stays. Planted (Role made sticky in `BoardView`): caught [tests/Yello.Tests.Client/BoardTests.cs:372]
+- [x] [Review][Patch] `GlossaryTableNames` was inserted between `Every_entity_configuration_reaches_the_model`'s documentation and its `[Fact]`, so the method's summary documented the field. It has moved above [tests/Yello.Tests.Architecture/PersistenceModelGateTests.cs:25]
+- [x] [Review][Defer] Position keys are safe only under the Tasks-per-Project bound's lock [Yello.Infrastructure/Persistence/TaskStore.cs:52]. Deferred to story 2.6, whose moves place keys without consulting the bound.
+- [x] [Review][Defer] Column totals and the Task list are separate reads that can disagree [Yello.Infrastructure/Persistence/BoardReader.cs:30]. Deferred to story 2.9, which pages the Board.
+- [x] [Review][Defer] The column count chip is a bare number to assistive technology [Yello.Client/Components/BoardColumn.razor:20]. Deferred to story 2.8, which owns the Board's accessible structure.
+- [x] [Review][Defer] The cold-load skeleton is always three columns [Yello.Client/Components/BoardView.razor:48]. Deferred to story 6.1, which makes Status sets configurable.
+- [x] [Review][Defer] "Board loaded." (AC15, `EXPERIENCE.md:279`) conflicts with `EXPERIENCE.md:390` "never on loading" [Yello.Client/Components/BoardView.razor:213]. Deferred to UX to reconcile.
+
+- [x] [Review][Decision] Full-suite flake in `SpaceBoundaryPipelineTests`' in-process duration cases. 3 of 4 full runs failed `A_missing_Space_and_a_Space_without_Membership_take_the_same_time_to_refuse` and/or `A_Token_mismatch_and_a_non_member_take_the_same_time_to_refuse`; Slices alone was green. Neither arm passes through `NotAvailableFloor`, and the in-process path is unchanged by 2.2. **Lee chose (b):** the class runs alone in `BoundaryDurationCollection` (`DisableParallelization = true`), as `IsolationTimingTests` does, with the method, the 21 samples and the 20% tolerance unchanged; failures already quote both medians. Afterwards: Slices alone green, then two consecutive full runs of 749 total, 746 passed, 0 failed, 3 skipped [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/SpaceBoundaryPipelineTests.cs:57]
+
+Dismissed (10):
+- A Task of unknown Status is placed in the first column: unreachable, because of the composite FK and the first-Status create.
+- Snapshot drift: `dotnet ef migrations has-pending-model-changes` reports none.
+- The pre-save idempotency check can fail every keyed write: Task 8 specified this fail-closed behaviour, and the suite is green.
+- Board-to-Board focus: no Board-to-Board link exists, and a keyed `BoardView` remounts.
+- Null JSON members: the server never sends them.
+- An empty effective set: every Space is seeded with three Statuses, and Epic 6 keeps at least one.
+- Zero-width-only titles: Q3 (a) uses the trimmed-length rule, as Project names do.
+- AC5's "+" in every column head: Q4 (b) decided this, and the UX ledger entry records it.
+- The second "Task added.": already in the ledger, owned by 2.8.
+- The Task 2 plant was "build red" but a test was built: the intent holds, because P8 was caught.
 
 ## Dev Notes
 
@@ -771,3 +807,6 @@ Not planted separately: the floor removed (the pre-floor measurement above is th
 ## Change Log
 
 - 2026-10-25 - Dev phase: Task table, create and Board routes on both surfaces, the Tasks-per-Project bound in the pipeline, the not-found floor (Q7), idempotency capture gates, the Board page with shared arrival, skip control and Project in the context bar; seven isolation rows live; ledger and conventions updated. Status to review.
+- 2026-10-25 - Code review: 31 raw findings, 27 unique; 12 patches applied (AC12's non-value body refused at capture, AC14's re-arrival keeps the page on a failed Role re-read and has its Role case, timeouts no longer read as purges, Task field focus, live regions, typed text and key retention, stale heading focus, floor cap, per-column aggregate assertion, a misplaced doc comment); 5 deferred (2.6, 2.9, 2.8, 6.1, UX); 10 dismissed. Status to done.
+- 2026-10-25 - Review follow-up: status back to in-progress. 3 of 4 full runs failed `SpaceBoundaryPipelineTests`' in-process duration cases (Slices alone green), and the reproduction was killed for low memory. The open item is in `deferred-work.md` (owner 2.2).
+- 2026-10-25 - Review follow-up, Lee's decision (b): `SpaceBoundaryPipelineTests` serialised in a `DisableParallelization` collection; Slices alone and two consecutive full runs green (749 / 746 passed / 0 failed / 3 skipped). Status to done.

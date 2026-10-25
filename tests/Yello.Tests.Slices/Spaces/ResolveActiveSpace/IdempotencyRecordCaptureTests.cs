@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Xunit;
 using Yello.Application.Spaces;
@@ -13,9 +14,10 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// setting reads as its remarks say.
 /// </summary>
 /// <remarks>
-/// No database: the record's check runs before any statement, and the context is never opened. The other
-/// two latent defects (a non-<c>IResult</c> handler, <c>Results.Created</c>) are held by the architecture
-/// suite's ARCH-009 and ARCH-010.
+/// No database: the record's check runs before any statement, and the context is never opened. A body the
+/// record cannot replay is refused by <c>IdempotentResponses.Capture</c> here; the other two latent defects
+/// (a non-<c>IResult</c> handler, <c>Results.Created</c>) are held by the architecture suite's ARCH-009 and
+/// ARCH-010.
 /// </remarks>
 [Trait("Suite", "Slices")]
 [Trait("Priority", "P0")]
@@ -48,8 +50,36 @@ public sealed class IdempotencyRecordCaptureTests
     }
 
     /// <summary>
+    /// AC12 - a success whose body is not a value (text, bytes, a file, a stream) is refused rather than
+    /// recorded with an empty body that every replay would answer.
+    /// </summary>
+    [Fact]
+    public void A_success_whose_body_the_record_cannot_replay_is_refused()
+    {
+        var refused = Assert.Throws<InvalidOperationException>(() => IdempotentResponses.Capture(
+            new DefaultHttpContext(),
+            "fingerprint",
+            Results.Text("created", statusCode: StatusCodes.Status201Created)));
+
+        Assert.Contains("cannot replay", refused.Message, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The anchor for <see cref="A_success_whose_body_the_record_cannot_replay_is_refused"/>: a success with
+    /// no body at all is recorded, as it is.
+    /// </summary>
+    [Fact]
+    public void A_success_with_no_body_is_recorded_without_one()
+    {
+        var record = IdempotentResponses.Capture(new DefaultHttpContext(), "fingerprint", Results.NoContent());
+
+        Assert.Equal(StatusCodes.Status204NoContent, record.StatusCode);
+        Assert.Equal(string.Empty, record.Body);
+    }
+
+    /// <summary>
     /// Q7 (a) - the floor defaults when unset, takes a whole number of milliseconds (0 turns it off), and
-    /// falls back to the default, saying why, on anything else.
+    /// falls back to the default, saying why, on anything else - a value above the longest floor included.
     /// </summary>
     /// <param name="configured">The configured value.</param>
     /// <param name="milliseconds">The floor read.</param>
@@ -61,6 +91,9 @@ public sealed class IdempotencyRecordCaptureTests
     [InlineData("0", 0, false)]
     [InlineData("-5", 50, true)]
     [InlineData("fast", 50, true)]
+    [InlineData("2000", 2000, false)]
+    [InlineData("2001", 50, true)]
+    [InlineData("2000000000", 50, true)]
     [Trait("Requirement", "AD-3")]
     public void The_not_found_floor_reads_whole_milliseconds_and_defaults_otherwise(string? configured, int milliseconds, bool problem)
     {

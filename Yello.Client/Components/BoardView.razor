@@ -221,9 +221,14 @@
                 await OnRefused.InvokeAsync(await SpaceWrites.ProblemOfAsync(response, token));
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             // The tab left this Space, or the Session ended: both purges have run.
+        }
+        catch (OperationCanceledException)
+        {
+            // The request timed out while the tab is still here: refuse rather than stay a skeleton.
+            await RefuseUnlessLeftAsync(generation);
         }
         catch (HttpRequestException)
         {

@@ -95,7 +95,7 @@ internal static class IdempotentResponses
     /// <b>What it can keep, and the rules that make that enough</b> (story 2.2, Task 8;
     /// <c>deferred-work.md:465-470</c>). The body is kept only from an <see cref="IValueHttpResult"/>, so a
     /// success is recorded faithfully only when the endpoint answers <c>Results.Json</c> or
-    /// <c>Results.Ok</c>; a handler declared to return anything but <see cref="IResult"/> is refused by the
+    /// <c>Results.Ok</c>, and a result that writes any other body is refused here rather than replayed empty; a handler declared to return anything but <see cref="IResult"/> is refused by the
     /// architecture suite (<c>Every_Space_scoped_state_changing_endpoint_answers_a_result_the_record_can_replay</c>),
     /// which also closes "a non-<see cref="IResult"/> is a <c>500</c> only when keyed".
     /// </para>
@@ -110,7 +110,10 @@ internal static class IdempotentResponses
     /// <param name="fingerprint">The request's fingerprint.</param>
     /// <param name="result">What the endpoint returned.</param>
     /// <returns>The record.</returns>
-    /// <exception cref="InvalidOperationException">The result is not an <see cref="IResult"/>.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// The result is not an <see cref="IResult"/>, or it writes a body that is not a value - text, bytes, a
+    /// file or a stream - which a replay would answer empty.
+    /// </exception>
     internal static RecordedResponse Capture(HttpContext httpContext, string fingerprint, object? result)
     {
         if (result is not IResult)
@@ -125,6 +128,15 @@ internal static class IdempotentResponses
 
         if (result is not IValueHttpResult { Value: { } value })
         {
+            // A result that writes a body of its own - text, bytes, a file, a stream - would be replayed
+            // empty, so it is refused rather than recorded wrongly (AC12). A bodiless one is kept as it is.
+            if (result is IContentTypeHttpResult or IFileHttpResult)
+            {
+                throw new InvalidOperationException(
+                    $"A Space-scoped endpoint answered an Idempotency-Key request with {result.GetType().Name}, "
+                    + "whose body the record cannot replay. Answer with Results.Json or Results.Ok.");
+            }
+
             return new RecordedResponse(fingerprint, status, ContentType: null, NullIfEmpty(location), string.Empty);
         }
 

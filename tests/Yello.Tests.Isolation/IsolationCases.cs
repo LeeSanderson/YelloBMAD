@@ -567,6 +567,10 @@ internal static class IsolationCases
         var listed = columns.SelectMany(column => column.GetProperty("tasks").EnumerateArray()).Select(task => task.GetProperty("id").GetGuid()).ToList();
 
         Assert.Equal(own.Count, columns.Sum(column => column.GetProperty("total").GetInt32()));
+
+        // Each column's own total, not just their sum: every Task is returned (Q6), so a total that also
+        // counted B's Tasks would exceed the column's listed Tasks.
+        Assert.All(columns, column => Assert.Equal(column.GetProperty("tasks").GetArrayLength(), column.GetProperty("total").GetInt32()));
         Assert.Equal(own.Select(task => task.Id).Order(), listed.Order());
         Assert.Empty(listed.Intersect(theirs.Select(task => task.Id)));
         Assert.All(theirs, task => Assert.DoesNotContain(task.Title, answer.Body, StringComparison.Ordinal));

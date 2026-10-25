@@ -48,6 +48,12 @@ internal static class NotAvailableFloor
     internal static TimeSpan Default { get; } = TimeSpan.FromMilliseconds(50);
 
     /// <summary>
+    /// The longest floor the setting accepts: a not-found held longer than this is a misconfiguration that
+    /// would pile requests up, not a timing defence.
+    /// </summary>
+    internal static TimeSpan Longest { get; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>
     /// Reads the configured floor.
     /// </summary>
     /// <param name="configured">The configured value, which may be absent.</param>
@@ -59,9 +65,16 @@ internal static class NotAvailableFloor
             return new FloorSetting(Default, Problem: null);
         }
 
-        return int.TryParse(configured, NumberStyles.None, CultureInfo.InvariantCulture, out var milliseconds)
-            ? new FloorSetting(TimeSpan.FromMilliseconds(milliseconds), Problem: null)
-            : new FloorSetting(Default, $"'{configured}' is not a whole number of milliseconds. Falling back to the default.");
+        if (!int.TryParse(configured, NumberStyles.None, CultureInfo.InvariantCulture, out var milliseconds))
+        {
+            return new FloorSetting(Default, $"'{configured}' is not a whole number of milliseconds. Falling back to the default.");
+        }
+
+        var floor = TimeSpan.FromMilliseconds(milliseconds);
+
+        return floor <= Longest
+            ? new FloorSetting(floor, Problem: null)
+            : new FloorSetting(Default, $"{milliseconds} ms is above the longest floor, {Longest.TotalMilliseconds} ms. Falling back to the default.");
     }
 
     /// <summary>
@@ -99,7 +112,8 @@ internal static class NotAvailableFloor
             if (remaining > TimeSpan.Zero)
             {
                 // Not the request's token: a client that disconnects does not get to learn the duration by
-                // cancelling, and the wait holds no lock and no connection.
+                // cancelling, and the wait holds no lock and no database connection
+                // (the unit of work has ended), though the client's request stays open for it.
                 await Task.Delay(remaining, clock, CancellationToken.None).ConfigureAwait(false);
             }
         }

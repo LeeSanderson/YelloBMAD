@@ -38,6 +38,14 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// <b>Seeded Memberships, on purpose</b> (<c>implementation-readiness-report-2026-08-22.md:964-968</c>):
 /// story 4.7 re-exercises the matrix through real Invitation and Role-change paths.
 /// </para>
+/// <para>
+/// <b>Alone, in a collection with parallelisation disabled</b> (<see cref="BoundaryDurationCollection"/>),
+/// as <c>IsolationTimingTests</c> is, so another class's load on the Slices engine cannot move one arm's
+/// samples and not the other's. Story 2.2 review, Lee's decision (b): after 2.2 added heavy parallel
+/// Slices work (4,999-Task seeds, lock-holding race cases), the in-process duration cases failed in 3 of 4
+/// full runs and passed when Slices ran alone. The method, its 21 samples and its 20% tolerance are
+/// unchanged, and a failure still quotes both medians (<c>verdict.Describe()</c>).
+/// </para>
 /// </remarks>
 [Trait("Suite", "Slices")]
 [Trait("Priority", "P0")]
@@ -46,6 +54,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 [Trait("Requirement", "AR-9")]
 [Trait("Requirement", "AR-10")]
 [Trait("Requirement", "AD-3")]
+[Collection(nameof(BoundaryDurationCollection))]
 public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     : IClassFixture<MigratedDatabaseFixture>
 {
@@ -549,3 +558,9 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
             };
     }
 }
+
+/// <summary>
+/// The Space boundary's in-process duration cases run alone - story 2.2 review, Lee's decision (b).
+/// </summary>
+[CollectionDefinition(nameof(BoundaryDurationCollection), DisableParallelization = true)]
+public sealed class BoundaryDurationCollection;

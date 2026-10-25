@@ -165,23 +165,35 @@
                 return;
             }
 
-            if (response.StatusCode != HttpStatusCode.Unauthorized)
+            if (response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                return;
+            }
+
+            // A re-arrival keeps the page it already has unless the Space itself is now refused: a
+            // failure that says nothing about the Space must not throw away what a person typed (AC14).
+            if (firstArrival || response.StatusCode == HttpStatusCode.NotFound)
             {
                 Refuse(await SpaceWrites.ProblemOfAsync(response, token));
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             // The tab left this Space, or the Session ended, while the answer was on its way. Both
             // purges have already run; there is nothing to render.
         }
+        catch (OperationCanceledException)
+        {
+            // The request timed out while the tab is still in this Space: a failure like any other.
+            RefuseUnlessLeft(token, firstArrival);
+        }
         catch (HttpRequestException)
         {
-            RefuseUnlessLeft(token);
+            RefuseUnlessLeft(token, firstArrival);
         }
         catch (JsonException)
         {
-            RefuseUnlessLeft(token);
+            RefuseUnlessLeft(token, firstArrival);
         }
     }
 
@@ -189,9 +201,10 @@
     /// Refuses this Space - unless the tab has already left it. This component is reused across
     /// Spaces, so a late failure about the departed Space would otherwise refuse the destination.
     /// </summary>
-    private void RefuseUnlessLeft(CancellationToken token)
+    private void RefuseUnlessLeft(CancellationToken token, bool firstArrival = true)
     {
-        if (!token.IsCancellationRequested)
+        // A failed re-arrival keeps the page and the Role it already has (AC14).
+        if (!token.IsCancellationRequested && firstArrival)
         {
             Refuse(problem: null);
         }
@@ -226,5 +239,9 @@
     {
         _refused = true;
         _problem = problem;
+
+        // A refused page renders no heading, so a first arrival's pending focus request would otherwise
+        // wait for - and be claimed by - an unrelated later page's heading.
+        HeadingFocus.ClaimRequest();
     }
 }

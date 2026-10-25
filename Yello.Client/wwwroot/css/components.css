@@ -773,3 +773,13 @@
     margin-block: 0;
     color: var(--text-muted);
 }
+
+/* An empty live region stays in the accessibility tree, so its next text is announced, but takes no
+   room in the form's flow. */
+.task-create__refusal:empty,
+.task-create__progress:empty {
+    position: absolute;
+    inset-inline: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+}

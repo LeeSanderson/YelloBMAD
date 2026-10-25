@@ -39,22 +39,16 @@
                Invalid="@(_titleMessage is not null)"
                FocusOnFirstRender="true" />
 
-    @if (_refusal is { } refusal)
-    {
-        <p class="task-create__refusal" role="status">@refusal</p>
-    }
+    @* Live regions present before their text changes, so each refusal and the progress line are announced. *@
+    <p class="task-create__refusal" role="status">@_refusal</p>
 
     <div class="task-create__actions">
-        @if (!_submitting)
-        {
-            <PrimaryButton>@Localizer["TaskAddSubmit"]</PrimaryButton>
-            <button type="button" class="button-secondary" @onclick="OnClose">@Localizer["TaskCancel"]</button>
-        }
+        @* Kept while a creation is out, so the control the person activated keeps focus; CreateAsync ignores
+           a second submit until the answer arrives. *@
+        <PrimaryButton>@Localizer["TaskAddSubmit"]</PrimaryButton>
+        <button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["TaskCancel"]</button>
 
-        @if (_submitting)
-        {
-            <p class="task-create__progress" role="status">@Localizer["TaskAdding"]</p>
-        }
+        <p class="task-create__progress" role="status">@(_submitting ? Localizer["TaskAdding"].Value : null)</p>
     </div>
 </form>
 
@@ -101,7 +95,10 @@
     public void Dispose() => _generation++;
 
     private Task KeyDownAsync(KeyboardEventArgs args) =>
-        args.Key == "Escape" && !_submitting ? OnClose.InvokeAsync() : Task.CompletedTask;
+        args.Key == "Escape" ? CancelAsync() : Task.CompletedTask;
+
+    // Not while a creation is out: closing would drop its confirmation, and the Task may already exist.
+    private Task CancelAsync() => _submitting ? Task.CompletedTask : OnClose.InvokeAsync();
 
     private async Task CreateAsync()
     {
@@ -115,31 +112,39 @@
         _refusal = null;
 
         var generation = _generation;
+        var token = ActiveSpace.Token;
+        var sent = _title;
 
-        var key = _unanswered is { } unanswered && string.Equals(unanswered.Title, _title, StringComparison.Ordinal)
+        var key = _unanswered is { } unanswered && string.Equals(unanswered.Title, sent, StringComparison.Ordinal)
             ? unanswered.Key
             : Guid.NewGuid().ToString("D");
 
-        _unanswered = new UnansweredCreate(_title, key);
+        _unanswered = new UnansweredCreate(sent, key);
 
         try
         {
-            using var answer = await Writes.SendAsync(HttpMethod.Post, TaskRoutes.CreateIn(SpaceId, ProjectId), new CreateTaskRequest(_title), key, ActiveSpace.Token);
+            using var answer = await Writes.SendAsync(HttpMethod.Post, TaskRoutes.CreateIn(SpaceId, ProjectId), new CreateTaskRequest(sent), key, token);
 
-            // In flight means the first use of this key has not finished: a resend must still reuse it.
-            if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
+            // In flight means the first use of this key has not finished, and a 201 whose body cannot be
+            // read was applied all the same: a resend of either must still reuse the key.
+            if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight && answer.StatusCode != HttpStatusCode.Created)
             {
                 _unanswered = null;
             }
 
             if (generation == _generation)
             {
-                await UseAnswerAsync(answer, generation);
+                await UseAnswerAsync(answer, generation, sent, token);
             }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way.
         }
         catch (OperationCanceledException)
         {
-            // The tab left this Space, or the Session ended, while the answer was on its way.
+            // Timed out with the tab still here: it may have been applied, so the key is kept for a resend.
+            _refusal = Localizer["SubmitFailed"];
         }
         catch (HttpRequestException)
         {
@@ -159,15 +164,22 @@
     /// The server's answer: the created Task to the Board, and the field emptied for the next; or the
     /// refusal, said where it was sent. A 401 is YelloApiHandler's.
     /// </summary>
-    private async Task UseAnswerAsync(SpaceWriteAnswer answer, int generation)
+    private async Task UseAnswerAsync(SpaceWriteAnswer answer, int generation, string sent, CancellationToken token)
     {
         switch (answer.StatusCode)
         {
             case HttpStatusCode.Created:
-                if (await answer.Response.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ActiveSpace.Token) is { } created
+                if (await answer.Response.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, token) is { } created
                     && generation == _generation)
                 {
-                    _title = string.Empty;
+                    _unanswered = null;
+
+                    // Emptied for the next only if nothing new was typed while this one was out.
+                    if (string.Equals(_title, sent, StringComparison.Ordinal))
+                    {
+                        _title = string.Empty;
+                    }
+
                     await OnCreated.InvokeAsync(created);
                 }
 

@@ -23,6 +23,17 @@ namespace Yello.Tests.Architecture;
 public sealed class PersistenceModelGateTests
 {
     /// <summary>
+    /// The entities whose CLR name differs from their Glossary table name, and only those. Story 2.2,
+    /// open question 1 (b): the Task's CLR type is <c>TaskItem</c>, because <c>Task</c> collides with
+    /// <c>System.Threading.Tasks.Task</c>; its table is <c>Task</c>. Convention would map it to
+    /// <c>Tasks</c>, from the <c>DbSet</c>, so the gate still tells an unapplied configuration apart.
+    /// </summary>
+    private static readonly Dictionary<Type, string> GlossaryTableNames = new()
+    {
+        [typeof(Yello.Domain.Tasks.TaskItem)] = "Task",
+    };
+
+    /// <summary>
     /// Every entity configuration in the assembly reaches the model.
     /// </summary>
     /// <remarks>
@@ -51,16 +62,6 @@ public sealed class PersistenceModelGateTests
     /// unapplied configuration gives <c>Accounts</c> where the Glossary says <c>Account</c>.
     /// </para>
     /// </remarks>
-    /// <summary>
-    /// The entities whose CLR name differs from their Glossary table name, and only those. Story 2.2,
-    /// open question 1 (b): the Task's CLR type is <c>TaskItem</c>, because <c>Task</c> collides with
-    /// <c>System.Threading.Tasks.Task</c>; its table is <c>Task</c>. Convention would map it to
-    /// <c>Tasks</c>, from the <c>DbSet</c>, so the gate still tells an unapplied configuration apart.
-    /// </summary>
-    private static readonly Dictionary<Type, string> GlossaryTableNames = new()
-    {
-        [typeof(Yello.Domain.Tasks.TaskItem)] = "Task",
-    };
     [Fact]
     public void Every_entity_configuration_reaches_the_model()
     {
