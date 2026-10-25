@@ -38,7 +38,7 @@ public sealed partial class TaskEndpointTests
     /// after the column's previous last key.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - no Task PATCH route and no locked key placement on a Status change yet (Task 6)")]
+    [Fact]
     [Trait("Requirement", "AD-15")]
     [Trait("Requirement", "AR-21")]
     public async Task An_edit_and_a_creation_into_one_column_take_distinct_keys()
@@ -99,7 +99,7 @@ public sealed partial class TaskEndpointTests
     /// the held column range, are both admitted with distinct keys after the column's previous last key.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - no Task PATCH route and no locked key placement on a Status change yet (Task 6)")]
+    [Fact]
     [Trait("Requirement", "AD-15")]
     [Trait("Requirement", "AR-21")]
     public async Task Two_edits_into_one_column_take_distinct_keys()
@@ -156,6 +156,84 @@ public sealed partial class TaskEndpointTests
         }
 
         AssertDistinctKeysAfter(await TaskRowsAsync(database, owner.SpaceId), [first, second], lastBefore);
+    }
+
+    /// <summary>
+    /// AC9, Task 6 - a Status edit reads its new column's last key only once the lock is its own: the test holds
+    /// the column, the edit queues, the test places a Task at the key after the column's last (what a creation
+    /// that has already read the last key would write) and commits, and the edit is admitted with a key after
+    /// the test's. An edit that read the last key without the lock would compute the test's key and collide on
+    /// the unique index - a <c>500</c>.
+    /// </summary>
+    /// <remarks>
+    /// Added by the dev phase: the two scaffolded race cases catch the hint's removal only by timing (one run in
+    /// three), because the edit's Project-wide read is serialised anyway by another writer's exclusive key
+    /// locks. This case makes the interleaving the test's.
+    /// </remarks>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AD-15")]
+    [Trait("Requirement", "AR-21")]
+    public async Task A_Status_edit_reads_the_last_key_of_its_new_column_only_under_the_lock()
+    {
+        var database = Available();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Actor? owner = null;
+        var moved = Guid.Empty;
+        var placed = Guid.NewGuid();
+        var lastBefore = string.Empty;
+        WireResponse? answer = null;
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            owner = await RegisterAsync(client, database);
+
+            var projectId = await CreateProjectAsync(owner, "Placed under the lock");
+            var statuses = await StatusesAsync(database, owner.SpaceId);
+            var resident = IdOf(await CreateTaskAsync(owner, owner.SpaceId, projectId, "Already done"));
+
+            Assert.Equal(HttpStatusCode.OK, (await EditTaskAsync(owner, owner.SpaceId, resident, Body(new { statusId = statuses[2].Id }))).StatusCode);
+
+            moved = IdOf(await CreateTaskAsync(owner, owner.SpaceId, projectId, "Finishing"));
+            lastBefore = LastKey(await TaskRowsAsync(database, owner.SpaceId), statuses[2].Id);
+
+            Assert.Equal(HttpStatusCode.OK, (await BoardAsync(owner, owner.SpaceId, projectId)).StatusCode);
+
+            await using var holder = await database.OpenForSpaceAsync(owner.SpaceId, cancellationToken);
+            await using var observer = await database.OpenWithoutSpaceContextAsync(cancellationToken);
+            await using var held = await holder.BeginTransactionAsync(cancellationToken);
+
+            await HoldColumnAsync(holder, held, projectId, statuses[2].Id, cancellationToken);
+
+            var racing = EditTaskAsync(owner, owner.SpaceId, moved, Body(new { statusId = statuses[2].Id }));
+
+            await WaitUntilBlockedOnALockAsync(observer, 1, racing, cancellationToken);
+
+            await using DbCommand place = holder.CreateCommand();
+
+            place.Transaction = held;
+            place.CommandText =
+                """
+                INSERT dbo.[Task] (Id, SpaceId, ProjectId, StatusId, Title, PositionKey, CreatedAt)
+                VALUES (@id, @space, @project, @status, N'Placed by the test', @key, SYSDATETIMEOFFSET())
+                """;
+            place.Parameters.Add(new SqlParameter("@id", placed));
+            place.Parameters.Add(new SqlParameter("@space", owner.SpaceId));
+            place.Parameters.Add(new SqlParameter("@project", projectId));
+            place.Parameters.Add(new SqlParameter("@status", statuses[2].Id));
+            place.Parameters.Add(new SqlParameter("@key", Yello.Domain.Tasks.PositionKey.After(lastBefore)));
+
+            Assert.Equal(1, await place.ExecuteNonQueryAsync(cancellationToken));
+
+            await held.CommitAsync(cancellationToken);
+
+            answer = await racing;
+        });
+
+        Assert.NotNull(owner);
+        Assert.True(answer?.StatusCode == HttpStatusCode.OK, $"{answer?.StatusCode} {answer?.Body}");
+
+        AssertDistinctKeysAfter(await TaskRowsAsync(database, owner.SpaceId), [moved, placed], lastBefore);
     }
 
     /// <summary>

@@ -51,6 +51,13 @@ public sealed class TaskItem
     public required string Title { get; set; }
 
     /// <summary>
+    /// When the Task is due, as an instant in UTC, or <c>null</c> when it has none (<c>prd.md:387</c>,
+    /// "optionally ... a due date"). Story 2.3; AR-34. Always a <see cref="DateTimeOffset"/> normalised by
+    /// <see cref="TaskDueDate.TryNormalise"/>, never a zone-less date.
+    /// </summary>
+    public DateTimeOffset? DueDate { get; set; }
+
+    /// <summary>
     /// Where the Task sits in its column (AD-15): ordered by ordinal comparison, unique within its
     /// (Project, Status), readable over the API and never writable through it.
     /// </summary>

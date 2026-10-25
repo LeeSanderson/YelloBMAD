@@ -13,6 +13,8 @@ using Yello.Application.Boards.ViewBoard;
 using Yello.Application.Spaces.ListSpaces;
 using Yello.Application.Statuses.ListStatuses;
 using Yello.Application.Tasks.CreateTask;
+using Yello.Application.Tasks.EditTaskAttributes;
+using Yello.Application.Tasks.ViewTask;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Localisation;
 using Yello.Host;
@@ -96,6 +98,8 @@ builder.Services.AddScoped<ListProjectsHandler>();
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<RenameProjectHandler>();
 builder.Services.AddScoped<CreateTaskHandler>();
+builder.Services.AddScoped<ViewTaskHandler>();
+builder.Services.AddScoped<EditTaskAttributesHandler>();
 builder.Services.AddScoped<ViewBoardHandler>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
@@ -379,6 +383,12 @@ api.MapRenameProject();
 // Board under the read capability every Role holds. Space-scoped on both surfaces.
 api.MapCreateTask();
 api.MapBoard();
+
+// One Task (story 2.3). GET and PATCH /api/v1/spaces/{spaceId}/tasks/{taskId} read it under the read
+// capability and edit its title, Status and due date under ManageTasks. No bound on the edit: it adds no
+// Task. Space-scoped on both surfaces; the URL never holds the Project (FR-41).
+api.MapViewTask();
+api.MapEditTask();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

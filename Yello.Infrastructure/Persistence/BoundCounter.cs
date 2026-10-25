@@ -20,6 +20,8 @@ namespace Yello.Infrastructure.Persistence;
 /// <b>The same lock serialises Task creation within a Project</b>, which the position key relies on:
 /// <c>TaskStore</c> reads the column's last key and appends after it, and no second creation in that
 /// Project can read the same last key while the first is uncommitted (story 2.2, open question 2 (a)).
+/// A Status change is the second writer that places a key, and <c>TaskStore.EditAsync</c> takes this same
+/// Project range before it does (story 2.3 Task 6), so an edit and a creation queue at one lock.
 /// </para>
 /// <para>
 /// <b>No <c>Where</c> on <c>SpaceId</c>.</b> The row-level security policy narrows the statement to

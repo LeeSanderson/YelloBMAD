@@ -209,6 +209,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC6 - a Task card's only content is its title (no badge, no count, no streak), and it carries no shadow.
+    /// Its one control, since story 2.3, is the title itself as the button that opens the Task.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -229,7 +230,11 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
 
             Assert.Equal("Draft the brief", (await card.TextContentAsync())?.Trim());
             Assert.Equal("none", await card.EvaluateAsync<string>("card => getComputedStyle(card).boxShadow"));
-            Assert.Equal(0, await card.Locator("button, a, [tabindex]").CountAsync());
+            // Widened by story 2.3 (open question 7 (a)): the card's one control is the native button that opens
+            // the Task detail panel, named by the title. Nothing else in the card is a control.
+            Assert.Equal(1, await card.Locator("button, a, [tabindex]").CountAsync());
+            Assert.Equal(1, await card.Locator("button[data-task-id]").CountAsync());
+            Assert.Equal(1, await card.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Draft the brief", Exact = true }).CountAsync());
         }
     }
 

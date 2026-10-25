@@ -28,4 +28,18 @@ public static class EffectiveStatusSet
 
         return [.. spaceDefaults.OrderBy(status => status.Position)];
     }
+
+    /// <summary>
+    /// Whether <paramref name="statusId"/> is one of an effective set - the one membership test every slice
+    /// that sets a Status makes (AD-17: no Task holds a Status outside its Project's effective set).
+    /// </summary>
+    /// <param name="effective">An effective set, as <see cref="Of"/> derived it.</param>
+    /// <param name="statusId">The Status a request asks for.</param>
+    /// <returns><c>true</c> when the set holds it.</returns>
+    public static bool Contains(IReadOnlyList<StatusDefinition> effective, Guid statusId)
+    {
+        ArgumentNullException.ThrowIfNull(effective);
+
+        return effective.Any(status => status.Id == statusId);
+    }
 }

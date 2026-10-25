@@ -1,23 +1,70 @@
+@using System.Globalization
+@using Yello.Client.Spaces
+@using Yello.Contracts.Tasks
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
 @*
-    ONE TASK ON THE BOARD - story 2.2, AC6; UX-DR8; DESIGN.md:137-144, :389-453.
+    ONE TASK ON THE BOARD - stories 2.2 and 2.3; UX-DR8; DESIGN.md:137-144, :389-453.
 
-    THE TITLE IS THE ONLY CONTENT. A metadata row in monospace sits beneath it and is empty in 2.2: Labels
-    (2.4), the Assignee (4.6) and Presence (Epic 7) fill it, so nothing stands in for them here - no
-    placeholder, no count, no badge, no streak (engagement is a counter-metric).
+    THE TITLE IS THE CARD'S CONTENT. A metadata row in monospace sits beneath it: the due date when there
+    is one (story 2.3), in the viewer's own locale and zone (UX-DR42); Labels (2.4), the Assignee (4.6) and
+    Presence (Epic 7) join it later. No placeholder, no count, no badge, no streak.
 
-    NOT A CONTROL YET. No click target (the detail panel is 2.3), not focusable (the keyboard grid is 2.8),
-    and no drag handle or Move control for any Role (2.7, 2.6). The card carries no shadow, declared
-    explicitly in components.css so nobody adds one back.
+    ONE CONTROL: the title is a native button that opens the Task detail panel (story 2.3, open question
+    7 (a)), named by the title and carrying data-task-id so the panel can return focus to it. Every Role
+    opens it - a Viewer reads the Task there (EXPERIENCE.md:199). It is one tab stop per card until story 2.8
+    converts the Board to its keyboard grid. No drag handle or Move control for any Role (2.7, 2.6). The card
+    carries no shadow, declared explicitly in components.css so nobody adds one back.
 *@
 
 <li class="task-card">
-    <p class="type-task-title task-card__title">@Title</p>
-    <div class="type-meta task-card__meta"></div>
+    <button type="button" class="task-card__open" data-task-id="@Item.Id.ToString("D", CultureInfo.InvariantCulture)" @onclick="OpenAsync" @ref="_open">
+        <span class="type-task-title task-card__title">@Item.Title</span>
+    </button>
+    <div class="type-meta task-card__meta">@DueText</div>
 </li>
 
 @code {
-    /// <summary>The Task's title, rendered as text.</summary>
+    private ElementReference _open;
+    private int _focusRequestsSeen;
+
+    /// <summary>The Task, as the Board's replica shows it now.</summary>
     [Parameter]
     [EditorRequired]
-    public string Title { get; set; } = string.Empty;
+    public TaskResponse Item { get; set; }
+
+    /// <summary>Raised with the Task's id when the card is opened.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnOpen { get; set; }
+
+    /// <summary>
+    /// Bumped by the Board to return focus to this card's control - when the panel it opened closes. Zero for
+    /// every card but the one being returned to.
+    /// </summary>
+    [Parameter]
+    public int FocusRequest { get; set; }
+
+    private string? DueText =>
+        Item.DueDate is { } due
+            ? string.Format(CultureInfo.CurrentCulture, Localizer["TaskDue"], TaskDates.DayAndMonth(due))
+            : null;
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (FocusRequest == _focusRequestsSeen)
+        {
+            return;
+        }
+
+        _focusRequestsSeen = FocusRequest;
+
+        if (FocusRequest > 0)
+        {
+            await _open.FocusAsync();
+        }
+    }
+
+    private Task OpenAsync() => OnOpen.InvokeAsync(Item.Id);
 }

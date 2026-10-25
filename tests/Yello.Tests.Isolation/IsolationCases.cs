@@ -297,12 +297,11 @@ internal static class IsolationCases
             ViewerCreatesATaskAsync,
             Both(new RoleRefused("manage-tasks") { Then = NoTaskWrittenByTheViewerAsync })),
 
-        // Story 2.3 - the by-id Task routes (AC8, Task 8), each on both surfaces, pending until the dev phase maps
-        // them. The route constant is TaskEditScaffold.Task until Yello.Contracts holds TaskRoutes.Task. A PATCH
+        // Story 2.3 - the by-id Task routes (AC8, Task 8), each on both surfaces. A PATCH
         // sends ProductActor's valid body, whose title is ProductActor.CaseBodyText, so a write that landed
         // anywhere would carry it.
         new(
-            "ISO-DIRECT-TASK", "I-1, I-13", IsolationVector.DirectIdentifier, HttpMethod.Get, TaskEditScaffold.Task,
+            "ISO-DIRECT-TASK", "I-1, I-13", IsolationVector.DirectIdentifier, HttpMethod.Get, TaskRoutes.Task,
             async world =>
             {
                 var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
@@ -313,12 +312,10 @@ internal static class IsolationCases
                     [new(TaskRoutes.TaskOf(world.B.SpaceId, foreign), TaskRoutes.TaskOf(Guid.NewGuid(), foreign))],
                     world.B.SpaceId);
             },
-            Both(new BoundaryNotFound()),
-            PendingUntil: "2.3",
-            PendingReason: "GET /spaces/{spaceId}/tasks/{taskId} is mapped by story 2.3 Task 5"),
+            Both(new BoundaryNotFound())),
 
         new(
-            "ISO-EDIT-TASK-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Patch, TaskEditScaffold.Task,
+            "ISO-EDIT-TASK-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Patch, TaskRoutes.Task,
             async world =>
             {
                 var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
@@ -329,12 +326,10 @@ internal static class IsolationCases
                     [new(TaskRoutes.TaskOf(world.B.SpaceId, foreign), TaskRoutes.TaskOf(Guid.NewGuid(), foreign))],
                     world.B.SpaceId);
             },
-            Both(new BoundaryNotFound { Then = NoTaskWrittenInEitherSpaceAsync }),
-            PendingUntil: "2.3",
-            PendingReason: "PATCH /spaces/{spaceId}/tasks/{taskId} is mapped by story 2.3 Task 5; a Token is admitted there, so it meets the boundary 404, not 401"),
+            Both(new BoundaryNotFound { Then = NoTaskWrittenInEitherSpaceAsync })),
 
         new(
-            "ISO-TASK-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5; deferred-work.md:485", IsolationVector.DeepLink, HttpMethod.Get, TaskEditScaffold.Task,
+            "ISO-TASK-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5; deferred-work.md:485", IsolationVector.DeepLink, HttpMethod.Get, TaskRoutes.Task,
             async world =>
             {
                 var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
@@ -347,12 +342,10 @@ internal static class IsolationCases
                     [new(TaskRoutes.TaskOf(world.A.SpaceId, foreign), TaskRoutes.TaskOf(world.A.SpaceId, Guid.NewGuid()))],
                     TargetSpaceId: null);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable)),
-            PendingUntil: "2.3",
-            PendingReason: "GET /spaces/{spaceId}/tasks/{taskId} is mapped by story 2.3 Task 5; the two-layer plant closes deferred-work.md:485"),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable))),
 
         new(
-            "ISO-EDIT-TASK-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Patch, TaskEditScaffold.Task,
+            "ISO-EDIT-TASK-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Patch, TaskRoutes.Task,
             async world =>
             {
                 var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
@@ -363,16 +356,12 @@ internal static class IsolationCases
                     [new(TaskRoutes.TaskOf(world.A.SpaceId, foreign), TaskRoutes.TaskOf(world.A.SpaceId, Guid.NewGuid()))],
                     TargetSpaceId: null);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = NoTaskWrittenInEitherSpaceAsync }),
-            PendingUntil: "2.3",
-            PendingReason: "PATCH /spaces/{spaceId}/tasks/{taskId} is mapped by story 2.3 Task 5"),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = NoTaskWrittenInEitherSpaceAsync })),
 
         new(
-            "ISO-RECORD-KIND-TASK-EDIT-VIEWER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Patch, TaskEditScaffold.Task,
+            "ISO-RECORD-KIND-TASK-EDIT-VIEWER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Patch, TaskRoutes.Task,
             ViewerEditsATaskAsync,
-            Both(new RoleRefused("manage-tasks") { Then = TheViewersTaskIsUnchangedAsync }),
-            PendingUntil: "2.3",
-            PendingReason: "PATCH /spaces/{spaceId}/tasks/{taskId} is mapped by story 2.3 Task 5"),
+            Both(new RoleRefused("manage-tasks") { Then = TheViewersTaskIsUnchangedAsync })),
 
         new(
             "ISO-TIMING-BOUNDARY", "I-6", IsolationVector.Timing, HttpMethod.Get, SpaceRoutes.Active,

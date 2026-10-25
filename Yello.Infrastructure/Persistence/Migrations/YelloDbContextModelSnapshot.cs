@@ -260,6 +260,9 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<DateTimeOffset?>("DueDate")
+                        .HasColumnType("datetimeoffset");
+
                     b.Property<string>("PositionKey")
                         .IsRequired()
                         .HasMaxLength(128)

@@ -61,6 +61,10 @@ internal sealed class TaskConfiguration(YelloDbContext context) : IEntityTypeCon
 
         builder.Property(task => task.CreatedAt).IsRequired();
 
+        // Optional (prd.md:387), and nullable is also what keeps story 2.3's migration expand-only: the
+        // revision still serving inserts Tasks without naming it. No index - sorting by due date is 2.10's.
+        builder.Property(task => task.DueDate).IsRequired(false);
+
         builder.HasOne<Project>()
             .WithMany()
             .HasForeignKey(task => new { task.SpaceId, task.ProjectId })

@@ -89,7 +89,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// and neither the address nor <c>document.title</c> changes.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the Task detail panel does not exist yet (Task 9; Q6, Q7)")]
+    [Fact]
     [Trait("Requirement", "UX-DR10")]
     [Trait("Requirement", "UX-DR33")]
     public async Task Opening_a_card_opens_one_panel_over_the_Board_with_focus_inside_and_no_change_of_address()
@@ -125,7 +125,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// and focus returns to the originating card's opening control, found by its <c>data-task-id</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the Task detail panel and its focus trap do not exist yet (Task 9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     [Trait("Requirement", "UX-DR40")]
     public async Task Focus_is_trapped_in_the_panel_and_returns_to_the_card_on_Esc()
@@ -162,7 +162,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// the panel's content, and there is still one dialog.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the Task detail panel does not exist yet (Task 9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR26")]
     public async Task Opening_another_card_replaces_the_panel_and_never_stacks_a_second()
     {
@@ -188,7 +188,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// the title field is present, so the panel rendered its attributes.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the Task detail panel does not exist yet (Task 9)")]
+    [Fact]
     [Trait("Requirement", "AD-12")]
     public async Task The_panel_has_no_description_editor()
     {
@@ -216,7 +216,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// was sent.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the Task detail panel does not exist yet (Task 9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR26")]
     public async Task There_is_no_save_button_and_no_save_indicator_before_or_after_an_edit()
     {
@@ -249,7 +249,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// the new title stays.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the Task detail panel and its optimistic edit do not exist yet (Task 9; Q1, Q8)")]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     [Trait("Requirement", "AD-18")]
     public async Task A_title_edit_renders_at_once_and_the_server_admits_it_afterwards()
@@ -291,7 +291,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// outstanding; the move is announced politely, once.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the Status picker and the optimistic move do not exist yet (Task 9; Q10, Q11)")]
+    [Fact]
     [Trait("Requirement", "UX-DR11")]
     [Trait("Requirement", "AD-11")]
     public async Task Choosing_a_Status_moves_the_card_and_both_totals_at_once()
@@ -347,7 +347,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// <param name="capability">A <c>403</c>'s capability.</param>
     /// <param name="copy">The copy the panel renders.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC12 - the optimistic edit and its revert do not exist yet (Task 9; Q8)")]
+    [Theory]
     [InlineData(400, InvalidTaskTitleType, null, TitleInvalidCopy)]
     [InlineData(403, InsufficientRoleType, "manage-tasks", ManageTasksCopy)]
     [InlineData(422, IdempotencyKeyReusedType, null, ReusedCopy)]
@@ -387,7 +387,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// available."; the panel does not stay open over a Task that is not there.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the optimistic edit and its revert do not exist yet (Task 9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task A_404_on_an_edit_renders_the_pages_refusal_surface()
     {
@@ -419,7 +419,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// the panel says why. The refusal here is a Role re-read lower on the server (<c>403</c>).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the optimistic move and its revert do not exist yet (Task 9; Q8)")]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     public async Task A_refused_Status_change_puts_the_card_and_both_totals_back()
     {
@@ -457,7 +457,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// and the panel says "Not sent." inline; the client is never the arbiter.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the optimistic edit and its no-answer revert do not exist yet (Task 9; Q8)")]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     public async Task An_unanswered_edit_is_reverted_and_said_to_be_not_sent()
     {
@@ -490,7 +490,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// as it stood before either edit.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - per-attribute last-admitted values do not exist yet (Task 9; Q8)")]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     public async Task A_refusal_reverts_only_its_own_attribute_to_its_last_admitted_value()
     {
@@ -526,7 +526,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// other Space's Board has the title field.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the Task detail panel does not exist yet (Task 9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "AD-1")]
     public async Task A_Viewer_sees_the_attributes_as_text_with_no_edit_affordance_and_nothing_disabled()
@@ -561,7 +561,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// the same Board) removes the edit controls in place: the panel stays, its title field goes.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - the Task detail panel does not exist yet (Task 9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR37")]
     public async Task A_Role_reread_lower_removes_the_edit_controls_in_place()
     {
@@ -592,7 +592,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// open and the Task's title is nowhere on screen; <c>document.title</c> is still <c>Yello</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - the Task detail panel does not exist yet (Task 9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR31")]
     public async Task Leaving_the_Space_closes_the_panel_with_the_Board()
     {
@@ -624,7 +624,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// <param name="localDate">The date field's value in that zone.</param>
     /// <param name="day">The day of the month the card shows.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC7 - the due date is not rendered yet (Task 9; Q4)")]
+    [Theory]
     [InlineData("en-US", "America/Los_Angeles", "2026-11-02", "2")]
     [InlineData("en-GB", "Asia/Tokyo", "2026-11-03", "3")]
     [Trait("Requirement", "UX-DR42")]
@@ -658,7 +658,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// with its offset: 3 November chosen in Tokyo is 15:00 UTC on 2 November.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the due date field does not exist yet (Task 9; Q4)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     public async Task Choosing_a_date_commits_the_start_of_that_day_in_the_editors_zone_with_its_offset()
     {
@@ -686,7 +686,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// AC7, Q1 (a) - "Clear due date" commits <c>dueDate: null</c> and nothing else, and the field empties.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the clear control does not exist yet (Task 9; Q1)")]
+    [Fact]
     [Trait("Requirement", "FR-20")]
     public async Task Clearing_the_due_date_commits_null()
     {
@@ -720,7 +720,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// address.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - the Task detail panel does not exist yet (Task 9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR33")]
     public async Task The_title_input_is_not_autofilled_and_no_title_reaches_the_tab_or_the_address()
     {
@@ -755,7 +755,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     /// reverts the field and sends nothing; a second <c>Esc</c> closes the panel.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the Task detail panel does not exist yet (Task 9; Q9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR40")]
     [Trait("Priority", "P1")]
     public async Task Esc_in_the_title_field_reverts_it_first_and_a_second_Esc_closes_the_panel()
@@ -873,7 +873,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
         var text = await page.Locator("body").InnerTextAsync();
 
         Assert.All(Banned, word => Assert.DoesNotContain(word, text, StringComparison.OrdinalIgnoreCase));
-        Assert.Equal(0, await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { NameRegex = new Regex("save", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1)) }).CountAsync());
+        Assert.Equal(0, await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { NameRegex = new Regex("save", RegexOptions.IgnoreCase, TimeSpan.FromSeconds(1)) }).CountAsync());
         Assert.Equal(0, await page.Locator($"{Dialog} [role='progressbar'], {Dialog} [aria-busy='true']").CountAsync());
     }
 

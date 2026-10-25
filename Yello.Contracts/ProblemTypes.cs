@@ -176,6 +176,38 @@ public static class ProblemTypes
     public static string InvalidTaskTitle => "urn:yello:problem:invalid-task-title";
 
     /// <summary>
+    /// A Task edit whose Status is not one of the Task's own Project's effective set. Answered <c>400</c>;
+    /// nothing is written. Story 2.3, open questions 5 (a) and 13 (a).
+    /// </summary>
+    /// <remarks>
+    /// <b>Never "that Status belongs to another Space", never "no such Status", and never the id sent.</b> A
+    /// random id and another Space's real Status id answer the same bytes, so the refusal cannot be used to
+    /// learn that an id exists elsewhere (I-13). It is not a <c>404</c>: the Task is present, and a
+    /// <c>404</c> would say it was not.
+    /// </remarks>
+    public static string InvalidTaskStatus => "urn:yello:problem:invalid-task-status";
+
+    /// <summary>
+    /// A Task edit whose due date is not an ISO 8601 instant with an offset between the start of 2000 and the
+    /// end of 2100. Answered <c>400</c>; nothing is written. Story 2.3, open question 4 (a).
+    /// </summary>
+    /// <remarks>
+    /// <b>Never a statement about the Task or its current due date</b>; this reports only what was sent.
+    /// <c>null</c> is not this refusal - it clears the due date.
+    /// </remarks>
+    public static string InvalidDueDate => "urn:yello:problem:invalid-due-date";
+
+    /// <summary>
+    /// A Task edit body that cannot be read as a JSON object, or that names none of the title, the Status and
+    /// the due date. Answered <c>400</c>; nothing is written. Story 2.3, open question 1 (a).
+    /// </summary>
+    /// <remarks>
+    /// <b>Never a statement about the Task</b>, and never a list of what the body did name. The product's own
+    /// client always sends at least one member, so only a hand-written request meets it.
+    /// </remarks>
+    public static string InvalidTaskEdit => "urn:yello:problem:invalid-task-edit";
+
+    /// <summary>
     /// An <c>Idempotency-Key</c> header that is empty or longer than
     /// <see cref="Idempotency.MaxKeyLength"/> characters. Answered <c>400</c>; nothing is applied.
     /// </summary>

@@ -16,6 +16,11 @@ namespace Yello.Domain.Tasks;
 /// two creations in one Project serialise there, and the second reads the first's key as the last.
 /// </para>
 /// <para>
+/// <b>A Status change places a key too</b> (story 2.3: the Task goes after the last key of its new column),
+/// and takes the same Project range under the same lock before reading that last key, so an edit and a
+/// creation - or two edits - into one column also serialise. Both writers now take a lock.
+/// </para>
+/// <para>
 /// <b>The alphabet is base 62 in ordinal order</b> - digits, then upper case, then lower case, which is
 /// their order in ASCII - so a key compares the same in .NET's <see cref="StringComparer.Ordinal"/> and in
 /// SQL Server's <c>Latin1_General_100_BIN2</c> collation, which the column is declared in.

@@ -567,4 +567,48 @@
   <data name="password-too-long" xml:space="preserve">
     <value>That password is too long.</value>
   </data>
+  <data name="TaskDetailClose" xml:space="preserve">
+    <value>Close</value>
+    <comment>The Task detail panel's close control (story 2.3). Esc does the same.</comment>
+  </data>
+  <data name="TaskDetailTitleLabel" xml:space="preserve">
+    <value>Title</value>
+    <comment>The Task detail panel's title field label (story 2.3).</comment>
+  </data>
+  <data name="TaskDetailStatusLabel" xml:space="preserve">
+    <value>Status</value>
+    <comment>The Task detail panel's Status label, above the picker or the Status as text (story 2.3).</comment>
+  </data>
+  <data name="TaskDetailDueDateLabel" xml:space="preserve">
+    <value>Due date</value>
+    <comment>The Task detail panel's due date label (story 2.3).</comment>
+  </data>
+  <data name="TaskDueDateClear" xml:space="preserve">
+    <value>Clear due date</value>
+    <comment>Removes a Task's due date at once (story 2.3). Never "Save".</comment>
+  </data>
+  <data name="TaskDue" xml:space="preserve">
+    <value>Due {0}</value>
+    <comment>A card's due date in its metadata row; {0} is the day and month in the viewer's locale and zone (story 2.3).</comment>
+  </data>
+  <data name="TaskMoved" xml:space="preserve">
+    <value>Moved to {0}.</value>
+    <comment>Announced politely, once, when a Task's Status is changed; {0} is the Status name (story 2.3, open question 10 (a)).</comment>
+  </data>
+  <data name="TaskEditNotSent" xml:space="preserve">
+    <value>Not sent.</value>
+    <comment>An edit that got no answer: the change is reverted (story 2.3, open question 8). Never "Saved" or "Saving".</comment>
+  </data>
+  <data name="InvalidTaskStatus" xml:space="preserve">
+    <value>That Status is not one of this Project's Statuses.</value>
+    <comment>400 invalid-task-status, inline in the Task detail panel (story 2.3). Never "Not available."</comment>
+  </data>
+  <data name="InvalidDueDate" xml:space="preserve">
+    <value>A due date is between 2000 and 2100.</value>
+    <comment>400 invalid-due-date, inline in the Task detail panel (story 2.3). Never "Not available."</comment>
+  </data>
+  <data name="InvalidTaskEdit" xml:space="preserve">
+    <value>That change could not be read.</value>
+    <comment>400 invalid-task-edit, inline in the Task detail panel (story 2.3). The product's own client never meets it.</comment>
+  </data>
 </root>

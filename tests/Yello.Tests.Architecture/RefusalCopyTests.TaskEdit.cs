@@ -12,26 +12,20 @@ namespace Yello.Tests.Architecture;
 /// UX-DR32, UX-DR37). Written by the story 2.3 ATDD run.
 /// </summary>
 /// <remarks>
-/// The two problem types are literals here, the text of <c>TaskEditScaffold</c>'s, because
-/// <c>ProblemTypes</c> does not hold them yet; replace them with <c>ProblemTypes.InvalidTaskStatus</c> and
-/// <c>ProblemTypes.InvalidDueDate</c> on activation. The exact sentences are the dev phase's (Task 9, "Copy");
+/// The exact sentences are the dev phase's (Task 9, "Copy");
 /// these cases hold only that each has its own key and copy.
 /// </remarks>
 public sealed partial class RefusalCopyTests
 {
-    private const string InvalidTaskStatusType = "urn:yello:problem:invalid-task-status";
-
-    private const string InvalidDueDateType = "urn:yello:problem:invalid-due-date";
-
     /// <summary>
     /// AC12 - a <c>400 invalid-task-status</c> renders copy of its own, not the not-found copy.
     /// </summary>
-    [Fact(Skip = "red: AC12 - RefusalCopy has no branch for invalid-task-status yet (Task 9 Copy; Q5)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "UX-DR32")]
     public void An_invalid_Status_refusal_renders_its_own_copy()
     {
-        var message = RefusalCopy.For(new ProblemResponse(InvalidTaskStatusType, Errors: null));
+        var message = RefusalCopy.For(new ProblemResponse(ProblemTypes.InvalidTaskStatus, Errors: null));
 
         Assert.NotEqual(RefusalCopy.NotAvailableKey, message.Key);
         Assert.False(string.IsNullOrWhiteSpace(Copy.GetString(message.Key, CultureInfo.InvariantCulture)), $"No copy for {message.Key}.");
@@ -40,12 +34,12 @@ public sealed partial class RefusalCopyTests
     /// <summary>
     /// AC12 - a <c>400 invalid-due-date</c> renders copy of its own, not the not-found copy.
     /// </summary>
-    [Fact(Skip = "red: AC12 - RefusalCopy has no branch for invalid-due-date yet (Task 9 Copy; Q4, Q5)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "UX-DR32")]
     public void An_invalid_due_date_refusal_renders_its_own_copy()
     {
-        var message = RefusalCopy.For(new ProblemResponse(InvalidDueDateType, Errors: null));
+        var message = RefusalCopy.For(new ProblemResponse(ProblemTypes.InvalidDueDate, Errors: null));
 
         Assert.NotEqual(RefusalCopy.NotAvailableKey, message.Key);
         Assert.False(string.IsNullOrWhiteSpace(Copy.GetString(message.Key, CultureInfo.InvariantCulture)), $"No copy for {message.Key}.");

@@ -160,5 +160,11 @@ public sealed class CreateTaskHandlerTests
                 CreatedAt = DateTimeOffset.UnixEpoch,
             });
         }
+
+        public Task<TaskItem?> FindAsync(Guid taskId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The create slice reads no Task.");
+
+        public Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The create slice edits no Task.");
     }
 }

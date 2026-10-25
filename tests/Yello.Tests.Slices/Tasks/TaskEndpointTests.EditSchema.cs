@@ -16,7 +16,7 @@ public sealed partial class TaskEndpointTests
     /// is the non-nullable <c>datetimeoffset</c> 2.2 wrote.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the TaskDueDate migration has not been written (Task 3)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "AD-12")]
     public async Task The_due_date_is_a_nullable_datetimeoffset_and_no_column_holds_a_description()

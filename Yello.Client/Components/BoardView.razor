@@ -9,6 +9,7 @@
 @inject IStringLocalizer<ClientCopy> Localizer
 @inject HttpClient Http
 @inject ActiveSpaceState ActiveSpace
+@inject SpaceWrites Writes
 
 @*
     ONE PROJECT'S BOARD - story 2.2. AC1-AC7, AC13-AC15; UX-DR8, UX-DR26, UX-DR27, UX-DR31, UX-DR33,
@@ -35,6 +36,13 @@
 
     PURGED WITH THE SPACE, and the Project's name reaches the context bar from this answer alone - never
     the document's title, never a URL (UX-DR33). Leaving the Board clears it from the bar.
+
+    THE TASK DETAIL PANEL (story 2.3) is this Board's state, not a route: a card opens it over the Board,
+    one level deep, and it goes with the Board's purge. Its edits are the product's first OPTIMISTIC WRITES
+    (AD-11): a change renders at once on the card and in the panel - a Status change moves the card to the
+    end of its new column and moves both totals - and the server admits or refuses it afterwards. See
+    BoardView.razor.cs for the replica: each attribute keeps its last ADMITTED value, and a refusal reverts
+    that attribute alone to it.
 *@
 
 <p class="visually-hidden" role="status" aria-live="polite">@_announcement</p>
@@ -78,6 +86,9 @@
                              Name="@column.Name"
                              Total="@column.Total"
                              Tasks="@column.Tasks"
+                             OnOpen="Open"
+                             FocusTaskId="@_focusCard"
+                             FocusRequest="@_focusCardRequests"
                              ShowAdd="@(IsFirst(column) && _canManage && !_creating && !IsEmpty)"
                              OnAdd="OpenCreate"
                              FocusAddRequests="@(IsFirst(column) ? _focusAddRequests : 0)">
@@ -88,6 +99,19 @@
                 </BoardColumn>
             }
         </div>
+
+        @if (OpenTask is { } open)
+        {
+            <TaskDetail @key="open.Id"
+                        Item="@open"
+                        Statuses="@_statusOptions"
+                        CanManage="@_canManage"
+                        Refusal="@_panelRefusal"
+                        OnTitle="title => EditAsync(open.Id, TaskAttribute.Title, title)"
+                        OnStatus="statusId => EditAsync(open.Id, TaskAttribute.Status, statusId)"
+                        OnDueDate="due => EditAsync(open.Id, TaskAttribute.DueDate, due)"
+                        OnClose="Close" />
+        }
     </div>
 }
 
@@ -187,6 +211,7 @@
         _projectName = string.Empty;
         _announcement = null;
         _creating = false;
+        PurgePanel();
     }
 
     private async Task LoadAsync(int generation)
@@ -210,6 +235,7 @@
                 {
                     _projectName = board.Project.Name;
                     _columns = [.. board.Columns.Select(column => new ColumnState(column.StatusId, column.Name, column.Total, [.. column.Tasks]))];
+                    UseStatuses(board.Columns.Select(column => new TaskStatusOption(column.StatusId, column.Name)));
                     _announcement = Localizer["BoardLoaded"];
                 }
 

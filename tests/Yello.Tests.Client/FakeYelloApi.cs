@@ -44,11 +44,6 @@ internal sealed class FakeYelloApi
     /// </summary>
     private const int AbortConnection = -1;
 
-    /// <summary>
-    /// Story 2.3's new problem type, as <c>TaskEditScaffold</c> states it until <c>ProblemTypes</c> holds it.
-    /// </summary>
-    private const string InvalidTaskStatusType = "urn:yello:problem:invalid-task-status";
-
     private readonly ConcurrentQueue<FakeRequest> _requests = new();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _held = new();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _arrived = new();
@@ -716,7 +711,7 @@ internal sealed class FakeYelloApi
         {
             if (ColumnOf(board, statusValue) is not { } target)
             {
-                return (400, Problem(InvalidTaskStatusType));
+                return (400, Problem(ProblemTypes.InvalidTaskStatus));
             }
 
             destination = target;

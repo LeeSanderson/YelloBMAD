@@ -617,6 +617,7 @@
     fixes a width that would preclude it.
 */
 .board {
+    position: relative;
     display: flex;
     flex-direction: column;
     gap: var(--space-4);
@@ -745,7 +746,31 @@
 }
 
 .task-card__title {
+    display: block;
     margin-block: 0;
+}
+
+/*
+    THE CARD'S ONE CONTROL (story 2.3, open question 7 (a)): the title is a native button that opens the
+    Task detail panel. It looks like the title it is - no button chrome - wraps as the title does, and
+    keeps the focus ring base.css draws. At least the 24px target (WCAG 2.5.8).
+*/
+.task-card__open {
+    display: block;
+    inline-size: 100%;
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    margin: 0;
+    padding: 0;
+    appearance: none;
+    background-color: transparent;
+    color: inherit;
+    border: 0;
+    font: inherit;
+    text-align: start;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    cursor: pointer;
 }
 
 .task-card__meta:empty {
@@ -782,4 +807,124 @@
     inset-inline: 0;
     overflow: hidden;
     clip-path: inset(50%);
+}
+
+/*
+    THE TASK DETAIL PANEL (story 2.3; DESIGN.md:238-244, :465-473; UX-DR5, UX-DR10). Over the Board, one
+    level deep, at the inline end of the Board and below the context bar, wide enough for a title to sit
+    in its field (and for Epic 7's description beneath). The layer passes the pointer through to the page
+    around the panel - the context bar and its switcher stay usable - and only the panel takes it. A
+    surface, not a floating layer: the 6px corners (rounded.lg - deferred-work.md:36), the gated hairline
+    and NO SHADOW, stated explicitly. No fixed height, so text spacing and text-only zoom grow the page
+    instead of clipping the panel.
+*/
+.task-detail-layer {
+    position: absolute;
+    inset-block-start: 0;
+    inset-inline: 0;
+    display: flex;
+    justify-content: flex-end;
+    align-items: flex-start;
+    box-sizing: border-box;
+    padding: var(--space-4);
+    pointer-events: none;
+}
+
+.task-detail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    box-sizing: border-box;
+    inline-size: min(40rem, 100%);
+    padding: var(--space-5);
+    pointer-events: auto;
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    box-shadow: none;
+    overflow-wrap: anywhere;
+}
+
+.task-detail__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: var(--space-3);
+}
+
+.task-detail__title {
+    flex: 1 1 12rem;
+    margin-block: 0;
+}
+
+.task-detail__field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.task-detail__due {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.task-detail__close,
+.task-detail__status {
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    text-align: start;
+}
+
+.task-detail__attributes {
+    display: grid;
+    gap: var(--space-2);
+    margin: 0;
+}
+
+.task-detail__attributes dd {
+    margin: 0;
+}
+
+.task-detail__refusal {
+    margin-block: 0;
+    color: var(--text-muted);
+}
+
+/* An empty live region stays in the accessibility tree, so its next text is announced, but takes no room. */
+.task-detail__refusal:empty,
+.task-detail__sentinel {
+    position: absolute;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+/*
+    THE STATUS PICKER (DESIGN.md:256-262; UX-DR11): a listbox inside the panel, never a second dialog,
+    with 3px corners (rounded.md) and no shadow. Each option meets the 24px target.
+*/
+.picker {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: var(--space-1);
+    list-style: none;
+    background-color: var(--surface-column);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    box-shadow: none;
+}
+
+.picker__option {
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding-block: var(--space-1);
+    padding-inline: var(--space-3);
+    cursor: pointer;
+}
+
+.picker__option[aria-checked="true"] {
+    font-weight: var(--type-task-title-weight);
 }

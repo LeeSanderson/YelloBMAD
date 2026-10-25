@@ -27,7 +27,7 @@ public sealed partial class DesignFoundationGateTests
     /// AC13, UX-DR5, <c>deferred-work.md:36</c> - every radius declared on the Task detail panel resolves to 6px
     /// (<c>rounded.lg</c>), and one is declared.
     /// </summary>
-    [Fact(Skip = "red: AC13 - the Task detail panel has no styles yet (Task 9 CSS)")]
+    [Fact]
     [Trait("Requirement", "UX-DR5")]
     [Trait("Requirement", "UX-DR10")]
     public void The_Task_detail_panel_takes_the_6px_radius() =>
@@ -37,7 +37,7 @@ public sealed partial class DesignFoundationGateTests
     /// AC13, UX-DR11, <c>DESIGN.md:256-262</c> - every radius declared on the Status picker resolves to 3px
     /// (<c>rounded.md</c>), and one is declared.
     /// </summary>
-    [Fact(Skip = "red: AC13 - the Status picker has no styles yet (Task 9 CSS; Q11)")]
+    [Fact]
     [Trait("Requirement", "UX-DR5")]
     [Trait("Requirement", "UX-DR11")]
     public void The_Status_picker_takes_the_3px_radius() =>
@@ -47,7 +47,7 @@ public sealed partial class DesignFoundationGateTests
     /// AC13, UX-DR10, <c>DESIGN.md:238-244</c> - the panel states <c>box-shadow: none</c> explicitly and draws its
     /// edge with the hairline width token, as the card does: a dialog here is a surface, not a floating layer.
     /// </summary>
-    [Fact(Skip = "red: AC13 - the Task detail panel has no styles yet (Task 9 CSS)")]
+    [Fact]
     [Trait("Requirement", "UX-DR10")]
     public void The_Task_detail_panel_declares_no_shadow_and_a_hairline_border()
     {

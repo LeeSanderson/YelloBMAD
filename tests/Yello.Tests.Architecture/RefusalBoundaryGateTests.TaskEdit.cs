@@ -16,9 +16,7 @@ namespace Yello.Tests.Architecture;
 /// <remarks>
 /// <para>
 /// <b>Scaffolded against the recommended options</b>: Q1 (a) - the request is <c>EditTaskRequest</c> with
-/// <c>Title</c>, <c>StatusId</c> and <c>DueDate</c>; the route is <see cref="TaskItemPattern"/> (this suite does
-/// not reference <c>Yello.Tests.Shared</c>, so the pattern is a private constant here, the same text as
-/// <c>TaskEditScaffold.Task</c>; replace both with <c>TaskRoutes.Task</c> on activation).
+/// <c>Title</c>, <c>StatusId</c> and <c>DueDate</c>; the route is <c>TaskRoutes.Task</c>.
 /// </para>
 /// <para>
 /// <b>One gate is green today</b> and stays active: <see cref="No_Domain_or_Contracts_member_is_typed_DateTime_or_DateOnly"/>,
@@ -27,8 +25,6 @@ namespace Yello.Tests.Architecture;
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
 {
-    private const string TaskItemPattern = "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}";
-
     private static readonly Type[] BannedClockTypes = [typeof(DateTime), typeof(DateTime?), typeof(DateOnly), typeof(DateOnly?)];
 
     /// <summary>
@@ -37,7 +33,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// (FR-31, Epic 7), no position key (readable, never writable), no Project (FR-41 is its own route) and no
     /// Space. The due date is <c>DateTimeOffset?</c>.
     /// </summary>
-    [Fact(Skip = "red: AC1 - EditTaskRequest does not exist yet (Task 4; Q1)")]
+    [Fact]
     [Trait("Requirement", "FR-20")]
     [Trait("Requirement", "AD-15")]
     [Trait("Requirement", "AD-12")]
@@ -62,7 +58,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>TaskResponse</c>, and <c>TaskResponse</c> keeps every field 2.2 shipped (a field is added, none
     /// removed or retyped, FR-37).
     /// </summary>
-    [Fact(Skip = "red: AC7 - TaskItem.DueDate and TaskResponse.DueDate do not exist yet (Task 2, Task 4)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "AD-19")]
     public void The_due_date_is_a_nullable_DateTimeOffset_on_the_Task_and_its_response()
@@ -121,14 +117,14 @@ public sealed partial class RefusalBoundaryGateTests
     /// the <c>PATCH</c> consults no bound - an edit adds no Task, so counting the Project would refuse edits in a
     /// full one.
     /// </summary>
-    [Fact(Skip = "red: AC8 - the Task GET and PATCH routes are not mapped yet (Task 5)")]
+    [Fact]
     [Trait("Requirement", "AD-4")]
     [Trait("Requirement", "AD-1")]
     [Trait("Requirement", "AR-30")]
     public void The_Task_routes_declare_their_capability_serve_both_surfaces_and_consult_no_bound()
     {
         var routes = RouteTable()
-            .Where(endpoint => endpoint.RoutePattern.RawText == TaskItemPattern)
+            .Where(endpoint => endpoint.RoutePattern.RawText == Yello.Contracts.Tasks.TaskRoutes.Task)
             .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? []).Select(method => (Method: method, Endpoint: endpoint)))
             .ToDictionary(route => route.Method, route => route.Endpoint, StringComparer.Ordinal);
 
@@ -145,7 +141,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// title agrees with <see cref="TaskTitle.TryNormalise"/> on every boundary - empty, blank, one character,
     /// padded, 200, 201, and 200 inside padding. The server still decides.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the client's mirrored title predicate does not exist yet (Task 9; Q9)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "AD-21")]
     public void The_clients_Task_title_predicate_agrees_with_the_Domain_rule()

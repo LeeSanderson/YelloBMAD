@@ -114,7 +114,9 @@ public sealed partial class RefusalBoundaryGateTests
     /// <summary>
     /// AC2, Task 3 - the Task creation request carries a title and nothing else: no Status, Project, Space or
     /// position, so "takes the first Status" and "belongs to the route's Project and Space" are true by
-    /// construction.
+    /// construction. Widened by story 2.3: the Task contracts now also hold <c>EditTaskRequest</c>, whose own
+    /// property set <c>The_Task_edit_request_carries_the_title_the_Status_and_the_due_date_and_nothing_else</c>
+    /// pins; the request set is still pinned exactly, so a third request fails here.
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-19")]
@@ -125,8 +127,11 @@ public sealed partial class RefusalBoundaryGateTests
             .Where(type => type.Namespace == TaskContractsNamespace && type.Name.EndsWith("Request", StringComparison.Ordinal))
             .ToList();
 
-        Assert.Equal(["CreateTaskRequest"], requests.Select(type => type.Name));
-        Assert.Equal(["Title"], requests[0].GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(property => property.Name));
+        Assert.Equal(["CreateTaskRequest", "EditTaskRequest"], requests.Select(type => type.Name).Order(StringComparer.Ordinal));
+
+        var creation = requests.Single(type => type.Name == "CreateTaskRequest");
+
+        Assert.Equal(["Title"], creation.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(property => property.Name));
     }
 
     /// <summary>

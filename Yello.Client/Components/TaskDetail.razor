@@ -1,0 +1,353 @@
+@using Yello.Client.Spaces
+@using Yello.Contracts.Tasks
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    THE TASK DETAIL PANEL - story 2.3. AC1-AC3, AC5-AC7, AC12-AC14; UX-DR10, UX-DR11, UX-DR12, UX-DR26,
+    UX-DR27, UX-DR33, UX-DR39, UX-DR40, UX-DR42; DESIGN.md:238-244, :465-473; EXPERIENCE.md:199, :206-211, :318.
+
+    ONE LEVEL DEEP, OVER THE BOARD, NEVER A ROUTE (open question 6 (a)). The Board renders it and owns its
+    state, so it is purged with the Board; the address and the tab's title never change. Opening another card
+    replaces this panel's content - it never stacks a second one.
+
+    A MODAL DIALOG LABELLED BY ITS OWN HEADING, the Task's title. Focus moves in on open and is trapped: a
+    sentinel at each end sends Tab and Shift+Tab back round. Esc closes - but the innermost meaning wins: Esc
+    in a title field holding an uncommitted change reverts the field first, and Esc in the open picker
+    closes the picker. On close the Board returns focus to the card that opened it.
+
+    ATTRIBUTES ONLY: title, Status, due date. No description region, no heading for one, no placeholder
+    (AC6; FR-31 is Epic 7). No Labels (2.4), no Assignee (4.6), no Move control (2.6), no delete (2.5).
+
+    NO SAVE (AC2, UX-DR26). A title commits on Enter or when the field is left; a Status commits when it is
+    chosen; a date commits when it is picked; "Clear due date" commits at once. Nothing reads "Save", and
+    nothing says an edit is in flight. Every change renders at once (the Board's replica) and a refusal is
+    said in the always-present region below the fields, in the client's own words for its type.
+
+    A VIEWER OPENS IT TOO, and reads the attributes as text: no input, no picker, no clear control, no
+    button but Close - absent, never disabled (UX-DR27). A Role re-read lower while the panel is open removes
+    the controls in place (AC14).
+*@
+
+<div class="task-detail-layer">
+    <div class="task-detail" role="dialog" aria-modal="true" aria-labelledby="@HeadingId" @onkeydown="KeyDownAsync">
+        <div class="task-detail__sentinel" tabindex="0" @onfocus="FocusLastAsync"></div>
+
+        <div class="task-detail__head">
+            <h2 class="type-dialog-title task-detail__title" id="@HeadingId">@Item.Title</h2>
+            <button type="button" class="button-secondary task-detail__close" @onclick="CloseAsync" @ref="_close">@Localizer["TaskDetailClose"]</button>
+        </div>
+
+        @if (CanManage)
+        {
+            <div class="task-detail__field">
+                <label class="form-field__label" for="@TitleId">@Localizer["TaskDetailTitleLabel"]</label>
+                <input class="form-field__control"
+                       id="@TitleId"
+                       name="@_fieldName"
+                       type="text"
+                       autocomplete="off"
+                       value="@_titleDraft"
+                       aria-invalid="@(_titleMessage is not null ? "true" : null)"
+                       aria-describedby="@(_titleMessage is not null ? TitleMessageId : null)"
+                       @oninput="TitleInput"
+                       @onkeydown="TitleKeyDownAsync"
+                       @onchange="TitleChangedAsync" />
+
+                @if (_titleMessage is not null)
+                {
+                    <p class="form-field__message" id="@TitleMessageId">@_titleMessage</p>
+                }
+            </div>
+
+            <div class="task-detail__field">
+                <span class="form-field__label" id="@StatusLabelId">@Localizer["TaskDetailStatusLabel"]</span>
+                <button type="button"
+                        class="button-secondary task-detail__status"
+                        id="@StatusButtonId"
+                        aria-haspopup="listbox"
+                        aria-expanded="@(_pickerOpen ? "true" : "false")"
+                        aria-labelledby="@($"{StatusLabelId} {StatusButtonId}")"
+                        @onclick="TogglePicker"
+                        @ref="_statusButton">@StatusName</button>
+
+                @if (_pickerOpen)
+                {
+                    @* In the panel, not a second dialog (open question 11): the current Status is marked as
+                       current, and nothing is pre-selected as a destination (UX-DR11). *@
+                    <ul class="picker" role="listbox" aria-labelledby="@StatusLabelId">
+                        @foreach (var status in Statuses)
+                        {
+                            <PickerOption @key="status.Id" Option="@status" Current="@(status.Id == Item.StatusId)" OnChoose="ChooseAsync" />
+                        }
+                    </ul>
+                }
+            </div>
+
+            <div class="task-detail__field">
+                <label class="form-field__label" for="@DueDateId">@Localizer["TaskDetailDueDateLabel"]</label>
+                <div class="task-detail__due">
+                    <input class="form-field__control task-detail__date"
+                           id="@DueDateId"
+                           type="date"
+                           value="@TaskDates.InputValue(Item.DueDate)"
+                           @onchange="DueDateChangedAsync"
+                           @ref="_dueDate" />
+
+                    @if (Item.DueDate is not null)
+                    {
+                        <button type="button" class="button-secondary" @onclick="ClearDueDateAsync" @ref="_clear">@Localizer["TaskDueDateClear"]</button>
+                    }
+                </div>
+            </div>
+        }
+
+        @if (!CanManage)
+        {
+            <dl class="task-detail__attributes">
+                <dt class="form-field__label">@Localizer["TaskDetailStatusLabel"]</dt>
+                <dd>@StatusName</dd>
+
+                @if (Item.DueDate is { } due)
+                {
+                    <dt class="form-field__label">@Localizer["TaskDetailDueDateLabel"]</dt>
+                    <dd>@TaskDates.FullDate(due)</dd>
+                }
+            </dl>
+        }
+
+        @* Present from the start, so a refusal's words are announced when they arrive. *@
+        <p class="task-detail__refusal" role="status">@Refusal</p>
+
+        <div class="task-detail__sentinel" tabindex="0" @onfocus="FocusFirstAsync"></div>
+    </div>
+</div>
+
+@code {
+    // A field name no browser's autofill would match to a saved value (UX-DR33): random per panel.
+    private readonly string _fieldName = Guid.NewGuid().ToString("N");
+    private readonly string _id = Guid.NewGuid().ToString("N");
+
+    private ElementReference _close;
+    private ElementReference _statusButton;
+    private ElementReference _dueDate;
+    private ElementReference _clear;
+
+    private string _titleDraft = string.Empty;
+    private string? _shownTitle;
+    private string? _titleMessage;
+    private bool _pickerOpen;
+    private bool _escapeHandled;
+    private bool _focusDueDate;
+    private bool _focusStatusButton;
+
+    /// <summary>The Task, as the Board's replica shows it now.</summary>
+    [Parameter]
+    [EditorRequired]
+    public TaskResponse Item { get; set; }
+
+    /// <summary>The Project's effective set: the Board's columns, in order.</summary>
+    [Parameter]
+    [EditorRequired]
+    public IReadOnlyList<TaskStatusOption> Statuses { get; set; } = [];
+
+    /// <summary>Whether the Role held may edit the Task; otherwise its attributes render as text.</summary>
+    [Parameter]
+    public bool CanManage { get; set; }
+
+    /// <summary>The words for the last refused edit, or <c>null</c>.</summary>
+    [Parameter]
+    public string? Refusal { get; set; }
+
+    /// <summary>Raised with a new title, already checked against the title rule.</summary>
+    [Parameter]
+    public EventCallback<string> OnTitle { get; set; }
+
+    /// <summary>Raised with a newly chosen Status.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnStatus { get; set; }
+
+    /// <summary>Raised with a new due date, or <c>null</c> to clear it.</summary>
+    [Parameter]
+    public EventCallback<DateTimeOffset?> OnDueDate { get; set; }
+
+    /// <summary>Raised when the panel is closed, by Close or by Esc.</summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    private string HeadingId => "task-detail-heading-" + _id;
+
+    private string TitleId => "task-detail-title-" + _id;
+
+    private string TitleMessageId => TitleId + "-message";
+
+    private string StatusLabelId => "task-detail-status-label-" + _id;
+
+    private string StatusButtonId => "task-detail-status-" + _id;
+
+    private string DueDateId => "task-detail-due-" + _id;
+
+    private string StatusName => Statuses.FirstOrDefault(status => status.Id == Item.StatusId)?.Name ?? string.Empty;
+
+    /// <summary>
+    /// The field follows the Task's title whenever the replica's title changes - a commit, an admission or a
+    /// revert - and otherwise keeps what is being typed.
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        if (!string.Equals(_shownTitle, Item.Title, StringComparison.Ordinal))
+        {
+            _shownTitle = Item.Title;
+            _titleDraft = Item.Title;
+        }
+
+        if (!CanManage)
+        {
+            _pickerOpen = false;
+            _titleMessage = null;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _close.FocusAsync();
+            return;
+        }
+
+        if (_focusDueDate)
+        {
+            _focusDueDate = false;
+            await _dueDate.FocusAsync();
+        }
+
+        if (_focusStatusButton)
+        {
+            _focusStatusButton = false;
+            await _statusButton.FocusAsync();
+        }
+    }
+
+    private Task CloseAsync() => OnClose.InvokeAsync();
+
+    /// <summary>
+    /// Esc, after any inner control has had its say: the open picker closes first; otherwise the panel does.
+    /// </summary>
+    private Task KeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key != "Escape")
+        {
+            return Task.CompletedTask;
+        }
+
+        if (_escapeHandled)
+        {
+            _escapeHandled = false;
+            return Task.CompletedTask;
+        }
+
+        if (_pickerOpen)
+        {
+            _pickerOpen = false;
+            _focusStatusButton = true;
+            return Task.CompletedTask;
+        }
+
+        return OnClose.InvokeAsync();
+    }
+
+    private async Task FocusFirstAsync() => await _close.FocusAsync();
+
+    private async Task FocusLastAsync()
+    {
+        if (!CanManage)
+        {
+            await _close.FocusAsync();
+        }
+        else if (Item.DueDate is not null)
+        {
+            await _clear.FocusAsync();
+        }
+        else
+        {
+            await _dueDate.FocusAsync();
+        }
+    }
+
+    private void TitleInput(ChangeEventArgs args) => _titleDraft = args.Value?.ToString() ?? string.Empty;
+
+    private Task TitleKeyDownAsync(KeyboardEventArgs args)
+    {
+        switch (args.Key)
+        {
+            case "Enter":
+                return CommitTitleAsync();
+
+            case "Escape" when !string.Equals(_titleDraft, Item.Title, StringComparison.Ordinal):
+                // The innermost meaning wins: this Esc reverts the field, and the panel stays open.
+                _titleDraft = Item.Title;
+                _titleMessage = null;
+                _escapeHandled = true;
+                return Task.CompletedTask;
+
+            default:
+                return Task.CompletedTask;
+        }
+    }
+
+    private Task TitleChangedAsync(ChangeEventArgs args)
+    {
+        _titleDraft = args.Value?.ToString() ?? string.Empty;
+
+        return CommitTitleAsync();
+    }
+
+    private Task CommitTitleAsync()
+    {
+        if (string.Equals(_titleDraft.Trim(), Item.Title, StringComparison.Ordinal))
+        {
+            _titleMessage = null;
+            return Task.CompletedTask;
+        }
+
+        if (!TaskTitleRule.IsTaskTitle(_titleDraft))
+        {
+            _titleMessage = Localizer["TaskTitleInvalid"];
+            return Task.CompletedTask;
+        }
+
+        _titleMessage = null;
+
+        return OnTitle.InvokeAsync(_titleDraft.Trim());
+    }
+
+    private void TogglePicker() => _pickerOpen = !_pickerOpen;
+
+    private Task ChooseAsync(Guid statusId)
+    {
+        _pickerOpen = false;
+        _focusStatusButton = true;
+
+        return statusId == Item.StatusId ? Task.CompletedTask : OnStatus.InvokeAsync(statusId);
+    }
+
+    private Task DueDateChangedAsync(ChangeEventArgs args)
+    {
+        if (!TaskDates.TryFromInputValue(args.Value?.ToString(), out var due) || due == Item.DueDate)
+        {
+            return Task.CompletedTask;
+        }
+
+        return OnDueDate.InvokeAsync(due);
+    }
+
+    private Task ClearDueDateAsync()
+    {
+        // The control goes with the date it clears, so focus moves to the date field rather than the page.
+        _focusDueDate = true;
+
+        return OnDueDate.InvokeAsync(null);
+    }
+}

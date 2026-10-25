@@ -32,7 +32,7 @@
         <ul class="board-column__cards">
             @foreach (var task in Tasks)
             {
-                <TaskCard @key="task.Id" Title="@task.Title" />
+                <TaskCard @key="task.Id" Item="@task" OnOpen="OnOpen" FocusRequest="@(task.Id == FocusTaskId ? FocusRequest : 0)" />
             }
         </ul>
     }
@@ -75,6 +75,18 @@
     /// </summary>
     [Parameter]
     public int FocusAddRequests { get; set; }
+
+    /// <summary>Raised with a Task's id when its card is opened (story 2.3).</summary>
+    [Parameter]
+    public EventCallback<Guid> OnOpen { get; set; }
+
+    /// <summary>The Task whose card the Board is returning focus to, if it is in this column.</summary>
+    [Parameter]
+    public Guid? FocusTaskId { get; set; }
+
+    /// <summary>Bumped by the Board with each return of focus to <see cref="FocusTaskId"/>'s card.</summary>
+    [Parameter]
+    public int FocusRequest { get; set; }
 
     /// <summary>What sits between the head and the cards: the open creation field, in the first column.</summary>
     [Parameter]

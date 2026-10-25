@@ -24,7 +24,7 @@ namespace Yello.Tests.Slices.Tasks;
 /// the new column's last key; Q4 (a) any instant in 2000-2100, stored and answered in UTC; Q5 (a) <c>400</c>
 /// with a stable type per field; Q13 (a) a real Status id from another Space stands in for AC4's
 /// sibling-Project Status until 6.1 adds deltas. The route and the two new types come from
-/// <see cref="TaskEditScaffold"/> until the contracts hold them.
+/// <c>Yello.Contracts</c>.
 /// </para>
 /// <para>
 /// <b>The same class and database as 2.2's Task cases</b> (one more partial file): no new engine, no new
@@ -44,7 +44,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="surface">The surface the edit is sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - the Task PATCH route does not exist yet (Task 4, Task 5; Q1)")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "FR-20")]
@@ -95,7 +95,7 @@ public sealed partial class TaskEndpointTests
     /// unchanged.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - no DueDate column and no Task PATCH route yet (Task 2, Task 3, Task 5; Q4)")]
+    [Fact]
     [Trait("Requirement", "FR-20")]
     [Trait("Requirement", "AR-34")]
     public async Task A_due_date_sent_with_an_offset_is_stored_and_answered_as_the_same_instant_in_UTC()
@@ -138,7 +138,7 @@ public sealed partial class TaskEndpointTests
     /// <c>"dueDate": null</c>. Anchor: the due date was set first, so the clear is about something.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - no DueDate column and no Task PATCH route yet (Task 3, Task 5; Q1)")]
+    [Fact]
     [Trait("Requirement", "FR-20")]
     public async Task Sending_a_null_due_date_clears_it()
     {
@@ -174,7 +174,7 @@ public sealed partial class TaskEndpointTests
     /// untouched, and its old key is not reused.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - no Task PATCH route and no key placement on a Status change yet (Task 5, Task 6; Q3)")]
+    [Fact]
     [Trait("Requirement", "FR-20")]
     [Trait("Requirement", "AD-15")]
     [Trait("Requirement", "AD-16")]
@@ -233,7 +233,7 @@ public sealed partial class TaskEndpointTests
     /// unchanged.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - no Task PATCH route yet (Task 5; Q3)")]
+    [Fact]
     [Trait("Requirement", "AD-15")]
     [Trait("Priority", "P1")]
     public async Task Setting_the_Status_a_Task_already_holds_keeps_its_key()
@@ -266,7 +266,7 @@ public sealed partial class TaskEndpointTests
     /// third Status is admitted afterwards.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - no Task PATCH route and no effective-set check yet (Task 2, Task 5; Q5, Q13)")]
+    [Fact]
     [Trait("Requirement", "FR-20")]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "AR-34")]
@@ -302,7 +302,7 @@ public sealed partial class TaskEndpointTests
         Assert.NotNull(random);
         Assert.NotNull(foreign);
         Assert.True(random.StatusCode == HttpStatusCode.BadRequest, $"{random.StatusCode} {random.Body}");
-        Assert.Equal(TaskEditScaffold.InvalidTaskStatus, Problem(random)?.Type);
+        Assert.Equal(ProblemTypes.InvalidTaskStatus, Problem(random)?.Type);
         Assert.Equal(random.StatusCode, foreign.StatusCode);
         Assert.Equal(random.ContentType, foreign.ContentType);
         Assert.Equal(random.Body, foreign.Body);
@@ -320,7 +320,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="titleJson">The title member's JSON value.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11 - no Task PATCH route yet (Task 5; Q1)")]
+    [Theory]
     [InlineData("\"\"")]
     [InlineData("\"   \"")]
     [InlineData("null")]
@@ -361,7 +361,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="dueDateJson">The dueDate member's JSON value.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11 - no due-date rule and no Task PATCH route yet (Task 2, Task 5; Q4)")]
+    [Theory]
     [InlineData("\"1999-12-31T23:59:59+00:00\"")]
     [InlineData("\"2101-01-01T00:00:00+00:00\"")]
     [InlineData("\"next Tuesday\"")]
@@ -383,12 +383,12 @@ public sealed partial class TaskEndpointTests
             (_, taskId) = await ProjectWithTaskAsync(owner, "Dated");
             refused = await EditTaskAsync(owner, owner.SpaceId, taskId, RawBody($$"""{"dueDate":{{dueDateJson}}}"""));
             afterRefusal = await DueDateAsync(database, owner.SpaceId, taskId);
-            anchor = await EditTaskAsync(owner, owner.SpaceId, taskId, Body(new { dueDate = TaskEditScaffold.EarliestDueDate }));
+            anchor = await EditTaskAsync(owner, owner.SpaceId, taskId, Body(new { dueDate = TaskDueDate.Earliest }));
         });
 
         Assert.NotNull(owner);
         Assert.True(refused?.StatusCode == HttpStatusCode.BadRequest, $"{refused?.StatusCode} {refused?.Body}");
-        Assert.Equal(TaskEditScaffold.InvalidDueDate, Problem(refused!)?.Type);
+        Assert.Equal(ProblemTypes.InvalidDueDate, Problem(refused!)?.Type);
         Assert.Null(afterRefusal);
         Assert.Equal(HttpStatusCode.OK, anchor?.StatusCode);
     }
@@ -399,7 +399,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="body">The raw body.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11 - no Task PATCH route yet (Task 5; Q1)")]
+    [Theory]
     [InlineData("{\"title\":")]
     [InlineData("{}")]
     [InlineData("{\"description\":\"no such member here\"}")]
@@ -432,7 +432,7 @@ public sealed partial class TaskEndpointTests
     /// Task is unchanged, whatever any interface offered. Anchor: a Member of the same Space edits it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - no Task PATCH route yet (Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "AD-4")]
@@ -487,7 +487,7 @@ public sealed partial class TaskEndpointTests
     /// and records nothing. Anchor: the Owner's real Task is read.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - the Task GET and PATCH routes do not exist yet (Task 4, Task 5)")]
+    [Fact]
     [Trait("Requirement", "AD-20")]
     public async Task An_unknown_Task_id_answers_the_boundary_404_on_read_and_edit_and_records_nothing()
     {
@@ -534,7 +534,7 @@ public sealed partial class TaskEndpointTests
     /// Token (<c>read-projects-and-tasks</c>), and both answers are the Owner's, byte for byte.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the Task GET route does not exist yet (Task 4, Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-20")]
     [Trait("Requirement", "AD-4")]
     public async Task A_Task_is_read_with_its_due_date_and_a_Viewer_reads_what_the_Owner_reads()
@@ -580,7 +580,7 @@ public sealed partial class TaskEndpointTests
     /// Space holds Tasks in every column.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - no Task PATCH route yet (Task 5, Task 10 S-2)")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "AR-24")]
     public async Task After_a_run_of_edits_no_Task_holds_a_Status_outside_its_effective_set()
@@ -620,7 +620,7 @@ public sealed partial class TaskEndpointTests
     /// <c>409</c>, so the Project is full.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - no Task PATCH route yet; this is the ConsultsBound plant's case (Task 5, Task 12)")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     public async Task An_edit_is_admitted_in_a_Project_that_holds_the_Task_limit()

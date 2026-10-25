@@ -43,7 +43,8 @@ namespace Yello.Tests.Slices.Tasks;
 public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
     : IClassFixture<MigratedDatabaseFixture>
 {
-    private static readonly string[] TaskProperties = ["createdAt", "id", "positionKey", "statusId", "title"];
+    // Story 2.3 appended dueDate (AD-19: adding a field is legal in v1); the set is still pinned exactly.
+    private static readonly string[] TaskProperties = ["createdAt", "dueDate", "id", "positionKey", "statusId", "title"];
 
     private static readonly string[] CreationOrderTitles = ["Charlie", "Alpha", "Bravo"];
 

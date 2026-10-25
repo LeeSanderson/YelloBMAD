@@ -24,6 +24,17 @@ public static class TaskRoutes
     public static string Create => "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/tasks";
 
     /// <summary>
+    /// The route parameter naming one Task.
+    /// </summary>
+    public static string TaskIdParameter => "taskId";
+
+    /// <summary>
+    /// One Task: <c>GET</c> it as a <see cref="TaskResponse"/>, or <c>PATCH</c> an <see cref="EditTaskRequest"/>
+    /// here for <c>200</c> with the Task as stored. Story 2.3. The path never holds the Project (FR-41).
+    /// </summary>
+    public static string Task => "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}";
+
+    /// <summary>
     /// The create path for one Project, as a client calls it.
     /// </summary>
     /// <param name="spaceId">The Space.</param>

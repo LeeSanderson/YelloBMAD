@@ -49,6 +49,27 @@ public static class RefusalCopy
     public static string IdempotencyKeyReusedKey => "IdempotencyKeyReused";
 
     /// <summary>
+    /// The resource key for <c>400 invalid-task-title</c>, met by a Task creation and a Task edit.
+    /// </summary>
+    public static string InvalidTaskTitleKey => "TaskTitleInvalid";
+
+    /// <summary>
+    /// The resource key for <c>400 invalid-task-status</c>: a Task edit's Status is not one of its Project's
+    /// (story 2.3).
+    /// </summary>
+    public static string InvalidTaskStatusKey => "InvalidTaskStatus";
+
+    /// <summary>
+    /// The resource key for <c>400 invalid-due-date</c> (story 2.3).
+    /// </summary>
+    public static string InvalidDueDateKey => "InvalidDueDate";
+
+    /// <summary>
+    /// The resource key for <c>400 invalid-task-edit</c>: an edit body the server could not read (story 2.3).
+    /// </summary>
+    public static string InvalidTaskEditKey => "InvalidTaskEdit";
+
+    /// <summary>
     /// The resource a refusal is rendered with.
     /// </summary>
     /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
@@ -87,20 +108,27 @@ public static class RefusalCopy
             return new RefusalMessage(problem.Bound, limit);
         }
 
-        // A creation meets these two, and neither is a not-found: a person told their request is still in
-        // flight must not be told it does not exist (story 2.2, AC13; deferred-work.md:460).
-        if (string.Equals(type, ProblemTypes.IdempotencyKeyInFlight, StringComparison.Ordinal))
+        // None of these is a not-found. A person told their request is still in flight must not be told it
+        // does not exist (story 2.2, AC13; deferred-work.md:460), and a person whose edit had one field refused
+        // must not be told their Task is gone (story 2.3, AC12).
+        if (OwnKey(type) is { } own)
         {
-            return new RefusalMessage(IdempotencyKeyInFlightKey, Limit: null);
-        }
-
-        if (string.Equals(type, ProblemTypes.IdempotencyKeyReused, StringComparison.Ordinal))
-        {
-            return new RefusalMessage(IdempotencyKeyReusedKey, Limit: null);
+            return new RefusalMessage(own, Limit: null);
         }
 
         return new RefusalMessage(NotAvailableKey, Limit: null);
     }
+
+    private static string? OwnKey(string? type) => type switch
+    {
+        _ when string.Equals(type, ProblemTypes.IdempotencyKeyInFlight, StringComparison.Ordinal) => IdempotencyKeyInFlightKey,
+        _ when string.Equals(type, ProblemTypes.IdempotencyKeyReused, StringComparison.Ordinal) => IdempotencyKeyReusedKey,
+        _ when string.Equals(type, ProblemTypes.InvalidTaskTitle, StringComparison.Ordinal) => InvalidTaskTitleKey,
+        _ when string.Equals(type, ProblemTypes.InvalidTaskStatus, StringComparison.Ordinal) => InvalidTaskStatusKey,
+        _ when string.Equals(type, ProblemTypes.InvalidDueDate, StringComparison.Ordinal) => InvalidDueDateKey,
+        _ when string.Equals(type, ProblemTypes.InvalidTaskEdit, StringComparison.Ordinal) => InvalidTaskEditKey,
+        _ => null,
+    };
 }
 
 /// <summary>

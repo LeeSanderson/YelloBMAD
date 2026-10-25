@@ -1,0 +1,36 @@
+@using Yello.Client.Spaces
+
+@*
+    ONE STATUS IN THE TASK DETAIL PANEL'S PICKER - story 2.3, UX-DR11. An option of the in-panel listbox
+    (open question 11): the Task's current Status is marked as current (aria-checked), and no option is ever
+    pre-selected as a destination (aria-selected is always false). Choosing one - click, Enter or Space -
+    commits it at once; there is nothing to confirm.
+*@
+
+<li class="picker__option"
+    role="option"
+    tabindex="0"
+    aria-selected="false"
+    aria-checked="@(Current ? "true" : "false")"
+    @onclick="ChooseAsync"
+    @onkeydown="KeyDownAsync">@Option.Name</li>
+
+@code {
+    /// <summary>The Status this option offers.</summary>
+    [Parameter]
+    [EditorRequired]
+    public TaskStatusOption Option { get; set; }
+
+    /// <summary>Whether it is the Task's current Status.</summary>
+    [Parameter]
+    public bool Current { get; set; }
+
+    /// <summary>Raised with the Status's id when it is chosen.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnChoose { get; set; }
+
+    private Task ChooseAsync() => OnChoose.InvokeAsync(Option.Id);
+
+    private Task KeyDownAsync(KeyboardEventArgs args) =>
+        args.Key is "Enter" or " " ? ChooseAsync() : Task.CompletedTask;
+}

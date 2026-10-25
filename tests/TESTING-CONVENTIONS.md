@@ -109,6 +109,15 @@ Account present in the Space first: an Account's first request in a Space insert
 `SpacePresence` row, and the second Account's presence count waits on it, which serialises the pair
 before they reach the race at all - why story 2.1's case caught its plant only 2 times in 3. Firing two
 requests with `Task.WhenAll` and asserting on whatever happened is not a race case.
+
+**When the race is about a read, the test does the other write - added by story 2.3.** Holding the range
+proves both writers queue, but a writer that reads without the lock may still be serialised by the
+other writer's exclusive key locks and get the right answer by luck (story 2.3's two race cases caught a
+removed `UPDLOCK, HOLDLOCK` only one run in three). So the deterministic case holds the range, sends the
+one request, waits until it is blocked, then writes in its own transaction what the competing writer would
+(`A_Status_edit_reads_the_last_key_of_its_new_column_only_under_the_lock` places a Task at the column's
+next key) and commits: a request that read before the lock computes the same key and collides, three runs
+in three.
 **Randomised data where identity does not matter; fixed where an assertion depends on it.**
 
 **Never a shared email address.** FR-1 makes an Account's email unique, so a shared literal is
@@ -193,6 +202,16 @@ real Chromium with **no Host, no database and no container**. The rules:
   Space-scoped request for an id the switcher did not list).
 - **Hold an answer with a `TaskCompletionSource`, never with `Task.Delay`** (`HoldAsync` /
   `Release`), to assert what is on screen while a response is outstanding.
+- **An optimistic edit is tested hold, assert, release, assert - added by story 2.3.** Arm the hold
+  (`HoldTaskEditAsync` holds the *next* edit only), make the change, await the hold's arrival, assert the
+  new value is already on the card and in the panel while the request is out (AC1's ordering, the one 2.1's
+  non-optimistic rename rejected), then release it admitted, refused (`ReleaseTaskEditRefused`) or
+  unanswered (`ReleaseTaskEditUnanswered`, a connection reset) and assert the value stays or reverts with
+  its copy. A case about two attributes holds the first edit and lets the second be answered, so a revert
+  is proved to go to the attribute's last *admitted* value, not to the display before either edit.
+- **Build `Yello.Client` before a browser plant.** The suite serves the client's own build output
+  with `--no-build` and the test project does not reference it, so `dotnet build tests/Yello.Tests.Client`
+  leaves a planted component unserved and the plant looks uncaught. Build `Yello.Client` (or the solution).
 - **What it does not prove**, stated in its remarks: the real Session cookie across origins, the
   real preflight, and anything the Host decides. Those are story 1.9's.
 - **Never wait for a client-side navigation with Playwright's URL wait.** Its default waits for
@@ -641,6 +660,10 @@ of wall clock on the development machine.
 **Counts when story 2.2's dev phase closed:** 743 cases - 740 passed, 0 failed, 3 skipped (the bundle
 cases and the legacy-factor duration case, `YELLO_MIGRATION_BUNDLE` unset), in about 2 m 55 s of wall
 clock. Still four engines; 2.2 added no engine and no fixture type.
+
+**Counts when story 2.3's dev phase closed:** 841 cases - 838 passed, 0 failed, 3 skipped (the same three,
+`YELLO_MIGRATION_BUNDLE` unset), in about 4 minutes of wall clock. Still four engines; 2.3 added no engine,
+no fixture type and no serial collection - its race cases hold locks briefly and add no timing case.
 
 ## Not yet decided
 
