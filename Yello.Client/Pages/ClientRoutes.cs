@@ -99,6 +99,15 @@ public static class ClientRoutes
     public static string SpaceHome(Guid spaceId) => $"/spaces/{spaceId:D}";
 
     /// <summary>
+    /// A Project's Board (story 2.2). Ids only, never a name (UX-DR33); the Space leads, so
+    /// <see cref="SpaceIn"/> reads it and the purge hook covers the Board as it covers Space home.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="projectId">The Project.</param>
+    /// <returns>The path.</returns>
+    public static string Board(Guid spaceId, Guid projectId) => $"/spaces/{spaceId:D}/projects/{projectId:D}";
+
+    /// <summary>
     /// The Space a client route is in, or <c>null</c> for a route outside every Space.
     /// </summary>
     /// <param name="relativePath">

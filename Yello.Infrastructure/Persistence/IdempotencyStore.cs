@@ -25,6 +25,11 @@ namespace Yello.Infrastructure.Persistence;
 /// first's key lock; once the first commits it fails, and the caller rolls back its whole unit of work.
 /// A duplicate-key error ends only the statement, so the failed entity is detached here.
 /// </para>
+/// <para>
+/// <b>The duplicate key can only be the record's own</b> (story 2.2, Task 8): before saving, the store
+/// refuses to run with any other change pending in the unit of work, so the one statement that can fail on
+/// a unique index is this record's insert.
+/// </para>
 /// </remarks>
 /// <param name="dbContext">The request's unit of work.</param>
 /// <param name="identifiers">Produces the record's identity.</param>
@@ -76,6 +81,12 @@ internal sealed class IdempotencyStore(YelloDbContext dbContext, IIdentifierGene
         RecordedResponse response,
         CancellationToken cancellationToken)
     {
+        // Every store saves its own effect, so the record is the only change this save may flush. Anything
+        // else pending would be saved here, and a duplicate key in IT would be reported as this key's
+        // in-flight 409 - a write silently mis-recorded (deferred-work.md:470). Refused before any
+        // statement, so the unit of work rolls back as for any other fault.
+        EnsureNothingElseIsPending();
+
         var now = clock.GetUtcNow();
         var oldest = now - IIdempotencyStore.Retention;
 
@@ -113,6 +124,26 @@ internal sealed class IdempotencyStore(YelloDbContext dbContext, IIdentifierGene
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Fails closed when the unit of work holds any unsaved change: a store that left its effect for this
+    /// save to flush would have its duplicate key read as the record's own.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">An entity other than the record is pending.</exception>
+    private void EnsureNothingElseIsPending()
+    {
+        var pending = dbContext.ChangeTracker.Entries()
+            .Where(entry => entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
+            .Select(entry => entry.Metadata.ClrType.Name)
+            .ToList();
+
+        if (pending.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"The idempotency record must be the only change it saves, and {string.Join(", ", pending)} "
+                + "is still pending. A store saves its own effect before the record is taken.");
+        }
     }
 
     /// <summary>

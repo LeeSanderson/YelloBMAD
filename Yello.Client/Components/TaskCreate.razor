@@ -1,0 +1,197 @@
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Spaces
+@using Yello.Contracts.Tasks
+
+@implements IDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceWrites Writes
+
+@*
+    THE INLINE TASK FIELD, at the top of the Board's first column - story 2.2, AC2, AC7, AC13, AC14;
+    open question 8 (a); UX-DR33, UX-DR37.
+
+    ONE FIELD, "Add" AND "Cancel"; Esc cancels. It stays open and empty after each Task, for the next one.
+    The title field is autocomplete="off" under a random name no browser would match to a saved value.
+
+    NOT OPTIMISTIC: the id and the position key are the server's, so a card appears only on the 201. Each
+    attempt carries an Idempotency-Key; a title sent again after an attempt that got no answer - or one
+    answered "still in flight" - reuses that attempt's key, because it may already have been applied.
+
+    EVERY REFUSAL SAID HERE, in words of its own: an invalid title beside the field; the bound, a Role
+    changed under the page and the two idempotency refusals inline (RefusalText); a 404 goes to the page's
+    one refusal surface. A connection that fails says so, rather than claiming the Project is gone.
+
+    ITS TEXT SURVIVES A RE-ARRIVAL: the Board keeps this component mounted while the Role still permits it
+    (AC14), and purges it with the Space.
+*@
+
+<form class="task-create" @onsubmit="CreateAsync" @onkeydown="KeyDownAsync" novalidate>
+    <FormField FieldId="task-create-title"
+               FieldName="@_fieldName"
+               Label="@Localizer["TaskTitleLabel"]"
+               Value="@_title"
+               ValueChanged="value => _title = value"
+               Message="@_titleMessage"
+               Invalid="@(_titleMessage is not null)"
+               FocusOnFirstRender="true" />
+
+    @if (_refusal is { } refusal)
+    {
+        <p class="task-create__refusal" role="status">@refusal</p>
+    }
+
+    <div class="task-create__actions">
+        @if (!_submitting)
+        {
+            <PrimaryButton>@Localizer["TaskAddSubmit"]</PrimaryButton>
+            <button type="button" class="button-secondary" @onclick="OnClose">@Localizer["TaskCancel"]</button>
+        }
+
+        @if (_submitting)
+        {
+            <p class="task-create__progress" role="status">@Localizer["TaskAdding"]</p>
+        }
+    </div>
+</form>
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    // A field name no browser's autofill would match to a saved value (UX-DR33): random per field.
+    private readonly string _fieldName = Guid.NewGuid().ToString("N");
+
+    /// <summary>
+    /// Bumped on disposal: an answer that arrives after the field has gone is dropped.
+    /// </summary>
+    private int _generation;
+
+    private bool _submitting;
+    private string _title = string.Empty;
+    private string? _titleMessage;
+    private string? _refusal;
+    private UnansweredCreate? _unanswered;
+
+    /// <summary>The Space the Project is in.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>The Project the Task is created in.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    /// <summary>Raised with each Task the server created.</summary>
+    [Parameter]
+    public EventCallback<TaskResponse> OnCreated { get; set; }
+
+    /// <summary>Raised for a <c>404</c>: the page renders its one refusal surface.</summary>
+    [Parameter]
+    public EventCallback<ProblemResponse?> OnRefused { get; set; }
+
+    /// <summary>Raised when the field is closed, by Cancel or by Esc.</summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <inheritdoc />
+    public void Dispose() => _generation++;
+
+    private Task KeyDownAsync(KeyboardEventArgs args) =>
+        args.Key == "Escape" && !_submitting ? OnClose.InvokeAsync() : Task.CompletedTask;
+
+    private async Task CreateAsync()
+    {
+        if (_submitting)
+        {
+            return;
+        }
+
+        _submitting = true;
+        _titleMessage = null;
+        _refusal = null;
+
+        var generation = _generation;
+
+        var key = _unanswered is { } unanswered && string.Equals(unanswered.Title, _title, StringComparison.Ordinal)
+            ? unanswered.Key
+            : Guid.NewGuid().ToString("D");
+
+        _unanswered = new UnansweredCreate(_title, key);
+
+        try
+        {
+            using var answer = await Writes.SendAsync(HttpMethod.Post, TaskRoutes.CreateIn(SpaceId, ProjectId), new CreateTaskRequest(_title), key, ActiveSpace.Token);
+
+            // In flight means the first use of this key has not finished: a resend must still reuse it.
+            if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
+            {
+                _unanswered = null;
+            }
+
+            if (generation == _generation)
+            {
+                await UseAnswerAsync(answer, generation);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way.
+        }
+        catch (HttpRequestException)
+        {
+            _refusal = Localizer["SubmitFailed"];
+        }
+        catch (JsonException)
+        {
+            _refusal = Localizer["SubmitFailed"];
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    /// <summary>
+    /// The server's answer: the created Task to the Board, and the field emptied for the next; or the
+    /// refusal, said where it was sent. A 401 is YelloApiHandler's.
+    /// </summary>
+    private async Task UseAnswerAsync(SpaceWriteAnswer answer, int generation)
+    {
+        switch (answer.StatusCode)
+        {
+            case HttpStatusCode.Created:
+                if (await answer.Response.Content.ReadFromJsonAsync<TaskResponse>(JsonOptions, ActiveSpace.Token) is { } created
+                    && generation == _generation)
+                {
+                    _title = string.Empty;
+                    await OnCreated.InvokeAsync(created);
+                }
+
+                return;
+
+            case HttpStatusCode.Unauthorized:
+                return;
+
+            case HttpStatusCode.NotFound:
+                await OnRefused.InvokeAsync(answer.Problem);
+                return;
+
+            case HttpStatusCode.BadRequest when answer.Problem?.Type == ProblemTypes.InvalidTaskTitle:
+                _titleMessage = Localizer["TaskTitleInvalid"];
+                return;
+
+            default:
+                _refusal = RefusalText.Of(Localizer, answer.Problem);
+                return;
+        }
+    }
+
+    /// <summary>
+    /// A creation sent with no answer yet: its title, exactly as sent, and its Idempotency-Key.
+    /// </summary>
+    private sealed record UnansweredCreate(string Title, string Key);
+}

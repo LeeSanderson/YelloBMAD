@@ -39,7 +39,13 @@
     a navigation, not a switch: the page's own heading takes focus then.
 
     ACCOUNT (story 1.8) leads to Account settings, where API Tokens are issued and revoked - after
-    the switcher and before Sign out, so the bar is three tab stops.
+    the switcher and before Sign out, so the bar is three tab stops. The layout's skip control, before
+    the bar, passes all three in one (story 2.2, open question 9 (a)).
+
+    THE PROJECT'S NAME, ON THE BOARD (story 2.2; DESIGN.md:454), in typography.meta after the Space name,
+    from the Board's own answer on this load (ActiveSpaceState.ProjectName) and never from Space home's
+    list. Purged with the Space, cleared on leaving the Board, and dropped by CSS at 768-1279px
+    (EXPERIENCE.md:413-419), where the Role chip is not.
 
     SIGN OUT asks the server to end the Session (which refuses every copy of the cookie from then
     on), then runs the same purge an expired Session does and lands on sign-in with no reason.
@@ -60,6 +66,11 @@
             }
             <span class="context-bar__switch-label">@Localizer["SwitchSpaceLabel"]</span>
         </button>
+
+        @if (ActiveSpace.Current is not null && ActiveSpace.ProjectName is { } project)
+        {
+            <span class="type-meta context-bar__project">@project</span>
+        }
 
         @if (ActiveSpace.Current is { } held)
         {

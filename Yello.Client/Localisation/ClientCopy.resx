@@ -386,6 +386,58 @@
     <value>A Project name is 1 to 100 characters.</value>
     <comment>The invalid-project-name refusal, beside the name field. Never "that name is taken" - Project names need not be unique.</comment>
   </data>
+  <data name="BoardLoading" xml:space="preserve">
+    <value>Loading the Board.</value>
+    <comment>Visually hidden inside the Board's cold-load skeleton (UX-DR35).</comment>
+  </data>
+  <data name="BoardLoaded" xml:space="preserve">
+    <value>Board loaded.</value>
+    <comment>Announced politely, once, when the Board has answered (EXPERIENCE.md:390).</comment>
+  </data>
+  <data name="BoardEmpty" xml:space="preserve">
+    <value>Nothing here yet.</value>
+    <comment>A Project holding no Tasks (UX-DR35, EXPERIENCE.md:251). No sub-line, and nothing about Statuses or configuration.</comment>
+  </data>
+  <data name="TaskAdd" xml:space="preserve">
+    <value>Add a Task</value>
+    <comment>The one primary action on an empty Board, and the accessible name of the first column's create control.</comment>
+  </data>
+  <data name="TaskTitleLabel" xml:space="preserve">
+    <value>Task title</value>
+    <comment>The label of the inline field a Task is created from.</comment>
+  </data>
+  <data name="TaskAddSubmit" xml:space="preserve">
+    <value>Add</value>
+    <comment>Sends the Task in the field. The field stays open, empty, for the next one.</comment>
+  </data>
+  <data name="TaskCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Closes the Task field without sending anything. Esc does the same.</comment>
+  </data>
+  <data name="TaskAdding" xml:space="preserve">
+    <value>Adding the Task.</value>
+    <comment>Shown while a Task creation is on its way.</comment>
+  </data>
+  <data name="TaskAdded" xml:space="preserve">
+    <value>Task added.</value>
+    <comment>Announced politely after a Task is created.</comment>
+  </data>
+  <data name="TaskTitleInvalid" xml:space="preserve">
+    <value>A Task title is 1 to 200 characters.</value>
+    <comment>The invalid-task-title refusal, beside the title field.</comment>
+  </data>
+  <data name="SkipToContent" xml:space="preserve">
+    <value>Skip to content</value>
+    <comment>The first tab stop on every authenticated surface: moves focus past the context bar to the page's heading.</comment>
+  </data>
+  <data name="IdempotencyKeyInFlight" xml:space="preserve">
+    <value>That was already sent. Reload to see it.</value>
+    <comment>409 idempotency-key-in-flight, inline where a creation or a rename was sent. Never "Not available."</comment>
+  </data>
+  <data name="IdempotencyKeyReused" xml:space="preserve">
+    <value>That request was already used for something else. Try again.</value>
+    <comment>422 idempotency-key-reused, inline where a creation or a rename was sent. Never "Not available."</comment>
+  </data>
   <data name="NoSpaceHeading" xml:space="preserve">
     <value>No Spaces yet</value>
     <comment>Heading shown to an Account that belongs to no Space. A valid state, not an error (UX-DR35); nothing is created for the person.</comment>

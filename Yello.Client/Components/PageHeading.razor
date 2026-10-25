@@ -1,0 +1,41 @@
+@implements IDisposable
+
+@inject PageHeadingFocus Focus
+
+@*
+    A SPACE-SCOPED PAGE'S <h1>. Story 2.2, open question 9 (a).
+
+    Registers itself with PageHeadingFocus when it renders, so the layout's skip control can move focus
+    here past the context bar, and takes focus itself when a Space's first arrival asked for it. A
+    programmatic focus target: tabindex="-1", never a tab stop.
+*@
+
+<h1 class="type-dialog-title" tabindex="-1" @ref="_heading">@ChildContent</h1>
+
+@code {
+    private ElementReference _heading;
+
+    /// <summary>The heading's text.</summary>
+    [Parameter]
+    [EditorRequired]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        Focus.Register(_heading);
+
+        if (Focus.ClaimRequest())
+        {
+            await _heading.FocusAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose() => Focus.Unregister(_heading);
+}

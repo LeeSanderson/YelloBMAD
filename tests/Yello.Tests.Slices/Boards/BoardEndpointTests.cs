@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Boards;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
 using Yello.Tests.Slices.Tasks;
@@ -13,7 +14,7 @@ namespace Yello.Tests.Slices.Boards;
 /// Story 2.2's Board read over the wire: <c>GET …/projects/{projectId}/board</c> answers the Project and one
 /// column per Status of its effective set, in effective order, each with the true total for that Status
 /// counted separately from the rows returned, and every Task of the Project in exactly one column. AC1,
-/// AC3-AC5, AC9; FR-28, AD-3, AD-16, AD-29. Red-phase scaffolds written by the story 2.2 ATDD run.
+/// AC3-AC5, AC9; FR-28, AD-3, AD-16, AD-29. Written red by the story 2.2 ATDD run; activated by its dev phase.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -46,7 +47,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
     /// the Space's default set, in <c>Position</c> order, each with <c>total: 0</c> and no Tasks.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - no Board route or read yet (Tasks 3-4)")]
+    [Fact]
     [Trait("Requirement", "AD-16")]
     public async Task An_empty_Projects_Board_answers_its_columns_in_effective_order_each_with_total_0()
     {
@@ -87,7 +88,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
     /// and the Space's id appears nowhere in it (a Space-scoped answer carries no <c>spaceId</c>).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - no Board route or contract yet (Task 3)")]
+    [Fact]
     [Trait("Priority", "P1")]
     public async Task The_Board_answer_has_exactly_the_contracts_properties_and_no_SpaceId()
     {
@@ -125,7 +126,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
     /// numbers so a total taken from the wrong column, or from the whole Project, cannot pass.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - no Board route or per-Status count yet (Task 4)")]
+    [Fact]
     [Trait("Requirement", "AD-29")]
     public async Task Each_columns_total_is_the_true_count_for_its_Status()
     {
@@ -173,7 +174,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
     /// appears in no column.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - no Board route or read yet (Task 4)")]
+    [Fact]
     public async Task Every_Task_of_the_Project_appears_in_exactly_one_column_and_no_other_Projects_does()
     {
         var database = Available();
@@ -228,7 +229,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
     /// Token: Role changes what can be done to a Board, never what it shows.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - no Board route yet (Task 4)")]
+    [Fact]
     [Trait("Requirement", "AD-4")]
     public async Task A_Viewer_is_served_the_same_Board_as_a_Member_on_both_surfaces()
     {
@@ -253,7 +254,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
 
             member = await BoardAsync(memberActor, owner.SpaceId, projectId);
             viewerSession = await BoardAsync(viewer, owner.SpaceId, projectId);
-            viewerToken = await viewer.Session.GetWithTokenAsync(TaskRouteScaffold.BoardOf(owner.SpaceId, projectId), token);
+            viewerToken = await viewer.Session.GetWithTokenAsync(BoardRoutes.BoardOf(owner.SpaceId, projectId), token);
         });
 
         Assert.Equal(HttpStatusCode.OK, member?.StatusCode);
@@ -268,7 +269,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
     /// nothing. Anchor: the same Owner's real Project's Board is served.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - no Board route yet (Task 4)")]
+    [Fact]
     [Trait("Requirement", "AD-20")]
     public async Task The_Board_of_a_Project_that_matches_nothing_answers_the_boundary_404_and_records_nothing()
     {

@@ -98,6 +98,17 @@ clock — a Testcontainers wait strategy, a completion signal, a polled predicat
 deadline. The test design calls this "cheaper to enforce as a convention from story 1.1 than
 to unpick later".
 
+**A race is controlled, never hoped for - added by story 2.2.** A case about two requests that race
+(a creation bound, a key's first use) holds the contended range itself and lets the requests queue on
+it: the test opens a connection under the Space's session key, begins a transaction, takes the same
+lock the product takes (`SELECT COUNT(*) ... WITH (UPDLOCK, HOLDLOCK)`), sends both requests, polls
+`sys.dm_exec_requests` with a deadline until both are blocked on any `LCK_M_%` wait
+(`TaskWire.WaitUntilBlockedOnALockAsync`), then commits. Wait on "blocked on a lock", not on one wait
+type, so a plant that drops the product's hint is caught at the insert instead. Make every racing
+Account present in the Space first: an Account's first request in a Space inserts its
+`SpacePresence` row, and the second Account's presence count waits on it, which serialises the pair
+before they reach the race at all - why story 2.1's case caught its plant only 2 times in 3. Firing two
+requests with `Task.WhenAll` and asserting on whatever happened is not a race case.
 **Randomised data where identity does not matter; fixed where an assertion depends on it.**
 
 **Never a shared email address.** FR-1 makes an Account's email unique, so a shared literal is
@@ -533,6 +544,15 @@ Host's request-finished line. A permanent oracle (the boundary refusal against t
 fallback, which records nothing) must read as distinguishable on both surfaces. The timing and
 pooled-connection rows run in collections with parallelisation disabled.
 
+**A Space-scoped not-found is held to a floor - added by story 2.2 (Q7 (a)).** The boundary `404`
+writes an `AccessRefusal` and the in-Space not-found (an id that matches nothing in one's own Space)
+writes nothing; measured on the Board route, the gap was 10.6-28.8% on a Session and 11.8-15.2% on a
+Token, and one run in three failed the 20% tolerance. `NotAvailableFloor` now holds every `404` a
+Space-scoped route answers to `SpaceBoundary:NotAvailableFloorMilliseconds` (50 ms by default), and
+the gap measures 0.1-1.2%. The unmatched fallback is outside the floor, so the permanent oracle still
+separates (93-99%). A timing row that passes only because both arms sit on the floor is the point:
+the floor is the product's equaliser, and it is what the row proves is in place.
+
 **The real browser against the real Host** is `Yello.Tests.Client`'s `RealHostCollection`: the dev
 server first, then a Host with `ClientOrigin` set to the client's origin, on a database on the
 suite's one engine, with `appsettings.Development.json` answered by `page.RouteAsync` carrying the
@@ -617,6 +637,10 @@ same Host therefore cannot satisfy a harness wait (`RunningHostCursorTests`).
 skipped (the legacy-factor duration case). Without it, the two bundle cases skip as well. There are
 still four engines (Slices, Isolation, Revocation, Client). A full local run took about 2.5 minutes
 of wall clock on the development machine.
+
+**Counts when story 2.2's dev phase closed:** 743 cases - 740 passed, 0 failed, 3 skipped (the bundle
+cases and the legacy-factor duration case, `YELLO_MIGRATION_BUNDLE` unset), in about 2 m 55 s of wall
+clock. Still four engines; 2.2 added no engine and no fixture type.
 
 ## Not yet decided
 

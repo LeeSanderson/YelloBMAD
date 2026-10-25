@@ -1,6 +1,10 @@
+---
+baseline_commit: 1395c0a5839c146b2fc95f999721f9ee54692cb2
+---
+
 # Story 2.2: Add Tasks and see them on a Board
 
-Status: ready-for-dev
+Status: review
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-2-add-tasks-and-see-them-on-a-board`
@@ -116,15 +120,15 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1023-1057` (`status: final`
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Confirm the gates, then record decisions before the code that depends on them** (AC: all)
-  - [ ] `dotnet build Yello.slnx`, then run `Yello.Tests.Isolation` filtered to `IsolationCaseListTests`. With 2.2 at `ready-for-dev` or `in-progress` the result is green, and `ISO-TIMING-IN-SPACE` is the one pending row. Record this in the Debug Log.
-  - [ ] Read the open questions. Decide Q1–Q4 before Task 2, Q5–Q6 before Task 4, Q7 before Task 9, Q8–Q10 before Task 10. Q11 can be decided at any time. Record each decision in the Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each decision is reversible.
+- [x] **Task 1 — Confirm the gates, then record decisions before the code that depends on them** (AC: all)
+  - [x] `dotnet build Yello.slnx`, then run `Yello.Tests.Isolation` filtered to `IsolationCaseListTests`. With 2.2 at `ready-for-dev` or `in-progress` the result is green, and `ISO-TIMING-IN-SPACE` is the one pending row. Record this in the Debug Log.
+  - [x] Read the open questions. Decide Q1–Q4 before Task 2, Q5–Q6 before Task 4, Q7 before Task 9, Q8–Q10 before Task 10. Q11 can be decided at any time. Record each decision in the Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each decision is reversible.
 
-- [ ] **Task 2 — The Task entity, its table and its policy** (AC: 2, 4, 8)
-  - [ ] Domain type in `Yello.Domain/Tasks/`. **The name collides with `System.Threading.Tasks.Task`** under the implicit usings that `Opinionated.DotNet.CodingStandards` turns on. Q1 decides the CLR name. Whatever it is, update `RefusalBoundaryGateTests.SpaceScopedEntities` (`RefusalBoundaryGateTests.cs:116-122`, which names `Yello.Domain.Tasks.Task` today) to the real full name. Then add an assertion that every listed name, other than `Label` (2.4), resolves to a type in the Domain assembly. Today a wrong name in that list silently covers nothing. Plant: misspell it, and the build must go red.
-  - [ ] Properties: `Id` (`init`); `SpaceId` (`init`, non-nullable, AC8, never settable after creation); `ProjectId` (settable only so FR-41/6.5 can move it within a Space; **no** 2.2 code path writes it after creation); `StatusId`; `Title` (settable, used by 2.3); `PositionKey` (Q2); `CreatedAt` (`DateTimeOffset`, UTC). There is **no description field** (`epics.md:437`; FR-31 is Epic 7). There are no navigation properties.
-  - [ ] Title rules in Domain (AR-34): a `TaskTitle.TryNormalise` like `ProjectName` (Q3).
-  - [ ] Configuration `TaskConfiguration(YelloDbContext context)`:
+- [x] **Task 2 — The Task entity, its table and its policy** (AC: 2, 4, 8)
+  - [x] Domain type in `Yello.Domain/Tasks/`. **The name collides with `System.Threading.Tasks.Task`** under the implicit usings that `Opinionated.DotNet.CodingStandards` turns on. Q1 decides the CLR name. Whatever it is, update `RefusalBoundaryGateTests.SpaceScopedEntities` (`RefusalBoundaryGateTests.cs:116-122`, which names `Yello.Domain.Tasks.Task` today) to the real full name. Then add an assertion that every listed name, other than `Label` (2.4), resolves to a type in the Domain assembly. Today a wrong name in that list silently covers nothing. Plant: misspell it, and the build must go red.
+  - [x] Properties: `Id` (`init`); `SpaceId` (`init`, non-nullable, AC8, never settable after creation); `ProjectId` (settable only so FR-41/6.5 can move it within a Space; **no** 2.2 code path writes it after creation); `StatusId`; `Title` (settable, used by 2.3); `PositionKey` (Q2); `CreatedAt` (`DateTimeOffset`, UTC). There is **no description field** (`epics.md:437`; FR-31 is Epic 7). There are no navigation properties.
+  - [x] Title rules in Domain (AR-34): a `TaskTitle.TryNormalise` like `ProjectName` (Q3).
+  - [x] Configuration `TaskConfiguration(YelloDbContext context)`:
     - Table `Task` (Glossary-exact; `SchemaNames.TaskTable`, added to `SpaceScopedTables`).
     - `ValueGeneratedNever()` on `Id`.
     - `SpaceId` mapped to `SchemaNames.SpaceIdColumn`, required.
@@ -132,8 +136,8 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1023-1057` (`status: final`
     - Composite FK `(SpaceId, ProjectId)` → `Project` alternate key `AK_Project_SpaceId_Id` (already exists, 2.1 Q4), `Cascade` (2.5 deletes a Project's Tasks with it).
     - Composite FK `(SpaceId, StatusId)` → `StatusDefinition`. **`StatusDefinition` has no `(SpaceId, Id)` key today** (`StatusDefinitionConfiguration.cs:26, 49`): add `HasAlternateKey(s => new { s.SpaceId, s.Id })`, expand-only.
     - The Status FK is `NoAction`/`Restrict`, and there is **no separate FK from Task to `Space`**. SQL Server refuses multiple cascade paths (error 1785): Space→Project→Task and Space→StatusDefinition→Task would be two. `SpaceId` is already constrained through the Project FK, which carries it.
-  - [ ] Index for the count and the column read: `(SpaceId, ProjectId, StatusId, PositionKey)`, unique if Q2 (a). `SpaceId` leads, so a seek and its key-range lock stay inside one Space's range (see `deferred-work.md:471`).
-  - [ ] Migration `…_Tasks`:
+  - [x] Index for the count and the column read: `(SpaceId, ProjectId, StatusId, PositionKey)`, unique if Q2 (a). `SpaceId` leads, so a seek and its key-range lock stay inside one Space's range (see `deferred-work.md:471`).
+  - [x] Migration `…_Tasks`:
     - The `StatusDefinition` alternate key, then the table.
     - `ALTER SECURITY POLICY dbo.SpaceIsolationPolicy ADD FILTER PREDICATE … ON dbo.[Task], ADD BLOCK PREDICATE … ON dbo.[Task] AFTER INSERT, ADD BLOCK PREDICATE … ON dbo.[Task] AFTER UPDATE`. The `AFTER UPDATE` block predicate makes "permanently to one Space" (AC2) a database fact, as 2.1 Q5 did for `Project`.
     - Bracket `[Task]`. `TASK` is not reserved in T-SQL, but brackets cost nothing.
@@ -141,98 +145,98 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1023-1057` (`status: final`
     - `Down` drops the predicates before the table.
     - Pattern: `20261025094743_Projects.cs`.
     - Hand-edit pass: `TESTING-CONVENTIONS.md:298-318`, with `Up` under 80 lines.
-  - [ ] `YelloDbContext`: `DbSet` plus an explicit configuration line. `PersistenceModelGateTests` fails otherwise. `SpaceIsolationSchemaTests.Every_Space_scoped_table_carries_a_filter_and_a_block_predicate` asserts **exactly three** predicates for `Project` and exactly two for every other table (2.1 Debug Log). Widen it so `Task` also expects three.
-  - [ ] **No table stores the effective Status set** (AD-16, AR-23). With no delta table until 6.1, the effective set is the Space's `StatusDefinition` rows in `Position` order. Read it through the existing `IStatusDefinitionReader` and derive it in one place (for example `EffectiveStatusSet.Of(spaceDefaults)` in Domain), so 6.1 adds the delta in one function. Ties: `StatusDefinitionReader` orders by `Position` with no tiebreaker (`deferred-work.md:271`). Add `.ThenBy(Id)` so column order is deterministic between requests. Doing so does not close that entry, which concerns custom Statuses.
+  - [x] `YelloDbContext`: `DbSet` plus an explicit configuration line. `PersistenceModelGateTests` fails otherwise. `SpaceIsolationSchemaTests.Every_Space_scoped_table_carries_a_filter_and_a_block_predicate` asserts **exactly three** predicates for `Project` and exactly two for every other table (2.1 Debug Log). Widen it so `Task` also expects three.
+  - [x] **No table stores the effective Status set** (AD-16, AR-23). With no delta table until 6.1, the effective set is the Space's `StatusDefinition` rows in `Position` order. Read it through the existing `IStatusDefinitionReader` and derive it in one place (for example `EffectiveStatusSet.Of(spaceDefaults)` in Domain), so 6.1 adds the delta in one function. Ties: `StatusDefinitionReader` orders by `Position` with no tiebreaker (`deferred-work.md:271`). Add `.ThenBy(Id)` so column order is deterministic between requests. Doing so does not close that entry, which concerns custom Statuses.
 
-- [ ] **Task 3 — Contracts** (AC: 1, 2, 5, 9)
-  - [ ] `Yello.Contracts/Tasks/TaskRoutes.cs`, with shapes per Q5:
+- [x] **Task 3 — Contracts** (AC: 1, 2, 5, 9)
+  - [x] `Yello.Contracts/Tasks/TaskRoutes.cs`, with shapes per Q5:
     - `Create` = `POST /api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/tasks`.
     - `TaskOf(spaceId, taskId)` = `/api/v1/spaces/{s}/tasks/{t}`. This is the creation's `Location`, and 2.3's by-id route. A Task can change Project later (FR-41), so its URL must not contain the Project.
-  - [ ] `Yello.Contracts/Boards/BoardRoutes.cs`: `Board` = `GET /api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/board`.
-  - [ ] `CreateTaskRequest(string? Title)`. **It carries no Status, Project, Space or position**: AC2's "first Status" is then true by construction.
-  - [ ] `TaskResponse(Guid Id, string Title, Guid StatusId, string PositionKey, DateTimeOffset CreatedAt)`. `PositionKey` is readable and not writable (FR-35, AD-15).
-  - [ ] `BoardResponse(BoardProjectResponse Project, IReadOnlyList<BoardColumnResponse> Columns)`.
-  - [ ] `BoardColumnResponse(Guid StatusId, string Name, int Total, IReadOnlyList<TaskResponse> Tasks)`. `Total` is the separate count (AC5), never `Tasks.Count`.
-  - [ ] Nothing carries a `SpaceId` (as `StatusResponse`'s remarks say).
-  - [ ] `ProblemTypes.InvalidTaskTitle` (`400`), with remarks stating what it never means.
-  - [ ] Client copy for the two idempotency refusals (Task 11) uses the existing `IdempotencyKeyInFlight` and `IdempotencyKeyReused` types. Do not add new types for them.
+  - [x] `Yello.Contracts/Boards/BoardRoutes.cs`: `Board` = `GET /api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/board`.
+  - [x] `CreateTaskRequest(string? Title)`. **It carries no Status, Project, Space or position**: AC2's "first Status" is then true by construction.
+  - [x] `TaskResponse(Guid Id, string Title, Guid StatusId, string PositionKey, DateTimeOffset CreatedAt)`. `PositionKey` is readable and not writable (FR-35, AD-15).
+  - [x] `BoardResponse(BoardProjectResponse Project, IReadOnlyList<BoardColumnResponse> Columns)`.
+  - [x] `BoardColumnResponse(Guid StatusId, string Name, int Total, IReadOnlyList<TaskResponse> Tasks)`. `Total` is the separate count (AC5), never `Tasks.Count`.
+  - [x] Nothing carries a `SpaceId` (as `StatusResponse`'s remarks say).
+  - [x] `ProblemTypes.InvalidTaskTitle` (`400`), with remarks stating what it never means.
+  - [x] Client copy for the two idempotency refusals (Task 11) uses the existing `IdempotencyKeyInFlight` and `IdempotencyKeyReused` types. Do not add new types for them.
 
-- [ ] **Task 4 — The slices and endpoints** (AC: 1, 2, 4, 5, 9)
-  - [ ] `Yello.Application/Tasks/CreateTask/` (AR-3 naming from FR-19's title) and `Yello.Application/Boards/ViewBoard/` (the spine's capability map: `Application/Boards/*`, `ARCHITECTURE-SPINE.md:412-415`). Handlers take the pipeline's `ActiveSpaceContext` or nothing. **None reads the Role, counts Tasks, checks a capability or touches `Idempotency-Key`**; the existing gates catch each.
-  - [ ] Ports in `Yello.Domain/Tasks` and `Yello.Domain/Boards` (or one store), implemented in Infrastructure and registered beside `ProjectStore` (`SpaceContentStores.cs`; `InfrastructureServices` is at S1200's coupling limit, per the 2.1 Debug Log). There is **no `Where(SpaceId == …)`**. Both layers are already narrowed.
-  - [ ] **Create**:
+- [x] **Task 4 — The slices and endpoints** (AC: 1, 2, 4, 5, 9)
+  - [x] `Yello.Application/Tasks/CreateTask/` (AR-3 naming from FR-19's title) and `Yello.Application/Boards/ViewBoard/` (the spine's capability map: `Application/Boards/*`, `ARCHITECTURE-SPINE.md:412-415`). Handlers take the pipeline's `ActiveSpaceContext` or nothing. **None reads the Role, counts Tasks, checks a capability or touches `Idempotency-Key`**; the existing gates catch each.
+  - [x] Ports in `Yello.Domain/Tasks` and `Yello.Domain/Boards` (or one store), implemented in Infrastructure and registered beside `ProjectStore` (`SpaceContentStores.cs`; `InfrastructureServices` is at S1200's coupling limit, per the 2.1 Debug Log). There is **no `Where(SpaceId == …)`**. Both layers are already narrowed.
+  - [x] **Create**:
     1. Confirm the Project is visible (RLS and the filter hide another Space's). If it is not, return `null` → the endpoint answers `BoundaryProblems.NotAvailable()` byte-identically, with **no** refusal record (AD-20). An FK violation must never surface as a `500`.
     2. The first Status of the effective set is the Task's `StatusId`.
     3. `SpaceId` comes from the context, never the request.
     4. The id comes from `IIdentifierGenerator`.
     5. The position key is per Q2.
-  - [ ] **Board read**:
+  - [x] **Board read**:
     1. The Project (not found → the same `404`, no record).
     2. The effective set, in order.
     3. Per Status, the **true total** as its own `COUNT` over `(SpaceId, ProjectId, StatusId)`. One grouped `COUNT … GROUP BY StatusId` is acceptable. It must not be derived from the rows returned (AC5, AD-29).
     4. The Tasks per column ordered by `PositionKey` then `Id` (Q6 decides how many).
     5. Materialise before return (`UnitOfWorkResults.EnsureMaterialised`).
     6. A Task whose `StatusId` is not in the effective set cannot exist in 2.2 (composite FK, first-Status create). Still, assert AC4 structurally: the read assigns each Task to exactly one column by `StatusId`, and a test seeds Tasks across all three Statuses and checks the union of the columns equals the Project's Tasks with no duplicate.
-  - [ ] Endpoints in `Yello.Host/Endpoints/TaskEndpoints.cs` and `BoardEndpoints.cs`, mapped through `api` in `Program.cs`:
+  - [x] Endpoints in `Yello.Host/Endpoints/TaskEndpoints.cs` and `BoardEndpoints.cs`, mapped through `api` in `Program.cs`:
     - `POST` create → `RequiresCapability(Capability.ManageTasks)` (wire code `manage-tasks`; copy exists, `ClientCopy.resx:410`) and `.ConsultsBound(Bound.TasksPerProject)` → `201` with `TaskResponse`. Set `Location` on `httpContext.Response.Headers` as `ProjectEndpoints.CreateAsync` does, never via `Results.Created` (see Task 8). Responses: `400 invalid-task-title`; `404 not-available` for an unknown Project.
     - `GET` board → `RequiresCapability(Capability.ReadProjectsAndTasks)` → `200`.
     - Neither is `SessionOnly`. Read the body inside the endpoint (`ProjectEndpoints.ReadAsync` pattern, including the `InvalidOperationException` catch the 2.1 review added).
-  - [ ] Structured logs: `SpaceId`, never a title or a Project name. Add every Task title an isolation case creates to the world's secret set (I-17).
+  - [x] Structured logs: `SpaceId`, never a title or a Project name. Add every Task title an isolation case creates to the world's secret set (I-17).
 
-- [ ] **Task 5 — The Tasks-per-Project bound, in the pipeline** (AC: 7, 11)
-  - [ ] **The count is per Project, and the pipeline does not know the Project today.** `IBoundCounter.CountAsync(Bound, CancellationToken)` counts across the active Space (`BoundCounter.cs`). Extend the port with the scope the bound needs, for example `CountAsync(Bound bound, Guid? scopeId, …)`. For `TasksPerProject`, the pipeline reads `scopeId` from the route value `projectId` (`ProjectRoutes.ProjectIdParameter`), and the declared bound fails closed (Host refuses to start, or the call throws) on a route that lacks it. This is the pipeline's work, not the slice's (AR-3). `Only_the_pipeline_depends_on_the_bound_count_port` still holds.
-  - [ ] SQL, in Infrastructure only: `SELECT COUNT(*) FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = @projectId`. RLS narrows it to the Space, and the Task 2 index gives a seek on `(SpaceId, ProjectId, …)`, so the range lock covers one Project's range plus the next key. Use a parameterised `SqlQuery` (FormattableString), never concatenation.
-  - [ ] **Serialisation side effect, which Q2 (a) relies on:** because every Task creation counts under that lock before the endpoint runs, two creations in the same Project serialise, so "append after the current last key" cannot produce a duplicate key. Say this in `BoundCounter`'s remarks and in the position-key code.
-  - [ ] An unknown or foreign `projectId` counts 0 and passes. The slice then answers `404`. Prove this (Task 12).
-  - [ ] Wire cases: seed 4,999 Tasks by raw SQL under the Space session key (as `SeedProjectsAsync` does), then the 5,000th (`201`, the anchor), then the 5,001st → `409 bound-reached`, `bound: tasks-per-project`, `limit: 5000`. `SELECT COUNT(*)` is still 5,000, and no refusal row exists. Copy exists: "This Project has {0} Tasks, the maximum." (`ClientCopy.resx:474-476`).
-  - [ ] **A full Project does not block another Project.** Anchor: Project P2 in the same Space creates a Task while P1 holds 5,000.
-  - [ ] Replay before bound (2.1 Task 7 order): the key of the 5,000th creation replays its `201`, not the 5,001st's `409`.
+- [x] **Task 5 — The Tasks-per-Project bound, in the pipeline** (AC: 7, 11)
+  - [x] **The count is per Project, and the pipeline does not know the Project today.** `IBoundCounter.CountAsync(Bound, CancellationToken)` counts across the active Space (`BoundCounter.cs`). Extend the port with the scope the bound needs, for example `CountAsync(Bound bound, Guid? scopeId, …)`. For `TasksPerProject`, the pipeline reads `scopeId` from the route value `projectId` (`ProjectRoutes.ProjectIdParameter`), and the declared bound fails closed (Host refuses to start, or the call throws) on a route that lacks it. This is the pipeline's work, not the slice's (AR-3). `Only_the_pipeline_depends_on_the_bound_count_port` still holds.
+  - [x] SQL, in Infrastructure only: `SELECT COUNT(*) FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = @projectId`. RLS narrows it to the Space, and the Task 2 index gives a seek on `(SpaceId, ProjectId, …)`, so the range lock covers one Project's range plus the next key. Use a parameterised `SqlQuery` (FormattableString), never concatenation.
+  - [x] **Serialisation side effect, which Q2 (a) relies on:** because every Task creation counts under that lock before the endpoint runs, two creations in the same Project serialise, so "append after the current last key" cannot produce a duplicate key. Say this in `BoundCounter`'s remarks and in the position-key code.
+  - [x] An unknown or foreign `projectId` counts 0 and passes. The slice then answers `404`. Prove this (Task 12).
+  - [x] Wire cases: seed 4,999 Tasks by raw SQL under the Space session key (as `SeedProjectsAsync` does), then the 5,000th (`201`, the anchor), then the 5,001st → `409 bound-reached`, `bound: tasks-per-project`, `limit: 5000`. `SELECT COUNT(*)` is still 5,000, and no refusal row exists. Copy exists: "This Project has {0} Tasks, the maximum." (`ClientCopy.resx:474-476`).
+  - [x] **A full Project does not block another Project.** Anchor: Project P2 in the same Space creates a Task while P1 holds 5,000.
+  - [x] Replay before bound (2.1 Task 7 order): the key of the 5,000th creation replays its `201`, not the 5,001st's `409`.
 
-- [ ] **Task 6 — Idempotency on Task creation** (AC: 2, 12)
-  - [ ] Nothing new in the pipeline: `POST …/tasks` is a `{spaceId}` state-changing route, so the 2.1 behaviour applies. Wire cases on **both** surfaces: same key twice → one row, identical bodies and `Location`; same key, different title → `422`; Account B's key does not replay A's record.
+- [x] **Task 6 — Idempotency on Task creation** (AC: 2, 12)
+  - [x] Nothing new in the pipeline: `POST …/tasks` is a `{spaceId}` state-changing route, so the 2.1 behaviour applies. Wire cases on **both** surfaces: same key twice → one row, identical bodies and `Location`; same key, different title → `422`; Account B's key does not replay A's record.
 
-- [ ] **Task 7 — Make the bound race deterministic (2.1 review P11)** (AC: 11)
-  - [ ] P11 planted "count without `UPDLOCK, HOLDLOCK`" against BND-002 (`ProjectEndpointTests.Bound.cs`, `Two_concurrent_creations_at_49_yield_exactly_one_201_and_one_409`). It was caught in 2 of 3 runs, because the case fires two requests with `Task.WhenAll` and depends on the race happening to race. The gate is in this story's area: 2.2 adds the same bound path for Tasks and changes `BoundCounter`.
-  - [ ] Rewrite BND-002, and write its Task twin, on the pattern the 2.1 review used for R8 (`ProjectEndpointTests.Idempotency.cs:280-360`, `A_concurrent_first_use_of_one_key_…`, which polls `sys.dm_exec_requests` for `LCK_M_RS_U`):
+- [x] **Task 7 — Make the bound race deterministic (2.1 review P11)** (AC: 11)
+  - [x] P11 planted "count without `UPDLOCK, HOLDLOCK`" against BND-002 (`ProjectEndpointTests.Bound.cs`, `Two_concurrent_creations_at_49_yield_exactly_one_201_and_one_409`). It was caught in 2 of 3 runs, because the case fires two requests with `Task.WhenAll` and depends on the race happening to race. The gate is in this story's area: 2.2 adds the same bound path for Tasks and changes `BoundCounter`.
+  - [x] Rewrite BND-002, and write its Task twin, on the pattern the 2.1 review used for R8 (`ProjectEndpointTests.Idempotency.cs:280-360`, `A_concurrent_first_use_of_one_key_…`, which polls `sys.dm_exec_requests` for `LCK_M_RS_U`):
     1. Seed to limit − 1.
     2. The **test** opens a connection, sets the Space session key, begins a transaction and takes the same range: `SELECT COUNT(*) … WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = …`.
     3. Send both creations.
     4. Poll until **both** requests are blocked on **any** `LCK_M_%` wait, with a deadline and no `Task.Delay`.
     5. Commit the test's transaction.
     6. Assert one `201`, one `409`, and the count equals the limit.
-  - [ ] Why this is deterministic either way:
+  - [x] Why this is deterministic either way:
     - With the hint, both requests queue on the count (`LCK_M_RS_U`).
     - With the plant (no hint), both counts read through the test's `RangeS-U` locks (S is compatible with U). Both inserts then block on `RangeI-N` (`LCK_M_RIn_NL`) until the test commits, and both then succeed, so the limit is exceeded and the case fails every time.
     - Wait on "blocked on a lock", not on a specific wait type, so the plant is caught at the insert.
-  - [ ] Plant P11 again, three runs for Projects and three runs for Tasks. All six must be caught. Record the result in the Debug Log.
+  - [x] Plant P11 again, three runs for Projects and three runs for Tasks. All six must be caught. Record the result in the Debug Log.
 
-- [ ] **Task 8 — The idempotency record's capture assumptions** (AC: 12; `deferred-work.md:465-470`)
-  - [ ] Each of the four latent defects either becomes impossible or is stated with a test:
+- [x] **Task 8 — The idempotency record's capture assumptions** (AC: 12; `deferred-work.md:465-470`)
+  - [x] Each of the four latent defects either becomes impossible or is stated with a test:
     - **Non-JSON success replayed empty.** A gate (architecture suite, reading the real route table as GATE-002 does) or a startup check beside `SpaceScopedRouteCheck` fails for a Space-scoped `POST`/`PUT`/`PATCH`/`DELETE` endpoint whose handler's declared return type is not `IResult`/`Task<IResult>`. Every such handler today returns `Results.Json`/`Results.Ok`. The record keeps the body only from an `IValueHttpResult`. State that rule in `IdempotentResponses.Capture`'s remarks.
     - **`Results.Created` replays with no `Location`.** A gate bans `Results.Created`, `TypedResults.Created`, `CreatedAtRoute` and `Accepted*` in `Yello.Host/Endpoints`. The comment in `ProjectEndpoints.CreateAsync` is the convention, and the gate holds it. Plant: the Task create uses `Results.Created`. It must be caught.
     - **A non-`IResult` is `500` only when keyed.** This is closed by the first bullet.
     - **Any duplicate-key error reads as in-flight.** In `IdempotencyStore.TryRecordAsync`, before `SaveChangesAsync`, fail closed (throw) if the change tracker holds any pending entry other than the record. Stores save their own effects (`ProjectStore.CreateAsync` does), so only the record is flushed, and a 2601/2627 there can only be the record's own index. Plant: a store that leaves its insert unsaved must be refused, not reported as `409`.
-  - [ ] Close `deferred-work.md:465` with a dated note.
+  - [x] Close `deferred-work.md:465` with a dated note.
 
-- [ ] **Task 9 — Isolation rows; `ISO-TIMING-IN-SPACE` converted** (AC: 9, 10)
-  - [ ] Add rows from the "Isolation rows" table in Dev Notes, each covering **both** surfaces. Seed through the product: A creates Project `PA` with Task `TA` in `SA`; B creates `PB` with `TB` in `SB`.
-  - [ ] **Convert `ISO-TIMING-IN-SPACE`** (`IsolationCases.cs:241-246`):
+- [x] **Task 9 — Isolation rows; `ISO-TIMING-IN-SPACE` converted** (AC: 9, 10)
+  - [x] Add rows from the "Isolation rows" table in Dev Notes, each covering **both** surfaces. Seed through the product: A creates Project `PA` with Task `TA` in `SA`; B creates `PB` with `TB` in `SB`.
+  - [x] **Convert `ISO-TIMING-IN-SPACE`** (`IsolationCases.cs:241-246`):
     - Route: `BoardRoutes.Board`, `GET`.
     - Arm 1: the boundary `404`, `GET …/spaces/{SB}/projects/{PB}/board` by A.
     - Arm 2: the in-Space not-found, `GET …/spaces/{SA}/projects/{random}/board` by A.
     - Use `IndistinguishableFromAbsent` or a sibling expectation through `DurationIndistinguishability.CompareMeasuredAsync` at the Host's request-finished line (`IsolationTimingTests` remarks).
     - Remove `PendingUntil` and `PendingReason`.
     - The permanent oracle (boundary vs unmatched fallback) stays.
-  - [ ] **Measure first, then decide (Q7).** The boundary path writes an `AccessRefusal` (~3 ms of ~6.5 ms, `deferred-work.md:291`). The in-Space not-found does not. Record both medians and the gap per surface in the Debug Log, whatever the outcome; 2.1 left this unmeasured.
+  - [x] **Measure first, then decide (Q7).** The boundary path writes an `AccessRefusal` (~3 ms of ~6.5 ms, `deferred-work.md:291`). The in-Space not-found does not. Record both medians and the gap per surface in the Debug Log, whatever the outcome; 2.1 left this unmeasured.
     - If the gap exceeds 20%, equalise per Q7 and re-measure.
     - Run the timing class alone (it is in a non-parallel collection), three times, and record all three. A timing gate caught 2 of 3 times is not a gate.
-  - [ ] I-3 "includes Board column counts": the aggregate row asserts each column's `Total` counts only A's Tasks after B has created Tasks in B's Space.
-  - [ ] Plant (one at a time, original held in memory and restored in a `finally`): drop the Board read's query filter **and** the `Task` FILTER predicate → `ISO-BOARD-AGGREGATE` caught on both surfaces. Run the two one-layer anchors as well; each must stay green.
-  - [ ] Close `deferred-work.md:291` with the measured numbers and the Q7 decision.
+  - [x] I-3 "includes Board column counts": the aggregate row asserts each column's `Total` counts only A's Tasks after B has created Tasks in B's Space.
+  - [x] Plant (one at a time, original held in memory and restored in a `finally`): drop the Board read's query filter **and** the `Task` FILTER predicate → `ISO-BOARD-AGGREGATE` caught on both surfaces. Run the two one-layer anchors as well; each must stay green.
+  - [x] Close `deferred-work.md:291` with the measured numbers and the Q7 decision.
 
-- [ ] **Task 10 — The Board page** (AC: 1, 3, 4, 5, 6, 14, 15)
-  - [ ] Client route `/spaces/{SpaceId:guid}/projects/{ProjectId:guid}` (`ClientRoutes.Board(spaceId, projectId)`). `ClientRoutes.SpaceIn` already reads the Space from the first two segments, so the purge hook covers it. A Project row on Space home becomes a link to it (2.1 Q10's promised change in `ProjectRow.razor`). The link text is the Project name, and the URL holds ids only.
-  - [ ] **Arrival:** do what `SpaceHome.razor` does, in order.
+- [x] **Task 10 — The Board page** (AC: 1, 3, 4, 5, 6, 14, 15)
+  - [x] Client route `/spaces/{SpaceId:guid}/projects/{ProjectId:guid}` (`ClientRoutes.Board(spaceId, projectId)`). `ClientRoutes.SpaceIn` already reads the Space from the first two segments, so the purge hook covers it. A Project row on Space home becomes a link to it (2.1 Q10's promised change in `ProjectRow.razor`). The link text is the Project name, and the URL holds ids only.
+  - [x] **Arrival:** do what `SpaceHome.razor` does, in order.
     1. Unlisted Space id → refusal surface with no request.
     2. `GET` Active → `ActiveSpace.Arrive`.
     3. `GET` Board.
@@ -240,23 +244,23 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1023-1057` (`status: final`
     5. Heading focus rule.
 
     Share the arrival through a component or a service rather than copying it. Two copies of the refusal and purge ordering would drift.
-  - [ ] **Re-arrival (AC14, `deferred-work.md:481`):** navigating to the same Space's home, or to the same Board, does **not** unmount the page's content. The Role is re-read (`GET` Active) and applied in place. Controls a now-Viewer lacks disappear, and an open form whose Role no longer permits it closes. A different Space or Project still remounts (`@key`), and the purge still runs on a Space change. Fix `SpaceHome.razor`'s `OnParametersSetAsync`, which today sets `_arrived = false` on every parameter set, and build the Board the same way. Browser cases: an open create on Space home survives a click on the same Space in the switcher; the Board's open creation survives re-navigation to the same Board.
-  - [ ] **Layout** (DESIGN.md `task-card` 137-144, `column` 149-155, `column-count` 156-161, prose 389-453; EXPERIENCE.md 199-201):
+  - [x] **Re-arrival (AC14, `deferred-work.md:481`):** navigating to the same Space's home, or to the same Board, does **not** unmount the page's content. The Role is re-read (`GET` Active) and applied in place. Controls a now-Viewer lacks disappear, and an open form whose Role no longer permits it closes. A different Space or Project still remounts (`@key`), and the purge still runs on a Space change. Fix `SpaceHome.razor`'s `OnParametersSetAsync`, which today sets `_arrived = false` on every parameter set, and build the Board the same way. Browser cases: an open create on Space home survives a click on the same Space in the switcher; the Board's open creation survives re-navigation to the same Board.
+  - [x] **Layout** (DESIGN.md `task-card` 137-144, `column` 149-155, `column-count` 156-161, prose 389-453; EXPERIENCE.md 199-201):
     - Columns side by side, in effective order. Each scrolls **within itself**, never the page.
     - Gutter 9px (`gutter`), card gap 6px (`card-stack-gap`).
     - Column head: `typography.column-head` (uppercase by `text-transform`, never in the string), then the count chip, then the create affordance pushed right (`margin-inline-start: auto`).
     - At 768–1279px the Board scrolls horizontally. Below 768px is 2.11's pager, and nothing here may preclude it.
-  - [ ] **Column count chip:** `{components.column-count}` is `rounded.full`, the **only pill in the product**. Tighten `The_fully_round_radius_is_declared_once_and_used_by_at_most_one_component` to **exactly one** consumer (`deferred-work.md:32`) and close that entry. The chip shows `Total` from the server, not the rendered row count. It is plain text, not a badge: no colour emphasis and no live updating beyond the user's own create.
-  - [ ] **Task card:**
+  - [x] **Column count chip:** `{components.column-count}` is `rounded.full`, the **only pill in the product**. Tighten `The_fully_round_radius_is_declared_once_and_used_by_at_most_one_component` to **exactly one** consumer (`deferred-work.md:32`) and close that entry. The chip shows `Total` from the server, not the rendered row count. It is plain text, not a badge: no colour emphasis and no live updating beyond the user's own create.
+  - [x] **Task card:**
     - Title in `typography.task-title`.
     - A metadata row in monospace (`typography.meta`) that is empty in 2.2. Labels (2.4), Assignee (4.6) and Presence (Epic 7) fill it, so render no placeholder.
     - Border `--hairline-width`, 3px radius, `box-shadow: none` declared explicitly (DESIGN.md:431).
     - No click target (detail is 2.3). The card is not focusable in 2.2: 2.8 builds the grid.
     - No drag handle and no Move control for **any** Role, because they arrive in 2.6/2.7. AC3's absence for Viewers therefore holds trivially here. Write the Viewer browser case so it also asserts the *create* affordance is absent and a Member's is present, and so 2.6/2.7 extend it rather than invent one.
-  - [ ] **Radius mapping (`deferred-work.md:36`):** 2.2 builds Task cards and columns (3px). Add the mapping clause for those two to the radius gate (`DesignFoundationGateTests.cs:720-750`), with a plant (a 2px card), and update the entry to say which surfaces remain.
-  - [ ] **Structural borders (`deferred-work.md:66`):** card and column borders are structural. The device-pixel snapping half is owned by **UX** and needs a specification that does not exist. Do not invent one. Use `--hairline-width` (1.5px floor, gated), and state in the Completion Notes that the snapping remains with UX. Q10 records this.
-  - [ ] **Empty Project (AC1):** columns render (`epics.md:1026`), plus "Nothing here yet." and one primary action, "Add a Task" (`EXPERIENCE.md:251`). There is no sub-line: the mock's "Add a Task and get on with it." loses to the spine (DESIGN.md:482). Nothing about Statuses or configuration.
-  - [ ] **Create (Q4, Q8):** the affordance and the inline form are described in Q4 and Q8.
+  - [x] **Radius mapping (`deferred-work.md:36`):** 2.2 builds Task cards and columns (3px). Add the mapping clause for those two to the radius gate (`DesignFoundationGateTests.cs:720-750`), with a plant (a 2px card), and update the entry to say which surfaces remain.
+  - [x] **Structural borders (`deferred-work.md:66`):** card and column borders are structural. The device-pixel snapping half is owned by **UX** and needs a specification that does not exist. Do not invent one. Use `--hairline-width` (1.5px floor, gated), and state in the Completion Notes that the snapping remains with UX. Q10 records this.
+  - [x] **Empty Project (AC1):** columns render (`epics.md:1026`), plus "Nothing here yet." and one primary action, "Add a Task" (`EXPERIENCE.md:251`). There is no sub-line: the mock's "Add a Task and get on with it." loses to the spine (DESIGN.md:482). Nothing about Statuses or configuration.
+  - [x] **Create (Q4, Q8):** the affordance and the inline form are described in Q4 and Q8.
     - The title field carries `autocomplete="off"` and a random `FieldName` (2.1's `FormField`), plus one primary "Add" button. `Esc` cancels.
     - The request is not optimistic (the id and the position key are the server's).
     - It carries an `Idempotency-Key`, reused for a resend after a lost answer (2.1 review R3, `ProjectList.razor` pattern).
@@ -265,22 +269,22 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1023-1057` (`status: final`
     - On `409 bound-reached`: "This Project has 5000 Tasks, the maximum." inline via `RefusalCopy.For` (the number formatted by culture as the resource does).
     - On `403`: the `manage-tasks` capability copy inline (UX-DR32).
     - On `404`: the page's one refusal surface.
-  - [ ] **Absent, not disabled (UX-DR27):** add `TaskCapabilities.PermitsManageTasks(roleCode)` beside `ProjectCapabilities`, and extend ARCH-007 (`The_clients_Project_controls_predicate_agrees_with_the_capability_matrix`) or a sibling gate to hold it against `RoleCapabilityMatrix` for `ManageTasks`. A Viewer gets no "+", no empty-state action and no form.
-  - [ ] **Cold load:** skeleton columns with no text, marked `aria-busy="true"`; completion announced politely once. Nothing is announced on load beyond that (`EXPERIENCE.md:390`).
-  - [ ] **Purge:** register the Board with `ActiveSpaceState.RegisterPurge` (`ActiveSpaceState.cs` remarks: "Epic 2 registers its Board here"). Every request uses `ActiveSpace.Token`. Nothing goes in browser storage (`ClientStorageBanTests`). `document.title` stays `Yello`. Disable scroll restoration on the route if the framework restores it (`EXPERIENCE.md:179`).
-  - [ ] **Context bar: Project name, and the skip link (Q9, `deferred-work.md:338`):**
+  - [x] **Absent, not disabled (UX-DR27):** add `TaskCapabilities.PermitsManageTasks(roleCode)` beside `ProjectCapabilities`, and extend ARCH-007 (`The_clients_Project_controls_predicate_agrees_with_the_capability_matrix`) or a sibling gate to hold it against `RoleCapabilityMatrix` for `ManageTasks`. A Viewer gets no "+", no empty-state action and no form.
+  - [x] **Cold load:** skeleton columns with no text, marked `aria-busy="true"`; completion announced politely once. Nothing is announced on load beyond that (`EXPERIENCE.md:390`).
+  - [x] **Purge:** register the Board with `ActiveSpaceState.RegisterPurge` (`ActiveSpaceState.cs` remarks: "Epic 2 registers its Board here"). Every request uses `ActiveSpace.Token`. Nothing goes in browser storage (`ClientStorageBanTests`). `document.title` stays `Yello`. Disable scroll restoration on the route if the framework restores it (`EXPERIENCE.md:179`).
+  - [x] **Context bar: Project name, and the skip link (Q9, `deferred-work.md:338`):**
     - On the Board, the bar shows the current Project's name in `typography.meta` after the Space name (DESIGN.md:454). It comes from the Board's own server answer on this load, never from Space home's list. It is purged with the Space and cleared on leaving the Board.
     - At 768–1279px it is dropped by CSS (`EXPERIENCE.md:413-419`; the Role chip is never dropped).
     - Add the skip control (Q9) and close `:338`.
-  - [ ] **Copy:** `ClientCopy.resx` only, sentence case (UX-DR37): "Nothing here yet.", "Add a Task", "Add", "Cancel", the title label, "Task added.", the loading text, `invalid-task-title`, the skip control's label, and the two idempotency strings (Task 11). Never "archive" or "save". `LocalisationGateTests` holds the rest.
-  - [ ] **Text spacing (`deferred-work.md:20`, X-11):** that entry's owner is "the first story with a real surface, after B5". 2.1's surface did not take it, and the Board is the product's primary surface. Either add one browser case per surface (Space home, Board) applying the 1.4.12 text-spacing override and 200% text-only zoom and asserting no clipped or overlapping text, or re-own the entry explicitly in the ledger with a reason. Do not leave it silent.
+  - [x] **Copy:** `ClientCopy.resx` only, sentence case (UX-DR37): "Nothing here yet.", "Add a Task", "Add", "Cancel", the title label, "Task added.", the loading text, `invalid-task-title`, the skip control's label, and the two idempotency strings (Task 11). Never "archive" or "save". `LocalisationGateTests` holds the rest.
+  - [x] **Text spacing (`deferred-work.md:20`, X-11):** that entry's owner is "the first story with a real surface, after B5". 2.1's surface did not take it, and the Board is the product's primary surface. Either add one browser case per surface (Space home, Board) applying the 1.4.12 text-spacing override and 200% text-only zoom and asserting no clipped or overlapping text, or re-own the entry explicitly in the ledger with a reason. Do not leave it silent.
 
-- [ ] **Task 11 — Client copy for the idempotency refusals** (AC: 13; `deferred-work.md:460`)
-  - [ ] `RefusalCopy.For` maps `idempotency-key-in-flight` to its own key ("That was already sent. Reload to see it.") and `idempotency-key-reused` to its own key ("That request was already used for something else. Try again."). `RefusalCopyTests` covers both. Both Space home's create and rename and the Board's create render them inline.
-  - [ ] Browser case: the fake answers a Task creation `409 idempotency-key-in-flight`, and the creation surface shows the in-flight copy, not "Not available.". Close `:460`.
+- [x] **Task 11 — Client copy for the idempotency refusals** (AC: 13; `deferred-work.md:460`)
+  - [x] `RefusalCopy.For` maps `idempotency-key-in-flight` to its own key ("That was already sent. Reload to see it.") and `idempotency-key-reused` to its own key ("That request was already used for something else. Try again."). `RefusalCopyTests` covers both. Both Space home's create and rename and the Board's create render them inline.
+  - [x] Browser case: the fake answers a Task creation `409 idempotency-key-in-flight`, and the creation surface shows the in-flight copy, not "Not available.". Close `:460`.
 
-- [ ] **Task 12 — Slice, schema and wire tests** (AC: 2, 4, 5, 7, 8)
-  - [ ] `tests/Yello.Tests.Slices/Tasks/…` and `…/Boards/…`, on `MigratedDatabaseFixture` and `HostProcess`/`WireSession` as 2.1's `ProjectEndpointTests` are. Cases:
+- [x] **Task 12 — Slice, schema and wire tests** (AC: 2, 4, 5, 7, 8)
+  - [x] `tests/Yello.Tests.Slices/Tasks/…` and `…/Boards/…`, on `MigratedDatabaseFixture` and `HostProcess`/`WireSession` as 2.1's `ProjectEndpointTests` are. Cases:
     - Create in the active Space only, with `SpaceId` from the context, the generator's id, and the first effective Status. Anchor: the Space's three Statuses exist, and the Task is in the one with the lowest `Position`.
     - A Viewer refused `403 manage-tasks` with one `InsufficientRole` row and no row written, on both surfaces, with a Viewer added to an Owner's Space (not 2.1's demoted-own-Space variance).
     - An unknown Project id answers `404`, byte-identical to the boundary's, with no refusal row and no Task written.
@@ -288,12 +292,12 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1023-1057` (`status: final`
     - Board columns in effective order, with totals equal to a `SELECT COUNT(*)` per Status.
     - AC4's union and no-duplicate check.
     - The empty Project's Board answers three columns, each `Total: 0` with no Tasks.
-  - [ ] AC8 and AC2 at the schema: `Task` carries a non-nullable `SpaceId` with three predicates; an `UPDATE dbo.[Task] SET SpaceId = …` fails on the `AFTER UPDATE` block (error 33504); the composite FKs exist; and the `StatusDefinition` alternate key exists. AD-17's invariant (no Task holds a Status absent from its Project's effective set) as a query-level test over the seeded data; S-2 proper belongs to 2.3 and Epic 6.
-  - [ ] A gate holding Task's `SpaceId` writes to the create path, sibling of 2.1's `Only_the_create_path_writes_a_Projects_Space`.
+  - [x] AC8 and AC2 at the schema: `Task` carries a non-nullable `SpaceId` with three predicates; an `UPDATE dbo.[Task] SET SpaceId = …` fails on the `AFTER UPDATE` block (error 33504); the composite FKs exist; and the `StatusDefinition` alternate key exists. AD-17's invariant (no Task holds a Status absent from its Project's effective set) as a query-level test over the seeded data; S-2 proper belongs to 2.3 and Epic 6.
+  - [x] A gate holding Task's `SpaceId` writes to the create path, sibling of 2.1's `Only_the_create_path_writes_a_Projects_Space`.
 
-- [ ] **Task 13 — Plants, runs, ledger, conventions** (AC: all)
-  - [ ] Plants run one at a time in the foreground. Hold the original content in memory, restore it in a `finally`, and compare the tree hash after each. **Never** `git checkout --`, `git restore`, `git reset` or `git stash`. Write a plant so that it compiles (2.1's P4 and P5 failed on a missing `<param>`).
-  - [ ] Record `| # | Plant | Gate | Caught |` in the Debug Log. Minimum set:
+- [x] **Task 13 — Plants, runs, ledger, conventions** (AC: all)
+  - [x] Plants run one at a time in the foreground. Hold the original content in memory, restore it in a `finally`, and compare the tree hash after each. **Never** `git checkout --`, `git restore`, `git reset` or `git stash`. Write a plant so that it compiles (2.1's P4 and P5 failed on a missing `<param>`).
+  - [x] Record `| # | Plant | Gate | Caught |` in the Debug Log. Minimum set:
     - `ISO-TIMING-IN-SPACE` left pending with 2.2 at `review` (GATE-003).
     - A Task route with no isolation row (GATE-002).
     - The two-layer disclosure (Task 9).
@@ -309,15 +313,15 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1023-1057` (`status: final`
     - A second `--radius-full` consumer.
     - The `AFTER UPDATE` predicate removed for `Task`.
     - `Total` taken from `Tasks.Count` (a case where the server answers fewer rows than the total must catch it; Q6).
-  - [ ] Runs: `dotnet build Yello.slnx` (warnings are errors), then `dotnet test Yello.slnx` (MTP; `--no-build` runs zero tests unless the same configuration was just built). Record totals and wall clock. Baseline after the 2.1 review: **633 total, 630 passed, 0 failed, 3 skipped** (`YELLO_MIGRATION_BUNDLE` unset). If a Client case fails only in the full run, run `dotnet test --project tests/Yello.Tests.Client` alone before calling it a regression. If Rancher's socket times out: `rdctl shutdown`, `wsl --terminate rancher-desktop`, then relaunch.
-  - [ ] `tests/TESTING-CONVENTIONS.md`: the deterministic concurrency pattern (Task 7) as the rule for every race case, the Q7 timing decision, and the new counts.
-  - [ ] Ledger (`deferred-work.md`):
+  - [x] Runs: `dotnet build Yello.slnx` (warnings are errors), then `dotnet test Yello.slnx` (MTP; `--no-build` runs zero tests unless the same configuration was just built). Record totals and wall clock. Baseline after the 2.1 review: **633 total, 630 passed, 0 failed, 3 skipped** (`YELLO_MIGRATION_BUNDLE` unset). If a Client case fails only in the full run, run `dotnet test --project tests/Yello.Tests.Client` alone before calling it a regression. If Rancher's socket times out: `rdctl shutdown`, `wsl --terminate rancher-desktop`, then relaunch.
+  - [x] `tests/TESTING-CONVENTIONS.md`: the deterministic concurrency pattern (Task 7) as the rule for every race case, the Q7 timing decision, and the new counts.
+  - [x] Ledger (`deferred-work.md`):
     - CLOSE with dated notes: `:291`, `:338`, `:460`, `:465`, `:481`, `:32`.
     - UPDATE: `:36` (which surfaces remain), `:20` (done or re-owned).
     - ADD anything this story defers, each with an owner.
     - Leave `:471` and `:477` with 2.9, but note in `:471` that the Task count's lock is narrowed by the `SpaceId`-leading index.
-  - [ ] `sprint-status.yaml`: set `review` at the end of the dev phase. GATE-003 then fails if `ISO-TIMING-IN-SPACE` is still pending. That is the gate working.
-  - [ ] **Do not add review narration to source files.**
+  - [x] `sprint-status.yaml`: set `review` at the end of the dev phase. GATE-003 then fails if `ISO-TIMING-IN-SPACE` is still pending. That is the gate working.
+  - [x] **Do not add review narration to source files.**
 
 ## Dev Notes
 
@@ -592,6 +596,8 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), dev-story run unattended by the story-cycle orchestrator.
+
 ### Debug Log References
 
 **Create-story phase (2026-10-25).**
@@ -599,8 +605,169 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 - After setting `2-2-add-tasks-and-see-them-on-a-board: ready-for-dev`: `dotnet build Yello.slnx` gave 0 warnings and 0 errors. `dotnet test --project tests/Yello.Tests.Isolation` gave **57 total, 57 passed, 0 failed, 0 skipped** (33 s).
 - GATE-003 permits a pending row while its story is `ready-for-dev`. `ISO-TIMING-IN-SPACE` is the only row pending on 2.2.
 
+**Dev phase (2026-10-25).**
+
+*Task 1.* `dotnet build Yello.slnx`: 0 warnings, 0 errors. `IsolationCaseListTests` with 2.2 `in-progress`: **14/14 green**. Not one pending row but **seven**: the ATDD run had added six more (ISO-DIRECT-BOARD, ISO-BOARD-AGGREGATE, ISO-WRITE-TASK, ISO-BOARD-FOREIGN-ID-IN-OWN-SPACE, ISO-WRITE-TASK-FOREIGN-PROJECT-IN-OWN-SPACE, ISO-RECORD-KIND-TASK-VIEWER) beside ISO-TIMING-IN-SPACE. All seven are live; no row names 2.2 as pending.
+
+*Activation order.* Followed the ATDD checklist's order. Per its step 1, the minimum server path the timing row needs (Task 2's table and policy, Task 4's create and Board read, the two routes) was built before any scaffold was activated; the slice, schema, bound and idempotency scaffolds therefore went green on their first activation, and the red evidence for them is the ATDD phase's skip reasons plus the product plants below, each of which turned the activated case red.
+
+*ISO-TIMING-IN-SPACE, measured first (AC10, Q7).* Timing class run alone, three times, through `DurationIndistinguishability` (21 samples, median, 20%) at the Host's request-finished line:
+
+| Run | Session boundary vs in-Space | Token boundary vs in-Space | Oracle S / T |
+|---|---|---|---|
+| 1 | 9.1 vs 8.1 ms (10.6%) | 9.8 vs 8.6 ms (11.8%) | 77.6% / 97.3% |
+| 2 | 8.4 vs 6.8 ms (18.9%) | 8.3 vs 7.0 ms (15.2%) | 76.6% / 97.4% |
+| 3 | 11.6 vs 8.3 ms (**28.8%, failed**) | 9.4 vs 8.0 ms (14.0%) | 79.3% / 97.7% |
+
+A consistent 1-3 ms gap (the `AccessRefusal` write), failing one run in three, so Q7 (a) was applied: `NotAvailableFloor`, a filter on the API group immediately before Space resolution, holds every `404` a Space-scoped route answers to `SpaceBoundary:NotAvailableFloorMilliseconds` (50 ms default, logged at startup). Re-measured, three runs: Session 61.7 vs 61.0 (1.2%), 61.7 vs 61.3 (0.7%), 61.1 vs 61.4 (0.6%); Token 61.3 vs 61.4 (0.2%), 61.2 vs 61.2 (0.1%), 61.1 vs 60.9 (0.4%). Oracle (unmatched fallback, outside the floor): 93-99.7%. ISO-TIMING-BOUNDARY and ISO-TIMING-TOKEN-ELSEWHERE stay within 1.1%.
+
+*Scaffold corrections (none deleted).*
+- `PersistenceModelGateTests.Every_entity_configuration_reaches_the_model` assumed table name == CLR name; Q1 (b) maps `TaskItem` to `Task`. Added a one-entry `GlossaryTableNames` map; convention would map it to `Tasks`, so an unapplied configuration is still caught.
+- 2.1's `No_route_moves_a_Project` matched by prefix and saw `POST .../tasks` and `GET .../board`; narrowed to the collection and the item exactly (the ATDD checklist predicted this). ARCH-006 holds what lies under the item.
+- `DesignFoundationGateTests.Board.cs` DSN-001 merged into the existing pill gate, renamed `The_fully_round_radius_is_declared_once_and_used_by_exactly_one_component_the_column_count_chip`.
+- `BoardTests` E2E-001 seeded no Board, so the fake answered `404`; added `Seed(..., [])`.
+- `BoardTests` E2E-013: `blur()` leaves Chromium's sequential-focus starting point on the heading the arrival focused, so Tab went to the next control after it; the case now resets focus to the document body first.
+- `TaskRouteScaffold` replaced by `TaskRoutes`, `BoardRoutes`, `ProblemTypes.InvalidTaskTitle`, `TaskTitle.MaxLength`, `BoundRegistry`, `StableCode`, and deleted; the Client suite keeps a local `ClientBoard` path (it cannot reference the client) and literal `tasks-per-project` / 5000 in the fake, as 2.1's fake does for Projects.
+- Stale "red-phase" headers rewritten in the activated files.
+
+*Found while building.* `S4041` refused a migration class named `Tasks` (it shadows `System.Threading.Tasks`): the migration is `20261025115412_TaskTable`. `S1200`: the creation-bound step moved to a nested class in `ActiveSpaceResolution.Bound.cs`, so every gate that asks who reads the bound port still sees the pipeline. Blazor does not re-set a page's parameters on a navigation to the same address (every parameter is an unchanged `Guid`), so AC14's Role re-read is driven by `NavigationManager.LocationChanged` in `SpaceArrival`.
+
+*Plants (one at a time, single test project, originals held in memory and restored in a `finally`, SHA-256 compared after each; never git checkout/restore/reset/stash).*
+
+| # | Plant | Gate | Caught |
+|---|---|---|---|
+| P1 | `ISO-TIMING-IN-SPACE` pending with 2.2 at `review` | GATE-003 `Every_pending_row_names_a_story_that_has_not_yet_reached_review` | yes |
+| P2 | No row names `POST .../tasks` | GATE-002 `Every_api_route_the_Host_maps_..._is_named_by_a_case` | yes |
+| P3 | Task query filter + `Task` FILTER predicate dropped (as specified) | ISO-BOARD-AGGREGATE | **no - nothing leaks**: every 2.2 read is narrowed by `ProjectId`, and the Project resolves only through its own two layers (ledger entry, owner 2.3) |
+| P3' | Board read `IgnoreQueryFilters()` + `Project` and `Task` FILTER predicates dropped | ISO-BOARD-FOREIGN-ID-IN-OWN-SPACE, Session and ApiToken | yes |
+| P3a/b | each layer of P3' alone | IsolationCaseTests (46) | green, as anchors should be |
+| P4 | `CreateTaskHandler` injects `IBoundCounter` and counts | `Only_the_pipeline_depends_on_the_bound_count_port` | yes |
+| P11 | `UPDLOCK, HOLDLOCK` removed from both counts, 3 runs | Projects BND-002 and Tasks BND-004 | **6 of 6** |
+| P6 | `Results.Created` in the Task endpoint | ARCH-009 | yes |
+| P7 | `TaskStore` leaves its insert unsaved | TaskEndpointTests (keyed replay answered `500`, not `409`; every create) | yes |
+| P8 | `SpaceScopedEntities` names `TaskItme` | ARCH-001 | yes |
+| P9 | `TaskCapabilities` offers Viewer | ARCH-008 and E2E-003 (browser) | yes, both |
+| P10 | Board name written to `sessionStorage` | `No_client_code_reaches_browser_storage` | yes |
+| P11b | `<PageTitle>` with the Project name | `No_client_code_sets_the_document_title` | yes |
+| P12 | Shadow on `.task-card` | `No_surface_carries_a_shadow`, DSN-003 | yes |
+| P13 | Second `var(--radius-full)` consumer | the exactly-one pill gate | yes |
+| P14 | `AFTER UPDATE` predicate removed for `Task` | SCH-001, SCH-002 (33504), `Every_Space_scoped_table_carries_a_filter_and_a_block_predicate` | yes |
+| P15 | Column `Total` from the placed Tasks | `ViewBoardHandlerTests.A_columns_total_is_the_count_not_the_number_of_Tasks_placed` | yes |
+| P16 | 2px Task card | DSN-002 | yes |
+| P17 | Card title `overflow: hidden; white-space: nowrap` | `TextSpacingTests` (spacing and 200% zoom) | yes |
+
+Not planted separately: the floor removed (the pre-floor measurement above is that run - caught 1 of 3, which is why the floor exists).
+
+*Runs.* `dotnet build Yello.slnx`: 0 warnings, 0 errors. Projects alone along the way: Architecture 233/233; Isolation 71/71; Client 70/70 (+4 text-spacing); Slices Task+Board classes 31/31, handler-level 28/28. **Full `dotnet test Yello.slnx` before `review`: 743 total, 740 passed, 0 failed, 3 skipped** (`YELLO_MIGRATION_BUNDLE` unset), 2 m 54 s wall clock. Against the post-ATDD 690 total / 55 skipped: +53 cases, 52 skips activated. **After setting `review` in `sprint-status.yaml`: `dotnet build Yello.slnx` 0 warnings, 0 errors; `dotnet test Yello.slnx` 743 total, 740 passed, 0 failed, 3 skipped** (2 m 51 s) - GATE-003 green, no row pending on 2.2.
+
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
+- Implemented FR-19 (create a Task) and FR-28 (the Board, without 2.9's 5,000-Task performance half) end to end: `Task` table under the Space policy with three predicates and composite keys carrying `SpaceId`; `POST /api/v1/spaces/{s}/projects/{p}/tasks` and `GET .../projects/{p}/board` on both surfaces; the Tasks-per-Project bound counted by the pipeline within the route's Project; the Board page with a shared Space arrival, inline creation, the skip control and the Project in the context bar. AC1-AC15 each have activated cases (slices, schema, isolation, architecture, browser).
+- **Q1 - (b), CLR type `TaskItem`.** Table, namespace, routes and copy stay "Task". Cost to later stories: none beyond reading `TaskItem` in code; reversible by a rename plus the one-line `GlossaryTableNames` entry.
+- **Q2 - (a), `PositionKey varchar(128) COLLATE Latin1_General_100_BIN2` now**, unique with `(SpaceId, ProjectId, StatusId)`, appended by `PositionKey.After` (base-62 carry increment, first key `V0000`), serialised by the bound's lock. Cost to later stories: 2.6 replaces the generator with the midpoint and adds the full BIN2 assertion and mixed-case case; no backfill needed.
+- **Q3 - (a), titles trimmed, 1-200, not unique, `invalid-task-title`.** Cost: none.
+- **Q4 - (b), "+" in the first column only, plus the empty state's "Add a Task"**; on an empty Board only the empty-state action shows, so AC1's "one primary action" holds. Variance from DESIGN.md:453 raised to UX in the ledger. Cost: 2.6 owns a creation into a later Status, if UX wants one.
+- **Q5 - (a), the three routes.** A Task's own URL omits the Project (FR-41). Cost: none.
+- **Q6 - (a), every Task returned, `Total` from a separate grouped `COUNT`.** Cost: 2.9 pages; a handler case already proves `Total` is not `Tasks.Count`.
+- **Q7 - (a), measured gap 10.6-28.8% (Session) / 11.8-15.2% (Token), one run in three failing, so a 50 ms not-found floor on Space-scoped routes**, configurable and logged; oracle outside it. Cost to later stories: every Space-scoped `404` takes at least the floor; 2.9 re-measures the floor on the deploy target (ledger). Reversible by setting the key to 0.
+- **Q8 - (a), inline field at the top of the first column**, stays open and empty after each Task, Esc/Cancel return focus to the opener. Cost: none.
+- **Q9 - (a), "Skip to content" button, first tab stop on every authenticated surface**, focuses the page heading (or `<main>`); Project name in the bar, dropped at 768-1279px. Cost: 2.11 asserts the breakpoints as ACs.
+- **Q10 - (a), structural borders at `--border-hairline-width`; device-pixel snapping remains with UX** (`deferred-work.md:66` open).
+- **Q11 - (a), AC3's drag-handle and Move-control halves are vacuous until 2.7 and 2.6**, which extend E2E-003 (it already asserts the create affordance's absence for a Viewer and presence for the Owner).
+- Deferred ledger: closed `:291`, `:338`, `:460`, `:465`, `:481`, `:32`; updated `:20` (done: `TextSpacingTests`), `:36`, `:66`, `:271`, `:471`; added four entries (owners 2.3, 2.9, 2.8, UX).
 
 ### File List
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `tests/TESTING-CONVENTIONS.md`
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.Board.cs`
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.cs`
+- `tests/Yello.Tests.Architecture/PersistenceModelGateTests.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Projects.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Tasks.cs`
+- `tests/Yello.Tests.Architecture/RefusalCopyTests.Tasks.cs`
+- `tests/Yello.Tests.Client/BoardTests.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.cs`
+- `tests/Yello.Tests.Client/TextSpacingTests.cs` (new)
+- `tests/Yello.Tests.Isolation/IsolationCases.cs`
+- `tests/Yello.Tests.Shared/TaskRouteScaffold.cs` (deleted)
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/SpaceIsolationSchemaTests.cs`
+- `tests/Yello.Tests.Slices/Boards/BoardEndpointTests.cs`
+- `tests/Yello.Tests.Slices/Boards/ViewBoard/ViewBoardHandlerTests.cs` (new)
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/IdempotencyRecordCaptureTests.cs` (new)
+- `tests/Yello.Tests.Slices/Tasks/CreateTask/CreateTaskHandlerTests.cs` (new)
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Bound.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Idempotency.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Schema.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskWire.cs`
+- `Yello.Application/Boards/ViewBoard/ViewBoardHandler.cs` (new)
+- `Yello.Application/Spaces/IBoundCounter.cs`
+- `Yello.Application/Tasks/CreateTask/CreateTaskHandler.cs` (new)
+- `Yello.Client/Components/BoardColumn.razor` (new)
+- `Yello.Client/Components/BoardView.razor` (new)
+- `Yello.Client/Components/ContextBar.razor`
+- `Yello.Client/Components/PageHeading.razor` (new)
+- `Yello.Client/Components/ProjectList.razor`
+- `Yello.Client/Components/ProjectRow.razor`
+- `Yello.Client/Components/SpaceArrival.razor` (new)
+- `Yello.Client/Components/TaskCard.razor` (new)
+- `Yello.Client/Components/TaskCreate.razor` (new)
+- `Yello.Client/Layout/MainLayout.razor`
+- `Yello.Client/Layout/PageHeadingFocus.cs` (new)
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Pages/Board.razor` (new)
+- `Yello.Client/Pages/ClientRoutes.cs`
+- `Yello.Client/Pages/SpaceHome.razor`
+- `Yello.Client/Program.cs`
+- `Yello.Client/Refusals/RefusalCopy.cs`
+- `Yello.Client/Refusals/RefusalText.cs` (new)
+- `Yello.Client/Spaces/ActiveSpaceState.cs`
+- `Yello.Client/Spaces/SpaceArrivalContext.cs` (new)
+- `Yello.Client/Spaces/SpaceWrites.cs` (new)
+- `Yello.Client/Spaces/TaskCapabilities.cs` (new)
+- `Yello.Client/wwwroot/css/components.css`
+- `Yello.Contracts/Boards/BoardResponse.cs` (new)
+- `Yello.Contracts/Boards/BoardRoutes.cs` (new)
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Contracts/Tasks/CreateTaskRequest.cs` (new)
+- `Yello.Contracts/Tasks/TaskResponse.cs` (new)
+- `Yello.Contracts/Tasks/TaskRoutes.cs` (new)
+- `Yello.Domain/Boards/IBoardReader.cs` (new)
+- `Yello.Domain/Statuses/EffectiveStatusSet.cs` (new)
+- `Yello.Domain/Statuses/IStatusDefinitionReader.cs`
+- `Yello.Domain/Tasks/ITaskStore.cs` (new)
+- `Yello.Domain/Tasks/PositionKey.cs` (new)
+- `Yello.Domain/Tasks/TaskItem.cs` (new)
+- `Yello.Domain/Tasks/TaskTitle.cs` (new)
+- `Yello.Host/ApiRouteGroup.cs`
+- `Yello.Host/Endpoints/BoardEndpoints.cs` (new)
+- `Yello.Host/Endpoints/ProjectEndpoints.cs`
+- `Yello.Host/Endpoints/TaskEndpoints.cs` (new)
+- `Yello.Host/Program.cs`
+- `Yello.Host/SpaceLog.cs`
+- `Yello.Host/Spaces/ActiveSpaceResolution.Bound.cs` (new)
+- `Yello.Host/Spaces/ActiveSpaceResolution.cs`
+- `Yello.Host/Spaces/IdempotentResponses.cs`
+- `Yello.Host/Spaces/NotAvailableFloor.cs` (new)
+- `Yello.Host/Spaces/RequiredBound.cs`
+- `Yello.Host/Spaces/SpaceScopedRouteCheck.cs`
+- `Yello.Infrastructure/Persistence/BoardReader.cs` (new)
+- `Yello.Infrastructure/Persistence/BoundCounter.cs`
+- `Yello.Infrastructure/Persistence/Configurations/StatusDefinitionConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Configurations/TaskConfiguration.cs` (new)
+- `Yello.Infrastructure/Persistence/IdempotencyStore.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261025115412_TaskTable.cs` (new)
+- `Yello.Infrastructure/Persistence/Migrations/20261025115412_TaskTable.Designer.cs` (new)
+- `Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs`
+- `Yello.Infrastructure/Persistence/SchemaNames.cs`
+- `Yello.Infrastructure/Persistence/StatusDefinitionReader.cs`
+- `Yello.Infrastructure/Persistence/TaskStore.cs` (new)
+- `Yello.Infrastructure/Persistence/YelloDbContext.cs`
+- `Yello.Infrastructure/SpaceContentStores.cs`
+- `_bmad-output/implementation-artifacts/2-2-add-tasks-and-see-them-on-a-board.md`
+
+## Change Log
+
+- 2026-10-25 - Dev phase: Task table, create and Board routes on both surfaces, the Tasks-per-Project bound in the pipeline, the not-found floor (Q7), idempotency capture gates, the Board page with shared arrival, skip control and Project in the context bar; seven isolation rows live; ledger and conventions updated. Status to review.

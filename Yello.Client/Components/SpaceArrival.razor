@@ -1,0 +1,230 @@
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Sessions
+@using Yello.Client.Spaces
+@using Yello.Contracts.Spaces
+
+@inject HttpClient Http
+@inject SessionState Session
+@inject SpaceDirectory Directory
+@inject ActiveSpaceState ActiveSpace
+@inject NavigationManager Navigation
+@inject PageHeadingFocus HeadingFocus
+
+@implements IDisposable
+
+@*
+    ARRIVING IN A SPACE - every Space-scoped page's first step, shared rather than copied (story 2.2,
+    Task 10). Space home and the Board both render inside this, so the refusal and purge ordering below
+    exists once. Story 1.7's rules, as Space home first wrote them:
+
+    NOTHING IS ASKED ABOUT A SPACE THE SWITCHER DID NOT LIST (AC10 of 1.7). The route's id is checked
+    against the switcher's current answer before any Space-scoped request is made; an id it did not
+    list renders the refusal surface in place and the server is never asked about it.
+
+    NOTHING IS RENDERED BEFORE THE SERVER HAS ANSWERED (UX-DR31). Until the active Space's own answer
+    arrives, nothing of the page renders, and the context bar renders its shell.
+
+    BOTH 404 CAUSES RENDER ONE PAGE. A listed Space the server now refuses and an id never listed both
+    render the same RefusalSurface; a 403 or 409 renders through the same surface with RefusalCopy's own
+    words; and a page's own 404 (a Project that matches nothing) comes back through Refuse to the same
+    surface. A 401 is YelloApiHandler's: the Session has ended, and the purge and the sign-in page follow.
+
+    A FIRST ARRIVAL FOCUSES THE PAGE'S HEADING, as FocusOnNavigate would have had the heading existed when
+    it ran (PageHeadingFocus). After a switch the context bar takes focus instead.
+
+    RE-ARRIVAL KEEPS WHAT A PERSON TYPED (story 2.2, AC14; deferred-work.md:481). Navigating again to the
+    Space this page has already arrived in - choosing it in the switcher, or the same Board - does not
+    unmount the page: the Role is re-read from the server and applied in place, so a control a now-Viewer
+    lacks disappears while an open form and its text survive. A different Space still starts again, and
+    its purge has already run.
+*@
+
+@if (_refused)
+{
+    <RefusalSurface Problem="@_problem" />
+}
+
+@if (_arrived && !_refused && ActiveSpace.Current is not null)
+{
+    @ChildContent(ArrivalContext)
+}
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private static readonly char[] PathEnds = ['?', '#'];
+
+    private bool _refused;
+    private bool _arrived;
+    private Guid? _arrivedIn;
+    private string? _arrivedAt;
+    private ProblemResponse? _problem;
+
+    /// <summary>
+    /// The Space the route names.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>
+    /// The page, rendered once the Space has answered, with that answer and a way to refuse.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public RenderFragment<SpaceArrivalContext> ChildContent { get; set; } = _ => _ => { };
+
+    /// <inheritdoc />
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+
+    /// <inheritdoc />
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
+    /// <summary>
+    /// A navigation to the address this page is already showing - the same Space chosen again in the
+    /// switcher, or the same Board - sets no parameter the renderer sees as changed, so the page is not
+    /// asked again. This is where that re-arrival is seen, and the Role re-read (AC14).
+    /// </summary>
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        if (!_arrived || _refused || _arrivedAt is null || !string.Equals(PathOf(args.Location), _arrivedAt, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        _ = InvokeAsync(async () =>
+        {
+            await AskAsync(ActiveSpace.Token, firstArrival: false);
+            StateHasChanged();
+        });
+    }
+
+    private string PathOf(string location) =>
+        Navigation.ToBaseRelativePath(location).Split(PathEnds)[0].Trim('/');
+
+    /// <inheritdoc />
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Navigation.NavigateTo(ClientRoutes.SignIn, replace: true);
+            return;
+        }
+
+        // Normally done already, before this render, by the location-changing hook; a first load of
+        // this address has no navigation to hook, so it is done here too. Idempotent for one Space.
+        ActiveSpace.Navigating(SpaceId);
+
+        var token = ActiveSpace.Token;
+
+        if (_arrived && !_refused && _arrivedIn == SpaceId && ActiveSpace.Current is not null)
+        {
+            // A re-arrival in the same Space: the Role is asked again and applied in place.
+            await AskAsync(token, firstArrival: false);
+            return;
+        }
+
+        _refused = false;
+        _arrived = false;
+        _arrivedIn = null;
+        _arrivedAt = null;
+        _problem = null;
+
+        // A held answer that does not list this Space is asked again once before it refuses: a
+        // Membership gained since the last look is otherwise refused until the switcher is opened.
+        // A refresh that fails leaves the held answer as it was, so it still does not list the Space.
+        if (!Directory.Lists(SpaceId))
+        {
+            await Directory.RefreshAsync(token);
+
+            if (!Directory.Lists(SpaceId))
+            {
+                RefuseUnlessLeft(token);
+                return;
+            }
+        }
+
+        await AskAsync(token, firstArrival: true);
+    }
+
+    private async Task AskAsync(CancellationToken token, bool firstArrival)
+    {
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(SpaceRoutes.ActiveOf(SpaceId), UriKind.Relative), token);
+
+            if (token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                await ArriveAsync(response, token, firstArrival);
+                return;
+            }
+
+            if (response.StatusCode != HttpStatusCode.Unauthorized)
+            {
+                Refuse(await SpaceWrites.ProblemOfAsync(response, token));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way. Both
+            // purges have already run; there is nothing to render.
+        }
+        catch (HttpRequestException)
+        {
+            RefuseUnlessLeft(token);
+        }
+        catch (JsonException)
+        {
+            RefuseUnlessLeft(token);
+        }
+    }
+
+    /// <summary>
+    /// Refuses this Space - unless the tab has already left it. This component is reused across
+    /// Spaces, so a late failure about the departed Space would otherwise refuse the destination.
+    /// </summary>
+    private void RefuseUnlessLeft(CancellationToken token)
+    {
+        if (!token.IsCancellationRequested)
+        {
+            Refuse(problem: null);
+        }
+    }
+
+    private async Task ArriveAsync(HttpResponseMessage response, CancellationToken token, bool firstArrival)
+    {
+        var answer = await response.Content.ReadFromJsonAsync<ActiveSpaceResponse>(JsonOptions, token);
+
+        if (answer is null || token.IsCancellationRequested || !ActiveSpace.Arrive(answer))
+        {
+            return;
+        }
+
+        _arrived = true;
+        _arrivedIn = answer.Id;
+        _arrivedAt = PathOf(Navigation.Uri);
+
+        // A first arrival is a navigation, and its heading takes focus as FocusOnNavigate would have
+        // given it had the heading existed when that ran. After a switch the context bar takes it, and a
+        // re-arrival leaves focus where the person put it.
+        if (firstArrival && !ActiveSpace.LastArrivalWasSwitch)
+        {
+            HeadingFocus.RequestFocus();
+        }
+    }
+
+    private SpaceArrivalContext ArrivalContext =>
+        new(ActiveSpace.Current ?? throw new InvalidOperationException(), EventCallback.Factory.Create<ProblemResponse?>(this, Refuse));
+
+    private void Refuse(ProblemResponse? problem)
+    {
+        _refused = true;
+        _problem = problem;
+    }
+}

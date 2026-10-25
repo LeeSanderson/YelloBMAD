@@ -1,0 +1,40 @@
+@page "/spaces/{SpaceId:guid}/projects/{ProjectId:guid}"
+
+@*
+    A PROJECT'S BOARD - the product's primary surface (story 2.2). FR-19, FR-28; UX-DR8, UX-DR26, UX-DR27,
+    UX-DR31, UX-DR33, UX-DR35.
+
+    ARRIVES LIKE EVERY SPACE-SCOPED PAGE, through SpaceArrival: an unlisted Space is refused with no
+    request, the active Space is asked first, nothing of the Board renders before the server has answered,
+    every 404 - the Space's or the Project's - renders the one refusal surface, and a 401 is
+    YelloApiHandler's. Re-navigating to the same Board keeps it, and an open Task creation with its text,
+    while the Role is re-read (AC14).
+
+    THE ADDRESS HOLDS IDS ONLY, and no Project or Task name reaches the document's title, which stays the product's name
+    (UX-DR33). The Space leads the path, so the purge hook reads it as it reads Space home's.
+
+    THE BOARD ITSELF is BoardView's, keyed on (Space, Project) so another Project starts a new Board
+    rather than reusing this one's columns.
+*@
+
+<SpaceArrival SpaceId="@SpaceId" Context="arrival">
+    <BoardView @key="(SpaceId, ProjectId)"
+               SpaceId="@SpaceId"
+               ProjectId="@ProjectId"
+               RoleCode="@arrival.Current.Role"
+               OnRefused="arrival.Refuse" />
+</SpaceArrival>
+
+@code {
+    /// <summary>
+    /// The Space this route names.
+    /// </summary>
+    [Parameter]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>
+    /// The Project whose Board this is.
+    /// </summary>
+    [Parameter]
+    public Guid ProjectId { get; set; }
+}

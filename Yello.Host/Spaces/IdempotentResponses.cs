@@ -90,6 +90,22 @@ internal static class IdempotentResponses
     /// Turns an endpoint's materialised success into the record to keep - without any secret the
     /// endpoint declares.
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>What it can keep, and the rules that make that enough</b> (story 2.2, Task 8;
+    /// <c>deferred-work.md:465-470</c>). The body is kept only from an <see cref="IValueHttpResult"/>, so a
+    /// success is recorded faithfully only when the endpoint answers <c>Results.Json</c> or
+    /// <c>Results.Ok</c>; a handler declared to return anything but <see cref="IResult"/> is refused by the
+    /// architecture suite (<c>Every_Space_scoped_state_changing_endpoint_answers_a_result_the_record_can_replay</c>),
+    /// which also closes "a non-<see cref="IResult"/> is a <c>500</c> only when keyed".
+    /// </para>
+    /// <para>
+    /// <c>Location</c> is read from the response headers, where the endpoint sets it before returning.
+    /// <c>Results.Created</c> and the <c>Accepted</c> factories write it only when the result executes -
+    /// after this runs - so they are banned in the Host
+    /// (<c>No_endpoint_answers_through_Results_Created_or_Accepted</c>).
+    /// </para>
+    /// </remarks>
     /// <param name="httpContext">The request, whose response headers carry any <c>Location</c>.</param>
     /// <param name="fingerprint">The request's fingerprint.</param>
     /// <param name="result">What the endpoint returned.</param>

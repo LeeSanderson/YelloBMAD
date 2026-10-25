@@ -151,12 +151,26 @@ public static class ProjectEndpoints
             type: ProblemTypes.InvalidProjectName,
             title: "A Project's name is 1 to 100 characters.");
 
+    private static Task<object?> ReadAsync(HttpRequest request, Type type, CancellationToken cancellationToken) =>
+        JsonRequestBody.ReadAsync(request, type, cancellationToken);
+}
+
+/// <summary>
+/// Reads a Space-scoped endpoint's JSON body inside the endpoint, after the pipeline has run. Stories 2.1
+/// and 2.2.
+/// </summary>
+internal static class JsonRequestBody
+{
     /// <summary>
     /// Reads a body, or <c>null</c> for one that is not JSON, does not parse, or names a charset the
     /// runtime does not know (which <c>ReadFromJsonAsync</c> reports as an
     /// <see cref="InvalidOperationException"/>).
     /// </summary>
-    private static async Task<object?> ReadAsync(HttpRequest request, Type type, CancellationToken cancellationToken)
+    /// <param name="request">The request.</param>
+    /// <param name="type">The contract to read.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The body, or <c>null</c>.</returns>
+    internal static async Task<object?> ReadAsync(HttpRequest request, Type type, CancellationToken cancellationToken)
     {
         if (!request.HasJsonContentType())
         {

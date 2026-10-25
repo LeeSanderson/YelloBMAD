@@ -1161,7 +1161,8 @@ public sealed partial class DesignFoundationGateTests
     }
 
     /// <summary>
-    /// The fully-round radius is declared once and reached by at most one component. AC9.
+    /// The fully-round radius is declared once and reached by exactly one component, the column count
+    /// chip. AC9; story 2.2, AC5.
     /// </summary>
     /// <remarks>
     /// <c>rounded.full</c> exists for exactly one component - the column count chip, the only pill
@@ -1169,14 +1170,14 @@ public sealed partial class DesignFoundationGateTests
     /// the token layer: that is what stops a component spelling out <c>9999px</c> and bypassing
     /// the reference count entirely.
     /// <para>
-    /// The reference count is gated at <b>at most one</b>, not exactly one, because the column
-    /// count chip is built by epic 2 and does not exist yet - so today the honest assertion is
-    /// zero-or-one, and a second pill fails. Tightening it to exactly one is the job of the story
-    /// that builds the chip. Stated plainly rather than gated at 1 and quietly disabled.
+    /// <b>Exactly one, and it is the chip</b> - tightened by story 2.2, which builds the chip
+    /// (<c>deferred-work.md:32</c>, closed). Until then the reference count was gated at at most
+    /// one, because the chip did not exist; now a second pill fails, and so does the chip losing
+    /// its radius to some other rule.
     /// </para>
     /// </remarks>
     [Fact]
-    public void The_fully_round_radius_is_declared_once_and_used_by_at_most_one_component()
+    public void The_fully_round_radius_is_declared_once_and_used_by_exactly_one_component_the_column_count_chip()
     {
         var problems = new List<string>();
 
@@ -1199,15 +1200,15 @@ public sealed partial class DesignFoundationGateTests
         var consumers = CssCorpus.AllDeclarations()
             .Where(d => !d.Sheet.File.Name.Equals(CssCorpus.TokensFileName, StringComparison.OrdinalIgnoreCase))
             .Where(d => CssCorpus.ReferencedTokens(d.Declaration.Value).Contains("radius-full", StringComparer.Ordinal))
-            .Select(d => $"{Where(d.Sheet, d.Declaration)} ('{d.Rule.Selector}')")
+            .Select(d => (Where: $"{Where(d.Sheet, d.Declaration)} ('{d.Rule.Selector}')", d.Rule.Selector))
             .ToList();
 
-        if (consumers.Count > 1)
+        if (consumers.Count != 1 || !consumers[0].Selector.Contains(ColumnCountClass, StringComparison.Ordinal))
         {
             problems.Add(
                 $"var(--radius-full) is used by {consumers.Count} rules: " +
-                $"{string.Join(", ", consumers)}. It exists for exactly one component - the " +
-                "column count chip, the only pill in the product.");
+                $"{string.Join(", ", consumers.Select(consumer => consumer.Where))}. It exists for exactly one " +
+                $"component - the column count chip ({ColumnCountClass}), the only pill in the product.");
         }
 
         AssertNoProblems(problems,

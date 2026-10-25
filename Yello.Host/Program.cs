@@ -9,8 +9,10 @@ using Yello.Application.Accounts.SignOut;
 using Yello.Application.Projects.CreateProject;
 using Yello.Application.Projects.ListProjects;
 using Yello.Application.Projects.RenameProject;
+using Yello.Application.Boards.ViewBoard;
 using Yello.Application.Spaces.ListSpaces;
 using Yello.Application.Statuses.ListStatuses;
+using Yello.Application.Tasks.CreateTask;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Localisation;
 using Yello.Host;
@@ -93,6 +95,8 @@ builder.Services.AddScoped<RevokeApiTokenHandler>();
 builder.Services.AddScoped<ListProjectsHandler>();
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<RenameProjectHandler>();
+builder.Services.AddScoped<CreateTaskHandler>();
+builder.Services.AddScoped<ViewBoardHandler>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
 builder.Services.AddAccountScopedResolution();
@@ -154,6 +158,14 @@ var permitsSetting = CredentialHashingRateLimit.ReadPermitsSetting(
 
 builder.Services.AddRateLimiter(options =>
     CredentialHashingRateLimit.Configure(options, permitsSetting.PermitsPerWindow));
+
+// THE NOT-FOUND FLOOR (story 2.2, open question 7 (a)). A Space-scoped 404 is held to a fixed minimum, so a
+// boundary refusal - which writes an AccessRefusal - and an in-Space not-found - which writes nothing - take
+// the same time as well as the same bytes (AD-3). Measured before it was added; see NotAvailableFloor.
+// Configurable, and the resolved value is logged below unconditionally.
+var floorSetting = NotAvailableFloor.ReadSetting(builder.Configuration[NotAvailableFloor.ConfigurationKey]);
+
+builder.Services.AddSingleton(floorSetting);
 
 // The clock, injected rather than read statically, so a test can assert that every row one
 // registration writes carries the same instant. The local-time properties on the date types are
@@ -245,6 +257,13 @@ if (permitsSetting.Problem is { } permitsProblem)
 }
 
 RateLimitLog.PermitsResolved(startupLogger, permitsSetting.PermitsPerWindow, CredentialHashingRateLimit.Window);
+
+if (floorSetting.Problem is { } floorProblem)
+{
+    SpaceLog.NotAvailableFloorUnusable(startupLogger, NotAvailableFloor.ConfigurationKey, floorProblem);
+}
+
+SpaceLog.NotAvailableFloorResolved(startupLogger, floorSetting.Floor);
 
 ProductionShape.Report(startupLogger, forwardedHeaders);
 
@@ -353,6 +372,13 @@ api.MapRevokeApiToken();
 api.MapListProjects();
 api.MapCreateProject();
 api.MapRenameProject();
+
+// Tasks and the Board (story 2.2). POST /api/v1/spaces/{spaceId}/projects/{projectId}/tasks creates a Task
+// in the Project's first Status, declaring ManageTasks and the Tasks-per-Project bound, which the pipeline
+// counts within the route's {projectId}. GET /api/v1/spaces/{spaceId}/projects/{projectId}/board reads the
+// Board under the read capability every Role holds. Space-scoped on both surfaces.
+api.MapCreateTask();
+api.MapBoard();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

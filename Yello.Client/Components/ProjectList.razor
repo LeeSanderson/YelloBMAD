@@ -1,7 +1,6 @@
 @using System.Net
 @using System.Text.Json
 @using Yello.Client.Refusals
-@using Yello.Client.Sessions
 @using Yello.Client.Spaces
 @using Yello.Contracts
 @using Yello.Contracts.Projects
@@ -11,7 +10,7 @@
 @inject IStringLocalizer<ClientCopy> Localizer
 @inject HttpClient Http
 @inject ActiveSpaceState ActiveSpace
-@inject AntiforgeryTokenSource Antiforgery
+@inject SpaceWrites Writes
 
 @*
     THE ACTIVE SPACE'S PROJECTS - story 2.1. AC1-AC5, AC13; UX-DR26, UX-DR27, UX-DR31, UX-DR33, UX-DR35.
@@ -106,6 +105,7 @@
                 @foreach (var project in _projects)
                 {
                     <ProjectRow @key="project.Id"
+                                SpaceId="@SpaceId"
                                 Project="@project"
                                 CanManage="@_canManage"
                                 Renaming="@(_renaming == project.Id)"
@@ -180,9 +180,23 @@
     protected override async Task OnInitializedAsync()
     {
         _purgeRegistration = ActiveSpace.RegisterPurge(Purge);
-        _canManage = ProjectCapabilities.PermitsManageProjects(RoleCode);
 
         await LoadAsync(_generation);
+    }
+
+    /// <summary>
+    /// The Role is re-read on every arrival, a re-arrival in the same Space included (story 2.2, AC14), and
+    /// applied in place: the list and an open form survive, and a form the Role no longer permits closes.
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        _canManage = ProjectCapabilities.PermitsManageProjects(RoleCode);
+
+        if (!_canManage)
+        {
+            _creating = false;
+            _renaming = null;
+        }
     }
 
     /// <inheritdoc />
@@ -361,7 +375,7 @@
     /// page, inline in the creation surface in RefusalCopy's words; the Space itself refused, the one
     /// refusal surface. A 401 is YelloApiHandler's.
     /// </summary>
-    private async Task RefuseCreateAsync(StateChangeAnswer answer)
+    private async Task RefuseCreateAsync(SpaceWriteAnswer answer)
     {
         switch (answer.StatusCode)
         {
@@ -465,7 +479,7 @@
     /// The server's answer to a rename: the renamed row; an invalid name beside the field; anything else
     /// on the row, in RefusalCopy's words. A 401 never reaches here - it is YelloApiHandler's.
     /// </summary>
-    private async Task UseRenameAnswerAsync(StateChangeAnswer answer, ProjectResponse original, int generation)
+    private async Task UseRenameAnswerAsync(SpaceWriteAnswer answer, ProjectResponse original, int generation)
     {
         if (answer.StatusCode == HttpStatusCode.OK
             && await answer.Response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ActiveSpace.Token) is { } renamed
@@ -532,83 +546,13 @@
             return byName != 0 ? byName : left.Id.CompareTo(right.Id);
         });
 
-    private string RefusalText(ProblemResponse? problem)
-    {
-        var message = RefusalCopy.For(problem, key => !Localizer[key].ResourceNotFound);
+    private string RefusalText(ProblemResponse? problem) => Refusals.RefusalText.Of(Localizer, problem);
 
-        return message.Limit is { } limit
-            ? string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer[message.Key], limit)
-            : Localizer[message.Key];
-    }
+    private Task<SpaceWriteAnswer> SendAsync(HttpMethod method, string path, object body, string key) =>
+        Writes.SendAsync(method, path, body, key, ActiveSpace.Token);
 
-    /// <summary>
-    /// Sends a state-changing request with its Idempotency-Key and an anti-forgery token, and sends it once
-    /// more - with the same key - if the held token is refused.
-    /// </summary>
-    private async Task<StateChangeAnswer> SendAsync(HttpMethod method, string path, object body, string key)
-    {
-        var token = ActiveSpace.Token;
-
-        await Antiforgery.EnsureTokenAsync();
-
-        var answer = await AnswerOfAsync(await Http.SendAsync(Message(method, path, body, key), token), token);
-
-        if (answer.StatusCode != HttpStatusCode.BadRequest || answer.Problem?.Type != ProblemTypes.AntiforgeryTokenMissing)
-        {
-            return answer;
-        }
-
-        answer.Dispose();
-        Antiforgery.Invalidate();
-        await Antiforgery.EnsureTokenAsync();
-
-        return await AnswerOfAsync(await Http.SendAsync(Message(method, path, body, key), token), token);
-    }
-
-    private static HttpRequestMessage Message(HttpMethod method, string path, object body, string key)
-    {
-        var message = new HttpRequestMessage(method, new Uri(path, UriKind.Relative))
-        {
-            Content = JsonContent.Create(body, body.GetType(), options: JsonOptions),
-        };
-
-        message.Headers.TryAddWithoutValidation(Idempotency.HeaderName, key);
-
-        return message;
-    }
-
-    private static async Task<StateChangeAnswer> AnswerOfAsync(HttpResponseMessage response, CancellationToken token)
-    {
-        if (response.IsSuccessStatusCode)
-        {
-            return new StateChangeAnswer(response, Problem: null);
-        }
-
-        try
-        {
-            return new StateChangeAnswer(response, await ProblemOfAsync(response, token));
-        }
-        catch
-        {
-            response.Dispose();
-            throw;
-        }
-    }
-
-    private static async Task<ProblemResponse?> ProblemOfAsync(HttpResponseMessage response, CancellationToken token) =>
-        response.Content.Headers.ContentType?.MediaType is "application/problem+json"
-            ? await response.Content.ReadFromJsonAsync<ProblemResponse>(JsonOptions, token)
-            : null;
-
-    /// <summary>
-    /// A state-changing request's response, and its problem body when it was refused with one.
-    /// </summary>
-    private sealed record StateChangeAnswer(HttpResponseMessage Response, ProblemResponse? Problem) : IDisposable
-    {
-        public HttpStatusCode StatusCode => Response.StatusCode;
-
-        public void Dispose() => Response.Dispose();
-    }
+    private static Task<ProblemResponse?> ProblemOfAsync(HttpResponseMessage response, CancellationToken token) =>
+        SpaceWrites.ProblemOfAsync(response, token);
 
     /// <summary>
     /// Why a row's rename was refused, shown on that row.

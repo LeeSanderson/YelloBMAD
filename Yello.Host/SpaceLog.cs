@@ -9,7 +9,7 @@ namespace Yello.Host;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>EventIds 1016-1020, and 1031-1032 (story 2.1's idempotency).</b> 1000-1007 belong to
+/// <b>EventIds 1016-1020, 1031-1032 (story 2.1's idempotency) and 1033-1034 (story 2.2's not-found floor).</b> 1000-1007 belong to
 /// <see cref="StartupLog"/>, 1008-1009 to <see cref="RegistrationLog"/> and 1010-1015 to
 /// <see cref="SessionLog"/>; 1021 onwards to <see cref="RateLimitLog"/> and the others.
 /// </para>
@@ -85,4 +85,16 @@ internal static partial class SpaceLog
         Level = LogLevel.Information,
         Message = "A request in {SpaceId} carried an Idempotency-Key it could not use ({Problem}); the request was refused.")]
     internal static partial void IdempotencyKeyRefused(ILogger logger, Guid spaceId, string problem);
+
+    [LoggerMessage(
+        EventId = 1033,
+        Level = LogLevel.Warning,
+        Message = "The not-found floor configured under '{ConfigurationKey}' was not used: {Problem}")]
+    internal static partial void NotAvailableFloorUnusable(ILogger logger, string configurationKey, string problem);
+
+    [LoggerMessage(
+        EventId = 1034,
+        Level = LogLevel.Information,
+        Message = "A Space-scoped not-found answer takes at least {Floor} (zero is off).")]
+    internal static partial void NotAvailableFloorResolved(ILogger logger, TimeSpan floor);
 }

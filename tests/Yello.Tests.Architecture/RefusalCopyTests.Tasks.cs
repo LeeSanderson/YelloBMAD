@@ -19,7 +19,7 @@ public sealed partial class RefusalCopyTests
     /// see it.", not the not-found copy, so a person told their request is still in flight is not told it does
     /// not exist.
     /// </summary>
-    [Fact(Skip = "red: AC13 - RefusalCopy maps idempotency-key-in-flight to Not available. (Task 11)")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     public void An_in_flight_key_refusal_renders_its_own_copy()
     {
@@ -33,7 +33,7 @@ public sealed partial class RefusalCopyTests
     /// AC13, UX-DR32, UX-DR37 - a <c>422 idempotency-key-reused</c> renders "That request was already used for
     /// something else. Try again.", not the not-found copy.
     /// </summary>
-    [Fact(Skip = "red: AC13 - RefusalCopy maps idempotency-key-reused to Not available. (Task 11)")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     public void A_reused_key_refusal_renders_its_own_copy()
     {

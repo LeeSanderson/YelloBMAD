@@ -66,6 +66,15 @@ internal static class SpaceScopedRouteCheck
         {
             yield return $"{route} declares {declared} required capabilities; it must declare exactly one.";
         }
+
+        // A bound counted within something narrower than the Space reads that scope from the route
+        // (story 2.2, Task 5); declared on a route without it, the count could never be scoped.
+        if (RequiredBoundExtensions.Of(endpoint) is { } bound
+            && RequiredBoundExtensions.ScopeParameter(bound) is { } scope
+            && endpoint.RoutePattern.GetParameter(scope) is null)
+        {
+            yield return $"{route} declares the {bound} bound, which is counted within the route's {{{scope}}}, and has none.";
+        }
     }
 }
 

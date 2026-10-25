@@ -51,6 +51,16 @@ public sealed class PersistenceModelGateTests
     /// unapplied configuration gives <c>Accounts</c> where the Glossary says <c>Account</c>.
     /// </para>
     /// </remarks>
+    /// <summary>
+    /// The entities whose CLR name differs from their Glossary table name, and only those. Story 2.2,
+    /// open question 1 (b): the Task's CLR type is <c>TaskItem</c>, because <c>Task</c> collides with
+    /// <c>System.Threading.Tasks.Task</c>; its table is <c>Task</c>. Convention would map it to
+    /// <c>Tasks</c>, from the <c>DbSet</c>, so the gate still tells an unapplied configuration apart.
+    /// </summary>
+    private static readonly Dictionary<Type, string> GlossaryTableNames = new()
+    {
+        [typeof(Yello.Domain.Tasks.TaskItem)] = "Task",
+    };
     [Fact]
     public void Every_entity_configuration_reaches_the_model()
     {
@@ -87,11 +97,12 @@ public sealed class PersistenceModelGateTests
             }
 
             var table = mapped.GetTableName();
+            var expected = GlossaryTableNames.GetValueOrDefault(entity, entity.Name);
 
-            if (!string.Equals(table, entity.Name, StringComparison.Ordinal))
+            if (!string.Equals(table, expected, StringComparison.Ordinal))
             {
                 problems.Add(
-                    $"{entity.Name} is mapped to table '{table}', not '{entity.Name}'. Every " +
+                    $"{entity.Name} is mapped to table '{table}', not '{expected}'. Every " +
                     "configuration in this assembly sets an explicit singular table name, so a " +
                     "differing one means YelloDbContext.OnModelCreating never applied it - and " +
                     "the entity is taking EF Core's conventions instead: a pluralised table " +

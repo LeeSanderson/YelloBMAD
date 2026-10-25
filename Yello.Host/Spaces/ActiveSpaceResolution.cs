@@ -270,35 +270,10 @@ internal static partial class ActiveSpaceResolution
     }
 
     /// <summary>
-    /// The creation bound the endpoint declares, consulted inside the unit of work before it runs: the
-    /// limit from <see cref="BoundRegistry"/>, the count under a lock held to the unit's end. AD-25 /
-    /// AR-30; story 2.1, Task 6.
+    /// The creation bound the endpoint declares - see <see cref="CreationBound"/>.
     /// </summary>
-    /// <returns>The <c>409</c> when the Space is already at the limit; otherwise <c>null</c>.</returns>
-    private static async Task<IResult?> ConsultCreationBoundAsync(HttpContext httpContext, BoundaryRequest request)
-    {
-        if (RequiredBoundExtensions.Of(httpContext.GetEndpoint()) is not { } declared)
-        {
-            return null;
-        }
-
-        var bound = BoundRegistry.For(declared);
-
-        var count = await request.Services.GetRequiredService<IBoundCounter>()
-            .CountAsync(bound.Bound, request.CancellationToken)
-            .ConfigureAwait(false);
-
-        if (count < bound.Limit)
-        {
-            return null;
-        }
-
-        // Inside the creation's transaction, which the caller disposes without completing. Not an
-        // AccessRefusal: AD-20 records two kinds, and this is neither.
-        SpaceLog.BoundReachedFor(request.Logger, request.SpaceId, bound);
-
-        return BoundaryProblems.BoundReached(bound);
-    }
+    private static Task<IResult?> ConsultCreationBoundAsync(HttpContext httpContext, BoundaryRequest request) =>
+        CreationBound.ConsultAsync(httpContext, request.Logger, request.SpaceId, request.CancellationToken);
 
     /// <summary>
     /// Writes the refusal record. The request pipeline is its only writer (AR-3).

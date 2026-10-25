@@ -66,6 +66,12 @@ public static class SchemaNames
     public static string ProjectTable => "Project";
 
     /// <summary>
+    /// The Task table (story 2.2). Space-scoped, and like <see cref="ProjectTable"/> its policy carries a
+    /// BLOCK predicate <c>AFTER UPDATE</c>, so no statement can move a Task to another Space.
+    /// </summary>
+    public static string TaskTable => "Task";
+
+    /// <summary>
     /// The idempotency record (story 2.1, AD-18). Space-scoped: a stored response holds Space content.
     /// </summary>
     public static string IdempotencyRecordTable => "IdempotencyRecord";
@@ -163,5 +169,5 @@ public static class SchemaNames
     /// reader would have acted on.
     /// </remarks>
     public static IReadOnlyList<string> SpaceScopedTables { get; } =
-        [MembershipTable, StatusDefinitionTable, SpacePresenceTable, ProjectTable, IdempotencyRecordTable];
+        [MembershipTable, StatusDefinitionTable, SpacePresenceTable, ProjectTable, IdempotencyRecordTable, TaskTable];
 }

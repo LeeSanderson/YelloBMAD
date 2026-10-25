@@ -21,17 +21,16 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The unwritten types are reached by name</b> - <see cref="TaskEntityName"/> (Q1 (b), <c>TaskItem</c>),
-/// <c>Yello.Contracts.Tasks</c>, <c>Yello.Contracts.Boards</c>, <c>TaskStore</c> - because they do not exist
-/// yet. On activation, use typed references to whatever dev-story wrote, as 2.1's gates do, so a rename
-/// breaks the build rather than emptying the gate. If Q1 is decided (a), correct
-/// <see cref="TaskEntityName"/>.
+/// <b>The subjects are typed references</b> - <see cref="TaskEntityName"/> (Q1 (b), <c>TaskItem</c>), the
+/// <c>Yello.Contracts.Tasks</c> and <c>Yello.Contracts.Boards</c> namespaces - so a rename breaks the build
+/// rather than emptying the gate. <c>TaskStore</c> stays a name, being internal to Infrastructure.
 /// </para>
 /// <para>
-/// <b>Two gates are active and green today</b>, because the rule they hold is already true of 2.1's
-/// endpoints: <see cref="No_endpoint_answers_through_Results_Created_or_Accepted"/> and
+/// <b>Two gates were green before 2.2 wrote anything</b>, because the rule they hold was already true of
+/// 2.1's endpoints: <see cref="No_endpoint_answers_through_Results_Created_or_Accepted"/> and
 /// <see cref="Every_Space_scoped_state_changing_endpoint_answers_a_result_the_record_can_replay"/>. Each
 /// carries a permanent oracle that runs its rule over a planted subject in this assembly and must report it.
+/// Every gate here was planted in story 2.2's dev phase (its Debug Log).
 /// </para>
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
@@ -41,11 +40,11 @@ public sealed partial class RefusalBoundaryGateTests
     /// with <see cref="System.Threading.Tasks.Task"/> under implicit usings; the table, namespace, routes and
     /// copy stay "Task".
     /// </summary>
-    private const string TaskEntityName = "Yello.Domain.Tasks.TaskItem";
+    private static string TaskEntityName => typeof(Yello.Domain.Tasks.TaskItem).FullName!;
 
-    private const string TaskContractsNamespace = "Yello.Contracts.Tasks";
+    private static string TaskContractsNamespace => typeof(Yello.Contracts.Tasks.TaskRoutes).Namespace!;
 
-    private const string BoardContractsNamespace = "Yello.Contracts.Boards";
+    private static string BoardContractsNamespace => typeof(Yello.Contracts.Boards.BoardRoutes).Namespace!;
 
     /// <summary>
     /// Every route under one Project, as story 2.2 leaves them (Q5 (a)).
@@ -64,7 +63,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>Yello.Domain.Tasks.Task</c>, which will never exist under Q1 (b). Dev-story updates the list to the
     /// real name in the same change.
     /// </summary>
-    [Fact(Skip = "red: AC8 - SpaceScopedEntities names Yello.Domain.Tasks.Task, which does not exist (Task 2; Q1)")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AD-3")]
     public void Every_Space_scoped_entity_the_gates_name_resolves_to_a_Domain_type()
@@ -81,7 +80,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// AC2 ("permanently to one Space"), AC8 - a Task's Space is fixed at creation in the type:
     /// <c>SpaceId</c> has an <c>init</c> accessor and no ordinary setter.
     /// </summary>
-    [Fact(Skip = "red: AC2 - no Task entity yet (Task 2; Q1)")]
+    [Fact]
     [Trait("Requirement", "FR-19")]
     [Trait("Requirement", "AD-2")]
     public void A_Tasks_Space_can_only_be_set_when_it_is_created()
@@ -101,7 +100,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// path, which takes the Space from the pipeline's context. Sibling of 2.1's
     /// <c>Only_the_create_path_writes_a_Projects_Space</c>.
     /// </summary>
-    [Fact(Skip = "red: AC2 - no Task entity or store yet (Tasks 2, 4)")]
+    [Fact]
     [Trait("Requirement", "FR-19")]
     [Trait("Requirement", "AD-2")]
     public void Only_the_create_path_writes_a_Tasks_Space()
@@ -117,7 +116,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// position, so "takes the first Status" and "belongs to the route's Project and Space" are true by
     /// construction.
     /// </summary>
-    [Fact(Skip = "red: AC2 - no Task contracts yet (Task 3)")]
+    [Fact]
     [Trait("Requirement", "FR-19")]
     [Trait("Requirement", "AD-15")]
     public void The_Task_creation_request_carries_a_title_and_nothing_else()
@@ -134,7 +133,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// AC5, Task 3 - no Task or Board response carries a <c>SpaceId</c>, and a column's <c>Total</c> is a
     /// property of its own beside its <c>Tasks</c>, never derived from them on the client (AD-29).
     /// </summary>
-    [Fact(Skip = "red: AC5 - no Task or Board contracts yet (Task 3)")]
+    [Fact]
     [Trait("Requirement", "AD-29")]
     [Trait("Requirement", "AD-3")]
     public void No_Task_or_Board_response_carries_a_SpaceId_and_a_column_carries_its_own_total()
@@ -166,7 +165,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>No_route_moves_a_Project</c>, whose prefix also matches these two routes: dev-story narrows that
     /// gate to the collection and the item, and this one holds what lies under the item.
     /// </summary>
-    [Fact(Skip = "red: AC9 - the Task and Board routes are not mapped yet (Task 4)")]
+    [Fact]
     [Trait("Requirement", "FR-19")]
     [Trait("Requirement", "FR-28")]
     public void The_routes_under_a_Project_are_its_rename_its_Task_creation_and_its_Board()
@@ -192,7 +191,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// pattern carries the Project the pipeline scopes the count by. A declaration on a route without it is
     /// the fail-closed case; this gate keeps it from reaching startup.
     /// </summary>
-    [Fact(Skip = "red: AC11 - no route declares the Tasks-per-Project bound yet (Tasks 4, 5)")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     public void The_Tasks_per_Project_bound_is_declared_only_where_the_route_names_the_Project()
@@ -210,7 +209,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// matrix for every Role: it offers it exactly where <c>ManageTasks</c> is not denied. Sibling of 2.1's
     /// ARCH-007 for <c>ManageProjects</c>.
     /// </summary>
-    [Fact(Skip = "red: AC3 - no client predicate for ManageTasks yet (Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "AD-1")]
     public void The_clients_Task_controls_predicate_agrees_with_the_capability_matrix()

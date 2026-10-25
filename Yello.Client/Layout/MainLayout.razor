@@ -4,10 +4,12 @@
 
 @inject SessionState Session
 @inject NavigationManager Navigation
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject PageHeadingFocus HeadingFocus
 
 @*
-    The application layout: the context bar on every authenticated surface, then a <main> landmark
-    and the routed page inside it.
+    The application layout: the skip control and the context bar on every authenticated surface, then a
+    <main> landmark and the routed page inside it.
 
     <main> is here rather than in index.html because it has to wrap the ROUTED content: a landmark
     around the pre-boot placeholder would announce an empty region, and a screen-reader user
@@ -20,23 +22,27 @@
     in it: it ends the Session on the server and purges through the same seam an expired Session
     does (story 1.7, open question 4 and Lee's decision (a)).
 
-    NO SKIP LINK, still, and now as a recorded decision rather than for want of anything to skip.
-    The bar holds four controls - the switcher, the Role chip (not a stop), Account (story 1.8) and
-    Sign out - so a keyboard user passes three tab stops to reach the page. A link to "#main" would also resolve
-    against <base href="/"> and send the router to "/#main". Re-decided when the bar grows a Project
-    name in epic 2.
+    THE SKIP CONTROL (story 2.2, open question 9 (a); deferred-work.md:338). Re-decided as the earlier
+    comment here promised, now that the bar names a Project on the Board. The first tab stop on every
+    authenticated surface, visually hidden until it has focus, and a BUTTON rather than a "#main" link,
+    which would resolve against <base href="/"> and send the router to "/#main". It moves focus to the
+    page's heading (PageHeadingFocus), or to <main> on a page that registers none, so a keyboard user
+    passes the bar in one step.
 *@
 
 @if (ShowsContextBar)
 {
+    <button type="button" class="skip-control" @onclick="SkipAsync">@Localizer["SkipToContent"]</button>
     <ContextBar />
 }
 
-<main>
+<main tabindex="-1" @ref="_main">
     @Body
 </main>
 
 @code {
+    private ElementReference _main;
+
     /// <summary>
     /// The bar shows once there is a Session, and not on the two surfaces reached without one.
     /// </summary>
@@ -44,5 +50,16 @@
     {
         get => Session.IsSignedIn
             && !ClientRoutes.IsReachedWithoutASession(Navigation.ToBaseRelativePath(Navigation.Uri));
+    }
+
+    private async Task SkipAsync()
+    {
+        if (HeadingFocus.Current is { } heading)
+        {
+            await heading.FocusAsync();
+            return;
+        }
+
+        await _main.FocusAsync();
     }
 }

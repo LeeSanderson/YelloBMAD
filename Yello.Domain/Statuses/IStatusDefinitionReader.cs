@@ -15,6 +15,9 @@ public interface IStatusDefinitionReader
     /// Every Status definition in the active Space, in Board order.
     /// </summary>
     /// <param name="cancellationToken">The request's cancellation token.</param>
-    /// <returns>The definitions, ascending by position.</returns>
+    /// <returns>
+    /// The definitions, ascending by position and then by id in the database's order, so a tie comes back
+    /// the same way on every request.
+    /// </returns>
     Task<IReadOnlyList<StatusDefinition>> ListAsync(CancellationToken cancellationToken);
 }

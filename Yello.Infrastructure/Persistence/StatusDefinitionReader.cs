@@ -20,6 +20,7 @@ internal sealed class StatusDefinitionReader(YelloDbContext dbContext) : IStatus
         await dbContext.StatusDefinitions
             .AsNoTracking()
             .OrderBy(status => status.Position)
+            .ThenBy(status => status.Id)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 }

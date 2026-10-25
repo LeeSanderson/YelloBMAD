@@ -29,7 +29,7 @@ public sealed partial class TaskEndpointTests
     /// description column (FR-31 is Epic 7, <c>epics.md:437</c>).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - no Task table or policy predicates yet (Task 2)")]
+    [Fact]
     [Trait("Requirement", "AR-5")]
     [Trait("Requirement", "NFR-1")]
     public async Task Task_carries_a_non_nullable_SpaceId_under_the_Space_policy_with_three_predicates()
@@ -66,7 +66,7 @@ public sealed partial class TaskEndpointTests
     /// is the <c>AFTER UPDATE</c> block predicate (error 33504). Anchor: the same connection may retitle it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - no Task table or AFTER UPDATE block predicate yet (Task 2)")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     public async Task Moving_a_Task_to_another_Space_is_refused_by_the_database()
     {
@@ -116,7 +116,7 @@ public sealed partial class TaskEndpointTests
     /// <c>Task</c> to <c>Space</c>, which would be a second cascade path (SQL Server error 1785).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - no Task table or composite keys yet (Task 2)")]
+    [Fact]
     [Trait("Requirement", "AR-8")]
     public async Task Task_reaches_its_Project_and_Status_only_through_keys_that_carry_SpaceId()
     {
@@ -150,7 +150,7 @@ public sealed partial class TaskEndpointTests
     /// Status can never be another Space's.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - StatusDefinition has no (SpaceId, Id) key yet (Task 2)")]
+    [Fact]
     [Trait("Requirement", "AR-8")]
     [Trait("Priority", "P1")]
     public async Task StatusDefinition_has_a_unique_key_on_SpaceId_and_Id_for_composite_references()
@@ -167,7 +167,7 @@ public sealed partial class TaskEndpointTests
     /// Space.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - no position key column yet (Task 2; Q2 (a))")]
+    [Fact]
     [Trait("Requirement", "AR-21")]
     [Trait("Requirement", "AD-15")]
     [Trait("Priority", "P1")]
@@ -189,7 +189,7 @@ public sealed partial class TaskEndpointTests
     /// holds a Status that its own Space does not define. Anchored: there are Tasks to have checked.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - no Task create route yet (Tasks 2-4)")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "AR-24")]
     public async Task No_Task_holds_a_Status_its_Space_does_not_define()

@@ -20,7 +20,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="surface">The surface both requests are sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - no Task create route for the pipeline's idempotency to apply to (Task 6)")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AR-25")]
@@ -59,7 +59,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="surface">The surface both requests are sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - no Task create route for the pipeline's idempotency to apply to (Task 6)")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AR-25")]
@@ -92,7 +92,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="surface">The surface both creations are sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - no Task create route for the pipeline's idempotency to apply to (Task 6)")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AR-25")]

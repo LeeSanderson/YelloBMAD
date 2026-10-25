@@ -2,7 +2,7 @@ using Microsoft.Playwright;
 using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.Spaces;
-using Yello.Tests.Shared;
+using Yello.Contracts.Tasks;
 
 namespace Yello.Tests.Client;
 
@@ -12,7 +12,7 @@ namespace Yello.Tests.Client;
 /// creation can meet rendered inline in copy of their own, and the Board treated as Space-scoped content
 /// (rendered only after the server answers, purged with its Space, never named in the title or the URL).
 /// Also the two re-arrival cases (AC14) and the skip control (Q9). AC1-AC7, AC13-AC15; UX-DR8, UX-DR26,
-/// UX-DR27, UX-DR31, UX-DR33, UX-DR35, UX-DR37. Red-phase scaffolds written by the story 2.2 ATDD run.
+/// UX-DR27, UX-DR31, UX-DR33, UX-DR35, UX-DR37. Written red by the story 2.2 ATDD run; activated by its dev phase.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -21,8 +21,7 @@ namespace Yello.Tests.Client;
 /// "before the server answers" observable.
 /// </para>
 /// <para>
-/// <b>Locators the markup does not exist for yet are assumptions</b>, stated here so activation corrects the
-/// case rather than the page: a column is <c>.board-column</c>, its chip <c>.column-count</c> and a card
+/// <b>The locators are the Board's markup</b>, as the ATDD run assumed it and the dev phase built it: a column is <c>.board-column</c>, its chip <c>.column-count</c> and a card
 /// <c>.task-card</c> (the DESIGN.md component names the design gates also use); the create affordance and
 /// the empty state's action are buttons named "Add a Task"; the creation field is the one text input in the
 /// first column; the cold-load announcement reads "Board loaded."; the skip control is a button named "Skip to
@@ -72,10 +71,11 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// about Statuses or configuration.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - no Board page yet (Task 10)")]
+    [Fact]
     public async Task An_empty_Board_shows_its_columns_in_order_and_one_action_to_add_a_Task()
     {
         var api = TwoSpaces();
+        Seed(api, Northwind, Atlas, "Atlas", []);
         var (context, page) = await surface.OpenAsync(EnglishLocale);
 
         await using (context)
@@ -99,7 +99,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// skeleton goes, and completion is announced politely, once.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - no Board page yet (Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR31")]
     public async Task The_Board_renders_only_after_the_server_answers()
     {
@@ -114,7 +114,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
 
             var arrived = api.HoldBoardAsync(Atlas);
 
-            await page.GotoAsync(Address(TaskRouteScaffold.ClientBoard(Northwind, Atlas)));
+            await page.GotoAsync(Address(ClientBoard(Northwind, Atlas)));
             await arrived.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
 
             var main = await page.Locator("main").InnerTextAsync();
@@ -141,7 +141,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// extend this case.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - no Board page yet (Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     public async Task A_Viewer_sees_the_same_Board_with_no_create_affordance_and_nothing_disabled()
     {
@@ -158,7 +158,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
 
             Assert.True(await AddTaskControls(page).CountAsync() >= 1, "Anchor: the Owner has no create affordance.");
 
-            await page.EvaluateAsync("path => Blazor.navigateTo(path)", TaskRouteScaffold.ClientBoard(Harbour, Beacon));
+            await page.EvaluateAsync("path => Blazor.navigateTo(path)", ClientBoard(Harbour, Beacon));
             await page.Locator(RoleChip, new PageLocatorOptions { HasText = "Viewer" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await page.Locator(Card, new PageLocatorOptions { HasText = "Shared card" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
@@ -175,7 +175,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// so it is never the number of rows rendered.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - no Board page yet (Task 10)")]
+    [Fact]
     [Trait("Requirement", "AD-29")]
     public async Task A_column_header_shows_the_name_then_the_servers_total_then_the_create_affordance()
     {
@@ -211,7 +211,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// AC6 - a Task card's only content is its title (no badge, no count, no streak), and it carries no shadow.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - no Board page yet (Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR8")]
     public async Task A_Task_card_is_its_title_alone_and_carries_no_shadow()
     {
@@ -240,7 +240,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// would not reuse; and neither the title nor a Project name reaches <c>document.title</c> or the URL.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - no Board page or Task creation yet (Task 10)")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "UX-DR33")]
     public async Task Adding_a_Task_appends_it_to_the_first_column_and_keeps_the_field_open()
@@ -264,7 +264,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
             Assert.Equal("1", (await first.Locator(ColumnCount).TextContentAsync())?.Trim());
             Assert.Equal(string.Empty, await first.Locator("input[type='text']").InputValueAsync());
 
-            var post = Assert.Single(api.Requests, request => request.Method == "POST" && request.Path == TaskRouteScaffold.CreateIn(Northwind, Atlas));
+            var post = Assert.Single(api.Requests, request => request.Method == "POST" && request.Path == TaskRoutes.CreateIn(Northwind, Atlas));
 
             Assert.False(string.IsNullOrWhiteSpace(post.Header(Idempotency.HeaderName)), "The creation carried no Idempotency-Key.");
             Assert.Contains(Added, string.Join(' ', await page.Locator("[aria-live='polite']").AllInnerTextsAsync()), StringComparison.Ordinal);
@@ -281,7 +281,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// stated plainly; nothing is added.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - no Board page or Task creation yet (Task 10)")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     public async Task The_5001st_Task_renders_the_bound_inline_and_adds_nothing()
     {
@@ -311,7 +311,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// <param name="status">The refusal's status.</param>
     /// <param name="inFlight">Whether it is the in-flight refusal (otherwise the reused-key one).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC13 - no Board page, and RefusalCopy has no idempotency copy (Tasks 10, 11)")]
+    [Theory]
     [InlineData(409, true)]
     [InlineData(422, false)]
     [Trait("Requirement", "UX-DR32")]
@@ -342,7 +342,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// creation keeps its text, while the Role is still re-read from the server.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - no Board page yet (Task 10)")]
+    [Fact]
     public async Task An_open_Task_creation_survives_navigating_to_the_same_Board()
     {
         var api = TwoSpaces();
@@ -360,7 +360,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
 
             var activeReads = ActiveReads(api);
 
-            await page.EvaluateAsync("path => Blazor.navigateTo(path)", TaskRouteScaffold.ClientBoard(Northwind, Atlas));
+            await page.EvaluateAsync("path => Blazor.navigateTo(path)", ClientBoard(Northwind, Atlas));
             await WaitUntilAsync(() => ActiveReads(api) > activeReads, "The Role was not re-read from the server on re-arrival.");
 
             Assert.Equal("Half typed", await page.Locator(Column).First.Locator("input[type='text']").InputValueAsync());
@@ -372,7 +372,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// open Project create form on Space home or its text.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - SpaceHome resets its content on every parameter set (Task 10)")]
+    [Fact]
     public async Task An_open_Project_create_on_Space_home_survives_choosing_the_same_Space()
     {
         var api = TwoSpaces();
@@ -402,7 +402,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// the departed Board's Tasks or Project name stays on screen, and no name ever reached the title.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - no Board page or purge registration yet (Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR31")]
     public async Task Leaving_the_Space_purges_the_Board_before_the_destination_answers()
     {
@@ -437,7 +437,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// the address holds ids only, and following it renders the Board.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - Project rows are not links yet (Task 10)")]
+    [Fact]
     public async Task A_Project_row_links_to_its_Board_by_id()
     {
         var api = TwoSpaces();
@@ -453,7 +453,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
             var link = page.Locator("main").GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = "Atlas", Exact = true });
             await link.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
-            Assert.EndsWith(TaskRouteScaffold.ClientBoard(Northwind, Atlas), await link.GetAttributeAsync("href") ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+            Assert.EndsWith(ClientBoard(Northwind, Atlas), await link.GetAttributeAsync("href") ?? string.Empty, StringComparison.OrdinalIgnoreCase);
 
             await link.ClickAsync();
             await page.Locator(Card, new PageLocatorOptions { HasText = "Draft the brief" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
@@ -467,7 +467,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// not from Space home's list, which here names it differently - and clears it on leaving the Board.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - the context bar shows no Project yet (Task 10)")]
+    [Fact]
     public async Task The_context_bar_names_the_Project_from_the_Boards_own_answer()
     {
         var api = TwoSpaces();
@@ -497,7 +497,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="onBoard">Whether the page is the Board (otherwise Space home).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC15 - no skip control yet (Task 10; Q9)")]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     [Trait("Requirement", "NFR-9")]
@@ -511,11 +511,13 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
         await using (context)
         {
             await api.InstallAsync(page);
-            await page.GotoAsync(Address(onBoard ? TaskRouteScaffold.ClientBoard(Northwind, Atlas) : ClientSpaceHome(Northwind)));
+            await page.GotoAsync(Address(onBoard ? ClientBoard(Northwind, Atlas) : ClientSpaceHome(Northwind)));
             await page.Locator(RoleChip).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await page.Locator("main h1").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
-            await page.EvaluateAsync("() => document.activeElement?.blur()");
+            // Focus starts at the top of the document. blur() alone leaves Chromium's sequential-focus
+            // starting point on the heading the arrival focused, so the next Tab would continue from there.
+            await page.EvaluateAsync("() => { document.activeElement?.blur(); document.body.tabIndex = -1; document.body.focus(); document.body.removeAttribute('tabindex'); }");
             await page.Keyboard.PressAsync("Tab");
 
             Assert.Equal(SkipControl, (await page.EvaluateAsync<string>("() => document.activeElement?.textContent ?? ''")).Trim());
@@ -615,12 +617,17 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
 
     private static string ClientSpaceHome(Guid spaceId) => $"/spaces/{spaceId:D}";
 
+    /// <summary>
+    /// The client's Board page for one Project - <c>ClientRoutes.Board</c>, which this assembly cannot reference: ids only.
+    /// </summary>
+    private static string ClientBoard(Guid spaceId, Guid projectId) => $"/spaces/{spaceId:D}/projects/{projectId:D}";
+
     private string Address(string path) => new Uri(surface.BaseAddress, path.TrimStart('/')).ToString();
 
     private async Task OpenBoardAsync(FakeYelloApi api, IPage page, Guid spaceId, Guid projectId)
     {
         await api.InstallAsync(page);
-        await page.GotoAsync(Address(TaskRouteScaffold.ClientBoard(spaceId, projectId)));
+        await page.GotoAsync(Address(ClientBoard(spaceId, projectId)));
         await page.Locator(RoleChip).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
     }
 

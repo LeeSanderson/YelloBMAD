@@ -91,18 +91,23 @@ public sealed partial class RefusalBoundaryGateTests
             "Yello.Infrastructure.SpaceBoundaryLimits");
 
     /// <summary>
-    /// AC7 - every route the Host maps under a Space's <c>/projects</c> is the collection (<c>GET</c>,
-    /// <c>POST</c>) or one Project (<c>PATCH</c>, the rename): no route carries a segment after the
-    /// Project's id, so none can move a Project. Story 2.5 adds <c>DELETE</c> on the Project and widens the
-    /// permitted set by exactly that.
+    /// AC7 - the collection takes <c>GET</c> and <c>POST</c> and one Project takes <c>PATCH</c>, the rename,
+    /// and nothing else, so no method on either can move a Project. Story 2.5 adds <c>DELETE</c> on the
+    /// Project and widens the permitted set by exactly that.
     /// </summary>
+    /// <remarks>
+    /// <b>Narrowed by story 2.2</b> to the collection and the item exactly: 2.2 maps <c>POST .../tasks</c> and
+    /// <c>GET .../board</c> under one Project, which a prefix match would count here.
+    /// <c>The_routes_under_a_Project_are_its_rename_its_Task_creation_and_its_Board</c> holds what lies under
+    /// the item, so a route that moved a Project through a new segment is still caught.
+    /// </remarks>
     [Fact]
     [Trait("Requirement", "FR-17")]
     [Trait("Requirement", "AD-2")]
     public void No_route_moves_a_Project()
     {
         var projectRoutes = RouteTable()
-            .Where(endpoint => endpoint.RoutePattern.RawText?.StartsWith(ProjectCollectionRoute, StringComparison.Ordinal) == true)
+            .Where(endpoint => endpoint.RoutePattern.RawText == ProjectCollectionRoute || endpoint.RoutePattern.RawText == ProjectItemRoute)
             .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()?.HttpMethods ?? [])
                 .Select(method => $"{method} {endpoint.RoutePattern.RawText}"))
             .Order(StringComparer.Ordinal)

@@ -10,7 +10,8 @@ namespace Yello.Client.Refusals;
 /// <b>The <c>type</c> decides; prose never does.</b> The server's <c>title</c> and <c>detail</c> are
 /// not even deserialised (<see cref="ProblemResponse"/>). A <c>403</c> is rendered from a resource
 /// keyed on its capability code, a bound refusal from one keyed on its bound code with the limit as
-/// the only argument, and everything else from the one not-available heading.
+/// the only argument, the two idempotency refusals from one each (story 2.2), and everything else
+/// from the one not-available heading.
 /// </para>
 /// <para>
 /// <b>No branch on which not-found occurred.</b> A Space the Account holds no Membership in, a
@@ -34,6 +35,18 @@ public static class RefusalCopy
     /// The refusal page's one link's resource key.
     /// </summary>
     public static string RouteBackKey => "RefusalRouteBack";
+
+    /// <summary>
+    /// The resource key for <c>409 idempotency-key-in-flight</c>: the request was already sent and its
+    /// first use is still finishing (story 2.2, AC13).
+    /// </summary>
+    public static string IdempotencyKeyInFlightKey => "IdempotencyKeyInFlight";
+
+    /// <summary>
+    /// The resource key for <c>422 idempotency-key-reused</c>: the key was already used for a different
+    /// request (story 2.2, AC13).
+    /// </summary>
+    public static string IdempotencyKeyReusedKey => "IdempotencyKeyReused";
 
     /// <summary>
     /// The resource a refusal is rendered with.
@@ -72,6 +85,18 @@ public static class RefusalCopy
             && problem.Limit is { } limit)
         {
             return new RefusalMessage(problem.Bound, limit);
+        }
+
+        // A creation meets these two, and neither is a not-found: a person told their request is still in
+        // flight must not be told it does not exist (story 2.2, AC13; deferred-work.md:460).
+        if (string.Equals(type, ProblemTypes.IdempotencyKeyInFlight, StringComparison.Ordinal))
+        {
+            return new RefusalMessage(IdempotencyKeyInFlightKey, Limit: null);
+        }
+
+        if (string.Equals(type, ProblemTypes.IdempotencyKeyReused, StringComparison.Ordinal))
+        {
+            return new RefusalMessage(IdempotencyKeyReusedKey, Limit: null);
         }
 
         return new RefusalMessage(NotAvailableKey, Limit: null);

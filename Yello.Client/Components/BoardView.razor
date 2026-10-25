@@ -1,0 +1,294 @@
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Spaces
+@using Yello.Contracts.Boards
+@using Yello.Contracts.Tasks
+
+@implements IDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+@inject ActiveSpaceState ActiveSpace
+
+@*
+    ONE PROJECT'S BOARD - story 2.2. AC1-AC7, AC13-AC15; UX-DR8, UX-DR26, UX-DR27, UX-DR31, UX-DR33,
+    UX-DR35, UX-DR37; DESIGN.md:137-161, :389-453; EXPERIENCE.md:199-201, :251, :390.
+
+    RENDERED ONLY AFTER THE SERVER HAS ANSWERED (UX-DR31). Until the Board answers, the region is skeleton
+    columns holding no text, marked aria-busy; completion is announced politely, once, and nothing else is
+    announced on load.
+
+    COLUMNS ARE THE PROJECT'S EFFECTIVE STATUS SET, IN ITS ORDER, as the server sends them (BoardColumn).
+    Each column's chip shows the server's TRUE TOTAL for its Status - never the number of cards rendered,
+    which story 2.9's paging will make smaller (AD-29) - and moves only with the person's own creation.
+
+    CREATION LIVES IN THE FIRST COLUMN (open questions 4 (b) and 8 (a)). A new Task takes the first Status
+    (AC2), so the create affordance is in the first column's head only, and the other columns' slot is empty
+    for every Role - not a Role-disabled state. On an empty Board the one primary action is "Add a Task" in
+    the empty state, and the head's affordance waits until there is a Task, so there is exactly one. The
+    field (TaskCreate) opens inline at the top of the first column; closing it returns focus to whichever
+    control opened it.
+
+    ABSENT, NOT DISABLED (UX-DR27). A Role without manage-tasks gets no "+", no empty-state action and no
+    field. The Role is re-read on every arrival (AC14); a field it no longer permits closes, and one it still
+    permits keeps its text.
+
+    PURGED WITH THE SPACE, and the Project's name reaches the context bar from this answer alone - never
+    the document's title, never a URL (UX-DR33). Leaving the Board clears it from the bar.
+*@
+
+<p class="visually-hidden" role="status" aria-live="polite">@_announcement</p>
+
+@if (_columns is null)
+{
+    <div class="board board--loading" aria-busy="true">
+        <p class="visually-hidden">@Localizer["BoardLoading"]</p>
+
+        @* Skeleton columns in the Board's own shape, holding no text (UX-DR35 cold load, UX-DR31). *@
+        <div class="board__columns" aria-hidden="true">
+            <div class="board-column board-column--skeleton"></div>
+            <div class="board-column board-column--skeleton"></div>
+            <div class="board-column board-column--skeleton"></div>
+        </div>
+    </div>
+}
+
+@if (_columns is { } columns)
+{
+    <div class="board">
+        <PageHeading>@_projectName</PageHeading>
+
+        @if (IsEmpty)
+        {
+            <div class="board__empty">
+                <p class="board__empty-text">@Localizer["BoardEmpty"]</p>
+
+                @if (_canManage && !_creating)
+                {
+                    <button type="button" class="button-primary board__empty-action" @onclick="OpenCreate" @ref="_emptyAction">@Localizer["TaskAdd"]</button>
+                }
+            </div>
+        }
+
+        <div class="board__columns">
+            @foreach (var column in columns)
+            {
+                <BoardColumn @key="column.StatusId"
+                             StatusId="@column.StatusId"
+                             Name="@column.Name"
+                             Total="@column.Total"
+                             Tasks="@column.Tasks"
+                             ShowAdd="@(IsFirst(column) && _canManage && !_creating && !IsEmpty)"
+                             OnAdd="OpenCreate"
+                             FocusAddRequests="@(IsFirst(column) ? _focusAddRequests : 0)">
+                    @if (IsFirst(column) && _canManage && _creating)
+                    {
+                        <TaskCreate SpaceId="@SpaceId" ProjectId="@ProjectId" OnCreated="Add" OnRefused="OnRefused" OnClose="CloseCreate" />
+                    }
+                </BoardColumn>
+            }
+        </div>
+    </div>
+}
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private IDisposable? _purgeRegistration;
+
+    /// <summary>
+    /// Bumped by every purge and by disposal. An answer that started before one is dropped.
+    /// </summary>
+    private int _generation;
+
+    private List<ColumnState>? _columns;
+    private string _projectName = string.Empty;
+    private bool _canManage;
+    private string? _announcement;
+    private bool _creating;
+
+    private ElementReference _emptyAction;
+    private bool _focusEmptyAction;
+    private int _focusAddRequests;
+
+    /// <summary>The Space the Project is in.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>The Project whose Board this is.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    /// <summary>The Role held in the Space, as its stable code, from the active Space's answer on this load.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string RoleCode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Raised for a <c>404</c> - the Project matches nothing in the Space, or the Space itself is refused -
+    /// so the page renders its one refusal surface.
+    /// </summary>
+    [Parameter]
+    public EventCallback<ProblemResponse?> OnRefused { get; set; }
+
+    private bool IsEmpty => _columns is { } columns && columns.TrueForAll(column => column.Total == 0);
+
+    private bool IsFirst(ColumnState column) => _columns is [var first, ..] && ReferenceEquals(first, column);
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _purgeRegistration = ActiveSpace.RegisterPurge(Purge);
+
+        await LoadAsync(_generation);
+    }
+
+    /// <summary>
+    /// The Role is re-read on every arrival, a re-arrival on this Board included (AC14), and applied in
+    /// place: the Board and an open field survive, and a field the Role no longer permits closes.
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        _canManage = TaskCapabilities.PermitsManageTasks(RoleCode);
+
+        if (!_canManage)
+        {
+            _creating = false;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusEmptyAction)
+        {
+            _focusEmptyAction = false;
+            await _emptyAction.FocusAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _generation++;
+        _purgeRegistration?.Dispose();
+        ActiveSpace.ClearProject();
+    }
+
+    /// <summary>
+    /// The Space is being left: everything about this Board goes, synchronously.
+    /// </summary>
+    private void Purge()
+    {
+        _generation++;
+        _columns = null;
+        _projectName = string.Empty;
+        _announcement = null;
+        _creating = false;
+    }
+
+    private async Task LoadAsync(int generation)
+    {
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(BoardRoutes.BoardOf(SpaceId, ProjectId), UriKind.Relative), token);
+
+            if (generation != _generation || token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                var board = await response.Content.ReadFromJsonAsync<BoardResponse>(JsonOptions, token);
+
+                if (board is not null && generation == _generation && ActiveSpace.ShowProject(SpaceId, board.Project.Name))
+                {
+                    _projectName = board.Project.Name;
+                    _columns = [.. board.Columns.Select(column => new ColumnState(column.StatusId, column.Name, column.Total, [.. column.Tasks]))];
+                    _announcement = Localizer["BoardLoaded"];
+                }
+
+                return;
+            }
+
+            if (response.StatusCode != HttpStatusCode.Unauthorized)
+            {
+                await OnRefused.InvokeAsync(await SpaceWrites.ProblemOfAsync(response, token));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab left this Space, or the Session ended: both purges have run.
+        }
+        catch (HttpRequestException)
+        {
+            await RefuseUnlessLeftAsync(generation);
+        }
+        catch (JsonException)
+        {
+            await RefuseUnlessLeftAsync(generation);
+        }
+    }
+
+    private async Task RefuseUnlessLeftAsync(int generation)
+    {
+        if (generation == _generation)
+        {
+            await OnRefused.InvokeAsync(null);
+        }
+    }
+
+    private void OpenCreate() => _creating = true;
+
+    private void CloseCreate()
+    {
+        _creating = false;
+
+        // Back to whichever control opened the field: the empty state's action, or the first column's "+".
+        if (IsEmpty)
+        {
+            _focusEmptyAction = true;
+        }
+        else
+        {
+            _focusAddRequests++;
+        }
+    }
+
+    /// <summary>
+    /// The created Task joins the bottom of its Status's column - its position key is the column's last -
+    /// and that column's total grows by one: the person's own creation, and the only live change to a count.
+    /// </summary>
+    private void Add(TaskResponse task)
+    {
+        if (_columns is not { Count: > 0 } columns)
+        {
+            return;
+        }
+
+        var column = columns.Find(candidate => candidate.StatusId == task.StatusId) ?? columns[0];
+
+        column.Tasks.Add(task);
+        column.Total++;
+        _announcement = Localizer["TaskAdded"];
+    }
+
+    /// <summary>
+    /// One column as this Board holds it: its total moves with the person's own creation.
+    /// </summary>
+    private sealed class ColumnState(Guid statusId, string name, int total, List<TaskResponse> tasks)
+    {
+        public Guid StatusId { get; } = statusId;
+
+        public string Name { get; } = name;
+
+        public int Total { get; set; } = total;
+
+        public List<TaskResponse> Tasks { get; } = tasks;
+    }
+}

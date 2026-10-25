@@ -7,8 +7,10 @@ using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.ApiTokens;
+using Yello.Contracts.Boards;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
+using Yello.Contracts.Tasks;
 using Yello.Domain.Accounts;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
@@ -141,10 +143,10 @@ internal static class TaskWire
         key is null ? NoHeaders : new Dictionary<string, string>(StringComparer.Ordinal) { [Idempotency.HeaderName] = key };
 
     public static Task<WireResponse> CreateTaskAsync(Actor actor, Guid spaceId, Guid projectId, string title, string? key = null) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, TaskRouteScaffold.CreateIn(spaceId, projectId), TitleBody(title), KeyHeader(key));
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, TaskRoutes.CreateIn(spaceId, projectId), TitleBody(title), KeyHeader(key));
 
     public static Task<WireResponse> CreateTaskWithTokenAsync(Actor actor, string token, Guid spaceId, Guid projectId, string title, string? key = null) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, TaskRouteScaffold.CreateIn(spaceId, projectId), token, TitleBody(title), KeyHeader(key));
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, TaskRoutes.CreateIn(spaceId, projectId), token, TitleBody(title), KeyHeader(key));
 
     public static Task<WireResponse> CreateTaskOnAsync(IsolationSurface surface, Actor actor, string token, Guid projectId, string title, string? key = null) =>
         surface == IsolationSurface.ApiToken
@@ -152,7 +154,7 @@ internal static class TaskWire
             : CreateTaskAsync(actor, actor.SpaceId, projectId, title, key);
 
     public static Task<WireResponse> BoardAsync(Actor actor, Guid spaceId, Guid projectId) =>
-        actor.Session.GetAsync(TaskRouteScaffold.BoardOf(spaceId, projectId));
+        actor.Session.GetAsync(BoardRoutes.BoardOf(spaceId, projectId));
 
     public static Guid IdOf(WireResponse created)
     {

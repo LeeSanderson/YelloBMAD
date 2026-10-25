@@ -55,11 +55,11 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
     private const int PredicatesPerTable = 2;
 
     /// <summary>
-    /// <c>Project</c> alone carries a third: BLOCK AFTER UPDATE, so no statement can move a Project to
-    /// another Space (story 2.1, AC7, open question 5). Exactly three, not "at least two", so a fourth on
-    /// it - or a third anywhere else - is still caught.
+    /// <c>Project</c> and <c>Task</c> carry a third: BLOCK AFTER UPDATE, so no statement can move a Project
+    /// (story 2.1, AC7, open question 5) or a Task (story 2.2, AC2) to another Space. Exactly three, not "at
+    /// least two", so a fourth on either - or a third anywhere else - is still caught.
     /// </summary>
-    private const int ProjectPredicates = 3;
+    private const int MovableTablePredicates = 3;
 
     [Fact]
     public async Task The_security_policy_exists_and_is_enabled()
@@ -116,7 +116,7 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
                 TestContext.Current.CancellationToken,
                 SchemaNames.SpaceIsolationPolicy);
 
-            Assert.Equal(table == SchemaNames.ProjectTable ? ProjectPredicates : PredicatesPerTable, predicates);
+            Assert.Equal(table == SchemaNames.ProjectTable || table == SchemaNames.TaskTable ? MovableTablePredicates : PredicatesPerTable, predicates);
         }
     }
 

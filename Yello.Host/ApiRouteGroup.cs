@@ -19,7 +19,9 @@ namespace Yello.Host;
 /// request rather than a missing Session (story 1.6, decision 11). Then an Account-scoped endpoint
 /// (AD-24's two surfaces) gets the same <c>401</c> without a Session, or its
 /// <c>AccountScopedContext</c> from the Session (story 1.7). Then anti-forgery, for every
-/// state-changing request, so a forged change is refused before any Space is read. Then Space
+/// state-changing request, so a forged change is refused before any Space is read. Then the
+/// not-found floor (story 2.2, Q7), which times everything after it and holds a Space-scoped <c>404</c>
+/// to a fixed minimum, so a boundary refusal and an in-Space not-found take the same time. Then Space
 /// resolution, the capability check, the bound and the refusal record. The group also stamps every
 /// endpoint it maps, which is how the Host knows at startup that no <c>{spaceId}</c> route was
 /// mapped around it.
@@ -38,5 +40,6 @@ internal static class ApiRouteGroup
             .AddEndpointFilter(ActiveSpaceResolution.RequireAccountAsync)
             .AddEndpointFilter(AccountScopedResolution.EstablishAsync)
             .AddEndpointFilter(AntiforgeryRequirement.ValidateStateChangingAsync)
+            .AddEndpointFilter(NotAvailableFloor.HoldAsync)
             .AddEndpointFilter(ActiveSpaceResolution.ResolveAsync);
 }

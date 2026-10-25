@@ -110,13 +110,15 @@ public sealed partial class RefusalBoundaryGateTests
     ];
 
     /// <summary>
-    /// The entities AC5 names. Only <c>StatusDefinition</c> exists today; the other three are named
-    /// so the gate covers them the day they are written.
+    /// The entities AC5 names, by full name. <c>Label</c> (story 2.4) is named so the gate covers it the
+    /// day it is written; every other name must resolve to a Domain type, which
+    /// <c>Every_Space_scoped_entity_the_gates_name_resolves_to_a_Domain_type</c> holds. The Task's CLR name is
+    /// <c>TaskItem</c> (story 2.2, Q1 (b)).
     /// </summary>
     private static readonly string[] SpaceScopedEntities =
     [
         "Yello.Domain.Statuses.StatusDefinition",
-        "Yello.Domain.Tasks.Task",
+        "Yello.Domain.Tasks.TaskItem",
         "Yello.Domain.Projects.Project",
         "Yello.Domain.Labels.Label",
     ];

@@ -2,6 +2,10 @@ using System.Net;
 using System.Text.Json;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Tasks;
+using Yello.Domain;
+using Yello.Domain.Memberships;
+using Yello.Domain.Tasks;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
 using static Yello.Tests.Slices.Tasks.TaskWire;
@@ -11,13 +15,13 @@ namespace Yello.Tests.Slices.Tasks;
 /// <summary>
 /// Story 2.2 over the wire: create a Task in a Project of the active Space, on both surfaces, with the
 /// Role, the Tasks-per-Project bound, idempotency and the schema that hold it. AC2, AC3, AC7-AC9, AC11;
-/// FR-19, AR-30, AD-2, AD-3, AD-15, AD-18, AD-25. Red-phase scaffolds written by the story 2.2 ATDD run.
+/// FR-19, AR-30, AD-2, AD-3, AD-15, AD-18, AD-25. Written red by the story 2.2 ATDD run; activated
+/// by its dev phase.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Routes and the problem type come from <see cref="TaskRouteScaffold"/> until <c>Yello.Contracts</c>
-/// states them</b>; on activation replace each use with <c>TaskRoutes</c> and
-/// <c>ProblemTypes.InvalidTaskTitle</c>. Answers are read as raw JSON, so an added property cannot hide
+/// <b>Routes and the problem type are <c>Yello.Contracts</c>'</b> (<c>TaskRoutes</c>,
+/// <c>ProblemTypes.InvalidTaskTitle</c>). Answers are read as raw JSON, so an added property cannot hide
 /// behind a DTO.
 /// </para>
 /// <para>
@@ -27,9 +31,8 @@ namespace Yello.Tests.Slices.Tasks;
 /// AC8, AD-15, AD-17). Seed constraints are stated on <see cref="TaskWire"/>.
 /// </para>
 /// <para>
-/// <b>Dependencies on undecided questions, stated so activation corrects the scaffold rather than the
-/// product:</b> Q2 (a) - <c>positionKey</c> in the body and the column; Q3 (a) - titles trimmed, 1-200
-/// characters; Q5 (a) - the routes. If any is decided otherwise, correct the case and record it.
+/// <b>Decisions these cases rest on</b> (story 2.2 Completion Notes): Q2 (a) - <c>positionKey</c> in the body
+/// and the column; Q3 (a) - titles trimmed, 1-200 characters; Q5 (a) - the routes.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Slices")]
@@ -53,7 +56,7 @@ public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
     /// </summary>
     /// <param name="surface">The surface the creation is sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - no Task table, slice or route yet (Tasks 2-4)")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AD-4")]
@@ -90,7 +93,7 @@ public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
         Assert.Equal("Draft the brief", document.RootElement.GetProperty("title").GetString());
         Assert.Equal(statuses[0].Id, document.RootElement.GetProperty("statusId").GetGuid());
         Assert.False(string.IsNullOrEmpty(document.RootElement.GetProperty("positionKey").GetString()));
-        Assert.Equal(TaskRouteScaffold.TaskOf(owner.SpaceId, id), created.Header("Location"));
+        Assert.Equal(TaskRoutes.TaskOf(owner.SpaceId, id), created.Header("Location"));
         Assert.DoesNotContain(projectId.ToString("D"), created.Header("Location") ?? string.Empty, StringComparison.OrdinalIgnoreCase);
 
         var row = Assert.Single(await TaskRowsAsync(database, owner.SpaceId));
@@ -109,7 +112,7 @@ public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
     /// <c>uniqueidentifier</c> ordering.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - no Task table or create route yet (Tasks 2-4)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Priority", "P1")]
     public async Task Task_ids_are_generated_by_the_application_in_sequential_order()
@@ -154,7 +157,7 @@ public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
     /// <param name="length">The title's length, in characters; 0 and a run of spaces are blank.</param>
     /// <param name="blank">Whether the title is spaces only.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - no title rule or create route yet (Tasks 2-4; Q3)")]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(3, true)]
     [InlineData(201, false)]
@@ -172,14 +175,14 @@ public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
             var projectId = await CreateProjectAsync(owner, "Titles");
 
             refused = await CreateTaskAsync(owner, owner.SpaceId, projectId, new string(blank ? ' ' : 't', length));
-            anchor = await CreateTaskAsync(owner, owner.SpaceId, projectId, new string('t', TaskRouteScaffold.TitleMaximumLength));
+            anchor = await CreateTaskAsync(owner, owner.SpaceId, projectId, new string('t', TaskTitle.MaxLength));
         });
 
         Assert.NotNull(owner);
         Assert.Equal(HttpStatusCode.BadRequest, refused?.StatusCode);
-        Assert.Equal(TaskRouteScaffold.InvalidTaskTitle, Problem(refused!)?.Type);
+        Assert.Equal(ProblemTypes.InvalidTaskTitle, Problem(refused!)?.Type);
         Assert.Equal(HttpStatusCode.Created, anchor?.StatusCode);
-        Assert.Equal([new string('t', TaskRouteScaffold.TitleMaximumLength)], (await TaskRowsAsync(database, owner.SpaceId)).Select(row => row.Title));
+        Assert.Equal([new string('t', TaskTitle.MaxLength)], (await TaskRowsAsync(database, owner.SpaceId)).Select(row => row.Title));
     }
 
     /// <summary>
@@ -189,7 +192,7 @@ public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
     /// Anchor: a Member of the same Space creates one (AC2: Owner, Admin or Member).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - no Task create route declaring manage-tasks yet (Task 4)")]
+    [Fact]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "NFR-7")]
@@ -226,7 +229,7 @@ public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
         {
             Assert.True(refused.StatusCode == HttpStatusCode.Forbidden, $"{refused.StatusCode} {refused.Body}");
             Assert.Equal(ProblemTypes.InsufficientRole, Problem(refused)?.Type);
-            Assert.Equal(TaskRouteScaffold.ManageTasks, Problem(refused)?.Capability);
+            Assert.Equal(StableCode.Of(Capability.ManageTasks), Problem(refused)?.Capability);
         }
 
         Assert.Equal([InsufficientRoleKind, InsufficientRoleKind], await RefusalKindsAsync(database, viewer.AccountId, owner.SpaceId));
@@ -241,7 +244,7 @@ public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
     /// takes a Task.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - no Task create route yet (Task 4)")]
+    [Fact]
     [Trait("Requirement", "AD-20")]
     public async Task Creating_in_a_Project_that_matches_nothing_answers_the_boundary_404_and_records_nothing()
     {

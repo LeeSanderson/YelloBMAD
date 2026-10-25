@@ -3,6 +3,8 @@ using System.Net;
 using Microsoft.Data.SqlClient;
 using Xunit;
 using Yello.Contracts;
+using Yello.Domain;
+using Yello.Domain.Bounds;
 using Yello.Tests.Shared;
 using static Yello.Tests.Slices.Tasks.TaskWire;
 
@@ -37,7 +39,7 @@ public sealed partial class TaskEndpointTests
     /// still holds 5,000, and the refusal is not an access refusal, so nothing is recorded.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the pipeline counts no Tasks-per-Project bound yet (Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     [Trait("Requirement", "NFR-8")]
@@ -55,7 +57,7 @@ public sealed partial class TaskEndpointTests
             projectId = await CreateProjectAsync(owner, "Full");
 
             var first = (await StatusesAsync(database, owner.SpaceId))[0];
-            await SeedTasksAsync(database, owner.SpaceId, projectId, first.Id, TaskRouteScaffold.TasksPerProjectLimit - 1);
+            await SeedTasksAsync(database, owner.SpaceId, projectId, first.Id, BoundRegistry.For(Bound.TasksPerProject).Limit - 1);
 
             fiveThousandth = await CreateTaskAsync(owner, owner.SpaceId, projectId, "The 5,000th");
             fiveThousandFirst = await CreateTaskAsync(owner, owner.SpaceId, projectId, BoundTitle);
@@ -68,12 +70,12 @@ public sealed partial class TaskEndpointTests
         var problem = Problem(fiveThousandFirst!);
 
         Assert.Equal(ProblemTypes.BoundReached, problem?.Type);
-        Assert.Equal(TaskRouteScaffold.TasksPerProject, problem?.Bound);
-        Assert.Equal(TaskRouteScaffold.TasksPerProjectLimit, problem?.Limit);
+        Assert.Equal(StableCode.Of(Bound.TasksPerProject), problem?.Bound);
+        Assert.Equal(BoundRegistry.For(Bound.TasksPerProject).Limit, problem?.Limit);
 
         var rows = await TaskRowsAsync(database, owner.SpaceId);
 
-        Assert.Equal(TaskRouteScaffold.TasksPerProjectLimit, rows.Count(row => row.ProjectId == projectId));
+        Assert.Equal(BoundRegistry.For(Bound.TasksPerProject).Limit, rows.Count(row => row.ProjectId == projectId));
         Assert.DoesNotContain(rows, row => row.Title == BoundTitle);
         Assert.Empty(await RefusalKindsAsync(database, owner.AccountId, owner.SpaceId));
     }
@@ -83,7 +85,7 @@ public sealed partial class TaskEndpointTests
     /// in the same Space takes a Task.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the bound count is not scoped to the route's Project yet (Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     public async Task A_full_Project_does_not_block_a_Task_in_another_Project_of_the_same_Space()
@@ -100,7 +102,7 @@ public sealed partial class TaskEndpointTests
             var other = await CreateProjectAsync(owner, "Other");
 
             var first = (await StatusesAsync(database, owner.SpaceId))[0];
-            await SeedTasksAsync(database, owner.SpaceId, full, first.Id, TaskRouteScaffold.TasksPerProjectLimit);
+            await SeedTasksAsync(database, owner.SpaceId, full, first.Id, BoundRegistry.For(Bound.TasksPerProject).Limit);
 
             // Anchor: the full Project really is full, so the second answer is the scope's and not a bound
             // that never counted.
@@ -119,7 +121,7 @@ public sealed partial class TaskEndpointTests
     /// Project in the Space is full.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the bound count is not scoped to the route's Project yet (Task 5)")]
+    [Fact]
     [Trait("Requirement", "AD-25")]
     [Trait("Requirement", "AD-3")]
     public async Task A_creation_in_an_unknown_Project_counts_nothing_and_answers_404_not_409()
@@ -134,7 +136,7 @@ public sealed partial class TaskEndpointTests
             var full = await CreateProjectAsync(owner, "Full");
 
             var first = (await StatusesAsync(database, owner.SpaceId))[0];
-            await SeedTasksAsync(database, owner.SpaceId, full, first.Id, TaskRouteScaffold.TasksPerProjectLimit);
+            await SeedTasksAsync(database, owner.SpaceId, full, first.Id, BoundRegistry.For(Bound.TasksPerProject).Limit);
 
             unknown = await CreateTaskAsync(owner, owner.SpaceId, Guid.NewGuid(), "Nowhere");
         });
@@ -150,7 +152,7 @@ public sealed partial class TaskEndpointTests
     /// scheduler's: see the class remarks.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - no Tasks-per-Project count under UPDLOCK, HOLDLOCK yet (Tasks 5, 7)")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     public async Task Two_concurrent_creations_at_4999_yield_exactly_one_201_and_one_409()
@@ -171,7 +173,7 @@ public sealed partial class TaskEndpointTests
 
             projectId = await CreateProjectAsync(owner, "Racing");
             var first = (await StatusesAsync(database, owner.SpaceId))[0];
-            await SeedTasksAsync(database, owner.SpaceId, projectId, first.Id, TaskRouteScaffold.TasksPerProjectLimit - 1);
+            await SeedTasksAsync(database, owner.SpaceId, projectId, first.Id, BoundRegistry.For(Bound.TasksPerProject).Limit - 1);
 
             // Presence first: a first request's SpacePresence insert would otherwise serialise the pair before
             // the bound count (story 2.2 ATDD finding on 2.1's BND-002).
@@ -206,7 +208,7 @@ public sealed partial class TaskEndpointTests
             [HttpStatusCode.Created, HttpStatusCode.Conflict],
             answers.Select(answer => answer.StatusCode).Order());
         Assert.Equal(ProblemTypes.BoundReached, Problem(answers.Single(answer => answer.StatusCode == HttpStatusCode.Conflict))?.Type);
-        Assert.Equal(TaskRouteScaffold.TasksPerProjectLimit, await TaskCountAsync(database, owner.SpaceId, projectId));
+        Assert.Equal(BoundRegistry.For(Bound.TasksPerProject).Limit, await TaskCountAsync(database, owner.SpaceId, projectId));
     }
 
     /// <summary>
@@ -215,7 +217,7 @@ public sealed partial class TaskEndpointTests
     /// <c>409</c>, and applies nothing. Anchor: a fresh key is refused.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - no Tasks-per-Project bound or Task create route yet (Tasks 4-6)")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "AD-18")]
     public async Task Replaying_the_key_of_the_5000th_creation_returns_its_201_not_the_bound_409()
@@ -234,7 +236,7 @@ public sealed partial class TaskEndpointTests
             projectId = await CreateProjectAsync(owner, "Full");
 
             var first = (await StatusesAsync(database, owner.SpaceId))[0];
-            await SeedTasksAsync(database, owner.SpaceId, projectId, first.Id, TaskRouteScaffold.TasksPerProjectLimit - 1);
+            await SeedTasksAsync(database, owner.SpaceId, projectId, first.Id, BoundRegistry.For(Bound.TasksPerProject).Limit - 1);
 
             original = await CreateTaskAsync(owner, owner.SpaceId, projectId, "The 5,000th", key);
             replay = await CreateTaskAsync(owner, owner.SpaceId, projectId, "The 5,000th", key);
@@ -247,7 +249,7 @@ public sealed partial class TaskEndpointTests
         Assert.Equal(original!.Body, replay!.Body);
         Assert.Equal(original.Header("Location"), replay.Header("Location"));
         Assert.Equal(HttpStatusCode.Conflict, fresh?.StatusCode);
-        Assert.Equal(TaskRouteScaffold.TasksPerProjectLimit, await TaskCountAsync(database, owner.SpaceId, projectId));
+        Assert.Equal(BoundRegistry.For(Bound.TasksPerProject).Limit, await TaskCountAsync(database, owner.SpaceId, projectId));
         Assert.DoesNotContain(CrossSpaceKind, await RefusalKindsAsync(database, owner.AccountId, owner.SpaceId));
     }
 }

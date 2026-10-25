@@ -8,7 +8,6 @@ using Yello.Contracts.ApiTokens;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
-using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -113,7 +112,7 @@ internal sealed class FakeYelloApi
 
     /// <summary>
     /// Each Project's Board, keyed by (Space, Project), as <c>GET …/projects/{projectId}/board</c> serves it.
-    /// Story 2.2; the routes are <see cref="TaskRouteScaffold"/>'s until <c>Yello.Contracts</c> states them,
+    /// Story 2.2; the routes are <c>BoardRoutes</c>' and <c>TaskRoutes</c>',
     /// and the bodies are <see cref="FakeBoard"/>, shaped as story 2.2 Task 3's <c>BoardResponse</c>.
     /// </summary>
     public IDictionary<(Guid SpaceId, Guid ProjectId), FakeBoard> Boards { get; } = new Dictionary<(Guid SpaceId, Guid ProjectId), FakeBoard>();
@@ -527,7 +526,7 @@ internal sealed class FakeYelloApi
 
         if (TaskBoundReached)
         {
-            return (409, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.BoundReached, Errors: null, Bound: TaskRouteScaffold.TasksPerProject, Limit: TaskRouteScaffold.TasksPerProjectLimit), JsonOptions));
+            return (409, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.BoundReached, Errors: null, Bound: "tasks-per-project", Limit: 5000), JsonOptions));
         }
 
         using var document = JsonDocument.Parse(string.IsNullOrEmpty(request.Body) ? "{}" : request.Body);
@@ -535,7 +534,7 @@ internal sealed class FakeYelloApi
 
         if (title.Length is < 1 or > 200)
         {
-            return (400, Problem(TaskRouteScaffold.InvalidTaskTitle));
+            return (400, Problem(ProblemTypes.InvalidTaskTitle));
         }
 
         var first = board.Columns[0];

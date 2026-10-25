@@ -60,6 +60,13 @@ public sealed class ActiveSpaceState : IDisposable
     public ActiveSpaceResponse? Current { get; private set; }
 
     /// <summary>
+    /// The name of the Project whose Board the tab is showing, from that Board's own answer on this load,
+    /// or <c>null</c> off a Board (story 2.2; DESIGN.md:454). The context bar renders it after the Space
+    /// name, and from nothing else - never from Space home's list.
+    /// </summary>
+    public string? ProjectName { get; private set; }
+
+    /// <summary>
     /// How many answers have arrived - so a listener can tell a new arrival from a redraw.
     /// </summary>
     public int Arrivals { get; private set; }
@@ -129,6 +136,7 @@ public sealed class ActiveSpaceState : IDisposable
         cancelling.Dispose();
 
         Current = null;
+        ProjectName = null;
         SpaceId = null;
         _switching = false;
 
@@ -176,6 +184,39 @@ public sealed class ActiveSpaceState : IDisposable
         Changed?.Invoke(this, EventArgs.Empty);
 
         return true;
+    }
+
+    /// <summary>
+    /// Records the name of the Project whose Board has just answered, for the context bar.
+    /// </summary>
+    /// <param name="spaceId">The Space the Board answer is about.</param>
+    /// <param name="name">The Project's name, as that answer states it.</param>
+    /// <returns><c>false</c>, and nothing recorded, for an answer about a Space the tab has left.</returns>
+    public bool ShowProject(Guid spaceId, string name)
+    {
+        if (spaceId != SpaceId)
+        {
+            return false;
+        }
+
+        ProjectName = name;
+        Changed?.Invoke(this, EventArgs.Empty);
+
+        return true;
+    }
+
+    /// <summary>
+    /// The tab has left the Board: the context bar names no Project.
+    /// </summary>
+    public void ClearProject()
+    {
+        if (ProjectName is null)
+        {
+            return;
+        }
+
+        ProjectName = null;
+        Changed?.Invoke(this, EventArgs.Empty);
     }
 
     /// <inheritdoc />

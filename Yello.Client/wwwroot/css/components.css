@@ -560,3 +560,216 @@
     border: var(--border-hairline-width) solid var(--danger);
     font-weight: var(--type-task-title-weight);
 }
+
+/*
+    THE SKIP CONTROL (story 2.2, open question 9 (a); deferred-work.md:338). The first tab stop on every
+    authenticated surface: clipped out of sight until it has focus, then drawn over the page's corner as
+    the bar's quiet controls are, so a keyboard user can see what Enter will do. A button, not a link -
+    MainLayout says why.
+*/
+.skip-control {
+    position: absolute;
+    inset-block-start: var(--space-3);
+    inset-inline-start: var(--space-3);
+    z-index: 2;
+    appearance: none;
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    padding-block: var(--space-1);
+    padding-inline: var(--space-3);
+    font-family: var(--type-body-family);
+    font-size: var(--type-body-size);
+    line-height: var(--type-body-line-height);
+    cursor: pointer;
+}
+
+.skip-control:not(:focus) {
+    overflow: hidden;
+    white-space: nowrap;
+    clip-path: inset(50%);
+}
+
+/*
+    THE CONTEXT BAR'S PROJECT NAME, on the Board (DESIGN.md:454): metadata, muted, after the Space name.
+    Dropped at 768-1279px, where the bar has the least room for it (EXPERIENCE.md:413-419); the Role chip
+    is never dropped. The breakpoints are in em - 48em and 80em against the 16px initial size - so no px
+    literal enters the corpus. Below 768px is story 2.11's.
+*/
+.context-bar__project {
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+@media (min-width: 48em) and (max-width: 79.9375em) {
+    .context-bar__project {
+        display: none;
+    }
+}
+
+/*
+    THE BOARD (story 2.2). DESIGN.md:137-161, :389-453; EXPERIENCE.md:199-201.
+
+    Columns side by side in effective order, the gutter between them, and each scrolls within itself -
+    never the page. When the columns are wider than the view, the row scrolls horizontally inside its own
+    box (768-1279px is the case DESIGN.md names); below 768px is story 2.11's pager, and nothing here
+    fixes a width that would preclude it.
+*/
+.board {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    padding-block: var(--space-5);
+    padding-inline: var(--space-4);
+}
+
+.board__empty {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.board__empty-text {
+    margin-block: 0;
+    color: var(--text-muted);
+}
+
+.board__empty-action {
+    inline-size: auto;
+}
+
+.board__columns {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-gutter);
+    overflow-x: auto;
+}
+
+/*
+    A column: the column surface on the hairline, 3px corners (deferred-work.md:36). Its width is in rem
+    so it grows with a text-size override, and its height is the content's up to most of the view, past
+    which it scrolls inside itself. The border is the gated 1.5px hairline; device-pixel snapping is UX's
+    to specify and is not invented here (deferred-work.md:66).
+*/
+.board-column {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-card-stack-gap);
+    flex: 0 0 auto;
+    box-sizing: border-box;
+    inline-size: 17rem;
+    max-block-size: 75vh;
+    overflow-y: auto;
+    padding: var(--space-3);
+    background-color: var(--surface-column);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+}
+
+/* The cold-load skeleton: a column's surface holding no text, given its depth by spacing alone. */
+.board-column--skeleton {
+    padding-block: var(--space-7);
+}
+
+/*
+    The head: the name, then the count chip, then the create affordance pushed right (AC5).
+*/
+.board-column__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+}
+
+.board-column__name {
+    margin-block: 0;
+    overflow-wrap: anywhere;
+}
+
+/*
+    THE COLUMN COUNT CHIP - the one pill in the product (rounded.full; deferred-work.md:32). The server's
+    true total as plain metadata: muted, never coloured for emphasis.
+*/
+.column-count {
+    display: inline-flex;
+    align-items: center;
+    padding-inline: var(--space-2);
+    background-color: var(--surface-card);
+    color: var(--text-muted);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-full);
+}
+
+.board-column__add {
+    margin-inline-start: auto;
+    appearance: none;
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    padding-block: 0;
+    padding-inline: var(--space-2);
+    font-family: var(--type-body-family);
+    font-size: var(--type-body-size);
+    line-height: var(--type-body-line-height);
+    cursor: pointer;
+}
+
+.board-column__cards {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-card-stack-gap);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+/*
+    THE TASK CARD (DESIGN.md:137-144, :431). The title is the only content; the card sizes to it, wraps a
+    long title rather than scrolling, and carries NO SHADOW - stated explicitly so nobody adds one back
+    (story 2.7's lifted card is the one sanctioned exception). The metadata row is empty in 2.2 and takes
+    no space until Labels, the Assignee or Presence fill it.
+*/
+.task-card {
+    padding-block: var(--space-card-pad-y);
+    padding-inline: var(--space-card-pad-x);
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    box-shadow: none;
+    overflow-wrap: anywhere;
+}
+
+.task-card__title {
+    margin-block: 0;
+}
+
+.task-card__meta:empty {
+    display: none;
+}
+
+/*
+    The inline Task field, at the top of the first column (open question 8 (a)).
+*/
+.task-create {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.task-create__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.task-create__refusal,
+.task-create__progress {
+    margin-block: 0;
+    color: var(--text-muted);
+}

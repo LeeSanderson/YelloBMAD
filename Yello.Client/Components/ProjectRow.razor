@@ -5,8 +5,8 @@
 @*
     ONE PROJECT IN THE LIST - story 2.1, AC3; UX-DR26, UX-DR27, UX-DR33.
 
-    Its name as text (no link target exists until story 2.2's Board), and for a Role that may rename it,
-    an explicit "Rename" control - never hover-only. Renaming opens an inline field with explicit Rename
+    Its name as a link to its Board (story 2.2; 2.1 Q10): the link text is the name, the address holds ids
+    only (UX-DR33). For a Role that may rename it, an explicit "Rename" control - never hover-only. Renaming opens an inline field with explicit Rename
     and Cancel; Esc cancels. For a Role that may not, the control is absent, not disabled.
 *@
 
@@ -32,7 +32,7 @@
 
     @if (!Renaming)
     {
-        <span class="project-list__name">@Project.Name</span>
+        <a class="project-list__name" href="@ClientRoutes.Board(SpaceId, Project.Id)">@Project.Name</a>
     }
 
     @if (!Renaming && CanManage)
@@ -47,6 +47,11 @@
 </li>
 
 @code {
+    /// <summary>The Space the Project is in, for its Board's address.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
     /// <summary>The Project.</summary>
     [Parameter]
     [EditorRequired]

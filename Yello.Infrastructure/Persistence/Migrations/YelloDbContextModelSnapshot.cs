@@ -186,8 +186,6 @@ namespace Yello.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("SpaceId", "Id");
-
                     b.ToTable("Project", (string)null);
                 });
 
@@ -252,6 +250,46 @@ namespace Yello.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("StatusDefinition", (string)null);
+                });
+
+            modelBuilder.Entity("Yello.Domain.Tasks.TaskItem", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("PositionKey")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(128)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SpaceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("SpaceId");
+
+                    b.Property<Guid>("StatusId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SpaceId", "StatusId");
+
+                    b.HasIndex("SpaceId", "ProjectId", "StatusId", "PositionKey")
+                        .IsUnique();
+
+                    b.ToTable("Task", (string)null);
                 });
 
             modelBuilder.Entity("Yello.Infrastructure.Persistence.DataProtectionKey", b =>
@@ -373,6 +411,23 @@ namespace Yello.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("SpaceId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Yello.Domain.Tasks.TaskItem", b =>
+                {
+                    b.HasOne("Yello.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId", "ProjectId")
+                        .HasPrincipalKey("SpaceId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Yello.Domain.Statuses.StatusDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId", "StatusId")
+                        .HasPrincipalKey("SpaceId", "Id")
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
                 });
 

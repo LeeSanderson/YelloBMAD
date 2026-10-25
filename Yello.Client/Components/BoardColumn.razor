@@ -1,0 +1,100 @@
+@using Yello.Contracts.Tasks
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    ONE COLUMN OF THE BOARD - story 2.2, AC4, AC5; UX-DR8, UX-DR27; DESIGN.md:149-161, :452.
+
+    THE HEAD: the Status name in typography.column-head (uppercase by text-transform, never in the string),
+    then the server's true total in the count chip - the only pill in the product, plain text, never a
+    nudge - then the create affordance pushed right. The affordance is the first column's alone, and absent,
+    not disabled, for a Role that lacks manage-tasks (UX-DR27).
+
+    THE CARDS scroll within the column, never the page. Each Task appears here only if its Status is this
+    column's (the Board answer places it; AC4).
+*@
+
+<section class="board-column" aria-labelledby="@HeadingId">
+    <div class="board-column__head">
+        <h2 class="type-column-head board-column__name" id="@HeadingId">@Name</h2>
+        <span class="type-meta column-count">@Total</span>
+
+        @if (ShowAdd)
+        {
+            <button type="button" class="board-column__add" aria-label="@Localizer["TaskAdd"]" @onclick="OnAdd" @ref="_add">+</button>
+        }
+    </div>
+
+    @ChildContent
+
+    @if (Tasks.Count > 0)
+    {
+        <ul class="board-column__cards">
+            @foreach (var task in Tasks)
+            {
+                <TaskCard @key="task.Id" Title="@task.Title" />
+            }
+        </ul>
+    }
+</section>
+
+@code {
+    private ElementReference _add;
+    private int _focusRequestsSeen;
+
+    /// <summary>The column's Status.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid StatusId { get; set; }
+
+    /// <summary>The Status's name.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>The server's true total for the Status - never <c>Tasks.Count</c> (AD-29).</summary>
+    [Parameter]
+    [EditorRequired]
+    public int Total { get; set; }
+
+    /// <summary>The Tasks placed in the column, by position key.</summary>
+    [Parameter]
+    [EditorRequired]
+    public IReadOnlyList<TaskResponse> Tasks { get; set; } = [];
+
+    /// <summary>Whether the head offers the create affordance.</summary>
+    [Parameter]
+    public bool ShowAdd { get; set; }
+
+    /// <summary>Raised when the create affordance is used.</summary>
+    [Parameter]
+    public EventCallback OnAdd { get; set; }
+
+    /// <summary>
+    /// Bumped by the Board to return focus to the create affordance - after a creation field closes.
+    /// </summary>
+    [Parameter]
+    public int FocusAddRequests { get; set; }
+
+    /// <summary>What sits between the head and the cards: the open creation field, in the first column.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string HeadingId => "h" + StatusId.ToString("N", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (FocusAddRequests == _focusRequestsSeen)
+        {
+            return;
+        }
+
+        _focusRequestsSeen = FocusAddRequests;
+
+        if (ShowAdd)
+        {
+            await _add.FocusAsync();
+        }
+    }
+}

@@ -1,0 +1,23 @@
+@*
+    ONE TASK ON THE BOARD - story 2.2, AC6; UX-DR8; DESIGN.md:137-144, :389-453.
+
+    THE TITLE IS THE ONLY CONTENT. A metadata row in monospace sits beneath it and is empty in 2.2: Labels
+    (2.4), the Assignee (4.6) and Presence (Epic 7) fill it, so nothing stands in for them here - no
+    placeholder, no count, no badge, no streak (engagement is a counter-metric).
+
+    NOT A CONTROL YET. No click target (the detail panel is 2.3), not focusable (the keyboard grid is 2.8),
+    and no drag handle or Move control for any Role (2.7, 2.6). The card carries no shadow, declared
+    explicitly in components.css so nobody adds one back.
+*@
+
+<li class="task-card">
+    <p class="type-task-title task-card__title">@Title</p>
+    <div class="type-meta task-card__meta"></div>
+</li>
+
+@code {
+    /// <summary>The Task's title, rendered as text.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string Title { get; set; } = string.Empty;
+}

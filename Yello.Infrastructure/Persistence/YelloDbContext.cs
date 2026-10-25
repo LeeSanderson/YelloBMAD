@@ -4,6 +4,7 @@ using Yello.Domain.Memberships;
 using Yello.Domain.Projects;
 using Yello.Domain.Spaces;
 using Yello.Domain.Statuses;
+using Yello.Domain.Tasks;
 using Yello.Infrastructure.Persistence.Configurations;
 
 namespace Yello.Infrastructure.Persistence;
@@ -101,6 +102,11 @@ public sealed class YelloDbContext(
     public DbSet<Project> Projects => Set<Project>();
 
     /// <summary>
+    /// Tasks, per Space (story 2.2). The CLR type is <see cref="TaskItem"/>; the table is <c>Task</c>.
+    /// </summary>
+    public DbSet<TaskItem> Tasks => Set<TaskItem>();
+
+    /// <summary>
     /// The Space every global query filter compares against, read from this context's
     /// <see cref="SpaceScope"/> each time a query runs.
     /// </summary>
@@ -145,6 +151,7 @@ public sealed class YelloDbContext(
         modelBuilder.ApplyConfiguration(new StatusDefinitionConfiguration(this));
         modelBuilder.ApplyConfiguration(new SpacePresenceConfiguration(this));
         modelBuilder.ApplyConfiguration(new ProjectConfiguration(this));
+        modelBuilder.ApplyConfiguration(new TaskConfiguration(this));
         modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration(this));
         modelBuilder.ApplyConfiguration(new AccessRefusalConfiguration());
         modelBuilder.ApplyConfiguration(new ApiTokenConfiguration());

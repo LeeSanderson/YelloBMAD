@@ -166,6 +166,16 @@ public static class ProblemTypes
     public static string InvalidProjectName => "urn:yello:problem:invalid-project-name";
 
     /// <summary>
+    /// A Task title that is not 1-200 characters once trimmed. Answered <c>400</c>; nothing is written.
+    /// Story 2.2, open question 3 (a).
+    /// </summary>
+    /// <remarks>
+    /// <b>Never "that title is taken", and never a statement about the Project.</b> Titles are not unique,
+    /// and a Project that matches nothing answers <see cref="NotAvailable"/>; this reports only what was sent.
+    /// </remarks>
+    public static string InvalidTaskTitle => "urn:yello:problem:invalid-task-title";
+
+    /// <summary>
     /// An <c>Idempotency-Key</c> header that is empty or longer than
     /// <see cref="Idempotency.MaxKeyLength"/> characters. Answered <c>400</c>; nothing is applied.
     /// </summary>

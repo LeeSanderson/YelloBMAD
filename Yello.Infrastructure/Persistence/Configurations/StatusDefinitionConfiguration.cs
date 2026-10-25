@@ -48,6 +48,10 @@ internal sealed class StatusDefinitionConfiguration(YelloDbContext context) : IE
         // normal case, since every Space starts from the same three defaults.
         builder.HasIndex(status => new { status.SpaceId, status.Name }).IsUnique();
 
+        // AR-8: a Space-scoped reference carries its Space, so story 2.2's Task references its Status
+        // through (SpaceId, Id) and can never hold a Status of another Space.
+        builder.HasAlternateKey(status => new { status.SpaceId, status.Id });
+
         builder.HasOne<Space>()
             .WithMany()
             .HasForeignKey(status => status.SpaceId)

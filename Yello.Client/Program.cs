@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.JSInterop;
 using Microsoft.AspNetCore.Components;
 using Yello.Client;
+using Yello.Client.Layout;
 using Yello.Client.Localisation;
 using Yello.Client.Pages;
 using Yello.Client.Sessions;
@@ -112,6 +113,11 @@ builder.Services.AddScoped<AntiforgeryTokenSource>();
 // every departure). Both in fields, never in browser storage, and per tab.
 builder.Services.AddScoped<SpaceDirectory>();
 builder.Services.AddScoped<ActiveSpaceState>();
+
+// Story 2.2: the one sender every Space-scoped write goes through (its Idempotency-Key and anti-forgery
+// rules exist once), and the routed page's heading, which the skip control and a first arrival focus.
+builder.Services.AddScoped<SpaceWrites>();
+builder.Services.AddScoped<PageHeadingFocus>();
 
 var host = builder.Build();
 
