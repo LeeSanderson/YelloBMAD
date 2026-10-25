@@ -7,9 +7,11 @@ using Yello.Tests.Slices.Accounts.RegisterAccount;
 namespace Yello.Tests.Slices.Deployment;
 
 /// <summary>
-/// The migration bundle - the one artefact that applies the schema in Azure and under
-/// <c>aspire run</c> - produces exactly the schema the test fixtures get from <c>MigrateAsync</c>,
-/// row-level security and the filtered Owner index included, and a second run applies nothing.
+/// The migration bundle - the artefact that applies the schema in Azure - produces exactly the schema
+/// the test fixtures get from <c>MigrateAsync</c>, row-level security and the filtered Owner index
+/// included, and a second run applies nothing. Under <c>aspire run</c> the same migrations are applied
+/// by <c>dotnet ef database update</c> (Q17 (a)), which is <c>MigrateAsync</c>'s path; this class is what
+/// ties the two together.
 /// Story 1.10 AC2, AC15 (AR-36); Task 3, Q3 (a), Finding F5.
 /// </summary>
 /// <remarks>
@@ -29,12 +31,15 @@ namespace Yello.Tests.Slices.Deployment;
 /// never an engine (<c>ContainerTopologyGateTests</c>). Each is dropped at the end.
 /// </para>
 /// <para>
-/// <b>The catalogue compared</b> is read from <c>sys.*</c>, not from EF's model: tables and columns,
+/// <b>The catalogue compared</b> is read from <c>sys.*</c>, not from EF's model: tables and columns
+/// (type, length, precision, scale, nullability, identity, computed, collation),
 /// <c>sys.security_policies</c> and <c>sys.security_predicates</c> (definition text, FILTER/BLOCK,
-/// operation), every index with its <c>filter_definition</c>, every module's definition (the predicate
-/// function), the <c>MAXDOP</c> database-scoped configuration, and the history rows. Anchors: the
-/// comparison finds <c>SpaceIsolationPolicy</c> and <c>UX_Membership_SpaceId_Owner</c> before it
-/// asserts equality.
+/// operation), every index with its <c>filter_definition</c>, foreign keys with their columns and
+/// referential actions, default, check and key constraints (by definition, and by name unless the
+/// engine named them), every module's definition (the predicate function), the <c>MAXDOP</c>
+/// database-scoped configuration, and the history rows. Anchors: the comparison finds
+/// <c>SpaceIsolationPolicy</c>, <c>UX_Membership_SpaceId_Owner</c>, a foreign key and a key constraint
+/// before it asserts equality.
 /// </para>
 /// </remarks>
 /// <param name="engine">The process's one SQL Server.</param>
@@ -58,7 +63,7 @@ public sealed class MigrationBundleEquivalenceTests(SqlServerEngine engine)
     private static readonly string[] CatalogueQueries =
     [
         """
-        SELECT CONCAT('column|', s.name COLLATE DATABASE_DEFAULT, '.', t.name COLLATE DATABASE_DEFAULT, '.', c.name COLLATE DATABASE_DEFAULT, '|', ty.name COLLATE DATABASE_DEFAULT, '|', c.max_length, '|', c.is_nullable, '|', c.collation_name COLLATE DATABASE_DEFAULT)
+        SELECT CONCAT('column|', s.name COLLATE DATABASE_DEFAULT, '.', t.name COLLATE DATABASE_DEFAULT, '.', c.name COLLATE DATABASE_DEFAULT, '|', ty.name COLLATE DATABASE_DEFAULT, '|', c.max_length, '|', c.precision, '|', c.scale, '|', c.is_nullable, '|', c.is_identity, '|', c.is_computed, '|', c.collation_name COLLATE DATABASE_DEFAULT)
         FROM sys.columns c
         JOIN sys.tables t ON t.object_id = c.object_id
         JOIN sys.schemas s ON s.schema_id = t.schema_id
@@ -74,6 +79,26 @@ public sealed class MigrationBundleEquivalenceTests(SqlServerEngine engine)
         FROM sys.indexes i
         JOIN sys.tables t ON t.object_id = i.object_id
         WHERE i.name IS NOT NULL
+        """,
+        """
+        SELECT CONCAT('fk|', fk.name COLLATE DATABASE_DEFAULT, '|', OBJECT_NAME(fk.parent_object_id) COLLATE DATABASE_DEFAULT, '.', pc.name COLLATE DATABASE_DEFAULT, '|', OBJECT_NAME(fk.referenced_object_id) COLLATE DATABASE_DEFAULT, '.', rc.name COLLATE DATABASE_DEFAULT, '|', fk.delete_referential_action_desc COLLATE DATABASE_DEFAULT, '|', fk.update_referential_action_desc COLLATE DATABASE_DEFAULT)
+        FROM sys.foreign_keys fk
+        JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
+        JOIN sys.columns pc ON pc.object_id = fkc.parent_object_id AND pc.column_id = fkc.parent_column_id
+        JOIN sys.columns rc ON rc.object_id = fkc.referenced_object_id AND rc.column_id = fkc.referenced_column_id
+        """,
+        """
+        SELECT CONCAT('default|', OBJECT_NAME(d.parent_object_id) COLLATE DATABASE_DEFAULT, '.', c.name COLLATE DATABASE_DEFAULT, '|', d.definition COLLATE DATABASE_DEFAULT)
+        FROM sys.default_constraints d
+        JOIN sys.columns c ON c.object_id = d.parent_object_id AND c.column_id = d.parent_column_id
+        """,
+        """
+        SELECT CONCAT('check|', OBJECT_NAME(parent_object_id) COLLATE DATABASE_DEFAULT, '|', CASE WHEN is_system_named = 1 THEN '' ELSE name COLLATE DATABASE_DEFAULT END, '|', definition COLLATE DATABASE_DEFAULT)
+        FROM sys.check_constraints
+        """,
+        """
+        SELECT CONCAT('key|', OBJECT_NAME(parent_object_id) COLLATE DATABASE_DEFAULT, '|', type_desc COLLATE DATABASE_DEFAULT, '|', CASE WHEN is_system_named = 1 THEN '' ELSE name COLLATE DATABASE_DEFAULT END)
+        FROM sys.key_constraints
         """,
         "SELECT CONCAT('module|', OBJECT_NAME(object_id) COLLATE DATABASE_DEFAULT, '|', definition COLLATE DATABASE_DEFAULT) FROM sys.sql_modules",
         "SELECT CONCAT('scoped|', name COLLATE DATABASE_DEFAULT, '|', CAST(value AS nvarchar(32)) COLLATE DATABASE_DEFAULT) FROM sys.database_scoped_configurations WHERE name = 'MAXDOP'",
@@ -105,6 +130,8 @@ public sealed class MigrationBundleEquivalenceTests(SqlServerEngine engine)
             Assert.Contains(fromMigrate, line => line.StartsWith("policy|SpaceIsolationPolicy|1", StringComparison.Ordinal));
             Assert.Contains(fromMigrate, line => line.Contains("|UX_Membership_SpaceId_Owner|1|1|", StringComparison.Ordinal));
             Assert.Contains("scoped|MAXDOP|1", fromMigrate);
+            Assert.Contains(fromMigrate, line => line.StartsWith("fk|", StringComparison.Ordinal));
+            Assert.Contains(fromMigrate, line => line.StartsWith("key|", StringComparison.Ordinal));
 
             Assert.Equal(fromMigrate, fromBundle);
         }
@@ -190,7 +217,16 @@ public sealed class MigrationBundleEquivalenceTests(SqlServerEngine engine)
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(BundleWindow);
 
-        await process.WaitForExitAsync(deadline.Token);
+        try
+        {
+            await process.WaitForExitAsync(deadline.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // A bundle past its window is killed rather than orphaned, so its database can be dropped.
+            process.Kill(entireProcessTree: true);
+            throw;
+        }
 
         return (process.ExitCode, await output + await error);
     }

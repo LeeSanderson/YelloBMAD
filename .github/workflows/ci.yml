@@ -93,7 +93,7 @@ jobs:
         with:
           name: efbundle
           path: artifacts/efbundle/efbundle
-          retention-days: 1
+          retention-days: 7
 
   build-images:
     needs: [test]
@@ -163,9 +163,12 @@ jobs:
             --image "${{ vars.YELLO_REGISTRY_NAME }}.azurecr.io/yello-migrate:${{ github.sha }}"
           execution=$(az containerapp job start --name yello-migrate --resource-group "$group" --query name -o tsv)
           echo "Started $execution"
-          for _ in $(seq 1 180); do
+          # One failed status read (throttling, a token refresh) is retried, not fatal. The loop's
+          # 25 minutes stay inside the job's timeout, and an execution still running then is stopped,
+          # so a re-run never starts a second one beside it.
+          for _ in $(seq 1 150); do
             status=$(az containerapp job execution show --name yello-migrate --resource-group "$group" \
-              --job-execution-name "$execution" --query properties.status -o tsv)
+              --job-execution-name "$execution" --query properties.status -o tsv) || status="Unknown"
             echo "Migration: $status"
             case "$status" in
               Succeeded) exit 0 ;;
@@ -173,7 +176,8 @@ jobs:
             esac
             sleep 10
           done
-          echo "The migration job did not finish within 30 minutes."
+          echo "The migration job did not finish within 25 minutes; stopping it." >&2
+          az containerapp job stop --name yello-migrate --resource-group "$group" --job-execution-name "$execution" || true
           exit 1
 
   promote:
@@ -191,10 +195,29 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      - name: Promote the new Host revision
+      # `az containerapp update` returns once the revision is provisioned, not once it is healthy. The
+      # step waits for the new revision to run and pass its probes, so a crash-looping image fails the
+      # deploy rather than leaving the old revision serving behind a green run.
+      - name: Promote the new Host revision and wait for it to be healthy
         run: |
-          az containerapp update --name yello-host --resource-group "${{ vars.YELLO_RESOURCE_GROUP }}" \
-            --image "${{ vars.YELLO_REGISTRY_NAME }}.azurecr.io/yello-host:${{ github.sha }}"
+          set -euo pipefail
+          group="${{ vars.YELLO_RESOURCE_GROUP }}"
+          revision=$(az containerapp update --name yello-host --resource-group "$group" \
+            --image "${{ vars.YELLO_REGISTRY_NAME }}.azurecr.io/yello-host:${{ github.sha }}" \
+            --query properties.latestRevisionName -o tsv)
+          echo "New revision: $revision"
+          for _ in $(seq 1 60); do
+            state=$(az containerapp revision show --name yello-host --resource-group "$group" --revision "$revision" \
+              --query "[properties.runningState, properties.healthState]" -o tsv | tr '\n\t' '  ') || state="Unknown"
+            echo "Revision: $state"
+            case "$state" in
+              *Failed*|*Unhealthy*) exit 1 ;;
+              *Running*Healthy*) exit 0 ;;
+            esac
+            sleep 10
+          done
+          echo "The new revision was not healthy within 10 minutes." >&2
+          exit 1
 
   client:
     needs: [promote]
@@ -217,8 +240,11 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      # The API's address is deploy-time configuration, not a secret, and is never committed: it is
-      # written into the publish output only (AC13). A custom API hostname (P4) wins when it is set.
+      # The API's address is deploy-time configuration, not a secret (AC13). The committed
+      # appsettings.Production.json is empty and exists only so the boot configuration lists it - the
+      # WebAssembly loader fetches no appsettings file that is not listed there. The published copy is
+      # overwritten with the address, and its precompressed siblings, which still hold `{}`, are
+      # removed. A custom API hostname (P4) wins when it is set.
       - name: Publish the client
         run: |
           set -euo pipefail
@@ -227,8 +253,15 @@ jobs:
             api=$(az containerapp show --name yello-host --resource-group "${{ vars.YELLO_RESOURCE_GROUP }}" \
               --query properties.configuration.ingress.fqdn -o tsv)
           fi
+          if [ -z "$api" ]; then
+            echo "No API hostname: set YELLO_API_HOSTNAME or give yello-host an ingress FQDN." >&2
+            exit 1
+          fi
           dotnet publish Yello.Client/Yello.Client.csproj -c Release -o publish/client
-          printf '{ "HostBaseAddress": "https://%s/" }\n' "$api" > publish/client/wwwroot/appsettings.Production.json
+          settings=publish/client/wwwroot/appsettings.Production.json
+          test -f "$settings"
+          printf '{ "HostBaseAddress": "https://%s/" }\n' "$api" > "$settings"
+          rm -f "$settings.br" "$settings.gz"
 
       # The deployment token is read at run time with the deploy identity and masked; none is stored.
       - name: Deployment token

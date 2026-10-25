@@ -18,9 +18,10 @@ namespace Yello.Host.Spaces;
 /// <b>Only after an authenticated request</b> (story 1.10, question 13). Authenticating a Session reads
 /// its Account's revocation instant, and authenticating an API Token looks the Token up, so such a
 /// request has already woken the database. An anonymous request - a scanner asking for an
-/// anti-forgery token, an unknown <c>/api</c> path, a <c>401</c> - reaches no database, and must not
-/// start a delete that would. With scale-to-zero every cold start is a new process, so a trigger on
-/// every request would purge on the first request after each one.
+/// anti-forgery token, an unknown <c>/api</c> path, a <c>401</c> - must not start a delete. (Such a
+/// request may still read the Data Protection key ring once per process, which lives in the database;
+/// that is one read, never a write and never repeated.) With scale-to-zero every cold start is a new
+/// process, so a trigger on every request would purge on the first request after each one.
 /// </para>
 /// <para>
 /// <b>Not awaited by the request.</b> The one request a day that claims the purge does not wait for

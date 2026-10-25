@@ -53,11 +53,10 @@ public sealed class SharedFixtureSmokeTest(SqlServerEngine engine)
     [Fact]
     public async Task The_shared_fixture_starts_the_pinned_SQL_Server_engine()
     {
-        Assert.SkipUnless(
-            SqlServerContainerFixture.IsContainerRuntimeAvailable(),
-            "No container runtime is reachable, so the shared fixture cannot start. This is a " +
-            "skip rather than a failure because a stopped Rancher Desktop backend is a local " +
-            "condition, not a defect in the solution.");
+        // An unconfigured runtime skips locally (a stopped Rancher Desktop backend is a local condition,
+        // not a defect) and throws on a CI agent (YELLO_REQUIRE_CONTAINER_RUNTIME=1, story 1.10 AC10).
+        var unavailable = SqlServerEngine.UnavailableReason;
+        Assert.SkipUnless(unavailable is null, unavailable ?? string.Empty);
 
         await using var connection = new SqlConnection(
             await engine.ServerConnectionStringAsync(TestContext.Current.CancellationToken));

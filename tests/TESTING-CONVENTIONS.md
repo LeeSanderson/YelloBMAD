@@ -572,8 +572,9 @@ class uses a database of its own:
 
 - **The migration bundle is equivalent to `MigrateAsync`** (`MigrationBundleEquivalenceTests`).
   The bundle and `MigrateAsync` each migrate a fresh database. The test compares the two catalogues:
-  columns, security policies and predicates, filtered indexes, module text, `MAXDOP` and the history
-  rows. A second run of the bundle must apply nothing and exit 0. The catalogue queries cast every
+  columns (with precision, scale, identity and computed flags), security policies and predicates,
+  filtered indexes, foreign keys with their referential actions, default, check and key constraints,
+  module text, `MAXDOP` and the history rows. A second run of the bundle must apply nothing and exit 0. The catalogue queries cast every
   string column to the database's collation, because `CONCAT` refuses mixed catalogue collations.
 - **The production Host shape runs on plain `http://127.0.0.1:0`.** Behind ingress, the Host learns
   the scheme from `X-Forwarded-Proto`. `DeploymentHosts.BehindIngress` sets
@@ -586,9 +587,16 @@ class uses a database of its own:
   works in process 2 on the same database, and it is refused on another database.
 - **Probes answer from process state** (`ProbeTests`). Both probes answer `200` against an
   unreachable server, and their log slice shows no connection attempt.
-- **Database failure is a `503`** (`DatabaseUnavailableTests`). This covers both the key-ring path
-  and the revocation-read path. The revocation-read case takes a database of its own offline in the
-  middle of the process.
+- **Database unavailability is a `503`** (`DatabaseUnavailableTests`). This covers both the key-ring
+  path and the revocation-read path. The revocation-read case takes a database of its own offline in
+  the middle of the process. Only availability is mapped: `DatabaseUnavailability` in
+  `Yello.Infrastructure` classifies SQL Server's connection and availability errors, and every other
+  database error stays a `500` (UNIT-008). The same class proves that a sign-out still ends a Session
+  issued at a sign-out instant ahead of the clock (SLC-018).
+- **The published client calls the configured API** (`StaticHostFallbackTests`, Client suite). The
+  committed `appsettings.Production.json` is empty, and it exists so the boot configuration lists it:
+  the WebAssembly loader fetches no other appsettings file. The test overwrites the published copy as
+  the deploy does, and asserts that the booted client calls that address and never its own origin.
 
 **`RunningHost` counts only its own requests.** Every request its client sends carries
 `yello-harness=1`, and only request-finished lines that carry the tag are counted. A browser on the

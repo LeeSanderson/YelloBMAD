@@ -1,14 +1,15 @@
-using System.Data.Common;
 using System.Globalization;
 using Microsoft.AspNetCore.DataProtection;
 using Yello.Contracts;
+using Yello.Infrastructure.Persistence;
 
 namespace Yello.Host.Deployment;
 
 /// <summary>
 /// A database that is paused, resuming or unreachable is answered with one uniform <c>503</c>, never an
 /// unhandled <c>500</c>, and admits nothing. Story 1.10 AC14 (and AC12); open question 11 (a);
-/// <c>deferred-work.md:336</c>.
+/// <c>deferred-work.md:336</c>. Only availability is mapped: any other database error stays a
+/// <c>500</c> (Lee's decision at code review, 2026-10-25; see <see cref="DatabaseUnavailability"/>).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,8 +28,9 @@ namespace Yello.Host.Deployment;
 /// decrypted with keys kept in the database (<see cref="PersistedKeyRing"/>), and the framework's cookie
 /// reader turns any decryption failure into "no cookie" - which would answer a paused database with
 /// <c>401</c> and send the client to sign in. So until this process has loaded the ring once, a request
-/// that carries a cookie loads it here first, where a failure surfaces as a database failure (see
-/// <see cref="KeyRingAvailability"/>).
+/// that carries one of Yello's cookies loads it here first, where a failure surfaces as a database
+/// failure (see <see cref="KeyRingAvailability"/>). A request carrying only somebody else's cookies
+/// has nothing to decrypt and does not load the ring.
 /// </para>
 /// <para>
 /// <b>No retry on failure</b> (Finding F7): EF Core's retrying strategy refuses the explicit
@@ -62,33 +64,26 @@ internal static class DatabaseAvailability
     }
 
     /// <summary>
-    /// Whether an exception, or one it wraps, is the database failing to answer.
+    /// The prefix every cookie the Host issues carries: the Session (<c>yello_session</c>, chunked or
+    /// not) and the anti-forgery cookie (<c>yello_antiforgery</c>).
+    /// </summary>
+    internal const string CookiePrefix = "yello_";
+
+    /// <summary>
+    /// Whether an exception, or one it wraps, is the database being unavailable.
     /// </summary>
     /// <param name="exception">The exception.</param>
-    /// <returns><c>true</c> for a provider exception anywhere in the chain.</returns>
-    /// <remarks>
-    /// EF Core wraps a transient failure in an <see cref="InvalidOperationException"/> and the Data
-    /// Protection system wraps a key-ring failure in a <c>CryptographicException</c>; the provider's
-    /// own exception is inside both.
-    /// </remarks>
-    internal static bool IsDatabaseFailure(Exception exception)
-    {
-        for (var current = exception; current is not null; current = current.InnerException)
-        {
-            if (current is DbException)
-            {
-                return true;
-            }
-        }
+    /// <returns><c>true</c> for an availability failure anywhere in the chain.</returns>
+    internal static bool IsDatabaseFailure(Exception exception) => DatabaseUnavailability.IsUnavailable(exception);
 
-        return false;
-    }
+    private static bool CarriesYelloCookie(HttpRequest request) =>
+        request.Cookies.Keys.Any(name => name.StartsWith(CookiePrefix, StringComparison.Ordinal));
 
     private static async Task InvokeCoreAsync(HttpContext context, RequestDelegate next)
     {
         try
         {
-            if (context.Request.Headers.Cookie.Count > 0)
+            if (CarriesYelloCookie(context.Request))
             {
                 context.RequestServices.GetRequiredService<KeyRingAvailability>().EnsureLoaded();
             }
@@ -107,6 +102,10 @@ internal static class DatabaseAvailability
 
     private static Task RefuseAsync(HttpContext context)
     {
+        // Nothing set before the failure survives into the refusal - a Session or anti-forgery cookie
+        // included - so the 503 is the same whichever route was asked. CORS writes its headers when the
+        // response starts, so clearing here does not remove them.
+        context.Response.Clear();
         context.Response.Headers.RetryAfter = RetryAfterSeconds.ToString(CultureInfo.InvariantCulture);
 
         return Results.Problem(

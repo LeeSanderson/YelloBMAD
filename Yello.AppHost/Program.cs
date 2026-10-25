@@ -30,6 +30,32 @@ var sqlServer = builder.AddSqlServer("sql")
 
 var database = sqlServer.AddDatabase(BuildConstant("Yello.DatabaseResourceName"));
 
+// THE MIGRATION, AS ITS OWN STEP BEFORE THE HOST - story 1.10, question 17 (a), Finding F4.
+//
+// The Host never migrates (AR-36), and until story 1.10 nothing else did here either: `aspire run`
+// created an empty `yello` catalogue and the Local environment answered every registration with a
+// 500 until somebody migrated by hand. Azure runs the migration as a job before the revision is
+// promoted; this is the same rule locally - a resource of its own that applies the migrations to the
+// database and exits, which the Host waits for. It runs the repository's pinned `dotnet-ef` local tool
+// (`dotnet tool restore`, which run.ps1 does first) against the migrations in Yello.Infrastructure, the
+// same migrations the bundle carries (the bundle's equivalence test proves the two apply one schema).
+var repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, ".."));
+
+var migrate = builder.AddExecutable("migrate", "dotnet", repositoryRoot)
+    .WithArgs(context =>
+    {
+        context.Args.Add("ef");
+        context.Args.Add("database");
+        context.Args.Add("update");
+        context.Args.Add("--project");
+        context.Args.Add("Yello.Infrastructure");
+        context.Args.Add("--startup-project");
+        context.Args.Add("Yello.Infrastructure");
+        context.Args.Add("--connection");
+        context.Args.Add(database.Resource.ConnectionStringExpression);
+    })
+    .WaitFor(database);
+
 // WaitFor is orchestration-level sequencing performed by the AppHost, not a probe inside
 // Yello.Host. AR-33's ban is on the application touching the database to answer a liveness
 // or readiness probe, and on any component doing so on an unconditional timer; neither
@@ -78,32 +104,6 @@ var client = builder.AddProject<Projects.Yello_Client>("client", launchProfileNa
 // Aspire SDK marks project references ReferenceOutputAssembly=false. CrossOriginPolicy states the
 // same key on the other side, and CrossOriginConfigurationTests reads THIS assembly's IL for it,
 // so the two spellings cannot drift apart silently.
-// THE MIGRATION, AS ITS OWN STEP BEFORE THE HOST - story 1.10, question 17 (a), Finding F4.
-//
-// The Host never migrates (AR-36), and until story 1.10 nothing else did here either: `aspire run`
-// created an empty `yello` catalogue and the Local environment answered every registration with a
-// 500 until somebody migrated by hand. Azure runs the migration as a job before the revision is
-// promoted; this is the same rule locally - a resource of its own that applies the migrations to the
-// database and exits, which the Host waits for. It runs the repository's pinned `dotnet-ef` local tool
-// (`dotnet tool restore`, which run.ps1 does first) against the migrations in Yello.Infrastructure, the
-// same migrations the bundle carries (the bundle's equivalence test proves the two apply one schema).
-var repositoryRoot = Path.GetFullPath(Path.Combine(builder.AppHostDirectory, ".."));
-
-var migrate = builder.AddExecutable("migrate", "dotnet", repositoryRoot)
-    .WithArgs(context =>
-    {
-        context.Args.Add("ef");
-        context.Args.Add("database");
-        context.Args.Add("update");
-        context.Args.Add("--project");
-        context.Args.Add("Yello.Infrastructure");
-        context.Args.Add("--startup-project");
-        context.Args.Add("Yello.Infrastructure");
-        context.Args.Add("--connection");
-        context.Args.Add(database.Resource.ConnectionStringExpression);
-    })
-    .WaitFor(database);
-
 builder.AddProject<Projects.Yello_Host>("host", launchProfileName: "https")
     .WithReference(database)
     .WaitFor(database)

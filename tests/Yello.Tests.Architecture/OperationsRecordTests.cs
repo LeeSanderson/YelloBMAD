@@ -34,19 +34,35 @@ public sealed partial class OperationsRecordTests
     /// deployment claiming no data-protection posture, the trigger that makes the PRD non-compliant,
     /// and the five prerequisites that become live at that moment.
     /// </summary>
+    /// <remarks>
+    /// Read from the §6.4 section alone, and each prerequisite from its own row of the section's table,
+    /// so a prerequisite dropped from the table fails even though the same words appear elsewhere in the
+    /// file (encryption at rest is also discussed under NFR-6 and the identities). Plant: rename
+    /// "Encryption at rest" in the table.
+    /// </remarks>
     [Fact]
     [Trait("Requirement", "PRD-6.4")]
     public void The_data_protection_gate_is_recorded_with_its_five_prerequisites()
     {
         var record = OperationsRecord();
+        var start = record.IndexOf("## 3. §6.4 data-protection gate", StringComparison.Ordinal);
 
-        string[] required =
+        Assert.True(start >= 0, "docs/operations.md has no '## 3. §6.4 data-protection gate' section.");
+
+        var end = record.IndexOf("\n## ", start + 1, StringComparison.Ordinal);
+        var section = end < 0 ? record[start..] : record[start..end];
+
+        string[] assertion =
         [
             "single-operator deployment",
             "no data-protection posture",
             "anyone other than the operator",
             "non-compliant until amended",
             "operational condition",
+        ];
+
+        string[] prerequisites =
+        [
             "lawful basis",
             "data region",
             "encryption at rest",
@@ -54,10 +70,19 @@ public sealed partial class OperationsRecordTests
             "subject-access",
         ];
 
-        var missing = required.Where(phrase => !record.Contains(phrase, StringComparison.OrdinalIgnoreCase)).ToList();
+        var rows = section.Split('\n')
+            .Select(line => line.Trim())
+            .Where(line => PrerequisiteRow.IsMatch(line))
+            .ToList();
 
-        Assert.True(missing.Count == 0, "docs/operations.md does not carry the §6.4 gate in full (AC8). Missing: " + string.Join("; ", missing));
-        Assert.Contains("§6.3", record, StringComparison.Ordinal);
+        var missing = assertion.Where(phrase => !section.Contains(phrase, StringComparison.OrdinalIgnoreCase))
+            .Concat(prerequisites.Where(phrase => !rows.Exists(row => row.Contains(phrase, StringComparison.OrdinalIgnoreCase)
+                && row.Contains("becomes live at the gate", StringComparison.OrdinalIgnoreCase))))
+            .ToList();
+
+        Assert.True(missing.Count == 0, "docs/operations.md's §6.4 section does not carry the gate in full (AC8). Missing: " + string.Join("; ", missing));
+        Assert.Equal(prerequisites.Length, rows.Count);
+        Assert.Contains("§6.3", section, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -142,6 +167,9 @@ public sealed partial class OperationsRecordTests
 
     [GeneratedRegex(@"against §6\.4['’]s data-protection gate", RegexOptions.IgnoreCase, 1000)]
     private static partial Regex ParkedAgainstTheGate { get; }
+
+    [GeneratedRegex(@"^\|\s*[1-5]\s*\|", RegexOptions.None, 1000)]
+    private static partial Regex PrerequisiteRow { get; }
 
     [GeneratedRegex(@"MAXDOP\s*=\s*1\b", RegexOptions.None, 1000)]
     private static partial Regex MaxdopOne { get; }

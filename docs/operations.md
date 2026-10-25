@@ -119,14 +119,14 @@ Encryption at rest is **not** asserted. It is §6.4 prerequisite 3.
 |---|---|---|---|
 | `id-yello-app` (the Host) | `AcrPull` on the registry, `Key Vault Secrets User` on the vault | Contained user `yello_app`: `db_datareader` and `db_datawriter` only | It cannot disable row-level security, alter a security policy or change a database-scoped configuration. `DatabaseIdentityTests` proves this locally with the same roles. |
 | `id-yello-migrate` (the job) | `AcrPull`, `Key Vault Secrets User` | Contained user `yello_migrate`: `db_owner` | The migrations create functions and security policies and set `ALTER DATABASE SCOPED CONFIGURATION SET MAXDOP = 1`, which needs `ALTER ANY DATABASE SCOPED CONFIGURATION` (`deferred-work.md:242`). |
-| `id-yello-deploy` (the GitHub workflow, by OIDC) | `AcrPush` on the registry. `Contributor` on `yello-host`, `yello-migrate` and `yello-client` only. | None | It pushes images, updates the job and the app, starts the job, and reads the Static Web App's deployment token. It holds no data access. |
+| `id-yello-deploy` (the GitHub workflow, by OIDC) | `AcrPush` on the registry. `Contributor` on `yello-host`, `yello-migrate` and `yello-client` only. | None | It pushes images, updates the job and the app, starts the job, and reads the Static Web App's deployment token. It has no database user of its own, but it is **not** without data access: `Contributor` on `yello-migrate` lets it run any image with the `db_owner` connection secret, and `Contributor` on `yello-host` lets it exec into the Host. A compromised workflow is therefore as strong as `db_owner`. That is why only `main` may use the `azure` environment (P3). |
 | The Entra administrator (Lee) | Owner of the resource group, for the bootstrap | Server administrator | The bootstrap, the tripwire query and AR-40c only. |
 
 **SQL authentication (open question 8 (b)).** Both runtime identities connect as contained database users with passwords. The passwords exist only in the two Key Vault secrets and in the operator's hands during the bootstrap. Entra managed-identity authentication (8 (a)) was not taken, because `Microsoft.Data.SqlClient` 7.0.2 needs another package, `Microsoft.Data.SqlClient.Extensions.Azure`, for any Entra authentication method. The driver's own error text says so. Adding that package needs Lee's approval. If Lee approves it, change the two connection strings to `Authentication=Active Directory Managed Identity;User Id=<client id>` and drop the passwords.
 
 **The firewall trade-off.** Consumption Container Apps has no fixed outbound address. The SQL server therefore admits "Azure services" (`0.0.0.0`). That means any Azure-hosted client can reach the login prompt, and only a credential stops it. The alternative is a VNet-integrated environment with a NAT gateway, which costs money that §6.3 does not have.
 
-**Expand/contract rule.** The deploy runs the migration job while the **previous** revision is still serving. Every migration must therefore work with the code of the revision before it. Add columns as nullable or with a default. Drop or rename only in a later release, after no running revision reads the old shape. A migration that breaks the running revision is a defect. All eight migrations in the repository, checked on 2026-10-25, comply. Their `Up` steps add tables, indexes, constraints, predicates, a database-scoped configuration and a nullable column. Two steps change something that already existed, and both stay compatible with the previous revision. `AccountScopedMembership` swaps Membership's filter predicate for a wider one (Space *or* Account), which still admits every row a Space-scoped request saw before. `ApiTokens` replaces an index with a unique constraint on the same columns, which keeps uniqueness throughout.
+**Expand/contract rule.** The deploy runs the migration job while the **previous** revision is still serving. Every migration must therefore work with the code of the revision before it. Add columns as nullable or with a default. Drop or rename only in a later release, after no running revision reads the old shape. A migration that breaks the running revision is a defect. All seven migrations in the repository, checked on 2026-10-25, comply. Their `Up` steps add tables, indexes, constraints, predicates, a database-scoped configuration and a nullable column. Two steps change something that already existed, and both stay compatible with the previous revision. `AccountScopedMembership` swaps Membership's filter predicate for a wider one (Space *or* Account), which still admits every row a Space-scoped request saw before. `ApiTokens` replaces an index with a unique constraint on the same columns, which keeps uniqueness throughout.
 
 ## 10. First-deploy runbook
 
@@ -180,7 +180,7 @@ Then forget the passwords. Key Vault holds the only copies. Keep `sqlAdmin` in y
 
 ### P3: GitHub deploy trust
 
-1. In the repository settings, create the environment **`azure`**. Optionally, require a reviewer.
+1. In the repository settings, create the environment **`azure`**, and set its **deployment branches to `main` only**. This step is not optional. The federated credential trusts the environment, not the branch, so without the restriction a workflow on any branch could obtain the deploy identity's token. A required reviewer is optional, and it would be asked once for each of the four deploy jobs.
 2. Add these repository variables. They are variables, not secrets, and none of them is a credential:
    - `AZURE_CLIENT_ID`: the output `deployIdentityClientId`
    - `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`
@@ -195,7 +195,7 @@ Then forget the passwords. Key Vault holds the only copies. Keep `sqlAdmin` in y
 
 The default hostnames put the client (`*.azurestaticapps.net`) and the API (`*.azurecontainerapps.io`) on **different sites**. The `SameSite=None; Secure` Session cookie is therefore a third-party cookie. Chromium accepts it. **Safari blocks it by default.** Firefox partitions it, and nobody has verified whether that still works. The fix is one registrable domain for both, such as `app.<domain>` and `api.<domain>`. That costs a domain (about £10 per year) and two DNS records. Steps:
 
-1. Deploy again with `clientCustomHostname=app.<domain>` and `apiCustomHostname=api.<domain>`. Add a CNAME from `app` to the Static Web App's default hostname, and validate it as the portal instructs.
+1. First add a CNAME from `app` to the Static Web App's default hostname, and wait until it resolves. Static Web Apps validates the CNAME while it creates the custom domain, so a deployment run before the record exists fails or hangs. Then deploy again with `clientCustomHostname=app.<domain>` and `apiCustomHostname=api.<domain>`.
 2. Bind the API hostname with a free managed certificate:
 
    ```bash
@@ -259,5 +259,5 @@ Nothing below has been seen working. Each item needs an Azure subscription, and 
 
 ### Known consequences, recorded rather than fixed
 
-- **The key ring wakes the database once per cold process.** The Data Protection key ring lives in the database. The first request of a new process that issues or reads a cookie or an anti-forgery token therefore reads it once, and that includes an anonymous `GET /api/v1/antiforgery/token`. After that the process keeps the ring in memory. Probes, the unmatched `/api` fallback and anonymous `401`s never read it, and none of them starts the refusal purge.
+- **The key ring wakes the database once per process start.** The Data Protection key ring lives in the database, and the framework's own `DataProtectionHostedService` loads it once when the process starts. That covers every cold start and every new revision, whatever request caused it. If the database cannot be read then, the failure is logged and the first request that carries a Yello cookie, or that issues an anti-forgery token, tries again. After that the process keeps the ring in memory. Probes, the unmatched `/api` fallback and anonymous `401`s never read it themselves, and none of them starts the refusal purge.
 - **The single-revision swap briefly runs two processes.** During the overlap, an in-process push and the `/sync` lease cannot assume a single process. `deferred-work.md` holds this against story 7.3.

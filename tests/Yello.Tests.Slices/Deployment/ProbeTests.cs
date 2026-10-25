@@ -19,10 +19,10 @@ namespace Yello.Tests.Slices.Deployment;
 /// proves the database really was unreachable - a sign-in, which must read it, does not succeed.
 /// </para>
 /// <para>
-/// <b>Depends on the purge trigger moving (Task 5, Q13 (a)).</b> Today the refusal purge is offered
-/// on every request, so the first probe would itself try the database. The log-slice assertion below
-/// catches that, which is the point: a probe that wakes the database is a defect whichever component
-/// opened the connection.
+/// <b>The log slice starts after the Host is up.</b> The framework loads the Data Protection key ring
+/// once at process start, and against this database that attempt fails and is logged before the slice
+/// begins. What the slice holds is the probes' own work, and a probe that wakes the database - the
+/// refusal purge offered on every request, say - is a defect whichever component opened the connection.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Slices")]

@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using Xunit;
 
@@ -55,7 +56,7 @@ public sealed partial class DeploymentShapeTests
 
         var named = SecondEnvironmentWord.Matches(workflows + "\n" + infra)
             .Select(match => match.Value)
-            .Concat(QuotedEnvironmentLiteral.Matches(infra).Select(match => match.Value))
+            .Concat(QuotedEnvironmentLiteral.Matches(workflows + "\n" + infra).Select(match => match.Value))
             .ToList();
 
         Assert.True(
@@ -109,20 +110,26 @@ public sealed partial class DeploymentShapeTests
     /// 100,000 vCore-second allowance.
     /// </summary>
     /// <remarks>
-    /// The metric's exact name and unit are to be confirmed against the Azure SQL free-offer page when
-    /// the Bicep is written (story Task 6). If the unit is not vCore-seconds, correct the threshold
-    /// literal here to the same 10% and record the correction in the Debug Log.
+    /// The metric is "Free amount remaining", in vCore-seconds (Azure SQL free-offer page, read
+    /// 2026-10-25), so 10% of the allowance is 10,000. The metric, the threshold and the operator are
+    /// read from the metric alert's own resource block, so a threshold elsewhere cannot satisfy it.
+    /// Plant: threshold <c>20000</c>.
     /// </remarks>
     [Fact]
     [Trait("Requirement", "AR-39")]
     public void A_metric_alert_fires_at_ten_percent_of_the_free_allowance()
     {
         var bicep = BicepText();
+        var start = bicep.IndexOf("Microsoft.Insights/metricAlerts@", StringComparison.Ordinal);
 
-        Assert.Contains("Microsoft.Insights/metricAlerts@", bicep, StringComparison.Ordinal);
-        Assert.Matches(FreeAmountRemainingMetric, bicep);
-        Assert.Matches(TenPercentThreshold, bicep);
-        Assert.Contains("LessThanOrEqual", bicep, StringComparison.Ordinal);
+        Assert.True(start >= 0, "No metric alert resource exists.");
+
+        var next = bicep.IndexOf("\nresource ", start, StringComparison.Ordinal);
+        var alert = next < 0 ? bicep[start..] : bicep[start..next];
+
+        Assert.Matches(FreeAmountRemainingMetric, alert);
+        Assert.Matches(TenPercentThreshold, alert);
+        Assert.Contains("LessThanOrEqual", alert, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -179,10 +186,12 @@ public sealed partial class DeploymentShapeTests
     /// migration job, and every job that deploys transitively needs the job that runs the tests.
     /// </summary>
     /// <remarks>
-    /// Reads <c>needs:</c> across every workflow's jobs. If Q10's recommendation is not taken and the
-    /// deploy is a separate <c>workflow_run</c> workflow, the second half of this gate must be corrected
-    /// to read that trigger instead, and the correction recorded. Plant (story Task 13): drop
-    /// <c>needs: migrate</c> from the promote job.
+    /// Reads <c>needs:</c> across every workflow's jobs. The deploy is a set of jobs in the CI workflow
+    /// (Task 10's recommendation); a separate <c>workflow_run</c> workflow would need this gate to read
+    /// that trigger instead. A <c>needs:</c> is only an order while the job still requires its
+    /// predecessors to succeed, so no deploying job may carry an <c>if:</c> with <c>always()</c>,
+    /// <c>failure()</c> or <c>cancelled()</c>. Plant (story Task 13): drop <c>needs: migrate</c> from the
+    /// promote job.
     /// </remarks>
     [Fact]
     [Trait("Requirement", "AR-36")]
@@ -199,6 +208,7 @@ public sealed partial class DeploymentShapeTests
 
         Assert.All(promotes, promote => Assert.Contains(migrate.Name, Needed(promote.Name, jobs)));
         Assert.All(deploys, deploy => Assert.Contains(test.Name, Needed(deploy.Name, jobs)));
+        Assert.All(deploys, deploy => Assert.DoesNotMatch(StatusOverride, deploy.Body));
     }
 
     /// <summary>
@@ -224,9 +234,14 @@ public sealed partial class DeploymentShapeTests
 
     /// <summary>
     /// 1.10-ARCH-015 - the static host serves <c>index.html</c> for every client route, never for the
-    /// framework's own files, and no production client configuration is committed (the deploy writes
-    /// it into the publish output from the IaC's output).
+    /// framework's own files, and the committed <c>appsettings.Production.json</c> holds no value.
     /// </summary>
+    /// <remarks>
+    /// The WebAssembly loader fetches only the appsettings files listed in the boot configuration
+    /// written at publish, so the production file has to exist at publish for the deploy's copy to be
+    /// read at all. It is committed empty, and the deploy overwrites the published copy with the API's
+    /// address from the IaC's output (Lee's decision at code review, 2026-10-25; Task 7).
+    /// </remarks>
     [Fact]
     [Trait("Requirement", "AD-7")]
     public void The_static_host_falls_back_to_index_html_for_client_routes()
@@ -245,9 +260,14 @@ public sealed partial class DeploymentShapeTests
             fallback.GetProperty("exclude").EnumerateArray().Select(item => item.GetString()),
             StringComparer.Ordinal);
 
-        Assert.False(
-            File.Exists(Path.Combine(wwwroot, "appsettings.Production.json")),
-            "appsettings.Production.json is generated into the publish output at deploy, never committed (Task 7).");
+        var production = new FileInfo(Path.Combine(wwwroot, "appsettings.Production.json"));
+
+        Assert.True(production.Exists, "Yello.Client/wwwroot/appsettings.Production.json must exist, empty, so the boot configuration lists it.");
+
+        using var settings = RepositoryLayout.LoadJson(production);
+
+        Assert.Equal(JsonValueKind.Object, settings.RootElement.ValueKind);
+        Assert.Empty(settings.RootElement.EnumerateObject());
     }
 
     /// <summary>
@@ -263,7 +283,19 @@ public sealed partial class DeploymentShapeTests
 
         // Anchor: the database the migration targets.
         Assert.Contains("AddDatabase(", appHost, StringComparison.Ordinal);
-        Assert.Contains("WaitForCompletion(", appHost, StringComparison.Ordinal);
+
+        var migrate = MigrateResource.Match(appHost);
+
+        Assert.True(migrate.Success, "No `migrate` executable resource exists in the AppHost.");
+        Assert.Matches(EfDatabaseUpdate, appHost[migrate.Index..]);
+
+        var host = appHost.IndexOf("AddProject<Projects.Yello_Host>", StringComparison.Ordinal);
+
+        Assert.True(host >= 0, "The AppHost does not add Yello.Host.");
+
+        var hostChain = appHost[host..appHost.IndexOf(';', host)];
+
+        Assert.Contains($".WaitForCompletion({migrate.Groups["var"].Value})", hostChain, StringComparison.Ordinal);
     }
 
     private static string BicepText()
@@ -458,6 +490,15 @@ public sealed partial class DeploymentShapeTests
 
     [GeneratedRegex(@"^[0-9a-f]{40}$", RegexOptions.None, 1000)]
     private static partial Regex CommitSha { get; }
+
+    [GeneratedRegex(@"^\s{4}if:.*\b(?:always|failure|cancelled)\(\)", RegexOptions.Multiline, 1000)]
+    private static partial Regex StatusOverride { get; }
+
+    [GeneratedRegex(@"var\s+(?<var>\w+)\s*=\s*builder\.AddExecutable\(\s*""migrate""", RegexOptions.None, 1000)]
+    private static partial Regex MigrateResource { get; }
+
+    [GeneratedRegex(@"""ef""[\s\S]{0,200}?""database""[\s\S]{0,200}?""update""", RegexOptions.None, 1000)]
+    private static partial Regex EfDatabaseUpdate { get; }
 
     /// <summary>
     /// One workflow job: its key, the jobs it needs, and its body as text.

@@ -68,9 +68,10 @@ public sealed class StartupConnectivityCheckTests(SqlServerEngine engine)
     [Fact]
     public async Task The_check_opens_a_real_connection_in_Development()
     {
-        Assert.SkipUnless(
-            SqlServerContainerFixture.IsContainerRuntimeAvailable(),
-            "No container runtime is reachable, so there is no engine to connect to.");
+        // On a CI agent (YELLO_REQUIRE_CONTAINER_RUNTIME=1) an unconfigured runtime throws here rather
+        // than skipping (story 1.10 AC10).
+        var unavailable = SqlServerEngine.UnavailableReason;
+        Assert.SkipUnless(unavailable is null, unavailable ?? string.Empty);
 
         var logger = new CapturingLogger();
 

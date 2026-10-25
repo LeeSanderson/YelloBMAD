@@ -24,9 +24,11 @@ namespace Yello.Host.Deployment;
 /// which differs between a container and a developer machine. Every Yello Host shares one.
 /// </para>
 /// <para>
-/// <b>Read lazily, on a request.</b> The ring is loaded on the first protect or unprotect of a process
-/// and refreshed by the framework when it is next used after its cache expires. Nothing here is on a
-/// timer.
+/// <b>Read once at process start, then on use - never on a timer.</b> The framework's own
+/// <c>DataProtectionHostedService</c>, which <c>AddDataProtection</c> registers, loads the ring once when
+/// the process starts. That is one read per process start (a cold start or a new revision), and a
+/// failure there is logged and left for the first request to retry (<see cref="KeyRingAvailability"/>).
+/// After that the framework refreshes the ring only when it is next used after its cache expires.
 /// </para>
 /// </remarks>
 internal static class PersistedKeyRing

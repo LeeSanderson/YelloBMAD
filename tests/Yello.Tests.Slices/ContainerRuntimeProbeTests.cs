@@ -59,8 +59,10 @@ public sealed class ContainerRuntimeProbeTests
     [Fact]
     public async Task The_configured_running_runtime_is_reported_available()
     {
-        // An unconfigured runtime skips, as every container-backed case does (Q1); a configured one must answer.
-        Assert.SkipUnless(SqlServerContainerFixture.IsContainerRuntimeAvailable(), "No container runtime is configured on this machine.");
+        // An unconfigured runtime skips, as every container-backed case does (Q1) - and fails on a CI
+        // agent, where it is required (story 1.10 AC10); a configured one must answer.
+        var unavailable = SqlServerEngine.UnavailableReason;
+        Assert.SkipUnless(unavailable is null, unavailable ?? string.Empty);
 
         Assert.Null(await SqlServerContainerFixture.ProbeContainerRuntimeAsync(Deadline));
     }

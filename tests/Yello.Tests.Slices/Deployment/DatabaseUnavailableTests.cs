@@ -33,12 +33,11 @@ namespace Yello.Tests.Slices.Deployment;
 /// name.
 /// </para>
 /// <para>
-/// <b>Which path the <c>503</c> case reaches.</b> Before F1 is fixed, two local Host processes share the
-/// developer-profile key ring, so the cookie decrypts and the revocation read is what fails. After F1
-/// the ring is in the database, and the unreachable Host fails while loading it instead - Task 5's
-/// "interaction with Q7 (a)". Both must answer the same <c>503</c>. If the revocation-read mapping can
-/// no longer be reached over the wire once F1 lands, add the in-process case Task 5 names (a store
-/// that throws) and record it.
+/// <b>Which path each <c>503</c> case reaches.</b> The key ring is in the database, so a Host that has
+/// never reached its database fails while loading the ring (SLC-012, SLC-013) - Task 5's "interaction
+/// with Q7 (a)". The revocation read itself is reached by a Host that loaded its ring and then lost its
+/// database (SLC-016). All of them answer the same <c>503</c>. Only availability is mapped: any other
+/// database error stays a <c>500</c> (UNIT-008).
 /// </para>
 /// </remarks>
 /// <param name="fixture">This class's migrated database on the shared engine.</param>
@@ -276,6 +275,78 @@ public sealed class DatabaseUnavailableTests(MigratedDatabaseFixture fixture, Sq
         Assert.Equal(signedOut.AddMinutes(5), Assert.IsType<DateTimeOffset>(issueInstant.Invoke(null, [signedOut.AddMinutes(5), signedOut])));
     }
 
+    /// <summary>
+    /// 1.10-SLC-018 - the clock clamp opens no hole in sign-out. With the host clock behind the
+    /// Account's last sign-out, a sign-in is issued at that instant and admitted; the next sign-out,
+    /// whose own clock is still behind, must still end that Session. Anchor: the clamped Session is
+    /// <c>204</c> before the sign-out.
+    /// </summary>
+    /// <remarks>
+    /// A clock behind the stored instant is reproduced by moving the stored instant an hour ahead of
+    /// the clock, which is the same comparison seen from the other side.
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "FR-2")]
+    public async Task A_sign_out_ends_a_session_issued_at_a_sign_out_instant_still_ahead_of_the_clock()
+    {
+        var connectionString = Available();
+        await using var host = await RunningHost.StartAsync(connectionString, new Dictionary<string, string>(StringComparer.Ordinal) { ["ClientOrigin"] = DeploymentHosts.ClientOrigin });
+
+        var address = DeploymentHosts.RandomAddress();
+        await DeploymentHosts.RegisterAndSignInAsync(new WireSession(host.Client), address);
+
+        await MoveLastSignOutAheadOfTheClockAsync(connectionString, address);
+
+        var clamped = new WireSession(host.Client);
+        await clamped.FetchAntiforgeryTokenAsync();
+        Assert.Equal(HttpStatusCode.NoContent, (await clamped.SignInAsync(address, DeploymentHosts.Password)).StatusCode);
+        await clamped.FetchAntiforgeryTokenAsync();
+
+        // Anchor: issued at the stored instant, so admitted.
+        Assert.Equal(HttpStatusCode.NoContent, (await clamped.CurrentSessionAsync()).StatusCode);
+
+        var held = new Dictionary<string, string>(clamped.Cookies, StringComparer.Ordinal);
+
+        Assert.Equal(HttpStatusCode.NoContent, (await clamped.DeleteAsync(SessionRoutes.Authenticate)).StatusCode);
+
+        var replay = new WireSession(host.Client);
+
+        foreach (var (name, value) in held)
+        {
+            replay.HoldCookie(name, value);
+        }
+
+        Assert.Equal(HttpStatusCode.Unauthorized, (await replay.CurrentSessionAsync()).StatusCode);
+    }
+
+    /// <summary>
+    /// 1.10-UNIT-008 - only availability is a <c>503</c>: a provider error that is not about the
+    /// database being reachable is not classified as unavailability, wherever it sits in the chain, so
+    /// it stays a <c>500</c>. The availability path itself is proved over the wire by SLC-012, SLC-013
+    /// and SLC-016.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "AR-3")]
+    public void A_database_error_that_is_not_about_availability_is_not_a_503()
+    {
+        var defect = new InvalidOperationException("wrapped", new NotAvailabilityException());
+
+        Assert.False(Yello.Infrastructure.Persistence.DatabaseUnavailability.IsUnavailable(defect));
+        Assert.False(Yello.Infrastructure.Persistence.DatabaseUnavailability.IsUnavailable(new InvalidOperationException("no provider error at all")));
+    }
+
+    private static async Task MoveLastSignOutAheadOfTheClockAsync(string connectionString, string address)
+    {
+        await using var connection = new SqlConnection(connectionString);
+        await connection.OpenAsync(TestContext.Current.CancellationToken);
+
+        await using var command = connection.CreateCommand();
+        command.CommandText = "UPDATE dbo.[Account] SET SessionsValidAfter = DATEADD(hour, 1, SYSDATETIMEOFFSET()) WHERE NormalizedEmailAddress = @address";
+        command.Parameters.AddWithValue("@address", EmailAddressNormalisation.Normalise(address));
+
+        Assert.Equal(1, await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken));
+    }
+
     private static void AssertUniformServiceUnavailable(WireResponse? first, WireResponse? second)
     {
         Assert.NotNull(first);
@@ -359,5 +430,26 @@ public sealed class DatabaseUnavailableTests(MigratedDatabaseFixture fixture, Sq
         Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? string.Empty);
 
         return fixture.ConnectionString!;
+    }
+
+    /// <summary>
+    /// A provider exception that is not SQL Server's: a defect, as far as availability is concerned.
+    /// </summary>
+    private sealed class NotAvailabilityException : System.Data.Common.DbException
+    {
+        public NotAvailabilityException()
+            : base("a constraint was violated")
+        {
+        }
+
+        public NotAvailabilityException(string message)
+            : base(message)
+        {
+        }
+
+        public NotAvailabilityException(string message, Exception innerException)
+            : base(message, innerException)
+        {
+        }
     }
 }

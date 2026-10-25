@@ -4,7 +4,7 @@
 //
 // Deployed by the operator once, by hand (docs/operations.md, runbook P1-P3), with:
 //   az deployment group create --resource-group <rg> --template-file infra/main.bicep \
-//     --parameters @infra/main.parameters.json <the secure parameters, on the command line>
+//     --parameters @<a parameters file kept outside the repository> <the secure parameters, on the command line>
 // Every later release is the GitHub workflow (.github/workflows/ci.yml), which changes images only.
 //
 // No secret is written here. The two connection strings and the SQL administrator password are

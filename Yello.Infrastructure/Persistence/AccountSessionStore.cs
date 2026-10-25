@@ -19,7 +19,8 @@ namespace Yello.Infrastructure.Persistence;
 /// id, like <see cref="AccountCredentialStore.RehashAsync"/>, and it only ever moves the instant
 /// forward: two sign-outs racing each other end everything issued before the later of them,
 /// whichever commits last, and a clock that has stepped back cannot re-admit a ticket already
-/// refused.
+/// refused - nor leave a Session issued at the stored instant standing (see
+/// <see cref="EndSessionsAsync"/>).
 /// </para>
 /// </remarks>
 /// <param name="dbContext">The request's unit of work.</param>
@@ -35,12 +36,22 @@ internal sealed class AccountSessionStore(YelloDbContext dbContext) : IAccountSe
             .ConfigureAwait(false);
 
     /// <inheritdoc />
+    /// <remarks>
+    /// <b>Always strictly past the stored instant.</b> A sign-in whose clock is behind the last sign-out
+    /// is issued at that sign-out's instant (<c>SessionRevocation.IssueInstant</c>), and is admitted
+    /// because the comparison is inclusive. A later sign-out whose own clock is still behind would then
+    /// store nothing and end nothing. So when <paramref name="at"/> is not past the stored instant, the
+    /// instant moves one millisecond past it instead - past every Session issued at it.
+    /// </remarks>
     public async Task EndSessionsAsync(Guid accountId, DateTimeOffset at, CancellationToken cancellationToken) =>
         await dbContext.Accounts
-            .Where(account => account.Id == accountId
-                && (account.SessionsValidAfter == null || account.SessionsValidAfter < at))
+            .Where(account => account.Id == accountId)
             .ExecuteUpdateAsync(
-                setters => setters.SetProperty(account => account.SessionsValidAfter, at),
+                setters => setters.SetProperty(
+                    account => account.SessionsValidAfter,
+                    account => account.SessionsValidAfter == null || account.SessionsValidAfter < at
+                        ? at
+                        : account.SessionsValidAfter.Value.AddMilliseconds(1)),
                 cancellationToken)
             .ConfigureAwait(false);
 }

@@ -28,7 +28,8 @@ public interface IAccountSessionStore
     Task<SessionStanding?> FindAsync(Guid accountId, CancellationToken cancellationToken);
 
     /// <summary>
-    /// Ends every Session the Account was issued before <paramref name="at"/>.
+    /// Ends every Session the Account was issued before <paramref name="at"/> - or, when the clock is
+    /// not past the Account's stored instant, every Session issued up to and including that instant.
     /// </summary>
     /// <param name="accountId">The Account signing out.</param>
     /// <param name="at">The instant, from the injected clock.</param>

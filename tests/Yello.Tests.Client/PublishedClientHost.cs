@@ -14,9 +14,10 @@ namespace Yello.Tests.Client;
 /// <remarks>
 /// <para>
 /// <b>The published output, not the build output.</b> <c>dotnet publish Yello.Client -c Release</c>
-/// into a temporary folder, with the <c>appsettings.Production.json</c> the deploy workflow writes
-/// (<c>HostBaseAddress</c>; not a secret). The dev server answers every route with <c>index.html</c> by
-/// itself, so serving through it would prove nothing about the file.
+/// into a temporary folder. The published <c>appsettings.Production.json</c> (committed empty, so the
+/// boot configuration lists it) is then overwritten with <c>HostBaseAddress</c>, and its precompressed
+/// siblings are removed, exactly as the deploy workflow does. The dev server answers every route with
+/// <c>index.html</c> by itself, so serving through it would prove nothing about the file.
 /// </para>
 /// <para>
 /// <b>Exactly one rule.</b> A request for a file that exists gets the file. Otherwise a path that
@@ -35,6 +36,11 @@ internal sealed class PublishedClientHost : IAsyncDisposable
     private const int StatusOk = 200;
 
     private const int StatusNotFound = 404;
+
+    /// <summary>
+    /// The API host written into the published <c>appsettings.Production.json</c>. Nothing listens there.
+    /// </summary>
+    public const string ConfiguredApiHost = "api.yello.test";
 
     private static readonly TimeSpan PublishWindow = TimeSpan.FromMinutes(5);
 
@@ -105,12 +111,18 @@ internal sealed class PublishedClientHost : IAsyncDisposable
         {
             await PublishAsync(publish, cancellationToken);
 
-            // What the deploy workflow writes from the infrastructure's output: the API's address.
-            // Nothing listens there; the case is about routing, not about the API.
-            await File.WriteAllTextAsync(
-                Path.Combine(publish.FullName, "wwwroot", "appsettings.Production.json"),
-                """{ "HostBaseAddress": "https://api.yello.test/" }""",
-                cancellationToken);
+            // What the deploy workflow does with the infrastructure's output: overwrite the published
+            // (empty) production settings with the API's address, and drop the precompressed copies.
+            var settings = new FileInfo(Path.Combine(publish.FullName, "wwwroot", "appsettings.Production.json"));
+
+            if (!settings.Exists)
+            {
+                throw new InvalidOperationException("The publish output has no appsettings.Production.json, so the boot configuration cannot list it.");
+            }
+
+            await File.WriteAllTextAsync(settings.FullName, $$"""{ "HostBaseAddress": "https://{{ConfiguredApiHost}}/" }""", cancellationToken);
+            File.Delete(settings.FullName + ".br");
+            File.Delete(settings.FullName + ".gz");
 
             return new PublishedClientHost(publish, FreePort());
         }
@@ -139,8 +151,10 @@ internal sealed class PublishedClientHost : IAsyncDisposable
         {
             // The same, on platforms that report it this way.
         }
-
-        _publish.Delete(recursive: true);
+        finally
+        {
+            _publish.Delete(recursive: true);
+        }
     }
 
     private static async Task PublishAsync(DirectoryInfo output, CancellationToken cancellationToken)
@@ -166,7 +180,16 @@ internal sealed class PublishedClientHost : IAsyncDisposable
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         deadline.CancelAfter(PublishWindow);
 
-        await process.WaitForExitAsync(deadline.Token);
+        try
+        {
+            await process.WaitForExitAsync(deadline.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // A publish past its window is killed rather than orphaned, so its files can be deleted.
+            process.Kill(entireProcessTree: true);
+            throw;
+        }
 
         if (process.ExitCode != 0)
         {
@@ -224,6 +247,12 @@ internal sealed class PublishedClientHost : IAsyncDisposable
             {
                 // The browser went away mid-response.
             }
+            catch (Exception exception) when (exception is IOException or InvalidOperationException or UnauthorizedAccessException)
+            {
+                // One bad request is answered 500 and the host keeps serving, so a later request does
+                // not hang until the browser's timeout.
+                context.Response.StatusCode = 500;
+            }
             finally
             {
                 context.Response.Close();
@@ -262,7 +291,7 @@ internal sealed class PublishedClientHost : IAsyncDisposable
     {
         var full = Path.GetFullPath(Path.Combine(_root.FullName, path.TrimStart('/')));
 
-        return full.StartsWith(_root.FullName, StringComparison.OrdinalIgnoreCase) && File.Exists(full)
+        return full.StartsWith(Path.TrimEndingDirectorySeparator(_root.FullName) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) && File.Exists(full)
             ? new FileInfo(full)
             : null;
     }

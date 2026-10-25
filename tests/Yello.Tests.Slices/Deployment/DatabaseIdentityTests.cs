@@ -11,12 +11,12 @@ namespace Yello.Tests.Slices.Deployment;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written by the ATDD run on 2026-10-25, and green today - a standing gate.</b> It does not wait
-/// for story 1.10's code: it proves the permission model the runbook grants (<c>db_datareader</c> and
+/// <b>A standing gate.</b> It proves the permission model the runbook grants (<c>db_datareader</c> and
 /// <c>db_datawriter</c> for the app identity, P2) on the local engine, which is the half of AC15's
-/// identity split that can be decided without Azure. In Azure the users are Entra principals
-/// (<c>CREATE USER ... FROM EXTERNAL PROVIDER</c>); locally they are SQL logins with the same roles,
-/// because the engine has no Entra tenant. The roles are what is under test, not the login type.
+/// identity split that can be decided without Azure. In Azure the users are contained database users
+/// with passwords held only in Key Vault (open question 8 (b), <c>docs/operations.md</c> section 9);
+/// locally they are SQL logins with the same roles. The roles are what is under test, not the login
+/// type.
 /// </para>
 /// <para>
 /// <b>Why it matters.</b> NFR-1 rests on the policy, and AD-2's <c>MAXDOP = 1</c> is AR-40c's
