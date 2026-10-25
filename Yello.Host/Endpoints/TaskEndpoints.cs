@@ -158,7 +158,6 @@ public static class TaskEndpoints
 
             EditTaskAttributesOutcome.StatusOutsideTheEffectiveSet => TaskEditBody.InvalidStatus(),
 
-
             // Not recorded: an in-Space not-found crossed no boundary (AD-20). The body is the boundary's.
             _ => BoundaryProblems.NotAvailable(),
         };

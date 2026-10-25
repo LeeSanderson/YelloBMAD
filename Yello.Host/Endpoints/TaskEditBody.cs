@@ -30,6 +30,12 @@ internal static partial class TaskEditBody
     private const string DueDateMember = "dueDate";
 
     /// <summary>
+    /// The longest text a due date can be: an ISO 8601 instant with seven fractional digits and an offset is
+    /// 33 characters. A longer text is refused before the offset pattern scans it.
+    /// </summary>
+    private const int LongestDueDate = 40;
+
+    /// <summary>
     /// Reads the edit, or the refusal that answers it.
     /// </summary>
     /// <param name="request">The request.</param>
@@ -153,7 +159,8 @@ internal static partial class TaskEditBody
     /// Whether an ISO 8601 text states its offset (<c>Z</c> or <c>±hh:mm</c>). Without one, the reader would
     /// assume the server's own zone, and a due date must never be a zone-less value (AR-34).
     /// </summary>
-    private static bool HasAnOffset(string? text) => text is not null && OffsetSuffix.IsMatch(text);
+    private static bool HasAnOffset(string? text) =>
+        text is { Length: <= LongestDueDate } && OffsetSuffix.IsMatch(text);
 
     [GeneratedRegex(@"(?:[Zz]|[+-][0-9]{2}:[0-9]{2})\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 100)]
     private static partial Regex OffsetSuffix { get; }

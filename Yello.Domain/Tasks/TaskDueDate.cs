@@ -13,24 +13,21 @@ namespace Yello.Domain.Tasks;
 /// </para>
 /// <para>
 /// <b>The range is a sanity bound, not a product rule.</b> It refuses values a date picker never produces
-/// (a year typed as 20261, an epoch zero) before they reach the column.
+/// (a year typed as 20261, an epoch zero) before they reach the column. It is judged on the year <b>as
+/// submitted, in its own offset</b> - the day the editor chose - so the start of 1 January 2000 east of UTC,
+/// or of 31 December 2100 west of it, is inside the range although its UTC instant is not.
 /// </para>
 /// </remarks>
 public static class TaskDueDate
 {
     private const int EarliestYear = 2000;
 
-    private const int FirstYearAfterTheRange = 2101;
+    private const int LatestYear = 2100;
 
     /// <summary>
-    /// The earliest due date accepted, inclusive.
+    /// The start of the first year accepted, at offset zero: a due date the range always admits.
     /// </summary>
     public static DateTimeOffset Earliest { get; } = new(EarliestYear, 1, 1, 0, 0, 0, TimeSpan.Zero);
-
-    /// <summary>
-    /// The first instant after the accepted range: the start of 2101, exclusive.
-    /// </summary>
-    public static DateTimeOffset FirstAfterTheRange { get; } = new(FirstYearAfterTheRange, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     /// <summary>
     /// Converts a submitted due date to UTC and says whether it is one. <c>null</c> - no due date - is one.
@@ -47,14 +44,12 @@ public static class TaskDueDate
             return true;
         }
 
-        var utc = value.ToUniversalTime();
-
-        if (utc < Earliest || utc >= FirstAfterTheRange)
+        if (value.Year is < EarliestYear or > LatestYear)
         {
             return false;
         }
 
-        dueDate = utc;
+        dueDate = value.ToUniversalTime();
 
         return true;
     }

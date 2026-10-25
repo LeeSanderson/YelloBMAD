@@ -22,6 +22,12 @@ public static class TaskDates
 {
     private const string InputFormat = "yyyy-MM-dd";
 
+    // The server's due-date range (Yello.Domain's TaskDueDate, which the client cannot reference); the server
+    // still decides.
+    private const int EarliestYear = 2000;
+
+    private const int LatestYear = 2100;
+
     /// <summary>
     /// The day and month a due date falls on in the viewer's zone, in the viewer's locale's own month-day
     /// pattern - the card's form.
@@ -52,7 +58,10 @@ public static class TaskDates
     /// </summary>
     /// <param name="value">The input's value, <c>yyyy-MM-dd</c>, or empty.</param>
     /// <param name="due">The instant, with the editor's offset; <c>null</c> for an empty value.</param>
-    /// <returns><c>true</c> when the value is empty or a date.</returns>
+    /// <returns>
+    /// <c>true</c> when the value is empty or a date in the years 2000 to 2100 - the server's range, judged on
+    /// the day as chosen (a year part-way through being typed, such as 0002, is not one).
+    /// </returns>
     public static bool TryFromInputValue(string? value, out DateTimeOffset? due)
     {
         due = null;
@@ -62,7 +71,8 @@ public static class TaskDates
             return true;
         }
 
-        if (!DateOnly.TryParseExact(value, InputFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var day))
+        if (!DateOnly.TryParseExact(value, InputFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out var day)
+            || day.Year is < EarliestYear or > LatestYear)
         {
             return false;
         }

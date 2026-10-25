@@ -4,7 +4,7 @@ baseline_commit: 51e1661db681d2173359d3c2ce7883fb796a027d
 
 # Story 2.3: Edit a Task's title, Status and due date
 
-Status: review
+Status: done
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-3-edit-a-tasks-title-status-and-due-date`
@@ -233,6 +233,37 @@ AC1–AC7 are reproduced **verbatim** from `epics.md:1067-1095` (`status: final`
   - [x] Ledger (`deferred-work.md`): CLOSE `:485` with the plant result. UPDATE `:36` (which surfaces remain), `:492` (the second key-placing writer). ADD anything this story defers, each with an owner — at least the literal sibling-Project Status case (owner 6.1, Q13) and any UX question raised (Q4, Q14).
   - [x] `sprint-status.yaml`: set `review` at the end of the dev phase. GATE-003 then fails if any row is still pending on 2.3 — that is the gate working.
   - [x] **Do not add review narration to source files.**
+
+### Review Findings
+
+Code review 2026-10-25 (`62150b7..d29402c`, full mode; Blind Hunter, Edge Case Hunter, Acceptance Auditor). 44 raw findings, 36 after deduplication: 0 decision-needed, 23 patch, 1 defer, 12 dismissed.
+
+- [x] [Review][Patch] A stale focus request pulls focus out of the open panel onto a re-created card (AC5, UX-DR40): `_focusCard` set on Close is never cleared, and a new `TaskCard` starts at `_focusRequestsSeen = 0` [Yello.Client/Components/BoardView.razor.cs:78; Yello.Client/Components/TaskCard.razor:54]
+- [x] [Review][Patch] The panel is `aria-modal` but the layer passes the pointer through to the Board, so a click leaves the focus trap (AC5) [Yello.Client/wwwroot/css/components.css (.task-detail-layer)]
+- [x] [Review][Patch] A refusal or no-answer for one Task is shown in another Task's open panel [Yello.Client/Components/BoardView.razor.cs:258-275]
+- [x] [Review][Patch] `InFlight` is cleared before the admission is recorded, so a same-attribute edit in that window starts a second parallel write [Yello.Client/Components/BoardView.razor.cs:208]
+- [x] [Review][Patch] A `200` whose body cannot be read drops the `Idempotency-Key` and says "Not sent." [Yello.Client/Components/BoardView.razor.cs:203]
+- [x] [Review][Patch] A `5xx` is treated as a definite refusal and shows "Not available." inline; it is an unknown outcome [Yello.Client/Components/BoardView.razor.cs:258]
+- [x] [Review][Patch] An admitted move back into the card's current column keeps the card at its old slot, not at its new key [Yello.Client/Components/BoardView.razor.cs:313]
+- [x] [Review][Patch] A partly edited date field (empty value) silently clears the due date; only "Clear due date" clears [Yello.Client/Components/TaskDetail.razor:336; Yello.Client/Spaces/TaskDates.cs:60]
+- [x] [Review][Patch] Intermediate years typed into the date input (0002, 0020...) are sent and refused, and 0001-01-01 east of UTC throws in the `DateTimeOffset` constructor [Yello.Client/Spaces/TaskDates.cs:70]
+- [x] [Review][Patch] The range check is in UTC, so 2000-01-01 east of UTC and 2100-12-31 west of UTC are refused although inside 2000-2100 [Yello.Domain/Tasks/TaskDueDate.cs:50]
+- [x] [Review][Patch] An unbounded `dueDate` string runs the offset regex to its timeout, a `500` [Yello.Host/Endpoints/TaskEditBody.cs:156]
+- [x] [Review][Patch] A Status edit to the Task's current Status skips the lock and can answer `200` with a stale Status while a concurrent move commits (per-attribute last writer must win) [Yello.Infrastructure/Persistence/TaskStore.cs:108]
+- [x] [Review][Patch] A Task removed between the first read and the reload under the lock is answered `200` (reachable once 2.5 deletes) [Yello.Infrastructure/Persistence/TaskStore.cs:113]
+- [x] [Review][Patch] The S-2 invariant query is already guaranteed by the composite FK until 6.1, and its remarks say Tasks move "there and back" when they do not [tests/Yello.Tests.Slices/Tasks/TaskEditWire.cs]
+- [x] [Review][Patch] A due date without an offset is refused by code no test exercises [tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Edit.cs]
+- [x] [Review][Patch] `invalid-task-edit` (the Q5 extension) is never asserted by type [tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Edit.cs]
+- [x] [Review][Patch] AC11 "no refusal row" is asserted only for the Status refusal, not for title, due date or unreadable body [tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Edit.cs]
+- [x] [Review][Patch] No case edits title, Status and due date together and checks the response against the row (Task 10) [tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Edit.cs]
+- [x] [Review][Patch] AC12's `409` (key in flight) revert has no browser case [tests/Yello.Tests.Client/TaskDetailTests.cs]
+- [x] [Review][Patch] Q8's queue (only the latest waiting value of an attribute is sent) has no browser case [tests/Yello.Tests.Client/TaskDetailTests.cs]
+- [x] [Review][Patch] Stale comments: `TaskEditWire.DueDateAsync` "column does not exist yet", and the EditRace remarks say the edit takes a column-only range [tests/Yello.Tests.Slices/Tasks/TaskEditWire.cs; tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.EditRace.cs]
+- [x] [Review][Patch] Double blank line in the endpoint's switch [Yello.Host/Endpoints/TaskEndpoints.cs:160]
+- [x] [Review][Patch] The 6.1 ledger entry says the edit is "correct by construction" but the handler never passes the Task's Project to `EffectiveStatusSet.Of`; 6.1 must change the handler too [_bmad-output/implementation-artifacts/deferred-work.md:507]
+Review patches applied: `dotnet build Yello.slnx` 0 warnings, 0 errors; Client suite alone 102/102; full `dotnet test Yello.slnx` **850 total, 847 passed, 0 failed, 3 skipped** (the 3 are the bundle and legacy-factor cases). Nine cases added (offset-less, date-only and over-long due dates; `[]` body; the three-member edit; two due-date range rows; the `409` revert; the one-attribute queue). One run first failed `No_user_visible_copy_is_written_as_a_csharp_string_literal` on a new comment quoting the clear control's copy; the comment was reworded. Changed rules, recorded: the due-date range is judged on the year as submitted in its own offset (was: in UTC), and the client never sends an empty date value or a year outside 2000-2100; a `5xx` is treated as no answer (key kept, "Not sent."); the panel's layer now covers the Board and takes the pointer.
+
+- [x] [Review][Defer] The Status picker's options are each a tab stop with no arrow-key navigation, not the listbox pattern, and Space is not prevented from scrolling [Yello.Client/Components/PickerOption.razor:10] — deferred, owner story 2.8 (keyboard model)
 
 ## Dev Notes
 
@@ -578,3 +609,4 @@ Claude Opus 5.5 (`claude-opus-5-5`), unattended dev-story phase of the story cyc
 ## Change Log
 
 - 2026-10-25 - Dev phase: Task GET and PATCH on both surfaces, the due date (column, contract, rule), the Status change's locked key placement, five isolation rows live, the Task detail panel with optimistic per-attribute edits and reverts, 6px panel and 3px picker gates, text-spacing case; ATDD scaffolds activated (three corrections), three active 2.2 cases widened deliberately; ledger and TESTING-CONVENTIONS updated. Status -> review.
+- 2026-10-25 - Code review (`62150b7..d29402c`): 44 raw findings, 36 unique; 23 patches applied (focus trap: stale card focus request and pointer pass-through; per-Task refusal copy; in-flight/key handling; date-input clears and partial years; due-date range in the submitted offset; locked same-Status edit; tests for offset-less dates, `invalid-task-edit`, no refusal rows, combined edit, `409`, the queue), 1 deferred (picker keyboard pattern, owner 2.8), 12 dismissed. Full suite 850/847/0/3. Status -> done.

@@ -105,12 +105,20 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
             return null;
         }
 
-        if (edit.StatusId is { } statusId && statusId != task.StatusId)
+        // Any Status named takes the lock, the Task's current one included: the Status read before the lock may
+        // be one that a move still uncommitted is about to replace, and this edit, coming after it, must win.
+        if (edit.StatusId is { } statusId)
         {
             var last = await LastKeyUnderTheProjectLockAsync(task.ProjectId, statusId, cancellationToken).ConfigureAwait(false);
 
             // Re-read under the lock: another edit may have moved this Task while this one waited.
-            await dbContext.Entry(task).ReloadAsync(cancellationToken).ConfigureAwait(false);
+            var entry = dbContext.Entry(task);
+            await entry.ReloadAsync(cancellationToken).ConfigureAwait(false);
+
+            if (entry.State == EntityState.Detached)
+            {
+                return null;
+            }
 
             if (task.StatusId != statusId)
             {

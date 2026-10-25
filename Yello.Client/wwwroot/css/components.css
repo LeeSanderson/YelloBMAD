@@ -812,22 +812,21 @@
 /*
     THE TASK DETAIL PANEL (story 2.3; DESIGN.md:238-244, :465-473; UX-DR5, UX-DR10). Over the Board, one
     level deep, at the inline end of the Board and below the context bar, wide enough for a title to sit
-    in its field (and for Epic 7's description beneath). The layer passes the pointer through to the page
-    around the panel - the context bar and its switcher stay usable - and only the panel takes it. A
+    in its field (and for Epic 7's description beneath). The layer covers the whole Board and takes the
+    pointer, so nothing behind the modal panel can be clicked and pull focus out of its trap (AC5); it sits
+    inside the Board, below the context bar, so the bar and its switcher stay usable. A
     surface, not a floating layer: the 6px corners (rounded.lg - deferred-work.md:36), the gated hairline
     and NO SHADOW, stated explicitly. No fixed height, so text spacing and text-only zoom grow the page
     instead of clipping the panel.
 */
 .task-detail-layer {
     position: absolute;
-    inset-block-start: 0;
-    inset-inline: 0;
+    inset: 0;
     display: flex;
     justify-content: flex-end;
     align-items: flex-start;
     box-sizing: border-box;
     padding: var(--space-4);
-    pointer-events: none;
 }
 
 .task-detail {
@@ -837,7 +836,6 @@
     box-sizing: border-box;
     inline-size: min(40rem, 100%);
     padding: var(--space-5);
-    pointer-events: auto;
     background-color: var(--surface-card);
     color: var(--text-primary);
     border: var(--border-hairline-width) solid var(--border-hairline);

@@ -63,12 +63,14 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     private const string TitleInvalidCopy = "A Task title is 1 to 200 characters.";
     private const string ManageTasksCopy = "Viewers cannot edit Tasks.";
     private const string ReusedCopy = "That request was already used for something else. Try again.";
+    private const string InFlightCopy = "That was already sent. Reload to see it.";
     private const string NotSentCopy = "Not sent.";
     private const string NotAvailableCopy = "Not available.";
 
     private const string InvalidTaskTitleType = "urn:yello:problem:invalid-task-title";
     private const string InsufficientRoleType = "urn:yello:problem:insufficient-role";
     private const string IdempotencyKeyReusedType = "urn:yello:problem:idempotency-key-reused";
+    private const string IdempotencyKeyInFlightType = "urn:yello:problem:idempotency-key-in-flight";
 
     private static readonly string[] StatusNames = ["Todo", "Doing", "Done"];
 
@@ -351,6 +353,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     [InlineData(400, InvalidTaskTitleType, null, TitleInvalidCopy)]
     [InlineData(403, InsufficientRoleType, "manage-tasks", ManageTasksCopy)]
     [InlineData(422, IdempotencyKeyReusedType, null, ReusedCopy)]
+    [InlineData(409, IdempotencyKeyInFlightType, null, InFlightCopy)]
     [Trait("Requirement", "UX-DR32")]
     [Trait("Requirement", "AD-11")]
     public async Task A_refused_title_edit_is_reverted_and_its_reason_is_said_inline(int status, string problemType, string? capability, string copy)
@@ -481,6 +484,47 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
 
             Assert.Equal("Draft the brief", await TitleField(page).InputValueAsync());
             Assert.Equal("Draft the brief", (await CardOf(page, tasks[0].Id).Locator(".task-card__title").TextContentAsync())?.Trim());
+        }
+    }
+
+    /// <summary>
+    /// Q8, AD-18 - changes to one attribute while its edit is out wait behind it, and only the latest waiting
+    /// value is sent once the first is admitted: one tab never has two writes racing for one field. The card shows
+    /// the latest value throughout. Anchor: the first edit was sent and admitted.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AD-11")]
+    [Trait("Requirement", "AD-18")]
+    public async Task Changes_to_one_attribute_while_its_edit_is_out_wait_and_only_the_latest_is_sent()
+    {
+        var api = TwoSpaces();
+        var tasks = Seed(api, Northwind, Atlas, "Draft the brief");
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenBoardAsync(api, page, Northwind, Atlas);
+            await OpenPanelAsync(page, tasks[0].Id);
+
+            var held = api.HoldTaskEditAsync();
+
+            await CommitTitleAsync(page, "First change");
+            await held.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+
+            await CommitTitleAsync(page, "Second change");
+            await CommitTitleAsync(page, "Third change");
+
+            await CardOf(page, tasks[0].Id).Locator(".task-card__title", new LocatorLocatorOptions { HasText = "Third change" })
+                .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Single(Edits(api));
+
+            api.ReleaseTaskEdit();
+            await WaitUntilAsync(() => api.FindTask(tasks[0].Id)?.Task.Title == "Third change", "The latest waiting title was never sent.");
+
+            Assert.Equal(["First change", "Third change"], Edits(api).Select(TitleOf));
+            Assert.Equal("Third change", await TitleField(page).InputValueAsync());
         }
     }
 
@@ -856,6 +900,13 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
 
     private static List<FakeRequest> Edits(FakeYelloApi api) =>
         [.. api.Requests.Where(request => request.Method == "PATCH" && request.Path.Contains("/tasks/", StringComparison.Ordinal))];
+
+    private static string TitleOf(FakeRequest edit)
+    {
+        using var document = JsonDocument.Parse(edit.Body ?? "{}");
+
+        return document.RootElement.GetProperty("title").GetString() ?? string.Empty;
+    }
 
     private static string[] Members(FakeRequest edit)
     {

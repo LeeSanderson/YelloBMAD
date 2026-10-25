@@ -89,7 +89,7 @@ development_status:
   epic-2: in-progress
   2-1-create-a-project-and-see-what-is-in-your-space: done
   2-2-add-tasks-and-see-them-on-a-board: done
-  2-3-edit-a-tasks-title-status-and-due-date: review
+  2-3-edit-a-tasks-title-status-and-due-date: done
   2-4-define-and-apply-labels: backlog
   2-5-delete-a-task-and-delete-a-project: backlog
   2-6-move-and-reorder-a-task-by-explicit-control: backlog

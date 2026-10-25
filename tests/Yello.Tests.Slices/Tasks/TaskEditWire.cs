@@ -21,9 +21,9 @@ namespace Yello.Tests.Slices.Tasks;
 /// <c>null</c> member rather than dropping it.
 /// </para>
 /// <para>
-/// <b><see cref="DueDateAsync"/> reads a column that does not exist yet</b> (story 2.3 Task 3:
-/// <c>DueDate datetimeoffset NULL</c>). It is called only by skipped cases; <see cref="TaskWire.TaskRowsAsync"/>
-/// is left as it is so 2.2's active cases keep running.
+/// <b><see cref="DueDateAsync"/> reads story 2.3's <c>DueDate</c> column on its own</b>;
+/// <see cref="TaskWire.TaskRowsAsync"/> and its <see cref="TaskRow"/> are left as 2.2 wrote them, so 2.2's
+/// cases that compare whole rows are unchanged.
 /// </para>
 /// </remarks>
 internal static class TaskEditWire
@@ -91,6 +91,12 @@ internal static class TaskEditWire
     /// The Space's Tasks whose Status is not one of their own Space's Statuses - AD-17's invariant as a query
     /// (story 2.2 SCH-006's shape; until 6.1's deltas every Project's effective set is the Space's defaults).
     /// </summary>
+    /// <remarks>
+    /// Until 6.1 the composite foreign key <c>(SpaceId, StatusId)</c> already makes this count zero, so the
+    /// query is the invariant's standing statement rather than its only guard: what a run of edits proves today
+    /// is that a foreign Status is refused as a <c>400</c> before the key could answer it. 6.1 narrows this
+    /// query to each Project's own effective set, where the key no longer covers it.
+    /// </remarks>
     public static async Task<int> TasksOutsideTheirEffectiveSetAsync(RegistrationDatabase database, Guid spaceId)
     {
         await using var connection = await database.OpenForSpaceAsync(spaceId, TestContext.Current.CancellationToken);

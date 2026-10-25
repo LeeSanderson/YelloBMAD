@@ -17,17 +17,19 @@ namespace Yello.Tests.Slices.Tasks;
 /// <para>
 /// <b>The interleaving is the test's</b> (TESTING-CONVENTIONS "A race is controlled, never hoped for"): the
 /// test opens a connection under the Space's key, takes the destination column's range itself
-/// (<c>WITH (UPDLOCK, HOLDLOCK)</c> over <c>ProjectId = @p AND StatusId = @s</c>, the lock Task 6 has the
-/// edit take), sends both requests, waits until both are blocked on any <c>LCK_M_%</c>
+/// (<c>WITH (UPDLOCK, HOLDLOCK)</c> over <c>ProjectId = @p AND StatusId = @s</c>, a subset of the
+/// Project-wide range the edit and the creation both take, so either queues behind it), sends both requests,
+/// waits until both are blocked on any <c>LCK_M_%</c>
 /// (<see cref="TaskWire.WaitUntilBlockedOnALockAsync"/>), then commits. Both Accounts read the Board first, so
 /// neither writes its <c>SpacePresence</c> row inside the race (the 2.2 ATDD finding).
 /// </para>
 /// <para>
 /// <b>What a missing lock looks like:</b> both placements read the same last key, compute the same
 /// <c>PositionKey.After(last)</c>, and the unique index <c>(SpaceId, ProjectId, StatusId, PositionKey)</c>
-/// refuses the second as a <c>500</c>. Task 6 asks the dev phase to measure whether creation's Project-wide
-/// range and the edit's column range conflict; if they do not, the edit takes the Project-wide range and the
-/// held statement here widens with it (record the correction).
+/// refuses the second as a <c>500</c>. The dev phase measured that a column range would also serialise an
+/// edit against a creation, and chose the Project-wide range for one lock order (<c>TaskStore</c>'s remarks).
+/// These two cases catch the hint's removal only by timing; the case that holds the column and inserts under
+/// it, <c>A_Status_edit_reads_the_last_key_of_its_new_column_only_under_the_lock</c>, catches it every run.
 /// </para>
 /// </remarks>
 public sealed partial class TaskEndpointTests

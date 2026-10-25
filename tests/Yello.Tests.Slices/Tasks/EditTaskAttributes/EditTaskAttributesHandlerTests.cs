@@ -94,7 +94,8 @@ public sealed class EditTaskAttributesHandlerTests
     }
 
     /// <summary>
-    /// Q4 (a) - the range is the start of 2000, inclusive, to the start of 2101, exclusive, judged in UTC.
+    /// Q4 (a) - the range is the years 2000 to 2100, judged on the day as submitted in its own offset (the day
+    /// the editor chose), so the range's first and last days are due dates in every zone.
     /// </summary>
     /// <param name="year">The year.</param>
     /// <param name="month">The month.</param>
@@ -104,11 +105,13 @@ public sealed class EditTaskAttributesHandlerTests
     [Theory]
     [InlineData(2000, 1, 1, 0, true)]
     [InlineData(1999, 12, 31, 0, false)]
-    [InlineData(2000, 1, 1, 1, false)]
+    [InlineData(2000, 1, 1, 14, true)]
+    [InlineData(1999, 12, 31, -12, false)]
     [InlineData(2100, 12, 31, 0, true)]
+    [InlineData(2100, 12, 31, -12, true)]
     [InlineData(2101, 1, 1, 0, false)]
-    [InlineData(2101, 1, 1, 2, true)]
-    public void A_due_date_is_between_2000_and_2100_in_UTC(int year, int month, int day, int offsetHours, bool accepted)
+    [InlineData(2101, 1, 1, 14, false)]
+    public void A_due_date_is_between_2000_and_2100_on_the_day_submitted(int year, int month, int day, int offsetHours, bool accepted)
     {
         var submitted = new DateTimeOffset(year, month, day, 0, 0, 0, TimeSpan.FromHours(offsetHours));
 

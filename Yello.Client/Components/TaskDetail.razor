@@ -335,7 +335,12 @@
 
     private Task DueDateChangedAsync(ChangeEventArgs args)
     {
-        if (!TaskDates.TryFromInputValue(args.Value?.ToString(), out var due) || due == Item.DueDate)
+        var value = args.Value?.ToString();
+
+        // An empty value is a date being retyped (the browser reports any incomplete date as empty), never a
+        // clear: only the panel's clear control clears. A date outside the range - a year part-way through typing -
+        // is not sent either.
+        if (string.IsNullOrEmpty(value) || !TaskDates.TryFromInputValue(value, out var due) || due is null || due == Item.DueDate)
         {
             return Task.CompletedTask;
         }

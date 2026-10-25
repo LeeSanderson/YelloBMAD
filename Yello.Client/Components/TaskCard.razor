@@ -53,6 +53,15 @@
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // A card created after the request was made - moved to another column by a Status change - takes the
+        // count as already seen: only a request made while it is on the Board moves focus to it, never one left
+        // over from an earlier close while a panel is open over it.
+        if (firstRender)
+        {
+            _focusRequestsSeen = FocusRequest;
+            return;
+        }
+
         if (FocusRequest == _focusRequestsSeen)
         {
             return;

@@ -64,6 +64,7 @@ public sealed partial class BoardView
     {
         Admitted,
         Refused,
+        Unanswered,
         Gone,
     }
 
@@ -84,6 +85,7 @@ public sealed partial class BoardView
 
         _openTaskId = taskId;
         _panelRefusal = null;
+        _focusCard = null;
     }
 
     /// <summary>
@@ -195,19 +197,9 @@ public sealed partial class BoardView
         {
             using var answer = await Writes.SendAsync(HttpMethod.Patch, TaskRoutes.TaskOf(SpaceId, taskId), body, key, token);
 
-            if (generation != _generation)
-            {
-                return EditOutcome.Gone;
-            }
-
-            if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
-            {
-                replica.Unanswered.Remove(attribute);
-            }
-
-            replica.InFlight.Remove(attribute);
-
-            return await UseAnswerAsync(replica, attribute, answer, generation, token);
+            return generation != _generation
+                ? EditOutcome.Gone
+                : await SettleAsync(taskId, replica, attribute, answer, generation, token);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -216,12 +208,40 @@ public sealed partial class BoardView
         }
         catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
         {
-            // No answer. The key is kept for a resend; the change reverts, and the person is told it was not sent.
-            return NotSent(replica, attribute, generation);
+            // No answer, or one that could not be read. The key is kept for a resend; the change reverts, and
+            // the person is told it was not sent.
+            return NotSent(taskId, replica, attribute, generation);
         }
     }
 
-    private async Task<EditOutcome> UseAnswerAsync(TaskReplica replica, TaskAttribute attribute, SpaceWriteAnswer answer, int generation, CancellationToken token)
+    /// <summary>
+    /// Settles one sent edit from its answer. The attribute stays in flight until the answer has been read and
+    /// applied, so a change of the same attribute made meanwhile still waits behind it.
+    /// </summary>
+    private async Task<EditOutcome> SettleAsync(Guid taskId, TaskReplica replica, TaskAttribute attribute, SpaceWriteAnswer answer, int generation, CancellationToken token)
+    {
+        if (answer.StatusCode >= HttpStatusCode.InternalServerError)
+        {
+            // The server failed and its outcome is not known: treated as no answer, so the key is kept.
+            return NotSent(taskId, replica, attribute, generation);
+        }
+
+        var outcome = await UseAnswerAsync(taskId, replica, attribute, answer, generation, token);
+
+        if (outcome is EditOutcome.Admitted or EditOutcome.Refused)
+        {
+            replica.InFlight.Remove(attribute);
+
+            if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
+            {
+                replica.Unanswered.Remove(attribute);
+            }
+        }
+
+        return outcome;
+    }
+
+    private async Task<EditOutcome> UseAnswerAsync(Guid taskId, TaskReplica replica, TaskAttribute attribute, SpaceWriteAnswer answer, int generation, CancellationToken token)
     {
         switch (answer.StatusCode)
         {
@@ -235,7 +255,7 @@ public sealed partial class BoardView
 
                 if (stored is null)
                 {
-                    return NotSent(replica, attribute, generation);
+                    return NotSent(taskId, replica, attribute, generation);
                 }
 
                 replica.Admitted = Admit(replica.Admitted, attribute, stored);
@@ -250,19 +270,24 @@ public sealed partial class BoardView
                 // Reverted, then the page's one refusal surface: the panel does not stay open over a Task
                 // that is not there.
                 replica.Queued.Remove(attribute);
-                _openTaskId = null;
-                _panelRefusal = null;
+
+                if (_openTaskId == taskId)
+                {
+                    _openTaskId = null;
+                    _panelRefusal = null;
+                }
+
                 await OnRefused.InvokeAsync(answer.Problem);
                 return EditOutcome.Refused;
 
             default:
                 replica.Queued.Remove(attribute);
-                _panelRefusal = RefusalText.Of(Localizer, answer.Problem);
+                SayInPanel(taskId, RefusalText.Of(Localizer, answer.Problem));
                 return EditOutcome.Refused;
         }
     }
 
-    private EditOutcome NotSent(TaskReplica replica, TaskAttribute attribute, int generation)
+    private EditOutcome NotSent(Guid taskId, TaskReplica replica, TaskAttribute attribute, int generation)
     {
         if (generation != _generation)
         {
@@ -271,9 +296,21 @@ public sealed partial class BoardView
 
         replica.InFlight.Remove(attribute);
         replica.Queued.Remove(attribute);
-        _panelRefusal = Localizer["TaskEditNotSent"];
+        SayInPanel(taskId, Localizer["TaskEditNotSent"]);
 
-        return EditOutcome.Refused;
+        return EditOutcome.Unanswered;
+    }
+
+    /// <summary>
+    /// Says a refusal in the panel - only when the panel is open on the Task it is about, never in another
+    /// Task's panel opened since the edit was sent.
+    /// </summary>
+    private void SayInPanel(Guid taskId, string words)
+    {
+        if (_openTaskId == taskId)
+        {
+            _panelRefusal = words;
+        }
     }
 
     private TaskReplica? ReplicaOf(Guid taskId)
@@ -312,7 +349,16 @@ public sealed partial class BoardView
 
         if (column.StatusId == displayed.StatusId)
         {
-            column.Tasks[index] = displayed;
+            if (string.Equals(column.Tasks[index].PositionKey, displayed.PositionKey, StringComparison.Ordinal))
+            {
+                column.Tasks[index] = displayed;
+                return;
+            }
+
+            // An admitted Status change gave the card a new key in the column it already shows in (moved away
+            // and back while the first move was out): it goes where its new key puts it.
+            column.Tasks.RemoveAt(index);
+            InsertByKey(column, displayed);
             return;
         }
 
@@ -327,13 +373,18 @@ public sealed partial class BoardView
 
         if (displayed.StatusId == replica.Admitted.StatusId)
         {
-            var at = destination.Tasks.FindIndex(task => string.CompareOrdinal(task.PositionKey, displayed.PositionKey) > 0);
-            destination.Tasks.Insert(at < 0 ? destination.Tasks.Count : at, displayed);
+            InsertByKey(destination, displayed);
         }
         else
         {
             destination.Tasks.Add(displayed);
         }
+    }
+
+    private static void InsertByKey(ColumnState column, TaskResponse task)
+    {
+        var at = column.Tasks.FindIndex(candidate => string.CompareOrdinal(candidate.PositionKey, task.PositionKey) > 0);
+        column.Tasks.Insert(at < 0 ? column.Tasks.Count : at, task);
     }
 
     private (ColumnState Column, int Index)? Locate(Guid taskId)

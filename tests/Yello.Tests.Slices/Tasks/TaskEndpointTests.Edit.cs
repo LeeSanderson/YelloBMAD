@@ -134,6 +134,50 @@ public sealed partial class TaskEndpointTests
     }
 
     /// <summary>
+    /// AC1, Task 10, Q1 (a) - one edit naming the title, the Status and the due date together changes all three:
+    /// the response is the Task as stored, and the row agrees with it.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-20")]
+    [Trait("Requirement", "AR-34")]
+    public async Task One_edit_changes_title_Status_and_due_date_together_and_the_row_agrees()
+    {
+        var database = Available();
+        Actor? owner = null;
+        var taskId = Guid.Empty;
+        var target = Guid.Empty;
+        TaskRow? before = null;
+        WireResponse? edited = null;
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            owner = await RegisterAsync(client, database);
+            (_, taskId) = await ProjectWithTaskAsync(owner, "All at once");
+            before = await RowAsync(database, owner.SpaceId, taskId);
+            target = (await StatusesAsync(database, owner.SpaceId))[1].Id;
+            edited = await EditTaskAsync(owner, owner.SpaceId, taskId, RawBody($$"""{"title":"Changed together","statusId":"{{target}}","dueDate":"2026-12-24T00:00:00-05:00"}"""));
+        });
+
+        Assert.NotNull(owner);
+        Assert.NotNull(before);
+        Assert.NotNull(edited);
+        Assert.True(edited.StatusCode == HttpStatusCode.OK, $"{edited.StatusCode} {edited.Body}");
+
+        using var document = JsonDocument.Parse(edited.Body);
+        var root = document.RootElement;
+        var after = await RowAsync(database, owner.SpaceId, taskId);
+
+        Assert.NotNull(after);
+        Assert.Equal("Changed together", root.GetProperty("title").GetString());
+        Assert.Equal(target, root.GetProperty("statusId").GetGuid());
+        Assert.Equal("2026-12-24T05:00:00+00:00", root.GetProperty("dueDate").GetString());
+        Assert.Equal(after.PositionKey, root.GetProperty("positionKey").GetString());
+        Assert.Equal(before with { Title = "Changed together", StatusId = target, PositionKey = after.PositionKey }, after);
+        Assert.Equal(new DateTimeOffset(2026, 12, 24, 5, 0, 0, TimeSpan.Zero), await DueDateAsync(database, owner.SpaceId, taskId));
+    }
+
+    /// <summary>
     /// AC7, Q1 (a) - <c>dueDate: null</c> clears the due date: <c>NULL</c> is stored and the wire carries
     /// <c>"dueDate": null</c>. Anchor: the due date was set first, so the clear is about something.
     /// </summary>
@@ -351,13 +395,15 @@ public sealed partial class TaskEndpointTests
         Assert.Equal(HttpStatusCode.BadRequest, refused?.StatusCode);
         Assert.Equal(ProblemTypes.InvalidTaskTitle, Problem(refused!)?.Type);
         Assert.Equal(before, afterRefusal);
+        Assert.Empty(await RefusalKindsAsync(database, owner.AccountId, owner.SpaceId));
         Assert.Equal(HttpStatusCode.OK, anchor?.StatusCode);
     }
 
     /// <summary>
-    /// AC11, Q4 (a) - a due date before 2000 or after 2100, or one that is not an ISO 8601 instant, is refused
-    /// <c>400 invalid-due-date</c>, never a <c>500</c>, and nothing is changed. Anchor: the first instant of 2000
-    /// is admitted.
+    /// AC11, Q4 (a), AR-34 - a due date before 2000 or after 2100, one that is not an ISO 8601 instant, one that
+    /// states no offset (it would otherwise be read in the server's zone), or an over-long text, is refused
+    /// <c>400 invalid-due-date</c>, never a <c>500</c>; nothing is changed and no refusal row is written.
+    /// Anchor: the first instant of 2000 is admitted.
     /// </summary>
     /// <param name="dueDateJson">The dueDate member's JSON value.</param>
     /// <returns>A task.</returns>
@@ -366,6 +412,9 @@ public sealed partial class TaskEndpointTests
     [InlineData("\"2101-01-01T00:00:00+00:00\"")]
     [InlineData("\"next Tuesday\"")]
     [InlineData("12")]
+    [InlineData("\"2026-11-03T00:00:00\"")]
+    [InlineData("\"2026-11-03\"")]
+    [InlineData("LONG")]
     [Trait("Requirement", "AR-34")]
     [Trait("Priority", "P1")]
     public async Task An_invalid_due_date_is_refused_400_and_nothing_is_changed(string dueDateJson)
@@ -376,12 +425,13 @@ public sealed partial class TaskEndpointTests
         DateTimeOffset? afterRefusal = DateTimeOffset.MinValue;
         WireResponse? refused = null;
         WireResponse? anchor = null;
+        var value = dueDateJson == "LONG" ? $"\"2026-11-03T00:00:00{new string('0', 100_000)}+00:00\"" : dueDateJson;
 
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             (_, taskId) = await ProjectWithTaskAsync(owner, "Dated");
-            refused = await EditTaskAsync(owner, owner.SpaceId, taskId, RawBody($$"""{"dueDate":{{dueDateJson}}}"""));
+            refused = await EditTaskAsync(owner, owner.SpaceId, taskId, RawBody($$"""{"dueDate":{{value}}}"""));
             afterRefusal = await DueDateAsync(database, owner.SpaceId, taskId);
             anchor = await EditTaskAsync(owner, owner.SpaceId, taskId, Body(new { dueDate = TaskDueDate.Earliest }));
         });
@@ -390,23 +440,28 @@ public sealed partial class TaskEndpointTests
         Assert.True(refused?.StatusCode == HttpStatusCode.BadRequest, $"{refused?.StatusCode} {refused?.Body}");
         Assert.Equal(ProblemTypes.InvalidDueDate, Problem(refused!)?.Type);
         Assert.Null(afterRefusal);
+        Assert.Empty(await RefusalKindsAsync(database, owner.AccountId, owner.SpaceId));
         Assert.Equal(HttpStatusCode.OK, anchor?.StatusCode);
     }
 
     /// <summary>
-    /// AC11, Q1 (a) - a body that cannot be read, a body naming no member this route reads, and
-    /// <c>statusId: null</c> are each a <c>400</c>, never a <c>500</c>, and change nothing.
+    /// AC11, Q1 (a), Q5 (a) extended - a body that cannot be read, or one naming no member this route reads, is
+    /// <c>400 invalid-task-edit</c>; <c>statusId: null</c> is <c>400 invalid-task-status</c>. Never a
+    /// <c>500</c>; nothing is changed and no refusal row is written.
     /// </summary>
     /// <param name="body">The raw body.</param>
+    /// <param name="refusedForStatus">Whether it is refused as the Status rather than as the edit.</param>
     /// <returns>A task.</returns>
     [Theory]
-    [InlineData("{\"title\":")]
-    [InlineData("{}")]
-    [InlineData("{\"description\":\"no such member here\"}")]
-    [InlineData("{\"statusId\":null}")]
+    [InlineData("{\"title\":", false)]
+    [InlineData("{}", false)]
+    [InlineData("[]", false)]
+    [InlineData("{\"description\":\"no such member here\"}", false)]
+    [InlineData("{\"statusId\":null}", true)]
     [Trait("Priority", "P1")]
-    public async Task An_unreadable_or_empty_edit_is_refused_400_and_never_500(string body)
+    public async Task An_unreadable_or_empty_edit_is_refused_400_and_never_500(string body, bool refusedForStatus)
     {
+        var type = refusedForStatus ? ProblemTypes.InvalidTaskStatus : ProblemTypes.InvalidTaskEdit;
         var database = Available();
         Actor? owner = null;
         var taskId = Guid.Empty;
@@ -423,7 +478,9 @@ public sealed partial class TaskEndpointTests
 
         Assert.NotNull(owner);
         Assert.True(refused?.StatusCode == HttpStatusCode.BadRequest, $"{refused?.StatusCode} {refused?.Body}");
+        Assert.Equal(type, Problem(refused!)?.Type);
         Assert.Equal(before, await RowAsync(database, owner.SpaceId, taskId));
+        Assert.Empty(await RefusalKindsAsync(database, owner.AccountId, owner.SpaceId));
     }
 
     /// <summary>
@@ -600,7 +657,8 @@ public sealed partial class TaskEndpointTests
             {
                 var id = IdOf(await CreateTaskAsync(owner, owner.SpaceId, projectId, $"Churn {index}"));
 
-                Assert.Equal(HttpStatusCode.OK, (await EditTaskAsync(owner, owner.SpaceId, id, Body(new { statusId = statuses[index % 3].Id, title = $"Churned {index}" }))).StatusCode);
+                Assert.Equal(HttpStatusCode.OK, (await EditTaskAsync(owner, owner.SpaceId, id, Body(new { statusId = statuses[(index + 1) % 3].Id, title = $"Churned {index}" }))).StatusCode);
+                Assert.Equal(HttpStatusCode.OK, (await EditTaskAsync(owner, owner.SpaceId, id, Body(new { statusId = statuses[index % 3].Id }))).StatusCode);
                 Assert.Equal(HttpStatusCode.BadRequest, (await EditTaskAsync(owner, owner.SpaceId, id, Body(new { statusId = foreign }))).StatusCode);
                 Assert.Equal(HttpStatusCode.OK, (await EditTaskAsync(owner, owner.SpaceId, id, Body(new { dueDate = new DateTimeOffset(2026, 12, 1 + index, 0, 0, 0, TimeSpan.Zero) }))).StatusCode);
             }
