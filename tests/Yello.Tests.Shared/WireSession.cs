@@ -301,6 +301,80 @@ public sealed class WireSession(HttpClient client)
     }
 
     /// <summary>
+    /// Sends any method with a body and extra headers, carrying the held cookies and, on request, the
+    /// anti-forgery header - the browser's shape for a state-changing request. Added by the story 2.1
+    /// ATDD run for <c>PATCH</c> (rename, the first non-<c>POST</c> write with a body) and for the
+    /// <c>Idempotency-Key</c> header.
+    /// </summary>
+    /// <param name="method">The method.</param>
+    /// <param name="route">The route.</param>
+    /// <param name="content">The body, or <c>null</c>.</param>
+    /// <param name="headers">Extra request headers, sent without validation.</param>
+    /// <param name="withAntiforgeryToken">Whether to send the anti-forgery header.</param>
+    /// <returns>The response, with its body already read.</returns>
+    public async Task<WireResponse> SendWithHeadersAsync(
+        HttpMethod method,
+        string route,
+        HttpContent? content,
+        IReadOnlyDictionary<string, string> headers,
+        bool withAntiforgeryToken = true)
+    {
+        using var request = new HttpRequestMessage(method, new Uri(route, UriKind.Relative))
+        {
+            Content = content,
+        };
+
+        if (withAntiforgeryToken && AntiforgeryRequestToken is { } token)
+        {
+            request.Headers.TryAddWithoutValidation(Antiforgery.HeaderName, token);
+        }
+
+        foreach (var (name, value) in headers)
+        {
+            request.Headers.TryAddWithoutValidation(name, value);
+        }
+
+        using var response = await SendAsync(request).ConfigureAwait(false);
+
+        return await WireResponse.ReadAsync(response).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends any method as a script would - <c>Authorization: Bearer</c>, no cookie, no anti-forgery
+    /// header - with a body and extra headers. Added by the story 2.1 ATDD run, as
+    /// <see cref="SendWithHeadersAsync"/>.
+    /// </summary>
+    /// <param name="method">The method.</param>
+    /// <param name="route">The route.</param>
+    /// <param name="token">The bearer value.</param>
+    /// <param name="content">The body, or <c>null</c>.</param>
+    /// <param name="headers">Extra request headers, sent without validation.</param>
+    /// <returns>The response, with its body already read.</returns>
+    public async Task<WireResponse> SendWithTokenAndHeadersAsync(
+        HttpMethod method,
+        string route,
+        string token,
+        HttpContent? content,
+        IReadOnlyDictionary<string, string> headers)
+    {
+        using var request = new HttpRequestMessage(method, new Uri(route, UriKind.Relative))
+        {
+            Content = content,
+        };
+
+        request.Headers.TryAddWithoutValidation("Authorization", "Bearer " + token);
+
+        foreach (var (name, value) in headers)
+        {
+            request.Headers.TryAddWithoutValidation(name, value);
+        }
+
+        using var response = await SendAsync(request, attachCookies: false).ConfigureAwait(false);
+
+        return await WireResponse.ReadAsync(response).ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Sends a CORS preflight for a sign-in from a given origin.
     /// </summary>
     /// <param name="origin">The origin to claim.</param>

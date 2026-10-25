@@ -7,6 +7,7 @@ using Yello.Contracts;
 using Yello.Contracts.ApiTokens;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Spaces;
+using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -40,6 +41,8 @@ internal sealed class FakeYelloApi
     private readonly ConcurrentQueue<FakeRequest> _requests = new();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _held = new();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _arrived = new();
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _heldProjects = new();
+    private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _arrivedProjects = new();
     private readonly TaskCompletionSource<FakeRequest> _signInSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<FakeRequest> _signOutSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -82,6 +85,20 @@ internal sealed class FakeYelloApi
     public string IssuedSecret { get; } = "yello_pat_" + Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32));
 
     /// <summary>
+    /// Each Space's Projects, as the list route serves them. Story 2.1; the routes are
+    /// <see cref="ProjectRouteScaffold"/>'s until <c>Yello.Contracts.Projects</c> exists, and the bodies
+    /// are <see cref="FakeProject"/>, shaped as story 2.1 Task 4's <c>ProjectResponse</c> - replace both on
+    /// activation.
+    /// </summary>
+    public IDictionary<Guid, List<FakeProject>> Projects { get; } = new Dictionary<Guid, List<FakeProject>>();
+
+    /// <summary>
+    /// Whether a Project creation is refused <c>409 bound-reached</c> for <c>projects-per-space</c>, limit
+    /// 50, as the Host refuses the 51st. Story 2.1.
+    /// </summary>
+    public bool ProjectBoundReached { get; set; }
+
+    /// <summary>
     /// Every request seen, in order.
     /// </summary>
     public IReadOnlyCollection<FakeRequest> Requests => _requests;
@@ -122,6 +139,32 @@ internal sealed class FakeYelloApi
     }
 
     /// <summary>
+    /// Holds the next Project list answer for <paramref name="spaceId"/> until
+    /// <see cref="ReleaseProjects"/>. Story 2.1.
+    /// </summary>
+    /// <returns>A task that completes when the held request has arrived and is waiting.</returns>
+    public Task HoldProjectsAsync(Guid spaceId)
+    {
+        _heldProjects[spaceId] = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        var arrived = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _arrivedProjects[spaceId] = arrived;
+
+        return arrived.Task;
+    }
+
+    /// <summary>
+    /// Lets a held Project list answer go.
+    /// </summary>
+    public void ReleaseProjects(Guid spaceId)
+    {
+        if (_heldProjects.TryRemove(spaceId, out var held))
+        {
+            held.TrySetResult();
+        }
+    }
+
+    /// <summary>
     /// Whether any request named <paramref name="spaceId"/> in its path.
     /// </summary>
     public bool WasRequested(Guid spaceId) =>
@@ -154,8 +197,8 @@ internal sealed class FakeYelloApi
             {
                 ["Access-Control-Allow-Origin"] = origin,
                 ["Access-Control-Allow-Credentials"] = "true",
-                ["Access-Control-Allow-Headers"] = $"content-type, {Antiforgery.HeaderName}",
-                ["Access-Control-Allow-Methods"] = "GET, POST, DELETE",
+                ["Access-Control-Allow-Headers"] = $"content-type, {Antiforgery.HeaderName}, {ProjectRouteScaffold.IdempotencyKeyHeader}",
+                ["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE",
                 ["Vary"] = "Origin",
             },
         }).ConfigureAwait(false);
@@ -204,6 +247,16 @@ internal sealed class FakeYelloApi
                 && Guid.TryParse(path[(ApiTokenRoutes.List.Length + 1)..], out var revoked):
                 _ = ApiTokens.Remove(ApiTokens.FirstOrDefault(token => token.Id == revoked) ?? FakeApiToken.None);
                 return (noContent, string.Empty);
+
+            // Story 2.1 - the Project routes.
+            case ("GET", var path) when TryProjects(path, out var listSpace):
+                return await ListProjectsAsync(listSpace).ConfigureAwait(false);
+
+            case ("POST", var path) when TryProjects(path, out var createSpace):
+                return CreateProject(createSpace, request.Body);
+
+            case ("PATCH", var path) when TryProject(path, out var renameSpace, out var renamed):
+                return RenameProject(renameSpace, renamed, request.Body);
 
             case ("GET", var path) when TryActiveSpace(path, out var spaceId):
                 if (_held.TryGetValue(spaceId, out var held))
@@ -255,6 +308,102 @@ internal sealed class FakeYelloApi
             IssuedSecret);
 
         return (201, JsonSerializer.Serialize(issued, JsonOptions));
+    }
+
+    private async Task<(int Status, string Body)> ListProjectsAsync(Guid spaceId)
+    {
+        if (_heldProjects.TryGetValue(spaceId, out var held))
+        {
+            if (_arrivedProjects.TryRemove(spaceId, out var arrived))
+            {
+                arrived.TrySetResult();
+            }
+
+            await held.Task.ConfigureAwait(false);
+        }
+
+        return Projects.TryGetValue(spaceId, out var projects)
+            ? (200, JsonSerializer.Serialize(projects.OrderBy(project => project.Name, StringComparer.Ordinal).ThenBy(project => project.Id), JsonOptions))
+            : (200, "[]");
+    }
+
+    private (int Status, string Body) CreateProject(Guid spaceId, string? body)
+    {
+        if (ProjectBoundReached)
+        {
+            return (409, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.BoundReached, Errors: null, Bound: "projects-per-space", Limit: 50), JsonOptions));
+        }
+
+        if (!TryProjectName(body, out var name))
+        {
+            return (400, Problem(ProjectRouteScaffold.InvalidProjectName));
+        }
+
+        var project = new FakeProject(Guid.NewGuid(), name, DateTimeOffset.UtcNow);
+
+        if (!Projects.TryGetValue(spaceId, out var projects))
+        {
+            projects = [];
+            Projects[spaceId] = projects;
+        }
+
+        projects.Add(project);
+
+        return (201, JsonSerializer.Serialize(project, JsonOptions));
+    }
+
+    private (int Status, string Body) RenameProject(Guid spaceId, Guid projectId, string? body)
+    {
+        var projects = Projects.TryGetValue(spaceId, out var held) ? held : [];
+        var index = projects.FindIndex(project => project.Id == projectId);
+
+        if (index < 0)
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        if (!TryProjectName(body, out var name))
+        {
+            return (400, Problem(ProjectRouteScaffold.InvalidProjectName));
+        }
+
+        projects[index] = projects[index] with { Name = name };
+
+        return (200, JsonSerializer.Serialize(projects[index], JsonOptions));
+    }
+
+    /// <summary>
+    /// The Host's Q3 rule, as the Host answers it: trimmed, 1-100 characters.
+    /// </summary>
+    private static bool TryProjectName(string? body, out string name)
+    {
+        using var document = JsonDocument.Parse(string.IsNullOrEmpty(body) ? "{}" : body);
+
+        name = (document.RootElement.TryGetProperty("name", out var value) ? value.GetString() ?? string.Empty : string.Empty).Trim();
+
+        return name.Length is >= 1 and <= 100;
+    }
+
+    private static bool TryProjects(string path, out Guid spaceId)
+    {
+        var prefix = SpaceRoutes.Directory + "/";
+
+        spaceId = Guid.Empty;
+
+        return path.StartsWith(prefix, StringComparison.Ordinal)
+            && Guid.TryParse(path[prefix.Length..].Split('/')[0], out spaceId)
+            && path == ProjectRouteScaffold.ListIn(spaceId);
+    }
+
+    private static bool TryProject(string path, out Guid spaceId, out Guid projectId)
+    {
+        var segments = path.Split('/');
+
+        projectId = Guid.Empty;
+
+        return TryProjects(string.Join('/', segments[..^1]), out spaceId)
+            && Guid.TryParse(segments[^1], out projectId)
+            && path == ProjectRouteScaffold.ProjectOf(spaceId, projectId);
     }
 
     private static ApiTokenResponse TokenRow(FakeApiToken token) =>
@@ -319,3 +468,12 @@ internal sealed record FakeApiToken(Guid Id, string Name, Guid SpaceId, string S
     /// </summary>
     public static FakeApiToken None { get; } = new(Guid.Empty, string.Empty, Guid.Empty, string.Empty, DateTimeOffset.MinValue);
 }
+
+/// <summary>
+/// One Project as the fake serves it - the shape of story 2.1 Task 4's <c>ProjectResponse</c>
+/// (<c>{id, name, createdAt}</c>). Replace with the contract type on activation.
+/// </summary>
+/// <param name="Id">The Project's id.</param>
+/// <param name="Name">Its name.</param>
+/// <param name="CreatedAt">When it was created.</param>
+internal sealed record FakeProject(Guid Id, string Name, DateTimeOffset CreatedAt);

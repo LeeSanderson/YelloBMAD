@@ -34,9 +34,13 @@ public sealed class ProductActor
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
+    private static readonly Dictionary<string, string> NoHeaders = new(StringComparer.Ordinal);
+
     private readonly WireSession _script;
 
     private readonly List<string> _otherSpaceNames = [];
+
+    private readonly List<string> _projectNames = [];
 
     private ProductActor(WireSession session, WireSession script)
     {
@@ -103,7 +107,7 @@ public sealed class ProductActor
         Password,
         TokenPlaintext,
         SessionCookieValue,
-        .. new[] { SpaceName }.Concat(_otherSpaceNames)
+        .. new[] { SpaceName }.Concat(_otherSpaceNames).Concat(_projectNames)
             .SelectMany(name => new[] { name, JsonEncodedText.Encode(name, JavaScriptEncoder.Default).ToString() }),
     ];
 
@@ -117,6 +121,19 @@ public sealed class ProductActor
         ArgumentException.ThrowIfNullOrEmpty(spaceName);
 
         _otherSpaceNames.Add(spaceName);
+    }
+
+    /// <summary>
+    /// Adds the name of a Project this actor created to <see cref="Secrets"/>, so the log check looks for
+    /// it too: a Project name is Space content and never belongs in a log (spine :274). Added by the
+    /// story 2.1 ATDD run (Task 9).
+    /// </summary>
+    /// <param name="projectName">The Project's name.</param>
+    public void HoldsProjectNamed(string projectName)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(projectName);
+
+        _projectNames.Add(projectName);
     }
 
     /// <summary>
@@ -211,12 +228,13 @@ public sealed class ProductActor
     /// Sends as this actor on <paramref name="surface"/>.
     /// </summary>
     /// <param name="surface">Which surface.</param>
-    /// <param name="method">GET, POST or DELETE.</param>
+    /// <param name="method">GET, POST, PATCH or DELETE.</param>
     /// <param name="path">The route.</param>
     /// <returns>The answer.</returns>
     /// <remarks>
-    /// A POST carries a valid Token-issue body (<c>{"name": ...}</c>), the only POST a Space-scoped
-    /// route takes today, so a refusal is the boundary's and never the body's.
+    /// A POST or PATCH carries a valid <c>{"name": ...}</c> body - the Token-issue body, which is also a
+    /// valid Project create and rename body (story 2.1) - so a refusal is the boundary's and never the
+    /// body's.
     /// </remarks>
     public Task<WireResponse> SendAsync(IsolationSurface surface, HttpMethod method, string path)
     {
@@ -227,11 +245,34 @@ public sealed class ProductActor
             (IsolationSurface.Session, "GET") => Session.GetAsync(path),
             (IsolationSurface.Session, "POST") => Session.PostAsync(path, ValidBody()),
             (IsolationSurface.Session, "DELETE") => Session.DeleteAsync(path),
+            (IsolationSurface.Session, "PATCH") => Session.SendWithHeadersAsync(HttpMethod.Patch, path, ValidBody(), NoHeaders),
             (IsolationSurface.ApiToken, "GET") => _script.GetWithTokenAsync(path, TokenPlaintext),
             (IsolationSurface.ApiToken, "POST") => _script.PostWithTokenAsync(path, ValidBody(), TokenPlaintext),
             (IsolationSurface.ApiToken, "DELETE") => _script.DeleteWithTokenAsync(path, TokenPlaintext),
+            (IsolationSurface.ApiToken, "PATCH") => _script.SendWithTokenAndHeadersAsync(HttpMethod.Patch, path, TokenPlaintext, ValidBody(), NoHeaders),
             _ => throw new ArgumentOutOfRangeException(nameof(method), $"{surface} {method} is not a surface request this harness sends."),
         };
+    }
+
+    /// <summary>
+    /// Sends as this actor on <paramref name="surface"/> with a body of the case's choosing and extra
+    /// headers (an <c>Idempotency-Key</c>). The Session surface still sends the cookie and, on a
+    /// state-changing method, the anti-forgery header; the Token surface still sends the bearer alone.
+    /// Added by the story 2.1 ATDD run (Task 9: the body-carrying overload).
+    /// </summary>
+    /// <param name="surface">Which surface.</param>
+    /// <param name="method">The method.</param>
+    /// <param name="path">The route.</param>
+    /// <param name="body">The body.</param>
+    /// <param name="headers">Extra headers, or <c>null</c> for none.</param>
+    /// <returns>The answer.</returns>
+    public Task<WireResponse> SendAsync(IsolationSurface surface, HttpMethod method, string path, HttpContent body, IReadOnlyDictionary<string, string>? headers)
+    {
+        ArgumentNullException.ThrowIfNull(method);
+
+        return surface == IsolationSurface.ApiToken
+            ? _script.SendWithTokenAndHeadersAsync(method, path, TokenPlaintext, body, headers ?? NoHeaders)
+            : Session.SendWithHeadersAsync(method, path, body, headers ?? NoHeaders, withAntiforgeryToken: method != HttpMethod.Get);
     }
 
     /// <summary>
@@ -263,7 +304,7 @@ public sealed class ProductActor
     /// The same request with no credential at all: no cookie, no bearer, no anti-forgery header.
     /// </summary>
     /// <param name="client">A client bound to the Host.</param>
-    /// <param name="method">GET, POST or DELETE.</param>
+    /// <param name="method">GET, POST, PATCH or DELETE.</param>
     /// <param name="path">The route.</param>
     /// <returns>The answer.</returns>
     public static Task<WireResponse> SendWithoutCredentialAsync(HttpClient client, HttpMethod method, string path)
@@ -277,6 +318,7 @@ public sealed class ProductActor
             "GET" => anonymous.GetAnonymouslyAsync(path),
             "POST" => anonymous.PostAsync(path, ValidBody(), withAntiforgeryToken: false),
             "DELETE" => anonymous.DeleteAsync(path, withAntiforgeryToken: false, attachCookies: false),
+            "PATCH" => anonymous.SendWithHeadersAsync(HttpMethod.Patch, path, ValidBody(), NoHeaders, withAntiforgeryToken: false),
             _ => throw new ArgumentOutOfRangeException(nameof(method), $"{method} is not a request this harness sends."),
         };
     }

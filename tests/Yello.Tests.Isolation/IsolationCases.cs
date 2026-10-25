@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Json;
 using System.Text.Json;
 using Xunit;
 using Yello.Contracts;
@@ -21,12 +22,12 @@ namespace Yello.Tests.Isolation;
 /// </para>
 /// <para>
 /// <b>A case never branches on the surface.</b> It reads its expectation from the row; the only
-/// surface-shaped code is <see cref="ProductActor.SendAsync"/>, which sends what each surface sends.
+/// surface-shaped code is <see cref="ProductActor.SendAsync(IsolationSurface, HttpMethod, string)"/>, which sends what each surface sends.
 /// </para>
 /// <para>
 /// <b>Rows owned by a later story are rows too</b>, with <see cref="IsolationCase.PendingUntil"/> naming
-/// it. They execute as nothing, and <c>IsolationCaseListTests</c> fails the suite once that story is no
-/// longer <c>backlog</c> while the row is still pending.
+/// it. They execute as nothing, and <c>IsolationCaseListTests</c> fails the suite once that story reaches
+/// <c>review</c> (or any status past <c>in-progress</c>) while the row is still pending - story 2.1 Q1 (c).
 /// </para>
 /// <para>
 /// <b>Two cross-cutting invariants are not rows</b>, because they are not requests: I-13 (no Space name
@@ -153,12 +154,84 @@ internal static class IsolationCases
                 world.B.SpaceId)),
             Both(new BoundaryNotFound())),
 
+        // Story 2.1 - the Project routes (AC8, Task 9). Pending until 2.1, with the rows' real requests and
+        // expectations already written: activation is removing PendingUntil and PendingReason and replacing
+        // ProjectRouteScaffold with ProjectRoutes. GATE-003 fails the suite if 2.1 reaches review first.
         new(
-            "ISO-RECORD-KIND-INSUFFICIENT-ROLE", "AC6, NFR-7", IsolationVector.RecordKind, HttpMethod.Get, SpaceRoutes.Active,
-            world => throw new InvalidOperationException("Pending until 2.1."),
-            Both(new Pending("403 for a Role below the route's capability, with one InsufficientRole row, distinguishable from CrossSpace")),
+            "ISO-RECORD-KIND-INSUFFICIENT-ROLE", "AC6 (1.9), NFR-7, V-1", IsolationVector.RecordKind, HttpMethod.Post, ProjectRouteScaffold.Collection,
+            ViewerCreatesAProjectAsync,
+            Both(new RoleRefused("manage-projects") { Then = NoProjectWrittenAsync }),
             PendingUntil: "2.1",
-            PendingReason: "No route a Session or Token reaches today is refused for a Role (story 1.6 decision 4); the first wire 403 is story 2.1's. The filter is proved in-process by SpaceBoundaryPipelineTests."),
+            PendingReason: PendingProjectRoutes),
+
+        new(
+            "ISO-DIRECT-PROJECTS", "I-1, I-3", IsolationVector.DirectIdentifier, HttpMethod.Get, ProjectRouteScaffold.Collection,
+            async world =>
+            {
+                await SeedProjectAsync(world.B);
+
+                return await ForeignAsync(world, ProjectRouteScaffold.ListIn);
+            },
+            Both(new BoundaryNotFound()),
+            PendingUntil: "2.1",
+            PendingReason: PendingProjectRoutes),
+
+        new(
+            "ISO-LIST-PROJECTS-AGGREGATE", "I-3, FR-18", IsolationVector.Aggregate, HttpMethod.Get, ProjectRouteScaffold.Collection,
+            async world =>
+            {
+                await SeedProjectAsync(world.A);
+                await SeedProjectAsync(world.B);
+
+                return await OwnAsync(world, ProjectRouteScaffold.ListIn(world.A.SpaceId));
+            },
+            Both(new Served(HttpStatusCode.OK, ListsExactlyTheCallersProjectsAsync, "200, exactly SA's Project ids, none of SB's")),
+            PendingUntil: "2.1",
+            PendingReason: PendingProjectRoutes),
+
+        new(
+            "ISO-WRITE-PROJECT", "I-2", IsolationVector.Write, HttpMethod.Post, ProjectRouteScaffold.Collection,
+            async world =>
+            {
+                await SeedProjectAsync(world.B);
+
+                return await ForeignAsync(world, ProjectRouteScaffold.ListIn, HttpMethod.Post);
+            },
+            Both(new BoundaryNotFound { Then = NothingWrittenInTheForeignSpaceAsync }),
+            PendingUntil: "2.1",
+            PendingReason: PendingProjectRoutes),
+
+        new(
+            "ISO-RENAME-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Patch, ProjectRouteScaffold.Item,
+            async world =>
+            {
+                var foreign = await SeedProjectAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Patch,
+                    [new(ProjectRouteScaffold.ProjectOf(world.B.SpaceId, foreign), ProjectRouteScaffold.ProjectOf(Guid.NewGuid(), foreign))],
+                    world.B.SpaceId);
+            },
+            Both(new BoundaryNotFound { Then = NothingWrittenInTheForeignSpaceAsync }),
+            PendingUntil: "2.1",
+            PendingReason: PendingProjectRoutes),
+
+        new(
+            "ISO-RENAME-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Patch, ProjectRouteScaffold.Item,
+            async world =>
+            {
+                var foreign = await SeedProjectAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Patch,
+                    [new(ProjectRouteScaffold.ProjectOf(world.A.SpaceId, foreign), ProjectRouteScaffold.ProjectOf(world.A.SpaceId, Guid.NewGuid()))],
+                    TargetSpaceId: null);
+            },
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = NothingWrittenInTheForeignSpaceAsync }),
+            PendingUntil: "2.1",
+            PendingReason: PendingProjectRoutes),
 
         new(
             "ISO-TIMING-BOUNDARY", "I-6", IsolationVector.Timing, HttpMethod.Get, SpaceRoutes.Active,
@@ -190,6 +263,20 @@ internal static class IsolationCases
             Both(new EachSeesOnlyItsOwnOnOneConnection()),
             Runner: CaseRunner.Pooled),
     ];
+
+    /// <summary>
+    /// Why the story 2.1 rows are pending, and what activates them.
+    /// </summary>
+    private const string PendingProjectRoutes =
+        "red: AC8 - the Project routes do not exist until story 2.1 Task 5. Activate by removing PendingUntil and PendingReason and replacing ProjectRouteScaffold with ProjectRoutes (Task 9).";
+
+    /// <summary>
+    /// The name every case's write body carries (<c>ProductActor</c>'s valid body): a Project created or
+    /// renamed by a refused request would carry it.
+    /// </summary>
+    private const string CaseBodyName = "from an isolation case";
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     /// <summary>
     /// The fallback the Host maps under <c>/api</c> for any unmatched path.
@@ -262,6 +349,76 @@ internal static class IsolationCases
         owner.HoldsSpaceNamed(secondName);
 
         return new CaseRequest(owner, HttpMethod.Get, [new(SpaceRoutes.ActiveOf(second), SpaceRoutes.ActiveOf(Guid.NewGuid()))], second);
+    }
+
+    /// <summary>
+    /// Creates a Project in <paramref name="owner"/>'s Personal Space through the product, with a name
+    /// unique to this call, and adds the name to the owner's secrets (I-17: a Project name never belongs
+    /// in a log). The request is sent after the case's log cursor, so its slice is checked too.
+    /// </summary>
+    /// <param name="owner">The actor.</param>
+    /// <returns>The Project's id.</returns>
+    private static async Task<Guid> SeedProjectAsync(ProductActor owner)
+    {
+        var name = $"Project {Guid.NewGuid():N}";
+
+        owner.HoldsProjectNamed(name);
+
+        var created = await owner.SendAsync(
+            IsolationSurface.Session,
+            HttpMethod.Post,
+            ProjectRouteScaffold.ListIn(owner.SpaceId),
+            JsonContent.Create(new { name }, options: JsonOptions),
+            headers: null);
+
+        Assert.True(created.StatusCode == HttpStatusCode.Created, $"Seeding a Project through the product: {created.StatusCode} {created.Body}");
+
+        using var document = JsonDocument.Parse(created.Body);
+
+        return document.RootElement.GetProperty("id").GetGuid();
+    }
+
+    /// <summary>
+    /// A fresh Account demoted to Viewer in its own Personal Space, so its Session and its Token (bound to
+    /// that Space) both hold exactly the Viewer Role there; the request is a Project creation in it.
+    /// <c>UX_Membership_SpaceId_Owner</c> is a filtered unique index and permits a Space with no Owner.
+    /// </summary>
+    private static async Task<CaseRequest> ViewerCreatesAProjectAsync(IsolationWorld world)
+    {
+        var viewer = await world.NewActorAsync("Vi");
+
+        await world.Database.ChangeRoleAsync(viewer.SpaceId, viewer.AccountId, "viewer");
+
+        return new CaseRequest(viewer, HttpMethod.Post, [new(ProjectRouteScaffold.ListIn(viewer.SpaceId), ProjectRouteScaffold.ListIn(viewer.SpaceId))], viewer.SpaceId);
+    }
+
+    private static async Task NoProjectWrittenAsync(IsolationWorld world, CaseRequest request) =>
+        Assert.Empty(await world.Database.ProjectsInAsync(request.Actor.SpaceId));
+
+    /// <summary>
+    /// B's Space holds Projects (the anchor: the seed landed), and none of them carries the refused
+    /// request's name - nothing was created there, and nothing was renamed to it.
+    /// </summary>
+    private static async Task NothingWrittenInTheForeignSpaceAsync(IsolationWorld world, CaseRequest request)
+    {
+        var theirs = await world.Database.ProjectsInAsync(world.B.SpaceId);
+
+        Assert.NotEmpty(theirs);
+        Assert.DoesNotContain(theirs, project => string.Equals(project.Name, CaseBodyName, StringComparison.Ordinal));
+    }
+
+    private static async Task ListsExactlyTheCallersProjectsAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
+    {
+        var listed = Ids(answer.Body);
+        var own = await world.Database.ProjectsInAsync(world.A.SpaceId);
+        var theirs = await world.Database.ProjectsInAsync(world.B.SpaceId);
+
+        // Anchored both ways: A's Space holds Projects and so does B's, so "none of B's" is about something.
+        Assert.NotEmpty(own);
+        Assert.NotEmpty(theirs);
+        Assert.Equal(own.Select(project => project.Id).Order(), listed.Order());
+        Assert.Empty(listed.Intersect(theirs.Select(project => project.Id)));
+        Assert.All(theirs, project => Assert.DoesNotContain(project.Name, answer.Body, StringComparison.Ordinal));
     }
 
     private static async Task NoTokenWrittenInTheForeignSpaceAsync(IsolationWorld world, CaseRequest request) =>

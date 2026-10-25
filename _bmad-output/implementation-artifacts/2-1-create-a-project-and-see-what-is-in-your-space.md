@@ -343,6 +343,39 @@ The dev phase takes these as **reversible, recorded decisions** in the Completio
 12. **How the client knows a Role lacks `ManageProjects`.** (a) A client predicate over the Role's stable code, held against `RoleCapabilityMatrix` by an architecture gate (the pattern `SpaceSwitcherGateTests` already uses for the Role copy). (b) The server adds the permitted capability codes to `GET /spaces/{id}` — one source of truth, but a contract change to an epic-1 route and its isolation rows. **Recommend (a).**
 13. **The in-Space not-found arm** (`deferred-work.md:291`, `ISO-TIMING-IN-SPACE`). Rename is the first by-id lookup inside a Space, and its not-found does no refusal write, so it is likely separable from a boundary `404` by duration (1.6 measured the write at about half a boundary refusal's cost). (a) Keep the timing row pending for 2.2, make the bodies byte-identical now (`ISO-RENAME-FOREIGN-ID-IN-OWN-SPACE`), measure and record the gap in the Debug Log, and update the row's reason and the ledger. (b) Convert `ISO-TIMING-IN-SPACE` here on the rename route and equalise the work — a design decision about what the in-Space path does to cost the same, taken under a story whose subject is Projects. **Recommend (a)**; SM-1 is a release gate and nothing ships between 2.1 and 2.2.
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+**Checklist:** `_bmad-output/test-artifacts/atdd-checklist-2-1-create-a-project-and-see-what-is-in-your-space.md` (scenario map, seed constraints checked, plants, activation order).
+
+**Task 1 gate correction applied in ATDD; dev verifies.** `tests/Yello.Tests.Isolation/IsolationCaseListTests.cs`: GATE-003 is now `Every_pending_row_names_a_story_that_has_not_yet_reached_review` - Q1 (c), a pending row passes while its story is `backlog`, `ready-for-dev` or `in-progress` and fails at `review`, `done` or any other status. The `pending.Count >= 2` vacuity guard is replaced by the `1-9-` status-file check plus three permanent oracle tests over synthetic rows and an in-memory status source (10 cases), sharing one function (`StalePendingRows`) with the live gate. Planted: `2-1` set to `review` in `sprint-status.yaml` (restored in a `finally`, hash matched) - all six 2.1 rows reported. Dev still owns: verify, record Q1 (c) in the Completion Notes, close `deferred-work.md:411`.
+
+| File | Cases | ACs | Today |
+|---|---|---|---|
+| `tests/Yello.Tests.Isolation/IsolationCaseListTests.cs` | GATE-003 corrected + 10 oracle cases | AC12 | **green, standing gate** |
+| `tests/Yello.Tests.Isolation/IsolationCases.cs` (+ `RoleRefused` in `Expectation.cs`) | 6 rows x 2 surfaces: `ISO-RECORD-KIND-INSUFFICIENT-ROLE` (converted shape), `ISO-DIRECT-PROJECTS`, `ISO-LIST-PROJECTS-AGGREGATE`, `ISO-WRITE-PROJECT`, `ISO-RENAME-FOREIGN-SPACE`, `ISO-RENAME-FOREIGN-ID-IN-OWN-SPACE` | AC8, AC4, AC7 | pending until 2.1 (real `Prepare` and expectations; activate by deleting `PendingUntil`/`PendingReason`) |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.cs` | 14 (12 entries) | AC2, AC3, AC4, AC6, AC8, AC11 | skipped |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.Bound.cs` | 3 | AC5, AC9 | skipped |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.Idempotency.cs` | 7 (6 entries) | AC9 | skipped |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.Schema.cs` | 4 | AC6, AC7, AC9 | skipped |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Projects.cs` | 7 | AC7, AC9, AC10, AC13 | `Nothing_but_the_pipeline_reads_the_bound_registry` **green, standing gate, planted**; 6 skipped |
+| `tests/Yello.Tests.Client/SpaceHomeProjectsTests.cs` | 7 | AC1, AC2, AC3, AC4, AC5, AC9, AC13 | skipped |
+
+Harness added (test code): `tests/Yello.Tests.Shared/ProjectRouteScaffold.cs` (the routes and problem types until `Yello.Contracts.Projects` exists - replace every use and delete it), `WireSession.SendWithHeadersAsync`/`SendWithTokenAndHeadersAsync`, `ProductActor` `PATCH` support plus the body-carrying `SendAsync` overload and `HoldsProjectNamed` (Task 9's overload: verify, do not rewrite), `WireDatabase.ProjectsInAsync`, and the Project routes in `FakeYelloApi`. `RefusalBoundaryGateTests` is now `partial`.
+
+Run at the end of the phase: `dotnet build Yello.slnx` 0 warnings, 0 errors; `dotnet test Yello.slnx --no-build` **601 total, 560 passed, 0 failed, 41 skipped** (`YELLO_MIGRATION_BUNDLE` unset).
+
+**Activation order** - riskiest assumption first:
+
+1. `Moving_a_Project_to_another_Space_is_refused_by_the_database`, then `Project_carries_a_non_nullable_SpaceId_under_the_Space_policy_with_both_block_predicates` (Task 3). They test the assumption the rest stands on and that nothing here has exercised: a `BLOCK ... AFTER UPDATE` predicate added to the shared policy in an expand-only migration refuses a `SpaceId` change (error 33504) while the foreign key is satisfied. Then widen `SpaceIsolationSchemaTests.Every_Space_scoped_table_carries_a_filter_and_a_block_predicate` for `Project`'s third predicate only, and activate `Project_has_a_unique_key_on_SpaceId_and_Id_for_composite_references` and `A_Projects_Space_can_only_be_set_when_it_is_created`.
+2. Create, rename, list slices (Tasks 4-5), then `No_route_moves_a_Project` and `No_Project_request_contract_carries_anything_but_a_name`.
+3. The six isolation rows (Task 9), `ISO-RECORD-KIND-INSUFFICIENT-ROLE` first; then the Viewer and not-found slices.
+4. `A_Token_creates_a_Project_without_antiforgery_and_a_Session_without_the_header_is_refused`, `An_unmapped_method_on_a_Project_route_answers_404_with_no_Allow_header` (Task 8).
+5. The 51st, then the concurrent pair, then `Only_the_pipeline_depends_on_the_bound_count_port` (Task 6).
+6. Idempotency (Task 7): the Token issuance replay first (NFR-6, high), then the rest, `Replaying_the_key_of_the_50th_creation_returns_its_201_not_the_bound_409`, the record's schema case, `Only_the_pipeline_depends_on_the_idempotency_port`.
+7. Client (Task 10) with `The_clients_Project_controls_predicate_agrees_with_the_capability_matrix`.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

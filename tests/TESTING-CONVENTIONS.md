@@ -497,8 +497,11 @@ except a short named list (registration, sign-in, sign-out, the current Session,
 token, the unmatched fallback), each with its reason, and each still mapped - **so a new Space or
 Account route needs an isolation row on both surfaces before the suite goes green**, whatever its
 parameter is called. The route table is read from the Host's own endpoint data source, in process,
-not from a hand list, and a row must send a request on the route it names. A row pending a later story names that story, and fails the suite once the
-story leaves `backlog`.
+not from a hand list, and a row must send a request on the route it names. A row pending a later story names that story and a reason, and fails the suite
+once the story reaches `review` (it may stay pending while the story is `backlog`, `ready-for-dev` or
+`in-progress`; any other status fails). Story 2.1 Q1 (c) corrected this from "leaves `backlog`", which
+turned the suite red at the create-story commit, before anyone could convert the row. The gate's
+oracle runs against synthetic rows, so it does not depend on how many real rows are pending.
 
 **The harness is shared, and seeds through the product.** `HostProcess` and `WireSession` moved from
 the slice suite into `Yello.Tests.Shared`, beside `RunningHost` (one Host process per test class, with

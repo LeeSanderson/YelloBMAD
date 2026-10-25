@@ -343,6 +343,48 @@ internal sealed record EachSeesOnlyItsOwnOnOneConnection() : Expectation("altern
 }
 
 /// <summary>
+/// The capability <c>403</c> (AD-3, AD-20, NFR-7, V-1): every path answers <c>403 insufficient-role</c>
+/// naming <paramref name="Capability"/>, adds exactly one <c>InsufficientRole</c> row and no
+/// <c>CrossSpace</c> row for (actor, Space), and the body discloses nothing (I-13). Written by the story
+/// 2.1 ATDD run for <c>ISO-RECORD-KIND-INSUFFICIENT-ROLE</c>, the first wire <c>403</c>.
+/// </summary>
+/// <param name="Capability">The capability's stable code, for example <c>manage-projects</c>.</param>
+internal sealed record RoleRefused(string Capability) : Expectation("403 insufficient-role, one InsufficientRole row, no CrossSpace row")
+{
+    private static readonly System.Text.Json.JsonSerializerOptions JsonOptions = new(System.Text.Json.JsonSerializerDefaults.Web);
+
+    /// <inheritdoc />
+    protected override async Task VerifyCoreAsync(IsolationWorld world, CaseRequest request, IsolationSurface surface)
+    {
+        var target = request.TargetSpaceId ?? throw new InvalidOperationException("A capability refusal needs the Space in its route.");
+        var before = await world.Database.RefusalKindsAsync(request.Actor.AccountId, target);
+
+        foreach (var (path, _) in request.Paths)
+        {
+            var answer = await request.Actor.SendAsync(surface, request.Method, path);
+
+            Assert.True(answer.StatusCode == HttpStatusCode.Forbidden, $"{path}: {answer.StatusCode} {answer.Body}");
+
+            var problem = System.Text.Json.JsonSerializer.Deserialize<Yello.Contracts.ProblemResponse>(answer.Body, JsonOptions);
+
+            Assert.Equal(Yello.Contracts.ProblemTypes.InsufficientRole, problem?.Type);
+            Assert.Equal(Capability, problem?.Capability);
+            AssertDisclosesNothing(world, answer, path);
+        }
+
+        var after = await world.Database.RefusalKindsAsync(request.Actor.AccountId, target);
+
+        Assert.Equal(before.Count + request.Paths.Count, after.Count);
+        Assert.Equal(
+            before.Count(kind => kind == IsolationCases.InsufficientRole) + request.Paths.Count,
+            after.Count(kind => kind == IsolationCases.InsufficientRole));
+        Assert.Equal(
+            before.Count(kind => kind == IsolationCases.CrossSpace),
+            after.Count(kind => kind == IsolationCases.CrossSpace));
+    }
+}
+
+/// <summary>
 /// A row owned by a later story. It is never executed; it states what the surface will get.
 /// </summary>
 /// <param name="WillBe">What the surface will get once the owning story builds the route.</param>

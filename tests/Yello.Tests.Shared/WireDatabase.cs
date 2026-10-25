@@ -103,6 +103,33 @@ public sealed class WireDatabase(string connectionString)
             System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>
+    /// Every Project in <paramref name="spaceId"/>, as (id, name), read under that Space's own key - the
+    /// database's view, independent of the Host's query filter. Added by the story 2.1 ATDD run; the
+    /// columns are the ones story 2.1 Task 3 names (<c>dbo.Project.Id</c>, <c>SpaceId</c>, <c>Name</c>).
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>Its Projects.</returns>
+    public async Task<IReadOnlyList<(Guid Id, string Name)>> ProjectsInAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT Id, Name FROM dbo.[Project] WHERE SpaceId = @space";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+
+        var projects = new List<(Guid Id, string Name)>();
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            projects.Add((reader.GetGuid(0), reader.GetString(1)));
+        }
+
+        return projects;
+    }
+
+    /// <summary>
     /// A second Space owned by <paramref name="accountId"/>: the <c>Space</c> row, then its Owner
     /// <c>Membership</c>, under that Space's key (no endpoint creates a Space yet).
     /// </summary>

@@ -49,7 +49,7 @@ namespace Yello.Tests.Architecture;
 [Trait("Requirement", "AD-3")]
 [Trait("Requirement", "AD-25")]
 [Trait("Requirement", "NFR-8")]
-public sealed class RefusalBoundaryGateTests
+public sealed partial class RefusalBoundaryGateTests
 {
     private const string PipelineTypeName = "Yello.Host.Spaces.ActiveSpaceResolution";
 

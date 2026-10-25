@@ -87,22 +87,120 @@ public sealed class IsolationCaseListTests
     }
 
     /// <summary>
-    /// 1.9-GATE-003 / AC8 - a row deferred to a later story names that story and a reason, and the story
-    /// is still <c>backlog</c>, so a pending row cannot outlive its story silently.
+    /// The statuses a story may hold while one of its isolation rows is still pending: the story has not
+    /// yet handed its work to review. Story 2.1 Q1 (c), <c>deferred-work.md:411</c>.
+    /// </summary>
+    /// <remarks>
+    /// <b>Why not "still backlog".</b> 1.9 wrote the rule as "the story is still <c>backlog</c>", so the
+    /// create-story phase - which by rule changes no test code - turned the suite red the moment it set
+    /// <c>ready-for-dev</c>, a commit before anyone could convert the row. A row owed by a story is owed
+    /// by its dev phase, and the dev phase ends by setting <c>review</c>; so the gate fails from
+    /// <c>review</c> on, on the phase that owes the conversion. Any status not named here, including one
+    /// this list has never heard of, fails: the gate is closed by default.
+    /// </remarks>
+    internal static readonly string[] StatusesWhileARowMayBePending = ["backlog", "ready-for-dev", "in-progress"];
+
+    /// <summary>
+    /// 1.9-GATE-003 / AC8, rule corrected by story 2.1 Q1 (c) (AC12) - a row deferred to a later story
+    /// names that story and a reason, and the story is still <c>backlog</c>, <c>ready-for-dev</c> or
+    /// <c>in-progress</c>; at <c>review</c>, <c>done</c> or any other status the row must have been
+    /// converted, so a pending row cannot outlive the dev phase of its story.
     /// </summary>
     [Fact]
-    public void Every_pending_row_names_a_story_that_is_still_in_backlog()
+    public void Every_pending_row_names_a_story_that_has_not_yet_reached_review()
     {
         var statuses = SprintStatuses();
-        var pending = IsolationCases.All.Where(@case => @case.PendingUntil is not null).ToList();
 
-        // Vacuity guard: story 1.9 lands at least two pending rows (2.1 and 2.2), and the status file was read.
-        Assert.True(pending.Count >= 2, $"Expected the 2.1 and 2.2 pending rows; found {pending.Count}.");
+        // Vacuity guard: the status file was read, and holds a story known to exist. It does not depend on
+        // how many rows happen to be pending - 2.1 and 2.2 convert theirs, and none may be left. That the
+        // gate reports what it should is proved against synthetic rows below, not against the live list.
         Assert.Contains(statuses, entry => entry.Key.StartsWith("1-9-", StringComparison.Ordinal));
 
+        var stale = StalePendingRows(IsolationCases.All, statuses);
+
+        Assert.True(stale.Count == 0, string.Join(Environment.NewLine, stale));
+    }
+
+    /// <summary>
+    /// GATE-003's own oracle (story 2.1 Task 1) - a synthetic pending row, against an in-memory status
+    /// source, passes while its story is before review and is reported from <c>review</c> on, and for a
+    /// status the gate does not know.
+    /// </summary>
+    /// <param name="status">The owning story's status.</param>
+    /// <param name="reported">Whether the gate must report the row.</param>
+    [Theory]
+    [InlineData("backlog", false)]
+    [InlineData("ready-for-dev", false)]
+    [InlineData("in-progress", false)]
+    [InlineData("review", true)]
+    [InlineData("done", true)]
+    [InlineData("optional", true)]
+    public void The_pending_row_gate_reports_a_row_whose_story_has_reached_review(string status, bool reported)
+    {
+        var statuses = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["9-9-a-synthetic-story"] = status,
+        };
+
+        var stale = StalePendingRows([SyntheticPendingRow("9.9", "a synthetic reason")], statuses);
+
+        Assert.Equal(reported ? 1 : 0, stale.Count);
+
+        if (reported)
+        {
+            Assert.Contains($"'{status}'", stale[0], StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
+    /// GATE-003's oracle - a pending row naming a story the status file does not hold is reported.
+    /// </summary>
+    [Fact]
+    public void The_pending_row_gate_reports_a_row_whose_story_is_not_in_the_status_file()
+    {
+        var statuses = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["9-9-a-synthetic-story"] = "backlog",
+        };
+
+        var stale = StalePendingRows([SyntheticPendingRow("9.8", "a synthetic reason")], statuses);
+
+        Assert.Contains("not a story in sprint-status.yaml", Assert.Single(stale), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// GATE-003's oracle - a pending row with no reason is reported even while its story is backlog.
+    /// </summary>
+    /// <param name="reason">A missing or blank reason.</param>
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void The_pending_row_gate_reports_a_row_with_no_reason(string? reason)
+    {
+        var statuses = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["9-9-a-synthetic-story"] = "backlog",
+        };
+
+        var stale = StalePendingRows([SyntheticPendingRow("9.9", reason)], statuses);
+
+        Assert.Contains("with no reason", Assert.Single(stale), StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// GATE-003's rule, over any list and any status source, so the live gate and its oracle run the same
+    /// code: one line per pending row that names no story, gives no reason, or names a story that is no
+    /// longer in <see cref="StatusesWhileARowMayBePending"/>.
+    /// </summary>
+    /// <param name="cases">The rows.</param>
+    /// <param name="statuses">Story key to status.</param>
+    /// <returns>The stale rows, described.</returns>
+    internal static List<string> StalePendingRows(IEnumerable<IsolationCase> cases, IReadOnlyDictionary<string, string> statuses)
+    {
         var stale = new List<string>();
 
-        foreach (var @case in pending)
+        foreach (var @case in cases.Where(@case => @case.PendingUntil is not null))
         {
             var story = @case.PendingUntil!;
             var prefix = story.Replace('.', '-') + "-";
@@ -117,18 +215,32 @@ public sealed class IsolationCaseListTests
             {
                 stale.Add($"{@case.Id}: pending until {story}, which is not a story in sprint-status.yaml");
             }
-            else if (!string.Equals(statuses[key], "backlog", StringComparison.Ordinal))
+            else if (!StatusesWhileARowMayBePending.Contains(statuses[key], StringComparer.Ordinal))
             {
-                stale.Add($"{@case.Id}: pending until {story}, which is now '{statuses[key]}' - convert the row");
+                stale.Add(
+                    $"{@case.Id}: pending until {story}, which is now '{statuses[key]}' - a row may stay pending only while its "
+                    + $"story is {string.Join(", ", StatusesWhileARowMayBePending)}; convert the row before the story reaches review");
             }
             else
             {
-                // Still backlog: the row is correctly pending.
+                // Before review: the row is correctly pending.
             }
         }
 
-        Assert.True(stale.Count == 0, string.Join(Environment.NewLine, stale));
+        return stale;
     }
+
+    private static IsolationCase SyntheticPendingRow(string story, string? reason) =>
+        new(
+            "ISO-SYNTHETIC-PENDING",
+            "GATE-003 oracle",
+            IsolationVector.RecordKind,
+            HttpMethod.Get,
+            SpaceRoutes.Active,
+            _ => throw new InvalidOperationException("A synthetic row is never executed."),
+            Enum.GetValues<IsolationSurface>().ToDictionary<IsolationSurface, IsolationSurface, Expectation>(surface => surface, _ => new Pending("synthetic")),
+            PendingUntil: story,
+            PendingReason: reason);
 
     /// <summary>
     /// 1.9-GATE-004 / AC1, AC8 - the theory data is generated from the list as exactly
