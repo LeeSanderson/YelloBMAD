@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Xunit;
+using Yello.Contracts;
 using Yello.Contracts.ApiTokens;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
@@ -30,7 +31,7 @@ public sealed partial class ProjectEndpointTests
     /// </summary>
     /// <param name="surface">The surface the create and its replay are sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - the idempotency behaviour does not exist until story 2.1 Task 7")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AR-25")]
@@ -67,7 +68,7 @@ public sealed partial class ProjectEndpointTests
     /// applies nothing: a silent "new request" would defeat the guarantee.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the idempotency behaviour does not exist until story 2.1 Task 7")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     public async Task The_same_key_with_a_different_request_is_refused_422_and_applies_nothing()
     {
@@ -86,7 +87,7 @@ public sealed partial class ProjectEndpointTests
 
         Assert.NotNull(owner);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, reused?.StatusCode);
-        Assert.Equal(ProjectRouteScaffold.IdempotencyKeyReused, Problem(reused!)?.Type);
+        Assert.Equal(ProblemTypes.IdempotencyKeyReused, Problem(reused!)?.Type);
         Assert.Equal(["First"], (await ProjectRowsAsync(database, owner.SpaceId)).Select(row => row.Name));
     }
 
@@ -95,7 +96,7 @@ public sealed partial class ProjectEndpointTests
     /// replayed after the Project was renamed still answers the name it was created with.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the idempotency behaviour does not exist until story 2.1 Task 7")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     public async Task A_replay_after_a_rename_returns_the_original_response_not_the_current_state()
     {
@@ -125,7 +126,7 @@ public sealed partial class ProjectEndpointTests
     /// a first use there, not a replay of the first Account's record.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the idempotency behaviour does not exist until story 2.1 Task 7")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "NFR-1")]
     public async Task A_key_used_by_another_Account_in_its_own_Space_is_not_a_replay_of_the_first()
@@ -160,7 +161,7 @@ public sealed partial class ProjectEndpointTests
     /// 255 characters is accepted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the idempotency behaviour does not exist until story 2.1 Task 7")]
+    [Fact]
     [Trait("Priority", "P1")]
     public async Task A_key_longer_than_255_characters_is_refused_400_and_nothing_is_written()
     {
@@ -189,7 +190,7 @@ public sealed partial class ProjectEndpointTests
     /// anywhere - the idempotency record included - holds the plaintext or its secret half.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the idempotency behaviour and the secret-carrying marker do not exist until story 2.1 Task 7")]
+    [Fact]
     [Trait("Requirement", "NFR-6")]
     [Trait("Requirement", "AD-6")]
     [Trait("Requirement", "AD-18")]

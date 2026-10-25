@@ -4,6 +4,7 @@ using System.Text.Json;
 using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.ApiTokens;
+using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
 using Yello.Tests.Shared;
 
@@ -154,55 +155,46 @@ internal static class IsolationCases
                 world.B.SpaceId)),
             Both(new BoundaryNotFound())),
 
-        // Story 2.1 - the Project routes (AC8, Task 9). Pending until 2.1, with the rows' real requests and
-        // expectations already written: activation is removing PendingUntil and PendingReason and replacing
-        // ProjectRouteScaffold with ProjectRoutes. GATE-003 fails the suite if 2.1 reaches review first.
+        // Story 2.1 - the Project routes (AC8, Task 9), each on both surfaces. ISO-RECORD-KIND-INSUFFICIENT-ROLE
+        // is the first wire 403: a Viewer's Session and a Viewer's Token creating a Project.
         new(
-            "ISO-RECORD-KIND-INSUFFICIENT-ROLE", "AC6 (1.9), NFR-7, V-1", IsolationVector.RecordKind, HttpMethod.Post, ProjectRouteScaffold.Collection,
+            "ISO-RECORD-KIND-INSUFFICIENT-ROLE", "AC6 (1.9), NFR-7, V-1", IsolationVector.RecordKind, HttpMethod.Post, ProjectRoutes.Create,
             ViewerCreatesAProjectAsync,
-            Both(new RoleRefused("manage-projects") { Then = NoProjectWrittenAsync }),
-            PendingUntil: "2.1",
-            PendingReason: PendingProjectRoutes),
+            Both(new RoleRefused("manage-projects") { Then = NoProjectWrittenAsync })),
 
         new(
-            "ISO-DIRECT-PROJECTS", "I-1, I-3", IsolationVector.DirectIdentifier, HttpMethod.Get, ProjectRouteScaffold.Collection,
+            "ISO-DIRECT-PROJECTS", "I-1, I-3", IsolationVector.DirectIdentifier, HttpMethod.Get, ProjectRoutes.List,
             async world =>
             {
                 await SeedProjectAsync(world.B);
 
-                return await ForeignAsync(world, ProjectRouteScaffold.ListIn);
+                return await ForeignAsync(world, ProjectRoutes.ListIn);
             },
-            Both(new BoundaryNotFound()),
-            PendingUntil: "2.1",
-            PendingReason: PendingProjectRoutes),
+            Both(new BoundaryNotFound())),
 
         new(
-            "ISO-LIST-PROJECTS-AGGREGATE", "I-3, FR-18", IsolationVector.Aggregate, HttpMethod.Get, ProjectRouteScaffold.Collection,
+            "ISO-LIST-PROJECTS-AGGREGATE", "I-3, FR-18", IsolationVector.Aggregate, HttpMethod.Get, ProjectRoutes.List,
             async world =>
             {
                 await SeedProjectAsync(world.A);
                 await SeedProjectAsync(world.B);
 
-                return await OwnAsync(world, ProjectRouteScaffold.ListIn(world.A.SpaceId));
+                return await OwnAsync(world, ProjectRoutes.ListIn(world.A.SpaceId));
             },
-            Both(new Served(HttpStatusCode.OK, ListsExactlyTheCallersProjectsAsync, "200, exactly SA's Project ids, none of SB's")),
-            PendingUntil: "2.1",
-            PendingReason: PendingProjectRoutes),
+            Both(new Served(HttpStatusCode.OK, ListsExactlyTheCallersProjectsAsync, "200, exactly SA's Project ids, none of SB's"))),
 
         new(
-            "ISO-WRITE-PROJECT", "I-2", IsolationVector.Write, HttpMethod.Post, ProjectRouteScaffold.Collection,
+            "ISO-WRITE-PROJECT", "I-2", IsolationVector.Write, HttpMethod.Post, ProjectRoutes.Create,
             async world =>
             {
                 await SeedProjectAsync(world.B);
 
-                return await ForeignAsync(world, ProjectRouteScaffold.ListIn, HttpMethod.Post);
+                return await ForeignAsync(world, ProjectRoutes.ListIn, HttpMethod.Post);
             },
-            Both(new BoundaryNotFound { Then = NothingWrittenInTheForeignSpaceAsync }),
-            PendingUntil: "2.1",
-            PendingReason: PendingProjectRoutes),
+            Both(new BoundaryNotFound { Then = NothingWrittenInTheForeignSpaceAsync })),
 
         new(
-            "ISO-RENAME-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Patch, ProjectRouteScaffold.Item,
+            "ISO-RENAME-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Patch, ProjectRoutes.Rename,
             async world =>
             {
                 var foreign = await SeedProjectAsync(world.B);
@@ -210,15 +202,13 @@ internal static class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Patch,
-                    [new(ProjectRouteScaffold.ProjectOf(world.B.SpaceId, foreign), ProjectRouteScaffold.ProjectOf(Guid.NewGuid(), foreign))],
+                    [new(ProjectRoutes.ProjectOf(world.B.SpaceId, foreign), ProjectRoutes.ProjectOf(Guid.NewGuid(), foreign))],
                     world.B.SpaceId);
             },
-            Both(new BoundaryNotFound { Then = NothingWrittenInTheForeignSpaceAsync }),
-            PendingUntil: "2.1",
-            PendingReason: PendingProjectRoutes),
+            Both(new BoundaryNotFound { Then = NothingWrittenInTheForeignSpaceAsync })),
 
         new(
-            "ISO-RENAME-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Patch, ProjectRouteScaffold.Item,
+            "ISO-RENAME-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Patch, ProjectRoutes.Rename,
             async world =>
             {
                 var foreign = await SeedProjectAsync(world.B);
@@ -226,12 +216,10 @@ internal static class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Patch,
-                    [new(ProjectRouteScaffold.ProjectOf(world.A.SpaceId, foreign), ProjectRouteScaffold.ProjectOf(world.A.SpaceId, Guid.NewGuid()))],
+                    [new(ProjectRoutes.ProjectOf(world.A.SpaceId, foreign), ProjectRoutes.ProjectOf(world.A.SpaceId, Guid.NewGuid()))],
                     TargetSpaceId: null);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = NothingWrittenInTheForeignSpaceAsync }),
-            PendingUntil: "2.1",
-            PendingReason: PendingProjectRoutes),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = NothingWrittenInTheForeignSpaceAsync })),
 
         new(
             "ISO-TIMING-BOUNDARY", "I-6", IsolationVector.Timing, HttpMethod.Get, SpaceRoutes.Active,
@@ -255,7 +243,7 @@ internal static class IsolationCases
             Both(new Pending("a boundary 404 and an in-Space not-found indistinguishable in body and duration (21 / median / 20%)")),
             Runner: CaseRunner.Timing,
             PendingUntil: "2.2",
-            PendingReason: "No route looks a resource up by id inside a Space until story 2.2; the unmatched-path fallback does no resolution and is not the work AD-3 means (Q5)."),
+            PendingReason: "Story 2.1's rename (PATCH /projects/{projectId}) is the first in-Space lookup by id, and its not-found body is already byte-identical to the boundary 404 (ISO-RENAME-FOREIGN-ID-IN-OWN-SPACE). The duration arm stays with 2.2 (story 2.1 Q13 (a)): the in-Space not-found writes no refusal record, so equalising its work with a boundary refusal is a design decision for the story that builds the Board's by-id reads."),
 
         new(
             "ISO-POOLED", "I-8", IsolationVector.PooledConnection, HttpMethod.Get, SpaceRoutes.Statuses,
@@ -263,12 +251,6 @@ internal static class IsolationCases
             Both(new EachSeesOnlyItsOwnOnOneConnection()),
             Runner: CaseRunner.Pooled),
     ];
-
-    /// <summary>
-    /// Why the story 2.1 rows are pending, and what activates them.
-    /// </summary>
-    private const string PendingProjectRoutes =
-        "red: AC8 - the Project routes do not exist until story 2.1 Task 5. Activate by removing PendingUntil and PendingReason and replacing ProjectRouteScaffold with ProjectRoutes (Task 9).";
 
     /// <summary>
     /// The name every case's write body carries (<c>ProductActor</c>'s valid body): a Project created or
@@ -367,7 +349,7 @@ internal static class IsolationCases
         var created = await owner.SendAsync(
             IsolationSurface.Session,
             HttpMethod.Post,
-            ProjectRouteScaffold.ListIn(owner.SpaceId),
+            ProjectRoutes.ListIn(owner.SpaceId),
             JsonContent.Create(new { name }, options: JsonOptions),
             headers: null);
 
@@ -389,7 +371,7 @@ internal static class IsolationCases
 
         await world.Database.ChangeRoleAsync(viewer.SpaceId, viewer.AccountId, "viewer");
 
-        return new CaseRequest(viewer, HttpMethod.Post, [new(ProjectRouteScaffold.ListIn(viewer.SpaceId), ProjectRouteScaffold.ListIn(viewer.SpaceId))], viewer.SpaceId);
+        return new CaseRequest(viewer, HttpMethod.Post, [new(ProjectRoutes.ListIn(viewer.SpaceId), ProjectRoutes.ListIn(viewer.SpaceId))], viewer.SpaceId);
     }
 
     private static async Task NoProjectWrittenAsync(IsolationWorld world, CaseRequest request) =>

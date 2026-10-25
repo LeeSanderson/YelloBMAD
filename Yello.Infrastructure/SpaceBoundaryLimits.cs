@@ -5,7 +5,8 @@ using Yello.Infrastructure.Persistence;
 namespace Yello.Infrastructure;
 
 /// <summary>
-/// Registers NFR-8's presence bound and the refusal record's retention purge. Story 1.6.
+/// Registers NFR-8's presence bound and the refusal record's retention purge (story 1.6), and the
+/// pipeline's creation-bound count and idempotency record (story 2.1).
 /// </summary>
 internal static class SpaceBoundaryLimits
 {
@@ -23,6 +24,11 @@ internal static class SpaceBoundaryLimits
     internal static IServiceCollection AddSpaceBoundaryLimits(this IServiceCollection services)
     {
         services.AddScoped<ISpacePresenceRegister, SpacePresenceRegister>();
+
+        // Story 2.1: the creation bound's count and the Idempotency-Key record - the pipeline's two
+        // other ports, on the request's own unit of work, so scoped with it.
+        services.AddScoped<IBoundCounter, BoundCounter>();
+        services.AddScoped<IIdempotencyStore, IdempotencyStore>();
         services.AddSingleton<RefusalPurgeSchedule>();
         services.AddSingleton<IRefusalRetention, AccessRefusalPurge>();
 

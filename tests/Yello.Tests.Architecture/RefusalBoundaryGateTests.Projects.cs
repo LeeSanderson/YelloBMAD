@@ -30,15 +30,13 @@ namespace Yello.Tests.Architecture;
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
 {
-    private const string BoundCountPortName = "Yello.Application.Spaces.IBoundCounter";
-    private const string IdempotencyPortName = "Yello.Application.Spaces.IIdempotencyStore";
-    private const string ProjectTypeName = "Yello.Domain.Projects.Project";
-    private const string ProjectContractsNamespace = "Yello.Contracts.Projects";
+    private static string BoundCountPortName => typeof(Yello.Application.Spaces.IBoundCounter).FullName!;
+    private static string IdempotencyPortName => typeof(Yello.Application.Spaces.IIdempotencyStore).FullName!;
+    private static string ProjectContractsNamespace => typeof(Yello.Contracts.Projects.ProjectRoutes).Namespace!;
 
-    // ProjectRoutes.List / Create and ProjectRoutes.Rename, as story 2.1 Task 4 names them. This suite does
-    // not reference Yello.Tests.Shared (and its ProjectRouteScaffold); on activation, read the contract.
-    private const string ProjectCollectionRoute = "/api/v1/spaces/{spaceId:guid}/projects";
-    private const string ProjectItemRoute = "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}";
+    private static string ProjectCollectionRoute => Yello.Contracts.Projects.ProjectRoutes.List;
+
+    private static string ProjectItemRoute => Yello.Contracts.Projects.ProjectRoutes.Rename;
 
     /// <summary>
     /// AC10, AR-30, <c>deferred-work.md:319</c> - nothing but the pipeline reads <c>BoundRegistry</c>: a
@@ -71,7 +69,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// bound-count port, so the creation bound cannot be counted inside a slice. Plant for Task 12: a
     /// handler injecting the port is caught.
     /// </summary>
-    [Fact(Skip = "red: AC10 - the bound-count port does not exist until story 2.1 Task 6")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "AR-3")]
     [Trait("Requirement", "AD-25")]
@@ -79,14 +77,14 @@ public sealed partial class RefusalBoundaryGateTests
         AssertOnlyThePipelineDependsOn(
             BoundCountPortName,
             "Yello.Infrastructure.Persistence.BoundCounter",
-            "Yello.Infrastructure.InfrastructureServices");
+            "Yello.Infrastructure.SpaceBoundaryLimits");
 
     /// <summary>
     /// AC9, A-12's idempotency clause, <c>deferred-work.md:253-256</c> - nothing but the pipeline, the
     /// store's adapter and its registration depends on the idempotency port, so no slice reads or writes
     /// an <c>Idempotency-Key</c> record. Plant for Task 12: a handler injecting the port is caught.
     /// </summary>
-    [Fact(Skip = "red: AC9 - the idempotency port does not exist until story 2.1 Task 7")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "AD-18")]
@@ -94,7 +92,7 @@ public sealed partial class RefusalBoundaryGateTests
         AssertOnlyThePipelineDependsOn(
             IdempotencyPortName,
             "Yello.Infrastructure.Persistence.IdempotencyStore",
-            "Yello.Infrastructure.InfrastructureServices");
+            "Yello.Infrastructure.SpaceBoundaryLimits");
 
     /// <summary>
     /// AC7 - every route the Host maps under a Space's <c>/projects</c> is the collection (<c>GET</c>,
@@ -102,7 +100,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Project's id, so none can move a Project. Story 2.5 adds <c>DELETE</c> on the Project and widens the
     /// permitted set by exactly that.
     /// </summary>
-    [Fact(Skip = "red: AC7 - the Project routes do not exist until story 2.1 Task 5")]
+    [Fact]
     [Trait("Requirement", "FR-17")]
     [Trait("Requirement", "AD-2")]
     public void No_route_moves_a_Project()
@@ -131,7 +129,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// route's, fixed at creation, and a body that could name another one is the leak closed by
     /// construction rather than by rule.
     /// </summary>
-    [Fact(Skip = "red: AC7 - Yello.Contracts.Projects does not exist until story 2.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "FR-17")]
     public void No_Project_request_contract_carries_anything_but_a_name()
     {
@@ -151,15 +149,12 @@ public sealed partial class RefusalBoundaryGateTests
     /// AC7, Task 11 - a Project's Space is fixed at creation in the type: <c>Project.SpaceId</c> has an
     /// <c>init</c> accessor and no ordinary setter, so no code path can assign it after construction.
     /// </summary>
-    [Fact(Skip = "red: AC7 - Yello.Domain.Projects.Project does not exist until story 2.1 Task 3")]
+    [Fact]
     [Trait("Requirement", "FR-17")]
     public void A_Projects_Space_can_only_be_set_when_it_is_created()
     {
-        var project = ProductionAssemblies.Domain.GetType(ProjectTypeName);
-
-        Assert.NotNull(project);
-
-        var setter = project.GetProperty("SpaceId", BindingFlags.Public | BindingFlags.Instance)?.SetMethod;
+        var setter = typeof(Yello.Domain.Projects.Project)
+            .GetProperty(nameof(Yello.Domain.Projects.Project.SpaceId), BindingFlags.Public | BindingFlags.Instance)?.SetMethod;
 
         Assert.NotNull(setter);
         Assert.Contains(typeof(IsExternalInit), setter.ReturnParameter.GetRequiredCustomModifiers());
@@ -171,7 +166,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The server still refuses; this gate keeps the client from offering what will be refused, or hiding
     /// what will not.
     /// </summary>
-    [Fact(Skip = "red: AC13 - the client's ManageProjects predicate does not exist until story 2.1 Task 10 (Q12)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "AD-1")]
     public void The_clients_Project_controls_predicate_agrees_with_the_capability_matrix()

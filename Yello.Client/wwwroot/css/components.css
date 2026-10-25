@@ -339,11 +339,69 @@
 }
 
 /*
-    A Space's home. Its heading only, until story 2.1 brings Projects.
+    A Space's home: its heading and its Projects (story 2.1).
 */
 .space-home {
     padding-block: var(--space-5);
     padding-inline: var(--space-4);
+}
+
+/*
+    THE PROJECT LIST. Rows are separated by spacing, not by a border: no structural border is drawn here
+    until the device-pixel snapping rule exists (deferred-work.md:66). Every row wraps, so a long name
+    or a long translation never forces a horizontal scroll at 320px.
+*/
+.project-list {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-4);
+    margin-block-start: var(--space-4);
+}
+
+.project-list__empty,
+.project-list__refusal,
+.project-create__refusal,
+.project-create__progress {
+    margin-block: 0;
+    color: var(--text-muted);
+}
+
+.project-list__items {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    align-self: stretch;
+}
+
+.project-list__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.project-list__name {
+    font-weight: var(--type-task-title-weight);
+    overflow-wrap: anywhere;
+}
+
+.project-create,
+.project-rename {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.project-create__actions,
+.project-rename__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
 }
 
 /*

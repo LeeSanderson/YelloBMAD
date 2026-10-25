@@ -65,6 +65,36 @@ internal static class BoundaryProblems
             });
 
     /// <summary>
+    /// An <c>Idempotency-Key</c> header that is empty, repeated, or over the length limit. Story 2.1.
+    /// </summary>
+    /// <returns>A <c>400</c> problem response.</returns>
+    internal static IResult InvalidIdempotencyKey() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            type: ProblemTypes.InvalidIdempotencyKey,
+            title: "An Idempotency-Key is 1 to 255 characters.");
+
+    /// <summary>
+    /// An <c>Idempotency-Key</c> already used by this Account in this Space for a different request.
+    /// </summary>
+    /// <returns>A <c>422</c> problem response.</returns>
+    internal static IResult IdempotencyKeyReused() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status422UnprocessableEntity,
+            type: ProblemTypes.IdempotencyKeyReused,
+            title: "This Idempotency-Key was used for a different request.");
+
+    /// <summary>
+    /// An <c>Idempotency-Key</c> whose first use committed while this request was running.
+    /// </summary>
+    /// <returns>A <c>409</c> problem response.</returns>
+    internal static IResult IdempotencyKeyInFlight() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status409Conflict,
+            type: ProblemTypes.IdempotencyKeyInFlight,
+            title: "A request with this Idempotency-Key was still in progress.");
+
+    /// <summary>
     /// The bound refusal: <c>409</c>, with the bound's stable code and its value, so the client can
     /// state the number plainly.
     /// </summary>

@@ -167,6 +167,30 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.ToTable("Membership", (string)null);
                 });
 
+            modelBuilder.Entity("Yello.Domain.Projects.Project", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid>("SpaceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("SpaceId");
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("SpaceId", "Id");
+
+                    b.ToTable("Project", (string)null);
+                });
+
             modelBuilder.Entity("Yello.Domain.Spaces.Space", b =>
                 {
                     b.Property<Guid>("Id")
@@ -248,6 +272,58 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.ToTable("DataProtectionKey", (string)null);
                 });
 
+            modelBuilder.Entity("Yello.Infrastructure.Persistence.IdempotencyRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("ContentType")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Fingerprint")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nchar(64)")
+                        .IsFixedLength();
+
+                    b.Property<string>("Key")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.Property<Guid>("SpaceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("SpaceId");
+
+                    b.Property<int>("StatusCode")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SpaceId", "CreatedAt");
+
+                    b.HasIndex("SpaceId", "AccountId", "Key")
+                        .IsUnique();
+
+                    b.ToTable("IdempotencyRecord", (string)null);
+                });
+
             modelBuilder.Entity("Yello.Domain.ApiTokens.ApiToken", b =>
                 {
                     b.HasOne("Yello.Domain.Memberships.Membership", null)
@@ -273,6 +349,15 @@ namespace Yello.Infrastructure.Persistence.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("Yello.Domain.Projects.Project", b =>
+                {
+                    b.HasOne("Yello.Domain.Spaces.Space", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("Yello.Domain.Spaces.SpacePresence", b =>
                 {
                     b.HasOne("Yello.Domain.Spaces.Space", null)
@@ -283,6 +368,15 @@ namespace Yello.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Yello.Domain.Statuses.StatusDefinition", b =>
+                {
+                    b.HasOne("Yello.Domain.Spaces.Space", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Yello.Infrastructure.Persistence.IdempotencyRecord", b =>
                 {
                     b.HasOne("Yello.Domain.Spaces.Space", null)
                         .WithMany()

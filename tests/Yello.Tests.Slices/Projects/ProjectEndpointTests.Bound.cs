@@ -26,7 +26,7 @@ public sealed partial class ProjectEndpointTests
     /// still holds 50, and the refusal is not an access refusal, so nothing is recorded.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the create route and its bound declaration do not exist until story 2.1 Tasks 5 and 6")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     [Trait("Requirement", "NFR-8")]
@@ -70,7 +70,7 @@ public sealed partial class ProjectEndpointTests
     /// repeated for a bound whose whole point is the number).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the bound check and its UPDLOCK, HOLDLOCK count do not exist until story 2.1 Task 6")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     public async Task Two_concurrent_creations_at_49_yield_exactly_one_201_and_one_409()
@@ -107,7 +107,7 @@ public sealed partial class ProjectEndpointTests
     /// nothing.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the idempotency behaviour and the bound do not exist until story 2.1 Tasks 6 and 7")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "AD-18")]
     public async Task Replaying_the_key_of_the_50th_creation_returns_its_201_not_the_bound_409()

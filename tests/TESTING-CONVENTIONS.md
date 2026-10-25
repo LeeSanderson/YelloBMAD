@@ -352,6 +352,7 @@ direct constructions), a 7.9 GB Docker peak, 0.63 GB of host memory left at the 
 Rancher backend timing out mid-run ("timed out dialing Hyper-V socket"), which failed 62 Slices
 tests. After: **four** engines (Slices, Isolation, Revocation, Client), a **3.4 GB** Docker peak,
 and the full run green with the browser suite in the same run (504 total, 503 passed, 1 skipped).
+Story 2.1 added no engine; its new cases ride the same four (see its Debug Log for the counts).
 The Slices suite alone starts one engine and peaks at about 1 GB. Host memory is not the cleaner
 measure on this machine - Chromium, the editor and the WSL VM move it more than the tests do - so
 the Docker peak is the number to compare.
@@ -510,6 +511,13 @@ a log cursor that waits for the request-finished line of every request a case se
 `WireDatabase` (raw SQL only for what no endpoint does yet: the refusal record, a second owned Space,
 Membership removal, Space and Account deletion, a Role change). Each class gets a world: a database
 of its own on the process's one engine, migrated, and a Host on it.
+
+**A row that writes sends a body** (story 2.1). `ProductActor.SendAsync(surface, method, path, body,
+headers)` carries JSON and any extra header - an `Idempotency-Key`, say - on either surface: the
+Session surface still adds the anti-forgery header on an unsafe method, and the Token surface still
+sends the bearer and nothing else. `HoldsProjectNamed` adds a Project name to the actor's secrets, so a
+Project name in the Host's log fails I-17 like any other secret; seed Projects after the case's log
+cursor, so the requests that create them are inside the checked slice.
 
 **Every row ends with its own slice of the Host's log checked** for every password, Token plaintext,
 Session cookie value and Space name the world has held (I-17, AC10), anchored on the Host's

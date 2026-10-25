@@ -7,6 +7,7 @@ using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.ApiTokens;
+using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
 using Yello.Domain.Accounts;
 using Yello.Tests.Shared;
@@ -23,7 +24,7 @@ namespace Yello.Tests.Slices.Projects;
 /// <para>
 /// <b>Written as red-phase scaffolds by the story 2.1 ATDD run on 2026-10-25.</b> Every case is skipped
 /// with <c>red: AC&lt;n&gt;</c> until dev-story activates it. Routes and problem types come from
-/// <see cref="ProjectRouteScaffold"/> until <c>Yello.Contracts.Projects</c> exists; bodies are anonymous
+/// <c>Yello.Contracts.Projects</c> (the scaffold constants were replaced on activation); bodies are anonymous
 /// objects and answers are read as raw JSON, so an added property cannot hide behind a DTO. On
 /// activation, replace the scaffold constants with the contract ones and keep reading raw JSON.
 /// </para>
@@ -86,7 +87,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     /// own path, and the row belongs to exactly that Space.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the create route does not exist until story 2.1 Task 5")]
+    [Fact]
     public async Task Creating_a_Project_answers_201_with_its_Location_and_fixes_it_to_the_active_Space()
     {
         var database = Available();
@@ -108,7 +109,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
 
         Assert.Equal(ProjectProperties, document.RootElement.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
         Assert.Equal("Northwind Redesign", document.RootElement.GetProperty("name").GetString());
-        Assert.Equal(ProjectRouteScaffold.ProjectOf(owner.SpaceId, id), created.Header("Location"));
+        Assert.Equal(ProjectRoutes.ProjectOf(owner.SpaceId, id), created.Header("Location"));
 
         var row = Assert.Single(await ProjectRowsAsync(database, owner.SpaceId));
 
@@ -123,7 +124,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     /// and nothing stores a Project's effective set: no Status column on <c>Project</c>, no delta table.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the create route and the Project table do not exist until story 2.1 Tasks 3 and 5")]
+    [Fact]
     [Trait("Requirement", "AD-16")]
     public async Task Creating_a_Project_leaves_the_Space_default_Statuses_unchanged_and_stores_no_effective_set()
     {
@@ -163,7 +164,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     /// <c>uniqueidentifier</c> ordering, which is what the sequential generator exists for.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the Project table and the create route do not exist until story 2.1 Tasks 3 and 5")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     public async Task Project_ids_are_generated_by_the_application_in_sequential_order()
     {
@@ -204,7 +205,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     /// <param name="length">The name's length, in characters; 0 and a run of spaces are blank.</param>
     /// <param name="blank">Whether the name is spaces only.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - the create route does not exist until story 2.1 Task 5; ProjectName lands in Task 3")]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(3, true)]
     [InlineData(101, false)]
@@ -227,7 +228,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
 
         Assert.NotNull(owner);
         Assert.Equal(HttpStatusCode.BadRequest, refused?.StatusCode);
-        Assert.Equal(ProjectRouteScaffold.InvalidProjectName, Problem(refused!)?.Type);
+        Assert.Equal(ProblemTypes.InvalidProjectName, Problem(refused!)?.Type);
         Assert.Equal(HttpStatusCode.Created, anchor?.StatusCode);
         Assert.Equal([new string('n', 100)], (await ProjectRowsAsync(database, owner.SpaceId)).Select(row => row.Name));
     }
@@ -239,7 +240,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     /// of the same Space then creates one.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the create route and its ManageProjects declaration do not exist until story 2.1 Task 5")]
+    [Fact]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "NFR-7")]
@@ -285,7 +286,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     /// the ones the Project was created with, and the answer is the renamed Project.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the rename route does not exist until story 2.1 Task 5")]
+    [Fact]
     public async Task Renaming_a_Project_changes_its_name_and_nothing_else()
     {
         var database = Available();
@@ -318,7 +319,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     /// is unchanged.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the rename route does not exist until story 2.1 Task 5")]
+    [Fact]
     [Trait("Requirement", "AD-20")]
     public async Task A_Viewer_is_refused_403_on_rename_on_both_surfaces_and_the_name_is_unchanged()
     {
@@ -357,7 +358,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     /// boundary refusal - records nothing (AD-20 records boundary <c>404</c>s and <c>403</c>s only).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - the rename route does not exist until story 2.1 Task 5")]
+    [Fact]
     [Trait("Requirement", "AD-20")]
     public async Task Renaming_an_id_that_matches_nothing_in_the_Space_answers_the_boundary_404_and_records_nothing()
     {
@@ -394,7 +395,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     /// duplicate names permitted (Q3) and ordered by id as the database orders them.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the list route does not exist until story 2.1 Task 5")]
+    [Fact]
     public async Task The_listing_holds_every_Project_in_the_Space_ordered_by_name_then_id()
     {
         var database = Available();
@@ -410,7 +411,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
                 Assert.Equal(HttpStatusCode.Created, (await CreateAsync(owner, name)).StatusCode);
             }
 
-            listed = await owner.Session.GetAsync(ProjectRouteScaffold.ListIn(owner.SpaceId));
+            listed = await owner.Session.GetAsync(ProjectRoutes.ListIn(owner.SpaceId));
         });
 
         Assert.NotNull(owner);
@@ -431,7 +432,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     /// done to a Project, not whether it is visible.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the list route does not exist until story 2.1 Task 5")]
+    [Fact]
     public async Task A_Viewer_is_served_the_same_listing_as_a_Member_on_both_surfaces()
     {
         var database = Available();
@@ -453,9 +454,9 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
 
             var token = await IssueTokenAsync(viewer, owner.SpaceId);
 
-            member = await memberActor.Session.GetAsync(ProjectRouteScaffold.ListIn(owner.SpaceId));
-            viewerSession = await viewer.Session.GetAsync(ProjectRouteScaffold.ListIn(owner.SpaceId));
-            viewerToken = await viewer.Session.GetWithTokenAsync(ProjectRouteScaffold.ListIn(owner.SpaceId), token);
+            member = await memberActor.Session.GetAsync(ProjectRoutes.ListIn(owner.SpaceId));
+            viewerSession = await viewer.Session.GetAsync(ProjectRoutes.ListIn(owner.SpaceId));
+            viewerToken = await viewer.Session.GetWithTokenAsync(ProjectRoutes.ListIn(owner.SpaceId), token);
         });
 
         Assert.Equal(HttpStatusCode.OK, member?.StatusCode);
@@ -470,7 +471,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     /// still refused <c>400 antiforgery-token-missing</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the create route does not exist until story 2.1 Task 5")]
+    [Fact]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "AR-14")]
     public async Task A_Token_creates_a_Project_without_antiforgery_and_a_Session_without_the_header_is_refused()
@@ -488,7 +489,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
             byToken = await CreateWithTokenAsync(owner, token, owner.SpaceId, "By script");
             bySessionWithoutHeader = await owner.Session.SendWithHeadersAsync(
                 HttpMethod.Post,
-                ProjectRouteScaffold.ListIn(owner.SpaceId),
+                ProjectRoutes.ListIn(owner.SpaceId),
                 NameBody("By browser, unguarded"),
                 NoHeaders,
                 withAntiforgeryToken: false);
@@ -507,7 +508,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     /// is not disclosed. Anchored on the route answering its mapped method.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the Project routes do not exist until story 2.1 Task 5; Q9 decides the expectation")]
+    [Fact]
     [Trait("Priority", "P1")]
     public async Task An_unmapped_method_on_a_Project_route_answers_404_with_no_Allow_header()
     {
@@ -520,11 +521,11 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
             var owner = await RegisterAsync(client, database);
             var id = IdOf(await CreateAsync(owner, "Methods"));
 
-            mapped = await owner.Session.GetAsync(ProjectRouteScaffold.ListIn(owner.SpaceId));
+            mapped = await owner.Session.GetAsync(ProjectRoutes.ListIn(owner.SpaceId));
 
-            unmapped.Add(await owner.Session.SendWithHeadersAsync(HttpMethod.Put, ProjectRouteScaffold.ListIn(owner.SpaceId), NameBody("x"), NoHeaders));
-            unmapped.Add(await owner.Session.SendWithHeadersAsync(HttpMethod.Put, ProjectRouteScaffold.ProjectOf(owner.SpaceId, id), NameBody("x"), NoHeaders));
-            unmapped.Add(await owner.Session.SendWithHeadersAsync(HttpMethod.Delete, ProjectRouteScaffold.ProjectOf(owner.SpaceId, id), content: null, NoHeaders));
+            unmapped.Add(await owner.Session.SendWithHeadersAsync(HttpMethod.Put, ProjectRoutes.ListIn(owner.SpaceId), NameBody("x"), NoHeaders));
+            unmapped.Add(await owner.Session.SendWithHeadersAsync(HttpMethod.Put, ProjectRoutes.ProjectOf(owner.SpaceId, id), NameBody("x"), NoHeaders));
+            unmapped.Add(await owner.Session.SendWithHeadersAsync(HttpMethod.Delete, ProjectRoutes.ProjectOf(owner.SpaceId, id), content: null, NoHeaders));
         });
 
         Assert.Equal(HttpStatusCode.OK, mapped?.StatusCode);
@@ -559,19 +560,19 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     private static JsonContent NameBody(string name) => JsonContent.Create(new { name }, options: JsonOptions);
 
     private static Dictionary<string, string> KeyHeader(string? key) =>
-        key is null ? NoHeaders : new Dictionary<string, string>(StringComparer.Ordinal) { [ProjectRouteScaffold.IdempotencyKeyHeader] = key };
+        key is null ? NoHeaders : new Dictionary<string, string>(StringComparer.Ordinal) { [Idempotency.HeaderName] = key };
 
     private static Task<WireResponse> CreateAsync(Actor actor, string name, Guid? spaceId = null, string? key = null) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectRouteScaffold.ListIn(spaceId ?? actor.SpaceId), NameBody(name), KeyHeader(key));
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectRoutes.ListIn(spaceId ?? actor.SpaceId), NameBody(name), KeyHeader(key));
 
     private static Task<WireResponse> CreateWithTokenAsync(Actor actor, string token, Guid spaceId, string name, string? key = null) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, ProjectRouteScaffold.ListIn(spaceId), token, NameBody(name), KeyHeader(key));
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, ProjectRoutes.ListIn(spaceId), token, NameBody(name), KeyHeader(key));
 
     private static Task<WireResponse> RenameAsync(Actor actor, Guid spaceId, Guid projectId, string name, string? key = null) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Patch, ProjectRouteScaffold.ProjectOf(spaceId, projectId), NameBody(name), KeyHeader(key));
+        actor.Session.SendWithHeadersAsync(HttpMethod.Patch, ProjectRoutes.ProjectOf(spaceId, projectId), NameBody(name), KeyHeader(key));
 
     private static Task<WireResponse> RenameWithTokenAsync(Actor actor, string token, Guid spaceId, Guid projectId, string name) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Patch, ProjectRouteScaffold.ProjectOf(spaceId, projectId), token, NameBody(name), NoHeaders);
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Patch, ProjectRoutes.ProjectOf(spaceId, projectId), token, NameBody(name), NoHeaders);
 
     /// <summary>
     /// Registers and signs in through the product, re-fetches the anti-forgery token (one minted while

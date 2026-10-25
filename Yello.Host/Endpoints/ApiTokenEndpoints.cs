@@ -39,7 +39,8 @@ public static class ApiTokenEndpoints
     public static RouteHandlerBuilder MapIssueApiToken(this IEndpointRouteBuilder endpoints) =>
         endpoints.MapPost(ApiTokenRoutes.Issue, IssueAsync)
             .RequiresCapability(Capability.IssueApiTokenForOneself)
-            .SessionOnly();
+            .SessionOnly()
+            .CarriesSecretInResponse(JsonNamingPolicy.CamelCase.ConvertName(nameof(IssuedApiTokenResponse.Token)));
 
     /// <summary>
     /// Registers <c>GET /api/v1/account/api-tokens</c>.

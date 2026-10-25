@@ -6,6 +6,9 @@ using Yello.Application.ApiTokens.ListApiTokens;
 using Yello.Application.ApiTokens.RevokeApiToken;
 using Yello.Application.Accounts.RegisterAccount;
 using Yello.Application.Accounts.SignOut;
+using Yello.Application.Projects.CreateProject;
+using Yello.Application.Projects.ListProjects;
+using Yello.Application.Projects.RenameProject;
 using Yello.Application.Spaces.ListSpaces;
 using Yello.Application.Statuses.ListStatuses;
 using Yello.Contracts.Accounts;
@@ -86,6 +89,9 @@ builder.Services.AddScoped<ListSpacesHandler>();
 builder.Services.AddScoped<IssueApiTokenHandler>();
 builder.Services.AddScoped<ListApiTokensHandler>();
 builder.Services.AddScoped<RevokeApiTokenHandler>();
+builder.Services.AddScoped<ListProjectsHandler>();
+builder.Services.AddScoped<CreateProjectHandler>();
+builder.Services.AddScoped<RenameProjectHandler>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
 builder.Services.AddAccountScopedResolution();
@@ -336,6 +342,16 @@ api.MapListSpaces();
 api.MapIssueApiToken();
 api.MapListApiTokens();
 api.MapRevokeApiToken();
+
+// Projects (story 2.1). GET and POST /api/v1/spaces/{spaceId}/projects list and create; PATCH
+// /api/v1/spaces/{spaceId}/projects/{projectId} renames. Space-scoped on both surfaces. Create declares
+// ManageProjects and the Projects-per-Space bound; rename declares ManageProjects; list declares the read
+// capability every Role holds. A method these routes do not map falls through to the unmatched fallback
+// below - 404 not-available with no Allow header, so a route's method set is not disclosed (open
+// question 9).
+api.MapListProjects();
+api.MapCreateProject();
+api.MapRenameProject();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

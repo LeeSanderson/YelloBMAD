@@ -104,6 +104,10 @@ public static class InfrastructureServices
 
         services.AddScoped<IStatusDefinitionReader, StatusDefinitionReader>();
 
+        // STORY 2.1: the Space's Projects, on the request's unit of work like every Space-scoped store -
+        // split out only to keep this class's dependencies within S1200's limit.
+        services.AddSpaceContentStores();
+
         // STORY 1.7: the Account-scoped context (AD-24), the active Space's name, and the Session
         // revocation instant - split out only to keep this class's dependencies within S1200's limit.
         services.AddAccountScopedReads();

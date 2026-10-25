@@ -6,8 +6,8 @@ using Microsoft.Playwright;
 using Yello.Contracts;
 using Yello.Contracts.ApiTokens;
 using Yello.Contracts.Accounts;
+using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
-using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -86,7 +86,7 @@ internal sealed class FakeYelloApi
 
     /// <summary>
     /// Each Space's Projects, as the list route serves them. Story 2.1; the routes are
-    /// <see cref="ProjectRouteScaffold"/>'s until <c>Yello.Contracts.Projects</c> exists, and the bodies
+    /// <c>Yello.Contracts.Projects</c>' ones, and the bodies
     /// are <see cref="FakeProject"/>, shaped as story 2.1 Task 4's <c>ProjectResponse</c> - replace both on
     /// activation.
     /// </summary>
@@ -197,7 +197,7 @@ internal sealed class FakeYelloApi
             {
                 ["Access-Control-Allow-Origin"] = origin,
                 ["Access-Control-Allow-Credentials"] = "true",
-                ["Access-Control-Allow-Headers"] = $"content-type, {Antiforgery.HeaderName}, {ProjectRouteScaffold.IdempotencyKeyHeader}",
+                ["Access-Control-Allow-Headers"] = $"content-type, {Antiforgery.HeaderName}, {Idempotency.HeaderName}",
                 ["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE",
                 ["Vary"] = "Origin",
             },
@@ -336,7 +336,7 @@ internal sealed class FakeYelloApi
 
         if (!TryProjectName(body, out var name))
         {
-            return (400, Problem(ProjectRouteScaffold.InvalidProjectName));
+            return (400, Problem(ProblemTypes.InvalidProjectName));
         }
 
         var project = new FakeProject(Guid.NewGuid(), name, DateTimeOffset.UtcNow);
@@ -364,7 +364,7 @@ internal sealed class FakeYelloApi
 
         if (!TryProjectName(body, out var name))
         {
-            return (400, Problem(ProjectRouteScaffold.InvalidProjectName));
+            return (400, Problem(ProblemTypes.InvalidProjectName));
         }
 
         projects[index] = projects[index] with { Name = name };
@@ -392,7 +392,7 @@ internal sealed class FakeYelloApi
 
         return path.StartsWith(prefix, StringComparison.Ordinal)
             && Guid.TryParse(path[prefix.Length..].Split('/')[0], out spaceId)
-            && path == ProjectRouteScaffold.ListIn(spaceId);
+            && path == ProjectRoutes.ListIn(spaceId);
     }
 
     private static bool TryProject(string path, out Guid spaceId, out Guid projectId)
@@ -403,7 +403,7 @@ internal sealed class FakeYelloApi
 
         return TryProjects(string.Join('/', segments[..^1]), out spaceId)
             && Guid.TryParse(segments[^1], out projectId)
-            && path == ProjectRouteScaffold.ProjectOf(spaceId, projectId);
+            && path == ProjectRoutes.ProjectOf(spaceId, projectId);
     }
 
     private static ApiTokenResponse TokenRow(FakeApiToken token) =>

@@ -1,6 +1,7 @@
 using Microsoft.Playwright;
 using Xunit;
-using Yello.Tests.Shared;
+using Yello.Contracts;
+using Yello.Contracts.Projects;
 
 namespace Yello.Tests.Client;
 
@@ -53,7 +54,7 @@ public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
     /// one action, to create a Project, and nothing that asks for configuration.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - Space home renders only its heading until story 2.1 Task 10")]
+    [Fact]
     public async Task An_empty_Space_states_no_Projects_yet_and_offers_one_action_to_create_one()
     {
         var api = TwoSpaces();
@@ -81,7 +82,7 @@ public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
     /// is busy; released, the Projects appear.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - Space home requests no Project list until story 2.1 Task 10")]
+    [Fact]
     [Trait("Requirement", "UX-DR31")]
     public async Task The_Project_list_renders_only_after_the_server_answers()
     {
@@ -117,7 +118,7 @@ public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
     /// control is present at all. Anchor: the Owner of the other Space, with the same Projects, sees both.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - Space home renders no Project list or controls until story 2.1 Task 10 (Q12)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     public async Task A_Viewer_sees_the_Projects_and_no_create_or_rename_control()
     {
@@ -152,7 +153,7 @@ public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
     /// browser's autofill would not reuse; and the title stays <c>Yello</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - Space home has no create surface until story 2.1 Task 10")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "UX-DR33")]
     public async Task Creating_a_Project_adds_its_row_announces_it_and_sends_an_idempotency_key()
@@ -170,9 +171,9 @@ public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
             await page.Locator("main li", new PageLocatorOptions { HasText = "Lighthouse" })
                 .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
-            var post = Assert.Single(api.Requests, request => request.Method == "POST" && request.Path == ProjectRouteScaffold.ListIn(Northwind));
+            var post = Assert.Single(api.Requests, request => request.Method == "POST" && request.Path == ProjectRoutes.ListIn(Northwind));
 
-            Assert.False(string.IsNullOrWhiteSpace(post.Header(ProjectRouteScaffold.IdempotencyKeyHeader)), "The create carried no Idempotency-Key.");
+            Assert.False(string.IsNullOrWhiteSpace(post.Header(Idempotency.HeaderName)), "The create carried no Idempotency-Key.");
             var announced = string.Join(' ', await page.Locator("[aria-live='polite']").AllInnerTextsAsync());
 
             Assert.Contains("Lighthouse", announced, StringComparison.Ordinal);
@@ -187,7 +188,7 @@ public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
     /// surface, with the bound stated plainly; nothing is added.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - Space home has no create surface until story 2.1 Task 10")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     public async Task The_51st_Project_renders_the_bound_inline_and_adds_nothing()
     {
@@ -215,7 +216,7 @@ public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
     /// Projects on screen; released, the destination's appear.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - the Project list is not registered with ActiveSpaceState's purge until story 2.1 Task 10")]
+    [Fact]
     [Trait("Requirement", "UX-DR31")]
     public async Task A_switch_purges_the_departed_Spaces_Projects_before_the_destination_answers()
     {
@@ -249,7 +250,7 @@ public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
     /// commit control reads "Rename", never "Save"; and the committed name replaces the row's.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - Space home has no rename control until story 2.1 Task 10 (Q11)")]
+    [Fact]
     [Trait("Requirement", "UX-DR26")]
     public async Task Rename_is_an_explicit_control_and_Escape_cancels_without_a_request()
     {

@@ -397,6 +397,8 @@ public sealed partial class RefusalBoundaryGateTests
             "Yello.Infrastructure.Persistence.Configurations.MembershipConfiguration",
             "Yello.Infrastructure.Persistence.Configurations.StatusDefinitionConfiguration",
             "Yello.Infrastructure.Persistence.Configurations.SpacePresenceConfiguration",
+            "Yello.Infrastructure.Persistence.Configurations.ProjectConfiguration",
+            "Yello.Infrastructure.Persistence.Configurations.IdempotencyRecordConfiguration",
         ];
 
         var dependents = DependentsOf(space);

@@ -1,7 +1,6 @@
 using Microsoft.AspNetCore.Routing.Patterns;
 using Yello.Application.Spaces;
 using Yello.Contracts.Spaces;
-using Yello.Domain;
 using Yello.Domain.AccessRefusals;
 using Yello.Domain.Bounds;
 using Yello.Domain.Memberships;
@@ -29,9 +28,11 @@ namespace Yello.Host.Spaces;
 /// and recorded as <c>CrossSpace</c>. A member whose Role the matrix denies the endpoint's declared
 /// capability: <c>403</c>, capability-shaped, recorded as <c>InsufficientRole</c>. A member who
 /// would exceed the Space's concurrent-presence bound: <c>409</c>, raised inside the resolution
-/// transaction and not recorded. Otherwise the endpoint runs inside the unit of work the resolution
-/// opened, which commits only once the endpoint has returned, only when it returned a success, and
-/// only when what it returned has already been read.
+/// transaction and not recorded. A state-changing request repeating an <c>Idempotency-Key</c>: the
+/// recorded response, and nothing applied (story 2.1). A creation the endpoint's declared bound
+/// refuses: <c>409</c>, inside the creation's transaction. Otherwise the endpoint runs inside the unit
+/// of work the resolution opened, which commits only once the endpoint has returned, only when it
+/// returned a success, and only when what it returned has already been read.
 /// </para>
 /// <para>
 /// <b>The two refusal points never convert into each other.</b> The <c>404</c> is produced only
@@ -44,7 +45,7 @@ namespace Yello.Host.Spaces;
 /// record - which is what keeps them indistinguishable in duration as well as in body.
 /// </para>
 /// </remarks>
-internal static class ActiveSpaceResolution
+internal static partial class ActiveSpaceResolution
 {
     /// <summary>
     /// The logger category, named for this type because a static class cannot be <c>T</c> in
@@ -190,16 +191,22 @@ internal static class ActiveSpaceResolution
 
         // Denied, and the unit of work disposed without completing - rolled back - before the
         // refusal is recorded on a unit of its own.
-        SpaceLog.CapabilityRefused(logger, spaceId, StableCode.Of(capability));
+        SpaceLog.CapabilityRefusedFor(logger, spaceId, capability);
         await RecordAsync(request, AccessRefusalKind.InsufficientRole).ConfigureAwait(false);
 
         return BoundaryProblems.InsufficientRole(capability);
     }
 
     /// <summary>
-    /// A permitted member: consult the presence bound inside the unit of work, then run the
-    /// endpoint and commit only a materialised success.
+    /// A permitted member: consult the presence bound inside the unit of work, replay an
+    /// <c>Idempotency-Key</c> already answered, consult the endpoint's creation bound, then run the
+    /// endpoint, record its answer for its key, and commit only a materialised success.
     /// </summary>
+    /// <remarks>
+    /// <b>The replay comes before the creation bound</b> (story 2.1, Task 7): a replay applies nothing,
+    /// so replaying the key of the creation that filled a Space answers its original <c>201</c>, not the
+    /// next creation's <c>409</c>.
+    /// </remarks>
     private static async ValueTask<object?> ServeAsync(
         EndpointFilterInvocationContext context,
         EndpointFilterDelegate next,
@@ -216,16 +223,18 @@ internal static class ActiveSpaceResolution
         {
             // Raised inside the resolution transaction, which the caller disposes without
             // completing: nothing is written for the refused Account (AC7).
-            SpaceLog.BoundReached(request.Logger, request.SpaceId, StableCode.Of(bound.Bound), bound.Limit);
+            SpaceLog.BoundReachedFor(request.Logger, request.SpaceId, bound);
 
             return BoundaryProblems.BoundReached(bound);
         }
 
         SpaceLog.SpaceResolved(request.Logger, request.SpaceId);
 
-        var result = await next(context).ConfigureAwait(false);
+        var idempotent = await BeginIdempotentAsync(context.HttpContext, request).ConfigureAwait(false);
 
-        UnitOfWorkResults.EnsureMaterialised(result);
+        var result = idempotent.Answer
+            ?? await ConsultCreationBoundAsync(context.HttpContext, request).ConfigureAwait(false)
+            ?? await RunEndpointAsync(context, next, request, idempotent).ConfigureAwait(false);
 
         if (UnitOfWorkResults.IsFailure(result))
         {
@@ -239,6 +248,56 @@ internal static class ActiveSpaceResolution
         await unitOfWork.CompleteAsync(CancellationToken.None).ConfigureAwait(false);
 
         return result;
+    }
+
+    /// <summary>
+    /// Runs the endpoint, and records a materialised success for its <c>Idempotency-Key</c> in the same
+    /// unit of work as its effect.
+    /// </summary>
+    private static async Task<object?> RunEndpointAsync(
+        EndpointFilterInvocationContext context,
+        EndpointFilterDelegate next,
+        BoundaryRequest request,
+        IdempotentRequest idempotent)
+    {
+        var result = await next(context).ConfigureAwait(false);
+
+        UnitOfWorkResults.EnsureMaterialised(result);
+
+        return UnitOfWorkResults.IsFailure(result) || idempotent.Key is null
+            ? result
+            : await RecordIdempotentAsync(context.HttpContext, request, idempotent, result).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The creation bound the endpoint declares, consulted inside the unit of work before it runs: the
+    /// limit from <see cref="BoundRegistry"/>, the count under a lock held to the unit's end. AD-25 /
+    /// AR-30; story 2.1, Task 6.
+    /// </summary>
+    /// <returns>The <c>409</c> when the Space is already at the limit; otherwise <c>null</c>.</returns>
+    private static async Task<IResult?> ConsultCreationBoundAsync(HttpContext httpContext, BoundaryRequest request)
+    {
+        if (RequiredBoundExtensions.Of(httpContext.GetEndpoint()) is not { } declared)
+        {
+            return null;
+        }
+
+        var bound = BoundRegistry.For(declared);
+
+        var count = await request.Services.GetRequiredService<IBoundCounter>()
+            .CountAsync(bound.Bound, request.CancellationToken)
+            .ConfigureAwait(false);
+
+        if (count < bound.Limit)
+        {
+            return null;
+        }
+
+        // Inside the creation's transaction, which the caller disposes without completing. Not an
+        // AccessRefusal: AD-20 records two kinds, and this is neither.
+        SpaceLog.BoundReachedFor(request.Logger, request.SpaceId, bound);
+
+        return BoundaryProblems.BoundReached(bound);
     }
 
     /// <summary>

@@ -30,7 +30,10 @@
     Session has ended, and the purge and the sign-in page follow.
 
     THE HEADING DOES NOT NAME THE SPACE - the context bar does, and the name lives in one place.
-    Projects arrive with story 2.1; until then the page is its heading.
+
+    THE PROJECTS (story 2.1) are ProjectList's, rendered only once the Space has answered, keyed on the
+    Space so a switch starts a new list rather than reusing the departed one's. A 404 the list or a
+    creation meets renders this page's one refusal surface.
 *@
 
 @if (_refused)
@@ -39,10 +42,12 @@
 }
 
 @* Neither yet: waiting for the server's answer, and nothing Space-scoped renders before it. *@
-@if (_arrived && !_refused)
+@if (_arrived && !_refused && ActiveSpace.Current is { } current)
 {
     <div class="space-home">
         <h1 class="type-dialog-title" tabindex="-1" @ref="_heading">@Localizer["SpaceHomeHeading"]</h1>
+
+        <ProjectList @key="SpaceId" SpaceId="@SpaceId" RoleCode="@current.Role" OnSpaceRefused="Refuse" />
     </div>
 }
 

@@ -1,0 +1,101 @@
+@using Yello.Contracts.Projects
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    ONE PROJECT IN THE LIST - story 2.1, AC3; UX-DR26, UX-DR27, UX-DR33.
+
+    Its name as text (no link target exists until story 2.2's Board), and for a Role that may rename it,
+    an explicit "Rename" control - never hover-only. Renaming opens an inline field with explicit Rename
+    and Cancel; Esc cancels. For a Role that may not, the control is absent, not disabled.
+*@
+
+<li class="project-list__row">
+    @if (Renaming)
+    {
+        <form class="project-rename" @onsubmit="CommitAsync" @onkeydown="KeyDownAsync" novalidate>
+            <FormField FieldId="@($"project-rename-{Project.Id:N}")"
+                       FieldName="@FieldName"
+                       Label="@Localizer["ProjectNameLabel"]"
+                       Value="@Name"
+                       ValueChanged="OnNameChanged"
+                       Message="@Message"
+                       Invalid="@(Message is not null)"
+                       FocusOnFirstRender="true" />
+
+            <div class="project-rename__actions">
+                <PrimaryButton>@Localizer["ProjectRename"]</PrimaryButton>
+                <button type="button" class="button-secondary" @onclick="OnCancel">@Localizer["ProjectCancel"]</button>
+            </div>
+        </form>
+    }
+
+    @if (!Renaming)
+    {
+        <span class="project-list__name">@Project.Name</span>
+    }
+
+    @if (!Renaming && CanManage)
+    {
+        <button type="button" class="button-secondary" @onclick="StartAsync">@Localizer["ProjectRename"]</button>
+    }
+
+    @if (Refusal is { } refusal)
+    {
+        <p class="project-list__refusal" role="status">@refusal</p>
+    }
+</li>
+
+@code {
+    /// <summary>The Project.</summary>
+    [Parameter]
+    [EditorRequired]
+    public ProjectResponse Project { get; set; } = new(Guid.Empty, string.Empty, default);
+
+    /// <summary>Whether the Role may rename it. When not, the control is absent.</summary>
+    [Parameter]
+    public bool CanManage { get; set; }
+
+    /// <summary>Whether its rename field is open.</summary>
+    [Parameter]
+    public bool Renaming { get; set; }
+
+    /// <summary>The name in the rename field.</summary>
+    [Parameter]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>The field's message - why the name typed is refused - or <c>null</c>.</summary>
+    [Parameter]
+    public string? Message { get; set; }
+
+    /// <summary>Why the last rename was refused and reverted, or <c>null</c>.</summary>
+    [Parameter]
+    public string? Refusal { get; set; }
+
+    /// <summary>A field name no browser's autofill would match (UX-DR33).</summary>
+    [Parameter]
+    public string FieldName { get; set; } = string.Empty;
+
+    /// <summary>Raised when the row's Rename control is used.</summary>
+    [Parameter]
+    public EventCallback<ProjectResponse> OnStart { get; set; }
+
+    /// <summary>Raised on every keystroke in the rename field.</summary>
+    [Parameter]
+    public EventCallback<string> OnNameChanged { get; set; }
+
+    /// <summary>Raised when the rename is committed.</summary>
+    [Parameter]
+    public EventCallback<ProjectResponse> OnCommit { get; set; }
+
+    /// <summary>Raised when the rename is cancelled, by its control or by Esc.</summary>
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private Task StartAsync() => OnStart.InvokeAsync(Project);
+
+    private Task CommitAsync() => OnCommit.InvokeAsync(Project);
+
+    private Task KeyDownAsync(KeyboardEventArgs args) =>
+        args.Key == "Escape" ? OnCancel.InvokeAsync() : Task.CompletedTask;
+}

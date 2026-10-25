@@ -25,7 +25,7 @@ public sealed partial class ProjectEndpointTests
     /// BLOCK predicates after insert and after update on <c>Project</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the Project table and its policy predicates do not exist until story 2.1 Task 3")]
+    [Fact]
     [Trait("Requirement", "AR-5")]
     [Trait("Requirement", "NFR-1")]
     public async Task Project_carries_a_non_nullable_SpaceId_under_the_Space_policy_with_both_block_predicates()
@@ -57,7 +57,7 @@ public sealed partial class ProjectEndpointTests
     /// same connection may change the Project's name.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the Project table and its AFTER UPDATE block predicate do not exist until story 2.1 Task 3")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     public async Task Moving_a_Project_to_another_Space_is_refused_by_the_database()
     {
@@ -95,7 +95,7 @@ public sealed partial class ProjectEndpointTests
     /// <c>Task</c> can hold a composite foreign key from its first migration.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the Project table and its (SpaceId, Id) key do not exist until story 2.1 Task 3")]
+    [Fact]
     [Trait("Requirement", "AR-8")]
     [Trait("Priority", "P1")]
     public async Task Project_has_a_unique_key_on_SpaceId_and_Id_for_composite_references()
@@ -122,7 +122,7 @@ public sealed partial class ProjectEndpointTests
     /// <c>(SpaceId, AccountId, Key)</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the IdempotencyRecord table does not exist until story 2.1 Task 7")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "AD-2")]
     public async Task The_idempotency_record_is_under_the_Space_policy_and_unique_per_Space_Account_and_key()

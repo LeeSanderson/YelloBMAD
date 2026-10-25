@@ -156,6 +156,46 @@ public static class ProblemTypes
     public static string InvalidApiToken => "urn:yello:problem:invalid-api-token";
 
     /// <summary>
+    /// A Project name that is not 1-100 characters once trimmed. Answered <c>400</c>. Story 2.1, open
+    /// question 3.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never "that name is taken".</b> Project names are not unique within a Space; this reports only
+    /// what was sent.
+    /// </remarks>
+    public static string InvalidProjectName => "urn:yello:problem:invalid-project-name";
+
+    /// <summary>
+    /// An <c>Idempotency-Key</c> header that is empty or longer than
+    /// <see cref="Idempotency.MaxKeyLength"/> characters. Answered <c>400</c>; nothing is applied.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never a statement about a stored key.</b> It depends only on the header as sent.
+    /// </remarks>
+    public static string InvalidIdempotencyKey => "urn:yello:problem:invalid-idempotency-key";
+
+    /// <summary>
+    /// An <c>Idempotency-Key</c> the same Account already used in this Space for a different request.
+    /// Answered <c>422</c>; nothing is applied. AD-18; story 2.1, open question 7.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never a replay, and never a new request.</b> Treating it as either would silently defeat the
+    /// guarantee the key exists to give. Scoped to (Space, Account): another Account's key, or the same
+    /// key in another Space, is never compared with it.
+    /// </remarks>
+    public static string IdempotencyKeyReused => "urn:yello:problem:idempotency-key-reused";
+
+    /// <summary>
+    /// An <c>Idempotency-Key</c> whose first use committed while this request with the same key was
+    /// still running. Answered <c>409</c>, rolled back; a retry is then answered with the first use's
+    /// response. Story 2.1, open question 7.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never "a limit was reached"</b> - that is <see cref="BoundReached"/>, also a <c>409</c>.
+    /// </remarks>
+    public static string IdempotencyKeyInFlight => "urn:yello:problem:idempotency-key-in-flight";
+
+    /// <summary>
     /// <c>503</c>: the database is paused, resuming or unreachable. Uniform for every route, carries
     /// <c>Retry-After</c>, and admits nothing (story 1.10 AC14).
     /// </summary>

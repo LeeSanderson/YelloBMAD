@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Yello.Domain.Accounts;
 using Yello.Domain.Memberships;
+using Yello.Domain.Projects;
 using Yello.Domain.Spaces;
 using Yello.Domain.Statuses;
 using Yello.Infrastructure.Persistence.Configurations;
@@ -95,6 +96,11 @@ public sealed class YelloDbContext(
     public DbSet<SpacePresence> SpacePresences => Set<SpacePresence>();
 
     /// <summary>
+    /// Projects, per Space (story 2.1).
+    /// </summary>
+    public DbSet<Project> Projects => Set<Project>();
+
+    /// <summary>
     /// The Space every global query filter compares against, read from this context's
     /// <see cref="SpaceScope"/> each time a query runs.
     /// </summary>
@@ -138,6 +144,8 @@ public sealed class YelloDbContext(
         modelBuilder.ApplyConfiguration(new MembershipConfiguration(this));
         modelBuilder.ApplyConfiguration(new StatusDefinitionConfiguration(this));
         modelBuilder.ApplyConfiguration(new SpacePresenceConfiguration(this));
+        modelBuilder.ApplyConfiguration(new ProjectConfiguration(this));
+        modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration(this));
         modelBuilder.ApplyConfiguration(new AccessRefusalConfiguration());
         modelBuilder.ApplyConfiguration(new ApiTokenConfiguration());
         modelBuilder.ApplyConfiguration(new DataProtectionKeyConfiguration());

@@ -1,3 +1,7 @@
+using Yello.Domain;
+using Yello.Domain.Bounds;
+using Yello.Domain.Memberships;
+
 namespace Yello.Host;
 
 /// <summary>
@@ -5,9 +9,9 @@ namespace Yello.Host;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>EventIds 1016-1020.</b> 1000-1007 belong to <see cref="StartupLog"/>, 1008-1009 to
-/// <see cref="RegistrationLog"/> and 1010-1015 to <see cref="SessionLog"/>; 1021 onwards to
-/// <see cref="RateLimitLog"/>.
+/// <b>EventIds 1016-1020, and 1031-1032 (story 2.1's idempotency).</b> 1000-1007 belong to
+/// <see cref="StartupLog"/>, 1008-1009 to <see cref="RegistrationLog"/> and 1010-1015 to
+/// <see cref="SessionLog"/>; 1021 onwards to <see cref="RateLimitLog"/> and the others.
 /// </para>
 /// <para>
 /// <b>The Space's id, never its name</b> (AR-34): a Space name is something a person typed, and a
@@ -51,4 +55,34 @@ internal static partial class SpaceLog
         Level = LogLevel.Warning,
         Message = "The refusal-record retention purge failed; it is not retried until tomorrow.")]
     internal static partial void RefusalPurgeFailed(ILogger logger, Exception exception);
+
+    /// <summary>
+    /// A capability refusal, logged by the capability's stable code.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="capability">The capability refused.</param>
+    internal static void CapabilityRefusedFor(ILogger logger, Guid spaceId, Capability capability) =>
+        CapabilityRefused(logger, spaceId, StableCode.Of(capability));
+
+    /// <summary>
+    /// A bound refusal, logged by the bound's stable code and its value.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="bound">The bound reached.</param>
+    internal static void BoundReachedFor(ILogger logger, Guid spaceId, BoundEntry bound) =>
+        BoundReached(logger, spaceId, StableCode.Of(bound.Bound), bound.Limit);
+
+    [LoggerMessage(
+        EventId = 1031,
+        Level = LogLevel.Information,
+        Message = "A request in {SpaceId} repeated an Idempotency-Key; the recorded response was replayed and nothing was applied.")]
+    internal static partial void IdempotentReplay(ILogger logger, Guid spaceId);
+
+    [LoggerMessage(
+        EventId = 1032,
+        Level = LogLevel.Information,
+        Message = "A request in {SpaceId} carried an Idempotency-Key it could not use ({Problem}); the request was refused.")]
+    internal static partial void IdempotencyKeyRefused(ILogger logger, Guid spaceId, string problem);
 }

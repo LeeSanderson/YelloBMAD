@@ -1,0 +1,583 @@
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Sessions
+@using Yello.Client.Spaces
+@using Yello.Contracts
+@using Yello.Contracts.Projects
+
+@implements IDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+@inject ActiveSpaceState ActiveSpace
+@inject AntiforgeryTokenSource Antiforgery
+
+@*
+    THE ACTIVE SPACE'S PROJECTS - story 2.1. AC1-AC5, AC13; UX-DR26, UX-DR27, UX-DR31, UX-DR33, UX-DR35.
+
+    RENDERED BY SPACE HOME ONLY AFTER THE SPACE'S OWN ANSWER, AND ITS LIST ONLY AFTER ITS OWN (UX-DR31).
+    Until the list answers, the region is a busy placeholder with nothing of any Project in it.
+
+    PURGED WITH THE SPACE. The list is registered with ActiveSpaceState's purge, which runs before the
+    destination renders, and every request is issued with ActiveSpace.Token, which that purge cancels -
+    so an answer about the departed Space cannot land after it.
+
+    ABSENT, NOT DISABLED (UX-DR27). A Role without manage-projects gets no create action, no empty-state
+    action and no rename control - not greyed ones. The server refuses 403 whatever is offered.
+
+    THE EMPTY SPACE ASKS FOR NOTHING BUT A PROJECT (AC1): "No Projects yet." and one action. Nothing
+    about Statuses or columns.
+
+    NEITHER IS OPTIMISTIC. Create cannot be - the id is the server's - and rename keeps its field open,
+    holding the new name, until the server answers, so a row never shows a name the server has not taken.
+    Each attempt carries a fresh Idempotency-Key, and the
+    one resend after a refused anti-forgery token reuses it.
+
+    A Project name is rendered as text, never in the document title and never in a URL, and every name
+    field is autocomplete="off" with a field name autofill would never match (UX-DR33).
+*@
+
+<p class="visually-hidden" role="status" aria-live="polite">@_announcement</p>
+
+@if (_projects is null)
+{
+    <div class="project-list project-list--loading" aria-busy="true">
+        <p class="visually-hidden">@Localizer["ProjectsLoading"]</p>
+    </div>
+}
+
+@if (_projects is not null)
+{
+    <div class="project-list">
+        @if (_projects.Count == 0)
+        {
+            <p class="project-list__empty">@Localizer["ProjectsEmpty"]</p>
+        }
+
+        @if (_canManage && !_creating)
+        {
+            <button type="button" class="button-primary" @onclick="OpenCreate">@Localizer["ProjectCreate"]</button>
+        }
+
+        @if (_canManage && _creating)
+        {
+            <form class="project-create" @onsubmit="CreateAsync" @onkeydown="CreateKeyDown" novalidate>
+                <FormField FieldId="project-create-name"
+                           FieldName="@_createFieldName"
+                           Label="@Localizer["ProjectNameLabel"]"
+                           Value="@_newName"
+                           ValueChanged="value => _newName = value"
+                           Message="@_createMessage"
+                           Invalid="@(_createMessage is not null)"
+                           FocusOnFirstRender="true" />
+
+                @if (_createRefusal is { } refusal)
+                {
+                    <p class="project-create__refusal" role="status">@refusal</p>
+                }
+
+                <div class="project-create__actions">
+                    @if (!_submitting)
+                    {
+                        <PrimaryButton>@Localizer["ProjectCreateSubmit"]</PrimaryButton>
+                        <button type="button" class="button-secondary" @onclick="CloseCreate">@Localizer["ProjectCancel"]</button>
+                    }
+
+                    @if (_submitting)
+                    {
+                        <p class="project-create__progress" role="status">@Localizer["ProjectCreating"]</p>
+                    }
+                </div>
+            </form>
+        }
+
+        @if (_projects.Count > 0)
+        {
+            <ul class="project-list__items">
+                @foreach (var project in _projects)
+                {
+                    <ProjectRow @key="project.Id"
+                                Project="@project"
+                                CanManage="@_canManage"
+                                Renaming="@(_renaming == project.Id)"
+                                Name="@_renameName"
+                                Message="@_renameMessage"
+                                Refusal="@(_rowRefusal?.ProjectId == project.Id ? _rowRefusal.Text : null)"
+                                FieldName="@_renameFieldName"
+                                OnStart="StartRename"
+                                OnNameChanged="RenameNameChanged"
+                                OnCommit="RenameAsync"
+                                OnCancel="CancelRename" />
+                }
+            </ul>
+        }
+    </div>
+}
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    // Field names no browser's autofill would match to a saved value (UX-DR33): random per page.
+    private readonly string _createFieldName = Guid.NewGuid().ToString("N");
+
+    private readonly string _renameFieldName = Guid.NewGuid().ToString("N");
+
+    private IDisposable? _purgeRegistration;
+
+    /// <summary>
+    /// Bumped by every purge. An answer that started before one is dropped when it arrives.
+    /// </summary>
+    private int _generation;
+
+    private List<ProjectResponse>? _projects;
+    private bool _canManage;
+    private string? _announcement;
+
+    private bool _creating;
+    private bool _submitting;
+    private string _newName = string.Empty;
+    private string? _createMessage;
+    private string? _createRefusal;
+
+    private Guid? _renaming;
+    private string _renameName = string.Empty;
+    private string? _renameMessage;
+    private bool _renameInFlight;
+    private RowRefusal? _rowRefusal;
+
+    /// <summary>
+    /// The Space whose Projects these are.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>
+    /// The Role held there, as its stable code, from the active Space's answer on this load.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public string RoleCode { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Raised when the server refuses the Space itself - a <c>404</c> - so Space home renders its one
+    /// refusal surface.
+    /// </summary>
+    [Parameter]
+    public EventCallback<ProblemResponse?> OnSpaceRefused { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _purgeRegistration = ActiveSpace.RegisterPurge(Purge);
+        _canManage = ProjectCapabilities.PermitsManageProjects(RoleCode);
+
+        await LoadAsync(_generation);
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _generation++;
+        _purgeRegistration?.Dispose();
+    }
+
+    /// <summary>
+    /// The Space is being left: everything about its Projects goes, synchronously.
+    /// </summary>
+    private void Purge()
+    {
+        _generation++;
+        _projects = null;
+        _announcement = null;
+        _creating = false;
+        _submitting = false;
+        _newName = string.Empty;
+        _createMessage = null;
+        _createRefusal = null;
+        _renaming = null;
+        _renameName = string.Empty;
+        _renameMessage = null;
+        _rowRefusal = null;
+    }
+
+    private async Task LoadAsync(int generation)
+    {
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(ProjectRoutes.ListIn(SpaceId), UriKind.Relative), token);
+
+            if (generation != _generation || token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                var projects = await response.Content.ReadFromJsonAsync<List<ProjectResponse>>(JsonOptions, token);
+
+                if (projects is not null && generation == _generation)
+                {
+                    _projects = projects;
+                }
+
+                return;
+            }
+
+            if (response.StatusCode != HttpStatusCode.Unauthorized)
+            {
+                await OnSpaceRefused.InvokeAsync(await ProblemOfAsync(response, token));
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab left this Space, or the Session ended: both purges have run.
+        }
+        catch (HttpRequestException)
+        {
+            await RefuseUnlessLeftAsync(generation);
+        }
+        catch (JsonException)
+        {
+            await RefuseUnlessLeftAsync(generation);
+        }
+    }
+
+    private async Task RefuseUnlessLeftAsync(int generation)
+    {
+        if (generation == _generation)
+        {
+            await OnSpaceRefused.InvokeAsync(null);
+        }
+    }
+
+    private void OpenCreate()
+    {
+        _creating = true;
+        _newName = string.Empty;
+        _createMessage = null;
+        _createRefusal = null;
+    }
+
+    private void CloseCreate()
+    {
+        _creating = false;
+        _createMessage = null;
+        _createRefusal = null;
+    }
+
+    private void CreateKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape" && !_submitting)
+        {
+            CloseCreate();
+        }
+    }
+
+    private async Task CreateAsync()
+    {
+        if (_submitting)
+        {
+            return;
+        }
+
+        _submitting = true;
+        _createMessage = null;
+        _createRefusal = null;
+
+        var generation = _generation;
+        var request = new CreateProjectRequest(_newName);
+        var key = Guid.NewGuid().ToString("D");
+
+        try
+        {
+            using var answer = await SendAsync(HttpMethod.Post, ProjectRoutes.ListIn(SpaceId), request, key);
+
+            if (generation != _generation)
+            {
+                return;
+            }
+
+            if (answer.StatusCode == HttpStatusCode.Created
+                && await answer.Response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ActiveSpace.Token) is { } created
+                && generation == _generation)
+            {
+                Add(created);
+                _newName = string.Empty;
+                _announcement = string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer["ProjectCreated"], created.Name);
+                return;
+            }
+
+            await RefuseCreateAsync(answer);
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way.
+        }
+        catch (HttpRequestException)
+        {
+            _createRefusal = Localizer[RefusalCopy.NotAvailableKey];
+        }
+        catch (JsonException)
+        {
+            _createRefusal = Localizer[RefusalCopy.NotAvailableKey];
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    /// <summary>
+    /// A refused creation: an invalid name beside the field; the bound, or a Role changed under the
+    /// page, inline in the creation surface in RefusalCopy's words; the Space itself refused, the one
+    /// refusal surface. A 401 is YelloApiHandler's.
+    /// </summary>
+    private async Task RefuseCreateAsync(StateChangeAnswer answer)
+    {
+        switch (answer.StatusCode)
+        {
+            case HttpStatusCode.Unauthorized:
+                return;
+
+            case HttpStatusCode.NotFound:
+                await OnSpaceRefused.InvokeAsync(answer.Problem);
+                return;
+
+            case HttpStatusCode.BadRequest when answer.Problem?.Type == ProblemTypes.InvalidProjectName:
+                _createMessage = Localizer["ProjectNameInvalid"];
+                return;
+
+            default:
+                _createRefusal = RefusalText(answer.Problem);
+                return;
+        }
+    }
+
+    private void StartRename(ProjectResponse project)
+    {
+        _renaming = project.Id;
+        _renameName = project.Name;
+        _renameMessage = null;
+        _rowRefusal = null;
+    }
+
+    private void CancelRename()
+    {
+        _renaming = null;
+        _renameMessage = null;
+    }
+
+    private void RenameNameChanged(string value) => _renameName = value;
+
+    /// <summary>
+    /// Renames a Project. Not optimistic: the field stays open, holding the new name, until the server
+    /// answers; then the row shows the answer's name, or the field says why it was refused.
+    /// </summary>
+    private async Task RenameAsync(ProjectResponse original)
+    {
+        var name = _renameName.Trim();
+
+        if (_renameInFlight)
+        {
+            return;
+        }
+
+        if (name.Length is < 1 or > 100)
+        {
+            _renameMessage = Localizer["ProjectNameInvalid"];
+            return;
+        }
+
+        _renameInFlight = true;
+        _renameMessage = null;
+        _rowRefusal = null;
+
+        var generation = _generation;
+
+        try
+        {
+            using var answer = await SendAsync(
+                HttpMethod.Patch,
+                ProjectRoutes.ProjectOf(SpaceId, original.Id),
+                new RenameProjectRequest(name),
+                Guid.NewGuid().ToString("D"));
+
+            if (generation == _generation && answer.StatusCode != HttpStatusCode.Unauthorized)
+            {
+                await UseRenameAnswerAsync(answer, original, generation);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab left this Space, or the Session ended.
+        }
+        catch (HttpRequestException)
+        {
+            RefuseRenameUnlessLeft(original, generation);
+        }
+        catch (JsonException)
+        {
+            RefuseRenameUnlessLeft(original, generation);
+        }
+        finally
+        {
+            _renameInFlight = false;
+        }
+    }
+
+    /// <summary>
+    /// The server's answer to a rename: the renamed row; an invalid name beside the field; anything else
+    /// on the row, in RefusalCopy's words. A 401 never reaches here - it is YelloApiHandler's.
+    /// </summary>
+    private async Task UseRenameAnswerAsync(StateChangeAnswer answer, ProjectResponse original, int generation)
+    {
+        if (answer.StatusCode == HttpStatusCode.OK
+            && await answer.Response.Content.ReadFromJsonAsync<ProjectResponse>(JsonOptions, ActiveSpace.Token) is { } renamed
+            && generation == _generation)
+        {
+            Replace(renamed);
+            _renaming = null;
+            _announcement = string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer["ProjectRenamed"], renamed.Name);
+            return;
+        }
+
+        if (answer.Problem?.Type == ProblemTypes.InvalidProjectName)
+        {
+            _renameMessage = Localizer["ProjectNameInvalid"];
+            return;
+        }
+
+        _renaming = null;
+        _rowRefusal = new RowRefusal(original.Id, RefusalText(answer.Problem));
+    }
+
+    private void RefuseRenameUnlessLeft(ProjectResponse original, int generation)
+    {
+        if (generation == _generation)
+        {
+            _renaming = null;
+            _rowRefusal = new RowRefusal(original.Id, Localizer[RefusalCopy.NotAvailableKey]);
+        }
+    }
+
+    private void Add(ProjectResponse project)
+    {
+        _projects ??= [];
+        _projects.Add(project);
+        Order();
+    }
+
+    private void Replace(ProjectResponse project)
+    {
+        if (_projects is null)
+        {
+            return;
+        }
+
+        var index = _projects.FindIndex(candidate => candidate.Id == project.Id);
+
+        if (index >= 0)
+        {
+            _projects[index] = project;
+            Order();
+        }
+    }
+
+    /// <summary>
+    /// The server's order: by name, then by id (open question 8).
+    /// </summary>
+    private void Order() =>
+        _projects?.Sort((left, right) =>
+        {
+            var byName = string.Compare(left.Name, right.Name, StringComparison.CurrentCulture);
+
+            return byName != 0 ? byName : left.Id.CompareTo(right.Id);
+        });
+
+    private string RefusalText(ProblemResponse? problem)
+    {
+        var message = RefusalCopy.For(problem, key => !Localizer[key].ResourceNotFound);
+
+        return message.Limit is { } limit
+            ? string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer[message.Key], limit)
+            : Localizer[message.Key];
+    }
+
+    /// <summary>
+    /// Sends a state-changing request with its Idempotency-Key and an anti-forgery token, and sends it once
+    /// more - with the same key - if the held token is refused.
+    /// </summary>
+    private async Task<StateChangeAnswer> SendAsync(HttpMethod method, string path, object body, string key)
+    {
+        var token = ActiveSpace.Token;
+
+        await Antiforgery.EnsureTokenAsync();
+
+        var answer = await AnswerOfAsync(await Http.SendAsync(Message(method, path, body, key), token), token);
+
+        if (answer.StatusCode != HttpStatusCode.BadRequest || answer.Problem?.Type != ProblemTypes.AntiforgeryTokenMissing)
+        {
+            return answer;
+        }
+
+        answer.Dispose();
+        Antiforgery.Invalidate();
+        await Antiforgery.EnsureTokenAsync();
+
+        return await AnswerOfAsync(await Http.SendAsync(Message(method, path, body, key), token), token);
+    }
+
+    private static HttpRequestMessage Message(HttpMethod method, string path, object body, string key)
+    {
+        var message = new HttpRequestMessage(method, new Uri(path, UriKind.Relative))
+        {
+            Content = JsonContent.Create(body, body.GetType(), options: JsonOptions),
+        };
+
+        message.Headers.TryAddWithoutValidation(Idempotency.HeaderName, key);
+
+        return message;
+    }
+
+    private static async Task<StateChangeAnswer> AnswerOfAsync(HttpResponseMessage response, CancellationToken token)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            return new StateChangeAnswer(response, Problem: null);
+        }
+
+        try
+        {
+            return new StateChangeAnswer(response, await ProblemOfAsync(response, token));
+        }
+        catch
+        {
+            response.Dispose();
+            throw;
+        }
+    }
+
+    private static async Task<ProblemResponse?> ProblemOfAsync(HttpResponseMessage response, CancellationToken token) =>
+        response.Content.Headers.ContentType?.MediaType is "application/problem+json"
+            ? await response.Content.ReadFromJsonAsync<ProblemResponse>(JsonOptions, token)
+            : null;
+
+    /// <summary>
+    /// A state-changing request's response, and its problem body when it was refused with one.
+    /// </summary>
+    private sealed record StateChangeAnswer(HttpResponseMessage Response, ProblemResponse? Problem) : IDisposable
+    {
+        public HttpStatusCode StatusCode => Response.StatusCode;
+
+        public void Dispose() => Response.Dispose();
+    }
+
+    /// <summary>
+    /// Why a row's rename was refused, shown on that row.
+    /// </summary>
+    private sealed record RowRefusal(Guid ProjectId, string Text);
+}

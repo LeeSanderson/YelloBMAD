@@ -338,6 +338,50 @@
     <value>Projects</value>
     <comment>The heading of a Space's home. It does not name the Space - the context bar does. "Project" is Glossary vocabulary.</comment>
   </data>
+  <data name="ProjectsLoading" xml:space="preserve">
+    <value>Loading Projects.</value>
+    <comment>For assistive technology only, inside the busy region shown while a Space's Project list is on its way (UX-DR35 cold load). Nothing of any Project renders before the answer (UX-DR31).</comment>
+  </data>
+  <data name="ProjectsEmpty" xml:space="preserve">
+    <value>No Projects yet.</value>
+    <comment>A Space with no Projects (AC1, EXPERIENCE.md:252). A valid state, not an error; it asks for nothing but a Project - never for Statuses or configuration.</comment>
+  </data>
+  <data name="ProjectCreate" xml:space="preserve">
+    <value>Create a Project</value>
+    <comment>The one action a Space offers to create a Project, empty or not. Absent - not disabled - for a Role that cannot create one (UX-DR27).</comment>
+  </data>
+  <data name="ProjectNameLabel" xml:space="preserve">
+    <value>Project name</value>
+    <comment>The label of the name field, when creating or renaming a Project.</comment>
+  </data>
+  <data name="ProjectCreateSubmit" xml:space="preserve">
+    <value>Create</value>
+    <comment>Submits a new Project's name. Not "Save" (UX-DR26).</comment>
+  </data>
+  <data name="ProjectCreating" xml:space="preserve">
+    <value>Creating the Project.</value>
+    <comment>Shown in place of the create actions while a creation is on its way, so it cannot be sent twice.</comment>
+  </data>
+  <data name="ProjectCreated" xml:space="preserve">
+    <value>{0} created.</value>
+    <comment>Announced politely once a Project exists. {0} is its name, as the person typed it.</comment>
+  </data>
+  <data name="ProjectRename" xml:space="preserve">
+    <value>Rename</value>
+    <comment>Both the row's control that opens a rename and the control that commits it. Never "Save": there is no save button anywhere (UX-DR26).</comment>
+  </data>
+  <data name="ProjectRenamed" xml:space="preserve">
+    <value>Renamed to {0}.</value>
+    <comment>Announced politely once a rename is accepted. {0} is the new name.</comment>
+  </data>
+  <data name="ProjectCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Closes a create or rename field without sending anything. Esc does the same.</comment>
+  </data>
+  <data name="ProjectNameInvalid" xml:space="preserve">
+    <value>A Project name is 1 to 100 characters.</value>
+    <comment>The invalid-project-name refusal, beside the name field. Never "that name is taken" - Project names need not be unique.</comment>
+  </data>
   <data name="NoSpaceHeading" xml:space="preserve">
     <value>No Spaces yet</value>
     <comment>Heading shown to an Account that belongs to no Space. A valid state, not an error (UX-DR35); nothing is created for the person.</comment>
