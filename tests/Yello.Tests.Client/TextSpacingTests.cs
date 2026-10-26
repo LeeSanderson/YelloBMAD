@@ -205,6 +205,59 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
         }
     }
 
+    /// <summary>
+    /// Story 2.4, AC13 ("a Label chip on a card and in the panel"), UX-DR40 - the Task detail panel open on a Task
+    /// carrying four long Labels, under 1.4.12 text spacing and 200% text-only zoom: no chip text clipped, no two chips
+    /// overlapping, no sideways page scroll. Anchored: a chip is on screen in the panel before the check runs. Added at
+    /// code review: the card and Space settings had their case, the panel did not.
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR40")]
+    public async Task Text_spacing_and_text_only_zoom_clip_no_Label_chip_in_the_Task_detail_panel(bool zoom)
+    {
+        var api = Seeded();
+        var names = Enumerable.Range(1, 4).Select(index => $"A rather long Label name, number {index}").ToList();
+        var labels = names.Select((name, index) => new FakeLabel(Guid.NewGuid(), name, LabelColours.Keys[index])).ToList();
+        var (column, task) = api.FindTask(api.Boards[(Northwind, Atlas)].Columns[0].Tasks[0].Id)!.Value;
+
+        api.Labels[Northwind] = labels;
+        column.Tasks[0] = task with { LabelIds = [.. labels.OrderBy(label => label.Name, StringComparer.OrdinalIgnoreCase).Select(label => label.Id)] };
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/projects/{Atlas:D}").ToString());
+
+            await page.Locator($".task-card button[data-task-id='{task.Id:D}']").ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await page.Locator("[role='dialog'] .label-chip").First.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+            var chips = await page.EvaluateAsync<int[]>(
+                """
+                () => {
+                    const chips = [...document.querySelectorAll("[role='dialog'] .label-chip")].map(chip => chip.getBoundingClientRect());
+                    let overlaps = 0;
+                    for (let a = 0; a < chips.length; a++)
+                        for (let b = a + 1; b < chips.length; b++)
+                            if (chips[a].left < chips[b].right - 1 && chips[b].left < chips[a].right - 1 && chips[a].top < chips[b].bottom - 1 && chips[b].top < chips[a].bottom - 1) overlaps++;
+                    return [chips.length, overlaps];
+                }
+                """);
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+            Assert.Equal(4, chips[0]);
+            Assert.Equal(0, chips[1]);
+        }
+    }
+
     private static FakeYelloApi Seeded()
     {
         var api = new FakeYelloApi { SignedIn = true };

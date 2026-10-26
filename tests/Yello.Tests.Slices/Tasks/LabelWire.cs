@@ -216,6 +216,34 @@ internal static class LabelWire
     }
 
     /// <summary>
+    /// Takes, in the caller's open transaction, what a Labels edit of <paramref name="taskId"/> takes before it writes:
+    /// the Task's row under <c>UPDLOCK, HOLDLOCK</c> on its clustered key, and the Task's <c>TaskLabel</c> range under
+    /// the same hints - so a second edit that skipped the Task lock would read the Task's applications and then queue
+    /// on the range to insert, instead of queueing before it read them.
+    /// </summary>
+    public static async Task HoldTaskLabelsAsync(SqlConnection connection, DbTransaction transaction, Guid spaceId, Guid taskId, CancellationToken cancellationToken)
+    {
+        await using DbCommand command = connection.CreateCommand();
+
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            SELECT COUNT(*) FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = @task;
+            SELECT COUNT(*) FROM dbo.[TaskLabel] WITH (UPDLOCK, HOLDLOCK) WHERE SpaceId = @space AND TaskId = @task;
+            """;
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+        command.Parameters.Add(new SqlParameter("@task", taskId));
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        Assert.True(await reader.ReadAsync(cancellationToken));
+        Assert.Equal(1, reader.GetInt32(0));
+        Assert.True(await reader.NextResultAsync(cancellationToken));
+        Assert.True(await reader.ReadAsync(cancellationToken));
+        Assert.Equal(0, reader.GetInt32(0));
+    }
+
+    /// <summary>
     /// Deletes a Label row in the caller's open transaction - the race case where the deletion wins.
     /// </summary>
     public static async Task DeleteLabelRowAsync(SqlConnection connection, DbTransaction transaction, Guid labelId, CancellationToken cancellationToken)

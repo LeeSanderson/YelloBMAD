@@ -42,12 +42,27 @@
 @code {
     private bool _wasPermitted;
     private bool _leaving;
+    private Guid _spaceSeen;
 
     /// <summary>
     /// The Space this route names.
     /// </summary>
     [Parameter]
     public Guid SpaceId { get; set; }
+
+    /// <summary>
+    /// The router reuses this page when only the Space changes (another Space's settings, back or forward): what an
+    /// earlier Space permitted says nothing about this one, so it starts again.
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        if (SpaceId != _spaceSeen)
+        {
+            _spaceSeen = SpaceId;
+            _wasPermitted = false;
+            _leaving = false;
+        }
+    }
 
     /// <summary>
     /// The Role decides what renders, read on every arrival. A Role that permitted this page on an earlier answer and

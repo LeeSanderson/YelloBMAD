@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace Yello.Tests.Architecture;
@@ -22,13 +23,48 @@ public sealed partial class DesignFoundationGateTests
 
     private const double LabelChipRadiusPx = 2;
 
-    /// <summary>
-    /// The palette keys story 2.4 Q3 recommends; held equal to the Domain's and the token layer's by
-    /// <c>LabelPaletteGateTests.The_token_palette_and_the_Domain_palette_are_the_same_set</c>.
-    /// </summary>
-    private static readonly string[] LabelPaletteKeys = ["rust", "ochre", "olive", "grass", "jade", "teal", "blue", "orchid"];
-
     private static readonly string[] FixedHeightProperties = ["height", "block-size", "max-height", "max-block-size"];
+
+    /// <summary>
+    /// The properties a type role binds (<c>--type-{role}-*</c>): a chip rule that states one of these overrides the
+    /// role it is given in markup.
+    /// </summary>
+    private static readonly string[] TypeRoleProperties = ["font", "font-family", "font-size", "font-weight", "line-height", "letter-spacing"];
+
+    private static readonly FileInfo LabelChipMarkup =
+        new(Path.Combine(RepositoryLayout.Root.FullName, "Yello.Client", "Components", "LabelChip.razor"));
+
+    /// <summary>
+    /// AC13, UX-DR5, <c>DESIGN.md:180-183</c> - the Label chip takes the <c>meta</c> type role as a mapping: its element
+    /// carries the <c>type-meta</c> class, and no rule that styles <c>.label-chip</c> states a property the role binds,
+    /// which would override it. Added at code review: the radius, height and shadow clauses were gated, this one was not.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "UX-DR5")]
+    public void Label_chips_take_the_meta_type_role()
+    {
+        Assert.True(LabelChipMarkup.Exists, $"{LabelChipMarkup.FullName} does not exist.");
+
+        var markup = LabelChipRazorComment.Replace(File.ReadAllText(LabelChipMarkup.FullName), string.Empty);
+        var element = LabelChipElement.Match(markup);
+
+        Assert.True(element.Success, "LabelChip.razor has no element carrying the label-chip class.");
+
+        var classes = element.Groups["classes"].Value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        var problems = new List<string>();
+
+        if (!classes.Contains("type-meta", StringComparer.Ordinal))
+        {
+            problems.Add("LabelChip.razor's chip element does not carry the type-meta class.");
+        }
+
+        problems.AddRange(CssCorpus.AllDeclarations()
+            .Where(d => SelectsComponent(d.Rule.Selector, LabelChipClass))
+            .Where(d => TypeRoleProperties.Contains(d.Declaration.Property, StringComparer.OrdinalIgnoreCase))
+            .Select(d => $"{Where(d.Sheet, d.Declaration)} overrides the chip's type role."));
+
+        AssertNoProblems(problems, "The Label chip does not take the meta type role.", "Give the chip class=\"type-meta label-chip ...\" and leave its type to the role.");
+    }
 
     /// <summary>
     /// AC13, UX-DR5, <c>deferred-work.md:36</c> - every radius declared on a Label chip resolves to 2px (<c>rounded.sm</c>),
@@ -108,7 +144,7 @@ public sealed partial class DesignFoundationGateTests
         var declarations = CssCorpus.AllDeclarations().ToList();
         var problems = new List<string>();
 
-        foreach (var key in LabelPaletteKeys)
+        foreach (var key in Yello.Domain.Labels.LabelPalette.Keys)
         {
             var fills = declarations
                 .Where(d => SelectsComponent(d.Rule.Selector, $"{LabelChipClass}--{key}"))
@@ -129,4 +165,10 @@ public sealed partial class DesignFoundationGateTests
 
         AssertNoProblems(problems, "A Label chip is not drawn from the palette tokens.", "Give each key a modifier class over var(--label-{key}) and the chip var(--label-ink).");
     }
+
+    [GeneratedRegex(@"@\*.*?\*@", RegexOptions.Singleline, 1000)]
+    private static partial Regex LabelChipRazorComment { get; }
+
+    [GeneratedRegex(@"<\w+\s[^>]*class=""(?<classes>[^""]*\blabel-chip\b[^""]*)""", RegexOptions.None, 1000)]
+    private static partial Regex LabelChipElement { get; }
 }

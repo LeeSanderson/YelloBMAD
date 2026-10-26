@@ -68,6 +68,8 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     private const string NotSentCopy = "Not sent.";
     private const string NotAvailableCopy = "Not available.";
     private const string NowAMemberCopy = "You're now a Member. Space settings is no longer available.";
+    private const string InUseConfirmCopy = "Delete In use? This cannot be undone.";
+    private const string LabelInUseCopy = "This Label is on Tasks. Remove it from them first.";
 
     private const string InsufficientRoleType = "urn:yello:problem:insufficient-role";
     private const string IdempotencyKeyReusedType = "urn:yello:problem:idempotency-key-reused";
@@ -294,6 +296,83 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
             {
                 Assert.Contains(copy, panel, StringComparison.Ordinal);
             }
+        }
+    }
+
+    /// <summary>
+    /// Q1 (a), the whole set (added at code review) - a Task carrying a Label this tab's list does not hold (defined and
+    /// applied elsewhere since the Board loaded) keeps it when another Label is toggled: the edit sends the whole set,
+    /// so leaving the unknown id out would remove a Label the person never saw.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-22")]
+    [Trait("Requirement", "AD-11")]
+    public async Task Toggling_a_Label_keeps_a_carried_Label_this_tab_does_not_know()
+    {
+        var api = TwoSpaces();
+        var labels = SeedLabels(api, Northwind, "Alpha", "Bravo");
+        var tasks = Seed(api, Northwind, Atlas, "Carrier");
+        var unknown = Guid.NewGuid();
+        var (column, task) = api.FindTask(tasks[0].Id)!.Value;
+
+        column.Tasks[column.Tasks.FindIndex(candidate => candidate.Id == task.Id)] = task with { LabelIds = [labels[0].Id, unknown] };
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenBoardAsync(api, page, Northwind, Atlas);
+            await OpenPanelAsync(page, tasks[0].Id);
+
+            var held = api.HoldTaskEditAsync();
+
+            await ToggleAsync(page, "Bravo");
+            await held.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+
+            var edit = Assert.Single(Edits(api));
+
+            Assert.Equal(new[] { labels[0].Id, labels[1].Id, unknown }.Order(), LabelIdsSent(edit).Order());
+
+            api.ReleaseTaskEditRefused(400, "urn:yello:problem:invalid-task-labels");
+        }
+    }
+
+    /// <summary>
+    /// AC10 (the deletion wins, in the client; added at code review) - a Labels edit refused <c>400 invalid-task-labels</c>
+    /// because a Label was deleted since the Board loaded re-reads the Space's Labels, so the picker stops offering it.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-22")]
+    [Trait("Requirement", "AD-11")]
+    public async Task A_Labels_edit_refused_for_a_deleted_Label_stops_offering_it()
+    {
+        var api = TwoSpaces();
+        var labels = SeedLabels(api, Northwind, "Alpha", "Bravo");
+        var tasks = Seed(api, Northwind, Atlas, "Carrier");
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenBoardAsync(api, page, Northwind, Atlas);
+            await OpenPanelAsync(page, tasks[0].Id);
+
+            var held = api.HoldTaskEditAsync();
+
+            await ToggleAsync(page, "Bravo");
+            await held.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+
+            api.Labels[Northwind].RemoveAll(label => label.Id == labels[1].Id);
+            api.ReleaseTaskEditRefused(400, "urn:yello:problem:invalid-task-labels");
+
+            var options = page.Locator(Dialog).Locator($"{Picker} {Option}");
+
+            await WaitUntilAsync(
+                async () => (await options.AllInnerTextsAsync()).Select(text => text.Trim()).SequenceEqual(["Alpha"]),
+                "The picker still offers the deleted Label.");
+
+            Assert.Empty(await ChipsOnCardAsync(page, tasks[0].Id));
         }
     }
 
@@ -533,13 +612,13 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
 
             await confirm.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
-            Assert.Contains("In use", await confirm.InnerTextAsync(), StringComparison.Ordinal);
+            Assert.Contains(InUseConfirmCopy, await confirm.InnerTextAsync(), StringComparison.Ordinal);
             Assert.True(await page.Locator(Dialog).CountAsync() <= 1, "The confirm stacked a second dialog.");
 
             await confirm.Locator(".button-danger").ClickAsync();
             await WaitUntilAsync(() => api.Requests.Count(request => request.Method == "DELETE" && request.Path.Contains("/labels/", StringComparison.Ordinal)) == 2, "The second deletion was never sent.");
 
-            await RowOf(page, "In use").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await RowOf(page, "In use").GetByText(LabelInUseCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             var main = await page.Locator("main").InnerTextAsync();
 

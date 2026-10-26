@@ -298,7 +298,40 @@ public sealed partial class BoardView
             default:
                 replica.Queued.Remove(attribute);
                 SayInPanel(taskId, RefusalText.Of(Localizer, answer.Problem));
+
+                if (answer.Problem?.Type == ProblemTypes.InvalidTaskLabels)
+                {
+                    await RefreshLabelsAsync(generation, token);
+                }
+
                 return EditOutcome.Refused;
+        }
+    }
+
+    /// <summary>
+    /// After <c>invalid-task-labels</c> the Space's Label list is read again: a Label in it has been deleted since the
+    /// Board loaded, and the picker must stop offering it. A read that fails leaves the list as it was - the refusal
+    /// has already been said, and the next Board load reads the list anyway.
+    /// </summary>
+    private async Task RefreshLabelsAsync(int generation, CancellationToken token)
+    {
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(LabelRoutes.LabelsOf(SpaceId), UriKind.Relative), token);
+
+            if (!response.IsSuccessStatusCode || generation != _generation || token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (await response.Content.ReadFromJsonAsync<List<LabelResponse>>(JsonOptions, token) is { } labels && generation == _generation)
+            {
+                UseLabels(labels);
+            }
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // Left as it was; see above.
         }
     }
 

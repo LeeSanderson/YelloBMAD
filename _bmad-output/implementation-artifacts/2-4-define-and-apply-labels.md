@@ -4,7 +4,7 @@ baseline_commit: 4969754
 
 # Story 2.4: Define and apply Labels
 
-Status: review
+Status: done
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-4-define-and-apply-labels`
@@ -264,6 +264,29 @@ AC1–AC6 are reproduced **verbatim** from `epics.md:1105-1130` (`status: final`
   - [x] `tests/TESTING-CONVENTIONS.md`: the palette harness (ΔE2000 known-answer first), the new counts.
   - [x] Ledger (`deferred-work.md`): UPDATE `:36` (Label chips done; which surfaces remain), `:20` (Labels case added), `:493` (third Board statement). ADD each with an owner: the Label-chip foreground amendment to `DESIGN.md:180-183` (owner UX, Q4); rename/recolour of a Label (owner per Q10); the Labels-per-Space / per-Task bound question (owner PM, Q6); sort by a many-to-many Label in the List View (owner 2.10); the `+N` interaction (owner UX, Q5); the Space settings page's later sections (owners 4.2/4.4/5.1/6.3).
   - [x] `sprint-status.yaml`: set `review` at the end of the dev phase. **Do not add review narration to source files.**
+
+### Review Findings
+
+Code review 2026-10-26 (`cd45af9..0cad37b`, full mode: Blind Hunter, Edge Case Hunter, Acceptance Auditor). 40 raw findings, 30 after dedup: 0 decision-needed, 12 patch, 6 defer, 12 dismissed.
+
+- [x] [Review][Patch] Two concurrent Labels edits of one Task can store a set neither sent, fail with a 500, or deadlock - a Labels-only edit takes no Task lock and `[]` takes no Label lock, so both edits read the same current `TaskLabel` rows: disjoint sets merge (`{X}` + `{Y}` → `{X,Y}`), two removals of one row raise `DbUpdateConcurrencyException` (500), and Label locks taken in submitted order let `[A,B]` and `[B,A]` deadlock (1205) [Yello.Infrastructure/Persistence/TaskStore.cs:172]
+- [x] [Review][Patch] Toggling a Label strips every carried Label this tab's list does not hold - `next` is built from `SpaceLabels` only, so a Label defined and applied elsewhere since the Board loaded is silently removed by the next toggle [Yello.Client/Components/TaskDetail.razor:451]
+- [x] [Review][Patch] Space settings keeps `_wasPermitted` / `_leaving` across a `SpaceId` change - Blazor reuses the page between `/spaces/A/settings` and `/spaces/B/settings`, so an Owner of A who is a Member of B is told their Role was lowered and routed away, and a stuck `_leaving` suppresses later narration [Yello.Client/Pages/SpaceSettings.razor:43]
+- [x] [Review][Patch] After `400 invalid-task-labels` the Board keeps offering the deleted Label - the Labels revert but the Space's Label list is not re-read, so every further toggle that carries it fails again until a reload [Yello.Client/Components/BoardView.razor.cs:298]
+- [x] [Review][Patch] Space settings treats an HttpClient timeout as "the tab left" and says nothing - `catch (OperationCanceledException)` has no `when` on the Space token, unlike `BoardView`, so a timed-out define or delete shows no message [Yello.Client/Components/LabelSection.razor:252]
+- [x] [Review][Patch] AC13: no text-spacing case measures the chips in the Task detail panel - `Text_spacing_and_text_only_zoom_clip_no_Label_chip` covers the card and Space settings only [tests/Yello.Tests.Client/TextSpacingTests.cs]
+- [x] [Review][Patch] AC13: the chip's `meta` type role is not gated as a mapping - radius, height, shadow and wrapping are gated; `type-meta` on `LabelChip` is not [tests/Yello.Tests.Architecture/DesignFoundationGateTests.Labels.cs]
+- [x] [Review][Patch] AC12: no palette plant fails the 3:1 rule against the dark card ground - the oracle plants separation, the light card and the ink, not the dark `surface-card` [tests/Yello.Tests.Architecture/LabelPaletteGateTests.cs]
+- [x] [Review][Patch] The chip-class gate keeps its own copy of the palette keys instead of reading `LabelPalette.Keys` - a ninth Domain key with a token but no `.label-chip--{key}` class would pass [tests/Yello.Tests.Architecture/DesignFoundationGateTests.Labels.cs]
+- [x] [Review][Patch] A combined `{title, labelIds:[invalid]}` edit writes the title before the Labels are refused, and nothing proves the unit of work rolls it back [tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Labels.cs]
+- [x] [Review][Patch] AC11: the out-of-palette colour case does not assert that no refusal row is written [tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Labels.cs]
+- [x] [Review][Patch] Task 11 / UX-DR36: the in-use deletion case never asserts the reason copy or the confirm's "This cannot be undone." [tests/Yello.Tests.Client/LabelTests.cs:513]
+- [x] [Review][Defer] Deleting a Label that is already gone raises the Space-level refusal surface [Yello.Client/Components/LabelSection.razor:388] — deferred to story 4.4, follows the client's existing 404 pattern
+- [x] [Review][Defer] Label names accept zero-width, format and control characters; the 50 limit counts UTF-16 code units [Yello.Domain/Labels/LabelName.cs:28] — deferred to Epic 2 (PM), same rule as Project names
+- [x] [Review][Defer] Case-insensitive Label-name uniqueness rests on the database's default collation; the client's insert order can differ from the server's [Yello.Infrastructure/Persistence/Configurations/LabelConfiguration.cs:60] — deferred to story 6.1, same as `StatusDefinition.Name`
+- [x] [Review][Defer] Space on a Label picker option is not prevented and can scroll the page [Yello.Client/Components/LabelOption.razor] — deferred to story 2.8, joins the Status picker entry
+- [x] [Review][Defer] The "narrated, then routed" sentence is inserted into Space home already filled, so a screen reader may not announce it [Yello.Client/Pages/SpaceHome.razor:35] — deferred to story 4.4, the first story that can lower a Role
+- [x] [Review][Defer] No plant proves the Label purge; leaving the Space unmounts the page either way [Yello.Client/Components/LabelSection.razor] — deferred to story 3.2
 
 ## Dev Notes
 
@@ -569,3 +592,4 @@ Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, run unattended by the story-c
 ### Change Log
 
 - 2026-10-25 - Dev phase: Labels defined per Space and applied to Tasks (FR-22, FR-20 Labels clause, UX-DR8, UX-DR13, AC1-AC14). Migration `LabelTables`; three Label routes and `labelIds` on the Task edit and every Task answer; the computed palette; chips, the Label picker and Space settings. All eight 2.4 isolation rows live; `LabelScaffold` deleted. A deadlock between deletion and application found by an added race case and fixed (`INDEX(1)`). Full run: 982 total, 979 passed, 0 failed, 3 skipped. Status -> review.
+- 2026-10-26 - Code review (`cd45af9..0cad37b`): 40 raw findings, 30 after dedup; 12 patched, 6 deferred to `deferred-work.md` with owners, 12 dismissed. Main fix: two concurrent Labels edits of one Task could store a set neither request sent, or fail with a 500. The edit now locks the Task row first and the Labels in the server's id order, and a deterministic race case catches the lock's removal 3 runs out of 3. Also: a toggle keeps carried Labels the tab does not know; an `invalid-task-labels` refusal re-reads the Label list; Space settings resets per Space; a define or delete that times out says "Not sent."; added gates and cases for the panel chips' text spacing, the chip's `meta` type role, a dark-ground palette plant, and the combined-edit rollback. Full run: 989 total, 986 passed, 0 failed, 3 skipped. Status -> done.

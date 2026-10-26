@@ -135,6 +135,11 @@ public sealed class LabelPaletteGateTests
 
         Assert.Contains(whitePlant, violation => violation.Contains("light card", StringComparison.Ordinal));
 
+        // The dark ground's own value: 1:1 against the dark card (added at code review, so each ground has its plant).
+        var darkCardPlant = Violations("planted", CssCorpus.TokenValues["surface-card"].Trim(), ProposedInk, grounds);
+
+        Assert.Contains(darkCardPlant, violation => violation.Contains("dark card", StringComparison.Ordinal));
+
         var textPrimary = CssCorpus.TokenValues["text-primary"].Trim();
 
         Assert.All(ProposedFills, fill => Assert.Contains(Violations(fill.Key, fill.Fill, textPrimary, grounds), violation => violation.Contains("ink", StringComparison.Ordinal)));

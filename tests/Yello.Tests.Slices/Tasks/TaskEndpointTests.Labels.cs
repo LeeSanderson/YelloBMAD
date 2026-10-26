@@ -269,6 +269,50 @@ public sealed partial class TaskEndpointTests
     }
 
     /// <summary>
+    /// AC8, Task 5 ("refused before any write") - an edit naming a new title, Status and due date beside a Label that is
+    /// not the Space's is refused <c>400 invalid-task-labels</c> and changes nothing: the store has already written the
+    /// other attributes when the Labels are found wanting, so the unit of work's rollback is what this case holds.
+    /// Added at code review.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-20")]
+    [Trait("Requirement", "AR-34")]
+    public async Task An_edit_refused_for_its_Labels_changes_none_of_its_other_attributes()
+    {
+        var database = Available();
+        Actor? owner = null;
+        var taskId = Guid.Empty;
+        TaskRow? before = null;
+        TaskRow? after = null;
+        WireResponse? refused = null;
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            owner = await RegisterAsync(client, database);
+            (_, taskId) = await ProjectWithTaskAsync(owner, "Unchanged");
+
+            var statuses = await StatusesAsync(database, owner.SpaceId);
+
+            before = await RowAsync(database, owner.SpaceId, taskId);
+            refused = await EditTaskAsync(owner, owner.SpaceId, taskId, Body(new
+            {
+                title = "Changed",
+                statusId = statuses[1].Id,
+                dueDate = "2026-12-01T00:00:00+00:00",
+                labelIds = new[] { Guid.NewGuid() },
+            }));
+            after = await RowAsync(database, owner.SpaceId, taskId);
+        });
+
+        Assert.NotNull(owner);
+        Assert.True(refused?.StatusCode == HttpStatusCode.BadRequest, $"{refused?.StatusCode} {refused?.Body}");
+        Assert.Equal(ProblemTypes.InvalidTaskLabels, Problem(refused!)?.Type);
+        Assert.Equal(before, after);
+        Assert.Empty(await AppliedToAsync(database, owner.SpaceId, taskId));
+    }
+
+    /// <summary>
     /// AC2 ("a Viewer cannot apply one by any route including the API"), AC9, C-6 - a Viewer added to an Owner's Space
     /// sends <c>labelIds</c> on its Session and its Token: <c>403 insufficient-role</c> naming <c>manage-tasks</c> (a
     /// Task edit, not Label definition), two <c>InsufficientRole</c> rows, no application. Anchor: a Member's same edit
@@ -394,6 +438,7 @@ public sealed partial class TaskEndpointTests
         Assert.NotNull(owner);
         Assert.Equal(HttpStatusCode.BadRequest, refused?.StatusCode);
         Assert.Equal(ProblemTypes.InvalidLabelColour, Problem(refused!)?.Type);
+        Assert.Empty(await RefusalKindsAsync(database, owner.AccountId, owner.SpaceId));
         Assert.Equal(HttpStatusCode.Created, anchor?.StatusCode);
         Assert.Equal([Rust], (await LabelRowsAsync(database, owner.SpaceId)).Select(row => row.Colour));
     }

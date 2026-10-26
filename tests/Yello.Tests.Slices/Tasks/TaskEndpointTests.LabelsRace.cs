@@ -239,4 +239,59 @@ public sealed partial class TaskEndpointTests
         Assert.Contains(labelId, (await LabelRowsAsync(database, owner.SpaceId)).Select(row => row.Id));
         Assert.Equal([labelId], await AppliedToAsync(database, owner.SpaceId, taskId));
     }
+
+    /// <summary>
+    /// Q1 (a), the whole set (added at code review) - the test is a first Labels edit of the Task: it takes the Task's
+    /// row and its <c>TaskLabel</c> range as the product does, and applies one Label in its own open transaction; a
+    /// second edit setting a different Label queues; the test commits; the second edit answers <c>200</c> and the Task
+    /// carries exactly the second edit's set. Without the edit's Task lock the second edit reads the Task's applications
+    /// before the test's is committed, queues only to insert, and stores both Labels - a set neither edit sent (and two
+    /// removals of one row meet as a <c>500</c>).
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-22")]
+    [Trait("Requirement", "AR-34")]
+    public async Task A_Labels_edit_racing_another_of_the_same_Task_stores_exactly_its_own_set()
+    {
+        var database = Available();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Actor? owner = null;
+        var taskId = Guid.Empty;
+        var second = Guid.Empty;
+        WireResponse? answer = null;
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            owner = await RegisterAsync(client, database);
+
+            var (projectId, createdTask) = await ProjectWithTaskAsync(owner, "Being relabelled");
+
+            taskId = createdTask;
+
+            var first = await SeedAsync(owner, owner.SpaceId, "First");
+
+            second = await SeedAsync(owner, owner.SpaceId, "Second");
+
+            Assert.Equal(HttpStatusCode.OK, (await BoardAsync(owner, owner.SpaceId, projectId)).StatusCode);
+
+            await using var holder = await database.OpenForSpaceAsync(owner.SpaceId, cancellationToken);
+            await using var observer = await database.OpenWithoutSpaceContextAsync(cancellationToken);
+            await using var held = await holder.BeginTransactionAsync(cancellationToken);
+
+            await HoldTaskLabelsAsync(holder, held, owner.SpaceId, taskId, cancellationToken);
+
+            var racing = EditTaskAsync(owner, owner.SpaceId, taskId, ApplyBody(second));
+
+            await WaitUntilBlockedOnALockAsync(observer, 1, racing, cancellationToken);
+            await InsertApplicationAsync(holder, held, owner.SpaceId, taskId, first, cancellationToken);
+            await held.CommitAsync(cancellationToken);
+
+            answer = await racing;
+        });
+
+        Assert.NotNull(owner);
+        Assert.True(answer?.StatusCode == HttpStatusCode.OK, $"{answer?.StatusCode} {answer?.Body}");
+        Assert.Equal([second], await AppliedToAsync(database, owner.SpaceId, taskId));
+    }
 }

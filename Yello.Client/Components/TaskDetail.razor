@@ -441,6 +441,8 @@
     /// <summary>
     /// Toggles one Label and commits the Task's whole new set (story 2.4, open question 1 (a)), in the server's order so
     /// the card and the panel draw it as a read would. The picker stays open: several Labels are often chosen at once.
+    /// A carried Label this tab's list does not hold - defined and applied elsewhere since the Board loaded - is kept,
+    /// after the known ones: the whole set is sent, so leaving it out would remove a Label this person never saw.
     /// </summary>
     private Task ToggleLabelAsync(Guid labelId)
     {
@@ -448,7 +450,13 @@
             ? Item.LabelIds.Where(id => id != labelId).ToHashSet()
             : Item.LabelIds.Append(labelId).ToHashSet();
 
-        IReadOnlyList<Guid> next = [.. SpaceLabels.Select(label => label.Id).Where(carried.Contains)];
+        var known = SpaceLabels.Select(label => label.Id).ToHashSet();
+
+        IReadOnlyList<Guid> next =
+        [
+            .. SpaceLabels.Select(label => label.Id).Where(carried.Contains),
+            .. Item.LabelIds.Where(id => carried.Contains(id) && !known.Contains(id)),
+        ];
 
         return OnLabels.InvokeAsync(next);
     }

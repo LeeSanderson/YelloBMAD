@@ -245,16 +245,19 @@
 
         _submitting = true;
 
+        var token = ActiveSpace.Token;
+
         try
         {
             await SendDefinitionAsync(name, _colour, _generation);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             // The tab left this Space, or the Session ended, while the answer was on its way.
         }
-        catch (Exception exception) when (exception is HttpRequestException or JsonException)
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
         {
+            // No answer - a timeout included - or one that could not be read: the person is told it was not sent.
             _defineRefusal = Localizer["TaskEditNotSent"];
         }
         finally
@@ -364,10 +367,11 @@
         _deleting = labelId;
 
         var generation = _generation;
+        var token = ActiveSpace.Token;
 
         try
         {
-            using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Delete, LabelRoutes.LabelOf(SpaceId, labelId), Guid.NewGuid().ToString("D"), ActiveSpace.Token);
+            using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Delete, LabelRoutes.LabelOf(SpaceId, labelId), Guid.NewGuid().ToString("D"), token);
 
             if (generation != _generation)
             {
@@ -394,12 +398,13 @@
                     return;
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
             // The tab left this Space, or the Session ended, while the answer was on its way.
         }
-        catch (Exception exception) when (exception is HttpRequestException or JsonException)
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
         {
+            // No answer - a timeout included - or one that could not be read: the row says it was not sent.
             _rowRefusal = (labelId, Localizer["TaskEditNotSent"]);
         }
         finally

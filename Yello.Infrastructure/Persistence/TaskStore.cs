@@ -1,3 +1,4 @@
+using System.Data.SqlTypes;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Yello.Domain;
@@ -38,9 +39,11 @@ namespace Yello.Infrastructure.Persistence;
 /// written, so the composite foreign key never answers it as a <c>500</c>. A deletion that committed first is then
 /// simply missing; one that comes second waits on the Label lock and then finds the application
 /// (<see cref="LabelStore"/>). <b>Lock order</b>: an edit takes the Project's Task range (a Status change only), then
-/// the Labels, then the Task's own <c>TaskLabel</c> rows; a deletion takes the Label, then its <c>TaskLabel</c>
-/// range. Label before TaskLabel in both, and a deletion never takes a Task lock, so the two cannot wait on each
-/// other in a cycle - measured by the story's race cases, which hold each side's lock and wait on the other.
+/// the Task's own row, then the Labels in the server's id order, then reads the Task's <c>TaskLabel</c> rows; a
+/// deletion takes the Label, then its <c>TaskLabel</c> range. Label before TaskLabel in both, and a deletion never
+/// takes a Task lock, so the two cannot wait on each other in a cycle - measured by the story's race cases, which
+/// hold each side's lock and wait on the other. The Task row lock serialises two Labels edits of one Task, so the
+/// whole-set replacement stays one request's set.
 /// </para>
 /// <para>
 /// <b>Saves its own effect</b>, as every store does, so the idempotency record is the only thing the
@@ -53,6 +56,12 @@ namespace Yello.Infrastructure.Persistence;
 internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator identifiers, TimeProvider clock)
     : ITaskStore
 {
+    /// <summary>
+    /// SQL Server's ordering of <c>uniqueidentifier</c>, which is not <see cref="Guid"/>'s own.
+    /// </summary>
+    private static readonly IComparer<Guid> ServerGuidOrder =
+        Comparer<Guid>.Create((first, second) => new SqlGuid(first).CompareTo(new SqlGuid(second)));
+
     /// <inheritdoc />
     public async Task<TaskItem?> CreateAsync(
         Guid spaceId,
@@ -170,8 +179,12 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
 
     private async Task<bool> ReplaceAsync(Guid taskId, IReadOnlyList<Guid> labelIds, CancellationToken cancellationToken)
     {
+        // The Task's own row first, under UPDLOCK, HOLDLOCK on its clustered key: two edits of one Task's Labels queue
+        // here, so the second reads the first's applications as current and the set stored is exactly one request's -
+        // never a merge of two, and never a second DELETE of a row the first already removed (a 500).
         var owner = await dbContext.Tasks
-            .Where(task => task.Id == taskId)
+            .FromSql($"SELECT * FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {taskId}")
+            .AsNoTracking()
             .Select(task => new { task.SpaceId })
             .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -185,7 +198,9 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
 
         if (labelIds.Count > 0)
         {
-            var submitted = JsonSerializer.Serialize(labelIds);
+            // In the server's uniqueidentifier order, so two edits naming the same Labels in different orders lock
+            // them in one order and cannot deadlock on each other.
+            var submitted = JsonSerializer.Serialize(labelIds.Order(ServerGuidOrder));
 
             var visible = await dbContext.Labels
                 .FromSql($"SELECT * FROM dbo.[Label] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id IN (SELECT CAST([value] AS uniqueidentifier) FROM OPENJSON({submitted}))")
