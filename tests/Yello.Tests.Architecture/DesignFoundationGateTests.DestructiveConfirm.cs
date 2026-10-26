@@ -30,6 +30,10 @@ public sealed partial class DesignFoundationGateTests
 
     private static readonly Regex DestructiveConfirmSelector = new(@"\.destructive-confirm(?![\w-])", RegexOptions.None, TimeSpan.FromSeconds(1));
 
+    // The confirms' own parts, styled by their component classes rather than under .destructive-confirm: the Task
+    // confirm and its actions in the panel, and each confirm's warning sentence (story 2.5 review).
+    private static readonly Regex ConfirmPartSelector = new(@"\.(task-detail__confirm|task-detail__confirm-actions|task-detail__warning|project-list__confirm|project-list__warning)(?![\w-])", RegexOptions.None, TimeSpan.FromSeconds(1));
+
     /// <summary>
     /// DSN-501 - AC13, UX-DR12, <c>DESIGN.md:476</c> - the confirm carries the <c>danger</c> border at the emphasis
     /// width: a rule selecting <c>.destructive-confirm</c> declares a solid border whose colour is <c>var(--danger)</c>
@@ -67,6 +71,7 @@ public sealed partial class DesignFoundationGateTests
         // Anchor: both the confirm and the danger button are styled, so "none declares motion" is about something.
         Assert.Contains(declarations, d => DestructiveConfirmSelector.IsMatch(d.Rule.Selector));
         Assert.Contains(declarations, d => SelectsComponent(d.Rule.Selector, DangerButtonClass));
+        Assert.Contains(declarations, d => ConfirmPartSelector.IsMatch(d.Rule.Selector));
 
         var problems = declarations
             .Where(d => MotionProperties.Contains(d.Declaration.Property, StringComparer.OrdinalIgnoreCase) && !IsNoneValue(d.Declaration.Value))
@@ -99,11 +104,13 @@ public sealed partial class DesignFoundationGateTests
 
     /// <summary>
     /// Every declaration in a rule whose selector names <c>.destructive-confirm</c> anywhere (the confirm or something
-    /// inside it), or whose last compound is the danger button.
+    /// inside it), names one of the confirms' own parts, or whose last compound is the danger button.
     /// </summary>
     private static List<(CssCorpus.Sheet Sheet, CssCorpus.Rule Rule, CssCorpus.Declaration Declaration)> ConfirmDeclarations() =>
         [
             .. CssCorpus.AllDeclarations()
-                .Where(d => DestructiveConfirmSelector.IsMatch(d.Rule.Selector) || SelectsComponent(d.Rule.Selector, DangerButtonClass)),
+                .Where(d => DestructiveConfirmSelector.IsMatch(d.Rule.Selector)
+                    || ConfirmPartSelector.IsMatch(d.Rule.Selector)
+                    || SelectsComponent(d.Rule.Selector, DangerButtonClass)),
         ];
 }

@@ -45,6 +45,15 @@ public interface IProjectStore
     Task<IReadOnlyDictionary<Guid, int>> TaskCountsAsync(CancellationToken cancellationToken);
 
     /// <summary>
+    /// The true number of Tasks in one Project of the resolved Space (AD-29), for a rename's answer (story 2.5, open
+    /// question 2 (a)).
+    /// </summary>
+    /// <param name="projectId">The Project.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>How many Tasks it holds, in every Status.</returns>
+    Task<int> TaskCountAsync(Guid projectId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Deletes a Project of the resolved Space with every Task in it and every Label applied to those Tasks,
     /// immediately and irreversibly (FR-17, PRD §6.2; story 2.5, AC3). The Space's Labels stay.
     /// </summary>

@@ -117,7 +117,8 @@
                         OnStatus="statusId => EditAsync(open.Id, TaskAttribute.Status, statusId)"
                         OnDueDate="due => EditAsync(open.Id, TaskAttribute.DueDate, due)"
                         OnLabels="labelIds => EditAsync(open.Id, TaskAttribute.Labels, labelIds)"
-                        OnConfirmToggled="ClearPanelRefusal"
+                        OnConfirmToggled="ConfirmToggled"
+                        DeleteRefusal="@_deleteRefusal"
                         OnDelete="() => DeleteTaskAsync(open.Id)"
                         Deleting="@(_deleting == open.Id)"
                         OnClose="Close" />

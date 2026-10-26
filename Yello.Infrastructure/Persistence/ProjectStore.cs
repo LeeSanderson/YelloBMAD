@@ -85,6 +85,10 @@ internal sealed class ProjectStore(YelloDbContext dbContext, IIdentifierGenerato
             .ConfigureAwait(false);
 
     /// <inheritdoc />
+    public Task<int> TaskCountAsync(Guid projectId, CancellationToken cancellationToken) =>
+        dbContext.Tasks.CountAsync(task => task.ProjectId == projectId, cancellationToken);
+
+    /// <inheritdoc />
     public async Task<ProjectDeletion> DeleteAsync(Guid projectId, CancellationToken cancellationToken)
     {
         var locked = await dbContext.Projects

@@ -402,6 +402,13 @@ internal sealed class FakeYelloApi
         _lastProjectDeleteHold?.Released.TrySetResult(new TaskEditOutcome(status, problemType, capability, Abort: false));
 
     /// <summary>
+    /// Lets the held Project deletion go with no answer - the connection reset. Nothing is deleted, so an identical
+    /// resend under the same key is applied. Story 2.5 review.
+    /// </summary>
+    public void ReleaseProjectDeleteUnanswered() =>
+        _lastProjectDeleteHold?.Released.TrySetResult(new TaskEditOutcome(0, string.Empty, Capability: null, Abort: true));
+
+    /// <summary>
     /// The Task with <paramref name="taskId"/> as the fake holds it now, with its column, in whichever Board.
     /// </summary>
     /// <param name="taskId">The Task.</param>

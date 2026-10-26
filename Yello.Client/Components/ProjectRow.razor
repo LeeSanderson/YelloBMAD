@@ -23,12 +23,12 @@
     @if (Confirming)
     {
         <div class="destructive-confirm project-list__confirm" @onkeydown="ConfirmKeyDownAsync">
-            <p class="project-list__warning">
+            <p class="project-list__warning" id="@WarningId">
                 <span>@string.Format(CultureInfo.CurrentCulture, Localizer["DeleteQuestion"], Project.Name)</span>
                 <span>@CountSentence</span>
                 <span>@Localizer["DeleteCannotBeUndone"]</span>
             </p>
-            <button type="button" class="button-danger" aria-busy="@(Deleting ? "true" : null)" @onclick="DeleteAsync">@Localizer["ProjectDelete"]</button>
+            <button type="button" class="button-danger" aria-describedby="@WarningId" aria-busy="@(Deleting ? "true" : null)" @onclick="DeleteAsync">@Localizer["ProjectDelete"]</button>
             <button type="button" class="button-secondary" @onclick="CancelDeleteAsync" @ref="_cancel">@Localizer["DeleteCancel"]</button>
         </div>
     }
@@ -78,7 +78,7 @@
     /// <summary>The Project.</summary>
     [Parameter]
     [EditorRequired]
-    public ProjectResponse Project { get; set; } = new(Guid.Empty, string.Empty, default);
+    public ProjectResponse Project { get; set; } = new(Guid.Empty, string.Empty, default, 0);
 
     /// <summary>Whether the Role may rename and delete it. When not, both controls are absent.</summary>
     [Parameter]
@@ -150,6 +150,8 @@
     private bool _focusCancel;
     private bool _focusDelete;
 
+    private string WarningId => $"project-delete-warning-{Project.Id:N}";
+
     // The count's sentence: none, one, or many - each its own whole sentence, never concatenated (story 2.5, AC2).
     private string CountSentence => Project.TaskCount switch
     {
@@ -180,10 +182,16 @@
             await _cancel.FocusAsync();
         }
 
-        if (_focusDelete && !Confirming && !Renaming && CanManage)
+        // The request is spent on the first render after the confirm closed, whether or not the control is there to take
+        // it, so a stale one cannot pull focus on a later, unrelated render.
+        if (_focusDelete && !Confirming)
         {
             _focusDelete = false;
-            await _delete.FocusAsync();
+
+            if (!Renaming && CanManage)
+            {
+                await _delete.FocusAsync();
+            }
         }
     }
 

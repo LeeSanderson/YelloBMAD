@@ -50,6 +50,9 @@ public sealed class DeleteProjectHandlerTests
         public Task<IReadOnlyDictionary<Guid, int>> TaskCountsAsync(CancellationToken cancellationToken) =>
             throw new NotSupportedException("The deletion slice counts nothing.");
 
+        public Task<int> TaskCountAsync(Guid projectId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The deletion slice counts nothing.");
+
         public Task<ProjectDeletion> DeleteAsync(Guid projectId, CancellationToken cancellationToken)
         {
             Deleted.Add(projectId);

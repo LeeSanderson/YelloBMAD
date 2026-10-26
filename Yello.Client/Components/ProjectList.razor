@@ -564,7 +564,7 @@
     /// </summary>
     private async Task AskToDeleteAsync(ProjectResponse project)
     {
-        if (_renameInFlight || _counting is not null || _deletingProject is not null)
+        if (!MayAskToDelete)
         {
             return;
         }
@@ -606,6 +606,9 @@
         }
     }
 
+    // One thing at a time on the rows, and only for a Role that may delete.
+    private bool MayAskToDelete => _canManage && !_renameInFlight && _counting is null && _deletingProject is null;
+
     /// <summary>
     /// The list read for the confirm: the fresh list (and its counts) replaces the one shown; a 404 is the Space refusal
     /// surface; anything else is said on the row and no confirm opens.
@@ -616,8 +619,14 @@
         {
             if (await response.Content.ReadFromJsonAsync<List<ProjectResponse>>(JsonOptions, token) is { } projects && generation == _generation)
             {
+                var listed = projects.Exists(candidate => candidate.Id == project.Id);
+
                 _projects = projects;
-                _confirmingDelete = projects.Exists(candidate => candidate.Id == project.Id) ? project.Id : null;
+                _confirmingDelete = listed && _canManage ? project.Id : null;
+
+                // Gone already (another tab deleted it): its row, which held focus, has left the list, so focus moves to
+                // the page's heading rather than falling to the body.
+                _focusHeading = !listed;
             }
 
             return;
@@ -733,6 +742,9 @@
     private void Add(ProjectResponse project)
     {
         _projects ??= [];
+
+        // A list read since the creation was sent (the delete confirm's count) may already hold it: one row per id.
+        _projects.RemoveAll(candidate => candidate.Id == project.Id);
         _projects.Add(project);
         Order();
     }

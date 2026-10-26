@@ -30,8 +30,8 @@ public sealed class RenameProjectHandler(IProjectStore store)
             return null;
         }
 
-        var counts = await store.TaskCountsAsync(cancellationToken).ConfigureAwait(false);
+        var count = await store.TaskCountAsync(renamed.Id, cancellationToken).ConfigureAwait(false);
 
-        return new ListedProject(renamed, counts.GetValueOrDefault(renamed.Id));
+        return new ListedProject(renamed, count);
     }
 }

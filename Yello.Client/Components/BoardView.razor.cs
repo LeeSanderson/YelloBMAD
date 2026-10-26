@@ -50,6 +50,9 @@ public sealed partial class BoardView
     private IReadOnlyDictionary<Guid, LabelResponse> _labelsById = new Dictionary<Guid, LabelResponse>();
     private Guid? _openTaskId;
     private string? _panelRefusal;
+
+    // Story 2.5: the deletion's own refusal, said in the confirm, kept apart from an edit's (review patch).
+    private string? _deleteRefusal;
     private Guid? _focusCard;
     private int _focusCardRequests;
 
@@ -101,6 +104,7 @@ public sealed partial class BoardView
 
         _openTaskId = taskId;
         _panelRefusal = null;
+        _deleteRefusal = null;
         _focusCard = null;
     }
 
@@ -117,6 +121,7 @@ public sealed partial class BoardView
 
         _openTaskId = null;
         _panelRefusal = null;
+        _deleteRefusal = null;
     }
 
     /// <summary>
@@ -130,6 +135,7 @@ public sealed partial class BoardView
         _statusOptions = [];
         _openTaskId = null;
         _panelRefusal = null;
+        _deleteRefusal = null;
         _focusCard = null;
         _deleteKeys.Clear();
         _deleted.Clear();
@@ -137,7 +143,19 @@ public sealed partial class BoardView
         _focusColumn = null;
     }
 
-    private void ClearPanelRefusal() => _panelRefusal = null;
+    /// <summary>
+    /// The confirm opened or was cancelled: the deletion's words go either way; an edit's words go when the confirm opens
+    /// over the content they were about, and one that answers while the confirm is open is shown when the content returns.
+    /// </summary>
+    private void ConfirmToggled(bool confirming)
+    {
+        _deleteRefusal = null;
+
+        if (confirming)
+        {
+            _panelRefusal = null;
+        }
+    }
 
     /// <summary>
     /// The confirm's danger action (story 2.5, AC11). Not optimistic (UX-DR26): the card and the panel stay while the
@@ -151,7 +169,7 @@ public sealed partial class BoardView
             return;
         }
 
-        _panelRefusal = null;
+        _deleteRefusal = null;
         _deleting = taskId;
 
         var generation = _generation;
@@ -182,7 +200,7 @@ public sealed partial class BoardView
             // No answer: nothing is removed, the key is kept for the resend, and the confirm says so.
             if (generation == _generation)
             {
-                SayInPanel(taskId, Localizer["TaskEditNotSent"]);
+                SayInConfirm(taskId, Localizer["TaskEditNotSent"]);
             }
         }
         finally
@@ -204,7 +222,7 @@ public sealed partial class BoardView
 
             case >= HttpStatusCode.InternalServerError:
                 // The server failed and its outcome is not known: treated as no answer, so the key is kept.
-                SayInPanel(taskId, Localizer["TaskEditNotSent"]);
+                SayInConfirm(taskId, Localizer["TaskEditNotSent"]);
                 return;
 
             case HttpStatusCode.Unauthorized:
@@ -215,8 +233,7 @@ public sealed partial class BoardView
                 // The Board's existing pattern for a 404: the panel closes and the page's one refusal surface follows -
                 // the indistinguishable not-found (deferred-work.md:530, owner 4.4).
                 _deleteKeys.Remove(taskId);
-                _openTaskId = null;
-                _panelRefusal = null;
+                LeavePanelOf(taskId);
                 await OnRefused.InvokeAsync(answer.Problem);
                 return;
 
@@ -226,8 +243,33 @@ public sealed partial class BoardView
                     _deleteKeys.Remove(taskId);
                 }
 
-                SayInPanel(taskId, RefusalText.Of(Localizer, answer.Problem));
+                SayInConfirm(taskId, RefusalText.Of(Localizer, answer.Problem));
                 return;
+        }
+    }
+
+    /// <summary>
+    /// Closes the panel only when it is still open on the Task the deletion was about - never another Task's panel opened
+    /// since (review patch).
+    /// </summary>
+    private void LeavePanelOf(Guid taskId)
+    {
+        if (_openTaskId == taskId)
+        {
+            _openTaskId = null;
+            _panelRefusal = null;
+            _deleteRefusal = null;
+        }
+    }
+
+    /// <summary>
+    /// Says the deletion's refusal in its confirm - only when the panel is open on the Task it is about.
+    /// </summary>
+    private void SayInConfirm(Guid taskId, string words)
+    {
+        if (_openTaskId == taskId)
+        {
+            _deleteRefusal = words;
         }
     }
 
@@ -240,11 +282,18 @@ public sealed partial class BoardView
         _deleteKeys.Remove(taskId);
         _deleted.Add(taskId);
         _replicas.Remove(taskId);
-        _openTaskId = null;
-        _panelRefusal = null;
-        _focusCard = null;
 
-        if (Remove(taskId) is { } column)
+        // Focus moves to the column only from the panel the deletion was confirmed in; another panel keeps its focus.
+        var fromItsPanel = _openTaskId == taskId;
+
+        LeavePanelOf(taskId);
+
+        if (_focusCard == taskId)
+        {
+            _focusCard = null;
+        }
+
+        if (Remove(taskId) is { } column && fromItsPanel)
         {
             _focusColumn = column.StatusId;
             _focusColumnRequests++;

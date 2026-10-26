@@ -4,7 +4,7 @@ baseline_commit: 9ca31d1a512ef21a7323b4f7d0b39a0d49aa0df1
 
 # Story 2.5: Delete a Task, and delete a Project
 
-Status: review
+Status: done
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-5-delete-a-task-and-delete-a-project`
@@ -225,6 +225,33 @@ AC1–AC6 are reproduced **verbatim** from `epics.md:1140-1164` (`status: final`
   - [x] Ledger (`deferred-work.md`): CLOSE `:510` (focus to the column, built). UPDATE `:36` (the destructive confirm's border mapping; whether a 6px clause was owed), `:20` (confirm cases added), `:530` (the Task delete's `404` shares the trade-off), `:492` (a note: deletion places no key and renumbers nothing; its lock order). ADD with owners: Project-delete lock escalation on a large Project (owner **2.9**); Delete Project's home once Project settings exists (owner **6.1**, Q1); any Q decided against the UX spine (owner **UX**).
   - [x] `sprint-status.yaml`: set `review` at the end of the dev phase. **Do not mark FR-23 complete anywhere**; its session clause is 7.4's. **Do not add review narration to source files.**
 
+### Review Findings
+
+Code review 2026-10-26 (bc19cea..798b3ec, full mode: Blind Hunter, Edge Case Hunter and Acceptance Auditor, with the lead's own lock-order pass). 40 raw findings: 17 patch, 5 defer and 13 dismissed after merging duplicates. No decision was needed.
+
+- [x] [Review][Patch] Delete Project while a Project creation is in flight renders two rows with one `@key`, and the render throws. The count re-read's list already holds the new Project, and the create answer then appends it again [Yello.Client/Components/ProjectList.razor:565, :733]
+- [x] [Review][Patch] `ProjectResponse.TaskCount` defaults to 0, so a construction site that omits the count makes the confirm say "It holds no Tasks." (false reassurance, AC2) [Yello.Contracts/Projects/ProjectResponse.cs:13]
+- [x] [Review][Patch] An edit's late refusal or "Not sent." is written into the panel refusal, which the delete confirm shows in its own status region, so it reads as the deletion refused [Yello.Client/Components/BoardView.razor.cs, TaskDetail.razor]
+- [x] [Review][Patch] A deletion's answer closes whatever panel is open. Cancel was not guarded while the DELETE was held (Esc was), so the person could cancel, close the panel and open another card, and a late `204`/`404` then closed that unrelated panel [Yello.Client/Components/BoardView.razor.cs:214-253, TaskDetail.razor CancelConfirmAsync]
+- [x] [Review][Patch] RACE-T3 (a) has its holder take the Project's Task range, which the product's Labels edit never takes. The deletion therefore queued on the range rather than on the Task row, where the real Labels edit meets it, so the real interleaving went unproved [tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.DeleteRace.cs:175]
+- [x] [Review][Patch] No browser case covers a refused, unanswered (key reused on resend) or `404` Project deletion. The fake's `NextProjectDeleteRefusal`/`ReleaseProjectDeleteRefused` are unused [tests/Yello.Tests.Client/DeleteTests.cs]
+- [x] [Review][Patch] A rename aggregates every Task in the Space to answer one Project's count [Yello.Application/Projects/RenameProject/RenameProjectHandler.cs:33]
+- [x] [Review][Patch] When the count re-read finds the Project gone, its row (holding focus) disappears and focus drops to `<body>` [Yello.Client/Components/ProjectList.razor:620]
+- [x] [Review][Patch] The confirm can open for a Role that lost ManageProjects while the count read was out [Yello.Client/Components/ProjectList.razor:620]
+- [x] [Review][Patch] TaskDetail keeps the confirm open after CanManage turns false, and it focuses `_cancel`/`_delete` without checking they are rendered [Yello.Client/Components/TaskDetail.razor]
+- [x] [Review][Patch] ProjectRow's `_focusDelete` can stay set and steal focus on a later render [Yello.Client/Components/ProjectRow.razor:183]
+- [x] [Review][Patch] The Project confirm's danger action is not tied to the Project it names (`aria-describedby`, as LabelRow does) [Yello.Client/Components/ProjectRow.razor:31]
+- [x] [Review][Patch] Deletions reuse `TaskEditNotSent`, whose translator comment says "the change is reverted" [Yello.Client/Localisation/ClientCopy.resx]
+- [x] [Review][Patch] The motion and shadow gates (DSN-502/503) do not select the confirms' own inner classes (`task-detail__confirm*`, `*__warning`) [tests/Yello.Tests.Architecture/DesignFoundationGateTests.DestructiveConfirm.cs]
+- [x] [Review][Patch] Ledger: the masked-hints entry is titled "Two of" but lists three [_bmad-output/implementation-artifacts/deferred-work.md]
+- [x] [Review][Patch] Ledger: `:477` (two concurrent creates) has no 2.5 note [_bmad-output/implementation-artifacts/deferred-work.md]
+- [x] [Review][Patch] Ledger: Q3's Project focus destination (Space home's `h1`, not the list's heading) is not ledgered to UX [_bmad-output/implementation-artifacts/deferred-work.md]
+- [x] [Review][Defer] The listing reads Projects and counts in two statements, so a count can match neither moment [Yello.Application/Projects/ListProjects/ListProjectsHandler.cs:28] — deferred, owner 2.9 (same class as the Board totals entry)
+- [x] [Review][Defer] Every listing and confirm aggregates all of the Space's Tasks and blocks behind an uncommitted large Project deletion [Yello.Infrastructure/Persistence/ProjectStore.cs TaskCountsAsync] — deferred, owner 2.9 (load)
+- [x] [Review][Defer] Two identical announcements in a row ("Task deleted." twice) are not re-announced, the pattern 2.4's Label deletion and 2.2's creation already use [Yello.Client/Components/BoardView.razor.cs:253, ProjectList.razor:705] — deferred, owner 2.8 (announcement model)
+- [x] [Review][Defer] Task deletion reads the Task's ProjectId unlocked and then locks that Project's range. This is safe only while a Task cannot change Project [Yello.Infrastructure/Persistence/TaskStore.cs:248] — deferred, owner 2.6 (moves)
+- [x] [Review][Defer] Deleting a Task that has no card in a loaded column raises no column focus, so focus lands on `<body>` [Yello.Client/Components/BoardView.razor.cs:247] — deferred, owner 2.9 (Board paging)
+
 ## Dev Notes
 
 ### The shape of the story in one paragraph
@@ -423,6 +450,12 @@ Claude Opus 5.5 (claude-opus-5-5), dev-story run by the unattended story-cycle o
 | 21 | Optimistic Project removal | E2E `A_Project_deletion_waits_for_the_server_...` | yes |
 | 22 | No column focus request after a deletion | the same Task case: `Expected "column:Todo", Actual "body"` | yes |
 
+**Code review (2026-10-26).** Two review plants, each restored in a `finally` with the restore verified byte for byte:
+- A transition on `.task-detail__warning`: caught by the widened DSN-502.
+- The confirm showing the panel's edit refusal (Debug client rebuilt): caught by `An_edit_refused_while_the_confirm_is_open_is_not_said_in_the_confirm`.
+
+RACE-T3 (a), without the Project range in its holder, passed 3/3.
+
 Every plant was held in memory and restored in a `finally` (`git status` showed only the story's own changes afterwards). No plant used `git checkout`, `restore`, `reset` or `stash`.
 
 ### Completion Notes List
@@ -509,4 +542,9 @@ Every plant was held in memory and restored in a `finally` (`git status` showed 
 
 ### Change Log
 
+- 2026-10-26 - Code review. 40 raw findings, triaged to 17 patches (all applied), 5 deferrals (to 2.6, 2.8 and 2.9) and 13 dismissed.
+  - The patches: Space home no longer crashes on a duplicate row key when Delete Project's count re-read races a Project creation; `ProjectResponse.TaskCount` is required; and the deletion's refusal is kept apart from an edit's.
+  - Also: a deletion's answer closes only its own panel; RACE-T3 (a) holds the real Labels edit's locks; and three browser cases were added (a refused Project deletion, an unanswered one with key reuse, and an edit refused under the confirm).
+  - Also: a rename counts one Project; the focus and aria fixes; the design gates select the confirms' own parts; and the ledger was corrected.
+  - The masked row-lock hints were judged harmless: they take the order every other writer takes and add no cycle.
 - 2026-10-26 - Dev phase. Task and Project deletion are on both surfaces, with deterministic races, live isolation rows and in-place confirms on the Board and on Space home. The Project listing carries a true `taskCount`. Every `.destructive-confirm`, the Label confirm included, has the danger border. Status moved to review. FR-23's session clause remains with story 7.4.

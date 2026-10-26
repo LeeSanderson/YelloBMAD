@@ -59,7 +59,7 @@
                 </div>
 
                 @* Present from the confirm's start, so a refusal's words are announced when they arrive. *@
-                <p class="task-detail__refusal" role="status">@Refusal</p>
+                <p class="task-detail__refusal" role="status">@DeleteRefusal</p>
             </div>
         }
 
@@ -298,11 +298,11 @@
     public EventCallback OnClose { get; set; }
 
     /// <summary>
-    /// Raised when the delete confirm opens or is cancelled, so the Board clears words that belonged to the content it
-    /// replaced (story 2.5).
+    /// Raised with <c>true</c> when the delete confirm opens and <c>false</c> when it is cancelled, so the Board clears
+    /// words that belonged to the content it replaced (story 2.5).
     /// </summary>
     [Parameter]
-    public EventCallback OnConfirmToggled { get; set; }
+    public EventCallback<bool> OnConfirmToggled { get; set; }
 
     /// <summary>Raised by the confirm's danger action: the Board asks the server to delete the Task (story 2.5).</summary>
     [Parameter]
@@ -311,6 +311,13 @@
     /// <summary>Whether the Task's deletion is on its way to the server: the danger action is busy (story 2.5).</summary>
     [Parameter]
     public bool Deleting { get; set; }
+
+    /// <summary>
+    /// The words for the deletion's own refusal or no answer, said in the confirm's status region - kept apart from
+    /// <see cref="Refusal"/>, so an edit answering while the confirm is open is never read as the deletion refused.
+    /// </summary>
+    [Parameter]
+    public string? DeleteRefusal { get; set; }
 
     private string HeadingId => "task-detail-heading-" + _id;
 
@@ -380,16 +387,25 @@
             await _labelsButton.FocusAsync();
         }
 
+        // Each request is spent whether or not its control is drawn, so focus never goes to an element that is not there.
         if (_focusCancel)
         {
             _focusCancel = false;
-            await _cancel.FocusAsync();
+
+            if (_confirming)
+            {
+                await _cancel.FocusAsync();
+            }
         }
 
         if (_focusDelete)
         {
             _focusDelete = false;
-            await _delete.FocusAsync();
+
+            if (!_confirming && CanManage)
+            {
+                await _delete.FocusAsync();
+            }
         }
     }
 
@@ -467,7 +483,7 @@
         _confirming = true;
         _focusCancel = true;
 
-        return OnConfirmToggled.InvokeAsync();
+        return OnConfirmToggled.InvokeAsync(true);
     }
 
     /// <summary>
@@ -475,10 +491,16 @@
     /// </summary>
     private Task CancelConfirmAsync()
     {
+        // While the deletion is with the server its answer decides what the panel shows next, as for Esc.
+        if (Deleting)
+        {
+            return Task.CompletedTask;
+        }
+
         _confirming = false;
         _focusDelete = true;
 
-        return OnConfirmToggled.InvokeAsync();
+        return OnConfirmToggled.InvokeAsync(false);
     }
 
     /// <summary>

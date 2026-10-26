@@ -491,6 +491,126 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// AC12, Task 10 ("Others: inline in the row") - a refused Project deletion is said on its row in the copy that
+    /// already exists for its type, and nothing is removed: the row and its confirm stay. Story 2.5 review.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR26")]
+    public async Task A_refused_Project_deletion_is_said_on_its_row_and_removes_nothing()
+    {
+        var api = TwoSpaces();
+
+        api.ServeProjectTaskCounts = true;
+        SeedProjectHolding(api, Northwind, Atlas, "Atlas", 1);
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSpaceAsync(api, page, Northwind);
+            await AskToDeleteProjectAsync(page, "Atlas");
+
+            api.NextProjectDeleteRefusal = (422, IdempotencyKeyReusedType, null);
+
+            await ProjectRow(page, "Atlas").Locator(Confirm).Locator(DangerButton).ClickAsync();
+            await ProjectRow(page, "Atlas").GetByText(ReusedCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal(1, await ProjectRow(page, "Atlas").CountAsync());
+            Assert.Single(Deletions(api));
+        }
+    }
+
+    /// <summary>
+    /// AC12, NFR-5, Task 10 ("key reused on identical resend after no answer") - a Project deletion that gets no answer
+    /// says "Not sent." on its row and removes nothing; sending it again carries the same <c>Idempotency-Key</c>, and that
+    /// answer removes the row. Story 2.5 review.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "NFR-5")]
+    [Trait("Requirement", "AR-25")]
+    public async Task An_unanswered_Project_deletion_says_not_sent_and_its_resend_reuses_the_key()
+    {
+        var api = TwoSpaces();
+
+        api.ServeProjectTaskCounts = true;
+        SeedProjectHolding(api, Northwind, Atlas, "Atlas", 1);
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSpaceAsync(api, page, Northwind);
+            await AskToDeleteProjectAsync(page, "Atlas");
+
+            var held = api.HoldProjectDeleteAsync();
+            var danger = ProjectRow(page, "Atlas").Locator(Confirm).Locator(DangerButton);
+
+            await danger.ClickAsync();
+            await held.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+            api.ReleaseProjectDeleteUnanswered();
+
+            await ProjectRow(page, "Atlas").GetByText(NotSentCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            Assert.Equal(1, await ProjectRow(page, "Atlas").CountAsync());
+
+            await danger.ClickAsync();
+            await page.GetByText(EmptyState).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var sent = Deletions(api);
+
+            Assert.Equal(2, sent.Count);
+            Assert.NotNull(sent[0].Header(Idempotency.HeaderName));
+            Assert.Equal(sent[0].Header(Idempotency.HeaderName), sent[1].Header(Idempotency.HeaderName));
+        }
+    }
+
+    /// <summary>
+    /// AC11 - an edit refused while the delete confirm is open is never said in the confirm, where it would read as the
+    /// deletion refused; the confirm's status region stays empty. Story 2.5 review.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR26")]
+    public async Task An_edit_refused_while_the_confirm_is_open_is_not_said_in_the_confirm()
+    {
+        var api = TwoSpaces();
+        var tasks = SeedBoard(api, Northwind, Atlas, "Draft the brief");
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenBoardAsync(api, page, Northwind, Atlas);
+            await OpenPanelAsync(page, tasks[0].Id);
+
+            var editHeld = api.HoldTaskEditAsync();
+            var title = page.Locator(Dialog).GetByLabel(TitleLabel, new LocatorGetByLabelOptions { Exact = true });
+
+            await title.FillAsync("Draft the brief, again");
+            await title.PressAsync("Enter");
+            await editHeld.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+
+            // The card shows the edit optimistically; its revert is the sign the refusal has been handled.
+            var optimistic = CardOf(page, tasks[0].Id).GetByText("Draft the brief, again");
+
+            await optimistic.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = Timeout });
+            await AskToDeleteTaskAsync(page);
+
+            api.ReleaseTaskEditRefused(422, IdempotencyKeyReusedType);
+
+            await optimistic.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
+
+            Assert.DoesNotContain(ReusedCopy, await page.Locator(Dialog).Locator(Confirm).InnerTextAsync(), StringComparison.Ordinal);
+
+            // Cancelled, the content returns with the edit's words beside it, where they belong.
+            await page.Locator(Dialog).Locator(Confirm).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = Cancel, Exact = true }).ClickAsync();
+            await page.Locator(Dialog).GetByText(ReusedCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Empty(Deletions(api));
+        }
+    }
+
+    /// <summary>
     /// AC1, AC14, UX-DR27 - a Viewer is offered no delete: no "Delete Task" in the Task detail panel and no
     /// "Delete Project" on Space home - absent, not disabled, not hidden by CSS - and nothing in <c>main</c> or the panel
     /// is disabled. Anchored: the Owner of the other Space is offered both.

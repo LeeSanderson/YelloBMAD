@@ -597,7 +597,7 @@
   </data>
   <data name="TaskEditNotSent" xml:space="preserve">
     <value>Not sent.</value>
-    <comment>An edit that got no answer: the change is reverted (story 2.3, open question 8). Never "Saved" or "Saving".</comment>
+    <comment>A write that got no answer. For a Task edit the change is reverted (story 2.3, open question 8). For a Task or Project deletion, said in its confirm or row, nothing is removed and the same press may be sent again (story 2.5). Never "Saved" or "Saving".</comment>
   </data>
   <data name="InvalidTaskStatus" xml:space="preserve">
     <value>That Status is not one of this Project's Statuses.</value>

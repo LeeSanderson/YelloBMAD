@@ -139,10 +139,12 @@ public sealed partial class TaskEndpointTests
     }
 
     /// <summary>
-    /// RACE-T3 (a) (AC10) - a Labels edit holds the Project's range, the Task row and its <c>TaskLabel</c> range, and
-    /// applies a Label; a deletion of the Task queues; the edit commits; the deletion answers <c>204</c>, and no
+    /// RACE-T3 (a) (AC10) - a Labels edit holds what the product's Labels edit takes, the Task row on its clustered key
+    /// and its <c>TaskLabel</c> range, but never the Project's range, and applies a Label. A deletion of the Task takes
+    /// the range, then queues on the row the edit holds. The edit commits; the deletion answers <c>204</c>, and no
     /// <c>TaskLabel</c> row is left for the gone Task (the cascade took the committed application with it). The Label
-    /// itself stays.
+    /// itself stays. The story 2.5 review removed the range from the holder: the real Labels edit does not take it, so
+    /// holding it made the deletion queue on the range rather than on the row where the two writers really meet.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -172,7 +174,6 @@ public sealed partial class TaskEndpointTests
             await using var observer = await database.OpenWithoutSpaceContextAsync(cancellationToken);
             await using var held = await holder.BeginTransactionAsync(cancellationToken);
 
-            await HoldProjectRangeAsync(holder, held, projectId, cancellationToken);
             await HoldTaskLabelsAsync(holder, held, owner.SpaceId, doomed, cancellationToken);
 
             var racing = DeleteTaskAsync(owner, owner.SpaceId, doomed);
