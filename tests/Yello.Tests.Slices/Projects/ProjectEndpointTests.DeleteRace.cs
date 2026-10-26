@@ -29,8 +29,8 @@ namespace Yello.Tests.Slices.Projects;
 /// </para>
 /// <para>
 /// <b>The other direction runs today.</b> RACE-P1 (b) and RACE-P2 (b) hold the Project deletion in SQL and make the
-/// request a creation or a Status edit - routes that exist. Green today, they stay active as standing gates (checklist);
-/// the two cases whose request is the deletion are skipped <c>red: AC10</c>.
+/// request a creation or a Status edit - routes that already existed - and ran from the ATDD run on; the two cases whose
+/// request is the deletion were activated by the dev phase. RACE-P1 (a) catches a deletion that skips the range (3/3).
 /// </para>
 /// </remarks>
 public sealed partial class ProjectEndpointTests
@@ -42,7 +42,7 @@ public sealed partial class ProjectEndpointTests
     /// creation's insert meets 547 - which the product would answer as a <c>500</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - DELETE /spaces/{spaceId}/projects/{projectId} is not mapped yet; it answers the unmatched 404 at once (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-17")]
     [Trait("Assumption", "PRD-12-5")]
@@ -157,7 +157,7 @@ public sealed partial class ProjectEndpointTests
     /// Project remains. Never a 1205.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - DELETE /spaces/{spaceId}/projects/{projectId} is not mapped yet (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-17")]
     public async Task A_Project_deletion_queued_behind_a_Status_edit_answers_204_once_the_edit_commits()

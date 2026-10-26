@@ -18,9 +18,9 @@ namespace Yello.Tests.Slices.Tasks;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Every case is skipped <c>red: AC&lt;n&gt;</c> until the route is mapped</b> (story Task 5), except the two schema
-/// cases at the end: the cascade 2.2 already declared and the absence of any soft-delete column are true today, so they
-/// run now as standing gates (AC3's "no trash").
+/// <b>Activated by story 2.5's dev phase</b> once the route was mapped (story Task 5). The two schema cases at the end -
+/// the cascade 2.2 already declared and the absence of any soft-delete column - ran from the ATDD run on as standing
+/// gates (AC3's "no trash").
 /// </para>
 /// <para>
 /// <b>Decisions these cases rest on</b> (story Open questions, recommended options): Q4 - an absent, already deleted or
@@ -40,7 +40,7 @@ public sealed partial class TaskEndpointTests
     /// <param name="role">The deleter's Role in the Owner's Space.</param>
     /// <param name="surface">The surface the deletion is sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC7 - DELETE /spaces/{spaceId}/tasks/{taskId} is not mapped yet (story Task 5)")]
+    [Theory]
     [InlineData("Owner", IsolationSurface.Session)]
     [InlineData("Admin", IsolationSurface.ApiToken)]
     [InlineData("Member", IsolationSurface.Session)]
@@ -123,7 +123,7 @@ public sealed partial class TaskEndpointTests
     /// <c>InsufficientRole</c>, and the Task is untouched. Anchor: a Member deletes it (<c>204</c>).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - DELETE /spaces/{spaceId}/tasks/{taskId} is not mapped yet, so a Viewer meets the unmatched 404 (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-23")]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "NFR-7")]
@@ -179,7 +179,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="surface">The surface every request is sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC7 - DELETE /spaces/{spaceId}/tasks/{taskId} is not mapped yet (story Task 5)")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AD-20")]
@@ -239,7 +239,7 @@ public sealed partial class TaskEndpointTests
     /// <c>409</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - DELETE /spaces/{spaceId}/tasks/{taskId} is not mapped yet (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-22")]
     [Trait("Requirement", "FR-23")]
     public async Task A_Label_whose_only_application_was_on_a_deleted_Task_can_then_be_deleted()
@@ -278,7 +278,7 @@ public sealed partial class TaskEndpointTests
     /// statement (2.2's <see cref="TaskWire.SeedTasksAsync"/>), never 4,999 requests.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - DELETE /spaces/{spaceId}/tasks/{taskId} is not mapped yet (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     [Trait("Priority", "P1")]

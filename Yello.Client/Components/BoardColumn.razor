@@ -13,9 +13,13 @@
 
     THE CARDS scroll within the column, never the page. Each Task appears here only if its Status is this
     column's (the Board answer places it; AC4).
+
+    FOCUS LANDS ON THE COLUMN when a card it held is deleted (story 2.5, AC11; UX-DR39; deferred-work.md:510): the
+    column is the nearest surviving container, so the section takes focus programmatically (tabindex -1, never in the
+    tab order) - never the page body, never an adjacent card.
 *@
 
-<section class="board-column" aria-labelledby="@HeadingId">
+<section class="board-column" aria-labelledby="@HeadingId" tabindex="-1" @ref="_section">
     <div class="board-column__head">
         <h2 class="type-column-head board-column__name" id="@HeadingId">@Name</h2>
         <span class="type-meta column-count">@Total</span>
@@ -41,7 +45,9 @@
 
 @code {
     private ElementReference _add;
+    private ElementReference _section;
     private int _focusRequestsSeen;
+    private int _focusColumnRequestsSeen = -1;
 
     /// <summary>The column's Status.</summary>
     [Parameter]
@@ -89,6 +95,13 @@
     [Parameter]
     public int FocusRequest { get; set; }
 
+    /// <summary>
+    /// Bumped by the Board to move focus to this column - after a card it held was deleted (story 2.5). Zero for every
+    /// other column.
+    /// </summary>
+    [Parameter]
+    public int FocusColumnRequest { get; set; }
+
     /// <summary>The Space's Labels by id, so each card can name the Labels it carries (story 2.4).</summary>
     [Parameter]
     public IReadOnlyDictionary<Guid, LabelResponse> Labels { get; set; } = new Dictionary<Guid, LabelResponse>();
@@ -102,6 +115,17 @@
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        // A column drawn afresh notes the request it was drawn with and never acts on it, so a stale request cannot
+        // steal focus (the 2.3 review fix TaskCard keeps too).
+        var requested = !firstRender && FocusColumnRequest != _focusColumnRequestsSeen && FocusColumnRequest > 0;
+
+        _focusColumnRequestsSeen = FocusColumnRequest;
+
+        if (requested)
+        {
+            await _section.FocusAsync();
+        }
+
         if (FocusAddRequests == _focusRequestsSeen)
         {
             return;

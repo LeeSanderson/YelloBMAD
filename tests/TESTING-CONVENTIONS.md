@@ -131,6 +131,20 @@ its lock makes it wait; one that does not lets it through, and the assertions af
 That case also found a real deadlock the first time it ran - the two writers' locking reads chose
 different indexes of one table (a covering alternate key and the clustered key), so their U locks never
 met. Name the index in a lock hint that two writers must share (`INDEX(1)`).
+
+**A deletion races every writer on its rows, from both sides - added by story 2.5.** `DeleteWire` plays each
+competing writer in the product's own statement shape, so the test and the request meet on one key: the
+Project's Task range (`SELECT COUNT(*) ... WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = @p`, the bound count's
+shape), a Task or Project row (`WITH (UPDLOCK, HOLDLOCK, INDEX(1))`), a Status move, a creation's insert, and
+the whole deletion held uncommitted. Write both directions for each pair. *The other writer holds, the request
+is the deletion* (RACE-T1, T3 (a), T5, P1 (a), P2 (a)): this is where a lock-order cycle shows - RACE-T1 caught
+a deletion that took the Task row before the range as a 1205, 3 runs in 3. *The deletion holds, the request is
+the other writer* (RACE-T2, T3 (b), T4, P1 (b), P2 (b)): this is where a writer answering `200` or `500` on a
+row that has gone shows. For the Project, hold the creation **between its statements** - counted under the
+range and read its Project, insert not yet sent - and wait until the deletion is blocked or has answered
+(RACE-P1 (a)); a deletion that skipped the range commits under it and the test's insert meets 547, 3 runs in
+3. A lock hint whose plant is caught 0/3 is recorded as masked with the reason, never deleted
+(`deferred-work.md`, story 2.5).
 **Randomised data where identity does not matter; fixed where an assertion depends on it.**
 
 **Never a shared email address.** FR-1 makes an Account's email unique, so a shared literal is
@@ -683,6 +697,10 @@ no fixture type and no serial collection - its race cases hold locks briefly and
 **Counts when story 2.4's dev phase closed:** see the story's Dev Agent Record for the run's figures.
 Still four engines; 2.4 added no engine, no fixture type and no serial collection. Its four race cases
 hold locks briefly.
+
+**Counts when story 2.5's dev phase closed:** 1077 cases - 1074 passed, 0 failed, 3 skipped (the bundle
+cases, `YELLO_MIGRATION_BUNDLE` unset), in about 13 minutes of wall clock. Still four engines; 2.5 added no
+engine, no fixture type and no serial collection. Its ten deletion race cases hold locks briefly.
 
 **The Label palette's harness - added by story 2.4.** `tests/Yello.Tests.Architecture/CieDe2000.cs`
 implements CIEDE2000 beside `WcagContrast.cs`, and `LabelPaletteGateTests` proves it against Sharma, Wu

@@ -18,7 +18,7 @@
     @if (Confirming)
     {
         <span class="destructive-confirm">
-            <span>@string.Format(CultureInfo.CurrentCulture, Localizer["LabelDeleteWarning"], Label.Name)</span>
+            <span>@string.Format(CultureInfo.CurrentCulture, Localizer["DeleteQuestion"], Label.Name) @Localizer["DeleteCannotBeUndone"]</span>
             <button type="button" class="button-danger" aria-describedby="@NameId" @onclick="DeleteAsync">@Localizer["LabelDelete"]</button>
             <button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["LabelCancel"]</button>
         </span>

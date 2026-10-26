@@ -30,10 +30,6 @@ public sealed partial class RefusalBoundaryGateTests
     private static string IdempotencyPortName => typeof(Yello.Application.Spaces.IIdempotencyStore).FullName!;
     private static string ProjectContractsNamespace => typeof(Yello.Contracts.Projects.ProjectRoutes).Namespace!;
 
-    private static string ProjectCollectionRoute => Yello.Contracts.Projects.ProjectRoutes.List;
-
-    private static string ProjectItemRoute => Yello.Contracts.Projects.ProjectRoutes.Rename;
-
     /// <summary>
     /// AC10, AR-30, <c>deferred-work.md:319</c> - nothing but the pipeline reads <c>BoundRegistry</c>: a
     /// slice that read a bound's limit would be the place it is checked outside the pipeline. Standing gate,
@@ -89,41 +85,6 @@ public sealed partial class RefusalBoundaryGateTests
             IdempotencyPortName,
             "Yello.Infrastructure.Persistence.IdempotencyStore",
             "Yello.Infrastructure.SpaceBoundaryLimits");
-
-    /// <summary>
-    /// AC7 - the collection takes <c>GET</c> and <c>POST</c> and one Project takes <c>PATCH</c>, the rename,
-    /// and nothing else, so no method on either can move a Project. Story 2.5 adds <c>DELETE</c> on the
-    /// Project and widens the permitted set by exactly that.
-    /// </summary>
-    /// <remarks>
-    /// <b>Narrowed by story 2.2</b> to the collection and the item exactly: 2.2 maps <c>POST .../tasks</c> and
-    /// <c>GET .../board</c> under one Project, which a prefix match would count here.
-    /// <c>The_routes_under_a_Project_are_its_rename_its_Task_creation_and_its_Board</c> holds what lies under
-    /// the item, so a route that moved a Project through a new segment is still caught.
-    /// </remarks>
-    [Fact]
-    [Trait("Requirement", "FR-17")]
-    [Trait("Requirement", "AD-2")]
-    public void No_route_moves_a_Project()
-    {
-        var projectRoutes = RouteTable()
-            .Where(endpoint => endpoint.RoutePattern.RawText == ProjectCollectionRoute || endpoint.RoutePattern.RawText == ProjectItemRoute)
-            .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()?.HttpMethods ?? [])
-                .Select(method => $"{method} {endpoint.RoutePattern.RawText}"))
-            .Order(StringComparer.Ordinal)
-            .ToList();
-
-        // Vacuity guard: the routes exist, or there is nothing to have checked.
-        Assert.NotEmpty(projectRoutes);
-
-        Assert.Equal(
-            [
-                $"GET {ProjectCollectionRoute}",
-                $"PATCH {ProjectItemRoute}",
-                $"POST {ProjectCollectionRoute}",
-            ],
-            projectRoutes);
-    }
 
     /// <summary>
     /// AC7 - no Project request contract carries a Space or anything but the name: the Space is the

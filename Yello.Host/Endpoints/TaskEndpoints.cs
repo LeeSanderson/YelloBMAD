@@ -1,5 +1,6 @@
 using Yello.Application.Spaces;
 using Yello.Application.Tasks.CreateTask;
+using Yello.Application.Tasks.DeleteTask;
 using Yello.Application.Tasks.EditTaskAttributes;
 using Yello.Application.Tasks.ViewTask;
 using Yello.Contracts;
@@ -12,8 +13,8 @@ using Yello.Host.Spaces;
 namespace Yello.Host.Endpoints;
 
 /// <summary>
-/// Create a Task in a Project of the active Space, and read and edit one Task. FR-19, FR-20; stories 2.2
-/// and 2.3.
+/// Create a Task in a Project of the active Space, and read, edit and delete one Task. FR-19, FR-20, FR-23;
+/// stories 2.2, 2.3 and 2.5.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -106,6 +107,37 @@ public static class TaskEndpoints
     public static RouteHandlerBuilder MapEditTask(this IEndpointRouteBuilder endpoints) =>
         endpoints.MapPatch(TaskRoutes.Task, EditAsync)
             .RequiresCapability(Capability.ManageTasks);
+
+    /// <summary>
+    /// Registers <c>DELETE /api/v1/spaces/{spaceId}/tasks/{taskId}</c>. Story 2.5.
+    /// </summary>
+    /// <remarks>
+    /// <b>No bound</b>: a deletion adds no Task, so consulting Tasks-per-Project would refuse deletions in a full
+    /// Project.
+    /// </remarks>
+    /// <param name="endpoints">The route builder.</param>
+    /// <returns>The registered route, for further configuration.</returns>
+    public static RouteHandlerBuilder MapDeleteTask(this IEndpointRouteBuilder endpoints) =>
+        endpoints.MapDelete(TaskRoutes.Task, DeleteAsync)
+            .RequiresCapability(Capability.ManageTasks);
+
+    /// <summary>
+    /// Deletes one Task of the active Space, with its Label applications.
+    /// </summary>
+    /// <param name="taskId">The Task, from the route.</param>
+    /// <param name="handler">The slice.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>
+    /// <c>204</c> with no body, or the boundary's <c>404 not-available</c> - byte for byte, and not recorded - for an id
+    /// that matches nothing in the active Space: never existed, already deleted, or another Space's (AD-3).
+    /// </returns>
+    public static async Task<IResult> DeleteAsync(Guid taskId, DeleteTaskHandler handler, CancellationToken cancellationToken)
+    {
+        var deletion = await handler.HandleAsync(taskId, cancellationToken).ConfigureAwait(false);
+
+        // Not recorded: an in-Space not-found crossed no boundary (AD-20). The body is the boundary's.
+        return deletion == TaskDeletion.Deleted ? Results.NoContent() : BoundaryProblems.NotAvailable();
+    }
 
     /// <summary>
     /// Reads one Task of the active Space.

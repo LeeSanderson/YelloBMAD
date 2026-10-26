@@ -53,6 +53,15 @@ public sealed partial class BoardView
     private Guid? _focusCard;
     private int _focusCardRequests;
 
+    // Story 2.5: the Task whose deletion is with the server; the key of each deletion that got no answer, reused by the
+    // identical resend (2.3 open question 8); the Tasks this tab has deleted, whose late edit answers are dropped (open
+    // question 7); and the column focus returns to once a card it held is gone (open question 3).
+    private readonly Dictionary<Guid, string> _deleteKeys = [];
+    private readonly HashSet<Guid> _deleted = [];
+    private Guid? _deleting;
+    private Guid? _focusColumn;
+    private int _focusColumnRequests;
+
     /// <summary>
     /// The four attributes a Task edit can change.
     /// </summary>
@@ -122,6 +131,126 @@ public sealed partial class BoardView
         _openTaskId = null;
         _panelRefusal = null;
         _focusCard = null;
+        _deleteKeys.Clear();
+        _deleted.Clear();
+        _deleting = null;
+        _focusColumn = null;
+    }
+
+    private void ClearPanelRefusal() => _panelRefusal = null;
+
+    /// <summary>
+    /// The confirm's danger action (story 2.5, AC11). Not optimistic (UX-DR26): the card and the panel stay while the
+    /// server is asked, and only its <c>204</c> removes the Task - from its column, whose true total drops by one - closes
+    /// the panel, announces it politely and moves focus to the column that held it, never the page body or a card.
+    /// </summary>
+    private async Task DeleteTaskAsync(Guid taskId)
+    {
+        if (!_canManage || _deleting is not null)
+        {
+            return;
+        }
+
+        _panelRefusal = null;
+        _deleting = taskId;
+
+        var generation = _generation;
+        var token = ActiveSpace.Token;
+
+        // A deletion sent again after an attempt that got no answer reuses its key: it may have been applied.
+        if (!_deleteKeys.TryGetValue(taskId, out var key))
+        {
+            key = Guid.NewGuid().ToString("D");
+            _deleteKeys[taskId] = key;
+        }
+
+        try
+        {
+            using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Delete, TaskRoutes.TaskOf(SpaceId, taskId), key, token);
+
+            if (generation == _generation)
+            {
+                await UseDeletionAnswerAsync(taskId, answer);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended: the purge has run.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // No answer: nothing is removed, the key is kept for the resend, and the confirm says so.
+            if (generation == _generation)
+            {
+                SayInPanel(taskId, Localizer["TaskEditNotSent"]);
+            }
+        }
+        finally
+        {
+            if (generation == _generation)
+            {
+                _deleting = null;
+            }
+        }
+    }
+
+    private async Task UseDeletionAnswerAsync(Guid taskId, SpaceWriteAnswer answer)
+    {
+        switch (answer.StatusCode)
+        {
+            case HttpStatusCode.NoContent:
+                Deleted(taskId);
+                return;
+
+            case >= HttpStatusCode.InternalServerError:
+                // The server failed and its outcome is not known: treated as no answer, so the key is kept.
+                SayInPanel(taskId, Localizer["TaskEditNotSent"]);
+                return;
+
+            case HttpStatusCode.Unauthorized:
+                // YelloApiHandler's: the Session has ended and the sign-in page follows.
+                return;
+
+            case HttpStatusCode.NotFound:
+                // The Board's existing pattern for a 404: the panel closes and the page's one refusal surface follows -
+                // the indistinguishable not-found (deferred-work.md:530, owner 4.4).
+                _deleteKeys.Remove(taskId);
+                _openTaskId = null;
+                _panelRefusal = null;
+                await OnRefused.InvokeAsync(answer.Problem);
+                return;
+
+            default:
+                if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
+                {
+                    _deleteKeys.Remove(taskId);
+                }
+
+                SayInPanel(taskId, RefusalText.Of(Localizer, answer.Problem));
+                return;
+        }
+    }
+
+    /// <summary>
+    /// The server deleted the Task: its replica, key and queued edits go, its card leaves its column, the panel closes
+    /// without returning focus to the card that is gone, and focus moves to the column that held it.
+    /// </summary>
+    private void Deleted(Guid taskId)
+    {
+        _deleteKeys.Remove(taskId);
+        _deleted.Add(taskId);
+        _replicas.Remove(taskId);
+        _openTaskId = null;
+        _panelRefusal = null;
+        _focusCard = null;
+
+        if (Remove(taskId) is { } column)
+        {
+            _focusColumn = column.StatusId;
+            _focusColumnRequests++;
+        }
+
+        _announcement = Localizer["TaskDeleted"];
     }
 
     private void UseStatuses(IEnumerable<TaskStatusOption> statuses) => _statusOptions = [.. statuses];
@@ -212,7 +341,9 @@ public sealed partial class BoardView
         {
             using var answer = await Writes.SendAsync(HttpMethod.Patch, TaskRoutes.TaskOf(SpaceId, taskId), body, key, token);
 
-            return generation != _generation
+            // A Task this tab deleted while the edit was out: its answer (a 404) is dropped - no refusal surface, no
+            // revert, no words (story 2.5, open question 7).
+            return generation != _generation || _deleted.Contains(taskId)
                 ? EditOutcome.Gone
                 : await SettleAsync(taskId, replica, attribute, answer, generation, token);
         }
@@ -224,8 +355,8 @@ public sealed partial class BoardView
         catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
         {
             // No answer, or one that could not be read. The key is kept for a resend; the change reverts, and
-            // the person is told it was not sent.
-            return NotSent(taskId, replica, attribute, generation);
+            // the person is told it was not sent - unless this tab has deleted the Task meanwhile.
+            return _deleted.Contains(taskId) ? EditOutcome.Gone : NotSent(taskId, replica, attribute, generation);
         }
     }
 

@@ -30,7 +30,8 @@ public static class TaskRoutes
 
     /// <summary>
     /// One Task: <c>GET</c> it as a <see cref="TaskResponse"/>, or <c>PATCH</c> an <see cref="EditTaskRequest"/>
-    /// here for <c>200</c> with the Task as stored. Story 2.3. The path never holds the Project (FR-41).
+    /// here for <c>200</c> with the Task as stored (story 2.3), or <c>DELETE</c> it for <c>204</c>, no body (story 2.5).
+    /// The path never holds the Project (FR-41).
     /// </summary>
     public static string Task => "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}";
 

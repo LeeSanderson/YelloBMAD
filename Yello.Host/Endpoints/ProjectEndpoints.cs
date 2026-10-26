@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Yello.Application.Projects.CreateProject;
+using Yello.Application.Projects.DeleteProject;
 using Yello.Application.Projects.ListProjects;
 using Yello.Application.Projects.RenameProject;
 using Yello.Application.Spaces;
@@ -13,7 +14,7 @@ using Yello.Host.Spaces;
 namespace Yello.Host.Endpoints;
 
 /// <summary>
-/// List, create and rename the active Space's Projects. FR-17, FR-18; story 2.1.
+/// List, create, rename and delete the active Space's Projects. FR-17, FR-18; stories 2.1 and 2.5.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -64,6 +65,18 @@ public static class ProjectEndpoints
             .RequiresCapability(Capability.ManageProjects);
 
     /// <summary>
+    /// Registers <c>DELETE /api/v1/spaces/{spaceId}/projects/{projectId}</c>. Story 2.5.
+    /// </summary>
+    /// <remarks>
+    /// <b>No bound</b>: a deletion adds nothing, so counting would refuse deletions in a full Space.
+    /// </remarks>
+    /// <param name="endpoints">The route builder.</param>
+    /// <returns>The registered route, for further configuration.</returns>
+    public static RouteHandlerBuilder MapDeleteProject(this IEndpointRouteBuilder endpoints) =>
+        endpoints.MapDelete(ProjectRoutes.Project, DeleteAsync)
+            .RequiresCapability(Capability.ManageProjects);
+
+    /// <summary>
     /// Lists the active Space's Projects.
     /// </summary>
     /// <param name="handler">The slice.</param>
@@ -73,7 +86,7 @@ public static class ProjectEndpoints
     {
         var projects = await handler.HandleAsync(cancellationToken).ConfigureAwait(false);
 
-        return Results.Ok(projects.Select(Response).ToList());
+        return Results.Ok(projects.Select(listed => Response(listed.Project, listed.TaskCount)).ToList());
     }
 
     /// <summary>
@@ -107,7 +120,8 @@ public static class ProjectEndpoints
         // reads it from one place whatever the endpoint.
         httpContext.Response.Headers.Location = ProjectRoutes.ProjectOf(project.SpaceId, project.Id);
 
-        return Results.Json(Response(project), statusCode: StatusCodes.Status201Created);
+        // A new Project holds no Tasks.
+        return Results.Json(Response(project, taskCount: 0), statusCode: StatusCodes.Status201Created);
     }
 
     /// <summary>
@@ -140,10 +154,29 @@ public static class ProjectEndpoints
         // Not recorded: an in-Space not-found crossed no boundary (AD-20). The body is the boundary's.
         return renamed is null
             ? BoundaryProblems.NotAvailable()
-            : Results.Ok(Response(renamed));
+            : Results.Ok(Response(renamed.Project, renamed.TaskCount));
     }
 
-    private static ProjectResponse Response(Project project) => new(project.Id, project.Name, project.CreatedAt);
+    /// <summary>
+    /// Deletes a Project of the active Space, with every Task in it.
+    /// </summary>
+    /// <param name="projectId">The Project, from the route.</param>
+    /// <param name="handler">The slice.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>
+    /// <c>204</c> with no body, or the boundary's <c>404 not-available</c> - byte for byte, and not recorded - for an id
+    /// that matches nothing in the active Space: never existed, already deleted, or another Space's (AD-3).
+    /// </returns>
+    public static async Task<IResult> DeleteAsync(Guid projectId, DeleteProjectHandler handler, CancellationToken cancellationToken)
+    {
+        var deletion = await handler.HandleAsync(projectId, cancellationToken).ConfigureAwait(false);
+
+        // Not recorded: an in-Space not-found crossed no boundary (AD-20). The body is the boundary's.
+        return deletion == ProjectDeletion.Deleted ? Results.NoContent() : BoundaryProblems.NotAvailable();
+    }
+
+    private static ProjectResponse Response(Project project, int taskCount) =>
+        new(project.Id, project.Name, project.CreatedAt, taskCount);
 
     private static IResult InvalidName() =>
         Results.Problem(

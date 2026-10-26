@@ -45,7 +45,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// capabilities (<c>prd.md:341-342</c>; no new capability) - neither is Session-only, and neither consults a bound: a
     /// deletion adds nothing, so counting would refuse deletions in a full Project or Space.
     /// </summary>
-    [Fact(Skip = "red: AC7 - neither DELETE route is mapped yet (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "AD-4")]
     [Trait("Requirement", "AD-1")]
     [Trait("Requirement", "FR-23")]
@@ -66,9 +66,11 @@ public sealed partial class RefusalBoundaryGateTests
     /// <summary>
     /// ARCH-502 - AC7, FR-17, AD-2 - the successor of 2.1's <c>No_route_moves_a_Project</c>, widened by exactly what its
     /// own remarks promised: the Project collection is <c>GET</c> and <c>POST</c>, the item is <c>PATCH</c> (rename) and
-    /// <c>DELETE</c>, and nothing else - still no method that moves a Project.
+    /// <c>DELETE</c>, and nothing else - still no method that moves a Project. It replaced 2.1's gate when story 2.5
+    /// mapped the deletion; the collection and the item are matched exactly, and ARCH-503 holds what lies under the item,
+    /// so a route that moved a Project through a new segment is still caught.
     /// </summary>
-    [Fact(Skip = "red: AC7 - DELETE is not mapped on the Project's item route yet (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-17")]
     [Trait("Requirement", "AD-2")]
     public void The_Project_routes_are_list_create_rename_and_delete_and_nothing_moves_a_Project()
@@ -93,9 +95,11 @@ public sealed partial class RefusalBoundaryGateTests
     /// <summary>
     /// ARCH-503 - AC7, FR-19, FR-28 - the successor of 2.2's
     /// <c>The_routes_under_a_Project_are_its_rename_its_Task_creation_and_its_Board</c>: under one Project the Host maps
-    /// its deletion, its rename, its Task creation and its Board, and nothing that lists its Tasks flat.
+    /// its deletion, its rename, its Task creation and its Board, and nothing that lists its Tasks flat (2.2's AC5 total
+    /// would then be the client's to derive) and nothing that moves a Project. It replaced 2.2's gate when story 2.5
+    /// mapped the deletion.
     /// </summary>
-    [Fact(Skip = "red: AC7 - DELETE is not mapped on the Project's item route yet (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-19")]
     [Trait("Requirement", "FR-28")]
     public void The_routes_under_a_Project_are_its_deletion_its_rename_its_Task_creation_and_its_Board()
@@ -122,7 +126,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// and <c>Rename</c> is the same template (two names, one route), so the route table and the isolation rows compare
     /// one string.
     /// </summary>
-    [Fact(Skip = "red: AC8 - ProjectRoutes.Project does not exist yet (story Task 4)")]
+    [Fact]
     [Trait("Requirement", "AR-35")]
     public void ProjectRoutes_names_the_Project_item_template_once()
     {
@@ -140,7 +144,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>IProjectStore.DeleteAsync(Guid, CancellationToken)</c> returns <c>Task&lt;ProjectDeletion&gt;</c>, each enum
     /// exactly <c>{Deleted, NotFound}</c> - no "already deleted", which would tell a caller an id once existed (Q4).
     /// </summary>
-    [Fact(Skip = "red: AC7 - ITaskStore and IProjectStore have no DeleteAsync yet (story Task 2)")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "FR-23")]
     public void The_Task_and_Project_stores_answer_a_deletion_with_Deleted_or_NotFound()
@@ -174,7 +178,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// the <c>Idempotency-Key</c>) is the existing pipeline-only gates' to hold; this gate only makes sure they have
     /// something to hold.
     /// </summary>
-    [Fact(Skip = "red: AC7 - neither deletion slice exists yet (story Task 2)")]
+    [Fact]
     [Trait("Requirement", "AR-3")]
     public void Each_deletion_is_one_slice_with_one_handler()
     {

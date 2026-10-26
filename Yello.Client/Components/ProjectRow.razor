@@ -1,3 +1,4 @@
+@using System.Globalization
 @using Yello.Contracts.Projects
 
 @inject IStringLocalizer<ClientCopy> Localizer
@@ -8,9 +9,30 @@
     Its name as a link to its Board (story 2.2; 2.1 Q10): the link text is the name, the address holds ids
     only (UX-DR33). For a Role that may rename it, an explicit "Rename" control - never hover-only. Renaming opens an inline field with explicit Rename
     and Cancel; Esc cancels. For a Role that may not, the control is absent, not disabled.
+
+    DELETE PROJECT (story 2.5, AC2, AC12; UX-DR12, UX-DR26, UX-DR36; open question 1 (a)): beside Rename, for the same
+    Roles. It asks first, IN PLACE: once the list has been read again for the Project's true Task count (AD-29), the
+    row's content is replaced by the confirm naming the Project and the count - "It holds no Tasks." when there are none,
+    the friction and the reassurance being one sentence - and saying it cannot be undone, with the danger action and
+    Cancel; focus moves to Cancel. Esc or Cancel restores the row with focus on "Delete Project". Not optimistic: the row
+    stays until the server agrees. While the count or the deletion is with the server the control is aria-busy, never
+    disabled.
 *@
 
 <li class="project-list__row">
+    @if (Confirming)
+    {
+        <div class="destructive-confirm project-list__confirm" @onkeydown="ConfirmKeyDownAsync">
+            <p class="project-list__warning">
+                <span>@string.Format(CultureInfo.CurrentCulture, Localizer["DeleteQuestion"], Project.Name)</span>
+                <span>@CountSentence</span>
+                <span>@Localizer["DeleteCannotBeUndone"]</span>
+            </p>
+            <button type="button" class="button-danger" aria-busy="@(Deleting ? "true" : null)" @onclick="DeleteAsync">@Localizer["ProjectDelete"]</button>
+            <button type="button" class="button-secondary" @onclick="CancelDeleteAsync" @ref="_cancel">@Localizer["DeleteCancel"]</button>
+        </div>
+    }
+
     @if (Renaming)
     {
         <form class="project-rename" @onsubmit="CommitAsync" @onkeydown="KeyDownAsync" novalidate>
@@ -30,14 +52,15 @@
         </form>
     }
 
-    @if (!Renaming)
+    @if (!Renaming && !Confirming)
     {
         <a class="project-list__name" href="@ClientRoutes.Board(SpaceId, Project.Id)">@Project.Name</a>
     }
 
-    @if (!Renaming && CanManage)
+    @if (!Renaming && !Confirming && CanManage)
     {
         <button type="button" class="button-secondary" @onclick="StartAsync">@Localizer["ProjectRename"]</button>
+        <button type="button" class="button-secondary" aria-busy="@(Counting ? "true" : null)" @onclick="AskToDeleteAsync" @ref="_delete">@Localizer["ProjectDelete"]</button>
     }
 
     @if (Refusal is { } refusal)
@@ -57,7 +80,7 @@
     [EditorRequired]
     public ProjectResponse Project { get; set; } = new(Guid.Empty, string.Empty, default);
 
-    /// <summary>Whether the Role may rename it. When not, the control is absent.</summary>
+    /// <summary>Whether the Role may rename and delete it. When not, both controls are absent.</summary>
     [Parameter]
     public bool CanManage { get; set; }
 
@@ -97,7 +120,94 @@
     [Parameter]
     public EventCallback OnCancel { get; set; }
 
+    /// <summary>Whether its delete confirm is open (story 2.5).</summary>
+    [Parameter]
+    public bool Confirming { get; set; }
+
+    /// <summary>Whether its true Task count is being read before the confirm opens (story 2.5).</summary>
+    [Parameter]
+    public bool Counting { get; set; }
+
+    /// <summary>Whether its deletion is with the server (story 2.5).</summary>
+    [Parameter]
+    public bool Deleting { get; set; }
+
+    /// <summary>Raised by the row's delete control: the list reads the count, then opens the confirm (story 2.5).</summary>
+    [Parameter]
+    public EventCallback<ProjectResponse> OnAskToDelete { get; set; }
+
+    /// <summary>Raised by the confirm's danger action (story 2.5).</summary>
+    [Parameter]
+    public EventCallback<ProjectResponse> OnDelete { get; set; }
+
+    /// <summary>Raised by the confirm's Cancel or by Esc in it (story 2.5).</summary>
+    [Parameter]
+    public EventCallback OnCancelDelete { get; set; }
+
+    private ElementReference _delete;
+    private ElementReference _cancel;
+    private bool _wasConfirming;
+    private bool _focusCancel;
+    private bool _focusDelete;
+
+    // The count's sentence: none, one, or many - each its own whole sentence, never concatenated (story 2.5, AC2).
+    private string CountSentence => Project.TaskCount switch
+    {
+        0 => Localizer["ProjectHoldsNoTasks"],
+        1 => Localizer["ProjectHoldsOneTask"],
+        var count => string.Format(CultureInfo.CurrentCulture, Localizer["ProjectHoldsTasks"], count),
+    };
+
+    /// <summary>
+    /// The confirm opening takes focus to its Cancel: neither choice is a default, and a misplaced Enter destroys nothing.
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        if (Confirming && !_wasConfirming)
+        {
+            _focusCancel = true;
+        }
+
+        _wasConfirming = Confirming;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusCancel && Confirming)
+        {
+            _focusCancel = false;
+            await _cancel.FocusAsync();
+        }
+
+        if (_focusDelete && !Confirming && !Renaming && CanManage)
+        {
+            _focusDelete = false;
+            await _delete.FocusAsync();
+        }
+    }
+
     private Task StartAsync() => OnStart.InvokeAsync(Project);
+
+    private Task AskToDeleteAsync() => Counting ? Task.CompletedTask : OnAskToDelete.InvokeAsync(Project);
+
+    private Task DeleteAsync() => Deleting ? Task.CompletedTask : OnDelete.InvokeAsync(Project);
+
+    /// <summary>Cancel, or Esc in the confirm: nothing is sent, and focus returns to the row's delete control.</summary>
+    private Task CancelDeleteAsync()
+    {
+        if (Deleting)
+        {
+            return Task.CompletedTask;
+        }
+
+        _focusDelete = true;
+
+        return OnCancelDelete.InvokeAsync();
+    }
+
+    private Task ConfirmKeyDownAsync(KeyboardEventArgs args) =>
+        args.Key == "Escape" ? CancelDeleteAsync() : Task.CompletedTask;
 
     private Task CommitAsync() => OnCommit.InvokeAsync(Project);
 

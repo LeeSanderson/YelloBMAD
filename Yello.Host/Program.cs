@@ -7,6 +7,7 @@ using Yello.Application.ApiTokens.RevokeApiToken;
 using Yello.Application.Accounts.RegisterAccount;
 using Yello.Application.Accounts.SignOut;
 using Yello.Application.Projects.CreateProject;
+using Yello.Application.Projects.DeleteProject;
 using Yello.Application.Projects.ListProjects;
 using Yello.Application.Projects.RenameProject;
 using Yello.Application.Boards.ViewBoard;
@@ -16,6 +17,7 @@ using Yello.Application.Labels.ListLabels;
 using Yello.Application.Spaces.ListSpaces;
 using Yello.Application.Statuses.ListStatuses;
 using Yello.Application.Tasks.CreateTask;
+using Yello.Application.Tasks.DeleteTask;
 using Yello.Application.Tasks.EditTaskAttributes;
 using Yello.Application.Tasks.ViewTask;
 using Yello.Contracts.Accounts;
@@ -100,9 +102,11 @@ builder.Services.AddScoped<RevokeApiTokenHandler>();
 builder.Services.AddScoped<ListProjectsHandler>();
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<RenameProjectHandler>();
+builder.Services.AddScoped<DeleteProjectHandler>();
 builder.Services.AddScoped<CreateTaskHandler>();
 builder.Services.AddScoped<ViewTaskHandler>();
 builder.Services.AddScoped<EditTaskAttributesHandler>();
+builder.Services.AddScoped<DeleteTaskHandler>();
 builder.Services.AddScoped<ViewBoardHandler>();
 builder.Services.AddScoped<ListLabelsHandler>();
 builder.Services.AddScoped<DefineLabelHandler>();
@@ -383,6 +387,10 @@ api.MapListProjects();
 api.MapCreateProject();
 api.MapRenameProject();
 
+// Project deletion (story 2.5). DELETE /api/v1/spaces/{spaceId}/projects/{projectId} deletes the Project with every
+// Task in it, under ManageProjects, on both surfaces; no bound - it adds nothing.
+api.MapDeleteProject();
+
 // Tasks and the Board (story 2.2). POST /api/v1/spaces/{spaceId}/projects/{projectId}/tasks creates a Task
 // in the Project's first Status, declaring ManageTasks and the Tasks-per-Project bound, which the pipeline
 // counts within the route's {projectId}. GET /api/v1/spaces/{spaceId}/projects/{projectId}/board reads the
@@ -395,6 +403,10 @@ api.MapBoard();
 // edit: it adds no Task. Space-scoped on both surfaces; the URL never holds the Project (FR-41).
 api.MapViewTask();
 api.MapEditTask();
+
+// Task deletion (story 2.5). DELETE /api/v1/spaces/{spaceId}/tasks/{taskId} deletes the Task and its Label
+// applications, under ManageTasks, on both surfaces; no bound - it adds nothing.
+api.MapDeleteTask();
 
 // Labels (story 2.4). GET and POST /api/v1/spaces/{spaceId}/labels list them under the read capability every
 // Role holds and define one under ManageLabels; DELETE /api/v1/spaces/{spaceId}/labels/{labelId} deletes an

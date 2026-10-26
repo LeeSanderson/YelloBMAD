@@ -7,8 +7,8 @@ using Yello.Domain.Tasks;
 namespace Yello.Infrastructure.Persistence;
 
 /// <summary>
-/// Creates, reads and edits Tasks, and the Labels applied to them, inside the request's Space-scoped unit of work.
-/// Stories 2.2, 2.3 and 2.4.
+/// Creates, reads, edits and deletes Tasks, and the Labels applied to them, inside the request's Space-scoped unit of
+/// work. Stories 2.2, 2.3, 2.4 and 2.5.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -44,6 +44,16 @@ namespace Yello.Infrastructure.Persistence;
 /// takes a Task lock, so the two cannot wait on each other in a cycle - measured by the story's race cases, which
 /// hold each side's lock and wait on the other. The Task row lock serialises two Labels edits of one Task, so the
 /// whole-set replacement stays one request's set.
+/// </para>
+/// <para>
+/// <b>A deletion takes the edit's locks in the edit's order</b> (story 2.5, open question 5): the Project's Task range
+/// first - the statement a creation's bound count and a Status edit take, so the same index and the same range - then the
+/// Task's own row on its clustered key (<c>INDEX(1)</c>, the Labels edit's Task lock), then the delete; the database's
+/// <c>TaskLabel</c> cascade removes the applications inside that statement. Range before row, as every key placer: a
+/// Status edit holds the range and then writes the row, so a deletion that locked the row first would hold what the edit
+/// needs while waiting for what it has. A Label deletion takes the Label and then its <c>TaskLabel</c> range and never a
+/// Task lock, so it queues behind the cascade's removed rows and never cycles. A deletion writes no position key and
+/// renumbers no sibling (AD-15). Measured by story 2.5's RACE-T1..T5, which hold each side and wait on the other.
 /// </para>
 /// <para>
 /// <b>Saves its own effect</b>, as every store does, so the idempotency record is the only thing the
@@ -230,6 +240,50 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
         await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         return true;
+    }
+
+    /// <inheritdoc />
+    public async Task<TaskDeletion> DeleteAsync(Guid taskId, CancellationToken cancellationToken)
+    {
+        var owner = await dbContext.Tasks
+            .AsNoTracking()
+            .Where(task => task.Id == taskId)
+            .Select(task => new { task.ProjectId })
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (owner is null)
+        {
+            return TaskDeletion.NotFound;
+        }
+
+        var project = owner.ProjectId;
+
+        // The Project's Task range, in the statement shape a creation's bound count takes, so all three meet on it.
+        _ = await dbContext.Database
+            .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = {project}")
+            .SingleAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        // The Task's own row, on the clustered key every other Task locker names. Gone by now (deleted while this waited
+        // on the range) is not found - never Deleted, never a 500.
+        var locked = await dbContext.Tasks
+            .FromSql($"SELECT * FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {taskId}")
+            .AsNoTracking()
+            .CountAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (locked == 0)
+        {
+            return TaskDeletion.NotFound;
+        }
+
+        var deleted = await dbContext.Tasks
+            .Where(task => task.Id == taskId)
+            .ExecuteDeleteAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return deleted == 0 ? TaskDeletion.NotFound : TaskDeletion.Deleted;
     }
 
     /// <summary>

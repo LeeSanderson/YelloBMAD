@@ -1,3 +1,4 @@
+@using System.Globalization
 @using Yello.Client.Spaces
 @using Yello.Contracts.Labels
 @using Yello.Contracts.Tasks
@@ -17,9 +18,16 @@
     in a title field holding an uncommitted change reverts the field first, and Esc in the open picker
     closes the picker. On close the Board returns focus to the card that opened it.
 
-    ATTRIBUTES ONLY: title, Status, due date and - since story 2.4 - Labels, attributes above. No description
-    region, no heading for one, no placeholder (AC6; FR-31 is Epic 7). No Assignee (4.6), no Move control (2.6), no
-    delete (2.5).
+    ATTRIBUTES, THEN DELETE: title, Status, due date and - since story 2.4 - Labels, attributes above. No description
+    region, no heading for one, no placeholder (AC6; FR-31 is Epic 7). No Assignee (4.6), no Move control (2.6).
+
+    DELETE TASK (story 2.5, AC1, AC11; UX-DR12, UX-DR26, UX-DR36): the panel's last control, a secondary button - the
+    danger colour is spent only inside the confirm (open question 8). It asks first, IN PLACE: the panel's content is
+    replaced by the confirm - still this one dialog, still trapped, never a second dialog stacked on it - which names the
+    Task, says it cannot be undone, and offers the danger action and Cancel, with focus on Cancel (open question 9: a
+    misplaced Enter destroys nothing). Esc or Cancel brings the content back and focus returns to "Delete Task"; a second
+    Esc closes the panel. Not optimistic: while the server is asked the danger action is aria-busy (never disabled, open
+    question 10) and the card stays; the Board removes it on 204. A refusal is said in the confirm's own status region.
 
     THE LABELS (story 2.4, AC7): the applied chips, and a "Labels" control opening a multi-select listbox in the
     panel - the Space's Labels, the applied ones selected, nothing else pre-selected (UX-DR11). Toggling one commits the
@@ -40,12 +48,30 @@
     <div class="task-detail" role="dialog" aria-modal="true" aria-labelledby="@HeadingId" @onkeydown="KeyDownAsync">
         <div class="task-detail__sentinel" tabindex="0" @onfocus="FocusLastAsync"></div>
 
-        <div class="task-detail__head">
-            <h2 class="type-dialog-title task-detail__title" id="@HeadingId">@Item.Title</h2>
-            <button type="button" class="button-secondary task-detail__close" @onclick="CloseAsync" @ref="_close">@Localizer["TaskDetailClose"]</button>
-        </div>
+        @if (_confirming)
+        {
+            <div class="destructive-confirm task-detail__confirm">
+                <h2 class="type-dialog-title task-detail__title" id="@HeadingId">@string.Format(CultureInfo.CurrentCulture, Localizer["DeleteQuestion"], Item.Title)</h2>
+                <p class="task-detail__warning">@Localizer["DeleteCannotBeUndone"]</p>
+                <div class="task-detail__confirm-actions">
+                    <button type="button" class="button-danger" aria-busy="@(Deleting ? "true" : null)" @onclick="DeleteAsync" @ref="_danger">@Localizer["TaskDelete"]</button>
+                    <button type="button" class="button-secondary" @onclick="CancelConfirmAsync" @ref="_cancel">@Localizer["DeleteCancel"]</button>
+                </div>
 
-        @if (CanManage)
+                @* Present from the confirm's start, so a refusal's words are announced when they arrive. *@
+                <p class="task-detail__refusal" role="status">@Refusal</p>
+            </div>
+        }
+
+        @if (!_confirming)
+        {
+            <div class="task-detail__head">
+                <h2 class="type-dialog-title task-detail__title" id="@HeadingId">@Item.Title</h2>
+                <button type="button" class="button-secondary task-detail__close" @onclick="CloseAsync" @ref="_close">@Localizer["TaskDetailClose"]</button>
+            </div>
+        }
+
+        @if (!_confirming && CanManage)
         {
             <div class="task-detail__field">
                 <label class="form-field__label" for="@TitleId">@Localizer["TaskDetailTitleLabel"]</label>
@@ -133,7 +159,7 @@
                     <ul class="picker" role="listbox" aria-multiselectable="true" aria-labelledby="@LabelsButtonId">
                         @foreach (var label in SpaceLabels)
                         {
-                            <LabelOption @key="label.Id" Label="@label" Selected="@Item.LabelIds.Contains(label.Id)" OnToggle="ToggleLabelAsync" @ref="_lastLabelOption" />
+                            <LabelOption @key="label.Id" Label="@label" Selected="@Item.LabelIds.Contains(label.Id)" OnToggle="ToggleLabelAsync" />
                         }
                     </ul>
                 }
@@ -145,14 +171,14 @@
 
                         @if (CanManageLabels)
                         {
-                            <a class="task-detail__labels-link" href="@ClientRoutes.SpaceSettings(SpaceId)" @ref="_settingsLink">@Localizer["SpaceSettingsLink"]</a>
+                            <a class="task-detail__labels-link" href="@ClientRoutes.SpaceSettings(SpaceId)">@Localizer["SpaceSettingsLink"]</a>
                         }
                     </p>
                 }
             </div>
         }
 
-        @if (!CanManage)
+        @if (!_confirming && !CanManage)
         {
             <dl class="task-detail__attributes">
                 <dt class="form-field__label">@Localizer["TaskDetailStatusLabel"]</dt>
@@ -177,8 +203,18 @@
             </dl>
         }
 
-        @* Present from the start, so a refusal's words are announced when they arrive. *@
-        <p class="task-detail__refusal" role="status">@Refusal</p>
+        @if (!_confirming && CanManage)
+        {
+            <div class="task-detail__field">
+                <button type="button" class="button-secondary task-detail__delete" @onclick="AskToDeleteAsync" @ref="_delete">@Localizer["TaskDelete"]</button>
+            </div>
+        }
+
+        @if (!_confirming)
+        {
+            @* Present from the start, so a refusal's words are announced when they arrive. *@
+            <p class="task-detail__refusal" role="status">@Refusal</p>
+        }
 
         <div class="task-detail__sentinel" tabindex="0" @onfocus="FocusFirstAsync"></div>
     </div>
@@ -194,8 +230,9 @@
     private ElementReference _dueDate;
     private ElementReference _clear;
     private ElementReference _labelsButton;
-    private ElementReference _settingsLink;
-    private LabelOption? _lastLabelOption;
+    private ElementReference _delete;
+    private ElementReference _danger;
+    private ElementReference _cancel;
 
     private string _titleDraft = string.Empty;
     private string? _shownTitle;
@@ -206,6 +243,9 @@
     private bool _focusStatusButton;
     private bool _labelPickerOpen;
     private bool _focusLabelsButton;
+    private bool _confirming;
+    private bool _focusCancel;
+    private bool _focusDelete;
 
     /// <summary>The Task, as the Board's replica shows it now.</summary>
     [Parameter]
@@ -257,6 +297,21 @@
     [Parameter]
     public EventCallback OnClose { get; set; }
 
+    /// <summary>
+    /// Raised when the delete confirm opens or is cancelled, so the Board clears words that belonged to the content it
+    /// replaced (story 2.5).
+    /// </summary>
+    [Parameter]
+    public EventCallback OnConfirmToggled { get; set; }
+
+    /// <summary>Raised by the confirm's danger action: the Board asks the server to delete the Task (story 2.5).</summary>
+    [Parameter]
+    public EventCallback OnDelete { get; set; }
+
+    /// <summary>Whether the Task's deletion is on its way to the server: the danger action is busy (story 2.5).</summary>
+    [Parameter]
+    public bool Deleting { get; set; }
+
     private string HeadingId => "task-detail-heading-" + _id;
 
     private string TitleId => "task-detail-title-" + _id;
@@ -294,6 +349,7 @@
             _pickerOpen = false;
             _labelPickerOpen = false;
             _titleMessage = null;
+            _confirming = false;
         }
     }
 
@@ -323,6 +379,18 @@
             _focusLabelsButton = false;
             await _labelsButton.FocusAsync();
         }
+
+        if (_focusCancel)
+        {
+            _focusCancel = false;
+            await _cancel.FocusAsync();
+        }
+
+        if (_focusDelete)
+        {
+            _focusDelete = false;
+            await _delete.FocusAsync();
+        }
     }
 
     private Task CloseAsync() => OnClose.InvokeAsync();
@@ -343,6 +411,13 @@
             return Task.CompletedTask;
         }
 
+        if (_confirming)
+        {
+            // The innermost meaning: this Esc leaves the confirm, and a second one closes the panel. While the
+            // deletion is with the server it does nothing - the answer decides what the panel shows next.
+            return Deleting ? Task.CompletedTask : CancelConfirmAsync();
+        }
+
         if (_pickerOpen)
         {
             _pickerOpen = false;
@@ -360,32 +435,57 @@
         return OnClose.InvokeAsync();
     }
 
-    private async Task FocusFirstAsync() => await _close.FocusAsync();
+    private async Task FocusFirstAsync() => await (_confirming ? _danger : _close).FocusAsync();
 
     /// <summary>
-    /// Shift+Tab from the panel's start goes to its last control: for a Role that edits, the Labels field's last - the
-    /// open picker's last option, the way to Space settings in an empty one, or the Labels control itself (story 2.4
-    /// moved the end of the panel from the due date's controls).
+    /// Shift+Tab from the panel's start goes to its last control: the confirm's Cancel while it is open; for a Role that
+    /// edits, the delete control (story 2.5 moved the end of the panel there from the Labels field); for a Viewer, Close.
     /// </summary>
     private async Task FocusLastAsync()
     {
-        if (!CanManage)
+        if (_confirming)
         {
-            await _close.FocusAsync();
+            await _cancel.FocusAsync();
         }
-        else if (_labelPickerOpen && SpaceLabels.Count > 0 && _lastLabelOption is { } last)
+        else if (CanManage)
         {
-            await last.FocusAsync();
-        }
-        else if (_labelPickerOpen && SpaceLabels.Count == 0 && CanManageLabels)
-        {
-            await _settingsLink.FocusAsync();
+            await _delete.FocusAsync();
         }
         else
         {
-            await _labelsButton.FocusAsync();
+            await _close.FocusAsync();
         }
     }
+
+    /// <summary>
+    /// The panel's delete control: the confirm replaces the panel's content, and focus moves to its Cancel (open question 9).
+    /// </summary>
+    private Task AskToDeleteAsync()
+    {
+        _pickerOpen = false;
+        _labelPickerOpen = false;
+        _confirming = true;
+        _focusCancel = true;
+
+        return OnConfirmToggled.InvokeAsync();
+    }
+
+    /// <summary>
+    /// Cancel, or Esc in the confirm: nothing is sent, the content returns, and focus returns to the panel's delete control.
+    /// </summary>
+    private Task CancelConfirmAsync()
+    {
+        _confirming = false;
+        _focusDelete = true;
+
+        return OnConfirmToggled.InvokeAsync();
+    }
+
+    /// <summary>
+    /// The danger action. A second press while the first is with the server is ignored - the busy state, never a
+    /// disabled one (open question 10).
+    /// </summary>
+    private Task DeleteAsync() => Deleting ? Task.CompletedTask : OnDelete.InvokeAsync();
 
     private void TitleInput(ChangeEventArgs args) => _titleDraft = args.Value?.ToString() ?? string.Empty;
 

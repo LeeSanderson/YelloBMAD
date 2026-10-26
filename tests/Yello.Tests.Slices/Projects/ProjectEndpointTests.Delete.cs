@@ -24,11 +24,10 @@ namespace Yello.Tests.Slices.Projects;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Every case is skipped <c>red: AC&lt;n&gt;</c></b> until <c>DELETE</c> is mapped on the Project's item route (story
-/// Task 5). That route is the path 2.1's rename already serves (<see cref="ProjectRoutes.ProjectOf"/>), so the cases
-/// compile today; today a <c>DELETE</c> there is the unmatched <c>404</c>, which is exactly what 2.1's
-/// <c>An_unmapped_method_on_a_Project_route_answers_404_with_no_Allow_header</c> asserts - story Task 5 retargets that
-/// case to <c>PUT</c> in the same change.
+/// <b>Activated by story 2.5's dev phase</b> once <c>DELETE</c> was mapped on the Project's item route (story Task 5) -
+/// the path 2.1's rename serves (<see cref="ProjectRoutes.Project"/>). 2.1's
+/// <c>An_unmapped_method_on_a_Project_route_answers_404_with_no_Allow_header</c> sent <c>DELETE</c> there; it now sends
+/// <c>DELETE</c> to the collection, which stays unmapped.
 /// </para>
 /// <para>
 /// <b>Tasks are created through the product with 2.2's <see cref="TaskWire"/></b>, which takes the Tasks namespace's
@@ -59,7 +58,7 @@ public sealed partial class ProjectEndpointTests
     /// <param name="role">The deleter's Role in the Owner's Space.</param>
     /// <param name="surface">The surface the deletion is sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC3 - DELETE /spaces/{spaceId}/projects/{projectId} is not mapped yet (story Task 5)")]
+    [Theory]
     [InlineData("Owner", IsolationSurface.Session)]
     [InlineData("Admin", IsolationSurface.ApiToken)]
     [InlineData("Member", IsolationSurface.Session)]
@@ -146,7 +145,7 @@ public sealed partial class ProjectEndpointTests
     /// and its Task stay. Anchor: a Member deletes it (<c>204</c>).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - DELETE /spaces/{spaceId}/projects/{projectId} is not mapped yet, so a Viewer meets the unmatched 404 (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "NFR-7")]
     public async Task A_Viewer_is_refused_403_manage_projects_on_both_surfaces_and_the_Project_stays()
@@ -205,7 +204,7 @@ public sealed partial class ProjectEndpointTests
     /// </summary>
     /// <param name="surface">The surface every request is sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC7 - DELETE /spaces/{spaceId}/projects/{projectId} is not mapped yet (story Task 5)")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AD-20")]
@@ -267,7 +266,7 @@ public sealed partial class ProjectEndpointTests
     /// <see cref="SeedProjectsAsync"/>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - DELETE /spaces/{spaceId}/projects/{projectId} is not mapped yet (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     [Trait("Priority", "P1")]
@@ -305,7 +304,7 @@ public sealed partial class ProjectEndpointTests
     /// <c>{createdAt, id, name, taskCount}</c> - 2.1's three fields and the one appended - and carries no Space.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the Project listing carries no taskCount yet (story Task 4, Q2 (a))")]
+    [Fact]
     [Trait("Requirement", "AD-29")]
     [Trait("Requirement", "AD-19")]
     public async Task The_Project_listing_states_each_Projects_true_Task_count()
@@ -355,7 +354,7 @@ public sealed partial class ProjectEndpointTests
     /// no serial collection.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - DELETE /spaces/{spaceId}/projects/{projectId} is not mapped yet (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Assumption", "PRD-12-5")]
     [Trait("Priority", "P1")]

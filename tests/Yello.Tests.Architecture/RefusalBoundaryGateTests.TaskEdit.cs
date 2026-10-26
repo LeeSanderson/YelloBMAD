@@ -116,9 +116,10 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// AC3, AC8, AD-4, Task 5 - the Task's own route is mapped for <c>GET</c> (requiring
-    /// <c>ReadProjectsAndTasks</c>) and <c>PATCH</c> (requiring <c>ManageTasks</c>), neither is Session-only, and
-    /// the <c>PATCH</c> consults no bound - an edit adds no Task, so counting the Project would refuse edits in a
-    /// full one.
+    /// <c>ReadProjectsAndTasks</c>), <c>PATCH</c> (requiring <c>ManageTasks</c>) and - story 2.5 - <c>DELETE</c>
+    /// (requiring <c>ManageTasks</c>, the matrix's delete capability); none is Session-only, and neither write
+    /// consults a bound - an edit or a deletion adds no Task, so counting the Project would refuse them in a full
+    /// one.
     /// </summary>
     [Fact]
     [Trait("Requirement", "AD-4")]
@@ -131,11 +132,13 @@ public sealed partial class RefusalBoundaryGateTests
             .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? []).Select(method => (Method: method, Endpoint: endpoint)))
             .ToDictionary(route => route.Method, route => route.Endpoint, StringComparer.Ordinal);
 
-        Assert.Equal(["GET", "PATCH"], routes.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(["DELETE", "GET", "PATCH"], routes.Keys.Order(StringComparer.Ordinal));
         Assert.Equal(Capability.ReadProjectsAndTasks, routes["GET"].Metadata.GetMetadata<RequiredCapability>()?.Capability);
         Assert.Equal(Capability.ManageTasks, routes["PATCH"].Metadata.GetMetadata<RequiredCapability>()?.Capability);
         Assert.All(routes.Values, endpoint => Assert.DoesNotContain(endpoint.Metadata, metadata => metadata.GetType().Name == "SessionOnlyEndpoint"));
+        Assert.Equal(Capability.ManageTasks, routes["DELETE"].Metadata.GetMetadata<RequiredCapability>()?.Capability);
         Assert.Null(routes["PATCH"].Metadata.GetMetadata<RequiredBound>());
+        Assert.Null(routes["DELETE"].Metadata.GetMetadata<RequiredBound>());
     }
 
     /// <summary>

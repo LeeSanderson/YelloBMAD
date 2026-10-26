@@ -16,9 +16,8 @@ namespace Yello.Tests.Architecture;
 /// <c>.button-danger</c>, no icon - is gated in the browser (<c>DeleteTests</c>), where the rendered confirm exists.
 /// </para>
 /// <para>
-/// <b>Two of the three run today.</b> No rule styling the confirm or the danger button declares a transition, an
-/// animation or a shadow now, so DSN-502 and DSN-503 are standing gates from this run on; DSN-501 is red until Task 11
-/// gives the confirm its border (today <c>components.css</c>'s rule is flex, wrap and gap only).
+/// <b>DSN-502 and DSN-503 ran from the ATDD run on</b>; DSN-501 was activated when story 2.5 gave the confirm its danger
+/// border, which changed 2.4's Label confirm too, deliberately.
 /// </para>
 /// </remarks>
 public sealed partial class DesignFoundationGateTests
@@ -36,7 +35,7 @@ public sealed partial class DesignFoundationGateTests
     /// width: a rule selecting <c>.destructive-confirm</c> declares a solid border whose colour is <c>var(--danger)</c>
     /// and whose width is <c>var(--border-emphasis-width)</c> (2px), as a shorthand or as its longhands.
     /// </summary>
-    [Fact(Skip = "red: AC13 - .destructive-confirm declares no danger border yet (story Task 11)")]
+    [Fact]
     [Trait("Requirement", "UX-DR12")]
     [Trait("Requirement", "UX-DR5")]
     public void The_destructive_confirm_carries_the_danger_border_at_the_emphasis_width()

@@ -46,11 +46,6 @@ public sealed partial class RefusalBoundaryGateTests
 
     private static string BoardContractsNamespace => typeof(Yello.Contracts.Boards.BoardRoutes).Namespace!;
 
-    /// <summary>
-    /// Every route under one Project, as story 2.2 leaves them (Q5 (a)).
-    /// </summary>
-    private const string ProjectItemPattern = "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}";
-
     private static readonly string[] BannedResultFactories = ["Created", "CreatedAtRoute", "Accepted", "AcceptedAtRoute"];
 
     private static readonly string[] ResultFactoryTypes = ["Microsoft.AspNetCore.Http.Results", "Microsoft.AspNetCore.Http.TypedResults"];
@@ -160,34 +155,6 @@ public sealed partial class RefusalBoundaryGateTests
 
         Assert.Equal(typeof(int), column.GetProperty("Total")?.PropertyType);
         Assert.NotNull(column.GetProperty("Tasks"));
-    }
-
-    /// <summary>
-    /// AC9, AC7 of 2.1, Q5 (a) - every route the Host maps under one Project is the rename (<c>PATCH</c>), the
-    /// Task creation (<c>POST …/tasks</c>) or the Board (<c>GET …/board</c>): nothing lists a Project's Tasks
-    /// flat (AC5's total would then be the client's to derive), and nothing moves a Project. Read beside
-    /// <c>No_route_moves_a_Project</c>, whose prefix also matches these two routes: dev-story narrows that
-    /// gate to the collection and the item, and this one holds what lies under the item.
-    /// </summary>
-    [Fact]
-    [Trait("Requirement", "FR-19")]
-    [Trait("Requirement", "FR-28")]
-    public void The_routes_under_a_Project_are_its_rename_its_Task_creation_and_its_Board()
-    {
-        var routes = RouteTable()
-            .Where(endpoint => endpoint.RoutePattern.RawText?.StartsWith(ProjectItemPattern, StringComparison.Ordinal) == true)
-            .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? [])
-                .Select(method => $"{method} {endpoint.RoutePattern.RawText}"))
-            .Order(StringComparer.Ordinal)
-            .ToList();
-
-        Assert.Equal(
-            [
-                $"GET {ProjectItemPattern}/board",
-                $"PATCH {ProjectItemPattern}",
-                $"POST {ProjectItemPattern}/tasks",
-            ],
-            routes);
     }
 
     /// <summary>

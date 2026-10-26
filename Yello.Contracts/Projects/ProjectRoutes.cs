@@ -11,8 +11,8 @@ namespace Yello.Contracts.Projects;
 /// </para>
 /// <para>
 /// <b>No route moves a Project</b> (AC7): the collection takes <c>GET</c> and <c>POST</c>, one Project
-/// takes <c>PATCH</c> for its name, and nothing carries a segment after the Project's id. Story 2.5 adds
-/// <c>DELETE</c> on one Project.
+/// takes <c>PATCH</c> for its name and <c>DELETE</c> (story 2.5), and nothing carries a segment after the
+/// Project's id.
 /// </para>
 /// </remarks>
 public static class ProjectRoutes
@@ -35,10 +35,16 @@ public static class ProjectRoutes
     public static string Create => List;
 
     /// <summary>
-    /// <c>PATCH</c> a <see cref="RenameProjectRequest"/> here: <c>200</c> with the renamed
-    /// <see cref="ProjectResponse"/>.
+    /// One Project's template: <c>PATCH</c> renames it (<see cref="Rename"/>), <c>DELETE</c> deletes it with every
+    /// Task in it - <c>204</c>, no body either way (story 2.5).
     /// </summary>
-    public static string Rename => "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}";
+    public static string Project => "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}";
+
+    /// <summary>
+    /// <c>PATCH</c> a <see cref="RenameProjectRequest"/> here: <c>200</c> with the renamed
+    /// <see cref="ProjectResponse"/>. The same template as <see cref="Project"/>.
+    /// </summary>
+    public static string Rename => Project;
 
     /// <summary>
     /// The list and create path for one Space, as a client calls it.

@@ -87,5 +87,11 @@ public sealed class CreateProjectHandlerTests
 
         public Task<IReadOnlyList<Project>> ListAsync(CancellationToken cancellationToken) =>
             throw new InvalidOperationException("Not used by the create slice.");
+
+        public Task<IReadOnlyDictionary<Guid, int>> TaskCountsAsync(CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Not used by the create slice.");
+
+        public Task<ProjectDeletion> DeleteAsync(Guid projectId, CancellationToken cancellationToken) =>
+            throw new InvalidOperationException("Not used by the create slice.");
     }
 }

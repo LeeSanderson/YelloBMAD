@@ -1,8 +1,8 @@
 namespace Yello.Domain.Tasks;
 
 /// <summary>
-/// Creates, reads and edits Tasks, and the Labels applied to them, in the Space the current unit of work is
-/// scoped to. FR-19, FR-20, FR-22; stories 2.2, 2.3 and 2.4.
+/// Creates, reads, edits and deletes Tasks, and the Labels applied to them, in the Space the current unit of work
+/// is scoped to. FR-19, FR-20, FR-22, FR-23; stories 2.2, 2.3, 2.4 and 2.5.
 /// </summary>
 /// <remarks>
 /// <b>Never asked about another Space.</b> Every call runs inside the request's Space-scoped unit of work,
@@ -60,4 +60,29 @@ public interface ITaskStore
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>The Label ids per Task id; a Task carrying none is absent.</returns>
     Task<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>> LabelIdsOfAsync(IReadOnlyCollection<Guid> taskIds, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Deletes one Task of the resolved Space, with the Labels applied to it, immediately and irreversibly (story 2.5,
+    /// AC3, AC7). Its Labels stay; no other Task's position key changes.
+    /// </summary>
+    /// <param name="taskId">The Task, from the route.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>What the deletion came to.</returns>
+    Task<TaskDeletion> DeleteAsync(Guid taskId, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// What a Task deletion came to. No "already deleted": that would tell a caller an id once existed (AD-3).
+/// </summary>
+public enum TaskDeletion
+{
+    /// <summary>
+    /// The Task and its applications were deleted.
+    /// </summary>
+    Deleted,
+
+    /// <summary>
+    /// No Task in the resolved Space has the id, whether it never existed, was deleted, or is another Space's.
+    /// </summary>
+    NotFound,
 }

@@ -250,5 +250,8 @@ public sealed class EditTaskAttributesHandlerTests
                 Replacements.Count > 0 && visible is not null
                     ? new Dictionary<Guid, IReadOnlyList<Guid>> { [visible.Id] = Replacements[^1] }
                     : new Dictionary<Guid, IReadOnlyList<Guid>>());
+
+        public Task<TaskDeletion> DeleteAsync(Guid taskId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The edit slice deletes nothing.");
     }
 }

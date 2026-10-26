@@ -23,7 +23,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="surface">The surface every request is sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - DELETE /spaces/{spaceId}/tasks/{taskId} is not mapped yet (story Task 5)")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AR-25")]
@@ -70,7 +70,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="surface">The surface both requests are sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - DELETE /spaces/{spaceId}/tasks/{taskId} is not mapped yet (story Task 5)")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AR-25")]

@@ -33,9 +33,9 @@ namespace Yello.Tests.Slices.Tasks;
 /// the range would hold what the edit needs while waiting for what the edit has - a 1205, either here or in the request.
 /// </para>
 /// <para>
-/// <b>Three of these run today.</b> RACE-T2, RACE-T3 (b) and RACE-T4 make the request an edit or a Label deletion - routes
-/// that exist - against a deletion the test plays in SQL. Where one is green today it stays active as a standing gate
-/// (checklist); the rest are skipped <c>red: AC10</c> until the Task DELETE route is mapped.
+/// <b>RACE-T2, RACE-T3 (b) and RACE-T4 ran from the ATDD run on</b>: they make the request an edit or a Label deletion -
+/// routes that already existed - against a deletion the test plays in SQL. The rest were activated by the dev phase once
+/// the Task DELETE route was mapped; RACE-T1 is the one that catches a deletion taking its locks out of order (a 1205).
 /// </para>
 /// </remarks>
 public sealed partial class TaskEndpointTests
@@ -47,7 +47,7 @@ public sealed partial class TaskEndpointTests
     /// the request's <c>500</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - DELETE /spaces/{spaceId}/tasks/{taskId} is not mapped yet; it answers the unmatched 404 without waiting (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-23")]
     public async Task A_deletion_queued_behind_a_Status_edit_answers_204_once_the_edit_commits()
@@ -145,7 +145,7 @@ public sealed partial class TaskEndpointTests
     /// itself stays.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - DELETE /spaces/{spaceId}/tasks/{taskId} is not mapped yet (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-22")]
     public async Task A_deletion_queued_behind_a_Labels_edit_answers_204_and_leaves_no_application()
@@ -315,7 +315,7 @@ public sealed partial class TaskEndpointTests
     /// and the bystander.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - DELETE /spaces/{spaceId}/tasks/{taskId} is not mapped yet (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "AR-30")]
     public async Task A_creation_and_a_deletion_in_one_Project_both_succeed()

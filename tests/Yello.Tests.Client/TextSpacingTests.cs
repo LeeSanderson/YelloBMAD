@@ -266,7 +266,7 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC13 - the Task detail panel has no Delete Task control yet (story Task 9)")]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "UX-DR40")]
@@ -301,7 +301,7 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC13 - Space home has no Delete Project control yet (story Task 10)")]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "UX-DR40")]

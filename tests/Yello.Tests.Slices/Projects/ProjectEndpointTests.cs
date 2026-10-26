@@ -71,7 +71,10 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
 
     private static readonly Dictionary<string, string> NoHeaders = new(StringComparer.Ordinal);
 
-    private static readonly string[] ProjectProperties = ["createdAt", "id", "name"];
+    /// <summary>
+    /// The Project row's shape: 2.1's three fields and the true Task count story 2.5 appended (open question 2 (a), AD-19).
+    /// </summary>
+    private static readonly string[] ProjectProperties = ["createdAt", "id", "name", "taskCount"];
 
     private static readonly string[] CreationOrderNames = ["Charlie", "Alpha", "Bravo"];
 
@@ -79,7 +82,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
 
     /// <summary>
     /// AC2 - a Member (here the Owner of a Personal Space) creates a Project: <c>201</c>, the body is
-    /// exactly <c>{createdAt, id, name}</c> with the name trimmed, the <c>Location</c> is the Project's
+    /// exactly <c>{createdAt, id, name, taskCount}</c> (the count appended by story 2.5) with the name trimmed, the <c>Location</c> is the Project's
     /// own path, and the row belongs to exactly that Space.
     /// </summary>
     /// <returns>A task.</returns>
@@ -105,6 +108,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
 
         Assert.Equal(ProjectProperties, document.RootElement.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
         Assert.Equal("Northwind Redesign", document.RootElement.GetProperty("name").GetString());
+        Assert.Equal(0, document.RootElement.GetProperty("taskCount").GetInt32());
         Assert.Equal(ProjectRoutes.ProjectOf(owner.SpaceId, id), created.Header("Location"));
 
         var row = Assert.Single(await ProjectRowsAsync(database, owner.SpaceId));
@@ -537,7 +541,8 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
     /// <summary>
     /// AC11, Q9 (a), <c>deferred-work.md:300</c> - a method a Project route does not map answers the
     /// unmatched fallback's <c>404 not-available</c> with no <c>Allow</c> header, so the route's method set
-    /// is not disclosed. Anchored on the route answering its mapped method.
+    /// is not disclosed. Anchored on the route answering its mapped method. Story 2.5 mapped <c>DELETE</c> on one
+    /// Project, so the third request moved to <c>DELETE</c> on the collection, which stays unmapped.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -557,7 +562,8 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
 
             unmapped.Add(await owner.Session.SendWithHeadersAsync(HttpMethod.Put, ProjectRoutes.ListIn(owner.SpaceId), NameBody("x"), NoHeaders));
             unmapped.Add(await owner.Session.SendWithHeadersAsync(HttpMethod.Put, ProjectRoutes.ProjectOf(owner.SpaceId, id), NameBody("x"), NoHeaders));
-            unmapped.Add(await owner.Session.SendWithHeadersAsync(HttpMethod.Delete, ProjectRoutes.ProjectOf(owner.SpaceId, id), content: null, NoHeaders));
+            // Story 2.5 maps DELETE on one Project; DELETE on the collection is still unmapped.
+            unmapped.Add(await owner.Session.SendWithHeadersAsync(HttpMethod.Delete, ProjectRoutes.ListIn(owner.SpaceId), content: null, NoHeaders));
         });
 
         Assert.Equal(HttpStatusCode.OK, mapped?.StatusCode);

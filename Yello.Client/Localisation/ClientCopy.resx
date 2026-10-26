@@ -707,10 +707,6 @@
     <value>Delete Label</value>
     <comment>A Label's delete control, and the confirmation's danger action (story 2.4).</comment>
   </data>
-  <data name="LabelDeleteWarning" xml:space="preserve">
-    <value>Delete {0}? This cannot be undone.</value>
-    <comment>The in-place confirmation before a Label is deleted (UX-DR12, UX-DR36). {0} is the Label's name.</comment>
-  </data>
   <data name="LabelCancel" xml:space="preserve">
     <value>Cancel</value>
     <comment>Leaves a Label's delete confirmation without deleting.</comment>
@@ -734,5 +730,45 @@
   <data name="InvalidTaskLabels" xml:space="preserve">
     <value>One of those Labels is not in this Space any more.</value>
     <comment>400 invalid-task-labels, inline in the Task detail panel (story 2.4). Reverts the Labels only.</comment>
+  </data>
+  <data name="DeleteQuestion" xml:space="preserve">
+    <value>Delete {0}?</value>
+    <comment>Opens every in-place delete confirmation - a Task's, a Project's, a Label's (UX-DR12, UX-DR36; story 2.5). {0} is what is deleted, by its own name or title. Never "Are you sure".</comment>
+  </data>
+  <data name="DeleteCannotBeUndone" xml:space="preserve">
+    <value>This cannot be undone.</value>
+    <comment>Said by every delete confirmation, after what it destroys (AC4, UX-DR36). The words carry the danger; the border only reinforces them. There is no trash and no restore, so never soften it.</comment>
+  </data>
+  <data name="DeleteCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Leaves a Task's or a Project's delete confirmation without deleting anything (story 2.5). Esc does the same.</comment>
+  </data>
+  <data name="TaskDelete" xml:space="preserve">
+    <value>Delete Task</value>
+    <comment>The Task detail panel's last control, which asks first, and the confirmation's danger action (story 2.5).</comment>
+  </data>
+  <data name="TaskDeleted" xml:space="preserve">
+    <value>Task deleted.</value>
+    <comment>Announced politely once the server has deleted a Task (story 2.5, open question 11). Never before.</comment>
+  </data>
+  <data name="ProjectDelete" xml:space="preserve">
+    <value>Delete Project</value>
+    <comment>A Project row's delete control on Space home, which asks first, and the confirmation's danger action (story 2.5).</comment>
+  </data>
+  <data name="ProjectHoldsNoTasks" xml:space="preserve">
+    <value>It holds no Tasks.</value>
+    <comment>In the Project's delete confirmation, when it holds no Tasks: the reassurance is the same sentence as the warning (AC2).</comment>
+  </data>
+  <data name="ProjectHoldsOneTask" xml:space="preserve">
+    <value>It holds 1 Task.</value>
+    <comment>In the Project's delete confirmation, when it holds exactly one Task - deleted with it (AC2).</comment>
+  </data>
+  <data name="ProjectHoldsTasks" xml:space="preserve">
+    <value>It holds {0} Tasks.</value>
+    <comment>In the Project's delete confirmation, when it holds more than one Task, all deleted with it (AC2). {0} is the true total, read when the confirmation opened.</comment>
+  </data>
+  <data name="ProjectDeleted" xml:space="preserve">
+    <value>Project deleted.</value>
+    <comment>Announced politely once the server has deleted a Project (story 2.5, open question 11). Never before.</comment>
   </data>
 </root>

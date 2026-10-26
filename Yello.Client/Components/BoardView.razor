@@ -91,6 +91,7 @@
                              OnOpen="Open"
                              FocusTaskId="@_focusCard"
                              FocusRequest="@_focusCardRequests"
+                             FocusColumnRequest="@(column.StatusId == _focusColumn ? _focusColumnRequests : 0)"
                              ShowAdd="@(IsFirst(column) && _canManage && !_creating && !IsEmpty)"
                              OnAdd="OpenCreate"
                              FocusAddRequests="@(IsFirst(column) ? _focusAddRequests : 0)">
@@ -116,6 +117,9 @@
                         OnStatus="statusId => EditAsync(open.Id, TaskAttribute.Status, statusId)"
                         OnDueDate="due => EditAsync(open.Id, TaskAttribute.DueDate, due)"
                         OnLabels="labelIds => EditAsync(open.Id, TaskAttribute.Labels, labelIds)"
+                        OnConfirmToggled="ClearPanelRefusal"
+                        OnDelete="() => DeleteTaskAsync(open.Id)"
+                        Deleting="@(_deleting == open.Id)"
                         OnClose="Close" />
         }
     </div>
@@ -352,7 +356,24 @@
     }
 
     /// <summary>
-    /// One column as this Board holds it: its total moves with the person's own creation.
+    /// A deleted Task leaves its column, whose true total drops by one (story 2.5, AC11): the person's own deletion, the
+    /// mirror of <see cref="Add"/>. Returns the column that held it.
+    /// </summary>
+    private ColumnState? Remove(Guid taskId)
+    {
+        if (Locate(taskId) is not { } found)
+        {
+            return null;
+        }
+
+        found.Column.Tasks.RemoveAt(found.Index);
+        found.Column.Total--;
+
+        return found.Column;
+    }
+
+    /// <summary>
+    /// One column as this Board holds it: its total moves with the person's own creation and deletion.
     /// </summary>
     private sealed class ColumnState(Guid statusId, string name, int total, List<TaskResponse> tasks)
     {

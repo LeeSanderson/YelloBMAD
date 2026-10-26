@@ -1,6 +1,10 @@
+---
+baseline_commit: 9ca31d1a512ef21a7323b4f7d0b39a0d49aa0df1
+---
+
 # Story 2.5: Delete a Task, and delete a Project
 
-Status: ready-for-dev
+Status: review
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-5-delete-a-task-and-delete-a-project`
@@ -111,41 +115,41 @@ AC1–AC6 are reproduced **verbatim** from `epics.md:1140-1164` (`status: final`
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Confirm the gates, then decide the open questions** (AC: all)
-  - [ ] `dotnet build Yello.slnx`, then `dotnet test --project tests/Yello.Tests.Isolation --no-build` filtered to `IsolationCaseListTests`. With 2.5 `in-progress` it is green. List every row with `PendingUntil: "2.5"` (the ATDD phase may add some) in the Debug Log; each is converted before `review`.
-  - [ ] Read the open questions (Dev Notes). Decide Q1–Q6 before Task 2, Q7–Q10 before Task 8, Q11–Q13 before Task 9. Record each in the Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each is reversible.
+- [x] **Task 1 — Confirm the gates, then decide the open questions** (AC: all)
+  - [x] `dotnet build Yello.slnx`, then `dotnet test --project tests/Yello.Tests.Isolation --no-build` filtered to `IsolationCaseListTests`. With 2.5 `in-progress` it is green. List every row with `PendingUntil: "2.5"` (the ATDD phase may add some) in the Debug Log; each is converted before `review`.
+  - [x] Read the open questions (Dev Notes). Decide Q1–Q6 before Task 2, Q7–Q10 before Task 8, Q11–Q13 before Task 9. Record each in the Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each is reversible.
 
-- [ ] **Task 2 — Domain ports and slices** (AC: 3, 7)
-  - [ ] `ITaskStore.DeleteAsync(Guid taskId, CancellationToken)` and `IProjectStore.DeleteAsync(Guid projectId, CancellationToken)` returning a typed outcome, mirroring `ILabelStore.DeleteAsync` / `LabelDeletion { Deleted, NotFound, InUse }` (`Yello.Domain/Labels/ILabelStore.cs:36-58`): `TaskDeletion { Deleted, NotFound }`, `ProjectDeletion { Deleted, NotFound }`. No `Where(SpaceId == …)`: both layers narrow; a foreign id is simply not found.
-  - [ ] Slices, one handler file each (AR-3, the `DeleteLabelHandler` shape — a pass-through with remarks "No Role, no Space"): `Yello.Application/Tasks/DeleteTask/DeleteTaskHandler.cs`, `Yello.Application/Projects/DeleteProject/DeleteProjectHandler.cs`. **No handler reads the Role, a capability, a count for a bound, or `Idempotency-Key`** (the pipeline-only gates catch each).
-  - [ ] If Q2 chooses a server-side count for the Project confirm, it is a read (`ReadProjectsAndTasks`), in its own slice or on an existing read — never computed by a delete handler.
+- [x] **Task 2 — Domain ports and slices** (AC: 3, 7)
+  - [x] `ITaskStore.DeleteAsync(Guid taskId, CancellationToken)` and `IProjectStore.DeleteAsync(Guid projectId, CancellationToken)` returning a typed outcome, mirroring `ILabelStore.DeleteAsync` / `LabelDeletion { Deleted, NotFound, InUse }` (`Yello.Domain/Labels/ILabelStore.cs:36-58`): `TaskDeletion { Deleted, NotFound }`, `ProjectDeletion { Deleted, NotFound }`. No `Where(SpaceId == …)`: both layers narrow; a foreign id is simply not found.
+  - [x] Slices, one handler file each (AR-3, the `DeleteLabelHandler` shape — a pass-through with remarks "No Role, no Space"): `Yello.Application/Tasks/DeleteTask/DeleteTaskHandler.cs`, `Yello.Application/Projects/DeleteProject/DeleteProjectHandler.cs`. **No handler reads the Role, a capability, a count for a bound, or `Idempotency-Key`** (the pipeline-only gates catch each).
+  - [x] If Q2 chooses a server-side count for the Project confirm, it is a read (`ReadProjectsAndTasks`), in its own slice or on an existing read — never computed by a delete handler.
 
-- [ ] **Task 3 — Stores, with a lock order that fits every existing writer** (AC: 3, 7, 10)
-  - [ ] **Read the lock-order remarks first**: `TaskStore.cs:21-46` (edit: Project Task range → Task row `INDEX(1)` → Labels in id order → TaskLabel), `LabelStore.cs:24-32` (Label `INDEX(1)` → TaskLabel), `BoundCounter.cs:46-62` (creation: `COUNT(*) … WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = @p`, the same Project range). Raw SQL only in Infrastructure, parameterised `FromSql`/`ExecuteSql` composed on the filtered `DbSet` (keeps the query filter; RLS still applies).
-  - [ ] **`TaskStore.DeleteAsync`** (recommended order, to be confirmed by Task 7's races — Q5):
+- [x] **Task 3 — Stores, with a lock order that fits every existing writer** (AC: 3, 7, 10)
+  - [x] **Read the lock-order remarks first**: `TaskStore.cs:21-46` (edit: Project Task range → Task row `INDEX(1)` → Labels in id order → TaskLabel), `LabelStore.cs:24-32` (Label `INDEX(1)` → TaskLabel), `BoundCounter.cs:46-62` (creation: `COUNT(*) … WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = @p`, the same Project range). Raw SQL only in Infrastructure, parameterised `FromSql`/`ExecuteSql` composed on the filtered `DbSet` (keeps the query filter; RLS still applies).
+  - [x] **`TaskStore.DeleteAsync`** (recommended order, to be confirmed by Task 7's races — Q5):
     1. Read the Task's `ProjectId` (plain read; none → `NotFound`).
     2. Take the Project's Task range exactly as creation and the Status edit do: `SELECT … FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = {projectId}` (same statement shape as `LastKeyUnderTheProjectLockAsync`/`BoundCounter`, so the same index and the same range).
     3. Lock the Task row `WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {taskId}` (the edit's Task lock, same clustered key — the 2.4 deadlock was two writers locking one row through different indexes). Gone → `NotFound` (the row vanished between 1 and 3: **never** `Deleted`, never `500`).
     4. `ExecuteDeleteAsync` on the Task; the database's `TaskLabel→Task` `CASCADE` removes its applications. 0 rows → `NotFound`.
     **Why the range first:** a Status edit holds the Project range `U` and then wants the Task row; a delete that took the row first and then needed the nonclustered `(SpaceId, ProjectId, StatusId, PositionKey)` key inside that range would deadlock against it. Record the measured order in `TaskStore`'s remarks.
-  - [ ] **`ProjectStore.DeleteAsync`**:
+  - [x] **`ProjectStore.DeleteAsync`**:
     1. Lock the Project row `WITH (UPDLOCK, HOLDLOCK, INDEX(1))`; none → `NotFound`.
     2. Take the Project's Task range `WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = {projectId}` — **this is what serialises the delete against a Task creation in that Project**: creation counts under that range in the pipeline (`ConsultsBound(Bound.TasksPerProject)`), then reads the Project, then inserts with the composite FK. Without the range lock, a creation that has read the Project can insert after the delete commits → FK 547 → `500`.
     3. `ExecuteDeleteAsync` on the Project; `FK_Task_Project_SpaceId_ProjectId` (`CASCADE`) removes its Tasks and `TaskLabel→Task` (`CASCADE`) their applications. Labels are per Space and **stay**.
     Whether 1 and 2 must be the other way round (creation takes Task range then Project `S` for the FK check; a delete holding the Project `U` then asking for the range could meet it) is exactly what RACE-P1 measures — Q5. Pick the order the races prove; record it in the remarks of `ProjectStore`, `TaskStore` and `BoundCounter`.
-  - [ ] Catch 547 (`SqlException`/`DbUpdateException`, `LabelStore.HasError` pattern) only if a race proves it reachable, and answer a documented outcome, never `500`.
-  - [ ] **Do not add a `BEFORE DELETE` block predicate** unless Q6 decides so: the FILTER predicate already makes another Space's row invisible to `DELETE`, every cascade runs along composite FKs carrying `SpaceId` (it cannot leave the Space), and `SpaceIsolationSchemaTests.MovableTablePredicates = 3` pins three predicates on Project, Task, Label and TaskLabel. **No migration is expected in this story.**
-  - [ ] **Lock escalation on a large Project** (measure, do not fix): deleting a Project holding ~5,000 Tasks plus their applications takes more than SQL Server's ~5,000-lock escalation threshold in one statement and may escalate to a table lock on `Task`/`TaskLabel` — every Space's Task traffic waits for its duration. Measure the duration with the existing 4,999-Task seed helper in the Slices suite (2.2's `TaskEndpointTests.Bound` seeds) and record it in the Debug Log; ledger it to **2.9** (owner of the 5,000-Task Board and load). Atomicity wins: no batching that could leave half a Project.
+  - [x] Catch 547 (`SqlException`/`DbUpdateException`, `LabelStore.HasError` pattern) only if a race proves it reachable, and answer a documented outcome, never `500`.
+  - [x] **Do not add a `BEFORE DELETE` block predicate** unless Q6 decides so: the FILTER predicate already makes another Space's row invisible to `DELETE`, every cascade runs along composite FKs carrying `SpaceId` (it cannot leave the Space), and `SpaceIsolationSchemaTests.MovableTablePredicates = 3` pins three predicates on Project, Task, Label and TaskLabel. **No migration is expected in this story.**
+  - [x] **Lock escalation on a large Project** (measure, do not fix): deleting a Project holding ~5,000 Tasks plus their applications takes more than SQL Server's ~5,000-lock escalation threshold in one statement and may escalate to a table lock on `Task`/`TaskLabel` — every Space's Task traffic waits for its duration. Measure the duration with the existing 4,999-Task seed helper in the Slices suite (2.2's `TaskEndpointTests.Bound` seeds) and record it in the Debug Log; ledger it to **2.9** (owner of the 5,000-Task Board and load). Atomicity wins: no batching that could leave half a Project.
 
-- [ ] **Task 4 — Contracts** (AC: 7, 9)
-  - [ ] `ProjectRoutes`: add `Project = "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}"` and make `Rename => Project` (one template, two names; the route table and gates compare the template). Use `ProjectRoutes.Project` for the DELETE map and its isolation rows. `TaskRoutes.Task` already exists.
-  - [ ] **No new problem type is expected** (`not-available`, `insufficient-role`, the idempotency types exist). If Q2 adds a count read, its response type lives in `Yello.Contracts.Projects` and carries no `SpaceId`. If Q4 chooses a `409`, its type gets remarks stating what it never means, a `RefusalCopy` entry and copy.
-  - [ ] No body on either `DELETE` (2.4 decided "DELETE carries no body"; `SpaceWrites.SendWithoutBodyAsync`).
+- [x] **Task 4 — Contracts** (AC: 7, 9)
+  - [x] `ProjectRoutes`: add `Project = "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}"` and make `Rename => Project` (one template, two names; the route table and gates compare the template). Use `ProjectRoutes.Project` for the DELETE map and its isolation rows. `TaskRoutes.Task` already exists.
+  - [x] **No new problem type is expected** (`not-available`, `insufficient-role`, the idempotency types exist). If Q2 adds a count read, its response type lives in `Yello.Contracts.Projects` and carries no `SpaceId`. If Q4 chooses a `409`, its type gets remarks stating what it never means, a `RefusalCopy` entry and copy.
+  - [x] No body on either `DELETE` (2.4 decided "DELETE carries no body"; `SpaceWrites.SendWithoutBodyAsync`).
 
-- [ ] **Task 5 — Endpoints and the gates that break on purpose** (AC: 7, 9)
-  - [ ] `TaskEndpoints.MapDeleteTask`: `MapDelete(TaskRoutes.Task, DeleteAsync).RequiresCapability(Capability.ManageTasks)`; `ProjectEndpoints.MapDeleteProject`: `MapDelete(ProjectRoutes.Project, …).RequiresCapability(Capability.ManageProjects)`. Copy `LabelEndpoints.DeleteAsync` (`LabelEndpoints.cs:138-154`): `Deleted` → `Results.NoContent()`; `NotFound` → `BoundaryProblems.NotAvailable()` (not recorded). **No `ConsultsBound`**, not `SessionOnly`, no `Results.Created`/`Accepted`. Register handlers (`Program.cs:92-109`) and maps beside their siblings (`Program.cs:382-405`), before `MapUnmatchedApi()`.
-  - [ ] Logs carry `SpaceId` and ids only — never a Task title or Project name (AR-34, I-17).
-  - [ ] **Gates that go red by design — amend deliberately, by exactly this, never loosen** (each named by the research for this story):
+- [x] **Task 5 — Endpoints and the gates that break on purpose** (AC: 7, 9)
+  - [x] `TaskEndpoints.MapDeleteTask`: `MapDelete(TaskRoutes.Task, DeleteAsync).RequiresCapability(Capability.ManageTasks)`; `ProjectEndpoints.MapDeleteProject`: `MapDelete(ProjectRoutes.Project, …).RequiresCapability(Capability.ManageProjects)`. Copy `LabelEndpoints.DeleteAsync` (`LabelEndpoints.cs:138-154`): `Deleted` → `Results.NoContent()`; `NotFound` → `BoundaryProblems.NotAvailable()` (not recorded). **No `ConsultsBound`**, not `SessionOnly`, no `Results.Created`/`Accepted`. Register handlers (`Program.cs:92-109`) and maps beside their siblings (`Program.cs:382-405`), before `MapUnmatchedApi()`.
+  - [x] Logs carry `SpaceId` and ids only — never a Task title or Project name (AR-34, I-17).
+  - [x] **Gates that go red by design — amend deliberately, by exactly this, never loosen** (each named by the research for this story):
     1. `RefusalBoundaryGateTests.Projects.cs` `No_route_moves_a_Project` (l.107-126) — its own doc says "Story 2.5 adds DELETE on the Project and widens the permitted set by exactly that."
     2. `RefusalBoundaryGateTests.Tasks.cs` `The_routes_under_a_Project_are_its_rename_its_Task_creation_and_its_Board` (l.175-194) — add exactly `DELETE {ProjectItemPattern}`; rename the test if its name stops being true.
     3. `RefusalBoundaryGateTests.TaskEdit.cs` `The_Task_routes_declare_their_capability_serve_both_surfaces_and_consult_no_bound` (l.127-140) — `["GET","PATCH"]` becomes `["DELETE","GET","PATCH"]`; DELETE declares `manage-tasks`, both surfaces, no bound.
@@ -153,12 +157,12 @@ AC1–AC6 are reproduced **verbatim** from `epics.md:1140-1164` (`status: final`
     5. `TaskEndpointTests.LabelsSchema.cs` `TaskLabel_reaches_Task_and_Label_only_through_keys_that_carry_SpaceId` already pins `Task|CASCADE` — keep it green; it is now load-bearing.
     Also must stay green unchanged: `Every_spaceId_endpoint_declares_exactly_one_capability`, `Every_Space_scoped_state_changing_endpoint_answers_a_result_the_record_can_replay` (a bodiless `204` replays, `IdempotentResponses.cs:129-141, 173-188`), `No_endpoint_answers_through_Results_Created_or_Accepted`, `No_endpoint_without_spaceId_in_its_path_reaches_a_Space_scoped_entity`.
 
-- [ ] **Task 6 — Idempotency** (AC: 9)
-  - [ ] Nothing new in the pipeline (`IdempotentResponses.IsStateChanging` already includes DELETE). Wire cases on **both** surfaces for each route: same key twice → one deletion, second answer `204` (not `404`); same key on another Task's path → `422 idempotency-key-reused`; no key, second send → `404 not-available`, no refusal row.
+- [x] **Task 6 — Idempotency** (AC: 9)
+  - [x] Nothing new in the pipeline (`IdempotentResponses.IsStateChanging` already includes DELETE). Wire cases on **both** surfaces for each route: same key twice → one deletion, second answer `204` (not `404`); same key on another Task's path → `422 idempotency-key-reused`; no key, second send → `404 not-available`, no refusal row.
 
-- [ ] **Task 7 — Slice, schema and race tests** (AC: 3, 7, 9, 10)
-  - [ ] **Memory-bound machine (CLAUDE.md "Test memory budget"): add no container-backed class.** New partials of the existing classes: `TaskEndpointTests.Delete.cs`, `.DeleteRace.cs`, `.DeleteIdempotency.cs`; `ProjectEndpointTests.Delete.cs`, `.DeleteRace.cs`, `.DeleteIdempotency.cs` (each class keeps its one database on the project's one engine). Reuse `TaskWire`/`TaskEditWire`/`LabelWire` (`LabelWire.DeleteAsync`/`DeleteWithTokenAsync`/`DeleteOnAsync`, `SendWithHeadersAsync(HttpMethod.Delete, …, content: null, …)` is the shape), `HostProcess`, `WireSession.DeleteWithTokenAsync`. Handler unit tests (`Tasks/DeleteTask/DeleteTaskHandlerTests.cs`, `Projects/DeleteProject/DeleteProjectHandlerTests.cs`) use hand fakes, no database (`DeleteLabelHandlerTests` pattern).
-  - [ ] Cases (assert the problem `type`, not only the status; every `4xx` asserts "no refusal row" unless it is a `403`/boundary `404`):
+- [x] **Task 7 — Slice, schema and race tests** (AC: 3, 7, 9, 10)
+  - [x] **Memory-bound machine (CLAUDE.md "Test memory budget"): add no container-backed class.** New partials of the existing classes: `TaskEndpointTests.Delete.cs`, `.DeleteRace.cs`, `.DeleteIdempotency.cs`; `ProjectEndpointTests.Delete.cs`, `.DeleteRace.cs`, `.DeleteIdempotency.cs` (each class keeps its one database on the project's one engine). Reuse `TaskWire`/`TaskEditWire`/`LabelWire` (`LabelWire.DeleteAsync`/`DeleteWithTokenAsync`/`DeleteOnAsync`, `SendWithHeadersAsync(HttpMethod.Delete, …, content: null, …)` is the shape), `HostProcess`, `WireSession.DeleteWithTokenAsync`. Handler unit tests (`Tasks/DeleteTask/DeleteTaskHandlerTests.cs`, `Projects/DeleteProject/DeleteProjectHandlerTests.cs`) use hand fakes, no database (`DeleteLabelHandlerTests` pattern).
+  - [x] Cases (assert the problem `type`, not only the status; every `4xx` asserts "no refusal row" unless it is a `403`/boundary `404`):
     - Owner, Admin, Member delete a Task → `204`; `GET` the Task → `404`; the Board no longer lists it and its column's `Total` dropped by one; its `TaskLabel` rows are gone; its Labels still list; sibling position keys unchanged (`SELECT` before and after).
     - Owner, Admin, Member delete a Project holding Tasks in several Statuses with Labels applied → `204`; the listing omits it; `SELECT COUNT(*)` of its Tasks and of their `TaskLabel` rows is 0 (read with the Space's session context — the rows are gone, not hidden); another Project's Tasks and every Label are untouched. Tag `Assumption=PRD-12-5`.
     - A Label whose only application was on a deleted Task is now deletable (`204`), closing 2.4's `409 label-in-use` loop.
@@ -166,7 +170,7 @@ AC1–AC6 are reproduced **verbatim** from `epics.md:1140-1164` (`status: final`
     - Random id, deleted id, a real id from another Space → byte-identical `404 not-available`, no refusal row.
     - Delete frees bound capacity: a Project at 5,000 Tasks refuses the 5,001st; delete one; the next creation is `201`. Same for 50 Projects per Space (reuse the existing `.Bound` seeds; no new seed of 5,000 unless one exists).
     - Schema: `FK_Task_Project_SpaceId_ProjectId` is `CASCADE` and carries `SpaceId` (pin it, as `.LabelsSchema.cs` pins `TaskLabel`).
-  - [ ] **Deterministic races** with `TaskWire.WaitUntilBlockedOnALockAsync` (`TaskWire.cs:347-370`) or `LabelWire.WaitUntilBlockedOrAnsweredAsync` (`LabelWire.cs:199-217`). The test holds the competing change in its own open transaction (`LabelWire.InsertApplicationAsync`/`HoldTaskLabelsAsync`/`DeleteLabelRowAsync` are the raw-SQL holders), sends one request, waits for `LCK_M_%`, then commits or rolls back. **Never `Task.Delay`, never two requests fired together.** Expected outcomes:
+  - [x] **Deterministic races** with `TaskWire.WaitUntilBlockedOnALockAsync` (`TaskWire.cs:347-370`) or `LabelWire.WaitUntilBlockedOrAnsweredAsync` (`LabelWire.cs:199-217`). The test holds the competing change in its own open transaction (`LabelWire.InsertApplicationAsync`/`HoldTaskLabelsAsync`/`DeleteLabelRowAsync` are the raw-SQL holders), sends one request, waits for `LCK_M_%`, then commits or rolls back. **Never `Task.Delay`, never two requests fired together.** Expected outcomes:
     - **RACE-T1** Status edit holding the Project range vs Task delete → delete waits; edit commits; delete `204`.
     - **RACE-T2** Task delete holding its locks (held after step 3) vs Status edit of the same Task → edit waits; delete commits; edit `404` (2.3's review patch: never `200` on a vanished Task).
     - **RACE-T3** Task delete vs a Labels-only edit of the same Task, both orders → `204` + `404`, or `200` + `204`; never a `TaskLabel` row left for a gone Task, never 1205.
@@ -176,50 +180,50 @@ AC1–AC6 are reproduced **verbatim** from `epics.md:1140-1164` (`status: final`
     - **RACE-P2** Status edit of a Task in the Project vs Project delete → `200` then `204`, or `204` then `404`.
     - Plants (three runs each, record `n/3`): each `UPDLOCK, HOLDLOCK` removed; `INDEX(1)` removed; the delete's range lock removed (RACE-P1 must catch the `500`). If a plant is masked (2.4 plant 9 was, by the `NoAction` backstop), record why rather than deleting the case.
 
-- [ ] **Task 8 — Isolation rows** (AC: 7, 8)
-  - [ ] Add the rows in "Isolation rows" (Dev Notes) via `Both(…)`, each sending a request on the exact route constant it names, seeded through the product (`ProductActor`; `SeedProjectWithTaskAsync`; `ViewerEditsATaskAsync`/`ViewerCreatesAProjectAsync` for the Viewer seeds, `IsolationCases.cs:618, 707`). `Then` callbacks assert the foreign row is still present (`TheForeignLabelIsStillPresentAsync` pattern, `IsolationCases.cs:406-434`). Every Project name and Task title a row writes goes in the world's secret set (`HoldsProjectNamed`).
-  - [ ] Two-layer plants, one at a time, original held in memory and restored in a `finally`: Task — `IgnoreQueryFilters()` on the delete's reads **and** the `Task` FILTER predicate removed → `ISO-DELETE-TASK-FOREIGN-ID-IN-OWN-SPACE` fails on both surfaces; each layer alone → green. Project — the same with the `Project` layers → `ISO-DELETE-PROJECT-FOREIGN-ID-IN-OWN-SPACE` fails. (If the plant requires editing a migration, follow 2.3's P6 and 2.4's plant 3: plant in the migration file, rebuild, restore.)
-  - [ ] No new timing row: the routes are under the API group, so `NotAvailableFloor` applies. If one is added, it runs in `TimingCollection`.
-  - [ ] GATE-003: no row pending on 2.5 at `review`.
+- [x] **Task 8 — Isolation rows** (AC: 7, 8)
+  - [x] Add the rows in "Isolation rows" (Dev Notes) via `Both(…)`, each sending a request on the exact route constant it names, seeded through the product (`ProductActor`; `SeedProjectWithTaskAsync`; `ViewerEditsATaskAsync`/`ViewerCreatesAProjectAsync` for the Viewer seeds, `IsolationCases.cs:618, 707`). `Then` callbacks assert the foreign row is still present (`TheForeignLabelIsStillPresentAsync` pattern, `IsolationCases.cs:406-434`). Every Project name and Task title a row writes goes in the world's secret set (`HoldsProjectNamed`).
+  - [x] Two-layer plants, one at a time, original held in memory and restored in a `finally`: Task — `IgnoreQueryFilters()` on the delete's reads **and** the `Task` FILTER predicate removed → `ISO-DELETE-TASK-FOREIGN-ID-IN-OWN-SPACE` fails on both surfaces; each layer alone → green. Project — the same with the `Project` layers → `ISO-DELETE-PROJECT-FOREIGN-ID-IN-OWN-SPACE` fails. (If the plant requires editing a migration, follow 2.3's P6 and 2.4's plant 3: plant in the migration file, rebuild, restore.)
+  - [x] No new timing row: the routes are under the API group, so `NotAvailableFloor` applies. If one is added, it runs in `TimingCollection`.
+  - [x] GATE-003: no row pending on 2.5 at `review`.
 
-- [ ] **Task 9 — Client: the Task delete in the panel** (AC: 1, 4, 6, 11, 13, 14)
-  - [ ] `TaskDetail.razor` (its header says "no delete (2.5)" — update it): for `CanManage` only, a `button-secondary` "Delete Task" control as the panel's last control (after the attributes; Q8). **Update `FocusLastAsync`** (l.370-388) — the last control changes. Viewer branch: no control (absent, not disabled).
-  - [ ] **The confirm replaces the panel's content in place** (UX-DR12): a `_confirming` state swaps the panel body for `<div class="destructive-confirm">` holding a heading/sentence naming the Task (`"Delete {title}?"`), the sentence "This cannot be undone.", `button-danger` "Delete Task" and `button-secondary` "Cancel". Still one `[role=dialog]`, same focus-trap sentinels, focus moves to the confirm's first control (Q9: recommend **Cancel**, because neither choice may be a default in a dialog — UX-DR12 `button-secondary` "for a dialog where neither choice may be a default"). `Esc` in the confirm cancels the confirm first (2.3 Q9: innermost meaning wins), a second `Esc` closes the panel.
-  - [ ] **Not optimistic** (UX-DR26): `BoardView.razor.cs` gains `DeleteTaskAsync(taskId)` sending `Writes.SendWithoutBodyAsync(HttpMethod.Delete, TaskRoutes.TaskOf(SpaceId, taskId), key, token)` with a key that is **reused on an identical resend after no answer** (2.3 Q8 rule; 2.4's Label delete took a fresh key per click and earned `deferred-work.md:530`). While held, a busy state on the danger control (`aria-busy`, not `disabled` — no disabled state anywhere is the safest reading of UX-DR27; record Q10). Answers:
+- [x] **Task 9 — Client: the Task delete in the panel** (AC: 1, 4, 6, 11, 13, 14)
+  - [x] `TaskDetail.razor` (its header says "no delete (2.5)" — update it): for `CanManage` only, a `button-secondary` "Delete Task" control as the panel's last control (after the attributes; Q8). **Update `FocusLastAsync`** (l.370-388) — the last control changes. Viewer branch: no control (absent, not disabled).
+  - [x] **The confirm replaces the panel's content in place** (UX-DR12): a `_confirming` state swaps the panel body for `<div class="destructive-confirm">` holding a heading/sentence naming the Task (`"Delete {title}?"`), the sentence "This cannot be undone.", `button-danger` "Delete Task" and `button-secondary` "Cancel". Still one `[role=dialog]`, same focus-trap sentinels, focus moves to the confirm's first control (Q9: recommend **Cancel**, because neither choice may be a default in a dialog — UX-DR12 `button-secondary` "for a dialog where neither choice may be a default"). `Esc` in the confirm cancels the confirm first (2.3 Q9: innermost meaning wins), a second `Esc` closes the panel.
+  - [x] **Not optimistic** (UX-DR26): `BoardView.razor.cs` gains `DeleteTaskAsync(taskId)` sending `Writes.SendWithoutBodyAsync(HttpMethod.Delete, TaskRoutes.TaskOf(SpaceId, taskId), key, token)` with a key that is **reused on an identical resend after no answer** (2.3 Q8 rule; 2.4's Label delete took a fresh key per click and earned `deferred-work.md:530`). While held, a busy state on the danger control (`aria-busy`, not `disabled` — no disabled state anywhere is the safest reading of UX-DR27; record Q10). Answers:
     - `204`: drop the Task from its `ColumnState` (mirror `Add`, `BoardView.razor:340-352`: remove, `Total--`), drop its `TaskReplica` and any queued edits, close the panel **without** the card focus request, announce "Task deleted." in the Board's live region (`BoardView.razor:49`), and move focus to the column that held the Task (Q3).
     - Edits still in flight for that Task when the `204` lands: their later answers (`404`) must **not** raise the Space refusal surface — mark the id as deleted by this tab and drop answers for it (Q7).
     - `403`/`409`/`422`: `RefusalText.Of(…)` in the confirm's status region; nothing removed.
     - `404`: the Board's existing pattern (`UseAnswerAsync` l.284-296 → `OnRefused`). This is the same indistinguishable-404 trade-off ledgered for Labels (`deferred-work.md:530`, owner 4.4); add this case to that entry rather than solving it here.
     - No answer / `5xx`: "Not sent." in the confirm, key kept.
-  - [ ] **Focus to the column (closes `deferred-work.md:510`)**: `BoardColumn` gains a focusable target (recommended: the column's `<section>`/heading with `tabindex="-1"`, never in the tab order) and a `FocusRequest`-style parameter like `TaskCard`'s (`_focusCardRequests` pattern; keep the 2.3 review fix — clear a stale focus request so a re-created card never steals focus). Close the ledger entry with what was built; `Close()` still returns focus to the card when it exists.
-  - [ ] Purge (UX-DR31): the confirm state and its title are panel state; `PurgePanel()` clears them.
+  - [x] **Focus to the column (closes `deferred-work.md:510`)**: `BoardColumn` gains a focusable target (recommended: the column's `<section>`/heading with `tabindex="-1"`, never in the tab order) and a `FocusRequest`-style parameter like `TaskCard`'s (`_focusCardRequests` pattern; keep the 2.3 review fix — clear a stale focus request so a re-created card never steals focus). Close the ledger entry with what was built; `Close()` still returns focus to the card when it exists.
+  - [x] Purge (UX-DR31): the confirm state and its title are panel state; `PurgePanel()` clears them.
 
-- [ ] **Task 10 — Client: the Project delete** (AC: 2, 4, 6, 12, 13, 14)
-  - [ ] Build it on the surface Q1 decides (recommended: `ProjectRow` on Space home, beside Rename, gated by `ProjectCapabilities.PermitsManageProjects`). The confirm replaces the row's content in place (the `LabelRow` pattern, `LabelRow.razor:18-35`; state in `ProjectList` as `LabelSection` holds `_confirming`/`_deleting`/`_rowRefusal`, l.128-130, 347-414). Only one row confirms at a time; opening rename on another row cancels it.
-  - [ ] **The Task count** (Q2): read when the confirm opens, as a true total; the confirm waits for it before offering the danger control (a confirm that cannot state the count does not offer deletion). Copy forms: zero, one, many — externalised, never concatenated.
-  - [ ] Not optimistic; key reused on identical resend after no answer. `204`: remove the row, announce "Project deleted." in `ProjectList`'s live region (l.41), focus per Q3 (when the last Project goes, the "No Projects yet." empty state renders with its one action). `404`: `OnSpaceRefused` (existing). Others: inline in the row.
-  - [ ] A Board open in another tab on a deleted Project answers its next read with `404` and shows the refusal surface — existing behaviour, nothing to build; note it.
+- [x] **Task 10 — Client: the Project delete** (AC: 2, 4, 6, 12, 13, 14)
+  - [x] Build it on the surface Q1 decides (recommended: `ProjectRow` on Space home, beside Rename, gated by `ProjectCapabilities.PermitsManageProjects`). The confirm replaces the row's content in place (the `LabelRow` pattern, `LabelRow.razor:18-35`; state in `ProjectList` as `LabelSection` holds `_confirming`/`_deleting`/`_rowRefusal`, l.128-130, 347-414). Only one row confirms at a time; opening rename on another row cancels it.
+  - [x] **The Task count** (Q2): read when the confirm opens, as a true total; the confirm waits for it before offering the danger control (a confirm that cannot state the count does not offer deletion). Copy forms: zero, one, many — externalised, never concatenated.
+  - [x] Not optimistic; key reused on identical resend after no answer. `204`: remove the row, announce "Project deleted." in `ProjectList`'s live region (l.41), focus per Q3 (when the last Project goes, the "No Projects yet." empty state renders with its one action). `404`: `OnSpaceRefused` (existing). Others: inline in the row.
+  - [x] A Board open in another tab on a deleted Project answers its next read with `404` and shows the refusal surface — existing behaviour, nothing to build; note it.
 
-- [ ] **Task 11 — Copy, the "archive" gate, the confirm's design gates** (AC: 4, 5, 13)
-  - [ ] `ClientCopy.resx` only, sentence case, every entry with a `<comment>`, no copy quoted in a code comment (a 2.3 run tripped `No_user_visible_string_literal_appears_in_a_component` on that): "Delete Task", "Delete {0}?", "This cannot be undone." (one key, reused by every confirm — the Label confirm's `LabelDeleteWarning` may be refactored onto it), "Delete Project", "It holds no Tasks.", "It holds 1 Task.", "It holds {0} Tasks.", "Task deleted.", "Project deleted.", "Cancel" (reuse an existing key if one fits). No "Are you sure", no exclamation, no apology (`EXPERIENCE.md:106-113`).
-  - [ ] **New gate `No_copy_uses_the_word_archive`** (Architecture suite, beside `LocalisationGateTests`): case-insensitive, word-prefix match (`archiv`) over `ClientCopy.resx` values **and** comments, every `.razor`/`.cs` under `Yello.Client`, `Yello.Contracts/ProblemTypes.cs` titles, and the Host's problem titles. Plant "Archive" in one resx value → caught; restore in a `finally`.
-  - [ ] **Design gates** (`DesignFoundationGateTests`, a new partial `.DestructiveConfirm.cs`): `.destructive-confirm` declares `border: var(--emphasis-width…) solid var(--danger)` (use the actual border-width token name in `tokens.css`) — the current rule (`components.css:1106-1111`) has **no** border, so this changes 2.4's Label confirm too, deliberately; no `animation`/`transition` on it or its descendants (DESIGN.md:519); no `box-shadow`. A browser case asserts each confirm has no `img`, `svg`, `[class*=icon]`, contains the "This cannot be undone." copy, and has exactly one `.button-danger`. Plants: border removed; an `svg` added; a transition added. If the confirm is styled as a dialog surface (it is not a new dialog — it lives in the panel or a row), no 6px clause is owed (`deferred-work.md:36`); state which in the ledger update.
-  - [ ] **Capability gates**: a `TaskCapabilities`/`ProjectCapabilities` predicate drives each delete control (reuse, do not add a predicate if the existing ones are exact — `ManageTasks` and `ManageProjects` are the delete capabilities; no new capability). The existing `…predicate_agrees_with_the_capability_matrix` gates hold them.
+- [x] **Task 11 — Copy, the "archive" gate, the confirm's design gates** (AC: 4, 5, 13)
+  - [x] `ClientCopy.resx` only, sentence case, every entry with a `<comment>`, no copy quoted in a code comment (a 2.3 run tripped `No_user_visible_string_literal_appears_in_a_component` on that): "Delete Task", "Delete {0}?", "This cannot be undone." (one key, reused by every confirm — the Label confirm's `LabelDeleteWarning` may be refactored onto it), "Delete Project", "It holds no Tasks.", "It holds 1 Task.", "It holds {0} Tasks.", "Task deleted.", "Project deleted.", "Cancel" (reuse an existing key if one fits). No "Are you sure", no exclamation, no apology (`EXPERIENCE.md:106-113`).
+  - [x] **New gate `No_copy_uses_the_word_archive`** (Architecture suite, beside `LocalisationGateTests`): case-insensitive, word-prefix match (`archiv`) over `ClientCopy.resx` values **and** comments, every `.razor`/`.cs` under `Yello.Client`, `Yello.Contracts/ProblemTypes.cs` titles, and the Host's problem titles. Plant "Archive" in one resx value → caught; restore in a `finally`.
+  - [x] **Design gates** (`DesignFoundationGateTests`, a new partial `.DestructiveConfirm.cs`): `.destructive-confirm` declares `border: var(--emphasis-width…) solid var(--danger)` (use the actual border-width token name in `tokens.css`) — the current rule (`components.css:1106-1111`) has **no** border, so this changes 2.4's Label confirm too, deliberately; no `animation`/`transition` on it or its descendants (DESIGN.md:519); no `box-shadow`. A browser case asserts each confirm has no `img`, `svg`, `[class*=icon]`, contains the "This cannot be undone." copy, and has exactly one `.button-danger`. Plants: border removed; an `svg` added; a transition added. If the confirm is styled as a dialog surface (it is not a new dialog — it lives in the panel or a row), no 6px clause is owed (`deferred-work.md:36`); state which in the ledger update.
+  - [x] **Capability gates**: a `TaskCapabilities`/`ProjectCapabilities` predicate drives each delete control (reuse, do not add a predicate if the existing ones are exact — `ManageTasks` and `ManageProjects` are the delete capabilities; no new capability). The existing `…predicate_agrees_with_the_capability_matrix` gates hold them.
 
-- [ ] **Task 12 — Browser tests** (AC: 1, 2, 4, 6, 11, 12, 13, 14)
-  - [ ] `tests/Yello.Tests.Client` against `FakeYelloApi` — add `DELETE TaskRoutes.Task` and `DELETE ProjectRoutes.Project` (`FakeYelloApi.cs:400-460` switch; `DeleteLabel` fake at l.913-937 is the model), removing from the fake Board/Projects so a re-read agrees; a hold/release for the deletes (`TaskCompletionSource`, the `HoldTaskEditAsync` pattern); the count read if Q2 adds one. Same `ClientSurfaceCollection`; no new fixture. Bodies are `Yello.Contracts` types.
-  - [ ] Cases: the Task confirm replaces the panel in place (exactly one `[role=dialog]`, panel attributes no longer in it, title named, "This cannot be undone."); **held** `DELETE` → card and panel still present; release `204` → card gone, column total −1, "Task deleted." in the live region, `document.activeElement` is the column target (not `body`, not a card); `Esc` and Cancel → content back, focus on "Delete Task", nothing sent (the fake recorded no DELETE); `403`/`409`/`422`/no answer → copy and nothing removed; an edit in flight answered `404` after the delete's `204` raises no refusal surface.
-  - [ ] Project: confirm names the Project and "It holds no Tasks." for an empty one, "It holds 3 Tasks." for three, in place in the row; cancel restores and focuses the delete control; `204` removes the row, announces, focus per Q3; deleting the last Project shows "No Projects yet.".
-  - [ ] Absence: Viewer sees no "Delete Task" in the panel and no Project delete control; the disabled-selector count is 0. Plants: a Viewer offered each control → caught.
-  - [ ] `TextSpacingTests`: the Task confirm in the panel and the Project confirm in its row under the 1.4.12 override and 200% text-only zoom (`deferred-work.md:20`).
-  - [ ] Never Playwright's URL wait; poll `location.pathname`. No `RegexOptions.CultureInvariant`. **Rebuild `Yello.Client` in Debug before a browser plant** (the suite's dev server runs `--no-build` against it), or the plant looks uncaught.
+- [x] **Task 12 — Browser tests** (AC: 1, 2, 4, 6, 11, 12, 13, 14)
+  - [x] `tests/Yello.Tests.Client` against `FakeYelloApi` — add `DELETE TaskRoutes.Task` and `DELETE ProjectRoutes.Project` (`FakeYelloApi.cs:400-460` switch; `DeleteLabel` fake at l.913-937 is the model), removing from the fake Board/Projects so a re-read agrees; a hold/release for the deletes (`TaskCompletionSource`, the `HoldTaskEditAsync` pattern); the count read if Q2 adds one. Same `ClientSurfaceCollection`; no new fixture. Bodies are `Yello.Contracts` types.
+  - [x] Cases: the Task confirm replaces the panel in place (exactly one `[role=dialog]`, panel attributes no longer in it, title named, "This cannot be undone."); **held** `DELETE` → card and panel still present; release `204` → card gone, column total −1, "Task deleted." in the live region, `document.activeElement` is the column target (not `body`, not a card); `Esc` and Cancel → content back, focus on "Delete Task", nothing sent (the fake recorded no DELETE); `403`/`409`/`422`/no answer → copy and nothing removed; an edit in flight answered `404` after the delete's `204` raises no refusal surface.
+  - [x] Project: confirm names the Project and "It holds no Tasks." for an empty one, "It holds 3 Tasks." for three, in place in the row; cancel restores and focuses the delete control; `204` removes the row, announces, focus per Q3; deleting the last Project shows "No Projects yet.".
+  - [x] Absence: Viewer sees no "Delete Task" in the panel and no Project delete control; the disabled-selector count is 0. Plants: a Viewer offered each control → caught.
+  - [x] `TextSpacingTests`: the Task confirm in the panel and the Project confirm in its row under the 1.4.12 override and 200% text-only zoom (`deferred-work.md:20`).
+  - [x] Never Playwright's URL wait; poll `location.pathname`. No `RegexOptions.CultureInvariant`. **Rebuild `Yello.Client` in Debug before a browser plant** (the suite's dev server runs `--no-build` against it), or the plant looks uncaught.
 
-- [ ] **Task 13 — Plants, runs, ledger, status** (AC: all)
-  - [ ] Plants one at a time in the foreground; original held in memory and restored in a `finally`; compare the tree hash after each. **Never** `git checkout --`, `git restore`, `git reset` or `git stash`. Write each plant so it compiles. Record `| # | Plant | Gate | Caught |` in the Debug Log. Minimum set: a row left `PendingUntil: "2.5"` at `review` (GATE-003); a DELETE route named by no row (GATE-002); each two-layer drop and each layer alone; each lock hint (3 runs); `ConsultsBound` on a delete route (ARCH-004 / Host start); a Viewer offered each delete control; "Archive" in copy; the confirm's border removed; an `svg` in the confirm; an optimistic removal (card removed before the `204`) → the held-`DELETE` case catches it; focus left on `body` after delete.
-  - [ ] Runs (CLAUDE.md): `dotnet build Yello.slnx` (0 warnings, 0 errors), `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. **Baseline after the 2.4 review: 989 total, 986 passed, 0 failed, 3 skipped** (the 3 are the bundle cases, `YELLO_MIGRATION_BUNDLE` unset). Never two `dotnet test` processes at once; iterate one project with `--filter`. If a Client case fails only in the full run, run `dotnet test --project tests/Yello.Tests.Client --no-build` alone before calling it real. Rerun once on an engine start failure or a low-memory kill. If `Yello.Host.exe` processes lock `bin/Debug`, check `Get-Process Yello.Host` (2.4 had to build in Release; the browser suite still needs a Debug `Yello.Client`).
-  - [ ] `tests/TESTING-CONVENTIONS.md`: the delete race pattern (which side holds what), the new counts.
-  - [ ] Ledger (`deferred-work.md`): CLOSE `:510` (focus to the column, built). UPDATE `:36` (the destructive confirm's border mapping; whether a 6px clause was owed), `:20` (confirm cases added), `:530` (the Task delete's `404` shares the trade-off), `:492` (a note: deletion places no key and renumbers nothing; its lock order). ADD with owners: Project-delete lock escalation on a large Project (owner **2.9**); Delete Project's home once Project settings exists (owner **6.1**, Q1); any Q decided against the UX spine (owner **UX**).
-  - [ ] `sprint-status.yaml`: set `review` at the end of the dev phase. **Do not mark FR-23 complete anywhere**; its session clause is 7.4's. **Do not add review narration to source files.**
+- [x] **Task 13 — Plants, runs, ledger, status** (AC: all)
+  - [x] Plants one at a time in the foreground; original held in memory and restored in a `finally`; compare the tree hash after each. **Never** `git checkout --`, `git restore`, `git reset` or `git stash`. Write each plant so it compiles. Record `| # | Plant | Gate | Caught |` in the Debug Log. Minimum set: a row left `PendingUntil: "2.5"` at `review` (GATE-003); a DELETE route named by no row (GATE-002); each two-layer drop and each layer alone; each lock hint (3 runs); `ConsultsBound` on a delete route (ARCH-004 / Host start); a Viewer offered each delete control; "Archive" in copy; the confirm's border removed; an `svg` in the confirm; an optimistic removal (card removed before the `204`) → the held-`DELETE` case catches it; focus left on `body` after delete.
+  - [x] Runs (CLAUDE.md): `dotnet build Yello.slnx` (0 warnings, 0 errors), `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. **Baseline after the 2.4 review: 989 total, 986 passed, 0 failed, 3 skipped** (the 3 are the bundle cases, `YELLO_MIGRATION_BUNDLE` unset). Never two `dotnet test` processes at once; iterate one project with `--filter`. If a Client case fails only in the full run, run `dotnet test --project tests/Yello.Tests.Client --no-build` alone before calling it real. Rerun once on an engine start failure or a low-memory kill. If `Yello.Host.exe` processes lock `bin/Debug`, check `Get-Process Yello.Host` (2.4 had to build in Release; the browser suite still needs a Debug `Yello.Client`).
+  - [x] `tests/TESTING-CONVENTIONS.md`: the delete race pattern (which side holds what), the new counts.
+  - [x] Ledger (`deferred-work.md`): CLOSE `:510` (focus to the column, built). UPDATE `:36` (the destructive confirm's border mapping; whether a 6px clause was owed), `:20` (confirm cases added), `:530` (the Task delete's `404` shares the trade-off), `:492` (a note: deletion places no key and renumbers nothing; its lock order). ADD with owners: Project-delete lock escalation on a large Project (owner **2.9**); Delete Project's home once Project settings exists (owner **6.1**, Q1); any Q decided against the UX spine (owner **UX**).
+  - [x] `sprint-status.yaml`: set `review` at the end of the dev phase. **Do not mark FR-23 complete anywhere**; its session clause is 7.4's. **Do not add review narration to source files.**
 
 ## Dev Notes
 
@@ -374,12 +378,135 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), dev-story run by the unattended story-cycle orchestrator.
+
 ### Debug Log References
 
 **Create-story phase (2026-10-26).** No isolation row is pending on 2.5 (grepped `PendingUntil` in `tests/Yello.Tests.Isolation`). No ATDD scaffold exists for 2.5. After setting `2-5-delete-a-task-and-delete-a-project: ready-for-dev`: `dotnet build Yello.slnx` 0 warnings, 0 errors; `IsolationCaseListTests` 14/14 passed (GATE-001..004 green). Planning inputs read via two research passes (planning documents; code map); facts above cite paths and lines as read on 2026-10-26.
 
+**Dev phase (2026-10-26).**
+
+- **Entry gates.** `dotnet build Yello.slnx` 0/0; `IsolationCaseListTests` 14/14 with 2.5 `in-progress`. Rows pending on 2.5 at entry (all six of the ATDD run's): ISO-DELETE-TASK-FOREIGN-SPACE, ISO-DELETE-TASK-FOREIGN-ID-IN-OWN-SPACE, ISO-DELETE-PROJECT-FOREIGN-SPACE, ISO-DELETE-PROJECT-FOREIGN-ID-IN-OWN-SPACE, ISO-RECORD-KIND-TASK-DELETE-VIEWER, ISO-RECORD-KIND-PROJECT-DELETE-VIEWER. All six are live now, and the Project rows name `ProjectRoutes.Project`; none is pending on 2.5.
+- **Activation (the checklist's order).** RACE-P1 (a) first: activated against the mapped route it was green, and its plant (the deletion's range lock removed) caught it 3/3 as the product's `500`, which is the failure the scaffold was written for. Then RACE-T1, T3 (a), T5, P2 (a); ARCH-501..506; Slices DEL/PDEL; the isolation rows; IDM; PDEL-05/06; COPY-501, DSN-501; E2E-501..512, A11Y-501/502. Every scaffold passed against the built markup without a locator correction. **No scaffold needed correcting.**
+- **Gates that went red by design, amended, never loosened.**
+  1. `No_route_moves_a_Project` (2.1) was retired in favour of its successor, ARCH-502 `The_Project_routes_are_list_create_rename_and_delete_and_nothing_moves_a_Project`. That gate is the same exact-match on the collection and the item, widened by exactly `DELETE {item}`. Its remarks carry the predecessor's reasoning.
+  2. `The_routes_under_a_Project_are_its_rename_its_Task_creation_and_its_Board` (2.2) was retired in favour of ARCH-503 `..._its_deletion_its_rename_...`, which adds exactly `DELETE {item}`. The two now-unused private members were removed.
+  3. `The_Task_routes_declare_their_capability_serve_both_surfaces_and_consult_no_bound`: the method list `["GET","PATCH"]` became `["DELETE","GET","PATCH"]`. DELETE asserts `ManageTasks` and no bound.
+  4. `An_unmapped_method_on_a_Project_route_answers_404_with_no_Allow_header`: the request that sent `DELETE` to one Project now sends `DELETE` to the collection, which stays unmapped. The scaffold suggested retargeting it to `PUT`, but `PUT` on the item was already the case's second request.
+  5. `TaskLabel_reaches_Task_and_Label_only_through_keys_that_carry_SpaceId` stayed green unchanged.
+  6. Q2 (a) widened `ProjectEndpointTests.ProjectProperties` by exactly `taskCount`. The creation case also asserts `taskCount = 0`. `BoardEndpointTests.ProjectProperties` is unchanged. `SpaceHomeProjectsTests` needed no change: no case counts a row's buttons for an Owner.
+- **Lock order (Q5), measured.** Task deletion takes the Project's Task range first, then the Task row on `INDEX(1)`, then `ExecuteDelete`. Project deletion takes the Project row on `INDEX(1)`, then the Project's Task range, then `ExecuteDelete`; the cascades are in the database. RACE-P1 (a) measured no cycle in that order: the row's `U` lock is compatible with the creation's foreign-key `S` check. No race reached a 547, so no 547 catch was added.
+- **Measured (Q13).** `A_Project_of_5000_Tasks_is_deleted_whole_by_one_request`: **330 ms over the wire**, 5,000 Tasks with no applications. Ledgered to 2.9.
+
+| # | Plant | Gate | Caught |
+|---|---|---|---|
+| 1 | Project deletion's range lock hint removed (3 runs) | RACE-P1 (a), as the product's `500` | 3/3 |
+| 2 | Task deletion's range lock hint removed (3 runs) | RACE-T1, 1205 deadlock or `500` | 3/3 |
+| 3 | `INDEX(1)` removed from the Task row lock (3 runs) | none | 0/3 - masked: the range already serialises every key placer, the `DELETE`'s own X on the clustered key queues behind any row holder, and a vanished row answers NotFound from the row count |
+| 4 | `UPDLOCK, HOLDLOCK` removed from the Task row lock (3 runs) | none | 0/3 - masked, same reason |
+| 5 | Project row lock hints removed (3 runs) | none | 0/3 - masked: the range serialises against creation; the `DELETE` row count decides NotFound |
+| 6 | Task query filter and `Task` FILTER predicate dropped together | ISO-DELETE-TASK-FOREIGN-ID-IN-OWN-SPACE, both surfaces (also 2.3's ISO-TASK/EDIT-TASK-FOREIGN-ID rows) | yes |
+| 7 | Task query filter alone | every row | green (109/109) |
+| 8 | Task FILTER predicate alone | every row green; `SchemaVarianceTests` reports the missing predicate | green rows |
+| 9 | Project query filter and `Project` FILTER predicate dropped together | ISO-DELETE-PROJECT-FOREIGN-ID-IN-OWN-SPACE, both surfaces (also RENAME/BOARD/WRITE-TASK/LIST rows) | yes |
+| 10 | Project query filter alone | every row | green (109/109) |
+| 11 | Project FILTER predicate alone | the 2.5 rows green; `SchemaVarianceTests` reports; two Task rows' ApiToken seeds hit `409 bound-reached` because the Projects-per-Space count (RLS only, by design) then counts every Space's Projects - a plant artefact, not a leak | green 2.5 rows |
+| 12 | The three Project DELETE rows re-declared as `PUT` (DELETE unnamed) | GATE-002 `Every_api_route_the_Host_maps_..._is_named_by_a_case` | yes |
+| 13 | A row left `PendingUntil: "2.5"` with 2.5 at `review` | GATE-003 `Every_pending_row_names_a_story_that_has_not_yet_reached_review` | yes |
+| 14 | `ConsultsBound(TasksPerProject)` on the Task DELETE | ARCH-501, the Tasks-per-Project route gate, the TaskEdit route gate | yes |
+| 15 | "Project archived." in `ClientCopy.resx` | ARC-001 (and COPY-501) | yes |
+| 16 | The confirm's danger border removed | DSN-501 | yes |
+| 17 | An `svg` in the Task confirm (Debug client rebuilt) | E2E `The_Task_and_Project_confirms_say_it_cannot_be_undone_...` | yes |
+| 18 | A Viewer offered Delete Task | E2E `A_Viewer_is_offered_no_delete_control_...` | yes |
+| 19 | A Viewer offered Delete Project | same | yes |
+| 20 | Optimistic Task removal (card removed before the `204`) | E2E `A_Task_deletion_waits_for_the_server_...` | yes |
+| 21 | Optimistic Project removal | E2E `A_Project_deletion_waits_for_the_server_...` | yes |
+| 22 | No column focus request after a deletion | the same Task case: `Expected "column:Todo", Actual "body"` | yes |
+
+Every plant was held in memory and restored in a `finally` (`git status` showed only the story's own changes afterwards). No plant used `git checkout`, `restore`, `reset` or `stash`.
+
 ### Completion Notes List
 
 - Story created 2026-10-26 by create-story: ultimate context engine analysis completed — comprehensive developer guide created. Open questions Q1–Q13 carry recommended decisions; the dev phase decides each as a reversible, recorded decision.
+- **What was built.**
+  - **Server.** `DELETE` on `TaskRoutes.Task` (`ManageTasks`) and on the new `ProjectRoutes.Project` (`ManageProjects`; `Rename => Project`). Both serve both surfaces, consult no bound, answer `204` with no body, and answer the boundary's floored `404` for an absent, deleted or foreign id, unrecorded.
+  - **Domain and slices.** `TaskDeletion` / `ProjectDeletion { Deleted, NotFound }`, with `DeleteTaskHandler` and `DeleteProjectHandler` as pass-through slices.
+  - **Stores.** Each deletion takes the locks above in one transaction; the cascades are the database's. No migration, no new problem type, no package.
+  - **Listing.** `ProjectResponse` gains `taskCount`. Create answers 0; the listing and rename read it in one grouped count.
+- **Client.**
+  - **Task.** "Delete Task" is the panel's last control. Its confirm replaces the panel content inside the one dialog. The deletion is not optimistic, and its key is reused after no answer. The `204` removes the card and drops its column total, announces "Task deleted.", and focuses the column (closes `deferred-work.md:510`). Late edit answers for a deleted Task are dropped.
+  - **Project.** "Delete Project" sits on the row on Space home. It re-reads the listing for a true count, and the confirm replaces the row. On `204` the row is removed, "Project deleted." is announced, and focus moves to Space home's `h1`.
+  - **Shared.** The danger border sits on every `.destructive-confirm`, 2.4's Label confirm included. The Label confirm now uses the shared "Delete {0}?" and "This cannot be undone." keys.
+- **Not delivered here.** FR-23's editing-session clause is story 7.4's. **FR-23 is not complete.**
+- **Decisions (each reversible; cut any line to reopen it):**
+  - **Q1 - (a).** Delete Project sits in `ProjectRow` on Space home, beside Rename, for the same Roles. Project settings does not exist before 6.1, and its audience excludes Members, whom FR-17 grants deletion. Cost to later stories: 6.1 may add a second entry point (a link). Ledgered to 6.1 and UX.
+  - **Q2 - (a).** `taskCount` is appended to `ProjectResponse` and served by the listing, create (0) and rename. "Delete Project" re-reads the listing before the confirm opens, so the count is true when stated, and the confirm offers no danger action until the read answers. The count is not shown in the list. No expected-count precondition: a Task added after the confirm opened is deleted too, as FR-17 says. Cost to later stories: none; the wire row widened by one field (AD-19).
+  - **Q3.** After a Task deletion, focus moves to the column that held the Task: its `<section>`, with `tabindex=-1`. After a Project deletion it moves to Space home's `h1`, the registered page heading, whether or not the list is now empty. Cost to later stories: 2.8's grid may move the column target to its own cell.
+  - **Q4.** Absent, already deleted or foreign answers the byte-identical `404 not-available`, as the architecture decides. The client follows the existing 404 pattern; added to `deferred-work.md:530`. Cost to later stories: 4.4's.
+  - **Q5.** The lock order is as recommended and measured above. Three row-lock hints were masked (0/3) and kept as defensive meeting points; ledgered to 2.6. Cost to later stories: 2.6 must read the remarks.
+  - **Q6 - no `BEFORE DELETE` predicate.** The two-layer plants prove the filter carries it. Cost to later stories: 3.3 reconsiders for Space deletion.
+  - **Q7.** A delete may be confirmed while an edit is in flight. On `204` the replica and queued edits are dropped, and a later answer for that id is ignored. Cost to later stories: none.
+  - **Q8.** "Delete Task" is the panel's last control, a `button-secondary`. `FocusLastAsync` now ends there. Cost to later stories: none.
+  - **Q9.** Focus opens on Cancel in both confirms. Cost to later stories: none.
+  - **Q10.** The busy state is `aria-busy` on the danger action and repeat presses are ignored. Nothing is ever `disabled`. Cost to later stories: none.
+  - **Q11.** Polite announcements of "Task deleted." and "Project deleted." Refusals are said in the confirm's own status region for a Task, and on the row for a Project. Cost to later stories: 2.8 owns the announcement model.
+  - **Q12.** No shared component. The two new confirms and 2.4's share the `.destructive-confirm` class and the copy keys, and the gates select the class. Cost to later stories: a later refactor onto one component is free.
+  - **Q13.** The large-Project deletion was measured only (330 ms) and ledgered to 2.9. Cost to later stories: 2.9's.
+- **Runs.** `dotnet build Yello.slnx`: 0 warnings, 0 errors. `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`: **1077 total, 1074 passed, 0 failed, 3 skipped** (the three bundle cases; 13 m 09 s). Against the ATDD baseline of 1044/999/0/45, the 42 skipped scaffolds are now active, and there are new handler tests. After `review` was set, `IsolationCaseListTests` passed 14/14 (GATE-003: nothing pending on 2.5). Still four engines; no engine, fixture type, serial collection, package, project or migration was added.
 
 ### File List
+
+- Yello.Domain/Tasks/ITaskStore.cs
+- Yello.Domain/Projects/IProjectStore.cs
+- Yello.Application/Tasks/DeleteTask/DeleteTaskHandler.cs (new)
+- Yello.Application/Projects/DeleteProject/DeleteProjectHandler.cs (new)
+- Yello.Application/Projects/ListProjects/ListedProject.cs (new)
+- Yello.Application/Projects/ListProjects/ListProjectsHandler.cs
+- Yello.Application/Projects/RenameProject/RenameProjectHandler.cs
+- Yello.Infrastructure/Persistence/TaskStore.cs
+- Yello.Infrastructure/Persistence/ProjectStore.cs
+- Yello.Infrastructure/Persistence/BoundCounter.cs
+- Yello.Contracts/Projects/ProjectRoutes.cs
+- Yello.Contracts/Projects/ProjectResponse.cs
+- Yello.Contracts/Tasks/TaskRoutes.cs
+- Yello.Host/Endpoints/TaskEndpoints.cs
+- Yello.Host/Endpoints/ProjectEndpoints.cs
+- Yello.Host/Program.cs
+- Yello.Client/Components/TaskDetail.razor
+- Yello.Client/Components/BoardView.razor
+- Yello.Client/Components/BoardView.razor.cs
+- Yello.Client/Components/BoardColumn.razor
+- Yello.Client/Components/ProjectList.razor
+- Yello.Client/Components/ProjectRow.razor
+- Yello.Client/Components/LabelRow.razor
+- Yello.Client/Localisation/ClientCopy.resx
+- Yello.Client/wwwroot/css/components.css
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Delete.cs
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Projects.cs
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Tasks.cs
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.TaskEdit.cs
+- tests/Yello.Tests.Architecture/DesignFoundationGateTests.DestructiveConfirm.cs
+- tests/Yello.Tests.Architecture/DeletionCopyGateTests.cs
+- tests/Yello.Tests.Isolation/IsolationCases.cs
+- tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Delete.cs
+- tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.DeleteIdempotency.cs
+- tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.DeleteRace.cs
+- tests/Yello.Tests.Slices/Tasks/DeleteTask/DeleteTaskHandlerTests.cs (new)
+- tests/Yello.Tests.Slices/Tasks/CreateTask/CreateTaskHandlerTests.cs
+- tests/Yello.Tests.Slices/Tasks/EditTaskAttributes/EditTaskAttributesHandlerTests.cs
+- tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.cs
+- tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.Delete.cs
+- tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.DeleteIdempotency.cs
+- tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.DeleteRace.cs
+- tests/Yello.Tests.Slices/Projects/DeleteProject/DeleteProjectHandlerTests.cs (new)
+- tests/Yello.Tests.Slices/Projects/CreateProject/CreateProjectHandlerTests.cs
+- tests/Yello.Tests.Client/DeleteTests.cs
+- tests/Yello.Tests.Client/TextSpacingTests.cs
+- tests/TESTING-CONVENTIONS.md
+- _bmad-output/implementation-artifacts/deferred-work.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- _bmad-output/implementation-artifacts/2-5-delete-a-task-and-delete-a-project.md
+
+### Change Log
+
+- 2026-10-26 - Dev phase. Task and Project deletion are on both surfaces, with deterministic races, live isolation rows and in-place confirms on the Board and on Space home. The Project listing carries a true `taskCount`. Every `.destructive-confirm`, the Label confirm included, has the danger border. Status moved to review. FR-23's session clause remains with story 7.4.

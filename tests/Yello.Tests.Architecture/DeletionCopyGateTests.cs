@@ -100,7 +100,7 @@ public sealed class DeletionCopyGateTests
     /// AC1, AC2, AC4, AC11, AC12, story Task 11 - every deletion sentence is a resource value exactly once (the
     /// confirms reuse one "This cannot be undone.", never concatenate it) and carries a non-empty translator's comment.
     /// </summary>
-    [Fact(Skip = "red: AC4 - the Task and Project deletion copy is not in ClientCopy.resx yet (story Task 11)")]
+    [Fact]
     [Trait("Requirement", "UX-DR36")]
     [Trait("Requirement", "UX-DR42")]
     public void The_deletion_copy_is_externalised_once_each_with_a_comment()

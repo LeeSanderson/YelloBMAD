@@ -172,5 +172,8 @@ public sealed class CreateTaskHandlerTests
 
         public Task<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>> LabelIdsOfAsync(IReadOnlyCollection<Guid> taskIds, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The create slice reads no Label.");
+
+        public Task<TaskDeletion> DeleteAsync(Guid taskId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The create slice deletes nothing.");
     }
 }

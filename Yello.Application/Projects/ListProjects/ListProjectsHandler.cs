@@ -3,11 +3,18 @@ using Yello.Domain.Projects;
 namespace Yello.Application.Projects.ListProjects;
 
 /// <summary>
-/// Lists every Project in the active Space, by name then id. FR-18; story 2.1, AC4.
+/// Lists every Project in the active Space, by name then id, each with its true Task count. FR-18; story 2.1, AC4;
+/// story 2.5, AC2.
 /// </summary>
 /// <remarks>
+/// <para>
 /// <b>The same list for every Role</b>: Role decides what can be done to a Project, not whether it is
 /// visible. The pipeline checked the read capability, which every Role holds.
+/// </para>
+/// <para>
+/// <b>The count is a true total</b> (AD-29), read in one grouped statement for the whole Space, so the deletion confirm
+/// can name it when it opens (story 2.5, open question 2 (a)).
+/// </para>
 /// </remarks>
 /// <param name="store">Reads the Projects of the Space the unit of work is scoped to.</param>
 public sealed class ListProjectsHandler(IProjectStore store)
@@ -16,7 +23,12 @@ public sealed class ListProjectsHandler(IProjectStore store)
     /// Lists the active Space's Projects.
     /// </summary>
     /// <param name="cancellationToken">The request's cancellation token.</param>
-    /// <returns>The Projects, by name then id.</returns>
-    public Task<IReadOnlyList<Project>> HandleAsync(CancellationToken cancellationToken) =>
-        store.ListAsync(cancellationToken);
+    /// <returns>The Projects, by name then id, with their counts.</returns>
+    public async Task<IReadOnlyList<ListedProject>> HandleAsync(CancellationToken cancellationToken)
+    {
+        var projects = await store.ListAsync(cancellationToken).ConfigureAwait(false);
+        var counts = await store.TaskCountsAsync(cancellationToken).ConfigureAwait(false);
+
+        return [.. projects.Select(project => new ListedProject(project, counts.GetValueOrDefault(project.Id)))];
+    }
 }

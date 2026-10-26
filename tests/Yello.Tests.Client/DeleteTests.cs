@@ -32,9 +32,8 @@ namespace Yello.Tests.Client;
 /// available.", "No Projects yet.") is asserted as written.
 /// </para>
 /// <para>
-/// <b>One case runs today</b>: the Label confirm 2.4 built already meets AC13's rendered half (the sentence, one danger
-/// action, no icon), so <see cref="The_Label_confirm_says_it_cannot_be_undone_with_one_danger_action_and_no_icon"/> is a
-/// standing gate from this run on. Every other case is skipped <c>red: AC&lt;n&gt;</c>.
+/// <b>The Label confirm's case ran from the ATDD run on</b>: 2.4's confirm already met AC13's rendered half (the
+/// sentence, one danger action, no icon). Every other case was activated by story 2.5's dev phase.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Client")]
@@ -95,7 +94,7 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     /// sent until the danger action is chosen.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the Task detail panel has no Delete Task control yet (story Task 9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR36")]
     public async Task Delete_Task_replaces_the_panel_content_with_a_confirm_naming_the_Task()
     {
@@ -131,7 +130,7 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     /// <c>&lt;body&gt;</c>, not on a card.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the Task detail panel has no Delete Task control yet (story Task 9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR26")]
     [Trait("Requirement", "UX-DR39")]
     public async Task A_Task_deletion_waits_for_the_server_then_removes_the_card_announces_and_focuses_its_column()
@@ -185,7 +184,7 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="byEscape">Whether the confirm is dismissed by <c>Esc</c> (otherwise by its Cancel).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC6 - the Task detail panel has no Delete Task control yet (story Task 9)")]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     [Trait("Requirement", "UX-DR39")]
@@ -236,7 +235,7 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     /// <param name="capability">The capability a <c>403</c> names.</param>
     /// <param name="copy">What the confirm says.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11 - the Task detail panel has no Delete Task control yet (story Task 9)")]
+    [Theory]
     [InlineData(403, InsufficientRoleType, "manage-tasks", ManageTasksCopy)]
     [InlineData(409, IdempotencyKeyInFlightType, null, InFlightCopy)]
     [InlineData(422, IdempotencyKeyReusedType, null, ReusedCopy)]
@@ -270,7 +269,7 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     /// nothing; sending it again carries the same <c>Idempotency-Key</c>, and that answer removes the card.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the Task detail panel has no Delete Task control yet (story Task 9)")]
+    [Fact]
     [Trait("Requirement", "NFR-5")]
     [Trait("Requirement", "AR-25")]
     public async Task An_unanswered_Task_deletion_says_not_sent_and_its_resend_reuses_the_key()
@@ -311,7 +310,7 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     /// answer raises no refusal surface, no copy and no revert: the Board stays, with the other card on it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the Task detail panel has no Delete Task control yet (story Task 9, Q7)")]
+    [Fact]
     [Trait("Requirement", "UX-DR26")]
     public async Task An_edit_answered_404_after_its_Tasks_deletion_raises_no_refusal()
     {
@@ -352,7 +351,7 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     /// claim that the Task was deleted elsewhere.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the Task detail panel has no Delete Task control yet (story Task 9)")]
+    [Fact]
     public async Task A_Task_deletion_answered_404_follows_the_Boards_not_found_pattern()
     {
         var api = TwoSpaces();
@@ -383,7 +382,7 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     /// <param name="tasks">How many Tasks the Project holds.</param>
     /// <param name="sentence">The count's sentence.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - Space home has no Delete Project control yet (story Task 10, Q1 (a), Q2 (a))")]
+    [Theory]
     [InlineData(0, HoldsNoTasks)]
     [InlineData(1, HoldsOneTask)]
     [InlineData(3, "It holds 3 Tasks.")]
@@ -424,7 +423,7 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     /// nothing.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - Space home has no Delete Project control yet (story Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     public async Task Cancelling_the_Project_confirm_destroys_nothing_and_returns_focus_to_Delete_Project()
     {
@@ -455,7 +454,7 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     /// <c>&lt;body&gt;</c>. Deleting the last Project shows the empty state with its one action.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - Space home has no Delete Project control yet (story Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR26")]
     [Trait("Requirement", "UX-DR35")]
     public async Task A_Project_deletion_waits_for_the_server_then_removes_the_row_and_announces()
@@ -497,7 +496,7 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     /// is disabled. Anchored: the Owner of the other Space is offered both.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - the anchor (an Owner offered Delete Task and Delete Project) has no control to find yet (story Tasks 9, 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     public async Task A_Viewer_is_offered_no_delete_control_and_nothing_is_disabled()
     {
@@ -539,7 +538,7 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     /// holds exactly one danger action, and holds no <c>img</c>, no <c>svg</c> and nothing classed as an icon.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - neither the Task nor the Project confirm exists yet (story Tasks 9, 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR36")]
     [Trait("Requirement", "UX-DR5")]
     public async Task The_Task_and_Project_confirms_say_it_cannot_be_undone_with_one_danger_action_and_no_icon()

@@ -11,6 +11,7 @@
 @inject HttpClient Http
 @inject ActiveSpaceState ActiveSpace
 @inject SpaceWrites Writes
+@inject PageHeadingFocus HeadingFocus
 
 @*
     THE ACTIVE SPACE'S PROJECTS - story 2.1. AC1-AC5, AC13; UX-DR26, UX-DR27, UX-DR31, UX-DR33, UX-DR35.
@@ -36,6 +37,12 @@
 
     A Project name is rendered as text, never in the document title and never in a URL, and every name
     field is autocomplete="off" with a field name autofill would never match (UX-DR33).
+
+    DELETION (story 2.5, AC2, AC3, AC12) is not optimistic either. "Delete Project" first reads the list again, so the
+    confirm states each Project's true Task count as it is when the confirm opens (open question 2 (a)); one row confirms
+    at a time, and opening a rename cancels it. On 204 the row leaves, "Project deleted." is announced, and focus moves to
+    Space home's heading - the nearest surviving container (open question 3). The key is kept for an identical resend
+    after no answer. A 404 is the Space refusal surface; any other refusal is said on the row.
 *@
 
 <p class="visually-hidden" role="status" aria-live="polite">@_announcement</p>
@@ -116,7 +123,13 @@
                                 OnStart="StartRename"
                                 OnNameChanged="RenameNameChanged"
                                 OnCommit="RenameAsync"
-                                OnCancel="CancelRename" />
+                                OnCancel="CancelRename"
+                                Confirming="@(_confirmingDelete == project.Id)"
+                                Counting="@(_counting == project.Id)"
+                                Deleting="@(_deletingProject == project.Id)"
+                                OnAskToDelete="AskToDeleteAsync"
+                                OnDelete="DeleteAsync"
+                                OnCancelDelete="CancelDelete" />
                 }
             </ul>
         }
@@ -154,6 +167,14 @@
     private string? _renameMessage;
     private bool _renameInFlight;
     private RowRefusal? _rowRefusal;
+
+    // Story 2.5: the row whose count is being read, the row confirming, the row whose deletion is with the server, the
+    // key of each deletion that got no answer, and whether focus moves to the page's heading after a deletion.
+    private Guid? _counting;
+    private Guid? _confirmingDelete;
+    private Guid? _deletingProject;
+    private readonly Dictionary<Guid, string> _deleteKeys = [];
+    private bool _focusHeading;
 
     /// <summary>
     /// The Space whose Projects these are.
@@ -196,6 +217,21 @@
         {
             _creating = false;
             _renaming = null;
+            _confirmingDelete = null;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusHeading)
+        {
+            _focusHeading = false;
+
+            if (HeadingFocus.Current is { } heading)
+            {
+                await heading.FocusAsync();
+            }
         }
     }
 
@@ -224,6 +260,11 @@
         _renameName = string.Empty;
         _renameMessage = null;
         _rowRefusal = null;
+        _counting = null;
+        _confirmingDelete = null;
+        _deletingProject = null;
+        _deleteKeys.Clear();
+        _focusHeading = false;
     }
 
     private async Task LoadAsync(int generation)
@@ -405,11 +446,12 @@
     {
         // One rename at a time: its answer closes the field it was sent from, so another row's field
         // must not open while it is on its way.
-        if (_renameInFlight)
+        if (_renameInFlight || _deletingProject is not null)
         {
             return;
         }
 
+        _confirmingDelete = null;
         _renaming = project.Id;
         _renameName = project.Name;
         _renameMessage = null;
@@ -515,6 +557,179 @@
         }
     }
 
+    /// <summary>
+    /// The row's delete control: the list is read again first, so the confirm states the Project's true Task count as it is now
+    /// (story 2.5, open question 2 (a)); the confirm opens only once it has. A Project the read no longer lists has gone,
+    /// and its row with it.
+    /// </summary>
+    private async Task AskToDeleteAsync(ProjectResponse project)
+    {
+        if (_renameInFlight || _counting is not null || _deletingProject is not null)
+        {
+            return;
+        }
+
+        _renaming = null;
+        _confirmingDelete = null;
+        _rowRefusal = null;
+        _counting = project.Id;
+
+        var generation = _generation;
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(ProjectRoutes.ListIn(SpaceId), UriKind.Relative), token);
+
+            if (generation == _generation && !token.IsCancellationRequested)
+            {
+                await UseCountAnswerAsync(project, response, generation, token);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            if (generation == _generation)
+            {
+                _rowRefusal = new RowRefusal(project.Id, Localizer[RefusalCopy.NotAvailableKey]);
+            }
+        }
+        finally
+        {
+            if (generation == _generation)
+            {
+                _counting = null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The list read for the confirm: the fresh list (and its counts) replaces the one shown; a 404 is the Space refusal
+    /// surface; anything else is said on the row and no confirm opens.
+    /// </summary>
+    private async Task UseCountAnswerAsync(ProjectResponse project, HttpResponseMessage response, int generation, CancellationToken token)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            if (await response.Content.ReadFromJsonAsync<List<ProjectResponse>>(JsonOptions, token) is { } projects && generation == _generation)
+            {
+                _projects = projects;
+                _confirmingDelete = projects.Exists(candidate => candidate.Id == project.Id) ? project.Id : null;
+            }
+
+            return;
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            await OnSpaceRefused.InvokeAsync(await ProblemOfAsync(response, token));
+            return;
+        }
+
+        if (response.StatusCode != HttpStatusCode.Unauthorized)
+        {
+            _rowRefusal = new RowRefusal(project.Id, RefusalText(await ProblemOfAsync(response, token)));
+        }
+    }
+
+    private void CancelDelete()
+    {
+        _confirmingDelete = null;
+        _rowRefusal = null;
+    }
+
+    /// <summary>
+    /// The confirm's danger action (story 2.5, AC12). Not optimistic: the row stays until the server's <c>204</c>.
+    /// </summary>
+    private async Task DeleteAsync(ProjectResponse project)
+    {
+        if (!_canManage || _deletingProject is not null)
+        {
+            return;
+        }
+
+        _deletingProject = project.Id;
+        _rowRefusal = null;
+
+        var generation = _generation;
+        var token = ActiveSpace.Token;
+
+        // A deletion sent again after an attempt that got no answer reuses its key: it may have been applied.
+        if (!_deleteKeys.TryGetValue(project.Id, out var key))
+        {
+            key = Guid.NewGuid().ToString("D");
+            _deleteKeys[project.Id] = key;
+        }
+
+        try
+        {
+            using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Delete, ProjectRoutes.ProjectOf(SpaceId, project.Id), key, token);
+
+            if (generation == _generation)
+            {
+                await UseDeletionAnswerAsync(project, answer);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // No answer: nothing is removed, the key is kept for the resend, and the row says so.
+            if (generation == _generation)
+            {
+                _rowRefusal = new RowRefusal(project.Id, Localizer["TaskEditNotSent"]);
+            }
+        }
+        finally
+        {
+            if (generation == _generation)
+            {
+                _deletingProject = null;
+            }
+        }
+    }
+
+    private async Task UseDeletionAnswerAsync(ProjectResponse project, SpaceWriteAnswer answer)
+    {
+        switch (answer.StatusCode)
+        {
+            case HttpStatusCode.NoContent:
+                _deleteKeys.Remove(project.Id);
+                _projects?.RemoveAll(candidate => candidate.Id == project.Id);
+                _confirmingDelete = null;
+                _announcement = Localizer["ProjectDeleted"];
+                _focusHeading = true;
+                return;
+
+            case >= HttpStatusCode.InternalServerError:
+                // The outcome is not known: treated as no answer, so the key is kept.
+                _rowRefusal = new RowRefusal(project.Id, Localizer["TaskEditNotSent"]);
+                return;
+
+            case HttpStatusCode.Unauthorized:
+                return;
+
+            case HttpStatusCode.NotFound:
+                _deleteKeys.Remove(project.Id);
+                await OnSpaceRefused.InvokeAsync(answer.Problem);
+                return;
+
+            default:
+                if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
+                {
+                    _deleteKeys.Remove(project.Id);
+                }
+
+                _rowRefusal = new RowRefusal(project.Id, RefusalText(answer.Problem));
+                return;
+        }
+    }
+
     private void Add(ProjectResponse project)
     {
         _projects ??= [];
@@ -560,7 +775,7 @@
         SpaceWrites.ProblemOfAsync(response, token);
 
     /// <summary>
-    /// Why a row's rename was refused, shown on that row.
+    /// Why a row's rename, count read or deletion was refused, shown on that row.
     /// </summary>
     private sealed record RowRefusal(Guid ProjectId, string Text);
 
