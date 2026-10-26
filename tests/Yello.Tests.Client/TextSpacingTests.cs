@@ -258,6 +258,83 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
         }
     }
 
+    /// <summary>
+    /// Story 2.5, AC13, <c>deferred-work.md:20</c> (each new surface adds its own case) - the Task confirm, in place in the
+    /// detail panel, for a Task with a long title, under 1.4.12 text spacing and 200% text-only zoom: no text clipped and no
+    /// sideways page scroll. Anchored: the confirm is on screen before the check runs. Written red by the story 2.5 ATDD
+    /// run; the locators are <c>DeleteTests</c>' assumptions ("Delete Task", <c>.destructive-confirm</c>).
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = "red: AC13 - the Task detail panel has no Delete Task control yet (story Task 9)")]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR40")]
+    [Trait("Requirement", "UX-DR12")]
+    public async Task Text_spacing_and_text_only_zoom_clip_nothing_in_the_Task_delete_confirm(bool zoom)
+    {
+        var api = Seeded();
+        var task = api.Boards[(Northwind, Atlas)].Columns[0].Tasks[0];
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/projects/{Atlas:D}").ToString());
+
+            await page.Locator($".task-card button[data-task-id='{task.Id:D}']").ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await page.Locator("[role='dialog']").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Delete Task", Exact = true }).ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await page.Locator("[role='dialog'] .destructive-confirm").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+        }
+    }
+
+    /// <summary>
+    /// Story 2.5, AC13, <c>deferred-work.md:20</c> - the Project confirm, in place in its row on Space home, for a Project
+    /// with a long name holding Tasks, under 1.4.12 text spacing and 200% text-only zoom: no text clipped and no sideways
+    /// page scroll. Anchored: the confirm is on screen before the check runs. Written red by the story 2.5 ATDD run.
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = "red: AC13 - Space home has no Delete Project control yet (story Task 10)")]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR40")]
+    [Trait("Requirement", "UX-DR12")]
+    public async Task Text_spacing_and_text_only_zoom_clip_nothing_in_the_Project_delete_confirm(bool zoom)
+    {
+        const string longName = "Prepare the quarterly planning document for the infrastructure review";
+
+        var api = Seeded();
+
+        api.ServeProjectTaskCounts = true;
+        api.Projects[Northwind] = [new FakeProject(Atlas, longName, DateTimeOffset.UtcNow)];
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}").ToString());
+
+            var row = page.Locator("main li", new PageLocatorOptions { HasText = longName });
+
+            await row.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Delete Project" }).ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await row.Locator(".destructive-confirm").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+        }
+    }
+
     private static FakeYelloApi Seeded()
     {
         var api = new FakeYelloApi { SignedIn = true };

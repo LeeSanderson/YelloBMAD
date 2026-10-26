@@ -462,6 +462,94 @@ internal static class IsolationCases
             ViewerClearsALabelAsync,
             Both(new RoleRefused("manage-tasks") { Then = TheViewersLabelIsStillAppliedAsync })),
 
+        // Story 2.5 - DELETE on the Task's item route and on the Project's item route (AC7, AC8, Task 8), each on both
+        // surfaces, pending until the dev phase maps them (GATE-003: every one live before 2.5 reaches review). The
+        // Project rows name ProjectRoutes.Rename - the same template story Task 4 renames ProjectRoutes.Project; switch
+        // the constant when it exists. Seeded through the product; every Project name and Task title a case writes is
+        // already in its owner's secrets (SeedProjectWithTaskAsync), so a name or title in the Host's log fails I-17.
+        new(
+            "ISO-DELETE-TASK-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Delete, TaskRoutes.Task,
+            async world =>
+            {
+                var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Delete,
+                    [new(TaskRoutes.TaskOf(world.B.SpaceId, foreign), TaskRoutes.TaskOf(Guid.NewGuid(), foreign))],
+                    world.B.SpaceId);
+            },
+            Both(new BoundaryNotFound { Then = TheForeignTaskIsStillPresentAsync }),
+            PendingUntil: "2.5",
+            PendingReason: "DELETE /spaces/{spaceId}/tasks/{taskId} is mapped by story 2.5 Task 5"),
+
+        new(
+            "ISO-DELETE-TASK-FOREIGN-ID-IN-OWN-SPACE", "I-1, I-13", IsolationVector.DeepLink, HttpMethod.Delete, TaskRoutes.Task,
+            async world =>
+            {
+                var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
+
+                // Only the Task's own query filter and FILTER predicate stand between A and B's Task (no BEFORE DELETE
+                // predicate, Q6): the dev phase plants the drop of both (the row fails on both surfaces), then each alone
+                // (green) - story Task 8.
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Delete,
+                    [new(TaskRoutes.TaskOf(world.A.SpaceId, foreign), TaskRoutes.TaskOf(world.A.SpaceId, Guid.NewGuid()))],
+                    TargetSpaceId: null);
+            },
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheForeignTaskIsStillPresentAsync }),
+            PendingUntil: "2.5",
+            PendingReason: "DELETE /spaces/{spaceId}/tasks/{taskId} is mapped by story 2.5 Task 5; the two-layer plant is Task 8's"),
+
+        new(
+            "ISO-DELETE-PROJECT-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Delete, ProjectRoutes.Rename,
+            async world =>
+            {
+                var (foreign, _) = await SeedProjectWithTaskAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Delete,
+                    [new(ProjectRoutes.ProjectOf(world.B.SpaceId, foreign), ProjectRoutes.ProjectOf(Guid.NewGuid(), foreign))],
+                    world.B.SpaceId);
+            },
+            Both(new BoundaryNotFound { Then = TheForeignProjectAndItsTasksAreStillPresentAsync }),
+            PendingUntil: "2.5",
+            PendingReason: "DELETE /spaces/{spaceId}/projects/{projectId} is mapped by story 2.5 Task 5"),
+
+        new(
+            "ISO-DELETE-PROJECT-FOREIGN-ID-IN-OWN-SPACE", "I-1, I-13", IsolationVector.DeepLink, HttpMethod.Delete, ProjectRoutes.Rename,
+            async world =>
+            {
+                var (foreign, _) = await SeedProjectWithTaskAsync(world.B);
+
+                // Only the Project's own query filter and FILTER predicate stand between A and B's Project and, through
+                // the cascade, its Tasks: the dev phase plants the drop of both, then each alone - story Task 8.
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Delete,
+                    [new(ProjectRoutes.ProjectOf(world.A.SpaceId, foreign), ProjectRoutes.ProjectOf(world.A.SpaceId, Guid.NewGuid()))],
+                    TargetSpaceId: null);
+            },
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheForeignProjectAndItsTasksAreStillPresentAsync }),
+            PendingUntil: "2.5",
+            PendingReason: "DELETE /spaces/{spaceId}/projects/{projectId} is mapped by story 2.5 Task 5; the two-layer plant is Task 8's"),
+
+        new(
+            "ISO-RECORD-KIND-TASK-DELETE-VIEWER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Delete, TaskRoutes.Task,
+            ViewerDeletesATaskAsync,
+            Both(new RoleRefused("manage-tasks") { Then = TheViewersRowIsStillPresentAsync }),
+            PendingUntil: "2.5",
+            PendingReason: "DELETE /spaces/{spaceId}/tasks/{taskId} is mapped by story 2.5 Task 5 with ManageTasks"),
+
+        new(
+            "ISO-RECORD-KIND-PROJECT-DELETE-VIEWER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Delete, ProjectRoutes.Rename,
+            ViewerDeletesAProjectAsync,
+            Both(new RoleRefused("manage-projects") { Then = TheViewersRowIsStillPresentAsync }),
+            PendingUntil: "2.5",
+            PendingReason: "DELETE /spaces/{spaceId}/projects/{projectId} is mapped by story 2.5 Task 5 with ManageProjects"),
+
         new(
             "ISO-TIMING-BOUNDARY", "I-6", IsolationVector.Timing, HttpMethod.Get, SpaceRoutes.Active,
             world => ForeignAsync(world, SpaceRoutes.ActiveOf),
@@ -858,6 +946,75 @@ internal static class IsolationCases
     /// </summary>
     private static async Task TheViewersLabelIsStillAppliedAsync(IsolationWorld world, CaseRequest request) =>
         Assert.Single(await world.Database.ApplicationsInAsync(request.Actor.SpaceId));
+
+    /// <summary>
+    /// The Task the refused deletion named - the last segment of its path - is still in B's Space. Story 2.5.
+    /// </summary>
+    private static async Task TheForeignTaskIsStillPresentAsync(IsolationWorld world, CaseRequest request)
+    {
+        var named = Guid.Parse(request.Paths[0].Path.Split('/')[^1]);
+
+        Assert.Contains(await world.Database.TasksInAsync(world.B.SpaceId), task => task.Id == named);
+    }
+
+    /// <summary>
+    /// The Project the refused deletion named - the last segment of its path - is still in B's Space, and so is the Task
+    /// seeded in it: a deletion that had landed would have cascaded to it. Story 2.5.
+    /// </summary>
+    private static async Task TheForeignProjectAndItsTasksAreStillPresentAsync(IsolationWorld world, CaseRequest request)
+    {
+        var named = Guid.Parse(request.Paths[0].Path.Split('/')[^1]);
+
+        Assert.Contains(await world.Database.ProjectsInAsync(world.B.SpaceId), project => project.Id == named);
+        Assert.Contains(await world.Database.TasksInAsync(world.B.SpaceId), task => task.ProjectId == named);
+    }
+
+    /// <summary>
+    /// A fresh Account with a Project and a Task in its own Personal Space, then demoted to Viewer there; the request
+    /// deletes that Task. Story 2.5.
+    /// </summary>
+    private static async Task<CaseRequest> ViewerDeletesATaskAsync(IsolationWorld world)
+    {
+        var viewer = await world.NewActorAsync("Vd");
+        var (_, taskId) = await SeedProjectWithTaskAsync(viewer);
+
+        await world.Database.ChangeRoleAsync(viewer.SpaceId, viewer.AccountId, "viewer");
+
+        var path = TaskRoutes.TaskOf(viewer.SpaceId, taskId);
+
+        return new CaseRequest(viewer, HttpMethod.Delete, [new(path, path)], viewer.SpaceId);
+    }
+
+    /// <summary>
+    /// A fresh Account with a Project holding a Task in its own Personal Space, then demoted to Viewer there; the request
+    /// deletes that Project. Story 2.5.
+    /// </summary>
+    private static async Task<CaseRequest> ViewerDeletesAProjectAsync(IsolationWorld world)
+    {
+        var viewer = await world.NewActorAsync("Vp");
+        var (projectId, _) = await SeedProjectWithTaskAsync(viewer);
+
+        await world.Database.ChangeRoleAsync(viewer.SpaceId, viewer.AccountId, "viewer");
+
+        var path = ProjectRoutes.ProjectOf(viewer.SpaceId, projectId);
+
+        return new CaseRequest(viewer, HttpMethod.Delete, [new(path, path)], viewer.SpaceId);
+    }
+
+    /// <summary>
+    /// The row the Viewer's refused deletion named - a Task or a Project, the last segment of its path - is still in the
+    /// Viewer's Space, with the Task the seed created. Story 2.5.
+    /// </summary>
+    private static async Task TheViewersRowIsStillPresentAsync(IsolationWorld world, CaseRequest request)
+    {
+        var named = Guid.Parse(request.Paths[0].Path.Split('/')[^1]);
+        var tasks = await world.Database.TasksInAsync(request.Actor.SpaceId);
+
+        Assert.Single(tasks);
+        Assert.True(
+            tasks[0].Id == named || tasks[0].ProjectId == named,
+            $"Neither the Viewer's Task nor its Project is {named} any more.");
+    }
 
     /// <summary>
     /// I-3 for Labels: A's list holds exactly A's Label ids, and none of B's ids or names - anchored both ways, since both

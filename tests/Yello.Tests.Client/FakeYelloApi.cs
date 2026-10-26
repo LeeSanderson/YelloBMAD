@@ -66,6 +66,11 @@ internal sealed class FakeYelloApi
     private TaskCompletionSource? _arrivedRename;
     private TaskCompletionSource? _heldLabelCreate;
     private TaskCompletionSource? _arrivedLabelCreate;
+    private DeleteHold? _taskDeleteHold;
+    private DeleteHold? _lastTaskDeleteHold;
+    private DeleteHold? _projectDeleteHold;
+    private DeleteHold? _lastProjectDeleteHold;
+    private readonly ConcurrentDictionary<string, string> _deletedByKey = new(StringComparer.Ordinal);
     private readonly TaskCompletionSource<FakeRequest> _signInSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<FakeRequest> _signOutSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -158,6 +163,24 @@ internal sealed class FakeYelloApi
     /// <c>LabelResponse</c>.
     /// </summary>
     public IDictionary<Guid, List<FakeLabel>> Labels { get; } = new Dictionary<Guid, List<FakeLabel>>();
+
+    /// <summary>
+    /// Whether the Project listing states each Project's true Task count (<c>taskCount</c>, the sum of its Board's column
+    /// totals, 0 without a Board) - story 2.5 Q2 (a)'s appended field. Off by default, so every case written before 2.5 is
+    /// served the bytes it always was. Story 2.5 (written by its ATDD run).
+    /// </summary>
+    public bool ServeProjectTaskCounts { get; set; }
+
+    /// <summary>
+    /// A refusal the next Task deletion is answered with instead of being applied - <c>(status, type, capability)</c>.
+    /// Cleared once used. Story 2.5.
+    /// </summary>
+    public (int Status, string ProblemType, string? Capability)? NextTaskDeleteRefusal { get; set; }
+
+    /// <summary>
+    /// A refusal the next Project deletion is answered with instead of being applied. Cleared once used. Story 2.5.
+    /// </summary>
+    public (int Status, string ProblemType, string? Capability)? NextProjectDeleteRefusal { get; set; }
 
     /// <summary>
     /// Every request seen, in order.
@@ -321,6 +344,64 @@ internal sealed class FakeYelloApi
     public void ReleaseTaskEditUnanswered() => ReleaseHeldEdit(new TaskEditOutcome(0, string.Empty, Capability: null, Abort: true));
 
     /// <summary>
+    /// Holds the <b>next</b> Task deletion (<c>DELETE …/tasks/{taskId}</c>) until it is released, so a case can assert
+    /// the deletion is not optimistic: the card and the panel stay while it is out. Story 2.5.
+    /// </summary>
+    /// <returns>A task that completes when the held deletion has arrived and is waiting.</returns>
+    public Task HoldTaskDeleteAsync()
+    {
+        var hold = new DeleteHold();
+
+        _taskDeleteHold = hold;
+        _lastTaskDeleteHold = hold;
+
+        return hold.Arrived.Task;
+    }
+
+    /// <summary>
+    /// Lets the held Task deletion go and applies it, as the Host does: <c>204</c>.
+    /// </summary>
+    public void ReleaseTaskDelete() => _lastTaskDeleteHold?.Released.TrySetResult(TaskEditOutcome.Deleted);
+
+    /// <summary>
+    /// Lets the held Task deletion go with a refusal instead: nothing is deleted.
+    /// </summary>
+    public void ReleaseTaskDeleteRefused(int status, string problemType, string? capability = null) =>
+        _lastTaskDeleteHold?.Released.TrySetResult(new TaskEditOutcome(status, problemType, capability, Abort: false));
+
+    /// <summary>
+    /// Lets the held Task deletion go with no answer - the connection reset. Nothing is deleted, so an identical resend
+    /// under the same key is applied.
+    /// </summary>
+    public void ReleaseTaskDeleteUnanswered() =>
+        _lastTaskDeleteHold?.Released.TrySetResult(new TaskEditOutcome(0, string.Empty, Capability: null, Abort: true));
+
+    /// <summary>
+    /// Holds the <b>next</b> Project deletion (<c>DELETE …/projects/{projectId}</c>) until it is released. Story 2.5.
+    /// </summary>
+    /// <returns>A task that completes when the held deletion has arrived and is waiting.</returns>
+    public Task HoldProjectDeleteAsync()
+    {
+        var hold = new DeleteHold();
+
+        _projectDeleteHold = hold;
+        _lastProjectDeleteHold = hold;
+
+        return hold.Arrived.Task;
+    }
+
+    /// <summary>
+    /// Lets the held Project deletion go and applies it: the Project and its Board are gone. <c>204</c>.
+    /// </summary>
+    public void ReleaseProjectDelete() => _lastProjectDeleteHold?.Released.TrySetResult(TaskEditOutcome.Deleted);
+
+    /// <summary>
+    /// Lets the held Project deletion go with a refusal instead: nothing is deleted.
+    /// </summary>
+    public void ReleaseProjectDeleteRefused(int status, string problemType, string? capability = null) =>
+        _lastProjectDeleteHold?.Released.TrySetResult(new TaskEditOutcome(status, problemType, capability, Abort: false));
+
+    /// <summary>
     /// The Task with <paramref name="taskId"/> as the fake holds it now, with its column, in whichever Board.
     /// </summary>
     /// <param name="taskId">The Task.</param>
@@ -454,6 +535,13 @@ internal sealed class FakeYelloApi
             case ("PATCH", var path) when TryTask(path, out var editSpace, out var editTask):
                 return await EditTaskAsync(editSpace, editTask, request).ConfigureAwait(false);
 
+            // Story 2.5 - a Task and a Project deleted by id, not optimistically: held, refused or applied.
+            case ("DELETE", var path) when TryTask(path, out var deleteTaskSpace, out var deletedTask):
+                return await DeleteTaskAsync(deleteTaskSpace, deletedTask, request).ConfigureAwait(false);
+
+            case ("DELETE", var path) when TryProject(path, out var deleteProjectSpace, out var deletedProject):
+                return await DeleteProjectAsync(deleteProjectSpace, deletedProject, request).ConfigureAwait(false);
+
             // Story 2.2 - the Board and Task routes.
             case ("GET", var path) when TryUnderProject(path, "board", out var boardSpace, out var boardProject):
                 return await BoardAsync(boardSpace, boardProject).ConfigureAwait(false);
@@ -543,8 +631,137 @@ internal sealed class FakeYelloApi
         }
 
         return Projects.TryGetValue(spaceId, out var projects)
-            ? (200, JsonSerializer.Serialize(projects.OrderBy(project => project.Name, StringComparer.Ordinal).ThenBy(project => project.Id), JsonOptions))
+            ? (200, JsonSerializer.Serialize(projects.OrderBy(project => project.Name, StringComparer.Ordinal).ThenBy(project => project.Id).Select(project => Counted(spaceId, project)), JsonOptions))
             : (200, "[]");
+    }
+
+    /// <summary>
+    /// The Project as the listing serves it: with its true Task count when <see cref="ServeProjectTaskCounts"/> is on
+    /// (story 2.5 Q2 (a)), otherwise exactly as stored.
+    /// </summary>
+    private FakeProject Counted(Guid spaceId, FakeProject project)
+    {
+        if (!ServeProjectTaskCounts)
+        {
+            return project;
+        }
+
+        var count = Boards.TryGetValue((spaceId, project.Id), out var board) ? board.Columns.Sum(column => column.Total) : 0;
+
+        return project with { TaskCount = count };
+    }
+
+    /// <summary>
+    /// The Host's Task deletion as story 2.5 specifies it: a key already applied replays <c>204</c>; a held deletion
+    /// waits for its release (applied, refused or unanswered); a queued refusal applies nothing; otherwise an absent Task
+    /// is the not-found and a present one leaves its column, whose true total drops by one.
+    /// </summary>
+    private async Task<(int Status, string Body)> DeleteTaskAsync(Guid spaceId, Guid taskId, FakeRequest request)
+    {
+        var key = request.Header(Idempotency.HeaderName);
+
+        if (key is not null && _deletedByKey.ContainsKey(key))
+        {
+            return (204, string.Empty);
+        }
+
+        var outcome = await DeleteOutcomeAsync(() => Interlocked.Exchange(ref _taskDeleteHold, null), () =>
+        {
+            var refusal = NextTaskDeleteRefusal;
+
+            NextTaskDeleteRefusal = null;
+            return refusal;
+        }).ConfigureAwait(false);
+
+        if (outcome.Abort)
+        {
+            return (AbortConnection, string.Empty);
+        }
+
+        if (outcome.Status != 204)
+        {
+            return (outcome.Status, JsonSerializer.Serialize(new ProblemResponse(outcome.ProblemType, Errors: null, Capability: outcome.Capability), JsonOptions));
+        }
+
+        if (FindTaskIn(spaceId, taskId) is not { } found)
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        found.Column.Tasks.RemoveAll(task => task.Id == taskId);
+        found.Column.Total--;
+
+        if (key is not null)
+        {
+            _deletedByKey[key] = request.Path;
+        }
+
+        return (204, string.Empty);
+    }
+
+    /// <summary>
+    /// The Host's Project deletion as story 2.5 specifies it: as <see cref="DeleteTaskAsync"/>, and a present Project
+    /// leaves the listing and takes its Board - every Task in it - with it.
+    /// </summary>
+    private async Task<(int Status, string Body)> DeleteProjectAsync(Guid spaceId, Guid projectId, FakeRequest request)
+    {
+        var key = request.Header(Idempotency.HeaderName);
+
+        if (key is not null && _deletedByKey.ContainsKey(key))
+        {
+            return (204, string.Empty);
+        }
+
+        var outcome = await DeleteOutcomeAsync(() => Interlocked.Exchange(ref _projectDeleteHold, null), () =>
+        {
+            var refusal = NextProjectDeleteRefusal;
+
+            NextProjectDeleteRefusal = null;
+            return refusal;
+        }).ConfigureAwait(false);
+
+        if (outcome.Abort)
+        {
+            return (AbortConnection, string.Empty);
+        }
+
+        if (outcome.Status != 204)
+        {
+            return (outcome.Status, JsonSerializer.Serialize(new ProblemResponse(outcome.ProblemType, Errors: null, Capability: outcome.Capability), JsonOptions));
+        }
+
+        var projects = Projects.TryGetValue(spaceId, out var held) ? held : [];
+
+        if (projects.RemoveAll(project => project.Id == projectId) == 0)
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        _ = Boards.Remove((spaceId, projectId));
+
+        if (key is not null)
+        {
+            _deletedByKey[key] = request.Path;
+        }
+
+        return (204, string.Empty);
+    }
+
+    /// <summary>
+    /// How a deletion is answered: the armed hold's release if one is armed, else a queued refusal, else applied.
+    /// </summary>
+    private static async Task<TaskEditOutcome> DeleteOutcomeAsync(Func<DeleteHold?> takeHold, Func<(int Status, string ProblemType, string? Capability)?> takeRefusal)
+    {
+        if (takeHold() is { } hold)
+        {
+            hold.Arrived.TrySetResult();
+
+            return await hold.Released.Task.ConfigureAwait(false);
+        }
+
+        return takeRefusal() is { } refusal
+            ? new TaskEditOutcome(refusal.Status, refusal.ProblemType, refusal.Capability, Abort: false)
+            : TaskEditOutcome.Deleted;
     }
 
     private (int Status, string Body) CreateProject(Guid spaceId, FakeRequest request)
@@ -1074,6 +1291,27 @@ internal sealed record TaskEditOutcome(int Status, string ProblemType, string? C
     /// Applied, as the Host admits it.
     /// </summary>
     public static TaskEditOutcome Admitted { get; } = new(200, string.Empty, Capability: null, Abort: false);
+
+    /// <summary>
+    /// A deletion applied, as the Host answers it: <c>204</c>. Story 2.5.
+    /// </summary>
+    public static TaskEditOutcome Deleted { get; } = new(204, string.Empty, Capability: null, Abort: false);
+}
+
+/// <summary>
+/// One armed hold on the next Task or Project deletion. Story 2.5.
+/// </summary>
+internal sealed class DeleteHold
+{
+    /// <summary>
+    /// Completes when the held deletion has arrived.
+    /// </summary>
+    public TaskCompletionSource Arrived { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>
+    /// Completes with the answer the held deletion is given.
+    /// </summary>
+    public TaskCompletionSource<TaskEditOutcome> Released { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 }
 
 /// <summary>
@@ -1133,7 +1371,16 @@ internal sealed record FakeApiToken(Guid Id, string Name, Guid SpaceId, string S
 /// <param name="Id">The Project's id.</param>
 /// <param name="Name">Its name.</param>
 /// <param name="CreatedAt">When it was created.</param>
-internal sealed record FakeProject(Guid Id, string Name, DateTimeOffset CreatedAt);
+/// <param name="TaskCount">
+/// Its true Task count - story 2.5 Q2 (a)'s appended field (AD-19), filled by the listing only when
+/// <see cref="FakeYelloApi.ServeProjectTaskCounts"/> is on. <c>null</c> is left out of the body entirely, so every case
+/// written before 2.5 is served the bytes it always was.
+/// </param>
+internal sealed record FakeProject(
+    Guid Id,
+    string Name,
+    DateTimeOffset CreatedAt,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] int? TaskCount = null);
 
 /// <summary>
 /// One Project's Board as the fake serves it - the shape of story 2.2 Task 3's <c>BoardResponse</c>

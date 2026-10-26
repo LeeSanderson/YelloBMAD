@@ -337,6 +337,39 @@ Recent commits follow "Add story → Add ATDD scaffolds → implement → Close 
 - `_bmad-output/implementation-artifacts/2-4-define-and-apply-labels.md` (Debug Log, plants, review findings); `2-3-edit-a-tasks-title-status-and-due-date.md` (review findings `:241-266`, Debug Log `:482-527`); `deferred-work.md:20, 36, 471, 477, 492, 493, 510, 530`
 - `tests/TESTING-CONVENTIONS.md:9-151, 205-237, 265-307, 358-403, 530-588`; `CLAUDE.md` (memory budget, race rule, undo rule, isolation rows)
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+**Checklist:** `_bmad-output/test-artifacts/atdd-checklist-2-5-delete-a-task-and-delete-a-project.md` (scenario map, the Q-table the scaffolds rest on, seed constraints checked, plants, full activation order). Scaffolded against the recommended Q1-Q13; if a decision differs, correct the scaffold first and record it. No product code was changed. Entry run: `dotnet build Yello.slnx` 0 warnings, 0 errors; `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1` **1044 total, 999 passed, 0 failed, 45 skipped** (+13 active, +42 skipped against 989/986/3; a skipped theory counts once).
+
+| File | Entries (cases) - ids | ACs | State |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Tasks/DeleteWire.cs` | harness (DELETE on both surfaces; race holders in the product's statement shapes; `TaskPlacement`) | - | active |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Delete.cs` | 7 (11) - DEL-T01 (4), T02, T03 (2), T04, T05; SCH-01, SCH-02 | AC3, AC7 | DEL skipped `red: AC7`; **SCH-01, SCH-02 green today** |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.DeleteIdempotency.cs` | 2 (4) - IDM-T01, T02 | AC9 | skipped |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.DeleteRace.cs` | 6 (7) - RACE-T1, T2, T3 (a), T3 (b), T4 (2), T5 | AC10 | T1, T3 (a), T5 skipped; **T2, T3 (b), T4 ×2 green today** |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.Delete.cs` | 6 (10) - PDEL-01 (4), 02, 03 (2), 04, 05 (Q2 (a) `taskCount`), 06 (5,000 Tasks, measured) | AC2, AC3, AC7 | skipped |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.DeleteIdempotency.cs` | 2 (4) - IDM-P01, P02 | AC9 | skipped |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.DeleteRace.cs` | 4 - RACE-P1 (a), P1 (b), P2 (a), P2 (b) | AC10 | P1 (a), P2 (a) skipped; **P1 (b), P2 (b) green today** |
+| `tests/Yello.Tests.Isolation/IsolationCases.cs` | 6 rows × 2 surfaces - the six rows of "Isolation rows" above (Project rows name `ProjectRoutes.Rename`, the same template; switch to `ProjectRoutes.Project`) | AC7, AC8 | **pending on 2.5** (GATE-003: convert all six before `review`) |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Delete.cs` | 6 - ARCH-501..506 | AC7, AC8 | skipped |
+| `tests/Yello.Tests.Architecture/DesignFoundationGateTests.DestructiveConfirm.cs` | 3 - DSN-501 border, 502 motion, 503 shadow | AC13 | DSN-501 skipped; **DSN-502, DSN-503 green today** (each plant caught 1/1) |
+| `tests/Yello.Tests.Architecture/DeletionCopyGateTests.cs` | 3 - ARC-001 "archive", ARC-000 oracle, COPY-501 | AC4, AC5 | COPY-501 skipped; **ARC-001, ARC-000 green today** (plant caught 1/1) |
+| `tests/Yello.Tests.Client/DeleteTests.cs` | 13 (18) - E2E-501..513 | AC1, AC2, AC4, AC6, AC11-AC14 | E2E-501..512 skipped; **E2E-513 (2.4's Label confirm) green today** (plant caught 1/1) |
+| `tests/Yello.Tests.Client/TextSpacingTests.cs` | 2 (4) - A11Y-501 Task confirm, A11Y-502 Project confirm | AC13 | skipped |
+| `tests/Yello.Tests.Client/FakeYelloApi.cs` | harness (Task/Project `DELETE` held/refused/unanswered, keyed replay; `ServeProjectTaskCounts`; `FakeProject.TaskCount`) | - | active |
+
+**Green today, standing regression gates - leave active:** SCH-01, SCH-02, RACE-T2, RACE-T3 (b), RACE-T4 ×2, RACE-P1 (b), RACE-P2 (b), DSN-502, DSN-503, ARC-001, ARC-000, E2E-513 (13 cases). Not scaffolded: the handler unit tests (types do not exist; write them with the slices on the `DeleteLabelHandlerTests` pattern).
+
+**Activation order** (detail in the checklist):
+1. **RACE-P1 (a) first - the riskiest assumption** (Q5): a Project deletion must wait on the Project's Task range for a creation that has already counted and read its Project; without it the creation's insert meets 547 → `500`. Then RACE-T1 (row-before-range deadlocks against a Status edit), RACE-T3 (a), RACE-T5, RACE-P2 (a); plant each hint 3×, record `n/3` and any masked plant.
+2. ARCH-505, 506, 504, then ARCH-501..503 with the three red-by-design gates (Task 5 items 1-3) amended in the same change, and the `PUT` retarget (item 4).
+3. Slices DEL-T01, T03, T02, T04, T05; PDEL-01, 03, 02, 04.
+4. Isolation rows one at a time with the two-layer plants; none pending at `review`.
+5. IDM-T01/T02, IDM-P01/P02. 6. PDEL-05 (with the `ProjectProperties` widening), PDEL-06 (record the duration, ledger to 2.9).
+7. COPY-501, DSN-501. 8. E2E-501..512, A11Y-501/502, correcting assumed locators and recording each.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used
