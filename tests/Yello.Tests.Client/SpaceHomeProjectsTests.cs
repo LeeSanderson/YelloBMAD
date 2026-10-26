@@ -67,7 +67,14 @@ public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
             var main = page.Locator("main");
             var text = await main.InnerTextAsync();
 
-            Assert.Equal(1, await main.GetByRole(AriaRole.Button).CountAsync() + await main.GetByRole(AriaRole.Link).CountAsync());
+            // Widened deliberately by story 2.4 (open question 7): an Owner's Space home also carries the "Space
+            // settings" link, which is the page's own navigation, not the empty state's action. Exactly that one link,
+            // to this Space's settings, is set aside; any other control still fails the count.
+            var settings = main.GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = "Space settings", Exact = true });
+
+            Assert.Equal(1, await settings.CountAsync());
+            Assert.Equal($"/spaces/{Northwind:D}/settings", await settings.GetAttributeAsync("href"));
+            Assert.Equal(1, await main.GetByRole(AriaRole.Button).CountAsync() + await main.GetByRole(AriaRole.Link).CountAsync() - 1);
             Assert.Equal(1, await main.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = CreateAction }).CountAsync());
             Assert.DoesNotContain("Status", text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("column", text, StringComparison.OrdinalIgnoreCase);

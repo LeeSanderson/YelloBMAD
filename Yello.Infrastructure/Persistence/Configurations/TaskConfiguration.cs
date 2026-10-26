@@ -65,6 +65,10 @@ internal sealed class TaskConfiguration(YelloDbContext context) : IEntityTypeCon
         // revision still serving inserts Tasks without naming it. No index - sorting by due date is 2.10's.
         builder.Property(task => task.DueDate).IsRequired(false);
 
+        // AR-8: story 2.4's TaskLabel references a Task through (SpaceId, Id), so an application can never point
+        // at a Task in another Space.
+        builder.HasAlternateKey(task => new { task.SpaceId, task.Id });
+
         builder.HasOne<Project>()
             .WithMany()
             .HasForeignKey(task => new { task.SpaceId, task.ProjectId })

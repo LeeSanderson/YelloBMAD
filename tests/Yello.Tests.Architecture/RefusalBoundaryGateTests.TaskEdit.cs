@@ -29,15 +29,17 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// AC1, AC6, AD-15, Q1 (a) - beside the creation request, the Task contracts hold exactly one edit request,
-    /// <c>EditTaskRequest</c>, whose properties are the title, the Status and the due date: no description
-    /// (FR-31, Epic 7), no position key (readable, never writable), no Project (FR-41 is its own route) and no
-    /// Space. The due date is <c>DateTimeOffset?</c>.
+    /// <c>EditTaskRequest</c>, whose properties are the title, the Status, the due date and - since story 2.4, Q1
+    /// (a) - the Labels: no description (FR-31, Epic 7), no position key (readable, never writable), no Project
+    /// (FR-41 is its own route) and no Space. The due date is <c>DateTimeOffset?</c>. Widened deliberately by story
+    /// 2.4 by exactly <c>LabelIds</c>; its type is pinned by
+    /// <c>The_Task_edit_request_carries_the_title_the_Status_the_due_date_and_the_Labels_and_nothing_else</c>.
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-20")]
     [Trait("Requirement", "AD-15")]
     [Trait("Requirement", "AD-12")]
-    public void The_Task_edit_request_carries_the_title_the_Status_and_the_due_date_and_nothing_else()
+    public void The_Task_edit_request_carries_its_editable_attributes_and_nothing_else()
     {
         var requests = ProductionAssemblies.Contracts.GetTypes()
             .Where(type => type.Namespace == TaskContractsNamespace && type.Name.EndsWith("Request", StringComparison.Ordinal))
@@ -48,7 +50,7 @@ public sealed partial class RefusalBoundaryGateTests
         var edit = requests.Single(type => type.Name == "EditTaskRequest");
 
         Assert.Equal(
-            ["DueDate", "StatusId", "Title"],
+            ["DueDate", "LabelIds", "StatusId", "Title"],
             edit.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(property => property.Name).Order(StringComparer.Ordinal));
         Assert.Equal(typeof(DateTimeOffset?), edit.GetProperty("DueDate")?.PropertyType);
     }
@@ -56,7 +58,8 @@ public sealed partial class RefusalBoundaryGateTests
     /// <summary>
     /// AC7, AR-34, AD-19 - the due date is held as a <c>DateTimeOffset?</c> on the Task entity and on
     /// <c>TaskResponse</c>, and <c>TaskResponse</c> keeps every field 2.2 shipped (a field is added, none
-    /// removed or retyped, FR-37).
+    /// removed or retyped, FR-37). Story 2.4 appended <c>LabelIds</c> on the same terms, so the set is widened by
+    /// exactly that name.
     /// </summary>
     [Fact]
     [Trait("Requirement", "AR-34")]
@@ -68,7 +71,7 @@ public sealed partial class RefusalBoundaryGateTests
         Assert.Equal(typeof(DateTimeOffset?), typeof(TaskItem).GetProperty("DueDate")?.PropertyType);
         Assert.Equal(typeof(DateTimeOffset?), response.GetProperty("DueDate")?.PropertyType);
         Assert.Equal(
-            ["CreatedAt", "DueDate", "Id", "PositionKey", "StatusId", "Title"],
+            ["CreatedAt", "DueDate", "Id", "LabelIds", "PositionKey", "StatusId", "Title"],
             response.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(property => property.Name).Order(StringComparer.Ordinal));
         Assert.Equal(typeof(DateTimeOffset), response.GetProperty("CreatedAt")?.PropertyType);
     }

@@ -1980,6 +1980,9 @@ public sealed partial class DesignFoundationGateTests
             .Where(d => WcagContrast.IsHexColour(d.Value))
             .Select(d => d.Property[2..])
             .Where(n => !n.EndsWith("-light", StringComparison.Ordinal))
+
+            // Story 2.4: the Label palette is its own family, never rebound (LabelPaletteGateTests).
+            .Where(n => !CssCorpus.IsLabelPaletteToken(n))
             .Distinct(StringComparer.Ordinal)
             .OrderBy(n => n, StringComparer.Ordinal),
     ];
@@ -2533,17 +2536,27 @@ public sealed partial class DesignFoundationGateTests
             || CssCorpus.IsCustomPropertyName(property));
 
     /// <summary>
-    /// A value with every <c>url(...)</c> and quoted run blanked, so a colour word inside a
-    /// filename or a content string is not read as a colour.
+    /// A value with every <c>url(...)</c>, quoted run and custom-property name blanked, so a colour word
+    /// inside a filename, a content string or a token's name is not read as a colour.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// <c>url("gold-star.svg")</c> was reported as stating <c>gold</c>. The keyword list is
     /// ordinary English - gold, tan, plum, snow, orchid, salmon - so any asset name can collide
     /// with it, and an author has no way to satisfy the gate but rename the file.
+    /// </para>
+    /// <para>
+    /// <b>A custom-property name is a reference, never a literal</b> (story 2.4): the Label palette's
+    /// <c>var(--label-olive)</c> was reported as stating <c>olive</c>. Only the name is blanked - the
+    /// <c>var()</c> itself, and any fallback after its comma, are still scanned, so
+    /// <c>var(--x, red)</c> is still caught.
+    /// </para>
     /// </remarks>
     private static string WithoutUrlsAndStrings(string value)
     {
         var blanked = UrlFunctionPattern.Replace(value, m => new string(' ', m.Length));
+
+        blanked = CustomPropertyNamePattern.Replace(blanked, m => new string(' ', m.Length));
 
         return QuotedRunPattern.Replace(blanked, m => new string(' ', m.Length));
     }
@@ -3366,6 +3379,10 @@ public sealed partial class DesignFoundationGateTests
     // A `url(...)` function and its whole argument.
     [GeneratedRegex(@"url\([^)]*\)", RegexOptions.IgnoreCase, matchTimeoutMilliseconds: 5000)]
     private static partial Regex UrlFunctionPattern { get; }
+
+    // A custom property's name as a value references it: `--label-olive` in `var(--label-olive)`.
+    [GeneratedRegex(@"--[A-Za-z0-9_-]+", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
+    private static partial Regex CustomPropertyNamePattern { get; }
 
     // A quoted run in a CSS value, either quoting style.
     [GeneratedRegex(@"""[^""]*""|'[^']*'", RegexOptions.None, matchTimeoutMilliseconds: 5000)]

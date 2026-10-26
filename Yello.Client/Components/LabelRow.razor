@@ -1,0 +1,75 @@
+@using System.Globalization
+@using Yello.Contracts.Labels
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    ONE LABEL IN SPACE SETTINGS' LIST - story 2.4. AC3; UX-DR12, UX-DR26, UX-DR36.
+
+    The Label's chip, then its delete control. Delete asks first, IN PLACE: the control is replaced by the warning
+    naming the Label, the danger action and Cancel - never a dialog over the page. Deletion is not optimistic, so the
+    row stays until the server agrees; a refusal (the Label is still on Tasks) is said on the row. Each delete control
+    is described by the Label's name, so a list of them is not a list of identical controls to a screen reader.
+*@
+
+<li class="label-list__row">
+    <span id="@NameId"><LabelChip Name="@Label.Name" Colour="@Label.Colour" /></span>
+
+    @if (Confirming)
+    {
+        <span class="destructive-confirm">
+            <span>@string.Format(CultureInfo.CurrentCulture, Localizer["LabelDeleteWarning"], Label.Name)</span>
+            <button type="button" class="button-danger" aria-describedby="@NameId" @onclick="DeleteAsync">@Localizer["LabelDelete"]</button>
+            <button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["LabelCancel"]</button>
+        </span>
+    }
+
+    @if (!Confirming && !Deleting)
+    {
+        <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="AskAsync">@Localizer["LabelDelete"]</button>
+    }
+
+    @if (Refusal is not null)
+    {
+        <p class="label-list__refusal" role="status">@Refusal</p>
+    }
+</li>
+
+@code {
+    /// <summary>The Label.</summary>
+    [Parameter]
+    [EditorRequired]
+    public LabelResponse Label { get; set; } = new(Guid.Empty, string.Empty, string.Empty);
+
+    /// <summary>Whether its deletion is being confirmed.</summary>
+    [Parameter]
+    public bool Confirming { get; set; }
+
+    /// <summary>Whether its deletion is on its way to the server.</summary>
+    [Parameter]
+    public bool Deleting { get; set; }
+
+    /// <summary>The words for its refused deletion, or <c>null</c>.</summary>
+    [Parameter]
+    public string? Refusal { get; set; }
+
+    /// <summary>Raised by the first Delete, with the Label's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnAskToDelete { get; set; }
+
+    /// <summary>Raised by the confirming Delete, with the Label's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnDelete { get; set; }
+
+    /// <summary>Raised by Cancel.</summary>
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private string NameId => $"label-{Label.Id:N}";
+
+    private Task AskAsync() => OnAskToDelete.InvokeAsync(Label.Id);
+
+    private Task DeleteAsync() => OnDelete.InvokeAsync(Label.Id);
+
+    private Task CancelAsync() => OnCancel.InvokeAsync();
+}

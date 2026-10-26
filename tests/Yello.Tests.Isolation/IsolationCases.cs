@@ -5,6 +5,7 @@ using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.ApiTokens;
 using Yello.Contracts.Boards;
+using Yello.Contracts.Labels;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
 using Yello.Contracts.Tasks;
@@ -364,35 +365,31 @@ internal static class IsolationCases
             Both(new RoleRefused("manage-tasks") { Then = TheViewersTaskIsUnchangedAsync })),
 
         // Story 2.4 - the Label routes and the Task PATCH carrying labelIds (AC8, AC9, Task 8), each on both surfaces,
-        // pending until the dev phase maps them. The route constants are LabelScaffold's until Yello.Contracts holds
-        // LabelRoutes. Seeded through the product; every Label name a case writes is added to its owner's secrets.
+        // live since the dev phase mapped them. Seeded through the product; every Label name a case writes is added to
+        // its owner's secrets.
         new(
-            "ISO-LIST-LABELS-FOREIGN-SPACE", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, LabelScaffold.Labels,
+            "ISO-LIST-LABELS-FOREIGN-SPACE", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, LabelRoutes.List,
             async world =>
             {
                 _ = await SeedLabelAsync(world.B);
 
-                return await ForeignAsync(world, LabelScaffold.LabelsOf);
+                return await ForeignAsync(world, LabelRoutes.LabelsOf);
             },
-            Both(new BoundaryNotFound()),
-            PendingUntil: "2.4",
-            PendingReason: "GET /spaces/{spaceId}/labels is mapped by story 2.4 Task 5"),
+            Both(new BoundaryNotFound())),
 
         new(
-            "ISO-LIST-LABELS-OWN-SPACE", "I-3", IsolationVector.Listing, HttpMethod.Get, LabelScaffold.Labels,
+            "ISO-LIST-LABELS-OWN-SPACE", "I-3", IsolationVector.Listing, HttpMethod.Get, LabelRoutes.List,
             async world =>
             {
                 _ = await SeedLabelAsync(world.A);
                 _ = await SeedLabelAsync(world.B);
 
-                return await OwnAsync(world, LabelScaffold.LabelsOf(world.A.SpaceId));
+                return await OwnAsync(world, LabelRoutes.LabelsOf(world.A.SpaceId));
             },
-            Both(new Served(HttpStatusCode.OK, ListsExactlyTheCallersLabelsAsync, "200, exactly SA's Label ids, none of SB's ids or names")),
-            PendingUntil: "2.4",
-            PendingReason: "GET /spaces/{spaceId}/labels is mapped by story 2.4 Task 5"),
+            Both(new Served(HttpStatusCode.OK, ListsExactlyTheCallersLabelsAsync, "200, exactly SA's Label ids, none of SB's ids or names"))),
 
         new(
-            "ISO-CREATE-LABEL-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, LabelScaffold.Labels,
+            "ISO-CREATE-LABEL-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, LabelRoutes.Create,
             async world =>
             {
                 _ = await SeedLabelAsync(world.B);
@@ -400,16 +397,14 @@ internal static class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Post,
-                    [new(LabelScaffold.LabelsOf(world.B.SpaceId), LabelScaffold.LabelsOf(Guid.NewGuid()))],
+                    [new(LabelRoutes.LabelsOf(world.B.SpaceId), LabelRoutes.LabelsOf(Guid.NewGuid()))],
                     world.B.SpaceId,
                     Body: CaseLabelDefinition);
             },
-            Both(new BoundaryNotFound { Then = NoLabelWrittenInEitherSpaceAsync }),
-            PendingUntil: "2.4",
-            PendingReason: "POST /spaces/{spaceId}/labels is mapped by story 2.4 Task 5; the body is a valid definition, so a write that landed would carry ProductActor.CaseBodyText"),
+            Both(new BoundaryNotFound { Then = NoLabelWrittenInEitherSpaceAsync })),
 
         new(
-            "ISO-DELETE-LABEL-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Delete, LabelScaffold.Label,
+            "ISO-DELETE-LABEL-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Delete, LabelRoutes.Label,
             async world =>
             {
                 var foreign = await SeedLabelAsync(world.B);
@@ -417,30 +412,26 @@ internal static class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Delete,
-                    [new(LabelScaffold.LabelOf(world.B.SpaceId, foreign), LabelScaffold.LabelOf(Guid.NewGuid(), foreign))],
+                    [new(LabelRoutes.LabelOf(world.B.SpaceId, foreign), LabelRoutes.LabelOf(Guid.NewGuid(), foreign))],
                     world.B.SpaceId);
             },
-            Both(new BoundaryNotFound { Then = TheForeignLabelIsStillPresentAsync }),
-            PendingUntil: "2.4",
-            PendingReason: "DELETE /spaces/{spaceId}/labels/{labelId} is mapped by story 2.4 Task 5"),
+            Both(new BoundaryNotFound { Then = TheForeignLabelIsStillPresentAsync })),
 
         new(
-            "ISO-LABEL-FOREIGN-ID-IN-OWN-SPACE", "I-1, I-13", IsolationVector.DeepLink, HttpMethod.Delete, LabelScaffold.Label,
+            "ISO-LABEL-FOREIGN-ID-IN-OWN-SPACE", "I-1, I-13", IsolationVector.DeepLink, HttpMethod.Delete, LabelRoutes.Label,
             async world =>
             {
                 var foreign = await SeedLabelAsync(world.B);
 
-                // Only the Label's own query filter and FILTER predicate stand between A and B's Label: the dev phase
-                // plants the drop of both (the row fails on both surfaces), then each alone (green) - story Task 8.
+                // Only the Label's own query filter and FILTER predicate stand between A and B's Label: dropping both
+                // fails the row on both surfaces, and either alone keeps it green (story 2.4 Task 8, planted).
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Delete,
-                    [new(LabelScaffold.LabelOf(world.A.SpaceId, foreign), LabelScaffold.LabelOf(world.A.SpaceId, Guid.NewGuid()))],
+                    [new(LabelRoutes.LabelOf(world.A.SpaceId, foreign), LabelRoutes.LabelOf(world.A.SpaceId, Guid.NewGuid()))],
                     TargetSpaceId: null);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheForeignLabelIsStillPresentAsync }),
-            PendingUntil: "2.4",
-            PendingReason: "DELETE /spaces/{spaceId}/labels/{labelId} is mapped by story 2.4 Task 5; the two-layer plant is Task 8's"),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheForeignLabelIsStillPresentAsync })),
 
         new(
             "ISO-APPLY-FOREIGN-LABEL", "I-2, I-13", IsolationVector.Write, HttpMethod.Patch, TaskRoutes.Task,
@@ -459,23 +450,17 @@ internal static class IsolationCases
                     Body: () => LabelIdsBody(foreign),
                     AnchorBody: () => LabelIdsBody(Guid.NewGuid()));
             },
-            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: LabelScaffold.InvalidTaskLabels) { Then = NoLabelAppliedInEitherSpaceAsync }),
-            PendingUntil: "2.4",
-            PendingReason: "PATCH /spaces/{spaceId}/tasks/{taskId} reads labelIds from story 2.4 Task 5 on; today it ignores the member"),
+            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidTaskLabels) { Then = NoLabelAppliedInEitherSpaceAsync })),
 
         new(
-            "ISO-RECORD-KIND-LABEL-DEFINE-MEMBER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Post, LabelScaffold.Labels,
+            "ISO-RECORD-KIND-LABEL-DEFINE-MEMBER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Post, LabelRoutes.Create,
             MemberDefinesALabelAsync,
-            Both(new RoleRefused("manage-labels") { Then = NoLabelInTheActorsSpaceAsync }),
-            PendingUntil: "2.4",
-            PendingReason: "POST /spaces/{spaceId}/labels is mapped by story 2.4 Task 5 with ManageLabels"),
+            Both(new RoleRefused("manage-labels") { Then = NoLabelInTheActorsSpaceAsync })),
 
         new(
             "ISO-RECORD-KIND-LABEL-APPLY-VIEWER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Patch, TaskRoutes.Task,
             ViewerClearsALabelAsync,
-            Both(new RoleRefused("manage-tasks") { Then = TheViewersLabelIsStillAppliedAsync }),
-            PendingUntil: "2.4",
-            PendingReason: "the Viewer's seeded application needs story 2.4's Label routes and labelIds member (Task 5)"),
+            Both(new RoleRefused("manage-tasks") { Then = TheViewersLabelIsStillAppliedAsync })),
 
         new(
             "ISO-TIMING-BOUNDARY", "I-6", IsolationVector.Timing, HttpMethod.Get, SpaceRoutes.Active,
@@ -771,8 +756,8 @@ internal static class IsolationCases
         var created = await owner.SendAsync(
             IsolationSurface.Session,
             HttpMethod.Post,
-            LabelScaffold.LabelsOf(owner.SpaceId),
-            JsonContent.Create(new { name, colour = LabelScaffold.PaletteKeys[0] }, options: JsonOptions),
+            LabelRoutes.LabelsOf(owner.SpaceId),
+            JsonContent.Create(new { name, colour = LabelColours.Keys[0] }, options: JsonOptions),
             headers: null);
 
         Assert.True(created.StatusCode == HttpStatusCode.Created, $"Seeding a Label through the product: {created.StatusCode} {created.Body}");
@@ -787,7 +772,7 @@ internal static class IsolationCases
     /// request would carry it.
     /// </summary>
     private static HttpContent CaseLabelDefinition() =>
-        JsonContent.Create(new { name = ProductActor.CaseBodyText, colour = LabelScaffold.PaletteKeys[0] }, options: JsonOptions);
+        JsonContent.Create(new { name = ProductActor.CaseBodyText, colour = LabelColours.Keys[0] }, options: JsonOptions);
 
     /// <summary>
     /// A Task edit naming exactly <paramref name="labelIds"/> (story 2.4 Q1 (a)).
@@ -805,7 +790,7 @@ internal static class IsolationCases
 
         await world.Database.ChangeRoleAsync(member.SpaceId, member.AccountId, "member");
 
-        var path = LabelScaffold.LabelsOf(member.SpaceId);
+        var path = LabelRoutes.LabelsOf(member.SpaceId);
 
         return new CaseRequest(member, HttpMethod.Post, [new(path, path)], member.SpaceId, Body: CaseLabelDefinition);
     }

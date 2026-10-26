@@ -166,5 +166,11 @@ public sealed class CreateTaskHandlerTests
 
         public Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The create slice edits no Task.");
+
+        public Task<bool> ReplaceLabelsAsync(Guid taskId, IReadOnlyList<Guid> labelIds, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The create slice applies no Label.");
+
+        public Task<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>> LabelIdsOfAsync(IReadOnlyCollection<Guid> taskIds, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The create slice reads no Label.");
     }
 }

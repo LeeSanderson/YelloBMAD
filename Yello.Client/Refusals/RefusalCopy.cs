@@ -70,6 +70,31 @@ public static class RefusalCopy
     public static string InvalidTaskEditKey => "InvalidTaskEdit";
 
     /// <summary>
+    /// The copy key for <c>400 invalid-label-name</c> (story 2.4): a name outside 1-50 characters.
+    /// </summary>
+    public static string InvalidLabelNameKey => "LabelNameInvalid";
+
+    /// <summary>
+    /// The copy key for <c>400 invalid-label-colour</c> (story 2.4): a colour outside the palette.
+    /// </summary>
+    public static string InvalidLabelColourKey => "InvalidLabelColour";
+
+    /// <summary>
+    /// The copy key for <c>409 label-name-taken</c> (story 2.4): the Space already holds that name.
+    /// </summary>
+    public static string LabelNameTakenKey => "LabelNameTaken";
+
+    /// <summary>
+    /// The copy key for <c>409 label-in-use</c> (story 2.4, AC3): the Label is on Tasks and was not deleted.
+    /// </summary>
+    public static string LabelInUseKey => "LabelInUse";
+
+    /// <summary>
+    /// The copy key for <c>400 invalid-task-labels</c> (story 2.4): a Label of the set is not the Space's.
+    /// </summary>
+    public static string InvalidTaskLabelsKey => "InvalidTaskLabels";
+
+    /// <summary>
     /// The resource a refusal is rendered with.
     /// </summary>
     /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
@@ -119,16 +144,27 @@ public static class RefusalCopy
         return new RefusalMessage(NotAvailableKey, Limit: null);
     }
 
-    private static string? OwnKey(string? type) => type switch
+    /// <summary>
+    /// The refusals that carry copy of their own, by type. A dictionary rather than a chain of comparisons since story
+    /// 2.4 added five, so each type is one line and the lookup is ordinal.
+    /// </summary>
+    private static readonly Dictionary<string, string> OwnKeys = new(StringComparer.Ordinal)
     {
-        _ when string.Equals(type, ProblemTypes.IdempotencyKeyInFlight, StringComparison.Ordinal) => IdempotencyKeyInFlightKey,
-        _ when string.Equals(type, ProblemTypes.IdempotencyKeyReused, StringComparison.Ordinal) => IdempotencyKeyReusedKey,
-        _ when string.Equals(type, ProblemTypes.InvalidTaskTitle, StringComparison.Ordinal) => InvalidTaskTitleKey,
-        _ when string.Equals(type, ProblemTypes.InvalidTaskStatus, StringComparison.Ordinal) => InvalidTaskStatusKey,
-        _ when string.Equals(type, ProblemTypes.InvalidDueDate, StringComparison.Ordinal) => InvalidDueDateKey,
-        _ when string.Equals(type, ProblemTypes.InvalidTaskEdit, StringComparison.Ordinal) => InvalidTaskEditKey,
-        _ => null,
+        [ProblemTypes.IdempotencyKeyInFlight] = IdempotencyKeyInFlightKey,
+        [ProblemTypes.IdempotencyKeyReused] = IdempotencyKeyReusedKey,
+        [ProblemTypes.InvalidTaskTitle] = InvalidTaskTitleKey,
+        [ProblemTypes.InvalidTaskStatus] = InvalidTaskStatusKey,
+        [ProblemTypes.InvalidDueDate] = InvalidDueDateKey,
+        [ProblemTypes.InvalidTaskEdit] = InvalidTaskEditKey,
+        [ProblemTypes.InvalidLabelName] = InvalidLabelNameKey,
+        [ProblemTypes.InvalidLabelColour] = InvalidLabelColourKey,
+        [ProblemTypes.LabelNameTaken] = LabelNameTakenKey,
+        [ProblemTypes.LabelInUse] = LabelInUseKey,
+        [ProblemTypes.InvalidTaskLabels] = InvalidTaskLabelsKey,
     };
+
+    private static string? OwnKey(string? type) =>
+        type is not null && OwnKeys.TryGetValue(type, out var key) ? key : null;
 }
 
 /// <summary>

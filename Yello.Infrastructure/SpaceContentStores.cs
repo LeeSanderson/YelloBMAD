@@ -1,5 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Yello.Domain.Boards;
+using Yello.Domain.Labels;
 using Yello.Domain.Projects;
 using Yello.Domain.Tasks;
 using Yello.Infrastructure.Persistence;
@@ -12,7 +13,7 @@ namespace Yello.Infrastructure;
 internal static class SpaceContentStores
 {
     /// <summary>
-    /// Adds the Project and Task stores and the Board reader.
+    /// Adds the Project, Task and Label stores and the Board reader.
     /// </summary>
     /// <param name="services">The container.</param>
     /// <returns>The same collection, for chaining.</returns>
@@ -25,6 +26,7 @@ internal static class SpaceContentStores
         services.AddScoped<IProjectStore, ProjectStore>();
         services.AddScoped<ITaskStore, TaskStore>();
         services.AddScoped<IBoardReader, BoardReader>();
+        services.AddScoped<ILabelStore, LabelStore>();
 
         return services;
     }

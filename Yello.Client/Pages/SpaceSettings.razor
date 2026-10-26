@@ -1,0 +1,79 @@
+@page "/spaces/{SpaceId:guid}/settings"
+
+@using System.Globalization
+@using Yello.Client.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject NavigationManager Navigation
+@inject SpaceNarration Narration
+
+@*
+    A SPACE'S SETTINGS - story 2.4, open question 7: its Labels section today; later stories add their own sections
+    (deferred-work.md). FR-22; UX-DR27, UX-DR29, UX-DR31, UX-DR32, UX-DR33.
+
+    ARRIVES LIKE EVERY SPACE-SCOPED PAGE, through SpaceArrival: an unlisted Space is refused with no request, the
+    Role is the server's answer on this load, and a 404 renders the one refusal surface. The address holds ids only,
+    and the document's title stays the product's name.
+
+    OWNER AND ADMIN ONLY (manage-labels). Space home links here only for them. A Member or Viewer who arrives by the
+    address meets the within-Space capability surface in place - "Only Owners and Admins can manage Labels.", never a
+    toast - and no define form (UX-DR32, UX-DR27).
+
+    A ROLE RE-READ LOWER WHILE HERE (UX-DR29): the change is narrated, then the page routes to Space home, which says
+    the sentence on arrival; focus then follows Space home's own arrival (UX-DR39).
+*@
+
+<SpaceArrival SpaceId="@SpaceId" Context="arrival">
+    <div class="space-settings">
+        <PageHeading>@Localizer["SpaceSettingsHeading"]</PageHeading>
+
+        @if (Permitted(arrival.Current.Role))
+        {
+            <LabelSection @key="SpaceId" SpaceId="@SpaceId" OnSpaceRefused="arrival.Refuse" />
+        }
+
+        @if (!LabelCapabilities.PermitsManageLabels(arrival.Current.Role))
+        {
+            <p class="space-settings__refusal" role="status">@Localizer["manage-labels"]</p>
+        }
+    </div>
+</SpaceArrival>
+
+@code {
+    private bool _wasPermitted;
+    private bool _leaving;
+
+    /// <summary>
+    /// The Space this route names.
+    /// </summary>
+    [Parameter]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>
+    /// The Role decides what renders, read on every arrival. A Role that permitted this page on an earlier answer and
+    /// does not on this one is the re-read lower: narrated, then routed (UX-DR29). One that never permitted it - an
+    /// address typed by hand - stays, on the capability surface.
+    /// </summary>
+    private bool Permitted(string roleCode)
+    {
+        var permitted = LabelCapabilities.PermitsManageLabels(roleCode);
+
+        if (permitted)
+        {
+            _wasPermitted = true;
+        }
+        else if (_wasPermitted && !_leaving)
+        {
+            _leaving = true;
+            Narration.Say(string.Format(CultureInfo.CurrentCulture, Localizer["SpaceSettingsNoLongerAvailable"], Localizer[RoleCopy.NameKey(roleCode)]));
+            // After this render, never during it.
+            _ = InvokeAsync(() => Navigation.NavigateTo(ClientRoutes.SpaceHome(SpaceId)));
+        }
+        else
+        {
+            // Never permitted here: the capability surface stands.
+        }
+
+        return permitted;
+    }
+}

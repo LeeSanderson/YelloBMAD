@@ -42,4 +42,13 @@ public interface IBoardReader
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>The Tasks, materialised.</returns>
     Task<IReadOnlyList<TaskItem>> ListTasksAsync(Guid projectId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The Labels applied to each of <paramref name="taskIds"/> - the Tasks this Board read returns - each list by
+    /// Label name and then id. Story 2.4; one statement for the whole page, never one per Task.
+    /// </summary>
+    /// <param name="taskIds">The Tasks being returned.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The Label ids per Task id; a Task carrying none is absent.</returns>
+    Task<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>> LabelIdsOfAsync(IReadOnlyCollection<Guid> taskIds, CancellationToken cancellationToken);
 }

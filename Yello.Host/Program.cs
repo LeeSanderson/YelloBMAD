@@ -10,6 +10,9 @@ using Yello.Application.Projects.CreateProject;
 using Yello.Application.Projects.ListProjects;
 using Yello.Application.Projects.RenameProject;
 using Yello.Application.Boards.ViewBoard;
+using Yello.Application.Labels.DefineLabel;
+using Yello.Application.Labels.DeleteLabel;
+using Yello.Application.Labels.ListLabels;
 using Yello.Application.Spaces.ListSpaces;
 using Yello.Application.Statuses.ListStatuses;
 using Yello.Application.Tasks.CreateTask;
@@ -101,6 +104,9 @@ builder.Services.AddScoped<CreateTaskHandler>();
 builder.Services.AddScoped<ViewTaskHandler>();
 builder.Services.AddScoped<EditTaskAttributesHandler>();
 builder.Services.AddScoped<ViewBoardHandler>();
+builder.Services.AddScoped<ListLabelsHandler>();
+builder.Services.AddScoped<DefineLabelHandler>();
+builder.Services.AddScoped<DeleteLabelHandler>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
 builder.Services.AddAccountScopedResolution();
@@ -385,10 +391,18 @@ api.MapCreateTask();
 api.MapBoard();
 
 // One Task (story 2.3). GET and PATCH /api/v1/spaces/{spaceId}/tasks/{taskId} read it under the read
-// capability and edit its title, Status and due date under ManageTasks. No bound on the edit: it adds no
-// Task. Space-scoped on both surfaces; the URL never holds the Project (FR-41).
+// capability and edit its title, Status, due date and Labels (story 2.4) under ManageTasks. No bound on the
+// edit: it adds no Task. Space-scoped on both surfaces; the URL never holds the Project (FR-41).
 api.MapViewTask();
 api.MapEditTask();
+
+// Labels (story 2.4). GET and POST /api/v1/spaces/{spaceId}/labels list them under the read capability every
+// Role holds and define one under ManageLabels; DELETE /api/v1/spaces/{spaceId}/labels/{labelId} deletes an
+// unused one under ManageLabels. Under the Space, not a Project: a Label serves every Project in it. No bound.
+// Space-scoped on both surfaces.
+api.MapListLabels();
+api.MapDefineLabel();
+api.MapDeleteLabel();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

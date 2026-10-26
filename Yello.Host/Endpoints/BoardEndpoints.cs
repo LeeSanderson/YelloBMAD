@@ -49,7 +49,7 @@ public static class BoardEndpoints
                 column.Status.Id,
                 column.Status.Name,
                 column.Total,
-                [.. column.Tasks.Select(TaskEndpoints.Response)]))]);
+                [.. column.Tasks.Select(task => TaskEndpoints.Response(task, board.LabelIds.GetValueOrDefault(task.Id, [])))]))]);
 
         return Results.Ok(response);
     }

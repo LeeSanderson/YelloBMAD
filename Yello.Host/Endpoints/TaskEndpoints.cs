@@ -82,7 +82,7 @@ public static class TaskEndpoints
         // reads it from one place whatever the endpoint (ARCH-009 holds the rule).
         httpContext.Response.Headers.Location = TaskRoutes.TaskOf(task.SpaceId, task.Id);
 
-        return Results.Json(Response(task), statusCode: StatusCodes.Status201Created);
+        return Results.Json(Response(task, []), statusCode: StatusCodes.Status201Created);
     }
 
     /// <summary>
@@ -119,14 +119,14 @@ public static class TaskEndpoints
     /// </returns>
     public static async Task<IResult> ViewAsync(Guid taskId, ViewTaskHandler handler, CancellationToken cancellationToken)
     {
-        var task = await handler.HandleAsync(taskId, cancellationToken).ConfigureAwait(false);
+        var viewed = await handler.HandleAsync(taskId, cancellationToken).ConfigureAwait(false);
 
-        return task is null ? BoundaryProblems.NotAvailable() : Results.Ok(Response(task));
+        return viewed is null ? BoundaryProblems.NotAvailable() : Results.Ok(Response(viewed.Task, viewed.LabelIds));
     }
 
     /// <summary>
-    /// Edits one Task of the active Space: any of its title, Status and due date, read as a JSON merge patch
-    /// (story 2.3, open question 1 (a)).
+    /// Edits one Task of the active Space: any of its title, Status, due date and Labels, read as a JSON merge patch
+    /// (story 2.3, open question 1 (a); story 2.4, open question 1 (a)).
     /// </summary>
     /// <param name="taskId">The Task, from the route.</param>
     /// <param name="handler">The slice.</param>
@@ -134,7 +134,7 @@ public static class TaskEndpoints
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>
     /// <c>200</c> with the Task as stored; <c>400</c> with <c>invalid-task-edit</c>, <c>invalid-task-title</c>,
-    /// <c>invalid-task-status</c> or <c>invalid-due-date</c>; or the boundary's <c>404 not-available</c> - byte
+    /// <c>invalid-task-status</c>, <c>invalid-due-date</c> or <c>invalid-task-labels</c>; or the boundary's <c>404 not-available</c> - byte
     /// for byte, and not recorded - for an id that matches nothing in the active Space.
     /// </returns>
     public static async Task<IResult> EditAsync(
@@ -154,9 +154,13 @@ public static class TaskEndpoints
 
         return result.Outcome switch
         {
-            EditTaskAttributesOutcome.Edited => Results.Ok(Response(result.Task!)),
+            EditTaskAttributesOutcome.Edited => Results.Ok(Response(result.Task!, result.LabelIds)),
 
             EditTaskAttributesOutcome.StatusOutsideTheEffectiveSet => TaskEditBody.InvalidStatus(),
+
+            // Not recorded: a Label that is not this Space's is a validation refusal, the same bytes for a random id
+            // and a foreign one (I-13). The unit of work rolls back whatever the edit had written.
+            EditTaskAttributesOutcome.LabelsInvalid => TaskEditBody.InvalidLabels(),
 
             // Not recorded: an in-Space not-found crossed no boundary (AD-20). The body is the boundary's.
             _ => BoundaryProblems.NotAvailable(),
@@ -167,7 +171,8 @@ public static class TaskEndpoints
     /// A Task as the wire carries it.
     /// </summary>
     /// <param name="task">The Task.</param>
+    /// <param name="labelIds">The Labels it carries, by name then id.</param>
     /// <returns>Its response.</returns>
-    internal static TaskResponse Response(TaskItem task) =>
-        new(task.Id, task.Title, task.StatusId, task.PositionKey, task.CreatedAt, task.DueDate);
+    internal static TaskResponse Response(TaskItem task, IReadOnlyList<Guid> labelIds) =>
+        new(task.Id, task.Title, task.StatusId, task.PositionKey, task.CreatedAt, task.DueDate) { LabelIds = labelIds };
 }

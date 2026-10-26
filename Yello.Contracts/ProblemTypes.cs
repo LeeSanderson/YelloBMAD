@@ -198,14 +198,64 @@ public static class ProblemTypes
     public static string InvalidDueDate => "urn:yello:problem:invalid-due-date";
 
     /// <summary>
-    /// A Task edit body that cannot be read as a JSON object, or that names none of the title, the Status and
-    /// the due date. Answered <c>400</c>; nothing is written. Story 2.3, open question 1 (a).
+    /// A Task edit body that cannot be read as a JSON object, or that names none of the title, the Status, the
+    /// due date and the Labels, or whose <c>labelIds</c> is not an array or holds more entries than any set could.
+    /// Answered <c>400</c>; nothing is written. Story 2.3, open question 1 (a); story 2.4, open question 6.
     /// </summary>
     /// <remarks>
     /// <b>Never a statement about the Task</b>, and never a list of what the body did name. The product's own
     /// client always sends at least one member, so only a hand-written request meets it.
     /// </remarks>
     public static string InvalidTaskEdit => "urn:yello:problem:invalid-task-edit";
+
+    /// <summary>
+    /// A Label name that is not 1-50 characters once trimmed. Answered <c>400</c>; nothing is written. Story 2.4,
+    /// open question 2.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never "that name is taken"</b> - that is <see cref="LabelNameTaken"/>. This reports only what was sent.
+    /// </remarks>
+    public static string InvalidLabelName => "urn:yello:problem:invalid-label-name";
+
+    /// <summary>
+    /// A Label colour that is not one of the palette's keys - a colour value such as <c>#D2592D</c> included.
+    /// Answered <c>400</c>; nothing is written. Story 2.4, open question 3.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never a list of the keys, and never the value sent</b>; the client offers the palette and nothing else.
+    /// </remarks>
+    public static string InvalidLabelColour => "urn:yello:problem:invalid-label-colour";
+
+    /// <summary>
+    /// The Space already holds a Label of that name, compared ignoring case. Answered <c>409</c>; nothing is
+    /// written. Story 2.4, open question 2.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never the name, the existing Label's id or its colour</b>, and never a statement about another Space: names
+    /// are unique per Space, so the same name in another Space is defined without conflict.
+    /// </remarks>
+    public static string LabelNameTaken => "urn:yello:problem:label-name-taken";
+
+    /// <summary>
+    /// The Label is applied to at least one Task, so it is not deleted until those applications are removed.
+    /// Answered <c>409</c>; nothing is deleted. Story 2.4, AC3, open question 11.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never how many Tasks carry it, and never their titles or ids.</b> It is not "the Label does not exist" - a
+    /// Label that matches nothing answers <see cref="NotAvailable"/>.
+    /// </remarks>
+    public static string LabelInUse => "urn:yello:problem:label-in-use";
+
+    /// <summary>
+    /// A Task edit whose <c>labelIds</c> names a Label that is not one of the Space's - unknown, another Space's,
+    /// repeated, not an id, or deleted while the edit ran. Answered <c>400</c>; nothing is written. Story 2.4, AC10,
+    /// AC11.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never which entry, never the id sent, and never "that Label belongs to another Space".</b> A random id and
+    /// another Space's real Label id answer the same bytes (I-13). It is not a <c>404</c>: the Task is present.
+    /// </remarks>
+    public static string InvalidTaskLabels => "urn:yello:problem:invalid-task-labels";
 
     /// <summary>
     /// An <c>Idempotency-Key</c> header that is empty or longer than

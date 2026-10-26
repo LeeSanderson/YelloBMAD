@@ -1,0 +1,28 @@
+@*
+    ONE LABEL CHIP - story 2.4. UX-DR5, UX-DR8, UX-DR13, UX-DR40; DESIGN.md:180-183, :451, :457-462.
+
+    NOT A CONTROL: a span holding the Label's name, filled from the palette through its key's modifier class
+    (`label-chip--{key}` over `var(--label-{key})`), never an inline style, so no colour is stated outside the token
+    layer and the palette gate's figures are what renders. One ink in both themes (`--label-ink`, story 2.4 open
+    question 4). The 2px radius, the meta type role, no fixed height and no shadow: the chip sizes to its text, so text
+    spacing and 200% text zoom grow it. The name is user data, never transformed.
+
+    NOTHING DEPENDS ON COLOUR: the name is always the chip's text.
+*@
+
+<span class="type-meta label-chip label-chip--@ColourClass">@Name</span>
+
+@code {
+    /// <summary>The Label's name.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>The Label's palette key, such as <c>rust</c>.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string Colour { get; set; } = string.Empty;
+
+    // A key the client does not know draws the chip unfilled rather than with a class the token layer lacks.
+    private string ColourClass => Yello.Contracts.Labels.LabelColours.Keys.Contains(Colour, StringComparer.Ordinal) ? Colour : "unknown";
+}

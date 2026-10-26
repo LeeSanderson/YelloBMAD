@@ -1,5 +1,6 @@
 using Microsoft.Playwright;
 using Xunit;
+using Yello.Contracts.Labels;
 
 namespace Yello.Tests.Client;
 
@@ -153,7 +154,7 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
     /// <param name="onSettings">Whether the surface is Space settings (otherwise the Board's labelled card).</param>
     /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC13 - no Label chips or Labels surface yet (story 2.4 Tasks 10-11)")]
+    [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]
     [InlineData(true, false)]
@@ -163,7 +164,7 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
     {
         var api = Seeded();
         var names = Enumerable.Range(1, 4).Select(index => $"A rather long Label name, number {index}").ToList();
-        var labels = names.Select((name, index) => new FakeLabel(Guid.NewGuid(), name, Yello.Tests.Shared.LabelScaffold.PaletteKeys[index])).ToList();
+        var labels = names.Select((name, index) => new FakeLabel(Guid.NewGuid(), name, LabelColours.Keys[index])).ToList();
         var (column, task) = api.FindTask(api.Boards[(Northwind, Atlas)].Columns[0].Tasks[0].Id)!.Value;
 
         api.Labels[Northwind] = labels;

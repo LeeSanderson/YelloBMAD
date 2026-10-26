@@ -1,5 +1,6 @@
 using System.Net;
 using Xunit;
+using Yello.Contracts;
 using Yello.Tests.Shared;
 using static Yello.Tests.Slices.Tasks.LabelWire;
 using static Yello.Tests.Slices.Tasks.TaskEditWire;
@@ -39,7 +40,7 @@ public sealed partial class TaskEndpointTests
     /// application are present.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - no Label delete or TaskLabel table yet (story 2.4 Tasks 3, 5)")]
+    [Fact]
     [Trait("Requirement", "FR-22")]
     [Trait("Requirement", "AR-34")]
     public async Task A_deletion_racing_an_application_that_commits_first_answers_409_label_in_use()
@@ -78,7 +79,7 @@ public sealed partial class TaskEndpointTests
 
         Assert.NotNull(owner);
         Assert.True(answer?.StatusCode == HttpStatusCode.Conflict, $"{answer?.StatusCode} {answer?.Body}");
-        Assert.Equal(LabelScaffold.LabelInUse, Problem(answer!)?.Type);
+        Assert.Equal(ProblemTypes.LabelInUse, Problem(answer!)?.Type);
         Assert.Equal([labelId], (await LabelRowsAsync(database, owner.SpaceId)).Select(row => row.Id));
         Assert.Equal([labelId], await AppliedToAsync(database, owner.SpaceId, taskId));
     }
@@ -89,7 +90,7 @@ public sealed partial class TaskEndpointTests
     /// exists.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - no labelIds member or Label table yet (story 2.4 Tasks 3, 5)")]
+    [Fact]
     [Trait("Requirement", "FR-22")]
     [Trait("Requirement", "AR-34")]
     public async Task An_application_racing_a_deletion_that_commits_first_answers_400_invalid_task_labels()
@@ -124,7 +125,7 @@ public sealed partial class TaskEndpointTests
 
         Assert.NotNull(owner);
         Assert.True(answer?.StatusCode == HttpStatusCode.BadRequest, $"{answer?.StatusCode} {answer?.Body}");
-        Assert.Equal(LabelScaffold.InvalidTaskLabels, Problem(answer!)?.Type);
+        Assert.Equal(ProblemTypes.InvalidTaskLabels, Problem(answer!)?.Type);
         Assert.Empty(await ApplicationsAsync(database, owner.SpaceId));
         Assert.Empty(await LabelRowsAsync(database, owner.SpaceId));
     }
@@ -135,7 +136,7 @@ public sealed partial class TaskEndpointTests
     /// test commits; the request answers <c>409 label-name-taken</c>, never <c>500</c>, and one Label exists.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - no Label route or unique index yet (story 2.4 Tasks 3, 5; Q2)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Assumption", "FR-22-Q2")]
     public async Task Two_definitions_of_one_name_answer_one_201_and_one_409_never_500()
@@ -169,7 +170,73 @@ public sealed partial class TaskEndpointTests
 
         Assert.NotNull(owner);
         Assert.True(answer?.StatusCode == HttpStatusCode.Conflict, $"{answer?.StatusCode} {answer?.Body}");
-        Assert.Equal(LabelScaffold.LabelNameTaken, Problem(answer!)?.Type);
+        Assert.Equal(ProblemTypes.LabelNameTaken, Problem(answer!)?.Type);
         Assert.Equal([heldLabel], (await LabelRowsAsync(database, owner.SpaceId)).Select(row => row.Id));
+    }
+
+    /// <summary>
+    /// AC10 (the application read its Labels first) - an edit applying a Label has read it and is held before it writes
+    /// (the test holds an uncommitted application of another Label to the same Task, which the edit's read of the
+    /// Task's current set waits on); a <c>DELETE</c> of the Label then queues on the edit's lock on it; the test rolls
+    /// back; the edit answers <c>200</c> and the deletion <c>409 label-in-use</c>, never a <c>500</c>. Added by the dev
+    /// phase: RACE-002 cannot see the apply's <c>UPDLOCK, HOLDLOCK</c> - a read-committed read already waits on the
+    /// deleted, uncommitted row - so this is the interleaving the hint exists for. Without it the deletion commits
+    /// under the held edit, whose insert then meets the composite foreign key: a <c>500</c>.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-22")]
+    [Trait("Requirement", "AR-34")]
+    public async Task A_deletion_racing_an_application_that_has_read_its_Labels_waits_and_answers_409()
+    {
+        var database = Available();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Actor? owner = null;
+        var taskId = Guid.Empty;
+        var labelId = Guid.Empty;
+        WireResponse? applied = null;
+        WireResponse? deleted = null;
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            owner = await RegisterAsync(client, database);
+
+            var (projectId, createdTask) = await ProjectWithTaskAsync(owner, "Being labelled");
+
+            taskId = createdTask;
+
+            // Defined first, so its id sorts before the contested Label's (sequential ids): the held application then
+            // lies outside the deletion's in-use range, and only the edit's Label lock can make the deletion wait.
+            var heldLabel = await SeedAsync(owner, owner.SpaceId, "Held aside");
+
+            labelId = await SeedAsync(owner, owner.SpaceId, "Contested");
+
+            Assert.Equal(HttpStatusCode.OK, (await BoardAsync(owner, owner.SpaceId, projectId)).StatusCode);
+
+            await using var holder = await database.OpenForSpaceAsync(owner.SpaceId, cancellationToken);
+            await using var observer = await database.OpenWithoutSpaceContextAsync(cancellationToken);
+            await using var held = await holder.BeginTransactionAsync(cancellationToken);
+
+            await InsertApplicationAsync(holder, held, owner.SpaceId, taskId, heldLabel, cancellationToken);
+
+            var applying = EditTaskAsync(owner, owner.SpaceId, taskId, ApplyBody(labelId));
+
+            await WaitUntilBlockedOnALockAsync(observer, 1, applying, cancellationToken);
+
+            var deleting = DeleteAsync(owner, owner.SpaceId, labelId);
+
+            await WaitUntilBlockedOrAnsweredAsync(observer, 2, deleting, cancellationToken);
+            await held.RollbackAsync(cancellationToken);
+
+            applied = await applying;
+            deleted = await deleting;
+        });
+
+        Assert.NotNull(owner);
+        Assert.True(applied?.StatusCode == HttpStatusCode.OK, $"{applied?.StatusCode} {applied?.Body}");
+        Assert.True(deleted?.StatusCode == HttpStatusCode.Conflict, $"{deleted?.StatusCode} {deleted?.Body}");
+        Assert.Equal(ProblemTypes.LabelInUse, Problem(deleted!)?.Type);
+        Assert.Contains(labelId, (await LabelRowsAsync(database, owner.SpaceId)).Select(row => row.Id));
+        Assert.Equal([labelId], await AppliedToAsync(database, owner.SpaceId, taskId));
     }
 }

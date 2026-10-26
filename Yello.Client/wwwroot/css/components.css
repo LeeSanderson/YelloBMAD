@@ -731,8 +731,9 @@
 /*
     THE TASK CARD (DESIGN.md:137-144, :431). The title is the only content; the card sizes to it, wraps a
     long title rather than scrolling, and carries NO SHADOW - stated explicitly so nobody adds one back
-    (story 2.7's lifted card is the one sanctioned exception). The metadata row is empty in 2.2 and takes
-    no space until Labels, the Assignee or Presence fill it.
+    (story 2.7's lifted card is the one sanctioned exception). The metadata row holds the Task's Labels (story
+    2.4) and its due date (story 2.3), and takes no space while it holds neither; the Assignee and Presence
+    join it later.
 */
 .task-card {
     padding-block: var(--space-card-pad-y);
@@ -773,8 +774,75 @@
     cursor: pointer;
 }
 
+/*
+    THE CARD'S METADATA ROW (UX-DR8, UX-DR41; story 2.4, AC5). It WRAPS before it ever scrolls sideways: at the
+    320px reflow width a row that scrolled inside a card is the 1.4.10 failure in the exact layout an audit uses.
+    Nothing on it may refuse to wrap, and a long Label name breaks rather than widening the card.
+*/
+.task-card__meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1);
+    min-inline-size: 0;
+    margin-block-start: var(--space-1);
+}
+
 .task-card__meta:empty {
     display: none;
+}
+
+/*
+    A LABEL CHIP (story 2.4; UX-DR5, UX-DR13, UX-DR40; DESIGN.md:180-183, :451, :457-462). The 2px radius
+    (--radius-sm, the token kept for exactly this), the meta type role, padding from the spacing tokens in rem, and
+    NO FIXED HEIGHT and NO SHADOW: the chip sizes to its text, so text spacing and 200% text zoom grow it. Never a
+    pill (--radius-full is the column count's alone). The fill comes from the key's modifier class, over the palette
+    token, and the ink is the one ink every fill was computed against (LabelPaletteGateTests). A Label name is user
+    data: no text-transform.
+*/
+.label-chip {
+    display: inline-block;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+    padding-block: 0.0625rem;
+    padding-inline: var(--space-2);
+    border-radius: var(--radius-sm);
+    background-color: transparent;
+    color: var(--label-ink);
+    box-shadow: none;
+    overflow-wrap: anywhere;
+}
+
+.label-chip--rust { background-color: var(--label-rust); }
+.label-chip--ochre { background-color: var(--label-ochre); }
+.label-chip--olive { background-color: var(--label-olive); }
+.label-chip--grass { background-color: var(--label-grass); }
+.label-chip--jade { background-color: var(--label-jade); }
+.label-chip--teal { background-color: var(--label-teal); }
+.label-chip--blue { background-color: var(--label-blue); }
+.label-chip--orchid { background-color: var(--label-orchid); }
+
+/* A key the client does not know: the name still reads, on the card's own ground. */
+.label-chip--unknown {
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+}
+
+/* The card's "+N" after three chips: text, never a control (story 2.4, open question 5). */
+.label-more {
+    color: var(--text-muted);
+}
+
+/*
+    A palette swatch beside a colour's name - the define form's radios and the Label picker's options. Decoration
+    only (aria-hidden): the name beside it is what is read, so nothing depends on colour (UX-DR7).
+*/
+.label-swatch {
+    display: inline-block;
+    flex: none;
+    padding: 0.4375rem;
+    border-radius: var(--radius-sm);
+    vertical-align: middle;
 }
 
 /*
@@ -925,4 +993,119 @@
 
 .picker__option[aria-checked="true"] {
     font-weight: var(--type-task-title-weight);
+}
+
+/* The Label picker's options (story 2.4): selected ones carry the weight the Status picker's current one does. */
+.label-option {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    overflow-wrap: anywhere;
+}
+
+.label-option[aria-selected="true"] {
+    font-weight: var(--type-task-title-weight);
+}
+
+/* The panel's applied Labels: chips that wrap, as on the card. */
+.task-detail__labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-1);
+    min-inline-size: 0;
+}
+
+.task-detail__labels-control {
+    align-self: flex-start;
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+}
+
+.task-detail__labels-empty {
+    margin-block: 0;
+    color: var(--text-muted);
+}
+
+/*
+    SPACE SETTINGS (story 2.4, open question 7): its Labels section. Every row wraps, so a long Label name, the
+    in-place delete confirmation or a long translation never forces a horizontal scroll at 320px (UX-DR41).
+*/
+.space-settings {
+    padding-block: var(--space-5);
+    padding-inline: var(--space-4);
+}
+
+.space-settings__refusal,
+.space-home__narration {
+    margin-block: var(--space-3) 0;
+}
+
+.space-home__settings {
+    display: inline-block;
+    margin-block: var(--space-3) 0;
+}
+
+.label-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-block-start: var(--space-4);
+}
+
+.label-section__heading {
+    margin-block: 0;
+}
+
+.label-define {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.label-define__colours {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    margin: 0;
+    padding: 0;
+    border: 0;
+}
+
+.label-define__colour {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+}
+
+.label-define__refusal,
+.label-define__progress,
+.label-list__refusal,
+.label-section__empty {
+    margin-block: 0;
+    color: var(--text-muted);
+}
+
+.label-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.label-list__row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+    padding-block: var(--space-2);
+    overflow-wrap: anywhere;
+}
+
+/* The in-place confirmation that replaces a Label's delete control (UX-DR12, UX-DR36): never a dialog. */
+.destructive-confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
 }

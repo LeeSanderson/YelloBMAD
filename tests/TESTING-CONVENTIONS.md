@@ -118,6 +118,19 @@ one request, waits until it is blocked, then writes in its own transaction what 
 (`A_Status_edit_reads_the_last_key_of_its_new_column_only_under_the_lock` places a Task at the column's
 next key) and commits: a request that read before the lock computes the same key and collides, three runs
 in three.
+
+**A race about a lock held between two statements holds the request between them - added by story 2.4.**
+When the guarded interleaving is "the request read X, then something changed X before it wrote", holding X
+itself cannot show it: a read-committed read already waits on the other writer's uncommitted change and
+reads the right answer, so removing the hint is caught zero runs in three (story 2.4's
+`An_application_racing_a_deletion_that_commits_first_answers_400_invalid_task_labels`). Hold something the
+request touches *after* its locked read instead (`A_deletion_racing_an_application_that_has_read_its_Labels_waits_and_answers_409`
+holds an uncommitted application of another Label to the same Task), send the competing request, and wait
+until it is blocked **or has answered** (`LabelWire.WaitUntilBlockedOrAnsweredAsync`): a product that holds
+its lock makes it wait; one that does not lets it through, and the assertions after the release report it.
+That case also found a real deadlock the first time it ran - the two writers' locking reads chose
+different indexes of one table (a covering alternate key and the clustered key), so their U locks never
+met. Name the index in a lock hint that two writers must share (`INDEX(1)`).
 **Randomised data where identity does not matter; fixed where an assertion depends on it.**
 
 **Never a shared email address.** FR-1 makes an Account's email unique, so a shared literal is
@@ -212,6 +225,8 @@ real Chromium with **no Host, no database and no container**. The rules:
 - **Build `Yello.Client` before a browser plant.** The suite serves the client's own build output
   with `--no-build` and the test project does not reference it, so `dotnet build tests/Yello.Tests.Client`
   leaves a planted component unserved and the plant looks uncaught. Build `Yello.Client` (or the solution).
+  **And build it in Debug** (story 2.4): the dev server is `dotnet run --no-build` with no configuration, so
+  it serves `Yello.Client/bin/Debug` whatever configuration the test project itself was built and run in.
 - **What it does not prove**, stated in its remarks: the real Session cookie across origins, the
   real preflight, and anything the Host decides. Those are story 1.9's.
 - **Never wait for a client-side navigation with Playwright's URL wait.** Its default waits for
@@ -664,6 +679,18 @@ clock. Still four engines; 2.2 added no engine and no fixture type.
 **Counts when story 2.3's dev phase closed:** 841 cases - 838 passed, 0 failed, 3 skipped (the same three,
 `YELLO_MIGRATION_BUNDLE` unset), in about 4 minutes of wall clock. Still four engines; 2.3 added no engine,
 no fixture type and no serial collection - its race cases hold locks briefly and add no timing case.
+
+**Counts when story 2.4's dev phase closed:** see the story's Dev Agent Record for the run's figures.
+Still four engines; 2.4 added no engine, no fixture type and no serial collection. Its four race cases
+hold locks briefly.
+
+**The Label palette's harness - added by story 2.4.** `tests/Yello.Tests.Architecture/CieDe2000.cs`
+implements CIEDE2000 beside `WcagContrast.cs`, and `LabelPaletteGateTests` proves it against Sharma, Wu
+and Dalal's (2005) published pairs to four decimal places **before** any palette figure is trusted (a
+known-answer test first), then computes every `--label-*` fill against the AC4 rules in both themes. Its
+oracle case is a permanent plant: the rule must pass the proposed fills and report a fill at the accent,
+a fill at white and an ink at `text-primary`. The 30-token colour gates exclude the family by its named
+`--label-` prefix (`CssCorpus.IsLabelPaletteToken`) and only by it.
 
 ## Not yet decided
 

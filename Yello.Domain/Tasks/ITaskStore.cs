@@ -1,8 +1,8 @@
 namespace Yello.Domain.Tasks;
 
 /// <summary>
-/// Creates, reads and edits Tasks in the Space the current unit of work is scoped to. FR-19, FR-20; stories
-/// 2.2 and 2.3.
+/// Creates, reads and edits Tasks, and the Labels applied to them, in the Space the current unit of work is
+/// scoped to. FR-19, FR-20, FR-22; stories 2.2, 2.3 and 2.4.
 /// </summary>
 /// <remarks>
 /// <b>Never asked about another Space.</b> Every call runs inside the request's Space-scoped unit of work,
@@ -40,4 +40,24 @@ public interface ITaskStore
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>The Task as stored, or <c>null</c> when no Task with that id is visible.</returns>
     Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Replaces the Labels applied to one Task of the resolved Space with exactly <paramref name="labelIds"/>, and
+    /// saves it. Every Label is read under a lock first, so one deleted, foreign or unknown refuses the whole set
+    /// before anything is written (story 2.4, AC2, AC10).
+    /// </summary>
+    /// <param name="taskId">The Task, already known to be visible.</param>
+    /// <param name="labelIds">The whole new set, without repeats; empty clears it.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns><c>true</c> when applied; <c>false</c> when any of the Labels is not visible in the Space.</returns>
+    Task<bool> ReplaceLabelsAsync(Guid taskId, IReadOnlyList<Guid> labelIds, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The Labels applied to each of <paramref name="taskIds"/>, each list by Label name and then id (story 2.4,
+    /// open question 12). One read for the whole set, never one per Task.
+    /// </summary>
+    /// <param name="taskIds">The Tasks.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The Label ids per Task id; a Task carrying none is absent.</returns>
+    Task<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>> LabelIdsOfAsync(IReadOnlyCollection<Guid> taskIds, CancellationToken cancellationToken);
 }

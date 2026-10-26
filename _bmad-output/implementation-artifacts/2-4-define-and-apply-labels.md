@@ -4,7 +4,7 @@ baseline_commit: 4969754
 
 # Story 2.4: Define and apply Labels
 
-Status: ready-for-dev
+Status: review
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-4-define-and-apply-labels`
@@ -117,26 +117,26 @@ AC1–AC6 are reproduced **verbatim** from `epics.md:1105-1130` (`status: final`
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Confirm the gates, then record decisions before the code that depends on them** (AC: all)
-  - [ ] `dotnet build Yello.slnx`, then run `dotnet test --project tests/Yello.Tests.Isolation` filtered to `IsolationCaseListTests`. With 2.4 at `ready-for-dev` or `in-progress` it is green. List every row with `PendingUntil: "2.4"` (the ATDD phase may add some) in the Debug Log; each is converted before `review`.
-  - [ ] Read the open questions (Dev Notes). Decide Q1–Q7 before Task 2, Q8–Q10 before Task 5, Q11–Q14 before Task 8. Record each in the Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each is reversible.
+- [x] **Task 1 — Confirm the gates, then record decisions before the code that depends on them** (AC: all)
+  - [x] `dotnet build Yello.slnx`, then run `dotnet test --project tests/Yello.Tests.Isolation` filtered to `IsolationCaseListTests`. With 2.4 at `ready-for-dev` or `in-progress` it is green. List every row with `PendingUntil: "2.4"` (the ATDD phase may add some) in the Debug Log; each is converted before `review`.
+  - [x] Read the open questions (Dev Notes). Decide Q1–Q7 before Task 2, Q8–Q10 before Task 5, Q11–Q14 before Task 8. Record each in the Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each is reversible.
 
-- [ ] **Task 2 — Domain: `Label`, the palette, the name rule, the Labels edit** (AC: 1, 2, 4, 6, 11, 12)
-  - [ ] `Yello.Domain/Labels/Label.cs` — **exactly that namespace and type name**: the gates already name `"Yello.Domain.Labels.Label"` (`RefusalBoundaryGateTests.cs:113-124`). Properties as `Project`: `Id` (init), `SpaceId` (init, required), `Name` (set), `Colour` (a palette key, Q3), `CreatedAt`. No navigation properties (the model has none by design).
-  - [ ] `LabelName.TryNormalise(string?, out string)` (Q2): trim, 1–50 characters, mirroring `TaskTitle`/`ProjectName`. Invariants in Domain, not validators (AR-34).
-  - [ ] `LabelPalette` (Q3): the closed set of palette keys (recommended eight: `rust`, `ochre`, `olive`, `grass`, `jade`, `teal`, `blue`, `orchid`) with `IsKnown(string)`. **Keys only** — no hex in Domain; hex is the token layer's (CSS). A gate holds the two sets equal (Task 9).
-  - [ ] `ILabelStore` (`Yello.Domain/Labels/ILabelStore.cs`): `ListAsync`, `CreateAsync(spaceId, name, colour)`, `DeleteAsync(labelId)` returning an outcome (`Deleted`, `NotFound`, `InUse`). Like `ITaskStore`: **no `Where(SpaceId == …)`** — both layers already narrow; a foreign id is simply not found.
-  - [ ] `TaskEdit` (`Yello.Domain/Tasks/TaskEdit.cs`) gains the Labels member per Q1 (recommended: `bool ChangesLabels, IReadOnlyList<Guid>? LabelIds`), and `TaskItem` does **not** gain a collection (no navigations); applications live in the store.
-  - [ ] No new `Bound` (Q6). `BoundRegistry` stays at six and its gate stays green.
+- [x] **Task 2 — Domain: `Label`, the palette, the name rule, the Labels edit** (AC: 1, 2, 4, 6, 11, 12)
+  - [x] `Yello.Domain/Labels/Label.cs` — **exactly that namespace and type name**: the gates already name `"Yello.Domain.Labels.Label"` (`RefusalBoundaryGateTests.cs:113-124`). Properties as `Project`: `Id` (init), `SpaceId` (init, required), `Name` (set), `Colour` (a palette key, Q3), `CreatedAt`. No navigation properties (the model has none by design).
+  - [x] `LabelName.TryNormalise(string?, out string)` (Q2): trim, 1–50 characters, mirroring `TaskTitle`/`ProjectName`. Invariants in Domain, not validators (AR-34).
+  - [x] `LabelPalette` (Q3): the closed set of palette keys (recommended eight: `rust`, `ochre`, `olive`, `grass`, `jade`, `teal`, `blue`, `orchid`) with `IsKnown(string)`. **Keys only** — no hex in Domain; hex is the token layer's (CSS). A gate holds the two sets equal (Task 9).
+  - [x] `ILabelStore` (`Yello.Domain/Labels/ILabelStore.cs`): `ListAsync`, `CreateAsync(spaceId, name, colour)`, `DeleteAsync(labelId)` returning an outcome (`Deleted`, `NotFound`, `InUse`). Like `ITaskStore`: **no `Where(SpaceId == …)`** — both layers already narrow; a foreign id is simply not found.
+  - [x] `TaskEdit` (`Yello.Domain/Tasks/TaskEdit.cs`) gains the Labels member per Q1 (recommended: `bool ChangesLabels, IReadOnlyList<Guid>? LabelIds`), and `TaskItem` does **not** gain a collection (no navigations); applications live in the store.
+  - [x] No new `Bound` (Q6). `BoundRegistry` stays at six and its gate stays green.
 
-- [ ] **Task 3 — Schema: `Label` and `TaskLabel`** (AC: 2, 3, 6, 10)
-  - [ ] `LabelConfiguration(YelloDbContext context)`: table `Label`; `Id` `ValueGeneratedNever()`; `SpaceId` required; `Name nvarchar(50)` required; `Colour varchar(16)` required; `CreatedAt datetimeoffset`; `HasAlternateKey(x => new { x.SpaceId, x.Id })`; unique index `(SpaceId, Name)` (Q2 — the database's default case-insensitive collation makes "Bug" and "bug" collide, which is the intended rule); `HasQueryFilter(label => label.SpaceId == context.ScopedSpaceId)`; FK `SpaceId` → Space cascade, matching `ProjectConfiguration`.
-  - [ ] `TaskLabel` (Domain record or Infrastructure-only entity — Q9): `SpaceId`, `TaskId`, `LabelId`, `AppliedAt`. Key `(SpaceId, TaskId, LabelId)`. Index `(SpaceId, LabelId, TaskId)` (the delete's in-use probe, and 2.10's filter by Label). Query filter on `SpaceId`.
+- [x] **Task 3 — Schema: `Label` and `TaskLabel`** (AC: 2, 3, 6, 10)
+  - [x] `LabelConfiguration(YelloDbContext context)`: table `Label`; `Id` `ValueGeneratedNever()`; `SpaceId` required; `Name nvarchar(50)` required; `Colour varchar(16)` required; `CreatedAt datetimeoffset`; `HasAlternateKey(x => new { x.SpaceId, x.Id })`; unique index `(SpaceId, Name)` (Q2 — the database's default case-insensitive collation makes "Bug" and "bug" collide, which is the intended rule); `HasQueryFilter(label => label.SpaceId == context.ScopedSpaceId)`; FK `SpaceId` → Space cascade, matching `ProjectConfiguration`.
+  - [x] `TaskLabel` (Domain record or Infrastructure-only entity — Q9): `SpaceId`, `TaskId`, `LabelId`, `AppliedAt`. Key `(SpaceId, TaskId, LabelId)`. Index `(SpaceId, LabelId, TaskId)` (the delete's in-use probe, and 2.10's filter by Label). Query filter on `SpaceId`.
     - FK `(SpaceId, TaskId)` → `Task(SpaceId, Id)` **cascade** (2.5's Task delete removes applications).
     - FK `(SpaceId, LabelId)` → `Label(SpaceId, Id)` **`NoAction`** — this is what makes AC3 hold in the database, and it is required anyway: SQL Server refuses two cascade paths into one table (error 1785; Space→Project→Task→TaskLabel and Space→Label→TaskLabel). Same reason Task's Status FK is `NoAction`.
-  - [ ] **`Task` has no `(SpaceId, Id)` alternate key yet.** Add `HasAlternateKey(task => new { task.SpaceId, task.Id })` to `TaskConfiguration` and `AddUniqueConstraint("AK_Task_SpaceId_Id", …)` in the migration, as `20261025115412_TaskTable` did for `AK_StatusDefinition_SpaceId_Id`. Expand-only; the previous revision is unaffected.
-  - [ ] Register both configurations in `YelloDbContext.OnModelCreating` (`PersistenceModelGateTests.Every_entity_configuration_reaches_the_model`). Add `SchemaNames.Label` and `SchemaNames.TaskLabel` and append both to `SchemaNames.SpaceScopedTables` (the schema tests derive from it). Check `PersistenceModelGateTests.GlossaryTableNames`: `Label` is a glossary term; `TaskLabel` is a join table — if the gate requires glossary names, amend it deliberately with a remark naming the join (Q9).
-  - [ ] Migration `…_Labels` via `dotnet ef migrations add`, hand-edited (`TESTING-CONVENTIONS.md` "EF Core migrations", `deferred-work.md:103`): file-scoped namespace, real XML docs, no `// <auto-generated />`, `Up` under 80 lines, no class name that shadows a namespace (S4041 — `Labels` is a namespace; name it e.g. `LabelTables`). Hand-write the RLS SQL for **both** tables, the `Task` pattern verbatim:
+  - [x] **`Task` has no `(SpaceId, Id)` alternate key yet.** Add `HasAlternateKey(task => new { task.SpaceId, task.Id })` to `TaskConfiguration` and `AddUniqueConstraint("AK_Task_SpaceId_Id", …)` in the migration, as `20261025115412_TaskTable` did for `AK_StatusDefinition_SpaceId_Id`. Expand-only; the previous revision is unaffected.
+  - [x] Register both configurations in `YelloDbContext.OnModelCreating` (`PersistenceModelGateTests.Every_entity_configuration_reaches_the_model`). Add `SchemaNames.Label` and `SchemaNames.TaskLabel` and append both to `SchemaNames.SpaceScopedTables` (the schema tests derive from it). Check `PersistenceModelGateTests.GlossaryTableNames`: `Label` is a glossary term; `TaskLabel` is a join table — if the gate requires glossary names, amend it deliberately with a remark naming the join (Q9).
+  - [x] Migration `…_Labels` via `dotnet ef migrations add`, hand-edited (`TESTING-CONVENTIONS.md` "EF Core migrations", `deferred-work.md:103`): file-scoped namespace, real XML docs, no `// <auto-generated />`, `Up` under 80 lines, no class name that shadows a namespace (S4041 — `Labels` is a namespace; name it e.g. `LabelTables`). Hand-write the RLS SQL for **both** tables, the `Task` pattern verbatim:
     ```sql
     ALTER SECURITY POLICY dbo.SpaceIsolationPolicy
         ADD FILTER PREDICATE dbo.fn_SpaceIsolationPredicate(SpaceId) ON dbo.[Label],
@@ -145,46 +145,46 @@ AC1–AC6 are reproduced **verbatim** from `epics.md:1105-1130` (`status: final`
     ```
     (and the same for `dbo.[TaskLabel]`). `Down` drops the predicates before the tables. `dotnet ef migrations has-pending-model-changes` reports none. `SpaceIsolationSchemaTests` (three predicates per table) and `SchemaVarianceTests` stay green.
 
-- [ ] **Task 4 — Contracts** (AC: 1, 2, 7, 8, 11)
-  - [ ] `Yello.Contracts/Labels/LabelRoutes.cs`: `List` and `Create` = `"/api/v1/spaces/{spaceId:guid}/labels"`, `Label` = `"/api/v1/spaces/{spaceId:guid}/labels/{labelId:guid}"`, builders `LabelsOf(s)`, `LabelOf(s, l)`. Routes sit under the Space, **not** under a Project (`The_routes_under_a_Project_are_its_rename_its_Task_creation_and_its_Board` must stay green; FR-22 "available to every Project").
-  - [ ] `Yello.Contracts/Labels/LabelResponse(Guid Id, string Name, string Colour)` and `CreateLabelRequest(string? Name, string? Colour)`. **Own namespace** `Yello.Contracts.Labels`: `No_Task_or_Board_response_carries_a_SpaceId_and_a_column_carries_its_own_total` pins the response names in the Tasks and Boards namespaces to exactly four. No `SpaceId` on any Label response.
-  - [ ] `TaskResponse` gains `IReadOnlyList<Guid> LabelIds` (appended with a default of empty; AD-19 / FR-37 — `The_due_date_is_a_nullable_DateTimeOffset…` permits gaining fields). Ordered server-side by Label name then id, so the card's first three are stable. Update the client fakes and every construction site.
-  - [ ] `EditTaskRequest` gains `IReadOnlyList<Guid>? LabelIds` (Q1). **Amend the gate deliberately**: `The_Task_edit_request_carries_the_title_the_Status_and_the_due_date_and_nothing_else` pins `{DueDate, StatusId, Title}` — make it `{DueDate, LabelIds, StatusId, Title}`, still **no** description, position key, Project or Space. The creation request gate stays exactly `Title`.
-  - [ ] **The two Slices shape lists break on purpose**: `TaskProperties = ["createdAt","dueDate","id","positionKey","statusId","title"]` in `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.cs:47` and `tests/Yello.Tests.Slices/Boards/BoardEndpointTests.cs:44` — add `"labelIds"` to both.
-  - [ ] `ProblemTypes.cs` (each with remarks stating what it never means):
+- [x] **Task 4 — Contracts** (AC: 1, 2, 7, 8, 11)
+  - [x] `Yello.Contracts/Labels/LabelRoutes.cs`: `List` and `Create` = `"/api/v1/spaces/{spaceId:guid}/labels"`, `Label` = `"/api/v1/spaces/{spaceId:guid}/labels/{labelId:guid}"`, builders `LabelsOf(s)`, `LabelOf(s, l)`. Routes sit under the Space, **not** under a Project (`The_routes_under_a_Project_are_its_rename_its_Task_creation_and_its_Board` must stay green; FR-22 "available to every Project").
+  - [x] `Yello.Contracts/Labels/LabelResponse(Guid Id, string Name, string Colour)` and `CreateLabelRequest(string? Name, string? Colour)`. **Own namespace** `Yello.Contracts.Labels`: `No_Task_or_Board_response_carries_a_SpaceId_and_a_column_carries_its_own_total` pins the response names in the Tasks and Boards namespaces to exactly four. No `SpaceId` on any Label response.
+  - [x] `TaskResponse` gains `IReadOnlyList<Guid> LabelIds` (appended with a default of empty; AD-19 / FR-37 — `The_due_date_is_a_nullable_DateTimeOffset…` permits gaining fields). Ordered server-side by Label name then id, so the card's first three are stable. Update the client fakes and every construction site.
+  - [x] `EditTaskRequest` gains `IReadOnlyList<Guid>? LabelIds` (Q1). **Amend the gate deliberately**: `The_Task_edit_request_carries_the_title_the_Status_and_the_due_date_and_nothing_else` pins `{DueDate, StatusId, Title}` — make it `{DueDate, LabelIds, StatusId, Title}`, still **no** description, position key, Project or Space. The creation request gate stays exactly `Title`.
+  - [x] **The two Slices shape lists break on purpose**: `TaskProperties = ["createdAt","dueDate","id","positionKey","statusId","title"]` in `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.cs:47` and `tests/Yello.Tests.Slices/Boards/BoardEndpointTests.cs:44` — add `"labelIds"` to both.
+  - [x] `ProblemTypes.cs` (each with remarks stating what it never means):
     - `invalid-label-name` (`400`), `invalid-label-colour` (`400`), `label-name-taken` (`409`, Q2), `label-in-use` (`409`, AC3 — no count and no Task names in the body).
     - `invalid-task-labels` (`400`): a `labelIds` entry that is unknown, foreign, duplicated, or deleted under the request (AC10). Random id and foreign id are **byte-identical**.
     - Reuse `invalid-task-edit` for `labelIds: null` or a non-array, and `insufficient-role` (`manage-labels`, `manage-tasks`) for Role refusals. The `manage-labels` copy already exists (`ClientCopy.resx:482` "Only Owners and Admins can manage Labels.").
 
-- [ ] **Task 5 — Slices, store and endpoints** (AC: 1, 2, 3, 7, 9, 10, 11)
-  - [ ] Slices (AR-3, one handler file per slice like 2.1–2.3): `Yello.Application/Labels/ListLabels/ListLabelsHandler.cs`, `Yello.Application/Labels/DefineLabel/DefineLabelHandler.cs`, `Yello.Application/Labels/DeleteLabel/DeleteLabelHandler.cs`. Applying is **not** a new slice: it extends `EditTaskAttributesHandler` (Q1). Handlers take `ActiveSpaceContext` or nothing; **none reads the Role, counts, checks a capability or touches `Idempotency-Key`** (the gates `Only_the_pipeline_depends_on_…`, `Nothing_but_the_pipeline_reads_the_Role_…` catch each). Results follow 2.3's result-plus-outcome-enum pattern (`EditTaskAttributesResult`).
-  - [ ] `LabelStore` (`Yello.Infrastructure/Persistence/LabelStore.cs`), registered in `SpaceContentStores.cs`. Ids from `IIdentifierGenerator.Next()` (`SequentialGuidIdentifierGenerator`; never `Guid.NewGuid()`/`CreateVersion7()`). A duplicate name is detected by catching the unique-index violation (2601/2627) on `(SpaceId, Name)` and answering `label-name-taken` — **never a `500`**, and never a pre-check alone (two concurrent creates).
-  - [ ] **Delete, serialised against apply (AC3, AC10)** — raw SQL is permitted in Infrastructure only (`SpaceResolutionSeamTests`), parameterised `SqlQuery`/`ExecuteSql`, never concatenation:
+- [x] **Task 5 — Slices, store and endpoints** (AC: 1, 2, 3, 7, 9, 10, 11)
+  - [x] Slices (AR-3, one handler file per slice like 2.1–2.3): `Yello.Application/Labels/ListLabels/ListLabelsHandler.cs`, `Yello.Application/Labels/DefineLabel/DefineLabelHandler.cs`, `Yello.Application/Labels/DeleteLabel/DeleteLabelHandler.cs`. Applying is **not** a new slice: it extends `EditTaskAttributesHandler` (Q1). Handlers take `ActiveSpaceContext` or nothing; **none reads the Role, counts, checks a capability or touches `Idempotency-Key`** (the gates `Only_the_pipeline_depends_on_…`, `Nothing_but_the_pipeline_reads_the_Role_…` catch each). Results follow 2.3's result-plus-outcome-enum pattern (`EditTaskAttributesResult`).
+  - [x] `LabelStore` (`Yello.Infrastructure/Persistence/LabelStore.cs`), registered in `SpaceContentStores.cs`. Ids from `IIdentifierGenerator.Next()` (`SequentialGuidIdentifierGenerator`; never `Guid.NewGuid()`/`CreateVersion7()`). A duplicate name is detected by catching the unique-index violation (2601/2627) on `(SpaceId, Name)` and answering `label-name-taken` — **never a `500`**, and never a pre-check alone (two concurrent creates).
+  - [x] **Delete, serialised against apply (AC3, AC10)** — raw SQL is permitted in Infrastructure only (`SpaceResolutionSeamTests`), parameterised `SqlQuery`/`ExecuteSql`, never concatenation:
     1. Lock the Label row: `SELECT … FROM Label WITH (UPDLOCK, HOLDLOCK) WHERE Id = @id` (filter and RLS narrow it). None → `NotFound`.
     2. Probe `TaskLabel WITH (UPDLOCK, HOLDLOCK) WHERE LabelId = @id` (the `(SpaceId, LabelId, TaskId)` index keeps the range inside one Space). Any → `InUse` → `409 label-in-use`.
     3. Delete. The `NoAction` FK is the backstop; if it ever fires (547), answer `409 label-in-use`, never `500`.
-  - [ ] **Apply, inside the 2.3 edit (AC2, AC7, AC10)**: in `TaskStore.EditAsync` (or a sibling the handler calls in the same unit of work), when `ChangesLabels`:
+  - [x] **Apply, inside the 2.3 edit (AC2, AC7, AC10)**: in `TaskStore.EditAsync` (or a sibling the handler calls in the same unit of work), when `ChangesLabels`:
     1. Refuse duplicates in the submitted list → `invalid-task-labels`.
     2. Read the submitted Labels `WITH (UPDLOCK, HOLDLOCK)` (filter + RLS hide foreign ones). Count mismatch → `invalid-task-labels`, **before any write**, so the composite FK never answers a `500` (2.3's Status rule).
     3. Replace the Task's set: delete the applications not submitted, insert the missing ones. Only that Task's `TaskLabel` rows change; no other attribute, no position key.
     4. Save before returning (`IdempotencyStore.EnsureNothingElseIsPending`).
     Lock order: the Task (2.3 takes the Project range), then Labels. Delete takes Label then TaskLabel. Confirm with the race cases (Task 7) that the two orders cannot deadlock; if they can, record what was measured and take the Label locks first in the edit. Record the choice in `TaskStore`'s and `LabelStore`'s remarks.
-  - [ ] `TaskEditBody.cs` (merge patch): `labelIds` absent = unchanged; `[]` clears; `null` or not an array → `invalid-task-edit`; an element that is not a GUID → `invalid-task-labels`. Cap the array length as an **input-shape guard**, not an NFR-8 bound (Q6; 2.3's unbounded `dueDate` string ran a regex to timeout — review finding). A body naming no editable member stays `invalid-task-edit`.
-  - [ ] Endpoints in `Yello.Host/Endpoints/LabelEndpoints.cs`, mapped in `Program.cs` through `api` beside the Task endpoints and before `MapUnmatchedApi()`:
+  - [x] `TaskEditBody.cs` (merge patch): `labelIds` absent = unchanged; `[]` clears; `null` or not an array → `invalid-task-edit`; an element that is not a GUID → `invalid-task-labels`. Cap the array length as an **input-shape guard**, not an NFR-8 bound (Q6; 2.3's unbounded `dueDate` string ran a regex to timeout — review finding). A body naming no editable member stays `invalid-task-edit`.
+  - [x] Endpoints in `Yello.Host/Endpoints/LabelEndpoints.cs`, mapped in `Program.cs` through `api` beside the Task endpoints and before `MapUnmatchedApi()`:
     - `GET LabelRoutes.List` → `RequiresCapability(Capability.ReadProjectsAndTasks)` → `200 LabelResponse[]` ordered by name then id. Viewers read Labels (they see chips).
     - `POST LabelRoutes.Create` → `RequiresCapability(Capability.ManageLabels)` → `201` with `Location` set on the headers yourself and `Results.Json(…, statusCode: 201)` (**`Results.Created`/`Accepted` are banned**, ARCH-009). No `ConsultsBound`.
     - `DELETE LabelRoutes.Label` → `RequiresCapability(Capability.ManageLabels)` → `204` via `Results.NoContent()`/`Results.StatusCode(204)`; `IdempotentResponses` replays a bodiless status (`IdempotentResponses.cs:187`) — confirm with the replay case. Not found → `BoundaryProblems.NotAvailable()` (byte-identical, no refusal row).
     - The Task `PATCH` stays `ManageTasks` (FR-20: applying is a Task edit; `ManageLabels` is definition only — `prd.md` FR-22, matrix row). **No new capability** is added.
     - None is `SessionOnly` (AD-4). Each `{spaceId}` endpoint declares exactly one capability (`SpaceScopedRouteCheck` refuses startup otherwise). Bodies are read with `JsonRequestBody.ReadAsync`; unreadable → `400`, never `500`. Answers through `Results.Json`/`Results.Ok`/status results (ARCH-010).
-  - [ ] Board read (`ViewBoardHandler` / `BoardEndpoints`) and `ViewTask` return each Task's `LabelIds`: one extra query over `TaskLabel` for the Task ids of the page being returned (never per Task; never `OFFSET`), composed into `TaskEndpoints.Response(TaskItem, …)`. Note on `deferred-work.md:493` (Board totals vs the Task read, owner 2.9) that the Board read now has a third statement.
-  - [ ] Logs carry `SpaceId`, never a Label name or Task title (AR-34, I-17). Every Label name an isolation case writes goes in the world's secret set.
+  - [x] Board read (`ViewBoardHandler` / `BoardEndpoints`) and `ViewTask` return each Task's `LabelIds`: one extra query over `TaskLabel` for the Task ids of the page being returned (never per Task; never `OFFSET`), composed into `TaskEndpoints.Response(TaskItem, …)`. Note on `deferred-work.md:493` (Board totals vs the Task read, owner 2.9) that the Board read now has a third statement.
+  - [x] Logs carry `SpaceId`, never a Label name or Task title (AR-34, I-17). Every Label name an isolation case writes goes in the world's secret set.
 
-- [ ] **Task 6 — Idempotency** (AC: 11)
-  - [ ] Nothing new in the pipeline (it already covers POST/PUT/PATCH/DELETE on `{spaceId}` routes). Wire cases on **both** surfaces: `POST` label same key twice → one Label, identical bodies; same key different body → `422`; `DELETE` same key twice → one `204` replayed (the second is **not** a `404`); a `PATCH` `labelIds` replay → one change.
+- [x] **Task 6 — Idempotency** (AC: 11)
+  - [x] Nothing new in the pipeline (it already covers POST/PUT/PATCH/DELETE on `{spaceId}` routes). Wire cases on **both** surfaces: `POST` label same key twice → one Label, identical bodies; same key different body → `422`; `DELETE` same key twice → one `204` replayed (the second is **not** a `404`); a `PATCH` `labelIds` replay → one change.
 
-- [ ] **Task 7 — Slice, schema and wire tests** (AC: 1, 2, 3, 6, 9, 10, 11)
-  - [ ] **Memory-bound machine: add no new container-backed class.** Put the cases in new partials of the existing `TaskEndpointTests` (`IClassFixture<MigratedDatabaseFixture>`), e.g. `TaskEndpointTests.Labels.cs`, `.LabelsSchema.cs`, `.LabelsRace.cs`, `.LabelsIdempotency.cs`, reusing `TaskWire`/`TaskEditWire` and `HostProcess`/`WireSession`. Do not add a `SqlServerContainerFixture` (`ContainerTopologyGateTests`). Handler unit tests (`Labels/DefineLabel/DefineLabelHandlerTests.cs` etc.) use hand fakes and no database.
-  - [ ] Cases:
+- [x] **Task 7 — Slice, schema and wire tests** (AC: 1, 2, 3, 6, 9, 10, 11)
+  - [x] **Memory-bound machine: add no new container-backed class.** Put the cases in new partials of the existing `TaskEndpointTests` (`IClassFixture<MigratedDatabaseFixture>`), e.g. `TaskEndpointTests.Labels.cs`, `.LabelsSchema.cs`, `.LabelsRace.cs`, `.LabelsIdempotency.cs`, reusing `TaskWire`/`TaskEditWire` and `HostProcess`/`WireSession`. Do not add a `SqlServerContainerFixture` (`ContainerTopologyGateTests`). Handler unit tests (`Labels/DefineLabel/DefineLabelHandlerTests.cs` etc.) use hand fakes and no database.
+  - [x] Cases:
     - Owner and Admin create a Label; it lists in that Space and is applicable to a Task in **two different Projects** of the Space (AC1 "every Project").
     - Member and Viewer `POST`/`DELETE` → `403 manage-labels`, one `InsufficientRole` row, nothing written, both surfaces.
     - Member applies and removes Labels (`200`, response and `SELECT` agree; `[]` clears; absent member unchanged). Viewer `PATCH labelIds` → `403 manage-tasks`, one row, nothing written, both surfaces (C-6).
@@ -193,20 +193,20 @@ AC1–AC6 are reproduced **verbatim** from `epics.md:1105-1130` (`status: final`
     - Delete an unused Label → `204`, gone from the list; delete an applied Label → `409 label-in-use`, still listed, applications intact; remove the applications, delete again → `204`.
     - The same Label name in two Spaces is allowed (uniqueness is per Space).
     - Labels survive a title, Status and due-date edit (the Labels member absent leaves them untouched).
-  - [ ] **Schema** (`TaskEndpointTests.LabelsSchema.cs`, the `TaskEndpointTests.Schema.cs` pattern): `Label` and `TaskLabel` carry a non-nullable `SpaceId` under the Space policy with three predicates; moving a `Label` to another Space is refused by the database; `TaskLabel` reaches `Task` and `Label` only through keys that carry `SpaceId`; the `TaskLabel→Label` FK is `NO_ACTION` and `TaskLabel→Task` is `CASCADE`; `Task` has `AK_Task_SpaceId_Id`.
-  - [ ] **Deterministic races (AC10)**, with `TaskWire.WaitUntilBlockedOnALockAsync`: (a) the test inserts a `TaskLabel` in its own open transaction, sends `DELETE`, waits until the request is blocked on `LCK_M_%`, commits → `409 label-in-use`; (b) the test deletes the Label in its own open transaction, sends the `PATCH` applying it, waits, commits → `400 invalid-task-labels`; (c) two `POST`s of the same name, one held → one `201`, one `409 label-name-taken`. Plant: remove each lock hint → caught three runs out of three. Never `Task.Delay`.
+  - [x] **Schema** (`TaskEndpointTests.LabelsSchema.cs`, the `TaskEndpointTests.Schema.cs` pattern): `Label` and `TaskLabel` carry a non-nullable `SpaceId` under the Space policy with three predicates; moving a `Label` to another Space is refused by the database; `TaskLabel` reaches `Task` and `Label` only through keys that carry `SpaceId`; the `TaskLabel→Label` FK is `NO_ACTION` and `TaskLabel→Task` is `CASCADE`; `Task` has `AK_Task_SpaceId_Id`.
+  - [x] **Deterministic races (AC10)**, with `TaskWire.WaitUntilBlockedOnALockAsync`: (a) the test inserts a `TaskLabel` in its own open transaction, sends `DELETE`, waits until the request is blocked on `LCK_M_%`, commits → `409 label-in-use`; (b) the test deletes the Label in its own open transaction, sends the `PATCH` applying it, waits, commits → `400 invalid-task-labels`; (c) two `POST`s of the same name, one held → one `201`, one `409 label-name-taken`. Plant: remove each lock hint → caught three runs out of three. Never `Task.Delay`.
 
-- [ ] **Task 8 — Isolation rows, including Label's two-layer row** (AC: 8, 9)
-  - [ ] Add the rows in the "Isolation rows" table (Dev Notes), each covering **both** surfaces via `Both(…)`, each sending a request on the exact route constant it names. Seed through the product (`ProductActor`): add a seed helper (e.g. `SeedLabelAsync(actor)` → `labelId`, and an apply helper using the Task `PATCH`) beside `SeedProjectWithTaskAsync`.
-  - [ ] **`ISO-LABEL-FOREIGN-ID-IN-OWN-SPACE`**: A sends `DELETE /spaces/{SA}/labels/{LB}`, anchored on `DELETE /spaces/{SA}/labels/{random}` → `SameAsAnchor(404, not-available)`, no refusal row, B's Label still present. Plant, one at a time, original held in memory and restored in a `finally`: drop **only** the `Label` query filter **and** the `Label` FILTER predicate → the row fails on both surfaces; then each layer alone → green.
-  - [ ] **`ISO-APPLY-FOREIGN-LABEL`**: A `PATCH`es its own Task with `labelIds: [LB]`, anchored on `[random]` → `SameAsAnchor(400, invalid-task-labels)`, nothing written in either Space. Pass the body explicitly (`ProductActor.SendAsync` sends a default `{name, title}` on `PATCH`).
-  - [ ] The Member row needs a Member in A's Space: seed it the way `ViewerEditsATaskAsync` seeds its Viewer.
-  - [ ] No new timing row: the routes are under the API group, so `NotAvailableFloor` applies. If one is added, it runs in `TimingCollection`.
-  - [ ] Remove the exclusion `.Where(name => name != "Yello.Domain.Labels.Label")` in `RefusalBoundaryGateTests.Tasks.cs:61-77` (`Every_Space_scoped_entity_the_gates_name_resolves_to_a_Domain_type`) — the type now exists. AR-9's `No_endpoint_without_spaceId_in_its_path_reaches_a_Space_scoped_entity` then covers `Label` for real; plant a Label route without `{spaceId}` → caught.
-  - [ ] GATE-003: no row pending on 2.4 at `review`.
+- [x] **Task 8 — Isolation rows, including Label's two-layer row** (AC: 8, 9)
+  - [x] Add the rows in the "Isolation rows" table (Dev Notes), each covering **both** surfaces via `Both(…)`, each sending a request on the exact route constant it names. Seed through the product (`ProductActor`): add a seed helper (e.g. `SeedLabelAsync(actor)` → `labelId`, and an apply helper using the Task `PATCH`) beside `SeedProjectWithTaskAsync`.
+  - [x] **`ISO-LABEL-FOREIGN-ID-IN-OWN-SPACE`**: A sends `DELETE /spaces/{SA}/labels/{LB}`, anchored on `DELETE /spaces/{SA}/labels/{random}` → `SameAsAnchor(404, not-available)`, no refusal row, B's Label still present. Plant, one at a time, original held in memory and restored in a `finally`: drop **only** the `Label` query filter **and** the `Label` FILTER predicate → the row fails on both surfaces; then each layer alone → green.
+  - [x] **`ISO-APPLY-FOREIGN-LABEL`**: A `PATCH`es its own Task with `labelIds: [LB]`, anchored on `[random]` → `SameAsAnchor(400, invalid-task-labels)`, nothing written in either Space. Pass the body explicitly (`ProductActor.SendAsync` sends a default `{name, title}` on `PATCH`).
+  - [x] The Member row needs a Member in A's Space: seed it the way `ViewerEditsATaskAsync` seeds its Viewer.
+  - [x] No new timing row: the routes are under the API group, so `NotAvailableFloor` applies. If one is added, it runs in `TimingCollection`.
+  - [x] Remove the exclusion `.Where(name => name != "Yello.Domain.Labels.Label")` in `RefusalBoundaryGateTests.Tasks.cs:61-77` (`Every_Space_scoped_entity_the_gates_name_resolves_to_a_Domain_type`) — the type now exists. AR-9's `No_endpoint_without_spaceId_in_its_path_reaches_a_Space_scoped_entity` then covers `Label` for real; plant a Label route without `{spaceId}` → caught.
+  - [x] GATE-003: no row pending on 2.4 at `review`.
 
-- [ ] **Task 9 — The palette in the token layer, gated by computation** (AC: 4, 12, 13)
-  - [ ] `tokens.css`: a **separate family** of palette tokens, declared once and **not** rebound at the theme boundary (one fill renders in both themes — the rule is "against **both** card grounds simultaneously"): `--label-rust: #D2592D` … and one foreground `--label-ink: #0B1020` (Q4). Values (computed for this story; Debug Log must record the harness's own numbers):
+- [x] **Task 9 — The palette in the token layer, gated by computation** (AC: 4, 12, 13)
+  - [x] `tokens.css`: a **separate family** of palette tokens, declared once and **not** rebound at the theme boundary (one fill renders in both themes — the rule is "against **both** card grounds simultaneously"): `--label-rust: #D2592D` … and one foreground `--label-ink: #0B1020` (Q4). Values (computed for this story; Debug Log must record the harness's own numbers):
 
     | Key | Fill | vs `surface-card` #18213C | vs `surface-card-light` #FFFFFF | vs ink #0B1020 | min ΔE2000 vs the 8 avoided values |
     |---|---|---|---|---|---|
@@ -220,35 +220,35 @@ AC1–AC6 are reproduced **verbatim** from `epics.md:1105-1130` (`status: final`
     | orchid | #CC3DD6 | 3.94 | 4.03 | 4.69 | 18.0 |
 
     Avoided values: `focus-ring` #ADA4FB / #6E62E6, `danger` #FB7185 / #BE123C, `accent` #8B80F9 / #5145CD, `presence` #38BDF8 / #0E7490. Minimum mutual ΔE2000 between the eight fills is 14.0. The arithmetic (sRGB → linear → WCAG luminance; sRGB → XYZ D65 → CIELAB → CIEDE2000) is a scratch computation done during story creation; **the gate's own implementation is the authority** — if it disagrees, fix the table, not the gate.
-  - [ ] **Gates this breaks on purpose — amend deliberately, never loosen**: `The_colour_token_layer_declares_exactly_the_thirty_names_the_design_states` (counts every hex custom property), `The_gated_set_is_exactly_the_eighteen_pairs_the_requirement_names`, `Every_theme_boundary_rule_rebinds_all_fifteen_semantic_names`. Exclude the `--label-*` family from those three by an explicit, named prefix, and add a gate pinning that family to exactly the Domain `LabelPalette` keys plus `--label-ink`. `No_colour_is_stated_as_a_literal_outside_the_token_layer` must stay green: chips take their fill through a class (`.label-chip--rust { background: var(--label-rust) }`), **never** an inline `style=""`.
-  - [ ] `tests/Yello.Tests.Architecture/CieDe2000.cs` (new; nothing implements ΔE2000 today) beside `WcagContrast.cs`, with a known-answer test from Sharma, Wu & Dalal (2005) reference pairs before it is trusted. Then `LabelPaletteGateTests` (or a partial of `ColorTokenContrastTests`): for each fill, the three ratios and the eight ΔE values against the AC4 thresholds. Plants: one fill at #8B80F9 (accent), one at #FFFFFF, `--label-ink` set to `--text-primary`'s value → each caught.
-  - [ ] Picker presentation never relies on colour alone: each swatch carries its localised colour name (UX-DR7 "nothing depends on colour").
+  - [x] **Gates this breaks on purpose — amend deliberately, never loosen**: `The_colour_token_layer_declares_exactly_the_thirty_names_the_design_states` (counts every hex custom property), `The_gated_set_is_exactly_the_eighteen_pairs_the_requirement_names`, `Every_theme_boundary_rule_rebinds_all_fifteen_semantic_names`. Exclude the `--label-*` family from those three by an explicit, named prefix, and add a gate pinning that family to exactly the Domain `LabelPalette` keys plus `--label-ink`. `No_colour_is_stated_as_a_literal_outside_the_token_layer` must stay green: chips take their fill through a class (`.label-chip--rust { background: var(--label-rust) }`), **never** an inline `style=""`.
+  - [x] `tests/Yello.Tests.Architecture/CieDe2000.cs` (new; nothing implements ΔE2000 today) beside `WcagContrast.cs`, with a known-answer test from Sharma, Wu & Dalal (2005) reference pairs before it is trusted. Then `LabelPaletteGateTests` (or a partial of `ColorTokenContrastTests`): for each fill, the three ratios and the eight ΔE values against the AC4 thresholds. Plants: one fill at #8B80F9 (accent), one at #FFFFFF, `--label-ink` set to `--text-primary`'s value → each caught.
+  - [x] Picker presentation never relies on colour alone: each swatch carries its localised colour name (UX-DR7 "nothing depends on colour").
 
-- [ ] **Task 10 — The client: chips, the Label picker, the Labels surface** (AC: 1, 2, 5, 7, 13, 14)
-  - [ ] **Label list state**: the Space's Labels are read from `GET …/labels` by the surfaces that need them (`BoardView` alongside the Board; the Labels surface), held in component state, purged through `ActiveSpace.RegisterPurge` and the `_generation` guard (UX-DR31). Nothing in browser storage (`ClientStorageBanTests`). The client never requests a Space id absent from the switcher answer.
-  - [ ] **`LabelChip.razor`**: a non-interactive `<span class="label-chip label-chip--{key} type-meta">` holding the name; `border-radius: var(--radius-sm)`, `color: var(--label-ink)`, padding from spacing tokens in rem (`card-pad`-style), no fixed height, no shadow, no `text-transform` (Label names are user data, not copy). `--radius-full` is forbidden (`The_fully_round_radius_is_declared_once_and_used_by_exactly_one_component_the_column_count_chip`).
-  - [ ] **`TaskCard.razor`** metadata row (`task-card__meta`): the Task's Labels ordered by the server's order, **at most three chips then `+N`** (Q5), then the due date. `flex-wrap: wrap`, `min-width: 0` on chips, long names wrap or break (`overflow-wrap: anywhere`) — **never** `overflow-x: auto` or `nowrap`. The card keeps **exactly one control** (the open button) — `BoardTests.A_Task_card_is_its_title_alone_and_carries_no_shadow` holds that; amend its "text is only the title" clause deliberately to "the title is the only text outside the metadata row". Update the card comment that says "Labels (2.4) … join it later" and the `components.css:731-736` remark.
-  - [ ] **`TaskDetail.razor`**: a Labels field after the due date ("attributes above", `DESIGN.md:471`). For `CanManage`: the applied chips plus a "Labels" control opening an in-panel multi-select listbox (`role="listbox"` `aria-multiselectable="true"`, options from the Space's list, `aria-selected` true for applied ones) — a multi-select variant of `PickerOption` (it is single-select and typed to `TaskStatusOption` today), the `.picker` styling, inside the focus trap; `Esc` closes the picker first (innermost meaning wins). Toggling an option commits the whole new set (Q1). **Update `FocusLastAsync`** — it picks Clear/date/Close as the last control today; the new field changes the order. When the Space has no Labels: for an Owner/Admin "No Labels yet." plus a link to the Labels surface; for a Member "No Labels yet." alone. For a Viewer: the chips as text in the `<dl>`, no control (UX-DR27).
-  - [ ] **Optimism and revert (AC7)**: add `TaskAttribute.Labels` to `BoardView.razor.cs` and a case in each per-attribute helper (`BodyOf` → `{"labelIds": […]}`, `MemberOf`, `ValueOf`, `Overlay`, `Admit`, `Displayed()`). Same queueing (only the latest queued set is sent), same `Idempotency-Key` reuse on an identical resend after no answer, same 404 → `OnRefused`, same inline `RefusalText.Of(…)` for 400/403/409/422, same "Not sent." on 5xx/no answer, same refusal-for-this-Task-only rule (2.3 review). A refusal reverts **only** the Labels attribute to its last admitted set.
-  - [ ] **The Labels surface (AC1, Q7)**: `Pages/SpaceSettings.razor` at `ClientRoutes.SpaceSettings(spaceId)` (`/spaces/{spaceId}/settings`), holding a Labels section only for now (`label-list` + define form + delete). Reached from Space home by a "Space settings" link **present only for Owner and Admin** (`LabelCapabilities.PermitsManageLabels(roleCode)`, held to the matrix by a gate cloned from `The_clients_Task_controls_predicate_agrees_with_the_capability_matrix`). A Member or Viewer arriving by URL gets the within-Space capability surface ("Only Owners and Admins can manage Labels.", UX-DR32 — not a toast). A Role dropping below Admin while on it: narrate "You're now a Member. Space settings is no longer available." then route to Space home (UX-DR29; focus per UX-DR39).
+- [x] **Task 10 — The client: chips, the Label picker, the Labels surface** (AC: 1, 2, 5, 7, 13, 14)
+  - [x] **Label list state**: the Space's Labels are read from `GET …/labels` by the surfaces that need them (`BoardView` alongside the Board; the Labels surface), held in component state, purged through `ActiveSpace.RegisterPurge` and the `_generation` guard (UX-DR31). Nothing in browser storage (`ClientStorageBanTests`). The client never requests a Space id absent from the switcher answer.
+  - [x] **`LabelChip.razor`**: a non-interactive `<span class="label-chip label-chip--{key} type-meta">` holding the name; `border-radius: var(--radius-sm)`, `color: var(--label-ink)`, padding from spacing tokens in rem (`card-pad`-style), no fixed height, no shadow, no `text-transform` (Label names are user data, not copy). `--radius-full` is forbidden (`The_fully_round_radius_is_declared_once_and_used_by_exactly_one_component_the_column_count_chip`).
+  - [x] **`TaskCard.razor`** metadata row (`task-card__meta`): the Task's Labels ordered by the server's order, **at most three chips then `+N`** (Q5), then the due date. `flex-wrap: wrap`, `min-width: 0` on chips, long names wrap or break (`overflow-wrap: anywhere`) — **never** `overflow-x: auto` or `nowrap`. The card keeps **exactly one control** (the open button) — `BoardTests.A_Task_card_is_its_title_alone_and_carries_no_shadow` holds that; amend its "text is only the title" clause deliberately to "the title is the only text outside the metadata row". Update the card comment that says "Labels (2.4) … join it later" and the `components.css:731-736` remark.
+  - [x] **`TaskDetail.razor`**: a Labels field after the due date ("attributes above", `DESIGN.md:471`). For `CanManage`: the applied chips plus a "Labels" control opening an in-panel multi-select listbox (`role="listbox"` `aria-multiselectable="true"`, options from the Space's list, `aria-selected` true for applied ones) — a multi-select variant of `PickerOption` (it is single-select and typed to `TaskStatusOption` today), the `.picker` styling, inside the focus trap; `Esc` closes the picker first (innermost meaning wins). Toggling an option commits the whole new set (Q1). **Update `FocusLastAsync`** — it picks Clear/date/Close as the last control today; the new field changes the order. When the Space has no Labels: for an Owner/Admin "No Labels yet." plus a link to the Labels surface; for a Member "No Labels yet." alone. For a Viewer: the chips as text in the `<dl>`, no control (UX-DR27).
+  - [x] **Optimism and revert (AC7)**: add `TaskAttribute.Labels` to `BoardView.razor.cs` and a case in each per-attribute helper (`BodyOf` → `{"labelIds": […]}`, `MemberOf`, `ValueOf`, `Overlay`, `Admit`, `Displayed()`). Same queueing (only the latest queued set is sent), same `Idempotency-Key` reuse on an identical resend after no answer, same 404 → `OnRefused`, same inline `RefusalText.Of(…)` for 400/403/409/422, same "Not sent." on 5xx/no answer, same refusal-for-this-Task-only rule (2.3 review). A refusal reverts **only** the Labels attribute to its last admitted set.
+  - [x] **The Labels surface (AC1, Q7)**: `Pages/SpaceSettings.razor` at `ClientRoutes.SpaceSettings(spaceId)` (`/spaces/{spaceId}/settings`), holding a Labels section only for now (`label-list` + define form + delete). Reached from Space home by a "Space settings" link **present only for Owner and Admin** (`LabelCapabilities.PermitsManageLabels(roleCode)`, held to the matrix by a gate cloned from `The_clients_Task_controls_predicate_agrees_with_the_capability_matrix`). A Member or Viewer arriving by URL gets the within-Space capability surface ("Only Owners and Admins can manage Labels.", UX-DR32 — not a toast). A Role dropping below Admin while on it: narrate "You're now a Member. Space settings is no longer available." then route to Space home (UX-DR29; focus per UX-DR39).
     - Define form: name input (`autocomplete="off"`, non-reusable field name via 2.1's `FormField`), a colour radio group of the eight swatches each with its localised name (Q8 decides the default), one `button-primary` "Add Label". Creation waits for the server (it needs the id; 2.1's Project creation pattern), refusals inline with their own copy.
     - Delete: per Label, a delete control opening `destructive-confirm` **in place** (UX-DR12/36: names the Label, "This cannot be undone.", `button-danger` + `button-secondary`); **not optimistic** (UX-DR26). `409 label-in-use` → its own copy inline, the Label stays.
     - `document.title` stays `Yello`; the URL holds only ids.
-  - [ ] **Copy** — `ClientCopy.resx` only, sentence case, no "archive", no "save": "Labels", "Space settings", "Add Label", "Label name", "Colour", the eight colour names, "No Labels yet.", "+{0}" and its accessible name "{0} more Labels" (Q5), "Delete Label", the confirm text, and `RefusalCopy.For` branches for `invalid-label-name`, `invalid-label-colour`, `label-name-taken`, `label-in-use`, `invalid-task-labels` (unknown types fall through to "Not available.", which would be untrue). `LocalisationGateTests` and `No_user_visible_string_literal_appears_in_a_component` hold the rest — and do not quote copy in a code comment (a 2.3 run tripped on that).
+  - [x] **Copy** — `ClientCopy.resx` only, sentence case, no "archive", no "save": "Labels", "Space settings", "Add Label", "Label name", "Colour", the eight colour names, "No Labels yet.", "+{0}" and its accessible name "{0} more Labels" (Q5), "Delete Label", the confirm text, and `RefusalCopy.For` branches for `invalid-label-name`, `invalid-label-colour`, `label-name-taken`, `label-in-use`, `invalid-task-labels` (unknown types fall through to "Not available.", which would be untrue). `LocalisationGateTests` and `No_user_visible_string_literal_appears_in_a_component` hold the rest — and do not quote copy in a code comment (a 2.3 run tripped on that).
 
-- [ ] **Task 11 — Browser tests** (AC: 1, 2, 5, 7, 13, 14)
-  - [ ] `tests/Yello.Tests.Client` against `FakeYelloApi` (add `GET/POST …/labels`, `DELETE …/labels/{id}`, `labelIds` on the Task `PATCH`, `FakeTask.LabelIds`; bodies are `Yello.Contracts` types; reuse `HoldTaskEditAsync`/`ReleaseTaskEdit*`). Same collection (`ClientSurfaceCollection`) — no new fixture.
-  - [ ] Optimistic apply: **hold** the `PATCH`, assert the card and panel already show the new chip, release with `400 invalid-task-labels`, `403`, `404`, `409`, `422`, and no answer — assert each revert and its copy; a concurrent title edit's outstanding value is not reverted by a Labels refusal.
-  - [ ] Card: five Labels → three chips and `+2` with its accessible name; at a 320px viewport with six long names, `scrollWidth <= clientWidth` on the metadata row and the card. Plant `flex-wrap: nowrap` → caught.
-  - [ ] Absence: a Member sees no "Space settings" link and no define form; a Viewer sees chips and no Label picker; `main [disabled], main [aria-disabled='true'], [role=dialog] [disabled]` count 0. Plants for each.
-  - [ ] Purge: switch Space with the Labels surface and the panel open → no previous Label name in the DOM.
-  - [ ] Delete confirm replaces in place (at most one `[role=dialog]`); `409` keeps the Label and says why.
-  - [ ] `TextSpacingTests`: add a card with Labels (wrapped) and the Labels surface under the 1.4.12 override and 200% text-only zoom (`deferred-work.md:20`).
-  - [ ] Never Playwright's URL wait; poll `location.pathname`. No `RegexOptions.CultureInvariant`. **Rebuild `Yello.Client` before a browser plant** (the suite runs `--no-build` against it), or the plant looks uncaught.
+- [x] **Task 11 — Browser tests** (AC: 1, 2, 5, 7, 13, 14)
+  - [x] `tests/Yello.Tests.Client` against `FakeYelloApi` (add `GET/POST …/labels`, `DELETE …/labels/{id}`, `labelIds` on the Task `PATCH`, `FakeTask.LabelIds`; bodies are `Yello.Contracts` types; reuse `HoldTaskEditAsync`/`ReleaseTaskEdit*`). Same collection (`ClientSurfaceCollection`) — no new fixture.
+  - [x] Optimistic apply: **hold** the `PATCH`, assert the card and panel already show the new chip, release with `400 invalid-task-labels`, `403`, `404`, `409`, `422`, and no answer — assert each revert and its copy; a concurrent title edit's outstanding value is not reverted by a Labels refusal.
+  - [x] Card: five Labels → three chips and `+2` with its accessible name; at a 320px viewport with six long names, `scrollWidth <= clientWidth` on the metadata row and the card. Plant `flex-wrap: nowrap` → caught.
+  - [x] Absence: a Member sees no "Space settings" link and no define form; a Viewer sees chips and no Label picker; `main [disabled], main [aria-disabled='true'], [role=dialog] [disabled]` count 0. Plants for each.
+  - [x] Purge: switch Space with the Labels surface and the panel open → no previous Label name in the DOM.
+  - [x] Delete confirm replaces in place (at most one `[role=dialog]`); `409` keeps the Label and says why.
+  - [x] `TextSpacingTests`: add a card with Labels (wrapped) and the Labels surface under the 1.4.12 override and 200% text-only zoom (`deferred-work.md:20`).
+  - [x] Never Playwright's URL wait; poll `location.pathname`. No `RegexOptions.CultureInvariant`. **Rebuild `Yello.Client` before a browser plant** (the suite runs `--no-build` against it), or the plant looks uncaught.
 
-- [ ] **Task 12 — Design gates, plants, runs, ledger** (AC: all)
-  - [ ] `DesignFoundationGateTests` (beside `Task_cards_and_columns_take_the_3px_radius` and `The_Task_detail_panel_takes_the_6px_radius`): `Label_chips_take_the_2px_radius` — plant 3px → caught. If the Labels surface's delete confirm is the product's first dialog other than the panel, add its 6px clause too (`deferred-work.md:36` "dialogs other than the panel (the first story that builds one)").
-  - [ ] Plants one at a time in the foreground; hold the original in memory and restore in a `finally`; compare the tree hash after each. **Never** `git checkout --`, `git restore`, `git reset` or `git stash`. Write each plant so it compiles. Record `| # | Plant | Gate | Caught |` in the Debug Log. Minimum set:
+- [x] **Task 12 — Design gates, plants, runs, ledger** (AC: all)
+  - [x] `DesignFoundationGateTests` (beside `Task_cards_and_columns_take_the_3px_radius` and `The_Task_detail_panel_takes_the_6px_radius`): `Label_chips_take_the_2px_radius` — plant 3px → caught. If the Labels surface's delete confirm is the product's first dialog other than the panel, add its 6px clause too (`deferred-work.md:36` "dialogs other than the panel (the first story that builds one)").
+  - [x] Plants one at a time in the foreground; hold the original in memory and restore in a `finally`; compare the tree hash after each. **Never** `git checkout --`, `git restore`, `git reset` or `git stash`. Write each plant so it compiles. Record `| # | Plant | Gate | Caught |` in the Debug Log. Minimum set:
     - A row left `PendingUntil: "2.4"` with 2.4 at `review` (GATE-003).
     - The `POST …/labels` with no isolation row (GATE-002).
     - The Label two-layer drop, and each layer alone (green).
@@ -260,10 +260,10 @@ AC1–AC6 are reproduced **verbatim** from `epics.md:1105-1130` (`status: final`
     - A Member offered the Space settings link; a Viewer offered the Label picker.
     - `flex-wrap: nowrap` on the metadata row; a 3px chip.
     - The Labels list left in the DOM after a Space purge.
-  - [ ] Runs: `dotnet build Yello.slnx` (warnings are errors), then `dotnet test Yello.slnx`. Baseline after the 2.3 review: **850 total, 847 passed, 0 failed, 3 skipped** (`YELLO_MIGRATION_BUNDLE` unset; Client alone 102/102). `--no-build` runs zero tests unless the same configuration was just built. If a Client case fails only in the full run, run `dotnet test --project tests/Yello.Tests.Client` alone before calling it a regression. If Rancher's socket times out: `rdctl shutdown`, `wsl --terminate rancher-desktop`, relaunch.
-  - [ ] `tests/TESTING-CONVENTIONS.md`: the palette harness (ΔE2000 known-answer first), the new counts.
-  - [ ] Ledger (`deferred-work.md`): UPDATE `:36` (Label chips done; which surfaces remain), `:20` (Labels case added), `:493` (third Board statement). ADD each with an owner: the Label-chip foreground amendment to `DESIGN.md:180-183` (owner UX, Q4); rename/recolour of a Label (owner per Q10); the Labels-per-Space / per-Task bound question (owner PM, Q6); sort by a many-to-many Label in the List View (owner 2.10); the `+N` interaction (owner UX, Q5); the Space settings page's later sections (owners 4.2/4.4/5.1/6.3).
-  - [ ] `sprint-status.yaml`: set `review` at the end of the dev phase. **Do not add review narration to source files.**
+  - [x] Runs: `dotnet build Yello.slnx` (warnings are errors), then `dotnet test Yello.slnx`. Baseline after the 2.3 review: **850 total, 847 passed, 0 failed, 3 skipped** (`YELLO_MIGRATION_BUNDLE` unset; Client alone 102/102). `--no-build` runs zero tests unless the same configuration was just built. If a Client case fails only in the full run, run `dotnet test --project tests/Yello.Tests.Client` alone before calling it a regression. If Rancher's socket times out: `rdctl shutdown`, `wsl --terminate rancher-desktop`, relaunch.
+  - [x] `tests/TESTING-CONVENTIONS.md`: the palette harness (ΔE2000 known-answer first), the new counts.
+  - [x] Ledger (`deferred-work.md`): UPDATE `:36` (Label chips done; which surfaces remain), `:20` (Labels case added), `:493` (third Board statement). ADD each with an owner: the Label-chip foreground amendment to `DESIGN.md:180-183` (owner UX, Q4); rename/recolour of a Label (owner per Q10); the Labels-per-Space / per-Task bound question (owner PM, Q6); sort by a many-to-many Label in the List View (owner 2.10); the `+N` interaction (owner UX, Q5); the Space settings page's later sections (owners 4.2/4.4/5.1/6.3).
+  - [x] `sprint-status.yaml`: set `review` at the end of the dev phase. **Do not add review narration to source files.**
 
 ## Dev Notes
 
@@ -408,10 +408,164 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, run unattended by the story-cycle orchestrator.
+
 ### Debug Log References
+
+- **Environment.** Two orphaned `Yello.Host.exe` processes (started 16:41, parent gone) held `Yello.Host/bin/Debug`; stopping them was refused by the permission layer, so every build and test ran in **Release** (`-c Release`; `HostProcess` resolves the Host from the same configuration). The browser suite's dev server is `dotnet run --no-build` with no configuration, so `Yello.Client` is also built in **Debug** before every browser run; the first browser run served the stale 2.3 client and timed out on every new case (recorded in TESTING-CONVENTIONS).
+- **Task 1.** Build 0 warnings, 0 errors; `IsolationCaseListTests` 14/14 with 2.4 `in-progress`. Rows pending on 2.4 (8): ISO-LIST-LABELS-FOREIGN-SPACE, ISO-LIST-LABELS-OWN-SPACE, ISO-CREATE-LABEL-FOREIGN-SPACE, ISO-DELETE-LABEL-FOREIGN-SPACE, ISO-LABEL-FOREIGN-ID-IN-OWN-SPACE, ISO-APPLY-FOREIGN-LABEL, ISO-RECORD-KIND-LABEL-DEFINE-MEMBER, ISO-RECORD-KIND-LABEL-APPLY-VIEWER. All eight are live; `LabelScaffold.cs` is deleted; GATE-003 plant caught.
+- **Red-green.** The scaffolds' stated red reason was the product's absence (verified at the ATDD entry run: no type, table or route). The minimum product was built first, as the checklist's step 1 directs; each scaffold was then activated and run green, and its red half shown by the plant in the table below.
+- **Scaffold corrections.** (1) `LabelScaffold` replaced by `LabelRoutes`, `ProblemTypes`, `LabelName.MaxLength` and a new contract `Yello.Contracts.Labels.LabelColours.Keys` - the Client and Isolation suites cannot reference the Domain's `LabelPalette`; `OversizeLabelIds` inlined (1,001); the fake's name limit became a local constant. (2) ARCH-002/004 swapped to typed references, as their remarks asked. (3) E2E-202's "did the row wrap" compared child tops, which differ for centred chips on one line, so a `flex-wrap: nowrap` plant passed it; it now requires a child starting below another's bottom, and catches the plant. (4) COPY-001 keeps the literal types (they are the wire values).
+- **Dominant finding - a real deadlock.** RACE-002 stayed green with the apply's `UPDLOCK, HOLDLOCK` removed (0/3): a read-committed read already waits on the deleted, uncommitted Label row. The hint guards the other interleaving, so a deterministic case was added - `A_deletion_racing_an_application_that_has_read_its_Labels_waits_and_answers_409` (the apply is held after its Label read by an uncommitted application of another Label; the DELETE is sent; wait until blocked **or answered**). Its first run failed with **1205 deadlock -> 500** on the DELETE: the apply's `COUNT` was covered by `AK_Label_SpaceId_Id` and took its U lock there, the delete's read took it on the clustered key, so the locks never met. Fixed by `INDEX(1)` on both Label lock reads (remarks in `LabelStore` and `TaskStore`). Lock order is Label then TaskLabel for both writers; a deletion takes no Task lock.
+- **Widened earlier gates, each deliberately** (story-predicted unless marked): `TaskProperties` in `TaskEndpointTests.cs` and `BoardEndpointTests.cs` and **`EditedTaskProperties` in `TaskEndpointTests.Edit.cs` (not predicted)** gain `labelIds`; 2.3's edit-request gate is renamed `The_Task_edit_request_carries_its_editable_attributes_and_nothing_else` and gains exactly `LabelIds` (ARCH-006 pins its type); `The_due_date_is_a_nullable_DateTimeOffset_on_the_Task_and_its_response` gains `LabelIds`; the `Label` exclusion leaves `Every_Space_scoped_entity_the_gates_name_resolves_to_a_Domain_type`; the 30-token colour gates (`The_colour_token_layer_declares_exactly_the_thirty_names...`, `Every_theme_boundary_rule_rebinds_all_fifteen...`) exclude the family by the named prefix `CssCorpus.IsLabelPaletteToken` (`The_gated_set_is_exactly_the_eighteen_pairs` stayed green unchanged); **`Space_is_read_only_where_named` permits `LabelConfiguration`** (its FK to Space; not predicted); **`No_colour_is_stated_as_a_literal_outside_the_token_layer` blanks custom-property names** (`var(--label-olive)` matched `olive`; a `var(--label-rust, olive)` fallback is still caught - planted; not predicted); **`SpaceHomeProjectsTests.An_empty_Space_states_no_Projects_yet...` sets aside exactly the Space settings link** (not predicted; ledgered to UX); **`SpaceIsolationSchemaTests.Every_Space_scoped_table_carries_a_filter_and_a_block_predicate` counts three predicates on Label and TaskLabel as on Project and Task** (not predicted - the story said it would stay green; every other table still two). `BoardTests.A_Task_card_is_its_title_alone...` stayed green and was not amended (no Labels on its card).
+- **Gates added by the dev phase:** RACE-004 above; `The_wire_palette_is_the_Domain_palette_in_the_same_order`; `The_clients_Label_name_predicate_agrees_with_the_Domain_rule`; handler unit tests (`DefineLabelHandlerTests`, `DeleteLabelHandlerTests`, three Labels cases in `EditTaskAttributesHandlerTests`).
+- **Palette.** PAL-000 and its oracle reproduce the story's table exactly (teal ΔE2000 13.8 the thinnest separation; blue 3.89:1 the thinnest dark-card ratio; grass 3.29:1 the thinnest light-card ratio; an ink at `text-primary` fails every fill at 2.74-3.40:1). PAL-001..003 green on the live token layer.
+- **Plants** (one at a time, original held in memory, restored in a `finally`, hash compared; never `git checkout`/`restore`/`reset`/`stash`):
+
+| # | Plant | Gate | Caught |
+|---|---|---|---|
+| 1 | A row left `PendingUntil: "2.4"` with 2.4 at `review` | `Every_pending_row_names_a_story_that_has_not_yet_reached_review` | yes |
+| 2 | Both `POST .../labels` rows re-pointed to `PUT` (POST unnamed) | `Every_api_route_the_Host_maps_..._is_named_by_a_case` | yes |
+| 3 | `Label` query filter and FILTER predicate dropped together | ISO-LABEL-FOREIGN-ID-IN-OWN-SPACE, both surfaces (also LIST-OWN-SPACE, APPLY-FOREIGN-LABEL) | yes |
+| 4 | Query filter alone dropped | every row | green (97/97) |
+| 5 | FILTER predicate alone dropped | every row green; `SchemaVarianceTests` reports the missing predicate | green rows |
+| 6 | Apply's `UPDLOCK, HOLDLOCK` removed (3 runs) | RACE-004 | 3/3 |
+| 7 | Delete's Label `UPDLOCK, HOLDLOCK` removed (3 runs) | RACE-004 | 3/3 |
+| 8 | `INDEX(1)` removed from both Label lock reads (3 runs) | RACE-004 (the deadlock) | 3/3 |
+| 9 | Delete's TaskLabel probe hint removed (3 runs) | none | 0/3 - masked: appliers take the Label lock first, a read-committed probe waits on an uncommitted row, and the `NoAction` backstop answers 409 |
+| 10 | The apply's count check skipped | LBL-011, RACE-002 (both 500) | yes |
+| 11 | `TaskLabel -> Label` FK set to cascade (migration) | the migration fails (1785, two cascade paths): every `TaskEndpointTests` case | yes |
+| 12 | `ConsultsBound` on `POST .../labels` | ARCH-001 | yes |
+| 13 | Fill at #8B80F9; fill at #FFFFFF; `--label-ink` = #E6EAF5 | PAL-001 (each) | yes x3 |
+| 14 | `flex-wrap: nowrap` on the metadata row | DSN-003; E2E-202 (after correction 3) | yes |
+| 15 | A 3px chip | DSN-001 | yes |
+| 16 | `var(--label-rust, olive)` | colour-literal gate, DSN-004 | yes |
+| 17 | A Member offered the Space settings link | E2E-208 | yes |
+| 18 | A Viewer offered the Label picker | E2E-209 | yes |
+| 19 | Label lists left in component state after a purge | E2E-210 (both) | no - no path renders them: leaving the Space unmounts the page before it could. Recorded, as 2.3's panel plant was |
+
+- **Runs.** `dotnet build Yello.slnx -c Release`: 0 warnings, 0 errors. Final full run (`dotnet build-server shutdown`, then `dotnet test Yello.slnx -c Release --no-build`): **982 total, 979 passed, 0 failed, 3 skipped** (the 3 skips are the bundle cases, `YELLO_MIGRATION_BUNDLE` unset). The run before it lost the Isolation suite's SQL engine at start (83 failures, all `The SQL Server container failed to start`) and was rerun once, per the orchestrator's rule. Baseline was 920 total, 858 passed, 0 failed, 62 skipped.
 
 ### Completion Notes List
 
 - Story created 2026-10-25 by create-story: ultimate context engine analysis completed — comprehensive developer guide created. No isolation row was pending on 2.4 at creation. After moving 2.4 to `ready-for-dev`: `dotnet build Yello.slnx` 0 warnings, 0 errors; `IsolationCaseListTests` 14/14 passed (GATE-001..004 green). The palette table was computed in a scratch script during creation and must be re-derived by the gate the dev phase writes.
+- Implemented FR-22, FR-20's Labels clause, UX-DR8, UX-DR13 and AC1-AC14: `Label` and `TaskLabel` (per Space, three predicates each, composite FKs, `NoAction` to Label), `GET`/`POST /spaces/{s}/labels` and `DELETE /spaces/{s}/labels/{l}`, `labelIds` on the Task `PATCH` and on every Task answer, five problem types, the computed palette, chips on the card (three then `+N`, wrapping), the panel's Label picker as a fourth optimistic attribute, and Space settings with the Labels section. Every new route is an isolation row on both surfaces.
+- **Q1 - (a).** `labelIds` on the Task `PATCH`, whole set, `ManageTasks`. Reuses 2.3's replica and pipeline; one route fewer for GATE-002. Cost to later stories: two people editing one Task's Labels at once lose one change (2.3's per-attribute last writer wins); 8.1 may add per-application routes.
+- **Q2 - recommended.** Trimmed, 1-50 characters, unique per Space ignoring case (default collation), `409 label-name-taken`; tests tagged `Assumption FR-22-Q2`. Cost to later stories: a rename (if added) needs the same refusal.
+- **Q3 - palette key.** `"rust"` on the wire and in the row; hex only in `tokens.css`. Added `Yello.Contracts.Labels.LabelColours` (the wire's statement of the keys, for the client), held equal to the Domain's `LabelPalette` and the token family by gates. Cost to later stories: none; a fill change moves no data.
+- **Q4 - one fixed ink** `--label-ink: #0B1020` in both themes; DESIGN.md amendment ledgered to UX. Cost to later stories: none in code.
+- **Q5 - text.** `+N` is not a control; accessible name "{N} more Labels"; ledgered to UX. Cost to later stories: 2.8 places it if it becomes one.
+- **Q6 - no NFR-8 bound.** `labelIds` capped at 500 entries as input shape (`invalid-task-edit`); ledgered to PM. Cost to later stories: 2.9 measures.
+- **Q7 - Space settings page** at `/spaces/{s}/settings`, Labels section only, linked from Space home for Owner/Admin. Extension: the link sits beside an empty Space's one action; the 2.1 empty-state test was widened to set aside exactly that link and the tension is ledgered to UX - cut by moving or hiding the link. Cost to later stories: 4.2/4.4/5.1/6.3 add sections.
+- **Q8 - first unused colour** pre-selected (rust when all are used). Cost to later stories: none.
+- **Q9 - Infrastructure-only `TaskLabel`.** No glossary amendment was needed (CLR name = table name). Cost to later stories: none.
+- **Q10 - out of scope** (no rename/recolour); ledgered to PM. Cost to later stories: a `PATCH` needs its own isolation rows.
+- **Q11 - refuse** `409 label-in-use`, no count, copy "This Label is on Tasks. Remove it from them first." Cost to later stories: none.
+- **Q12 - server order** by name then id (Label table collation); the client never re-sorts a read, and orders an optimistic set by the Space's list. Cost to later stories: 2.10's sort decides its own meaning (ledgered).
+- **Q13 - polite** "Label added." / "Label deleted." on Space settings; nothing on apply; refusals in the panel's status region. Cost to later stories: none.
+- **Q14 - native radio group**, legend "Colour", each swatch named. Cost to later stories: none.
+- **Decision (reversible): DELETE carries no body.** `SpaceWrites.SendWithoutBodyAsync` was added rather than sending `{}`. Cut by sending an empty object through `SendAsync`.
+- **Decision (reversible): "narrated, then routed" survives the navigation** through a scoped `SpaceNarration` (one sentence, memory only) that Space home says on arrival. Cut by narrating in the context bar's live region instead.
+- **Decision (reversible): the Board reads the Space's Labels before the Board itself** and draws only once both have answered, so a card never shows an id it cannot name. Cut by loading them in parallel.
 
 ### File List
+
+- `Yello.Domain/Labels/Label.cs` (new)
+- `Yello.Domain/Labels/LabelName.cs` (new)
+- `Yello.Domain/Labels/LabelPalette.cs` (new)
+- `Yello.Domain/Labels/ILabelStore.cs` (new)
+- `Yello.Domain/Tasks/TaskEdit.cs`
+- `Yello.Domain/Tasks/ITaskStore.cs`
+- `Yello.Domain/Boards/IBoardReader.cs`
+- `Yello.Application/Labels/ListLabels/ListLabelsHandler.cs` (new)
+- `Yello.Application/Labels/DefineLabel/DefineLabelHandler.cs` (new)
+- `Yello.Application/Labels/DeleteLabel/DeleteLabelHandler.cs` (new)
+- `Yello.Application/Tasks/EditTaskAttributes/EditTaskAttributesHandler.cs`
+- `Yello.Application/Tasks/ViewTask/ViewTaskHandler.cs`
+- `Yello.Application/Boards/ViewBoard/ViewBoardHandler.cs`
+- `Yello.Infrastructure/Persistence/TaskLabel.cs` (new)
+- `Yello.Infrastructure/Persistence/TaskLabelReads.cs` (new)
+- `Yello.Infrastructure/Persistence/LabelStore.cs` (new)
+- `Yello.Infrastructure/Persistence/Configurations/LabelConfiguration.cs` (new)
+- `Yello.Infrastructure/Persistence/Configurations/TaskLabelConfiguration.cs` (new)
+- `Yello.Infrastructure/Persistence/Configurations/TaskConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261025175001_LabelTables.cs` (new)
+- `Yello.Infrastructure/Persistence/Migrations/20261025175001_LabelTables.Designer.cs` (new)
+- `Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs`
+- `Yello.Infrastructure/Persistence/SchemaNames.cs`
+- `Yello.Infrastructure/Persistence/TaskStore.cs`
+- `Yello.Infrastructure/Persistence/BoardReader.cs`
+- `Yello.Infrastructure/Persistence/YelloDbContext.cs`
+- `Yello.Infrastructure/SpaceContentStores.cs`
+- `Yello.Contracts/Labels/LabelRoutes.cs` (new)
+- `Yello.Contracts/Labels/LabelResponse.cs` (new)
+- `Yello.Contracts/Labels/CreateLabelRequest.cs` (new)
+- `Yello.Contracts/Labels/LabelColours.cs` (new)
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Contracts/Tasks/TaskResponse.cs`
+- `Yello.Contracts/Tasks/EditTaskRequest.cs`
+- `Yello.Host/Endpoints/LabelEndpoints.cs` (new)
+- `Yello.Host/Endpoints/TaskEndpoints.cs`
+- `Yello.Host/Endpoints/TaskEditBody.cs`
+- `Yello.Host/Endpoints/BoardEndpoints.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Client/Components/LabelChip.razor` (new)
+- `Yello.Client/Components/LabelOption.razor` (new)
+- `Yello.Client/Components/LabelSection.razor` (new)
+- `Yello.Client/Components/LabelRow.razor` (new)
+- `Yello.Client/Components/LabelColourOption.razor` (new)
+- `Yello.Client/Pages/SpaceSettings.razor` (new)
+- `Yello.Client/Spaces/LabelCapabilities.cs` (new)
+- `Yello.Client/Spaces/LabelNameRule.cs` (new)
+- `Yello.Client/Spaces/SpaceNarration.cs` (new)
+- `Yello.Client/Components/BoardColumn.razor`
+- `Yello.Client/Components/BoardView.razor`
+- `Yello.Client/Components/BoardView.razor.cs`
+- `Yello.Client/Components/TaskCard.razor`
+- `Yello.Client/Components/TaskDetail.razor`
+- `Yello.Client/Pages/ClientRoutes.cs`
+- `Yello.Client/Pages/SpaceHome.razor`
+- `Yello.Client/Program.cs`
+- `Yello.Client/Refusals/RefusalCopy.cs`
+- `Yello.Client/Spaces/SpaceWrites.cs`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/wwwroot/css/components.css`
+- `Yello.Client/wwwroot/css/tokens.css`
+- `tests/Yello.Tests.Shared/LabelScaffold.cs` (deleted)
+- `tests/Yello.Tests.Slices/Labels/DefineLabel/DefineLabelHandlerTests.cs` (new)
+- `tests/Yello.Tests.Slices/Labels/DeleteLabel/DeleteLabelHandlerTests.cs` (new)
+- `tests/Yello.Tests.Slices/Tasks/LabelWire.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Edit.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Labels.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.LabelsIdempotency.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.LabelsRace.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.LabelsSchema.cs`
+- `tests/Yello.Tests.Slices/Tasks/CreateTask/CreateTaskHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/EditTaskAttributes/EditTaskAttributesHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Boards/BoardEndpointTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/SpaceIsolationSchemaTests.cs`
+- `tests/Yello.Tests.Slices/Boards/ViewBoard/ViewBoardHandlerTests.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.cs`
+- `tests/Yello.Tests.Architecture/CssCorpus.cs`
+- `tests/Yello.Tests.Architecture/ColorTokenContrastTests.cs`
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.cs`
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.Labels.cs`
+- `tests/Yello.Tests.Architecture/LabelPaletteGateTests.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Labels.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.TaskEdit.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Tasks.cs`
+- `tests/Yello.Tests.Architecture/RefusalCopyTests.Labels.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.cs`
+- `tests/Yello.Tests.Client/LabelTests.cs`
+- `tests/Yello.Tests.Client/SpaceHomeProjectsTests.cs`
+- `tests/Yello.Tests.Client/TextSpacingTests.cs`
+- `tests/TESTING-CONVENTIONS.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/2-4-define-and-apply-labels.md`
+
+### Change Log
+
+- 2026-10-25 - Dev phase: Labels defined per Space and applied to Tasks (FR-22, FR-20 Labels clause, UX-DR8, UX-DR13, AC1-AC14). Migration `LabelTables`; three Label routes and `labelIds` on the Task edit and every Task answer; the computed palette; chips, the Label picker and Space settings. All eight 2.4 isolation rows live; `LabelScaffold` deleted. A deadlock between deletion and application found by an added race case and fixed (`INDEX(1)`). Full run: 982 total, 979 passed, 0 failed, 3 skipped. Status -> review.

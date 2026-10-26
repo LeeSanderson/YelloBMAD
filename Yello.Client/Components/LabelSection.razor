@@ -1,0 +1,410 @@
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Spaces
+@using Yello.Contracts.Labels
+
+@implements IDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceWrites Writes
+
+@*
+    THE LABELS SECTION OF SPACE SETTINGS - story 2.4. AC1, AC3, AC4, AC14; FR-22; UX-DR11, UX-DR12, UX-DR13,
+    UX-DR26, UX-DR31, UX-DR33, UX-DR36, UX-DR37.
+
+    RENDERED ONLY AFTER THE SERVER HAS ANSWERED, and PURGED WITH THE SPACE (UX-DR31): the list goes the moment the
+    tab leaves the Space, before anything else renders.
+
+    DEFINE: a name (autocomplete off, a field name no autofill reuses - UX-DR33) and a colour from the palette, a
+    native radio group with each swatch named (open question 14; nothing depends on colour), the first colour the
+    Space does not use yet chosen (open question 8 - a colour is not a consequential choice). "Add Label" waits for
+    the server, which gives the Label its id; refusals are said beside the field or in the section, in the client's own
+    words.
+
+    DELETE IS NEVER OPTIMISTIC (UX-DR26) and asks first, in place (UX-DR12, UX-DR36): the row's control is replaced
+    by the confirmation naming the Label, "This cannot be undone.", the danger action and Cancel - never a dialog over
+    the page. A Label still on Tasks is refused and stays, and the row says why.
+*@
+
+<p class="visually-hidden" role="status" aria-live="polite">@_announcement</p>
+
+<section class="label-section" aria-labelledby="label-section-heading">
+    <h2 class="type-space-name label-section__heading" id="label-section-heading">@Localizer["LabelsHeading"]</h2>
+
+    @if (_labels is null)
+    {
+        <div class="label-section__loading" aria-busy="true">
+            <p class="visually-hidden">@Localizer["LabelsLoading"]</p>
+        </div>
+    }
+
+    @if (_labels is not null)
+    {
+        <form class="label-define" @onsubmit="DefineAsync" novalidate>
+            <FormField FieldId="label-define-name"
+                       FieldName="@_nameFieldName"
+                       Label="@Localizer["LabelNameLabel"]"
+                       Value="@_name"
+                       ValueChanged="value => _name = value"
+                       Message="@_nameMessage"
+                       Invalid="@(_nameMessage is not null)" />
+
+            <fieldset class="label-define__colours">
+                <legend class="form-field__label">@Localizer["LabelColourLegend"]</legend>
+
+                @foreach (var key in LabelColours.Keys)
+                {
+                    <LabelColourOption @key="key" Key="@key" GroupName="@_colourGroupName" Checked="@(key == _colour)" OnChoose="ChooseColour" />
+                }
+            </fieldset>
+
+            @if (_defineRefusal is { } refusal)
+            {
+                <p class="label-define__refusal" role="status">@refusal</p>
+            }
+
+            <div class="label-define__actions">
+                @if (!_submitting)
+                {
+                    <PrimaryButton>@Localizer["LabelAdd"]</PrimaryButton>
+                }
+
+                @if (_submitting)
+                {
+                    <p class="label-define__progress" role="status">@Localizer["LabelAdding"]</p>
+                }
+            </div>
+        </form>
+
+        @if (_labels.Count == 0)
+        {
+            <p class="label-section__empty">@Localizer["LabelsEmpty"]</p>
+        }
+
+        @if (_labels.Count > 0)
+        {
+            <ul class="label-list">
+                @foreach (var label in _labels)
+                {
+                    <LabelRow @key="label.Id"
+                              Label="@label"
+                              Confirming="@(_confirming == label.Id)"
+                              Deleting="@(_deleting == label.Id)"
+                              Refusal="@(_rowRefusal?.LabelId == label.Id ? _rowRefusal.Value.Text : null)"
+                              OnAskToDelete="AskToDelete"
+                              OnDelete="DeleteAsync"
+                              OnCancel="CancelDelete" />
+                }
+            </ul>
+        }
+    }
+</section>
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    // Names no browser's autofill would match to a saved value (UX-DR33): random per page.
+    private readonly string _nameFieldName = Guid.NewGuid().ToString("N");
+    private readonly string _colourGroupName = Guid.NewGuid().ToString("N");
+
+    private IDisposable? _purgeRegistration;
+
+    /// <summary>
+    /// Bumped by every purge and by disposal. An answer that started before one is dropped when it arrives.
+    /// </summary>
+    private int _generation;
+
+    private List<LabelResponse>? _labels;
+    private string? _announcement;
+    private string _name = string.Empty;
+    private string _colour = LabelColours.Keys[0];
+    private string? _nameMessage;
+    private string? _defineRefusal;
+    private bool _submitting;
+    private (string Name, string Colour, string Key)? _unanswered;
+    private Guid? _confirming;
+    private Guid? _deleting;
+    private (Guid LabelId, string Text)? _rowRefusal;
+
+    /// <summary>The Space whose Labels these are.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>
+    /// Raised for a <c>404</c> - the Space refused, or a Label that matches nothing - so the page renders its one
+    /// refusal surface.
+    /// </summary>
+    [Parameter]
+    public EventCallback<ProblemResponse?> OnSpaceRefused { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _purgeRegistration = ActiveSpace.RegisterPurge(Purge);
+
+        await LoadAsync(_generation);
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _generation++;
+        _purgeRegistration?.Dispose();
+    }
+
+    /// <summary>
+    /// The Space is being left: its Labels, and everything half-typed about them, go synchronously.
+    /// </summary>
+    private void Purge()
+    {
+        _generation++;
+        _labels = null;
+        _announcement = null;
+        _name = string.Empty;
+        _nameMessage = null;
+        _defineRefusal = null;
+        _submitting = false;
+        _unanswered = null;
+        _confirming = null;
+        _deleting = null;
+        _rowRefusal = null;
+    }
+
+    private async Task LoadAsync(int generation)
+    {
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(LabelRoutes.LabelsOf(SpaceId), UriKind.Relative), token);
+
+            if (generation != _generation || token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                var labels = await response.Content.ReadFromJsonAsync<List<LabelResponse>>(JsonOptions, token);
+
+                if (labels is not null && generation == _generation)
+                {
+                    _labels = labels;
+                    _colour = FirstUnusedColour();
+                }
+
+                return;
+            }
+
+            if (response.StatusCode != HttpStatusCode.Unauthorized)
+            {
+                await OnSpaceRefused.InvokeAsync(await SpaceWrites.ProblemOfAsync(response, token));
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended: both purges have run.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            if (generation == _generation)
+            {
+                await OnSpaceRefused.InvokeAsync(null);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The first palette colour the Space's Labels do not use yet, or the first of all when every one is used
+    /// (open question 8).
+    /// </summary>
+    private string FirstUnusedColour() =>
+        LabelColours.Keys.FirstOrDefault(key => _labels?.TrueForAll(label => label.Colour != key) ?? true) ?? LabelColours.Keys[0];
+
+    private async Task DefineAsync()
+    {
+        if (_submitting || _labels is null)
+        {
+            return;
+        }
+
+        _nameMessage = null;
+        _defineRefusal = null;
+
+        var name = _name.Trim();
+
+        if (!LabelNameRule.IsLabelName(name))
+        {
+            _nameMessage = Localizer["LabelNameInvalid"];
+            return;
+        }
+
+        _submitting = true;
+
+        try
+        {
+            await SendDefinitionAsync(name, _colour, _generation);
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way.
+        }
+        catch (Exception exception) when (exception is HttpRequestException or JsonException)
+        {
+            _defineRefusal = Localizer["TaskEditNotSent"];
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    /// <summary>
+    /// Sends one definition and uses its answer. An attempt that never got an answer may still have been applied: the
+    /// same definition sent again reuses its key, so the server replays it rather than meeting its own name as taken.
+    /// </summary>
+    private async Task SendDefinitionAsync(string name, string colour, int generation)
+    {
+        var key = KeyFor(name, colour);
+
+        _unanswered = (name, colour, key);
+
+        using var answer = await Writes.SendAsync(HttpMethod.Post, LabelRoutes.LabelsOf(SpaceId), new CreateLabelRequest(name, colour), key, ActiveSpace.Token);
+
+        if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
+        {
+            _unanswered = null;
+        }
+
+        if (generation != _generation)
+        {
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.Created
+            && await answer.Response.Content.ReadFromJsonAsync<LabelResponse>(JsonOptions, ActiveSpace.Token) is { } created
+            && generation == _generation)
+        {
+            Accept(created);
+            return;
+        }
+
+        await RefuseDefinitionAsync(answer);
+    }
+
+    private string KeyFor(string name, string colour) =>
+        _unanswered is { } unanswered && unanswered.Name == name && unanswered.Colour == colour
+            ? unanswered.Key
+            : Guid.NewGuid().ToString("D");
+
+    /// <summary>
+    /// The defined Label joins the list where a read would place it - by name, then id - and the form is ready for the
+    /// next.
+    /// </summary>
+    private void Accept(LabelResponse created)
+    {
+        _labels = [.. (_labels ?? []).Append(created).OrderBy(label => label.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(label => label.Id)];
+        _name = string.Empty;
+        _colour = FirstUnusedColour();
+        _announcement = Localizer["LabelAdded"];
+    }
+
+    /// <summary>
+    /// A refused definition: a name the rule or the Space refuses beside the field; the Space itself refused, the one
+    /// refusal surface; anything else in the section, in RefusalCopy's words. A 401 is YelloApiHandler's.
+    /// </summary>
+    private async Task RefuseDefinitionAsync(SpaceWriteAnswer answer)
+    {
+        switch (answer.StatusCode)
+        {
+            case HttpStatusCode.Unauthorized:
+                return;
+
+            case HttpStatusCode.NotFound:
+                await OnSpaceRefused.InvokeAsync(answer.Problem);
+                return;
+
+            case HttpStatusCode.BadRequest when answer.Problem?.Type == ProblemTypes.InvalidLabelName:
+            case HttpStatusCode.Conflict when answer.Problem?.Type == ProblemTypes.LabelNameTaken:
+                _nameMessage = RefusalText.Of(Localizer, answer.Problem);
+                return;
+
+            default:
+                _defineRefusal = RefusalText.Of(Localizer, answer.Problem);
+                return;
+        }
+    }
+
+    private void ChooseColour(string key) => _colour = key;
+
+    private void AskToDelete(Guid labelId)
+    {
+        _confirming = labelId;
+        _rowRefusal = null;
+    }
+
+    private void CancelDelete() => _confirming = null;
+
+    /// <summary>
+    /// Deletes once the server agrees - never before (UX-DR26). A Label still on Tasks stays, and its row says why.
+    /// </summary>
+    private async Task DeleteAsync(Guid labelId)
+    {
+        if (_deleting is not null)
+        {
+            return;
+        }
+
+        _confirming = null;
+        _rowRefusal = null;
+        _deleting = labelId;
+
+        var generation = _generation;
+
+        try
+        {
+            using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Delete, LabelRoutes.LabelOf(SpaceId, labelId), Guid.NewGuid().ToString("D"), ActiveSpace.Token);
+
+            if (generation != _generation)
+            {
+                return;
+            }
+
+            switch (answer.StatusCode)
+            {
+                case HttpStatusCode.NoContent:
+                    _labels?.RemoveAll(label => label.Id == labelId);
+                    _colour = FirstUnusedColour();
+                    _announcement = Localizer["LabelDeleted"];
+                    return;
+
+                case HttpStatusCode.Unauthorized:
+                    return;
+
+                case HttpStatusCode.NotFound:
+                    await OnSpaceRefused.InvokeAsync(answer.Problem);
+                    return;
+
+                default:
+                    _rowRefusal = (labelId, RefusalText.Of(Localizer, answer.Problem));
+                    return;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way.
+        }
+        catch (Exception exception) when (exception is HttpRequestException or JsonException)
+        {
+            _rowRefusal = (labelId, Localizer["TaskEditNotSent"]);
+        }
+        finally
+        {
+            _deleting = null;
+        }
+    }
+}

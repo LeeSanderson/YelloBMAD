@@ -34,7 +34,7 @@ public sealed partial class DesignFoundationGateTests
     /// AC13, UX-DR5, <c>deferred-work.md:36</c> - every radius declared on a Label chip resolves to 2px (<c>rounded.sm</c>),
     /// and one is declared: never the fully round radius, which belongs to the column count chip alone.
     /// </summary>
-    [Fact(Skip = "red: AC13 - no .label-chip rule yet (story 2.4 Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR5")]
     public void Label_chips_take_the_2px_radius() =>
         AssertComponentRadius(LabelChipClass, LabelChipRadiusPx, "Use var(--radius-sm) on the Label chip.");
@@ -43,7 +43,7 @@ public sealed partial class DesignFoundationGateTests
     /// AC13, UX-DR40 ("chips size to content"), <c>DESIGN.md:451</c> - the Label chip states no fixed or maximum height
     /// (so text spacing and 200% text zoom grow it) and no shadow other than <c>none</c>. Anchored: a rule styles it.
     /// </summary>
-    [Fact(Skip = "red: AC13 - no .label-chip rule yet (story 2.4 Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR40")]
     [Trait("Requirement", "UX-DR5")]
     public void Label_chips_size_to_their_content_and_carry_no_shadow()
@@ -71,7 +71,7 @@ public sealed partial class DesignFoundationGateTests
     /// <c>white-space: nowrap</c>): horizontal overflow inside a card at 320px is the 1.4.10 failure in the exact layout
     /// an audit uses.
     /// </summary>
-    [Fact(Skip = "red: AC5 - .task-card__meta has no wrapping layout yet (story 2.4 Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR8")]
     [Trait("Requirement", "UX-DR41")]
     public void The_card_metadata_row_wraps_and_never_scrolls_sideways()
@@ -100,7 +100,7 @@ public sealed partial class DesignFoundationGateTests
     /// through a class, never an inline style, so <c>No_colour_is_stated_as_a_literal_outside_the_token_layer</c> keeps
     /// holding and the palette gate's figures are the rendered ones.
     /// </summary>
-    [Fact(Skip = "red: AC13 - no .label-chip--{key} classes yet (story 2.4 Task 10; Q3, Q4)")]
+    [Fact]
     [Trait("Requirement", "UX-DR13")]
     [Trait("Priority", "P1")]
     public void Every_palette_key_has_a_chip_class_filled_from_its_token_and_inked_from_the_ink_token()

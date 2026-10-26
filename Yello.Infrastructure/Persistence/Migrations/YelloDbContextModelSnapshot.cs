@@ -133,6 +133,37 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.ToTable("ApiToken", (string)null);
                 });
 
+            modelBuilder.Entity("Yello.Domain.Labels.Label", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Colour")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
+                    b.Property<Guid>("SpaceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("SpaceId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SpaceId", "Name")
+                        .IsUnique();
+
+                    b.ToTable("Label", (string)null);
+                });
+
             modelBuilder.Entity("Yello.Domain.Memberships.Membership", b =>
                 {
                     b.Property<Guid>("Id")
@@ -365,12 +396,43 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.ToTable("IdempotencyRecord", (string)null);
                 });
 
+            modelBuilder.Entity("Yello.Infrastructure.Persistence.TaskLabel", b =>
+                {
+                    b.Property<Guid>("SpaceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("SpaceId");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("LabelId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("AppliedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.HasKey("SpaceId", "TaskId", "LabelId");
+
+                    b.HasIndex("SpaceId", "LabelId", "TaskId");
+
+                    b.ToTable("TaskLabel", (string)null);
+                });
+
             modelBuilder.Entity("Yello.Domain.ApiTokens.ApiToken", b =>
                 {
                     b.HasOne("Yello.Domain.Memberships.Membership", null)
                         .WithMany()
                         .HasForeignKey("BoundSpaceId", "AccountId")
                         .HasPrincipalKey("SpaceId", "AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Yello.Domain.Labels.Label", b =>
+                {
+                    b.HasOne("Yello.Domain.Spaces.Space", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
@@ -439,6 +501,23 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.HasOne("Yello.Domain.Spaces.Space", null)
                         .WithMany()
                         .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Yello.Infrastructure.Persistence.TaskLabel", b =>
+                {
+                    b.HasOne("Yello.Domain.Labels.Label", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId", "LabelId")
+                        .HasPrincipalKey("SpaceId", "Id")
+                        .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+
+                    b.HasOne("Yello.Domain.Tasks.TaskItem", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId", "TaskId")
+                        .HasPrincipalKey("SpaceId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

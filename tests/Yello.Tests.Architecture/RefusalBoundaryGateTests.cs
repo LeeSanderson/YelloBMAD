@@ -401,6 +401,9 @@ public sealed partial class RefusalBoundaryGateTests
             "Yello.Infrastructure.Persistence.Configurations.SpacePresenceConfiguration",
             "Yello.Infrastructure.Persistence.Configurations.ProjectConfiguration",
             "Yello.Infrastructure.Persistence.Configurations.IdempotencyRecordConfiguration",
+
+            // Story 2.4: the Label's foreign key to its Space, declared in the model and reading nothing.
+            "Yello.Infrastructure.Persistence.Configurations.LabelConfiguration",
         ];
 
         var dependents = DependentsOf(space);

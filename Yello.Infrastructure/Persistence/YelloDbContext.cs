@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Yello.Domain.Accounts;
+using Yello.Domain.Labels;
 using Yello.Domain.Memberships;
 using Yello.Domain.Projects;
 using Yello.Domain.Spaces;
@@ -107,6 +108,12 @@ public sealed class YelloDbContext(
     public DbSet<TaskItem> Tasks => Set<TaskItem>();
 
     /// <summary>
+    /// Labels, per Space (story 2.4). Which Tasks carry each is <c>TaskLabel</c>'s, which only the stores reach,
+    /// through <c>Set&lt;T&gt;()</c>.
+    /// </summary>
+    public DbSet<Label> Labels => Set<Label>();
+
+    /// <summary>
     /// The Space every global query filter compares against, read from this context's
     /// <see cref="SpaceScope"/> each time a query runs.
     /// </summary>
@@ -152,6 +159,8 @@ public sealed class YelloDbContext(
         modelBuilder.ApplyConfiguration(new SpacePresenceConfiguration(this));
         modelBuilder.ApplyConfiguration(new ProjectConfiguration(this));
         modelBuilder.ApplyConfiguration(new TaskConfiguration(this));
+        modelBuilder.ApplyConfiguration(new LabelConfiguration(this));
+        modelBuilder.ApplyConfiguration(new TaskLabelConfiguration(this));
         modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration(this));
         modelBuilder.ApplyConfiguration(new AccessRefusalConfiguration());
         modelBuilder.ApplyConfiguration(new ApiTokenConfiguration());

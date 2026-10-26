@@ -117,6 +117,7 @@ builder.Services.AddScoped<ActiveSpaceState>();
 // Story 2.2: the one sender every Space-scoped write goes through (its Idempotency-Key and anti-forgery
 // rules exist once), and the routed page's heading, which the skip control and a first arrival focus.
 builder.Services.AddScoped<SpaceWrites>();
+builder.Services.AddScoped<SpaceNarration>();
 builder.Services.AddScoped<PageHeadingFocus>();
 
 var host = builder.Build();

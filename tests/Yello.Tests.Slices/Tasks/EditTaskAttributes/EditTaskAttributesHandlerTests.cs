@@ -77,6 +77,66 @@ public sealed class EditTaskAttributesHandlerTests
     }
 
     /// <summary>
+    /// Story 2.4, AC2, AC7, Q1 (a) - a Labels edit hands the whole set to the store and answers the set it now carries.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-22")]
+    public async Task A_Labels_edit_replaces_the_whole_set_and_answers_it()
+    {
+        var spaceId = Guid.NewGuid();
+        var task = NewTask(spaceId);
+        var store = new RecordingStore(task);
+        IReadOnlyList<Guid> labels = [Guid.NewGuid(), Guid.NewGuid()];
+
+        var result = await new EditTaskAttributesHandler(store, new FixedStatuses())
+            .HandleAsync(task.Id, new TaskEdit(null, null, false, null, ChangesLabels: true, LabelIds: labels), TestContext.Current.CancellationToken);
+
+        Assert.Equal(EditTaskAttributesOutcome.Edited, result.Outcome);
+        Assert.Equal(labels, Assert.Single(store.Replacements));
+        Assert.Equal(labels, result.LabelIds);
+    }
+
+    /// <summary>
+    /// Story 2.4, AC10, AC11 - a set the store cannot see whole (unknown, another Space's, or deleted under the edit) is
+    /// <see cref="EditTaskAttributesOutcome.LabelsInvalid"/>, never an edit.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-22")]
+    public async Task A_Labels_edit_the_store_cannot_see_whole_is_refused()
+    {
+        var spaceId = Guid.NewGuid();
+        var task = NewTask(spaceId);
+        var store = new RecordingStore(task, labelsVisible: false);
+
+        var result = await new EditTaskAttributesHandler(store, new FixedStatuses())
+            .HandleAsync(task.Id, new TaskEdit(null, null, false, null, ChangesLabels: true, LabelIds: [Guid.NewGuid()]), TestContext.Current.CancellationToken);
+
+        Assert.Equal(EditTaskAttributesOutcome.LabelsInvalid, result.Outcome);
+        Assert.Null(result.Task);
+    }
+
+    /// <summary>
+    /// Story 2.4, AC7 - an edit that does not name the Labels never asks the store to replace them.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-22")]
+    public async Task An_edit_without_the_Labels_leaves_them_alone()
+    {
+        var spaceId = Guid.NewGuid();
+        var task = NewTask(spaceId);
+        var store = new RecordingStore(task);
+
+        var result = await new EditTaskAttributesHandler(store, new FixedStatuses())
+            .HandleAsync(task.Id, new TaskEdit("Renamed", null, false, null), TestContext.Current.CancellationToken);
+
+        Assert.Equal(EditTaskAttributesOutcome.Edited, result.Outcome);
+        Assert.Empty(store.Replacements);
+    }
+
+    /// <summary>
     /// AR-34, Q4 (a) - a due date is the same instant at offset zero; <c>null</c> is no due date.
     /// </summary>
     [Fact]
@@ -159,9 +219,11 @@ public sealed class EditTaskAttributesHandlerTests
             Task.FromResult<IReadOnlyList<StatusDefinition>>(statuses);
     }
 
-    private sealed class RecordingStore(TaskItem? visible) : ITaskStore
+    private sealed class RecordingStore(TaskItem? visible, bool labelsVisible = true) : ITaskStore
     {
         public List<TaskEdit> Edits { get; } = [];
+
+        public List<IReadOnlyList<Guid>> Replacements { get; } = [];
 
         public Task<TaskItem?> CreateAsync(Guid spaceId, Guid projectId, Guid statusId, string title, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The edit slice creates no Task.");
@@ -175,5 +237,18 @@ public sealed class EditTaskAttributesHandlerTests
 
             return Task.FromResult(visible);
         }
+
+        public Task<bool> ReplaceLabelsAsync(Guid taskId, IReadOnlyList<Guid> labelIds, CancellationToken cancellationToken)
+        {
+            Replacements.Add(labelIds);
+
+            return Task.FromResult(labelsVisible);
+        }
+
+        public Task<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>> LabelIdsOfAsync(IReadOnlyCollection<Guid> taskIds, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>>(
+                Replacements.Count > 0 && visible is not null
+                    ? new Dictionary<Guid, IReadOnlyList<Guid>> { [visible.Id] = Replacements[^1] }
+                    : new Dictionary<Guid, IReadOnlyList<Guid>>());
     }
 }

@@ -58,17 +58,16 @@ public sealed partial class RefusalBoundaryGateTests
     private static readonly string[] StateChangingMethods = ["POST", "PUT", "PATCH", "DELETE"];
 
     /// <summary>
-    /// AC8, Task 2 - every name in <c>SpaceScopedEntities</c> other than <c>Label</c> (story 2.4) resolves to a
-    /// type in the Domain assembly. Today a wrong name in that list silently covers nothing: it names
-    /// <c>Yello.Domain.Tasks.Task</c>, which will never exist under Q1 (b). Dev-story updates the list to the
-    /// real name in the same change.
+    /// AC8, Task 2 - every name in <c>SpaceScopedEntities</c> resolves to a type in the Domain assembly, so a wrong
+    /// name in that list cannot silently cover nothing. Story 2.4 removed the temporary <c>Label</c> exclusion in the
+    /// change that added <c>Yello.Domain.Labels.Label</c>.
     /// </summary>
     [Fact]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AD-3")]
     public void Every_Space_scoped_entity_the_gates_name_resolves_to_a_Domain_type()
     {
-        var listed = SpaceScopedEntities.Where(name => name != "Yello.Domain.Labels.Label").ToList();
+        var listed = SpaceScopedEntities.ToList();
 
         // Vacuity guard: the list names the Task, so the assertion below is about it.
         Assert.Contains(TaskEntityName, listed);
@@ -115,7 +114,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// AC2, Task 3 - the Task creation request carries a title and nothing else: no Status, Project, Space or
     /// position, so "takes the first Status" and "belongs to the route's Project and Space" are true by
     /// construction. Widened by story 2.3: the Task contracts now also hold <c>EditTaskRequest</c>, whose own
-    /// property set <c>The_Task_edit_request_carries_the_title_the_Status_and_the_due_date_and_nothing_else</c>
+    /// property set <c>The_Task_edit_request_carries_its_editable_attributes_and_nothing_else</c>
     /// pins; the request set is still pinned exactly, so a third request fails here.
     /// </summary>
     [Fact]

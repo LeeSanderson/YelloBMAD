@@ -13,7 +13,7 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// The exact sentences are the dev phase's (story Task 10, "Copy"); these cases hold only that each type has its own key
-/// and copy. The types are literals until <c>ProblemTypes</c> holds them; on activation, use the constants.
+/// and copy. The types stay literals: they are the wire values the client meets.
 /// </remarks>
 public sealed partial class RefusalCopyTests
 {
@@ -22,7 +22,7 @@ public sealed partial class RefusalCopyTests
     /// fall through to "Not available.", which would be untrue here).
     /// </summary>
     /// <param name="problemType">The problem type.</param>
-    [Theory(Skip = "red: AC14 - RefusalCopy has no branch for the Label problem types yet (story 2.4 Task 10)")]
+    [Theory]
     [InlineData("urn:yello:problem:invalid-label-name")]
     [InlineData("urn:yello:problem:invalid-label-colour")]
     [InlineData("urn:yello:problem:label-name-taken")]

@@ -4,8 +4,8 @@ using Yello.Domain.Tasks;
 namespace Yello.Application.Tasks.EditTaskAttributes;
 
 /// <summary>
-/// Edits a Task's title, Status and due date in the active Space. FR-20 ("Edit Task attributes"); story 2.3,
-/// AC1, AC4, AC9.
+/// Edits a Task's title, Status, due date and Labels in the active Space. FR-20 ("Edit Task attributes"), FR-22;
+/// story 2.3, AC1, AC4, AC9; story 2.4, AC2, AC7, AC10.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -17,6 +17,13 @@ namespace Yello.Application.Tasks.EditTaskAttributes;
 /// <b>The Status is checked before anything is written</b> against the effective set of the Task's own Project
 /// (AD-17), so another Space's Status id is refused as a validation <c>400</c> rather than reaching the
 /// composite foreign key <c>(SpaceId, StatusId)</c>, which would answer it as a <c>500</c>.
+/// </para>
+/// <para>
+/// <b>Applying Labels is a Task edit</b> (story 2.4, open question 1 (a)): the same capability, the same
+/// idempotency, and the whole set replaces the Task's own. Which of the Labels exist is the store's to decide under
+/// its lock (AC10); a set with any missing - unknown, another Space's, or deleted under the request - comes back as
+/// <see cref="EditTaskAttributesOutcome.LabelsInvalid"/>, and the endpoint's <c>400</c> rolls back whatever the
+/// same edit had already written.
 /// </para>
 /// </remarks>
 /// <param name="store">Reads and writes the Task.</param>
@@ -60,7 +67,19 @@ public sealed class EditTaskAttributesHandler(ITaskStore store, IStatusDefinitio
 
         var edited = await store.EditAsync(taskId, edit, cancellationToken).ConfigureAwait(false);
 
-        return edited is null ? EditTaskAttributesResult.NotFound : EditTaskAttributesResult.Edited(edited);
+        if (edited is null)
+        {
+            return EditTaskAttributesResult.NotFound;
+        }
+
+        if (edit.ChangesLabels && !await store.ReplaceLabelsAsync(taskId, edit.LabelIds ?? [], cancellationToken).ConfigureAwait(false))
+        {
+            return EditTaskAttributesResult.LabelsInvalid;
+        }
+
+        var labels = await store.LabelIdsOfAsync([taskId], cancellationToken).ConfigureAwait(false);
+
+        return EditTaskAttributesResult.Edited(edited, labels.GetValueOrDefault(taskId, []));
     }
 }
 
@@ -69,24 +88,31 @@ public sealed class EditTaskAttributesHandler(ITaskStore store, IStatusDefinitio
 /// </summary>
 /// <param name="Outcome">What happened.</param>
 /// <param name="Task">The Task as stored, when <see cref="Outcome"/> is <see cref="EditTaskAttributesOutcome.Edited"/>.</param>
-public sealed record EditTaskAttributesResult(EditTaskAttributesOutcome Outcome, TaskItem? Task)
+/// <param name="LabelIds">The Labels the Task carries afterwards, by name then id; empty unless edited.</param>
+public sealed record EditTaskAttributesResult(EditTaskAttributesOutcome Outcome, TaskItem? Task, IReadOnlyList<Guid> LabelIds)
 {
     /// <summary>
     /// No Task in the active Space has the id.
     /// </summary>
-    public static EditTaskAttributesResult NotFound { get; } = new(EditTaskAttributesOutcome.NotFound, null);
+    public static EditTaskAttributesResult NotFound { get; } = new(EditTaskAttributesOutcome.NotFound, null, []);
 
     /// <summary>
     /// The Status is not in the Task's Project's effective set; nothing was written.
     /// </summary>
-    public static EditTaskAttributesResult StatusOutsideTheEffectiveSet { get; } = new(EditTaskAttributesOutcome.StatusOutsideTheEffectiveSet, null);
+    public static EditTaskAttributesResult StatusOutsideTheEffectiveSet { get; } = new(EditTaskAttributesOutcome.StatusOutsideTheEffectiveSet, null, []);
+
+    /// <summary>
+    /// A Label of the submitted set is not visible in the active Space; the edit must not be committed.
+    /// </summary>
+    public static EditTaskAttributesResult LabelsInvalid { get; } = new(EditTaskAttributesOutcome.LabelsInvalid, null, []);
 
     /// <summary>
     /// The edit was applied.
     /// </summary>
     /// <param name="task">The Task as stored.</param>
+    /// <param name="labelIds">The Labels it carries, by name then id.</param>
     /// <returns>The result.</returns>
-    public static EditTaskAttributesResult Edited(TaskItem task) => new(EditTaskAttributesOutcome.Edited, task);
+    public static EditTaskAttributesResult Edited(TaskItem task, IReadOnlyList<Guid> labelIds) => new(EditTaskAttributesOutcome.Edited, task, labelIds);
 }
 
 /// <summary>
@@ -108,4 +134,9 @@ public enum EditTaskAttributesOutcome
     /// The Status is not in the Task's Project's effective set.
     /// </summary>
     StatusOutsideTheEffectiveSet,
+
+    /// <summary>
+    /// A Label of the submitted set is unknown, another Space's, or was deleted under the edit (story 2.4, AC10).
+    /// </summary>
+    LabelsInvalid,
 }

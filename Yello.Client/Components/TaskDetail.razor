@@ -1,4 +1,5 @@
 @using Yello.Client.Spaces
+@using Yello.Contracts.Labels
 @using Yello.Contracts.Tasks
 
 @inject IStringLocalizer<ClientCopy> Localizer
@@ -16,8 +17,14 @@
     in a title field holding an uncommitted change reverts the field first, and Esc in the open picker
     closes the picker. On close the Board returns focus to the card that opened it.
 
-    ATTRIBUTES ONLY: title, Status, due date. No description region, no heading for one, no placeholder
-    (AC6; FR-31 is Epic 7). No Labels (2.4), no Assignee (4.6), no Move control (2.6), no delete (2.5).
+    ATTRIBUTES ONLY: title, Status, due date and - since story 2.4 - Labels, attributes above. No description
+    region, no heading for one, no placeholder (AC6; FR-31 is Epic 7). No Assignee (4.6), no Move control (2.6), no
+    delete (2.5).
+
+    THE LABELS (story 2.4, AC7): the applied chips, and a "Labels" control opening a multi-select listbox in the
+    panel - the Space's Labels, the applied ones selected, nothing else pre-selected (UX-DR11). Toggling one commits the
+    Task's whole new set at once, optimistically, like every other attribute. A Space with no Labels says so, with a
+    way to Space settings for a Role that may define them. A Viewer reads the chips as text.
 
     NO SAVE (AC2, UX-DR26). A title commits on Enter or when the field is left; a Status commits when it is
     chosen; a date commits when it is picked; "Clear due date" commits at once. Nothing reads "Save", and
@@ -100,6 +107,49 @@
                     }
                 </div>
             </div>
+
+            <div class="task-detail__field">
+                <button type="button"
+                        class="button-secondary task-detail__labels-control"
+                        id="@LabelsButtonId"
+                        aria-haspopup="listbox"
+                        aria-expanded="@(_labelPickerOpen ? "true" : "false")"
+                        @onclick="ToggleLabelPicker"
+                        @ref="_labelsButton">@Localizer["LabelsControl"]</button>
+
+                @if (AppliedLabels.Count > 0)
+                {
+                    <div class="task-detail__labels">
+                        @foreach (var label in AppliedLabels)
+                        {
+                            <LabelChip @key="label.Id" Name="@label.Name" Colour="@label.Colour" />
+                        }
+                    </div>
+                }
+
+                @if (_labelPickerOpen && SpaceLabels.Count > 0)
+                {
+                    @* In the panel, not a second dialog: selected exactly where applied (UX-DR11). *@
+                    <ul class="picker" role="listbox" aria-multiselectable="true" aria-labelledby="@LabelsButtonId">
+                        @foreach (var label in SpaceLabels)
+                        {
+                            <LabelOption @key="label.Id" Label="@label" Selected="@Item.LabelIds.Contains(label.Id)" OnToggle="ToggleLabelAsync" @ref="_lastLabelOption" />
+                        }
+                    </ul>
+                }
+
+                @if (_labelPickerOpen && SpaceLabels.Count == 0)
+                {
+                    <p class="task-detail__labels-empty">
+                        @Localizer["LabelsEmpty"]
+
+                        @if (CanManageLabels)
+                        {
+                            <a class="task-detail__labels-link" href="@ClientRoutes.SpaceSettings(SpaceId)" @ref="_settingsLink">@Localizer["SpaceSettingsLink"]</a>
+                        }
+                    </p>
+                }
+            </div>
         }
 
         @if (!CanManage)
@@ -112,6 +162,17 @@
                 {
                     <dt class="form-field__label">@Localizer["TaskDetailDueDateLabel"]</dt>
                     <dd>@TaskDates.FullDate(due)</dd>
+                }
+
+                @if (AppliedLabels.Count > 0)
+                {
+                    <dt class="form-field__label">@Localizer["LabelsControl"]</dt>
+                    <dd class="task-detail__labels">
+                        @foreach (var label in AppliedLabels)
+                        {
+                            <LabelChip @key="label.Id" Name="@label.Name" Colour="@label.Colour" />
+                        }
+                    </dd>
                 }
             </dl>
         }
@@ -132,6 +193,9 @@
     private ElementReference _statusButton;
     private ElementReference _dueDate;
     private ElementReference _clear;
+    private ElementReference _labelsButton;
+    private ElementReference _settingsLink;
+    private LabelOption? _lastLabelOption;
 
     private string _titleDraft = string.Empty;
     private string? _shownTitle;
@@ -140,6 +204,8 @@
     private bool _escapeHandled;
     private bool _focusDueDate;
     private bool _focusStatusButton;
+    private bool _labelPickerOpen;
+    private bool _focusLabelsButton;
 
     /// <summary>The Task, as the Board's replica shows it now.</summary>
     [Parameter]
@@ -150,6 +216,18 @@
     [Parameter]
     [EditorRequired]
     public IReadOnlyList<TaskStatusOption> Statuses { get; set; } = [];
+
+    /// <summary>The Space the Task is in, for the way to Space settings when it has no Labels.</summary>
+    [Parameter]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>The Space's Labels, in the server's order (by name, then id). Story 2.4.</summary>
+    [Parameter]
+    public IReadOnlyList<LabelResponse> SpaceLabels { get; set; } = [];
+
+    /// <summary>Whether the Role held may define Labels, so an empty picker offers the way to Space settings.</summary>
+    [Parameter]
+    public bool CanManageLabels { get; set; }
 
     /// <summary>Whether the Role held may edit the Task; otherwise its attributes render as text.</summary>
     [Parameter]
@@ -171,6 +249,10 @@
     [Parameter]
     public EventCallback<DateTimeOffset?> OnDueDate { get; set; }
 
+    /// <summary>Raised with the Task's whole new set of Labels, in the server's order, when one is toggled.</summary>
+    [Parameter]
+    public EventCallback<IReadOnlyList<Guid>> OnLabels { get; set; }
+
     /// <summary>Raised when the panel is closed, by Close or by Esc.</summary>
     [Parameter]
     public EventCallback OnClose { get; set; }
@@ -186,6 +268,12 @@
     private string StatusButtonId => "task-detail-status-" + _id;
 
     private string DueDateId => "task-detail-due-" + _id;
+
+    private string LabelsButtonId => "task-detail-labels-" + _id;
+
+    // The Labels the Task carries, in its own (server) order; an id this tab holds no Label for is not drawn.
+    private List<LabelResponse> AppliedLabels =>
+        [.. Item.LabelIds.Select(id => SpaceLabels.FirstOrDefault(label => label.Id == id)).OfType<LabelResponse>()];
 
     private string StatusName => Statuses.FirstOrDefault(status => status.Id == Item.StatusId)?.Name ?? string.Empty;
 
@@ -204,6 +292,7 @@
         if (!CanManage)
         {
             _pickerOpen = false;
+            _labelPickerOpen = false;
             _titleMessage = null;
         }
     }
@@ -227,6 +316,12 @@
         {
             _focusStatusButton = false;
             await _statusButton.FocusAsync();
+        }
+
+        if (_focusLabelsButton)
+        {
+            _focusLabelsButton = false;
+            await _labelsButton.FocusAsync();
         }
     }
 
@@ -255,24 +350,40 @@
             return Task.CompletedTask;
         }
 
+        if (_labelPickerOpen)
+        {
+            _labelPickerOpen = false;
+            _focusLabelsButton = true;
+            return Task.CompletedTask;
+        }
+
         return OnClose.InvokeAsync();
     }
 
     private async Task FocusFirstAsync() => await _close.FocusAsync();
 
+    /// <summary>
+    /// Shift+Tab from the panel's start goes to its last control: for a Role that edits, the Labels field's last - the
+    /// open picker's last option, the way to Space settings in an empty one, or the Labels control itself (story 2.4
+    /// moved the end of the panel from the due date's controls).
+    /// </summary>
     private async Task FocusLastAsync()
     {
         if (!CanManage)
         {
             await _close.FocusAsync();
         }
-        else if (Item.DueDate is not null)
+        else if (_labelPickerOpen && SpaceLabels.Count > 0 && _lastLabelOption is { } last)
         {
-            await _clear.FocusAsync();
+            await last.FocusAsync();
+        }
+        else if (_labelPickerOpen && SpaceLabels.Count == 0 && CanManageLabels)
+        {
+            await _settingsLink.FocusAsync();
         }
         else
         {
-            await _dueDate.FocusAsync();
+            await _labelsButton.FocusAsync();
         }
     }
 
@@ -324,6 +435,23 @@
     }
 
     private void TogglePicker() => _pickerOpen = !_pickerOpen;
+
+    private void ToggleLabelPicker() => _labelPickerOpen = !_labelPickerOpen;
+
+    /// <summary>
+    /// Toggles one Label and commits the Task's whole new set (story 2.4, open question 1 (a)), in the server's order so
+    /// the card and the panel draw it as a read would. The picker stays open: several Labels are often chosen at once.
+    /// </summary>
+    private Task ToggleLabelAsync(Guid labelId)
+    {
+        var carried = Item.LabelIds.Contains(labelId)
+            ? Item.LabelIds.Where(id => id != labelId).ToHashSet()
+            : Item.LabelIds.Append(labelId).ToHashSet();
+
+        IReadOnlyList<Guid> next = [.. SpaceLabels.Select(label => label.Id).Where(carried.Contains)];
+
+        return OnLabels.InvokeAsync(next);
+    }
 
     private Task ChooseAsync(Guid statusId)
     {

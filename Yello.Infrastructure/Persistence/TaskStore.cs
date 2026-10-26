@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Yello.Domain;
 using Yello.Domain.Tasks;
@@ -5,7 +6,8 @@ using Yello.Domain.Tasks;
 namespace Yello.Infrastructure.Persistence;
 
 /// <summary>
-/// Creates, reads and edits Tasks inside the request's Space-scoped unit of work. Stories 2.2 and 2.3.
+/// Creates, reads and edits Tasks, and the Labels applied to them, inside the request's Space-scoped unit of work.
+/// Stories 2.2, 2.3 and 2.4.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,6 +29,18 @@ namespace Yello.Infrastructure.Persistence;
 /// placer takes its key-range locks in the same order and none can hold one column while waiting on another
 /// that the first holds - a column-only lock taken by the edit would interleave with the creation's
 /// Project-wide scan and could deadlock.
+/// </para>
+/// <para>
+/// <b>Applying Labels locks them first</b> (story 2.4, AC10): the submitted Labels are read under
+/// <c>UPDLOCK, HOLDLOCK</c> on the clustered key that a deletion locks too (<see cref="LabelStore"/> says why it is
+/// named) - raw SQL composed onto the <c>Label</c> set, so the query filter and the security
+/// policy both still narrow it - and a set with any Label missing is refused before a <c>TaskLabel</c> row is
+/// written, so the composite foreign key never answers it as a <c>500</c>. A deletion that committed first is then
+/// simply missing; one that comes second waits on the Label lock and then finds the application
+/// (<see cref="LabelStore"/>). <b>Lock order</b>: an edit takes the Project's Task range (a Status change only), then
+/// the Labels, then the Task's own <c>TaskLabel</c> rows; a deletion takes the Label, then its <c>TaskLabel</c>
+/// range. Label before TaskLabel in both, and a deletion never takes a Task lock, so the two cannot wait on each
+/// other in a cycle - measured by the story's race cases, which hold each side's lock and wait on the other.
 /// </para>
 /// <para>
 /// <b>Saves its own effect</b>, as every store does, so the idempotency record is the only thing the
@@ -140,6 +154,67 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
         await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         return task;
+    }
+
+    /// <inheritdoc />
+    public Task<bool> ReplaceLabelsAsync(Guid taskId, IReadOnlyList<Guid> labelIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(labelIds);
+
+        return ReplaceAsync(taskId, labelIds, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>> LabelIdsOfAsync(IReadOnlyCollection<Guid> taskIds, CancellationToken cancellationToken) =>
+        TaskLabelReads.LabelIdsOfAsync(dbContext, taskIds, cancellationToken);
+
+    private async Task<bool> ReplaceAsync(Guid taskId, IReadOnlyList<Guid> labelIds, CancellationToken cancellationToken)
+    {
+        var owner = await dbContext.Tasks
+            .Where(task => task.Id == taskId)
+            .Select(task => new { task.SpaceId })
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (owner is null)
+        {
+            return false;
+        }
+
+        var space = owner.SpaceId;
+
+        if (labelIds.Count > 0)
+        {
+            var submitted = JsonSerializer.Serialize(labelIds);
+
+            var visible = await dbContext.Labels
+                .FromSql($"SELECT * FROM dbo.[Label] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id IN (SELECT CAST([value] AS uniqueidentifier) FROM OPENJSON({submitted}))")
+                .AsNoTracking()
+                .CountAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+            if (visible != labelIds.Count)
+            {
+                return false;
+            }
+        }
+
+        var current = await dbContext.Set<TaskLabel>()
+            .Where(application => application.TaskId == taskId)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        dbContext.Set<TaskLabel>().RemoveRange(current.Where(application => !labelIds.Contains(application.LabelId)));
+
+        var now = clock.GetUtcNow();
+
+        dbContext.Set<TaskLabel>().AddRange(labelIds
+            .Where(labelId => !current.Exists(application => application.LabelId == labelId))
+            .Select(labelId => new TaskLabel { SpaceId = space, TaskId = taskId, LabelId = labelId, AppliedAt = now }));
+
+        await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return true;
     }
 
     /// <summary>

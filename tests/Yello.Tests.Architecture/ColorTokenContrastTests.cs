@@ -512,7 +512,10 @@ public sealed class ColorTokenContrastTests
             .SelectMany(r => r.Declarations)
             .Where(CssCorpus.IsCustomProperty)
             .Where(d => WcagContrast.IsHexColour(d.Value))
-            .Select(d => d.Property[2..]),
+            .Select(d => d.Property[2..])
+
+            // Story 2.4: the Label palette is its own family, gated by LabelPaletteGateTests.
+            .Where(n => !CssCorpus.IsLabelPaletteToken(n)),
     ];
 
     private static IReadOnlyDictionary<string, string> BuildDarkPalette()

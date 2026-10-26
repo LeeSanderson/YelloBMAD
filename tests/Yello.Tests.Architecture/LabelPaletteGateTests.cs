@@ -145,7 +145,7 @@ public sealed class LabelPaletteGateTests
     /// computed: 3:1 against <c>surface-card</c> and <c>surface-card-light</c>, 4.5:1 against <c>--label-ink</c>, and
     /// ΔE2000 10 from the dark and light value of each avoided colour. Anchored: the family and the ink are declared.
     /// </summary>
-    [Fact(Skip = "red: AC12 - tokens.css declares no --label-* family yet (story 2.4 Task 9; Q4)")]
+    [Fact]
     public void Every_Label_fill_meets_the_fill_rules_in_both_themes()
     {
         var fills = DeclaredFills();
@@ -162,7 +162,7 @@ public sealed class LabelPaletteGateTests
     /// AC12, Task 9 - the fills the token layer declares are exactly the Domain's <c>LabelPalette</c> keys (the wire
     /// carries a key, the token layer owns its hex, Q3), and the family holds nothing else but <c>--label-ink</c>.
     /// </summary>
-    [Fact(Skip = "red: AC12 - no LabelPalette in Domain and no --label-* family yet (story 2.4 Tasks 2, 9; Q3)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     public void The_token_palette_and_the_Domain_palette_are_the_same_set()
     {
@@ -177,11 +177,24 @@ public sealed class LabelPaletteGateTests
     }
 
     /// <summary>
+    /// AC12, Q3 - the keys the wire states for a client (<c>Yello.Contracts.Labels.LabelColours</c>, which the client
+    /// offers and which cannot reference the Domain) are the Domain's palette, in the same order. Added by the dev
+    /// phase with that contract.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "AR-34")]
+    public void The_wire_palette_is_the_Domain_palette_in_the_same_order()
+    {
+        Assert.NotEmpty(Yello.Domain.Labels.LabelPalette.Keys);
+        Assert.Equal(Yello.Domain.Labels.LabelPalette.Keys, Yello.Contracts.Labels.LabelColours.Keys);
+    }
+
+    /// <summary>
     /// AC4 ("against both card grounds simultaneously") - one fill renders in both themes, so no theme-boundary rule
     /// rebinds a <c>--label-*</c> token; a rebinding would let a fill pass the gate in one theme while rendering another.
     /// Anchored: the boundary rules exist and the family is declared outside them.
     /// </summary>
-    [Fact(Skip = "red: AC12 - no --label-* family yet, so the absence is vacuous (story 2.4 Task 9)")]
+    [Fact]
     [Trait("Priority", "P1")]
     public void No_theme_boundary_rule_rebinds_a_Label_token()
     {

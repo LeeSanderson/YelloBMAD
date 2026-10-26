@@ -1,0 +1,37 @@
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    ONE COLOUR OF THE DEFINE FORM'S PALETTE - story 2.4, open question 14; UX-DR7, UX-DR13. A native radio in the
+    "Colour" group, labelled by the colour's name with its swatch beside it: arrow keys come with the native group,
+    and nothing depends on colour because every swatch is named.
+*@
+
+<label class="label-define__colour">
+    <input type="radio" name="@GroupName" value="@Key" checked="@Checked" @onchange="ChooseAsync" />
+    <span class="label-swatch label-chip--@Key" aria-hidden="true"></span>
+    @Localizer[NameKey]
+</label>
+
+@code {
+    /// <summary>The palette key, such as <c>rust</c>.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string Key { get; set; } = string.Empty;
+
+    /// <summary>The radio group's name, shared by every colour of one form.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string GroupName { get; set; } = string.Empty;
+
+    /// <summary>Whether this colour is the one chosen.</summary>
+    [Parameter]
+    public bool Checked { get; set; }
+
+    /// <summary>Raised with the key when this colour is chosen.</summary>
+    [Parameter]
+    public EventCallback<string> OnChoose { get; set; }
+
+    private string NameKey => "LabelColour" + char.ToUpperInvariant(Key[0]) + Key[1..];
+
+    private Task ChooseAsync() => OnChoose.InvokeAsync(Key);
+}

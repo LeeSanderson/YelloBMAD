@@ -9,7 +9,8 @@ namespace Yello.Contracts.Tasks;
 /// </para>
 /// <para>
 /// <b><see cref="DueDate"/> was appended by story 2.3</b> - adding a field is legal in v1 (AD-19, FR-37);
-/// removing or retyping one is not.
+/// removing or retyping one is not. <see cref="LabelIds"/> was appended by story 2.4 on the same terms, as a member
+/// that defaults to empty, so every earlier construction still states a Task with no Labels.
 /// </para>
 /// </remarks>
 /// <param name="Id">Its id.</param>
@@ -24,4 +25,11 @@ public sealed record TaskResponse(
     Guid StatusId,
     string PositionKey,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? DueDate = null);
+    DateTimeOffset? DueDate = null)
+{
+    /// <summary>
+    /// The Labels the Task carries, as ids of its Space's Labels, by Label name and then id (story 2.4, open question
+    /// 12) - so a card's first three are the same on every read. Empty when it carries none.
+    /// </summary>
+    public IReadOnlyList<Guid> LabelIds { get; init; } = [];
+}

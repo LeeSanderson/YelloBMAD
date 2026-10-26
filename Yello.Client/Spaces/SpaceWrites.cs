@@ -43,6 +43,18 @@ public sealed class SpaceWrites(HttpClient http, AntiforgeryTokenSource antiforg
     }
 
     /// <summary>
+    /// Sends a bodiless state-changing request - a deletion (story 2.4) - with its key, and once more with the same key
+    /// if the anti-forgery token is refused.
+    /// </summary>
+    /// <param name="method">The method.</param>
+    /// <param name="path">The path.</param>
+    /// <param name="key">The <c>Idempotency-Key</c>.</param>
+    /// <param name="token">The active Space's token, cancelled by its purge.</param>
+    /// <returns>The answer; the caller disposes it.</returns>
+    public Task<SpaceWriteAnswer> SendWithoutBodyAsync(HttpMethod method, string path, string key, CancellationToken token) =>
+        SendCoreAsync(method, path, body: null, key, token);
+
+    /// <summary>
     /// The problem body of a refusal, or <c>null</c> when it carries none.
     /// </summary>
     /// <param name="response">The response.</param>
@@ -60,7 +72,7 @@ public sealed class SpaceWrites(HttpClient http, AntiforgeryTokenSource antiforg
             ? await response.Content.ReadFromJsonAsync<ProblemResponse>(JsonOptions, token)
             : null;
 
-    private async Task<SpaceWriteAnswer> SendCoreAsync(HttpMethod method, string path, object body, string key, CancellationToken token)
+    private async Task<SpaceWriteAnswer> SendCoreAsync(HttpMethod method, string path, object? body, string key, CancellationToken token)
     {
         await antiforgery.EnsureTokenAsync();
 
@@ -79,11 +91,11 @@ public sealed class SpaceWrites(HttpClient http, AntiforgeryTokenSource antiforg
     }
 
 
-    private static HttpRequestMessage Message(HttpMethod method, string path, object body, string key)
+    private static HttpRequestMessage Message(HttpMethod method, string path, object? body, string key)
     {
         var message = new HttpRequestMessage(method, new Uri(path, UriKind.Relative))
         {
-            Content = JsonContent.Create(body, body.GetType(), options: JsonOptions),
+            Content = body is null ? null : JsonContent.Create(body, body.GetType(), options: JsonOptions),
         };
 
         message.Headers.TryAddWithoutValidation(Idempotency.HeaderName, key);

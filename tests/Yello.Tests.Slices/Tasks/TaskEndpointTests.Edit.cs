@@ -33,7 +33,8 @@ namespace Yello.Tests.Slices.Tasks;
 /// </remarks>
 public sealed partial class TaskEndpointTests
 {
-    private static readonly string[] EditedTaskProperties = ["createdAt", "dueDate", "id", "positionKey", "statusId", "title"];
+    // Story 2.4 appended labelIds (AD-19); the edit and the read still answer exactly one shape.
+    private static readonly string[] EditedTaskProperties = ["createdAt", "dueDate", "id", "labelIds", "positionKey", "statusId", "title"];
 
     private static readonly string[] AlreadyDoneTitles = ["Already done one", "Already done two"];
 

@@ -1,3 +1,4 @@
+@using Yello.Contracts.Labels
 @using Yello.Contracts.Tasks
 
 @inject IStringLocalizer<ClientCopy> Localizer
@@ -32,7 +33,7 @@
         <ul class="board-column__cards">
             @foreach (var task in Tasks)
             {
-                <TaskCard @key="task.Id" Item="@task" OnOpen="OnOpen" FocusRequest="@(task.Id == FocusTaskId ? FocusRequest : 0)" />
+                <TaskCard @key="task.Id" Item="@task" Labels="@Labels" OnOpen="OnOpen" FocusRequest="@(task.Id == FocusTaskId ? FocusRequest : 0)" />
             }
         </ul>
     }
@@ -87,6 +88,10 @@
     /// <summary>Bumped by the Board with each return of focus to <see cref="FocusTaskId"/>'s card.</summary>
     [Parameter]
     public int FocusRequest { get; set; }
+
+    /// <summary>The Space's Labels by id, so each card can name the Labels it carries (story 2.4).</summary>
+    [Parameter]
+    public IReadOnlyDictionary<Guid, LabelResponse> Labels { get; set; } = new Dictionary<Guid, LabelResponse>();
 
     /// <summary>What sits between the head and the cards: the open creation field, in the first column.</summary>
     [Parameter]

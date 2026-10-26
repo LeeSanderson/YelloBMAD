@@ -341,3 +341,33 @@
     --motion-long-press-threshold: 320ms;
     --motion-long-press-slop: 10px;
 }
+
+:root {
+
+    /*
+        The Label palette (story 2.4; UX-DR13, AC4). A SEPARATE FAMILY from the 30 semantic colour
+        tokens above, declared once and NEVER rebound at the theme boundary: a Label's fill is one
+        colour in both themes, which is what lets the rule "3:1 against BOTH card grounds
+        simultaneously" be checked at all. The 30-token gates exclude this family by its named
+        `--label-` prefix, and `LabelPaletteGateTests` holds it instead - each fill COMPUTED
+        against `surface-card` and `surface-card-light` (3:1), against `--label-ink` (4.5:1), and
+        at least CIEDE2000 10 from both values of `focus-ring`, `danger`, `accent` and `presence`;
+        and the keys exactly the Domain's `LabelPalette`.
+
+        One ink for every fill, in both themes (story 2.4, open question 4). `DESIGN.md:180-183`
+        names `text-primary` as the chip foreground, but no fill can hold 3:1 against both card
+        grounds AND 4.5:1 against a foreground that swaps with the theme - the dark theme's
+        `text-primary` is too light (2.74-3.40:1 against these fills). The deviation is recorded in
+        `deferred-work.md` for UX. The page ground's value is reused, not referenced: the ink must
+        not move with the theme.
+    */
+    --label-rust: #D2592D;
+    --label-ochre: #B18225;
+    --label-olive: #8A8A42;
+    --label-grass: #5B9E2E;
+    --label-jade: #469169;
+    --label-teal: #428A8A;
+    --label-blue: #357FD4;
+    --label-orchid: #CC3DD6;
+    --label-ink: #0B1020;
+}

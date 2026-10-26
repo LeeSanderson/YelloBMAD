@@ -1,0 +1,48 @@
+@using Yello.Contracts.Labels
+
+@*
+    ONE LABEL IN THE TASK DETAIL PANEL'S LABEL PICKER - story 2.4, UX-DR11. The multi-select sibling of PickerOption:
+    an option of the in-panel listbox (aria-multiselectable), selected exactly when the Task carries the Label, so
+    nothing is pre-selected that is not already applied. Choosing one - click, Enter or Space - toggles it and commits
+    the Task's whole new set at once (open question 1 (a)); there is nothing to confirm. The swatch is decoration: the
+    option's name is its text, and nothing depends on colour (UX-DR7). The keyboard pattern beyond this is story 2.8's
+    (deferred-work.md:515).
+*@
+
+<li class="picker__option label-option"
+    role="option"
+    tabindex="0"
+    aria-selected="@(Selected ? "true" : "false")"
+    @onclick="ToggleAsync"
+    @onkeydown="KeyDownAsync"
+    @ref="_element"><span class="label-swatch label-chip--@ColourClass" aria-hidden="true"></span>@Label.Name</li>
+
+@code {
+    private ElementReference _element;
+
+    /// <summary>The Label this option offers.</summary>
+    [Parameter]
+    [EditorRequired]
+    public LabelResponse Label { get; set; } = new(Guid.Empty, string.Empty, string.Empty);
+
+    /// <summary>Whether the Task carries it now.</summary>
+    [Parameter]
+    public bool Selected { get; set; }
+
+    /// <summary>Raised with the Label's id when it is toggled.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnToggle { get; set; }
+
+    private string ColourClass => LabelColours.Keys.Contains(Label.Colour, StringComparer.Ordinal) ? Label.Colour : "unknown";
+
+    /// <summary>
+    /// Moves focus to this option - the panel's focus trap sends Shift+Tab from its start here when this is the last.
+    /// </summary>
+    /// <returns>A task.</returns>
+    public ValueTask FocusAsync() => _element.FocusAsync();
+
+    private Task ToggleAsync() => OnToggle.InvokeAsync(Label.Id);
+
+    private Task KeyDownAsync(KeyboardEventArgs args) =>
+        args.Key is "Enter" or " " ? ToggleAsync() : Task.CompletedTask;
+}

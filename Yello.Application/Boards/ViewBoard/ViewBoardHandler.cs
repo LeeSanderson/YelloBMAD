@@ -44,6 +44,7 @@ public sealed class ViewBoardHandler(IBoardReader reader, IStatusDefinitionReade
         var effective = EffectiveStatusSet.Of(await statuses.ListAsync(cancellationToken).ConfigureAwait(false));
         var totals = await reader.CountTasksByStatusAsync(projectId, cancellationToken).ConfigureAwait(false);
         var tasks = await reader.ListTasksAsync(projectId, cancellationToken).ConfigureAwait(false);
+        var labels = await reader.LabelIdsOfAsync([.. tasks.Select(task => task.Id)], cancellationToken).ConfigureAwait(false);
 
         var placed = effective.ToDictionary(status => status.Id, _ => new List<TaskItem>());
 
@@ -61,7 +62,7 @@ public sealed class ViewBoardHandler(IBoardReader reader, IStatusDefinitionReade
             .Select(status => new BoardColumnView(status, totals.GetValueOrDefault(status.Id), placed[status.Id]))
             .ToList();
 
-        return new BoardView(project, columns);
+        return new BoardView(project, columns, labels);
     }
 }
 
@@ -70,7 +71,14 @@ public sealed class ViewBoardHandler(IBoardReader reader, IStatusDefinitionReade
 /// </summary>
 /// <param name="Project">The Project.</param>
 /// <param name="Columns">One column per Status of its effective set, in effective order.</param>
-public sealed record BoardView(Project Project, IReadOnlyList<BoardColumnView> Columns);
+/// <param name="LabelIds">
+/// The Labels applied to each Task placed on the Board, by Label name then id; a Task carrying none is absent.
+/// Story 2.4.
+/// </param>
+public sealed record BoardView(
+    Project Project,
+    IReadOnlyList<BoardColumnView> Columns,
+    IReadOnlyDictionary<Guid, IReadOnlyList<Guid>> LabelIds);
 
 /// <summary>
 /// One column of a Board.

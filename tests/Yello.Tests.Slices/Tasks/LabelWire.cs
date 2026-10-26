@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Xunit;
+using Yello.Contracts.Labels;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
 
@@ -15,8 +16,7 @@ namespace Yello.Tests.Slices.Tasks;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Routes are <see cref="LabelScaffold"/>'s</b> until <c>Yello.Contracts.Labels.LabelRoutes</c> exists; bodies are
-/// anonymous objects or JSON text, so a case can send what the contract will not type (a hex colour, a non-GUID id).
+/// <b>Routes are <see cref="LabelRoutes"/>'s</b>; bodies are anonymous objects or JSON text, so a case can send what the contract will not type (a hex colour, a non-GUID id).
 /// </para>
 /// <para>
 /// <b>Seed constraints checked</b> against story 2.4 Task 3 for the two tables that do not exist yet:
@@ -46,13 +46,13 @@ internal static class LabelWire
         JsonContent.Create(new { labelIds }, options: TaskWire.JsonOptions);
 
     public static Task<WireResponse> DefineAsync(Actor actor, Guid spaceId, string? name, string? colour = Rust, string? key = null) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, LabelScaffold.LabelsOf(spaceId), DefinitionBody(name, colour), TaskWire.KeyHeader(key));
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, LabelRoutes.LabelsOf(spaceId), DefinitionBody(name, colour), TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> DefineRawAsync(Actor actor, Guid spaceId, HttpContent body) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, LabelScaffold.LabelsOf(spaceId), body, TaskWire.NoHeaders);
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, LabelRoutes.LabelsOf(spaceId), body, TaskWire.NoHeaders);
 
     public static Task<WireResponse> DefineWithTokenAsync(Actor actor, string token, Guid spaceId, string? name, string? colour = Rust, string? key = null) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, LabelScaffold.LabelsOf(spaceId), token, DefinitionBody(name, colour), TaskWire.KeyHeader(key));
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, LabelRoutes.LabelsOf(spaceId), token, DefinitionBody(name, colour), TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> DefineOnAsync(IsolationSurface surface, Actor actor, string token, Guid spaceId, string? name, string? colour = Rust, string? key = null) =>
         surface == IsolationSurface.ApiToken
@@ -60,18 +60,18 @@ internal static class LabelWire
             : DefineAsync(actor, spaceId, name, colour, key);
 
     public static Task<WireResponse> ListAsync(Actor actor, Guid spaceId) =>
-        actor.Session.GetAsync(LabelScaffold.LabelsOf(spaceId));
+        actor.Session.GetAsync(LabelRoutes.LabelsOf(spaceId));
 
     public static Task<WireResponse> ListOnAsync(IsolationSurface surface, Actor actor, string token, Guid spaceId) =>
         surface == IsolationSurface.ApiToken
-            ? actor.Session.GetWithTokenAsync(LabelScaffold.LabelsOf(spaceId), token)
+            ? actor.Session.GetWithTokenAsync(LabelRoutes.LabelsOf(spaceId), token)
             : ListAsync(actor, spaceId);
 
     public static Task<WireResponse> DeleteAsync(Actor actor, Guid spaceId, Guid labelId, string? key = null) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Delete, LabelScaffold.LabelOf(spaceId, labelId), content: null, TaskWire.KeyHeader(key));
+        actor.Session.SendWithHeadersAsync(HttpMethod.Delete, LabelRoutes.LabelOf(spaceId, labelId), content: null, TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> DeleteWithTokenAsync(Actor actor, string token, Guid spaceId, Guid labelId, string? key = null) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Delete, LabelScaffold.LabelOf(spaceId, labelId), token, content: null, TaskWire.KeyHeader(key));
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Delete, LabelRoutes.LabelOf(spaceId, labelId), token, content: null, TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> DeleteOnAsync(IsolationSurface surface, Actor actor, string token, Guid spaceId, Guid labelId, string? key = null) =>
         surface == IsolationSurface.ApiToken
@@ -189,6 +189,30 @@ internal static class LabelWire
         command.Parameters.Add(new SqlParameter("@label", labelId));
 
         Assert.Equal(1, await command.ExecuteNonQueryAsync(cancellationToken));
+    }
+
+    /// <summary>
+    /// Waits until at least <paramref name="expected"/> requests are blocked on a lock, or until
+    /// <paramref name="racing"/> has answered without waiting - the race case where waiting is what the product must
+    /// do and answering at once is the defect the assertions after it report. Never a delay.
+    /// </summary>
+    public static async Task WaitUntilBlockedOrAnsweredAsync(SqlConnection observer, int expected, Task racing, CancellationToken cancellationToken)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+
+        while (!racing.IsCompleted)
+        {
+            await using var command = observer.CreateCommand();
+
+            command.CommandText = "SELECT COUNT(*) FROM sys.dm_exec_requests WHERE database_id = DB_ID() AND blocking_session_id <> 0 AND wait_type LIKE 'LCK_M_%'";
+
+            if (Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture) >= expected)
+            {
+                return;
+            }
+
+            Assert.True(DateTimeOffset.UtcNow < deadline, $"Fewer than {expected} requests ever waited on a lock, and the racing one never answered.");
+        }
     }
 
     /// <summary>

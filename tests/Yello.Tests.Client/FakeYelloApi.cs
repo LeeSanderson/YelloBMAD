@@ -5,12 +5,12 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Playwright;
 using Yello.Contracts;
-using Yello.Contracts.ApiTokens;
 using Yello.Contracts.Accounts;
+using Yello.Contracts.ApiTokens;
+using Yello.Contracts.Labels;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
 using Yello.Contracts.Tasks;
-using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -45,6 +45,11 @@ internal sealed class FakeYelloApi
     /// The status <c>DecideAsync</c> answers when the connection must be reset rather than answered. Story 2.3.
     /// </summary>
     private const int AbortConnection = -1;
+
+    /// <summary>
+    /// The longest Label name the Host accepts (<c>LabelName.MaxLength</c>, story 2.4 Q2), which the fake mirrors.
+    /// </summary>
+    private const int FakeLabelNameMaxLength = 50;
 
     private readonly ConcurrentQueue<FakeRequest> _requests = new();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _held = new();
@@ -149,8 +154,8 @@ internal sealed class FakeYelloApi
 
     /// <summary>
     /// Each Space's Labels, as <c>GET …/labels</c> serves them, by name then id (story 2.4 Q12). Story 2.4 (written by
-    /// its ATDD run); the routes are <see cref="LabelScaffold"/>'s until <c>LabelRoutes</c> exists, and the bodies are
-    /// <see cref="FakeLabel"/>, shaped as story 2.4 Task 4's <c>LabelResponse</c>.
+    /// its ATDD run); the routes are <see cref="LabelRoutes"/>'s, and the bodies are <see cref="FakeLabel"/>, shaped as
+    /// <c>LabelResponse</c>.
     /// </summary>
     public IDictionary<Guid, List<FakeLabel>> Labels { get; } = new Dictionary<Guid, List<FakeLabel>>();
 
@@ -808,7 +813,7 @@ internal sealed class FakeYelloApi
             && sent.Distinct().Count() == sent.Count
             && sent.TrueForAll(id => spaceLabels.Any(label => label.Id == id));
 
-        return valid ? null : LabelScaffold.InvalidTaskLabels;
+        return valid ? null : ProblemTypes.InvalidTaskLabels;
     }
 
     /// <summary>
@@ -873,14 +878,14 @@ internal sealed class FakeYelloApi
         var name = (root.TryGetProperty("name", out var nameValue) && nameValue.ValueKind == JsonValueKind.String ? nameValue.GetString() ?? string.Empty : string.Empty).Trim();
         var colour = root.TryGetProperty("colour", out var colourValue) && colourValue.ValueKind == JsonValueKind.String ? colourValue.GetString() ?? string.Empty : string.Empty;
 
-        if (name.Length < 1 || name.Length > LabelScaffold.NameMaxLength)
+        if (name.Length < 1 || name.Length > FakeLabelNameMaxLength)
         {
-            return (400, Problem(LabelScaffold.InvalidLabelName));
+            return (400, Problem(ProblemTypes.InvalidLabelName));
         }
 
-        if (!LabelScaffold.PaletteKeys.Contains(colour, StringComparer.Ordinal))
+        if (!LabelColours.Keys.Contains(colour, StringComparer.Ordinal))
         {
-            return (400, Problem(LabelScaffold.InvalidLabelColour));
+            return (400, Problem(ProblemTypes.InvalidLabelColour));
         }
 
         if (!Labels.TryGetValue(spaceId, out var labels))
@@ -891,7 +896,7 @@ internal sealed class FakeYelloApi
 
         if (labels.Exists(label => string.Equals(label.Name, name, StringComparison.OrdinalIgnoreCase)))
         {
-            return (409, Problem(LabelScaffold.LabelNameTaken));
+            return (409, Problem(ProblemTypes.LabelNameTaken));
         }
 
         var created = new FakeLabel(Guid.NewGuid(), name, colour);
@@ -923,7 +928,7 @@ internal sealed class FakeYelloApi
 
         if (inUse)
         {
-            return (409, Problem(LabelScaffold.LabelInUse));
+            return (409, Problem(ProblemTypes.LabelInUse));
         }
 
         labels.RemoveAt(index);
@@ -932,7 +937,7 @@ internal sealed class FakeYelloApi
     }
 
     /// <summary>
-    /// Whether <paramref name="path"/> is <c>/api/v1/spaces/{s}/labels</c> - <see cref="LabelScaffold.LabelsOf"/>.
+    /// Whether <paramref name="path"/> is <c>/api/v1/spaces/{s}/labels</c> - <see cref="LabelRoutes.LabelsOf"/>.
     /// </summary>
     private static bool TryLabels(string path, out Guid spaceId)
     {
@@ -942,11 +947,11 @@ internal sealed class FakeYelloApi
 
         return path.StartsWith(prefix, StringComparison.Ordinal)
             && Guid.TryParse(path[prefix.Length..].Split('/')[0], out spaceId)
-            && path == LabelScaffold.LabelsOf(spaceId);
+            && path == LabelRoutes.LabelsOf(spaceId);
     }
 
     /// <summary>
-    /// Whether <paramref name="path"/> is <c>/api/v1/spaces/{s}/labels/{l}</c> - <see cref="LabelScaffold.LabelOf"/>.
+    /// Whether <paramref name="path"/> is <c>/api/v1/spaces/{s}/labels/{l}</c> - <see cref="LabelRoutes.LabelOf"/>.
     /// </summary>
     private static bool TryLabel(string path, out Guid spaceId, out Guid labelId)
     {
@@ -956,7 +961,7 @@ internal sealed class FakeYelloApi
 
         return TryLabels(string.Join('/', segments[..^1]), out spaceId)
             && Guid.TryParse(segments[^1], out labelId)
-            && path == LabelScaffold.LabelOf(spaceId, labelId);
+            && path == LabelRoutes.LabelOf(spaceId, labelId);
     }
 
     private void ReleaseHeldEdit(TaskEditOutcome outcome) => _lastTaskEditHold?.Released.TrySetResult(outcome);

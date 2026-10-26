@@ -611,4 +611,128 @@
     <value>That change could not be read.</value>
     <comment>400 invalid-task-edit, inline in the Task detail panel (story 2.3). The product's own client never meets it.</comment>
   </data>
+  <data name="SpaceSettingsLink" xml:space="preserve">
+    <value>Space settings</value>
+    <comment>The link from Space home to Space settings, for Owners and Admins only, and from an empty Label picker (story 2.4, open question 7).</comment>
+  </data>
+  <data name="SpaceSettingsHeading" xml:space="preserve">
+    <value>Space settings</value>
+    <comment>Space settings' page heading (story 2.4). Never names the Space: the context bar does.</comment>
+  </data>
+  <data name="SpaceSettingsNoLongerAvailable" xml:space="preserve">
+    <value>You're now a {0}. Space settings is no longer available.</value>
+    <comment>Narrated when a Role re-read lower no longer permits Space settings, then said on Space home (UX-DR29). {0} is the Role's name.</comment>
+  </data>
+  <data name="LabelsHeading" xml:space="preserve">
+    <value>Labels</value>
+    <comment>The Labels section of Space settings (story 2.4).</comment>
+  </data>
+  <data name="LabelsLoading" xml:space="preserve">
+    <value>Loading Labels.</value>
+    <comment>Announced while the Space's Labels are read (story 2.4). Never names a Label.</comment>
+  </data>
+  <data name="LabelsControl" xml:space="preserve">
+    <value>Labels</value>
+    <comment>The Task detail panel's Labels control, which opens the Label picker, and the Labels attribute's name for a Viewer (story 2.4).</comment>
+  </data>
+  <data name="LabelsEmpty" xml:space="preserve">
+    <value>No Labels yet.</value>
+    <comment>A Space with no Labels, in Space settings and in the Label picker (story 2.4).</comment>
+  </data>
+  <data name="LabelsMore" xml:space="preserve">
+    <value>+{0}</value>
+    <comment>The card's overflow after three Label chips (UX-DR8; story 2.4, open question 5). Text, never a control. {0} is how many more.</comment>
+  </data>
+  <data name="LabelsMoreName" xml:space="preserve">
+    <value>{0} more Labels</value>
+    <comment>The accessible name of the card's '+N' (story 2.4, open question 5). {0} is how many more.</comment>
+  </data>
+  <data name="LabelNameLabel" xml:space="preserve">
+    <value>Label name</value>
+    <comment>The define form's name field (story 2.4).</comment>
+  </data>
+  <data name="LabelColourLegend" xml:space="preserve">
+    <value>Colour</value>
+    <comment>The define form's colour radio group (story 2.4, open question 14).</comment>
+  </data>
+  <data name="LabelColourRust" xml:space="preserve">
+    <value>Rust</value>
+    <comment>Palette colour name: rust. Every swatch is named, so nothing depends on colour (UX-DR7).</comment>
+  </data>
+  <data name="LabelColourOchre" xml:space="preserve">
+    <value>Ochre</value>
+    <comment>Palette colour name: ochre.</comment>
+  </data>
+  <data name="LabelColourOlive" xml:space="preserve">
+    <value>Olive</value>
+    <comment>Palette colour name: olive.</comment>
+  </data>
+  <data name="LabelColourGrass" xml:space="preserve">
+    <value>Grass</value>
+    <comment>Palette colour name: grass.</comment>
+  </data>
+  <data name="LabelColourJade" xml:space="preserve">
+    <value>Jade</value>
+    <comment>Palette colour name: jade.</comment>
+  </data>
+  <data name="LabelColourTeal" xml:space="preserve">
+    <value>Teal</value>
+    <comment>Palette colour name: teal.</comment>
+  </data>
+  <data name="LabelColourBlue" xml:space="preserve">
+    <value>Blue</value>
+    <comment>Palette colour name: blue.</comment>
+  </data>
+  <data name="LabelColourOrchid" xml:space="preserve">
+    <value>Orchid</value>
+    <comment>Palette colour name: orchid.</comment>
+  </data>
+  <data name="LabelAdd" xml:space="preserve">
+    <value>Add Label</value>
+    <comment>The define form's one primary action (story 2.4). Never 'Save'.</comment>
+  </data>
+  <data name="LabelAdding" xml:space="preserve">
+    <value>Adding the Label.</value>
+    <comment>While a definition waits for the server, which gives the Label its id (story 2.4).</comment>
+  </data>
+  <data name="LabelAdded" xml:space="preserve">
+    <value>Label added.</value>
+    <comment>Announced politely once a Label is defined (story 2.4, open question 13).</comment>
+  </data>
+  <data name="LabelDeleted" xml:space="preserve">
+    <value>Label deleted.</value>
+    <comment>Announced politely once a Label is deleted (story 2.4, open question 13).</comment>
+  </data>
+  <data name="LabelDelete" xml:space="preserve">
+    <value>Delete Label</value>
+    <comment>A Label's delete control, and the confirmation's danger action (story 2.4).</comment>
+  </data>
+  <data name="LabelDeleteWarning" xml:space="preserve">
+    <value>Delete {0}? This cannot be undone.</value>
+    <comment>The in-place confirmation before a Label is deleted (UX-DR12, UX-DR36). {0} is the Label's name.</comment>
+  </data>
+  <data name="LabelCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Leaves a Label's delete confirmation without deleting.</comment>
+  </data>
+  <data name="LabelNameInvalid" xml:space="preserve">
+    <value>A Label's name is 1 to 50 characters.</value>
+    <comment>400 invalid-label-name, beside the define form's name field (story 2.4, open question 2).</comment>
+  </data>
+  <data name="InvalidLabelColour" xml:space="preserve">
+    <value>Choose one of the colours.</value>
+    <comment>400 invalid-label-colour (story 2.4, open question 3). The product's own form only offers the palette.</comment>
+  </data>
+  <data name="LabelNameTaken" xml:space="preserve">
+    <value>This Space already has a Label of that name.</value>
+    <comment>409 label-name-taken, beside the name field (story 2.4, open question 2). Never repeats the name.</comment>
+  </data>
+  <data name="LabelInUse" xml:space="preserve">
+    <value>This Label is on Tasks. Remove it from them first.</value>
+    <comment>409 label-in-use, on the Label's row (AC3; story 2.4, open question 11). No count, no Task names.</comment>
+  </data>
+  <data name="InvalidTaskLabels" xml:space="preserve">
+    <value>One of those Labels is not in this Space any more.</value>
+    <comment>400 invalid-task-labels, inline in the Task detail panel (story 2.4). Reverts the Labels only.</comment>
+  </data>
 </root>

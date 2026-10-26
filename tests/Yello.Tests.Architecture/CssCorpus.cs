@@ -225,6 +225,15 @@ internal static partial class CssCorpus
         offset > ThemeBoundaryRange.Begin && offset < ThemeBoundaryRange.End;
 
     /// <summary>
+    /// True when a token name (without its leading <c>--</c>) belongs to story 2.4's Label palette family -
+    /// <c>--label-{key}</c> and <c>--label-ink</c> - which is a separate family from the 30 semantic colour tokens:
+    /// declared once, never rebound at the theme boundary, and gated by <c>LabelPaletteGateTests</c>. The 30-token
+    /// gates exclude it by this named prefix, and only by it, so any other added colour still fails them.
+    /// </summary>
+    public static bool IsLabelPaletteToken(string name) =>
+        name.StartsWith("label-", StringComparison.Ordinal);
+
+    /// <summary>
     /// True when a declaration declares a custom property rather than a CSS property.
     /// </summary>
     public static bool IsCustomProperty(Declaration declaration) =>

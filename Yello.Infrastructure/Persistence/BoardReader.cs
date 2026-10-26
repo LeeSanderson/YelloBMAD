@@ -45,4 +45,8 @@ internal sealed class BoardReader(YelloDbContext dbContext) : IBoardReader
             .ThenBy(task => task.Id)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public Task<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>> LabelIdsOfAsync(IReadOnlyCollection<Guid> taskIds, CancellationToken cancellationToken) =>
+        TaskLabelReads.LabelIdsOfAsync(dbContext, taskIds, cancellationToken);
 }

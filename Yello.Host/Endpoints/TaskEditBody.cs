@@ -18,7 +18,13 @@ namespace Yello.Host.Endpoints;
 /// <para>
 /// <b>Every refusal is a <c>400</c> with a stable type per field</b> (open question 5 (a)), never a
 /// <c>500</c>, and none echoes what was sent. A member this route does not read is ignored; a body naming
-/// none of the three is refused.
+/// none of the four is refused.
+/// </para>
+/// <para>
+/// <b><c>labelIds</c> is the whole set</b> (story 2.4, open question 1 (a)): <c>[]</c> clears it; <c>null</c>, a
+/// value that is not an array, or an array longer than <see cref="MostLabelIds"/> is the shape refusal
+/// <c>invalid-task-edit</c>; an entry that is not an id, or an id named twice, is <c>invalid-task-labels</c> - the
+/// same type, and the same bytes, as a Label that is not the Space's, which only the store can tell.
 /// </para>
 /// </remarks>
 internal static partial class TaskEditBody
@@ -28,6 +34,17 @@ internal static partial class TaskEditBody
     private const string StatusMember = "statusId";
 
     private const string DueDateMember = "dueDate";
+
+    private const string LabelsMember = "labelIds";
+
+    private static readonly string[] AttributeMembers = [TitleMember, StatusMember, DueDateMember];
+
+    /// <summary>
+    /// The most entries a <c>labelIds</c> array may hold: an input-shape guard, so a hand-written body cannot make the
+    /// server parse and lock without limit - not an NFR-8 bound, which would be the PM's to set (story 2.4, open
+    /// question 6). No Task carries anywhere near this many Labels.
+    /// </summary>
+    private const int MostLabelIds = 500;
 
     /// <summary>
     /// The longest text a due date can be: an ISO 8601 instant with seven fractional digits and an offset is
@@ -61,16 +78,51 @@ internal static partial class TaskEditBody
             type: ProblemTypes.InvalidTaskStatus,
             title: "That Status is not one of this Task's Project's Statuses.");
 
+    /// <summary>
+    /// <c>400 invalid-task-labels</c>: a Label of the set is not one of the Space's. One body for a malformed id, a
+    /// repeated id, a random id, another Space's real id and a Label deleted under the edit alike (I-13).
+    /// </summary>
+    /// <returns>The refusal.</returns>
+    internal static IResult InvalidLabels() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            type: ProblemTypes.InvalidTaskLabels,
+            title: "Those Labels are not all this Space's.");
+
     private static (TaskEdit? Edit, IResult? Refusal) Read(JsonElement root)
+    {
+        var hasLabels = root.TryGetProperty(LabelsMember, out var labelsElement);
+
+        if (!hasLabels && !Array.Exists(AttributeMembers, member => root.TryGetProperty(member, out _)))
+        {
+            return (null, InvalidEdit());
+        }
+
+        var (attributes, refusal) = ReadAttributes(root);
+
+        if (refusal is not null)
+        {
+            return (null, refusal);
+        }
+
+        IReadOnlyList<Guid>? labelIds = null;
+
+        if (hasLabels && ReadLabels(labelsElement, out labelIds) is { } labelsRefusal)
+        {
+            return (null, labelsRefusal);
+        }
+
+        return (attributes! with { ChangesLabels = hasLabels, LabelIds = labelIds }, null);
+    }
+
+    /// <summary>
+    /// The title, Status and due date members - story 2.3's - or the refusal of the first that is not one.
+    /// </summary>
+    private static (TaskEdit? Edit, IResult? Refusal) ReadAttributes(JsonElement root)
     {
         var hasTitle = root.TryGetProperty(TitleMember, out var titleElement);
         var hasStatus = root.TryGetProperty(StatusMember, out var statusElement);
         var hasDueDate = root.TryGetProperty(DueDateMember, out var dueDateElement);
-
-        if (!hasTitle && !hasStatus && !hasDueDate)
-        {
-            return (null, InvalidEdit());
-        }
 
         string? title = null;
         Guid? statusId = null;
@@ -92,6 +144,32 @@ internal static partial class TaskEditBody
         }
 
         return (new TaskEdit(title, statusId, hasDueDate, dueDate), null);
+    }
+
+    private static IResult? ReadLabels(JsonElement element, out IReadOnlyList<Guid>? labelIds)
+    {
+        labelIds = null;
+
+        if (element.ValueKind != JsonValueKind.Array || element.GetArrayLength() > MostLabelIds)
+        {
+            return InvalidEdit();
+        }
+
+        var ids = new List<Guid>(element.GetArrayLength());
+
+        foreach (var entry in element.EnumerateArray())
+        {
+            if (entry.ValueKind != JsonValueKind.String || !entry.TryGetGuid(out var id) || ids.Contains(id))
+            {
+                return InvalidLabels();
+            }
+
+            ids.Add(id);
+        }
+
+        labelIds = ids;
+
+        return null;
     }
 
     private static async Task<JsonDocument?> ParseAsync(HttpRequest request, CancellationToken cancellationToken)
@@ -169,7 +247,7 @@ internal static partial class TaskEditBody
         Results.Problem(
             statusCode: StatusCodes.Status400BadRequest,
             type: ProblemTypes.InvalidTaskEdit,
-            title: "A Task edit names its title, Status or due date.");
+            title: "A Task edit names its title, Status, due date or Labels.");
 
     private static IResult InvalidTitle() =>
         Results.Problem(

@@ -2,6 +2,7 @@
 @using System.Text.Json
 @using Yello.Client.Spaces
 @using Yello.Contracts.Boards
+@using Yello.Contracts.Labels
 @using Yello.Contracts.Tasks
 
 @implements IDisposable
@@ -86,6 +87,7 @@
                              Name="@column.Name"
                              Total="@column.Total"
                              Tasks="@column.Tasks"
+                             Labels="@_labelsById"
                              OnOpen="Open"
                              FocusTaskId="@_focusCard"
                              FocusRequest="@_focusCardRequests"
@@ -106,10 +108,14 @@
                         Item="@open"
                         Statuses="@_statusOptions"
                         CanManage="@_canManage"
+                        SpaceId="@SpaceId"
+                        SpaceLabels="@_labels"
+                        CanManageLabels="@_canManageLabels"
                         Refusal="@_panelRefusal"
                         OnTitle="title => EditAsync(open.Id, TaskAttribute.Title, title)"
                         OnStatus="statusId => EditAsync(open.Id, TaskAttribute.Status, statusId)"
                         OnDueDate="due => EditAsync(open.Id, TaskAttribute.DueDate, due)"
+                        OnLabels="labelIds => EditAsync(open.Id, TaskAttribute.Labels, labelIds)"
                         OnClose="Close" />
         }
     </div>
@@ -128,6 +134,7 @@
     private List<ColumnState>? _columns;
     private string _projectName = string.Empty;
     private bool _canManage;
+    private bool _canManageLabels;
     private string? _announcement;
     private bool _creating;
 
@@ -176,6 +183,7 @@
     protected override void OnParametersSet()
     {
         _canManage = TaskCapabilities.PermitsManageTasks(RoleCode);
+        _canManageLabels = LabelCapabilities.PermitsManageLabels(RoleCode);
 
         if (!_canManage)
         {
@@ -220,6 +228,13 @@
 
         try
         {
+            // The Space's Labels first (story 2.4): a card names the Labels it carries from this list, so the Board
+            // is drawn only once both have answered.
+            if (await LoadLabelsAsync(generation, token) is not { } labels)
+            {
+                return;
+            }
+
             using var response = await Http.GetAsync(new Uri(BoardRoutes.BoardOf(SpaceId, ProjectId), UriKind.Relative), token);
 
             if (generation != _generation || token.IsCancellationRequested)
@@ -233,6 +248,7 @@
 
                 if (board is not null && generation == _generation && ActiveSpace.ShowProject(SpaceId, board.Project.Name))
                 {
+                    UseLabels(labels);
                     _projectName = board.Project.Name;
                     _columns = [.. board.Columns.Select(column => new ColumnState(column.StatusId, column.Name, column.Total, [.. column.Tasks]))];
                     UseStatuses(board.Columns.Select(column => new TaskStatusOption(column.StatusId, column.Name)));
@@ -264,6 +280,32 @@
         {
             await RefuseUnlessLeftAsync(generation);
         }
+    }
+
+    /// <summary>
+    /// The Space's Labels, in the server's order, or <c>null</c> when the read was refused (the refusal surface has
+    /// been raised) or the tab has left.
+    /// </summary>
+    private async Task<List<LabelResponse>?> LoadLabelsAsync(int generation, CancellationToken token)
+    {
+        using var response = await Http.GetAsync(new Uri(LabelRoutes.LabelsOf(SpaceId), UriKind.Relative), token);
+
+        if (generation != _generation || token.IsCancellationRequested)
+        {
+            return null;
+        }
+
+        if (response.IsSuccessStatusCode)
+        {
+            return await response.Content.ReadFromJsonAsync<List<LabelResponse>>(JsonOptions, token);
+        }
+
+        if (response.StatusCode != HttpStatusCode.Unauthorized)
+        {
+            await OnRefused.InvokeAsync(await SpaceWrites.ProblemOfAsync(response, token));
+        }
+
+        return null;
     }
 
     private async Task RefuseUnlessLeftAsync(int generation)

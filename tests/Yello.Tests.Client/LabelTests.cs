@@ -1,7 +1,7 @@
 using System.Text.Json;
 using Microsoft.Playwright;
 using Xunit;
-using Yello.Tests.Shared;
+using Yello.Contracts.Labels;
 
 namespace Yello.Tests.Client;
 
@@ -88,7 +88,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// is text, not a second control.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - no Label chips on the card yet (story 2.4 Task 10; Q5)")]
+    [Fact]
     [Trait("Requirement", "UX-DR8")]
     public async Task A_card_shows_three_chips_in_server_order_then_plus_N()
     {
@@ -123,7 +123,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// in its metadata row or in the card: the row wraps to more than one line instead. Anchored: the chips rendered.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - no Label chips on the card yet (story 2.4 Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR41")]
     [Trait("Requirement", "NFR-9")]
     public async Task At_320px_a_card_with_six_long_Labels_wraps_and_never_scrolls_sideways()
@@ -148,8 +148,10 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
 
             Assert.True(await meta.EvaluateAsync<bool>("m => m.scrollWidth <= m.clientWidth + 1"), "The metadata row overflows sideways.");
             Assert.True(await card.EvaluateAsync<bool>("c => c.scrollWidth <= c.clientWidth + 1"), "The card overflows sideways.");
+            // A second line, not merely different tops: centred chips of different heights on one line have different
+            // tops too (corrected by the dev phase - a flex-wrap: nowrap plant passed the first form).
             Assert.True(
-                await meta.EvaluateAsync<bool>("m => new Set([...m.children].map(child => Math.round(child.getBoundingClientRect().top))).size > 1"),
+                await meta.EvaluateAsync<bool>("m => { const boxes = [...m.children].map(child => child.getBoundingClientRect()); return boxes.some(a => boxes.some(b => b.top >= a.bottom - 1)); }"),
                 "The metadata row did not wrap.");
         }
     }
@@ -159,7 +161,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// applied ones selected, every other one not - nothing pre-selected that is not already applied.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - no Label picker in the panel yet (story 2.4 Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR11")]
     public async Task The_picker_offers_exactly_the_Spaces_Labels_with_the_applied_ones_selected()
     {
@@ -197,7 +199,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// the chip stays.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - no Label picker or labelIds edit yet (story 2.4 Task 10; Q1)")]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     [Trait("Requirement", "AD-18")]
     public async Task Applying_a_Label_renders_at_once_and_the_server_admits_it_afterwards()
@@ -246,7 +248,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// <param name="capability">A <c>403</c>'s capability.</param>
     /// <param name="copy">The sentence expected, or <c>null</c> for "its own copy, not Not available.".</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC7 - no Label picker or Labels revert yet (story 2.4 Task 10)")]
+    [Theory]
     [InlineData(400, "urn:yello:problem:invalid-task-labels", null, null)]
     [InlineData(403, InsufficientRoleType, "manage-tasks", ManageTasksCopy)]
     [InlineData(409, IdempotencyKeyInFlightType, null, InFlightCopy)]
@@ -301,7 +303,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="notFound">Whether the edit is answered <c>404</c> (otherwise not at all).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC7 - no Label picker or Labels revert yet (story 2.4 Task 10)")]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "AD-11")]
@@ -343,7 +345,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// the Labels edit was held stays on the card and in the panel.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - no TaskAttribute.Labels in the replica yet (story 2.4 Task 10)")]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     public async Task A_Labels_refusal_reverts_only_the_Labels()
     {
@@ -383,7 +385,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// Space home has the link.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - no Space settings page or link yet (story 2.4 Task 10; Q7)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "UX-DR32")]
     public async Task A_Member_has_no_Label_definition_affordance()
@@ -421,7 +423,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// the Owner's panel on the other Space's Board has the "Labels" control.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - no Labels field in the panel yet (story 2.4 Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "AD-1")]
     public async Task A_Viewer_sees_the_Labels_as_text_and_no_picker()
@@ -461,7 +463,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="fromSettings">Whether the switch is made from Space settings (otherwise from the open panel).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC14 - no Label list state to purge yet (story 2.4 Task 10)")]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     [Trait("Requirement", "UX-DR31")]
@@ -505,7 +507,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// deletes and leaves the list.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - no Labels surface or delete confirm yet (story 2.4 Task 10; Q11)")]
+    [Fact]
     [Trait("Requirement", "UX-DR36")]
     [Trait("Requirement", "UX-DR26")]
     public async Task Deleting_a_Label_confirms_in_place_and_an_applied_one_is_kept_with_a_reason()
@@ -553,7 +555,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// the Label is listed only once the held definition is answered.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - no Space settings page or define form yet (story 2.4 Task 10; Q7, Q8, Q14)")]
+    [Fact]
     [Trait("Requirement", "UX-DR13")]
     [Trait("Requirement", "UX-DR33")]
     public async Task The_define_form_offers_the_palette_and_waits_for_the_server()
@@ -570,7 +572,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
 
             Assert.Equal("off", await name.GetAttributeAsync("autocomplete"));
             Assert.DoesNotContain((await name.GetAttributeAsync("name") ?? string.Empty).ToUpperInvariant(), ReusableFieldNames);
-            Assert.Equal(LabelScaffold.PaletteKeys.Count, await colours.CountAsync());
+            Assert.Equal(LabelColours.Keys.Count, await colours.CountAsync());
             Assert.All(await colours.EvaluateAllAsync<string[]>("radios => radios.map(radio => radio.labels.length ? radio.labels[0].textContent.trim() : '')"), label => Assert.False(string.IsNullOrEmpty(label)));
             Assert.Equal(1, await colours.EvaluateAllAsync<int>("radios => radios.filter(radio => radio.checked).length"));
             Assert.Equal(0, await page.Locator("main input[type='color']").CountAsync());
@@ -583,12 +585,12 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
 
             Assert.Equal(0, await RowOf(page, "Needs design").CountAsync());
 
-            var posted = Assert.Single(api.Requests, request => request.Method == "POST" && request.Path == LabelScaffold.LabelsOf(Northwind));
+            var posted = Assert.Single(api.Requests, request => request.Method == "POST" && request.Path == LabelRoutes.LabelsOf(Northwind));
 
             using (var document = JsonDocument.Parse(posted.Body ?? "{}"))
             {
                 Assert.Equal(["colour", "name"], document.RootElement.EnumerateObject().Select(member => member.Name).Order(StringComparer.Ordinal));
-                Assert.Contains(document.RootElement.GetProperty("colour").GetString(), LabelScaffold.PaletteKeys);
+                Assert.Contains(document.RootElement.GetProperty("colour").GetString(), LabelColours.Keys);
             }
 
             api.ReleaseLabelCreate();
@@ -602,7 +604,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// Space home: the narration names what happened, and the define form is gone.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - no Space settings page yet (story 2.4 Task 10; Q7)")]
+    [Fact]
     [Trait("Requirement", "UX-DR29")]
     [Trait("Requirement", "UX-DR37")]
     public async Task A_Role_reread_to_Member_on_Space_settings_is_narrated_then_routed_to_Space_home()
@@ -629,7 +631,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// stays and the Task's Labels stay as text.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - no Label picker yet (story 2.4 Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR37")]
     public async Task A_Role_reread_to_Viewer_removes_the_picker_in_place()
     {
@@ -664,7 +666,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// browser storage. Anchor: the Label is on screen.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - no Labels surface or picker yet (story 2.4 Task 10)")]
+    [Fact]
     [Trait("Requirement", "UX-DR33")]
     [Trait("Priority", "P1")]
     public async Task No_Label_name_reaches_the_tab_the_address_or_storage()
@@ -736,7 +738,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     /// </summary>
     private static List<FakeLabel> SeedLabels(FakeYelloApi api, Guid spaceId, params string[] names)
     {
-        var labels = names.Select((name, index) => new FakeLabel(Guid.NewGuid(), name, LabelScaffold.PaletteKeys[index % LabelScaffold.PaletteKeys.Count])).ToList();
+        var labels = names.Select((name, index) => new FakeLabel(Guid.NewGuid(), name, LabelColours.Keys[index % LabelColours.Keys.Count])).ToList();
 
         api.Labels[spaceId] = labels;
 

@@ -1,5 +1,6 @@
 @using System.Globalization
 @using Yello.Client.Spaces
+@using Yello.Contracts.Labels
 @using Yello.Contracts.Tasks
 
 @inject IStringLocalizer<ClientCopy> Localizer
@@ -7,9 +8,13 @@
 @*
     ONE TASK ON THE BOARD - stories 2.2 and 2.3; UX-DR8; DESIGN.md:137-144, :389-453.
 
-    THE TITLE IS THE CARD'S CONTENT. A metadata row in monospace sits beneath it: the due date when there
-    is one (story 2.3), in the viewer's own locale and zone (UX-DR42); Labels (2.4), the Assignee (4.6) and
-    Presence (Epic 7) join it later. No placeholder, no count, no badge, no streak.
+    THE TITLE IS THE CARD'S CONTENT. A metadata row in monospace sits beneath it: the Task's Labels (story 2.4) -
+    at most three chips, in the server's order, then "+N" - and the due date when there is one (story 2.3), in the
+    viewer's own locale and zone (UX-DR42); the Assignee (4.6) and Presence (Epic 7) join it later. The row wraps
+    before it ever scrolls sideways (UX-DR8, UX-DR41). No placeholder, no count beyond "+N", no badge, no streak.
+
+    "+N" IS TEXT, NOT A CONTROL (story 2.4, open question 5): the card keeps its one control, and the panel it opens
+    shows every Label. Its accessible name says what it counts.
 
     ONE CONTROL: the title is a native button that opens the Task detail panel (story 2.3, open question
     7 (a)), named by the title and carrying data-task-id so the panel can return focus to it. Every Role
@@ -22,7 +27,25 @@
     <button type="button" class="task-card__open" data-task-id="@Item.Id.ToString("D", CultureInfo.InvariantCulture)" @onclick="OpenAsync" @ref="_open">
         <span class="type-task-title task-card__title">@Item.Title</span>
     </button>
-    <div class="type-meta task-card__meta">@DueText</div>
+    <div class="type-meta task-card__meta">
+        @foreach (var label in ShownLabels)
+        {
+            <LabelChip @key="label.Id" Name="@label.Name" Colour="@label.Colour" />
+        }
+
+        @if (MoreLabels > 0)
+        {
+            <span class="label-more">
+                <span aria-hidden="true">@string.Format(CultureInfo.CurrentCulture, Localizer["LabelsMore"], MoreLabels)</span>
+                <span class="visually-hidden">@string.Format(CultureInfo.CurrentCulture, Localizer["LabelsMoreName"], MoreLabels)</span>
+            </span>
+        }
+
+        @if (DueText is { } due)
+        {
+            <span class="task-card__due">@due</span>
+        }
+    </div>
 </li>
 
 @code {
@@ -34,6 +57,10 @@
     [EditorRequired]
     public TaskResponse Item { get; set; }
 
+    /// <summary>The Space's Labels by id, so the card can name the ones it carries (story 2.4).</summary>
+    [Parameter]
+    public IReadOnlyDictionary<Guid, LabelResponse> Labels { get; set; } = new Dictionary<Guid, LabelResponse>();
+
     /// <summary>Raised with the Task's id when the card is opened.</summary>
     [Parameter]
     public EventCallback<Guid> OnOpen { get; set; }
@@ -44,6 +71,16 @@
     /// </summary>
     [Parameter]
     public int FocusRequest { get; set; }
+
+    /// <summary>The most chips a card shows before "+N" (UX-DR8).</summary>
+    private const int MostChips = 3;
+
+    // In the server's order (by name, then id); an id this tab does not hold a Label for is not drawn.
+    private List<LabelResponse> CarriedLabels => [.. Item.LabelIds.Select(id => Labels.GetValueOrDefault(id)).OfType<LabelResponse>()];
+
+    private IEnumerable<LabelResponse> ShownLabels => CarriedLabels.Take(MostChips);
+
+    private int MoreLabels => Math.Max(0, CarriedLabels.Count - MostChips);
 
     private string? DueText =>
         Item.DueDate is { } due

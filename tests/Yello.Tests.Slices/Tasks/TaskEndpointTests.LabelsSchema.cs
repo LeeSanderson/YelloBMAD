@@ -28,7 +28,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="table">The table.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC6 - no Label or TaskLabel table yet (story 2.4 Task 3)")]
+    [Theory]
     [InlineData("Label")]
     [InlineData("TaskLabel")]
     [Trait("Requirement", "AR-5")]
@@ -61,7 +61,7 @@ public sealed partial class TaskEndpointTests
     /// Anchor: the same connection may rename it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - no Label table yet (story 2.4 Task 3)")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     public async Task Moving_a_Label_to_another_Space_is_refused_by_the_database()
     {
@@ -102,7 +102,7 @@ public sealed partial class TaskEndpointTests
     /// its own to <c>Space</c>. <c>Label</c> reaches <c>Space</c> with cascade, as <c>Project</c> does.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - no Label or TaskLabel table yet (story 2.4 Task 3)")]
+    [Fact]
     [Trait("Requirement", "AR-8")]
     [Trait("Requirement", "FR-22")]
     public async Task TaskLabel_reaches_Task_and_Label_only_through_keys_that_carry_SpaceId()
@@ -126,7 +126,7 @@ public sealed partial class TaskEndpointTests
     /// delete's probe and its range lock stay inside one Space.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - no Label or TaskLabel table, and no AK_Task_SpaceId_Id, yet (story 2.4 Task 3)")]
+    [Fact]
     [Trait("Requirement", "AR-8")]
     [Trait("Priority", "P1")]
     public async Task The_Label_tables_carry_the_keys_their_references_and_the_in_use_probe_need()
@@ -158,7 +158,7 @@ public sealed partial class TaskEndpointTests
     /// deletes on the same connection.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - no Label or TaskLabel table yet (story 2.4 Task 3)")]
+    [Fact]
     [Trait("Requirement", "FR-22")]
     [Trait("Requirement", "AR-8")]
     public async Task The_database_refuses_deleting_a_Label_that_is_still_applied()

@@ -5,13 +5,15 @@ using System.Text.Json;
 using Yello.Client.Refusals;
 using Yello.Client.Spaces;
 using Yello.Contracts;
+using Yello.Contracts.Labels;
 using Yello.Contracts.Tasks;
 
 namespace Yello.Client.Components;
 
 /// <summary>
 /// The Board's Task detail panel and its replica: the product's first optimistic writes. Story 2.3; AC1,
-/// AC12, AC14; AD-11, AD-18; open questions 1 (a), 6 (a) and 8.
+/// AC12, AC14; AD-11, AD-18; open questions 1 (a), 6 (a) and 8. Story 2.4 adds the Labels as a fourth attribute
+/// (AC7): the same replica, queue, key and per-attribute revert, the whole set sent as <c>labelIds</c>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -42,19 +44,24 @@ public sealed partial class BoardView
     private readonly Dictionary<Guid, TaskReplica> _replicas = [];
 
     private List<TaskStatusOption> _statusOptions = [];
+
+    // The Space's Labels, in the server's order, and by id for the cards (story 2.4). Purged with the Board.
+    private IReadOnlyList<LabelResponse> _labels = [];
+    private IReadOnlyDictionary<Guid, LabelResponse> _labelsById = new Dictionary<Guid, LabelResponse>();
     private Guid? _openTaskId;
     private string? _panelRefusal;
     private Guid? _focusCard;
     private int _focusCardRequests;
 
     /// <summary>
-    /// The three attributes a Task edit can change.
+    /// The four attributes a Task edit can change.
     /// </summary>
     private enum TaskAttribute
     {
         Title,
         Status,
         DueDate,
+        Labels,
     }
 
     /// <summary>
@@ -109,6 +116,8 @@ public sealed partial class BoardView
     private void PurgePanel()
     {
         _replicas.Clear();
+        _labels = [];
+        _labelsById = new Dictionary<Guid, LabelResponse>();
         _statusOptions = [];
         _openTaskId = null;
         _panelRefusal = null;
@@ -116,6 +125,12 @@ public sealed partial class BoardView
     }
 
     private void UseStatuses(IEnumerable<TaskStatusOption> statuses) => _statusOptions = [.. statuses];
+
+    private void UseLabels(IReadOnlyList<LabelResponse> labels)
+    {
+        _labels = labels;
+        _labelsById = labels.ToDictionary(label => label.Id);
+    }
 
     /// <summary>
     /// One change from the panel: rendered at once, then sent - or queued behind an edit of the same attribute
@@ -165,7 +180,7 @@ public sealed partial class BoardView
 
             more = outcome == EditOutcome.Admitted
                 && replica.Queued.Remove(attribute, out sending)
-                && !Equals(sending, ValueOf(replica.Admitted, attribute));
+                && !SameValue(sending, ValueOf(replica.Admitted, attribute));
 
             if (more)
             {
@@ -402,6 +417,15 @@ public sealed partial class BoardView
         return null;
     }
 
+    /// <summary>
+    /// Whether two values of one attribute are the same: a set of Labels by its members in order, anything else by
+    /// value.
+    /// </summary>
+    private static bool SameValue(object? first, object? second) =>
+        first is IReadOnlyList<Guid> firstLabels && second is IReadOnlyList<Guid> secondLabels
+            ? firstLabels.SequenceEqual(secondLabels)
+            : Equals(first, second);
+
     private static Dictionary<string, object?> BodyOf(TaskAttribute attribute, object? value) =>
         new(StringComparer.Ordinal) { [MemberOf(attribute)] = value };
 
@@ -409,6 +433,7 @@ public sealed partial class BoardView
     {
         TaskAttribute.Title => "title",
         TaskAttribute.Status => "statusId",
+        TaskAttribute.Labels => "labelIds",
         _ => "dueDate",
     };
 
@@ -416,6 +441,7 @@ public sealed partial class BoardView
     {
         TaskAttribute.Title => task.Title,
         TaskAttribute.Status => task.StatusId,
+        TaskAttribute.Labels => task.LabelIds,
         _ => task.DueDate,
     };
 
@@ -424,6 +450,7 @@ public sealed partial class BoardView
         TaskAttribute.Title when value is string title => task with { Title = title },
         TaskAttribute.Status when value is Guid statusId => task with { StatusId = statusId },
         TaskAttribute.DueDate => task with { DueDate = value as DateTimeOffset? },
+        TaskAttribute.Labels when value is IReadOnlyList<Guid> labelIds => task with { LabelIds = labelIds },
         _ => task,
     };
 
@@ -435,6 +462,7 @@ public sealed partial class BoardView
     {
         TaskAttribute.Title => admitted with { Title = stored.Title },
         TaskAttribute.Status => admitted with { StatusId = stored.StatusId, PositionKey = stored.PositionKey },
+        TaskAttribute.Labels => admitted with { LabelIds = stored.LabelIds },
         _ => admitted with { DueDate = stored.DueDate },
     };
 

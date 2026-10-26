@@ -2,7 +2,9 @@ using System.Net;
 using System.Text.Json;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Labels;
 using Yello.Domain;
+using Yello.Domain.Labels;
 using Yello.Domain.Memberships;
 using Yello.Tests.Shared;
 using static Yello.Tests.Slices.Tasks.LabelWire;
@@ -19,8 +21,8 @@ namespace Yello.Tests.Slices.Tasks;
 /// <remarks>
 /// <para>
 /// <b>One class, one database</b>: these are partials of 2.2's <see cref="TaskEndpointTests"/> on the Slices engine -
-/// no new container-backed class (story Task 7). Routes and problem types are <see cref="LabelScaffold"/>'s until the
-/// contracts exist; answers are read as raw JSON.
+/// no new container-backed class (story Task 7). Routes and problem types are the contracts'; answers are read as raw
+/// JSON, so an added property cannot hide.
 /// </para>
 /// <para>
 /// <b>Scaffolded against the recommended options</b>: Q1 (a) <c>labelIds</c> on the Task <c>PATCH</c>, the whole set;
@@ -39,7 +41,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="surface">The surface the definition is sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - no Label route, contract or table yet (story 2.4 Tasks 2-5)")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "FR-22")]
@@ -70,7 +72,7 @@ public sealed partial class TaskEndpointTests
         Assert.Equal(LabelProperties, document.RootElement.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
         Assert.Equal("Needs design", document.RootElement.GetProperty("name").GetString());
         Assert.Equal("teal", document.RootElement.GetProperty("colour").GetString());
-        Assert.Equal(LabelScaffold.LabelOf(owner.SpaceId, id), created.Header("Location"));
+        Assert.Equal(LabelRoutes.LabelOf(owner.SpaceId, id), created.Header("Location"));
         Assert.Equal(HttpStatusCode.OK, listed?.StatusCode);
         Assert.Equal([id], ListedIds(listed!.Body));
         Assert.Equal([new LabelRow(id, owner.SpaceId, "Needs design", "teal")], await LabelRowsAsync(database, owner.SpaceId));
@@ -81,7 +83,7 @@ public sealed partial class TaskEndpointTests
     /// two different Projects of the Space: both <c>200</c>, both recorded.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - no Label route or labelIds member yet (story 2.4 Tasks 4-5)")]
+    [Fact]
     [Trait("Requirement", "FR-22")]
     public async Task An_Admins_Label_is_applicable_to_Tasks_in_every_Project_of_the_Space()
     {
@@ -126,7 +128,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="role">The refused Role, as stored.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - no Label route yet (story 2.4 Task 5)")]
+    [Theory]
     [InlineData("Member")]
     [InlineData("Viewer")]
     [Trait("Requirement", "FR-16")]
@@ -176,7 +178,7 @@ public sealed partial class TaskEndpointTests
     /// <c>labelIds</c> leaves them as they were.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - no labelIds member or TaskLabel table yet (story 2.4 Tasks 3-5)")]
+    [Fact]
     [Trait("Requirement", "FR-20")]
     [Trait("Requirement", "FR-22")]
     public async Task A_Member_applies_and_clears_Labels_and_an_edit_without_them_leaves_them()
@@ -232,7 +234,7 @@ public sealed partial class TaskEndpointTests
     /// the title, the Status, the due date or the position key.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - no labelIds member yet (story 2.4 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-20")]
     [Trait("Priority", "P1")]
     public async Task Labels_survive_other_edits_and_a_Labels_edit_touches_nothing_else()
@@ -273,7 +275,7 @@ public sealed partial class TaskEndpointTests
     /// is <c>200</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - no labelIds member yet (story 2.4 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-22")]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "NFR-7")]
@@ -330,7 +332,7 @@ public sealed partial class TaskEndpointTests
     /// <param name="length">The name's length.</param>
     /// <param name="blank">Whether it is spaces only.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11 - no Label route or LabelName rule yet (story 2.4 Tasks 2, 5; Q2)")]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(3, true)]
     [InlineData(51, false)]
@@ -343,7 +345,7 @@ public sealed partial class TaskEndpointTests
         Actor? owner = null;
         WireResponse? refused = null;
         WireResponse? anchor = null;
-        var longest = new string('n', LabelScaffold.NameMaxLength);
+        var longest = new string('n', LabelName.MaxLength);
 
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
@@ -355,7 +357,7 @@ public sealed partial class TaskEndpointTests
 
         Assert.NotNull(owner);
         Assert.Equal(HttpStatusCode.BadRequest, refused?.StatusCode);
-        Assert.Equal(LabelScaffold.InvalidLabelName, Problem(refused!)?.Type);
+        Assert.Equal(ProblemTypes.InvalidLabelName, Problem(refused!)?.Type);
         Assert.Empty(await RefusalKindsAsync(database, owner.AccountId, owner.SpaceId));
         Assert.Equal(HttpStatusCode.Created, anchor?.StatusCode);
         Assert.Equal([longest], (await LabelRowsAsync(database, owner.SpaceId)).Select(row => row.Name));
@@ -368,7 +370,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="colour">The colour sent.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC4 - no Label route or LabelPalette yet (story 2.4 Tasks 2, 5; Q3)")]
+    [Theory]
     [InlineData("magenta")]
     [InlineData("#D2592D")]
     [InlineData(null)]
@@ -391,7 +393,7 @@ public sealed partial class TaskEndpointTests
 
         Assert.NotNull(owner);
         Assert.Equal(HttpStatusCode.BadRequest, refused?.StatusCode);
-        Assert.Equal(LabelScaffold.InvalidLabelColour, Problem(refused!)?.Type);
+        Assert.Equal(ProblemTypes.InvalidLabelColour, Problem(refused!)?.Type);
         Assert.Equal(HttpStatusCode.Created, anchor?.StatusCode);
         Assert.Equal([Rust], (await LabelRowsAsync(database, owner.SpaceId)).Select(row => row.Colour));
     }
@@ -402,7 +404,7 @@ public sealed partial class TaskEndpointTests
     /// Space defines the same name.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - no Label route or unique index yet (story 2.4 Tasks 3, 5; Q2)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Assumption", "FR-22-Q2")]
     public async Task A_name_the_Space_already_holds_is_refused_409_and_another_Space_may_hold_it()
@@ -425,7 +427,7 @@ public sealed partial class TaskEndpointTests
 
         Assert.NotNull(owner);
         Assert.Equal(HttpStatusCode.Conflict, taken?.StatusCode);
-        Assert.Equal(LabelScaffold.LabelNameTaken, Problem(taken!)?.Type);
+        Assert.Equal(ProblemTypes.LabelNameTaken, Problem(taken!)?.Type);
         Assert.DoesNotContain("bug", taken!.Body, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(await RefusalKindsAsync(database, owner.AccountId, owner.SpaceId));
         Assert.Equal(["Bug"], (await LabelRowsAsync(database, owner.SpaceId)).Select(row => row.Name));
@@ -438,7 +440,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="body">The raw body.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11 - no Label route yet (story 2.4 Task 5)")]
+    [Theory]
     [InlineData("{ not json")]
     [InlineData("{}")]
     [InlineData("[\"rust\"]")]
@@ -469,7 +471,7 @@ public sealed partial class TaskEndpointTests
     /// the own Label alone is applied.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - no labelIds member yet (story 2.4 Task 5)")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "AR-34")]
@@ -514,7 +516,7 @@ public sealed partial class TaskEndpointTests
         foreach (var (what, refused) in answers)
         {
             Assert.True(refused.StatusCode == HttpStatusCode.BadRequest, $"{what}: {refused.StatusCode} {refused.Body}");
-            Assert.Equal(LabelScaffold.InvalidTaskLabels, Problem(refused)?.Type);
+            Assert.Equal(ProblemTypes.InvalidTaskLabels, Problem(refused)?.Type);
 
             foreach (var id in new[] { own, foreign, deleted, random })
             {
@@ -540,7 +542,7 @@ public sealed partial class TaskEndpointTests
     /// <param name="body">The raw body.</param>
     /// <param name="expected">The problem type.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11 - TaskEditBody does not read labelIds yet (story 2.4 Task 5; Q1, Q6)")]
+    [Theory]
     [InlineData("{\"labelIds\":null}", "urn:yello:problem:invalid-task-edit")]
     [InlineData("{\"labelIds\":\"rust\"}", "urn:yello:problem:invalid-task-edit")]
     [InlineData("OVERSIZE", "urn:yello:problem:invalid-task-edit")]
@@ -555,7 +557,7 @@ public sealed partial class TaskEndpointTests
         var taskId = Guid.Empty;
         WireResponse? refused = null;
         var sent = body == "OVERSIZE"
-            ? JsonSerializer.Serialize(new { labelIds = Enumerable.Range(0, LabelScaffold.OversizeLabelIds).Select(_ => Guid.NewGuid()) })
+            ? JsonSerializer.Serialize(new { labelIds = Enumerable.Range(0, 1001).Select(_ => Guid.NewGuid()) })
             : body;
 
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
@@ -578,7 +580,7 @@ public sealed partial class TaskEndpointTests
     /// once they are removed it deletes.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - no Label delete or TaskLabel table yet (story 2.4 Tasks 3, 5)")]
+    [Fact]
     [Trait("Requirement", "FR-22")]
     public async Task An_applied_Label_is_refused_deletion_until_its_applications_are_removed()
     {
@@ -613,7 +615,7 @@ public sealed partial class TaskEndpointTests
         Assert.NotNull(owner);
         Assert.Equal(HttpStatusCode.NoContent, unusedDeleted?.StatusCode);
         Assert.Equal(HttpStatusCode.Conflict, refused?.StatusCode);
-        Assert.Equal(LabelScaffold.LabelInUse, Problem(refused!)?.Type);
+        Assert.Equal(ProblemTypes.LabelInUse, Problem(refused!)?.Type);
         Assert.DoesNotContain("A title nobody may read", refused!.Body, StringComparison.Ordinal);
         Assert.DoesNotContain("count", refused.Body, StringComparison.OrdinalIgnoreCase);
         Assert.Equal([applied], listedAfterRefusal);
@@ -628,7 +630,7 @@ public sealed partial class TaskEndpointTests
     /// Label deletes.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - no Label delete yet (story 2.4 Task 5)")]
+    [Fact]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "AD-3")]
     public async Task Deleting_a_Label_that_matches_nothing_answers_the_boundary_404_and_records_nothing()
@@ -669,7 +671,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="surface">The surface the Viewer reads on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - no Label list yet (story 2.4 Task 5; Q12)")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "FR-22")]
@@ -712,7 +714,7 @@ public sealed partial class TaskEndpointTests
     /// a Task with none carries <c>[]</c>, never an absent member.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - TaskResponse has no labelIds yet (story 2.4 Tasks 4-5)")]
+    [Fact]
     [Trait("Requirement", "FR-20")]
     [Trait("Requirement", "AD-19")]
     public async Task The_Board_and_the_Task_read_carry_each_Tasks_Labels_in_server_order()

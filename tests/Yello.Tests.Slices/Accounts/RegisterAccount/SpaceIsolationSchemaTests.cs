@@ -93,6 +93,9 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
     /// a row into a Space it cannot see, which is the more damaging direction and the one a
     /// read-only test would never notice.
     /// </remarks>
+    private static readonly string[] TablesThatCannotMove =
+        [SchemaNames.ProjectTable, SchemaNames.TaskTable, SchemaNames.LabelTable, SchemaNames.TaskLabelTable];
+
     [Fact]
     public async Task Every_Space_scoped_table_carries_a_filter_and_a_block_predicate()
     {
@@ -116,7 +119,9 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
                 TestContext.Current.CancellationToken,
                 SchemaNames.SpaceIsolationPolicy);
 
-            Assert.Equal(table == SchemaNames.ProjectTable || table == SchemaNames.TaskTable ? MovableTablePredicates : PredicatesPerTable, predicates);
+            // Widened deliberately by story 2.4: Label and TaskLabel carry BLOCK AFTER UPDATE too, like Project and
+            // Task, so neither can be moved to another Space. Every other table still carries exactly two.
+            Assert.Equal(TablesThatCannotMove.Contains(table) ? MovableTablePredicates : PredicatesPerTable, predicates);
         }
     }
 
