@@ -335,6 +335,79 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
         }
     }
 
+    /// <summary>
+    /// Story 2.6, AC14, <c>deferred-work.md:20</c> (each new surface adds its own case) - the Move picker, in place in the
+    /// Task detail panel at its position step for a column of long titles, under 1.4.12 text spacing and 200% text-only
+    /// zoom: no option text clipped and no sideways page scroll. Anchored: the position options are on screen before the
+    /// check runs. Written red by the story 2.6 ATDD run; the locators are <c>MoveTests</c>' assumptions (a "Move" button,
+    /// <c>.move-picker [role=option]</c>, "Top of column").
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = "red: AC14 - Task detail has no Move picker yet (Task 9, Q5)")]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR21")]
+    [Trait("Requirement", "UX-DR11")]
+    public async Task Text_spacing_and_text_only_zoom_clip_nothing_in_the_Move_picker(bool zoom)
+    {
+        var api = Seeded();
+        var task = api.Boards[(Northwind, Atlas)].Columns[0].Tasks[1];
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/projects/{Atlas:D}").ToString());
+
+            await page.Locator($".task-card button[data-task-id='{task.Id:D}']").ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await page.Locator("[role='dialog']").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Move", Exact = true }).ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await page.Locator(".move-picker [role='option']", new PageLocatorOptions { HasText = "Doing" }).First.ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await page.Locator(".move-picker [role='option']", new PageLocatorOptions { HasText = "Top of column" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+        }
+    }
+
+    /// <summary>
+    /// Story 2.6, AC14, <c>deferred-work.md:20</c> - a card's context menu, opened from its actions control on a card with a
+    /// long title, under 1.4.12 text spacing and 200% text-only zoom: no menu text clipped, no card overlapping the next,
+    /// and no sideways page scroll. Anchored: the menu is on screen before the check runs. Written red by the story 2.6
+    /// ATDD run (Q6 (a): "Actions for {title}", <c>[role=menu]</c>).
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = "red: AC14 - the card has no context menu yet (Task 9, Q6)")]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR21")]
+    [Trait("Requirement", "UX-DR24")]
+    public async Task Text_spacing_and_text_only_zoom_clip_nothing_in_a_cards_menu(bool zoom)
+    {
+        var api = Seeded();
+        var task = api.Boards[(Northwind, Atlas)].Columns[0].Tasks[0];
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/projects/{Atlas:D}").ToString());
+
+            await page.Locator(".task-card").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = $"Actions for {task.Title}", Exact = true }).First.ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await page.Locator("[role='menu']").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+        }
+    }
+
     private static FakeYelloApi Seeded()
     {
         var api = new FakeYelloApi { SignedIn = true };

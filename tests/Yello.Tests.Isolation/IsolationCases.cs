@@ -536,6 +536,118 @@ internal static class IsolationCases
             ViewerDeletesAProjectAsync,
             Both(new RoleRefused("manage-projects") { Then = TheViewersRowIsStillPresentAsync })),
 
+        // Story 2.6 - the move route (AC9, AC12, Task 8), pending until the dev phase maps it (GATE-003: every one live
+        // before 2.6 reaches review). The route is Session-only (Q1 (a), FR-35: position is not writable over the API), so
+        // every ApiToken expectation is the no-credential 401 - a refusal, never a success - on the ISO-WRITE-TOKEN model.
+        // The rows name MoveRoute, the template story Task 5 adds as TaskRoutes.Move; switch the constant (and MoveOf)
+        // when it exists. Bodies follow Q2 (a): { statusId, afterTaskId } and never a key. Seeded through the product.
+        new(
+            "ISO-MOVE-TASK-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, MoveRoute,
+            async world =>
+            {
+                var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
+                var theirStatus = (await StatusIdsAsync(world.B))[1];
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Post,
+                    [new(MoveOf(world.B.SpaceId, foreign), MoveOf(Guid.NewGuid(), foreign))],
+                    world.B.SpaceId,
+                    Body: () => MoveBody(theirStatus, afterTaskId: null));
+            },
+            new Dictionary<IsolationSurface, Expectation>
+            {
+                [IsolationSurface.Session] = new BoundaryNotFound { Then = TheNamedTaskWasNotMovedAsync },
+                [IsolationSurface.ApiToken] = new NoCredential { Then = TheNamedTaskWasNotMovedAsync },
+            },
+            PendingUntil: "2.6",
+            PendingReason: "POST /spaces/{spaceId}/tasks/{taskId}/move is mapped, Session-only, by story 2.6 Task 6"),
+
+        new(
+            "ISO-MOVE-TASK-FOREIGN-ID-IN-OWN-SPACE", "I-1, I-13", IsolationVector.Write, HttpMethod.Post, MoveRoute,
+            async world =>
+            {
+                var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
+                var ownStatus = (await StatusIdsAsync(world.A))[1];
+
+                // Only the Task's own query filter and FILTER predicate stand between A and B's Task: the dev phase plants
+                // the drop of both (the Session row fails), then each alone (green) - story Task 8.
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Post,
+                    [new(MoveOf(world.A.SpaceId, foreign), MoveOf(world.A.SpaceId, Guid.NewGuid()))],
+                    TargetSpaceId: null,
+                    Body: () => MoveBody(ownStatus, afterTaskId: null));
+            },
+            new Dictionary<IsolationSurface, Expectation>
+            {
+                [IsolationSurface.Session] = new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheNamedTaskWasNotMovedAsync },
+                [IsolationSurface.ApiToken] = new NoCredential { Then = TheNamedTaskWasNotMovedAsync },
+            },
+            PendingUntil: "2.6",
+            PendingReason: "POST /spaces/{spaceId}/tasks/{taskId}/move is mapped by story 2.6 Task 6; the two-layer plant is Task 8's"),
+
+        new(
+            "ISO-MOVE-FOREIGN-NEIGHBOUR-IN-OWN-SPACE", "I-1, I-13", IsolationVector.DirectIdentifier, HttpMethod.Post, MoveRoute,
+            async world =>
+            {
+                var (_, own) = await SeedProjectWithTaskAsync(world.A);
+                var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
+                var ownStatus = (await StatusIdsAsync(world.A))[1];
+                var path = MoveOf(world.A.SpaceId, own);
+
+                // The foreign id is the neighbour, in the body: the anchor is the same move after a random id (Q3 (a)).
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Post,
+                    [new(path, path)],
+                    TargetSpaceId: null,
+                    Body: () => MoveBody(ownStatus, foreign),
+                    AnchorBody: () => MoveBody(ownStatus, Guid.NewGuid()));
+            },
+            new Dictionary<IsolationSurface, Expectation>
+            {
+                [IsolationSurface.Session] = new SameAsAnchor(HttpStatusCode.Conflict, ExpectedType: TaskPositionUnavailable) { Then = TheNamedTaskWasNotMovedAsync },
+                [IsolationSurface.ApiToken] = new NoCredential { Then = TheNamedTaskWasNotMovedAsync },
+            },
+            PendingUntil: "2.6",
+            PendingReason: "POST /spaces/{spaceId}/tasks/{taskId}/move and Q3's task-position-unavailable are story 2.6 Tasks 5-6"),
+
+        new(
+            "ISO-MOVE-FOREIGN-STATUS-IN-OWN-SPACE", "I-1, I-13", IsolationVector.DirectIdentifier, HttpMethod.Post, MoveRoute,
+            async world =>
+            {
+                var (_, own) = await SeedProjectWithTaskAsync(world.A);
+                var theirStatus = (await StatusIdsAsync(world.B))[1];
+                var path = MoveOf(world.A.SpaceId, own);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Post,
+                    [new(path, path)],
+                    TargetSpaceId: null,
+                    Body: () => MoveBody(theirStatus, afterTaskId: null),
+                    AnchorBody: () => MoveBody(Guid.NewGuid(), afterTaskId: null));
+            },
+            new Dictionary<IsolationSurface, Expectation>
+            {
+                [IsolationSurface.Session] = new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidTaskStatus) { Then = TheNamedTaskWasNotMovedAsync },
+                [IsolationSurface.ApiToken] = new NoCredential { Then = TheNamedTaskWasNotMovedAsync },
+            },
+            PendingUntil: "2.6",
+            PendingReason: "POST /spaces/{spaceId}/tasks/{taskId}/move is mapped by story 2.6 Task 6"),
+
+        new(
+            "ISO-RECORD-KIND-TASK-MOVE-VIEWER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Post, MoveRoute,
+            ViewerMovesATaskAsync,
+            new Dictionary<IsolationSurface, Expectation>
+            {
+                [IsolationSurface.Session] = new RoleRefused("manage-tasks") { Then = TheNamedTaskWasNotMovedAsync },
+                [IsolationSurface.ApiToken] = new NoCredential { Then = TheNamedTaskWasNotMovedAsync },
+            },
+            PendingUntil: "2.6",
+            PendingReason: "POST /spaces/{spaceId}/tasks/{taskId}/move is mapped, ManageTasks and Session-only, by story 2.6 Task 6"),
+
         new(
             "ISO-TIMING-BOUNDARY", "I-6", IsolationVector.Timing, HttpMethod.Get, SpaceRoutes.Active,
             world => ForeignAsync(world, SpaceRoutes.ActiveOf),
@@ -1000,6 +1112,85 @@ internal static class IsolationCases
         Assert.True(
             tasks[0].Id == named || tasks[0].ProjectId == named,
             $"Neither the Viewer's Task nor its Project is {named} any more.");
+    }
+
+    /// <summary>
+    /// The move route's template - story 2.6 Task 5 adds it as <c>TaskRoutes.Move</c> (Q1 (a)). A scaffold constant until
+    /// then, so the pending rows name the exact <c>(Method, Route)</c> GATE-002 will look for; replace it with the contract
+    /// constant when that exists.
+    /// </summary>
+    private const string MoveRoute = "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/move";
+
+    /// <summary>
+    /// Q3 (a)'s problem type for a neighbour that is not a neighbour - story 2.6 Task 5 adds it as
+    /// <c>ProblemTypes.TaskPositionUnavailable</c>. A scaffold constant until then.
+    /// </summary>
+    private const string TaskPositionUnavailable = "urn:yello:problem:task-position-unavailable";
+
+    /// <summary>
+    /// One Task's move path, as <c>TaskRoutes.MoveOf</c> will state it.
+    /// </summary>
+    private static string MoveOf(Guid spaceId, Guid taskId) => TaskRoutes.TaskOf(spaceId, taskId) + "/move";
+
+    /// <summary>
+    /// A move request as Q2 (a) shapes it: the destination Status and the Task to land after (<c>null</c> = the top of the
+    /// column). Never a position key.
+    /// </summary>
+    private static HttpContent MoveBody(Guid statusId, Guid? afterTaskId) =>
+        JsonContent.Create(new { statusId, afterTaskId }, options: JsonOptions);
+
+    /// <summary>
+    /// The actor's Space's Status ids, as its own Session reads them (the effective order). Story 2.6.
+    /// </summary>
+    private static async Task<List<Guid>> StatusIdsAsync(ProductActor actor)
+    {
+        var answer = await actor.SendAsync(IsolationSurface.Session, HttpMethod.Get, SpaceRoutes.StatusesOf(actor.SpaceId));
+
+        Assert.True(answer.StatusCode == HttpStatusCode.OK, $"Reading the Statuses through the product: {answer.StatusCode} {answer.Body}");
+
+        return Ids(answer.Body);
+    }
+
+    /// <summary>
+    /// A fresh Account with a Project and a Task in its own Personal Space, then demoted to Viewer there; the request moves
+    /// that Task to its second Status with a valid body, so only the Role can refuse it. Story 2.6.
+    /// </summary>
+    private static async Task<CaseRequest> ViewerMovesATaskAsync(IsolationWorld world)
+    {
+        var viewer = await world.NewActorAsync("Vm");
+        var (_, taskId) = await SeedProjectWithTaskAsync(viewer);
+        var destination = (await StatusIdsAsync(viewer))[1];
+
+        await world.Database.ChangeRoleAsync(viewer.SpaceId, viewer.AccountId, "viewer");
+
+        var path = MoveOf(viewer.SpaceId, taskId);
+
+        return new CaseRequest(viewer, HttpMethod.Post, [new(path, path)], viewer.SpaceId, Body: () => MoveBody(destination, afterTaskId: null));
+    }
+
+    /// <summary>
+    /// The Task the refused move named - the segment before <c>/move</c> in its path - is still where its seed put it: the
+    /// first Task of a fresh Project, so in its Space's first Status at <c>PositionKey.First</c> (<c>V0000</c>). It is
+    /// looked for in B's Space and in the actor's own, whichever holds it. Story 2.6.
+    /// </summary>
+    private static async Task TheNamedTaskWasNotMovedAsync(IsolationWorld world, CaseRequest request)
+    {
+        var named = Guid.Parse(request.Paths[0].Path.Split('/')[^2]);
+
+        foreach (var owner in new[] { world.B, request.Actor })
+        {
+            var placement = (await world.Database.TaskPlacementsInAsync(owner.SpaceId)).SingleOrDefault(task => task.Id == named);
+
+            if (placement.Id == named)
+            {
+                Assert.Equal((await StatusIdsAsync(owner))[0], placement.StatusId);
+                Assert.Equal("V0000", placement.PositionKey);
+
+                return;
+            }
+        }
+
+        Assert.Fail($"The Task {named} the move named is in neither Space any more.");
     }
 
     /// <summary>

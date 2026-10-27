@@ -1,6 +1,7 @@
 using System.Buffers.Text;
 using System.Collections.Concurrent;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Playwright;
@@ -51,6 +52,12 @@ internal sealed class FakeYelloApi
     /// </summary>
     private const int FakeLabelNameMaxLength = 50;
 
+    /// <summary>
+    /// Story 2.6 Q3 (a)'s recommended refusal for a neighbour that is no longer a neighbour (and Q10's exhaustion), stated
+    /// here because <c>ProblemTypes</c> gains it only in the dev phase. Retarget to the contract constant on activation.
+    /// </summary>
+    public const string TaskPositionUnavailableType = "urn:yello:problem:task-position-unavailable";
+
     private readonly ConcurrentQueue<FakeRequest> _requests = new();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _held = new();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _arrived = new();
@@ -71,6 +78,9 @@ internal sealed class FakeYelloApi
     private DeleteHold? _projectDeleteHold;
     private DeleteHold? _lastProjectDeleteHold;
     private readonly ConcurrentDictionary<string, string> _deletedByKey = new(StringComparer.Ordinal);
+    private TaskEditHold? _taskMoveHold;
+    private TaskEditHold? _lastTaskMoveHold;
+    private readonly ConcurrentDictionary<string, (string Path, string Body, string Answer)> _movedByKey = new(StringComparer.Ordinal);
     private readonly TaskCompletionSource<FakeRequest> _signInSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<FakeRequest> _signOutSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
@@ -181,6 +191,12 @@ internal sealed class FakeYelloApi
     /// A refusal the next Project deletion is answered with instead of being applied. Cleared once used. Story 2.5.
     /// </summary>
     public (int Status, string ProblemType, string? Capability)? NextProjectDeleteRefusal { get; set; }
+
+    /// <summary>
+    /// A refusal the next Task move is answered with instead of being applied - <c>(status, type, capability)</c>.
+    /// Cleared once used. Story 2.6 (written by its ATDD run).
+    /// </summary>
+    public (int Status, string ProblemType, string? Capability)? NextTaskMoveRefusal { get; set; }
 
     /// <summary>
     /// Every request seen, in order.
@@ -409,6 +425,53 @@ internal sealed class FakeYelloApi
         _lastProjectDeleteHold?.Released.TrySetResult(new TaskEditOutcome(0, string.Empty, Capability: null, Abort: true));
 
     /// <summary>
+    /// Holds the <b>next</b> Task move (<c>POST …/tasks/{taskId}/move</c>) until it is released, so a case can assert the
+    /// move is optimistic: the card is already in its chosen slot and both totals have moved while it is out. Later moves
+    /// are answered at once. Story 2.6 (written by its ATDD run).
+    /// </summary>
+    /// <returns>A task that completes when the held move has arrived and is waiting.</returns>
+    public Task HoldTaskMoveAsync()
+    {
+        var hold = new TaskEditHold();
+
+        _taskMoveHold = hold;
+        _lastTaskMoveHold = hold;
+
+        return hold.Arrived.Task;
+    }
+
+    /// <summary>
+    /// Lets the held Task move go and applies it, as the Host admits it: <c>200</c> with the moved Task.
+    /// </summary>
+    public void ReleaseTaskMove() => _lastTaskMoveHold?.Released.TrySetResult(TaskEditOutcome.Admitted);
+
+    /// <summary>
+    /// Lets the held Task move go with a refusal instead: nothing is moved.
+    /// </summary>
+    /// <param name="status">The status code.</param>
+    /// <param name="problemType">The problem type.</param>
+    /// <param name="capability">The capability a <c>403</c> names, or <c>null</c>.</param>
+    public void ReleaseTaskMoveRefused(int status, string problemType, string? capability = null) =>
+        _lastTaskMoveHold?.Released.TrySetResult(new TaskEditOutcome(status, problemType, capability, Abort: false));
+
+    /// <summary>
+    /// Lets the held Task move go with no answer - the connection reset. Nothing is moved, so an identical resend under the
+    /// same key is applied.
+    /// </summary>
+    public void ReleaseTaskMoveUnanswered() =>
+        _lastTaskMoveHold?.Released.TrySetResult(new TaskEditOutcome(0, string.Empty, Capability: null, Abort: true));
+
+    /// <summary>
+    /// The move path for one Task: <c>TaskRoutes.TaskOf</c> then <c>/move</c> - story 2.6 Q1 (a)'s recommended route,
+    /// stated here because <c>TaskRoutes.MoveOf</c> does not exist until the dev phase adds it. Retarget to the contract
+    /// helper on activation.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="taskId">The Task.</param>
+    /// <returns>The path.</returns>
+    public static string MovePathOf(Guid spaceId, Guid taskId) => TaskRoutes.TaskOf(spaceId, taskId) + "/move";
+
+    /// <summary>
     /// The Task with <paramref name="taskId"/> as the fake holds it now, with its column, in whichever Board.
     /// </summary>
     /// <param name="taskId">The Task.</param>
@@ -548,6 +611,10 @@ internal sealed class FakeYelloApi
 
             case ("DELETE", var path) when TryProject(path, out var deleteProjectSpace, out var deletedProject):
                 return await DeleteProjectAsync(deleteProjectSpace, deletedProject, request).ConfigureAwait(false);
+
+            // Story 2.6 - a Task moved to a Status and a position by its neighbour, optimistically: held, refused or applied.
+            case ("POST", var path) when TryTaskMove(path, out var moveSpace, out var movedTask):
+                return await MoveTaskAsync(moveSpace, movedTask, request).ConfigureAwait(false);
 
             // Story 2.2 - the Board and Task routes.
             case ("GET", var path) when TryUnderProject(path, "board", out var boardSpace, out var boardProject):
@@ -769,6 +836,215 @@ internal sealed class FakeYelloApi
         return takeRefusal() is { } refusal
             ? new TaskEditOutcome(refusal.Status, refusal.ProblemType, refusal.Capability, Abort: false)
             : TaskEditOutcome.Deleted;
+    }
+
+    /// <summary>
+    /// The Host's Task move as story 2.6 recommends it (Q1 (a) a Session-only <c>POST …/move</c>, Q2 (a)
+    /// <c>{statusId, afterTaskId}</c> with <c>null</c> for the top, Q3 (a) <c>409 task-position-unavailable</c>, Q18 a move
+    /// to where the Task already is answers <c>200</c> unchanged): a key already applied replays its answer, and the same
+    /// key on another body is <c>422 idempotency-key-reused</c>; a held move waits for its release; a queued refusal moves
+    /// nothing; otherwise an absent Task is the not-found, a Status outside the Board is <c>400 invalid-task-status</c>, a
+    /// <c>positionKey</c> member is <c>400 invalid-task-edit</c>, a neighbour that is not a Task of the destination column
+    /// (or is the moved Task) is the Q3 refusal, and a present Task leaves its column for the slot after its neighbour,
+    /// both totals following. Only the moved Task's key is written - a key strictly between its new neighbours - so every
+    /// sibling's key is unchanged, as AC3 requires of the Host.
+    /// </summary>
+    private async Task<(int Status, string Body)> MoveTaskAsync(Guid spaceId, Guid taskId, FakeRequest request)
+    {
+        var key = request.Header(Idempotency.HeaderName);
+        var body = request.Body ?? string.Empty;
+
+        if (key is not null && _movedByKey.TryGetValue(key, out var replayed))
+        {
+            return string.Equals(replayed.Path, request.Path, StringComparison.Ordinal) && string.Equals(replayed.Body, body, StringComparison.Ordinal)
+                ? (200, replayed.Answer)
+                : (422, Problem(ProblemTypes.IdempotencyKeyReused));
+        }
+
+        var outcome = TaskEditOutcome.Admitted;
+
+        if (Interlocked.Exchange(ref _taskMoveHold, null) is { } hold)
+        {
+            hold.Arrived.TrySetResult();
+            outcome = await hold.Released.Task.ConfigureAwait(false);
+        }
+        else if (NextTaskMoveRefusal is { } refusal)
+        {
+            NextTaskMoveRefusal = null;
+            outcome = new TaskEditOutcome(refusal.Status, refusal.ProblemType, refusal.Capability, Abort: false);
+        }
+        else
+        {
+            // Unheld and unrefused: applied below.
+        }
+
+        if (outcome.Abort)
+        {
+            return (AbortConnection, string.Empty);
+        }
+
+        if (outcome.Status != 200)
+        {
+            return (outcome.Status, JsonSerializer.Serialize(new ProblemResponse(outcome.ProblemType, Errors: null, Capability: outcome.Capability), JsonOptions));
+        }
+
+        if (FindTaskIn(spaceId, taskId) is not { } found)
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        var answer = Move(found.Board, found.Column, found.Task, body);
+
+        if (answer.Status == 200 && key is not null)
+        {
+            _movedByKey[key] = (request.Path, body, answer.Body);
+        }
+
+        return answer;
+    }
+
+    private static (int Status, string Body) Move(FakeBoard board, FakeColumn column, FakeTask task, string body)
+    {
+        var (refusal, destination, afterTaskId) = ReadMove(board, body);
+
+        if (refusal is not null || destination is null)
+        {
+            return (400, Problem(refusal ?? ProblemTypes.InvalidTaskEdit));
+        }
+
+        if (afterTaskId == task.Id || (afterTaskId is { } neighbour && !destination.Tasks.Exists(candidate => candidate.Id == neighbour)))
+        {
+            return (409, Problem(TaskPositionUnavailableType));
+        }
+
+        var current = column.Tasks.FindIndex(candidate => candidate.Id == task.Id);
+        Guid? predecessor = current > 0 ? column.Tasks[current - 1].Id : null;
+
+        // Q18: already there - nothing written, the Task answered unchanged.
+        if (destination == column && predecessor == afterTaskId)
+        {
+            return (200, JsonSerializer.Serialize(task, JsonOptions));
+        }
+
+        return (200, JsonSerializer.Serialize(Place(column, current, destination, task, afterTaskId), JsonOptions));
+    }
+
+    /// <summary>
+    /// A move body read as the Host reads it: unreadable, not an object, carrying a <c>positionKey</c> member, or an
+    /// <c>afterTaskId</c> that is not a GUID is <c>invalid-task-edit</c>; a <c>statusId</c> outside the Board is
+    /// <c>invalid-task-status</c>; <c>afterTaskId</c> absent or <c>null</c> is the top.
+    /// </summary>
+    private static (string? Refusal, FakeColumn? Destination, Guid? AfterTaskId) ReadMove(FakeBoard board, string body)
+    {
+        JsonElement members;
+
+        try
+        {
+            using var document = JsonDocument.Parse(string.IsNullOrEmpty(body) ? "{}" : body);
+
+            members = document.RootElement.Clone();
+        }
+        catch (JsonException)
+        {
+            return (ProblemTypes.InvalidTaskEdit, null, null);
+        }
+
+        if (members.ValueKind != JsonValueKind.Object || members.TryGetProperty("positionKey", out _))
+        {
+            return (ProblemTypes.InvalidTaskEdit, null, null);
+        }
+
+        if (!members.TryGetProperty("statusId", out var statusValue) || ColumnOf(board, statusValue) is not { } destination)
+        {
+            return (ProblemTypes.InvalidTaskStatus, null, null);
+        }
+
+        if (!members.TryGetProperty("afterTaskId", out var afterValue) || afterValue.ValueKind == JsonValueKind.Null)
+        {
+            return (null, destination, null);
+        }
+
+        if (afterValue.ValueKind == JsonValueKind.String && afterValue.TryGetGuid(out var after))
+        {
+            return (null, destination, after);
+        }
+
+        return (ProblemTypes.InvalidTaskEdit, null, null);
+    }
+
+    /// <summary>
+    /// Takes the Task out of its column and places it after <paramref name="afterTaskId"/> (or at the top) in
+    /// <paramref name="destination"/>, with a key strictly between its new neighbours; both totals follow.
+    /// </summary>
+    private static FakeTask Place(FakeColumn column, int current, FakeColumn destination, FakeTask task, Guid? afterTaskId)
+    {
+        column.Tasks.RemoveAt(current);
+        column.Total--;
+
+        var index = afterTaskId is { } placedAfter ? destination.Tasks.FindIndex(candidate => candidate.Id == placedAfter) + 1 : 0;
+        var lower = index > 0 ? destination.Tasks[index - 1].PositionKey : null;
+        var upper = index < destination.Tasks.Count ? destination.Tasks[index].PositionKey : null;
+        var moved = task with { StatusId = destination.StatusId, PositionKey = KeyBetween(lower, upper) };
+
+        destination.Tasks.Insert(index, moved);
+        destination.Total++;
+
+        return moved;
+    }
+
+    /// <summary>
+    /// A key that sorts strictly between <paramref name="lower"/> and <paramref name="upper"/> under
+    /// <see cref="StringComparer.Ordinal"/>, in the product's base-62 alphabet - a midpoint, with no jitter. The fake's own
+    /// stand-in for <c>PositionKey.Between</c>, which this suite cannot see (it references <c>Yello.Contracts</c> only). An
+    /// out-of-order pair (a Status edit's appended <c>z</c> key) is treated as "after the last".
+    /// </summary>
+    private static string KeyBetween(string? lower, string? upper)
+    {
+        const string alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+
+        var low = lower ?? string.Empty;
+        var free = upper is null || (lower is not null && string.CompareOrdinal(lower, upper) >= 0);
+        var high = upper ?? string.Empty;
+        var key = new StringBuilder();
+
+        var position = 0;
+
+        while (true)
+        {
+            var below = position < low.Length ? alphabet.IndexOf(low[position], StringComparison.Ordinal) : 0;
+            var bounded = position < high.Length ? alphabet.IndexOf(high[position], StringComparison.Ordinal) : 0;
+            var above = free ? alphabet.Length : bounded;
+
+            if (above - below > 1)
+            {
+                key.Append(alphabet[(below + above) / 2]);
+                return key.ToString();
+            }
+
+            key.Append(alphabet[below]);
+
+            if (above - below == 1)
+            {
+                free = true;
+            }
+
+            position++;
+        }
+    }
+
+    /// <summary>
+    /// Whether <paramref name="path"/> is <c>/api/v1/spaces/{s}/tasks/{t}/move</c> - <see cref="MovePathOf"/>.
+    /// </summary>
+    private static bool TryTaskMove(string path, out Guid spaceId, out Guid taskId)
+    {
+        const string leaf = "/move";
+
+        spaceId = Guid.Empty;
+        taskId = Guid.Empty;
+
+        return path.EndsWith(leaf, StringComparison.Ordinal)
+            && TryTask(path[..^leaf.Length], out spaceId, out taskId)
+            && path == MovePathOf(spaceId, taskId);
     }
 
     private (int Status, string Body) CreateProject(Guid spaceId, FakeRequest request)

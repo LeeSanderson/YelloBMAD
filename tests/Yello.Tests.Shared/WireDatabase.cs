@@ -158,6 +158,33 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// Every Task in <paramref name="spaceId"/>, as (id, Status, position key), read under that Space's own key - so a
+    /// refused move can be proved to have changed neither the Task's column nor its key. Added by the story 2.6 ATDD run;
+    /// the columns are 2.2's (<c>dbo.[Task].StatusId</c>, <c>PositionKey</c>).
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>Its Tasks' placements, ordered by id.</returns>
+    public async Task<IReadOnlyList<(Guid Id, Guid StatusId, string PositionKey)>> TaskPlacementsInAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT Id, StatusId, PositionKey FROM dbo.[Task] WHERE SpaceId = @space ORDER BY Id";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+
+        var tasks = new List<(Guid Id, Guid StatusId, string PositionKey)>();
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            tasks.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2)));
+        }
+
+        return tasks;
+    }
+
+    /// <summary>
     /// Every Label in <paramref name="spaceId"/>, as (id, name), read under that Space's own key - the database's view,
     /// independent of the Host's query filter. Added by the story 2.4 ATDD run; the columns are the ones story 2.4 Task 3
     /// names (<c>dbo.[Label].Id</c>, <c>SpaceId</c>, <c>Name</c>). The table does not exist until 2.4's migration, so only

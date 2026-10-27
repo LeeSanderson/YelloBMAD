@@ -362,6 +362,30 @@ Each story lands as "Add story → Add ATDD scaffolds → implement → Close th
 - Updated: `PositionKey.cs`, `ITaskStore.cs`, `TaskStore.cs` (and its remarks), `TaskRoutes.cs`, `ProblemTypes.cs`, `TaskEndpoints.cs`, `Program.cs`, `AccountConfiguration.cs`, `EmailAddressNormalisation.cs` (remarks), model snapshot, `TaskCard.razor`, `TaskDetail.razor`, `BoardView.razor(.cs)`, `BoardColumn.razor` (if the card needs new parameters), `components.css`, `ClientCopy.resx`, `RefusalCopy.cs`, the gates in Task 6, `BoardTests.cs`, `FakeYelloApi.cs`, `TextSpacingTests.cs`, `IsolationCases.cs`, `TaskEndpointTests.Schema.cs`, `TESTING-CONVENTIONS.md`, `deferred-work.md`, `sprint-status.yaml`.
 - Variances to record: the AC4 index tuple (Q11); the card's second control and `Enter` (Q6); the position list vs the mockup (Q4); a Session-only Task write (Q1, FR-35's named exception to C-6 parity).
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-2-6-move-and-reorder-a-task-by-explicit-control.md` (Q-dependency table, seed constraints checked, assumed locators, gates that go red by design). Every scaffold follows the recommended answer to Q1-Q18. The route, problem type and request are scaffold constants until Task 5 adds them (`MoveWire.MoveOf`/`TaskPositionUnavailable`, `IsolationCases.MoveRoute`/`MoveOf`/`TaskPositionUnavailable`); `PositionKeyBetweenTests.Between` is a seam to bind to `PositionKey.Between`.
+
+| File | Entries (cases) | ACs | Green today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Tasks/MoveWire.cs` | harness (active) | - | - |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Move.cs` | 15 (22) - MOV-01..15 | AC2, AC3, AC5, AC6, AC8, AC9, AC10 | MOV-13, MOV-14, MOV-15 (FR-35 standing gates) |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.MoveIdempotency.cs` | 2 - IDM-M01, IDM-M02 | AC13 | - |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.MoveRace.cs` | 12 - RACE-M1, M2, M3, M4 (a), M5-M8 (a) and (b) | AC5, AC11 | M5 (b), M6 (b), M7 (b), M8 (b) |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.MoveSchema.cs` | 4 - SCH-601..604 | AC4, AC16 | SCH-601, SCH-602 (SCH-602's plant is owed, Task 4) |
+| `tests/Yello.Tests.Slices/Tasks/MoveTask/PositionKeyBetweenTests.cs` | 7 - PK-01..07 (no database) | AC3, AC10 | - |
+| `tests/Yello.Tests.Shared/WireDatabase.cs` | `TaskPlacementsInAsync` (read-only helper) | AC12 | - |
+| `tests/Yello.Tests.Isolation/IsolationCases.cs` | 5 rows × 2 surfaces, **pending on 2.6** (every `ApiToken` expectation is `NoCredential`, Q1) | AC9, AC12 | - (GATE-001..004 green, 14/14) |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Move.cs` | 7 - ARCH-601..607 | AC3, AC8, AC9 | - |
+| `tests/Yello.Tests.Architecture/DesignFoundationGateTests.MovePicker.cs` | 3 (4) - DSN-601..603 | AC2, AC14, AC15 | DSN-602 (hover-only plant caught 1/1) |
+| `tests/Yello.Tests.Client/MoveTests.cs` | 16 (24) - E2E-601..616 | AC1-AC3, AC6, AC7, AC14, AC15 | E2E-613 |
+| `tests/Yello.Tests.Client/TextSpacingTests.cs` | +2 (4) - the panel picker, the card menu | AC14 | - |
+| `tests/Yello.Tests.Client/FakeYelloApi.cs` | `POST .../move` harness (active) | - | - |
+
+Activation order: **RACE-M2 first** (`A_move_reads_its_neighbours_keys_only_under_the_lock` - the riskiest assumption: Q2 (a) converges only if the move reads its neighbour's current successor under the Project range; bind the PK seam and map the route, then activate it before anything else on the wire), then RACE-M4 (a), M1, M3, M5-M8 (a) with the hint plants (three runs each) and 2.5's masked hints under M5 (b)/M6 (b); PK-01..07; ARCH-604..607, then ARCH-601..603 with the 1.8 Token-unreachable gate and the Task route sets amended by exactly the move route; MOV-01..12 and IDM-M01/02; the five isolation rows with the two-layer plant; SCH-603/604 with Q12's migration and SCH-602's plant; DSN-601/603, then E2E-601..616 and the text-spacing theories (amending `BoardTests`' one-control gate and, if Q8 (b), `TaskDetailTests`' "Moved to Done." deliberately).
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ### References
 
 - `_bmad-output/planning-artifacts/epics.md:1166-1209` (story), `:129, :141` (FR-29, FR-35), `:158, :162` (NFR-5, NFR-9), `:208-213, :222` (AR-20, 21, 22, 24, 25, 34), `:241, :249, :250, :262, :265, :266, :271, :282, :285` (UX-DR6, 11, 12, 21, 24, 25, 27, 38, 41), `:322, :328, :359` (coverage), `:1253-1293` (2.8), `:2654-2657` (7.6), `:2782-2790` (8.1)
