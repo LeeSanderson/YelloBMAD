@@ -458,6 +458,47 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
         }
     }
 
+    /// <summary>
+    /// Story 2.8, <c>deferred-work.md:20</c>'s convention: mid-carry by the keyboard, the carried card (in its own slot, its
+    /// 2px emphasis border) and the drop zone in the next column under 1.4.12 text spacing and 200% text-only zoom - no text
+    /// clipped, no card overlapping the next, no sideways page scroll. The carried card stays in the flow, so nothing is
+    /// excluded. Anchored: the carried card and the drop zone are on screen before the check runs.
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR24")]
+    public async Task Text_spacing_and_text_only_zoom_clip_nothing_mid_carry(bool zoom)
+    {
+        var api = Seeded();
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/projects/{Atlas:D}").ToString());
+            await page.Locator(".task-card").First.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await KeyboardHarness.WaitForKeysAsync(page);
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            await page.Locator("main .board-column").First.Locator("[data-task-id]").Last.FocusAsync(new LocatorFocusOptions { Timeout = Timeout });
+            await KeyboardHarness.WaitForFocusAsync(page, "Short one");
+            await page.Keyboard.PressAsync(" ");
+            await page.Keyboard.PressAsync("ArrowRight");
+            await page.Locator(".task-card--carried").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.Locator("main .board-column").Nth(1).Locator(".drop-zone").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+
+            await page.Keyboard.PressAsync("Escape");
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+        }
+    }
+
     private static FakeYelloApi Seeded()
     {
         var api = new FakeYelloApi { SignedIn = true };

@@ -8,8 +8,9 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A collection fixture rather than a class fixture: cases will be spread across several classes
-/// as stories 2.8 and 2.9 add theirs, and a class fixture would start a browser per class. It also
+/// A collection fixture rather than a class fixture: cases are spread across several classes - story
+/// 2.8's <c>KeyboardTests</c> among them, and 2.9's to come - and a class fixture would start a browser
+/// per class. It also
 /// serialises the suite, which is wanted rather than tolerated - the cases share one dev server
 /// process, and per-case isolation comes from a fresh browser context instead.
 /// </para>

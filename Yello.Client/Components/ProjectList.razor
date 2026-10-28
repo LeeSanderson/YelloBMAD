@@ -45,7 +45,7 @@
     after no answer. A 404 is the Space refusal surface; any other refusal is said on the row.
 *@
 
-<p class="visually-hidden" role="status" aria-live="polite">@_announcement</p>
+<LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
 
 @if (_projects is null)
 {
@@ -154,6 +154,7 @@
     private List<ProjectResponse>? _projects;
     private bool _canManage;
     private string? _announcement;
+    private int _announcements;
 
     private bool _creating;
     private bool _submitting;
@@ -249,7 +250,7 @@
     {
         _generation++;
         _projects = null;
-        _announcement = null;
+        Say(null);
         _creating = false;
         _submitting = false;
         _newName = string.Empty;
@@ -287,7 +288,7 @@
                 if (projects is not null && generation == _generation)
                 {
                     _projects = projects;
-                    _announcement = Localizer["ProjectsLoaded"];
+                    Say(Localizer["ProjectsLoaded"]);
                 }
 
                 return;
@@ -392,7 +393,7 @@
             {
                 Add(created);
                 _newName = string.Empty;
-                _announcement = string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer["ProjectCreated"], created.Name);
+                Say(string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer["ProjectCreated"], created.Name));
                 return;
             }
 
@@ -534,7 +535,7 @@
         {
             Replace(renamed);
             _renaming = null;
-            _announcement = string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer["ProjectRenamed"], renamed.Name);
+            Say(string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer["ProjectRenamed"], renamed.Name));
             return;
         }
 
@@ -711,7 +712,7 @@
                 _deleteKeys.Remove(project.Id);
                 _projects?.RemoveAll(candidate => candidate.Id == project.Id);
                 _confirmingDelete = null;
-                _announcement = Localizer["ProjectDeleted"];
+                Say(Localizer["ProjectDeleted"]);
                 _focusHeading = true;
                 return;
 
@@ -795,4 +796,13 @@
     /// A creation sent with no answer yet: its name, exactly as sent, and its Idempotency-Key.
     /// </summary>
     private sealed record UnansweredCreate(string Name, string Key);
+
+    /// <summary>
+    /// Says a sentence politely - the same one again included (story 2.8, AC14) - or, with <c>null</c>, clears the regions.
+    /// </summary>
+    private void Say(string? words)
+    {
+        _announcement = words;
+        _announcements++;
+    }
 }

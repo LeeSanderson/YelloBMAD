@@ -887,6 +887,15 @@
     cursor: grabbing;
 }
 
+/*
+    THE CARRIED CARD (story 2.8, open question 12 (a)): a Task picked up with the keyboard stays in its own slot, marked by
+    the 2px emphasis border the lifted card takes - and nothing else: no shadow, no tilt, no change of position, so it is
+    never re-created as it is carried and focus stays on it. The drop zone marks where it would land.
+*/
+.task-card.task-card--carried {
+    border-width: var(--border-emphasis-width);
+}
+
 /* THE SETTLE: the dropped or returned card comes to rest from the tilt on motion.settle (UX-DR6). */
 .task-card.task-card--settled {
     animation: task-card-settle var(--motion-settle) var(--motion-easing-exit);

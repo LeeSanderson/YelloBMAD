@@ -22,14 +22,23 @@
     Status id so the drag can tell which column the pointer is over.
 
     FOCUS LANDS ON THE COLUMN when a card it held is deleted (story 2.5, AC11; UX-DR39; deferred-work.md:510): the
-    column is the nearest surviving container, so the section takes focus programmatically (tabindex -1, never in the
-    tab order) - never the page body, never an adjacent card.
+    column is the nearest surviving container, so the section takes focus programmatically - never the page body, never
+    an adjacent card. It is out of the tab order (tabindex -1) except while it is the Board's ONE ROVING TAB STOP: an empty
+    column the arrows landed on, or the first column of an empty Board (story 2.8, open question 4 (a)).
+
+    NAMED AND COUNTED FOR ASSISTIVE TECHNOLOGY (story 2.8, AC13, open question 8 (a)): the section is named by its Status
+    and described by "{n} Tasks" - the chip's bare number is hidden from assistive technology, never read alone - and each
+    card's list item states its 1-based position and the column's TRUE total (aria-posinset, aria-setsize; AD-29).
+
+    A KEYBOARD CARRY (story 2.8, open question 12 (a)) draws the same drop zone at its slot; the carried card stays in its
+    own slot, and the zone at that slot is drawn just before it, where the Task is now.
 *@
 
-<section class="board-column" aria-labelledby="@HeadingId" data-status-id="@StatusIdText" tabindex="-1" @ref="_section">
+<section class="board-column" aria-labelledby="@HeadingId" aria-describedby="@CountId" data-status-id="@StatusIdText" tabindex="@(ColumnActive ? "0" : "-1")" @ref="_section">
     <div class="board-column__head">
         <h2 class="type-column-head board-column__name" id="@HeadingId">@Name</h2>
-        <span class="type-meta column-count">@Total</span>
+        <span class="type-meta column-count" aria-hidden="true">@Total</span>
+        <span class="visually-hidden" id="@CountId">@CountText</span>
 
         @if (ShowAdd)
         {
@@ -42,7 +51,7 @@
     @if (Tasks.Count > 0 || DropIndex is not null)
     {
         <ul class="board-column__cards">
-            @foreach (var task in Tasks)
+            @foreach (var (task, position) in Positioned)
             {
                 @if (DropBefore is { } before && before == task.Id)
                 {
@@ -63,7 +72,11 @@
                           FocusActionsRequest="@(task.Id == FocusActionsTaskId ? FocusActionsRequest : 0)"
                           Moved="@(task.Id == MovedTaskId)"
                           Settling="@(task.Id == SettlingTaskId)"
-                          Lifted="@(task.Id == LiftedTaskId)" />
+                          Lifted="@(task.Id == LiftedTaskId)"
+                          Carried="@(task.Id == CarriedTaskId)"
+                          Active="@(task.Id == ActiveTaskId)"
+                          Position="@position"
+                          SetSize="@Total" />
             }
 
             @if (DropLast)
@@ -177,6 +190,18 @@
     [Parameter]
     public Guid? LiftedTaskId { get; set; }
 
+    /// <summary>The Task carried by the keyboard, if any: its card is drawn carried, in its own slot (story 2.8).</summary>
+    [Parameter]
+    public Guid? CarriedTaskId { get; set; }
+
+    /// <summary>The Task whose card is the Board's one roving tab stop, if it is in this column (story 2.8).</summary>
+    [Parameter]
+    public Guid? ActiveTaskId { get; set; }
+
+    /// <summary>Whether this column itself is the Board's one roving tab stop: it is empty, and active (story 2.8).</summary>
+    [Parameter]
+    public bool ColumnActive { get; set; }
+
     /// <summary>
     /// The drop zone's slot in this column, counted without the dragged Task, or <c>null</c> when the zone is elsewhere.
     /// </summary>
@@ -195,6 +220,15 @@
 
     private string StatusIdText => StatusId.ToString("D", System.Globalization.CultureInfo.InvariantCulture);
 
+    // Each Task with its 1-based position in the column (aria-posinset, AD-29).
+    private IEnumerable<(TaskResponse Task, int Position)> Positioned => Tasks.Select((task, index) => (task, index + 1));
+
+    private string CountId => "c" + StatusId.ToString("N", System.Globalization.CultureInfo.InvariantCulture);
+
+    // The true total with its unit, never a bare number (AC13): singular and plural are two keys (English-only copy).
+    private string CountText =>
+        Total == 1 ? Localizer["ColumnCountOne"] : string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer["ColumnCountMany"], Total);
+
     // The Task the drop zone is drawn before, or null when it is last or not in this column.
     private Guid? DropBefore { get; set; }
 
@@ -203,11 +237,19 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        // A drop slot is counted among every Task but the dragged one.
-        List<TaskResponse> others = DropIndex is null ? [] : Tasks.Where(task => task.Id != LiftedTaskId).ToList();
+        // A drop slot is counted among every Task but the dragged or carried one.
+        var held = LiftedTaskId ?? CarriedTaskId;
+        List<TaskResponse> others = DropIndex is null ? [] : Tasks.Where(task => task.Id != held).ToList();
 
         DropBefore = DropIndex is { } index && index < others.Count ? others[index].Id : null;
         DropLast = DropIndex is { } last && last >= others.Count;
+
+        // A carried card stays in its slot (a lifted one leaves the flow), so the zone at its own slot is drawn before it.
+        if (CarriedTaskId is { } carried && DropIndex is { } own && own < Tasks.Count && Tasks[own].Id == carried)
+        {
+            DropBefore = carried;
+            DropLast = false;
+        }
     }
 
     /// <inheritdoc />

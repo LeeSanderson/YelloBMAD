@@ -7,6 +7,7 @@
 
 @implements IAsyncDisposable
 @implements IBoardDragHost
+@implements IBoardKeysHost
 
 @inject IStringLocalizer<ClientCopy> Localizer
 @inject HttpClient Http
@@ -50,9 +51,14 @@
     THE POINTER AND TOUCH DRAG (story 2.7) is attached to the row of columns for a Role that may move Tasks, and never
     for a Viewer (UX-DR27). The gesture lives in js/board-drag.js; this Board renders the lifted card and the drop zone
     from what it reports (BoardDrag), and a drop is story 2.6's move - the one write path. See BoardView.Drag.cs.
+
+    THE KEYBOARD (story 2.8) makes the row of columns ONE roving tab stop for every Role: the active card's title (or an
+    empty column) is the one stop, the arrows move focus by logical direction with a sticky origin index, and Space on a
+    mover's card picks the Task up, carries it and drops it through the same move. The keys live in js/board-keys.js; see
+    BoardView.Keys.cs. Announcements go through LiveAnnouncement, so a sentence said twice is heard twice.
 *@
 
-<p class="visually-hidden" role="status" aria-live="polite">@_announcement</p>
+<LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
 
 @if (_columns is null)
 {
@@ -70,7 +76,7 @@
 
 @if (_columns is { } columns)
 {
-    <div class="board">
+    <div class="board" @ref="_boardElement">
         <PageHeading>@_projectName</PageHeading>
 
         @* A refused move made from a card's menu, said on the Board where it was made (story 2.6). Present from the start,
@@ -116,6 +122,9 @@
                              MovedTaskId="@_movedCard"
                              SettlingTaskId="@_settlingCard"
                              LiftedTaskId="@_drag?.LiftedTaskId"
+                             CarriedTaskId="@_carried"
+                             ActiveTaskId="@ActiveStop.TaskId"
+                             ColumnActive="@(ActiveStop.StatusId == column.StatusId)"
                              DropIndex="@DropIndexIn(column)">
                     @if (IsFirst(column) && _canManage && _creating)
                     {
@@ -165,6 +174,8 @@
     private bool _canManage;
     private bool _canManageLabels;
     private string? _announcement;
+    private int _announcements;
+    private bool _saidSinceRender;
     private bool _creating;
 
     private ElementReference _emptyAction;
@@ -201,6 +212,7 @@
     protected override async Task OnInitializedAsync()
     {
         _drag = new BoardDrag(JS, this);
+        _keys = new BoardKeys(JS, this);
         _purgeRegistration = ActiveSpace.RegisterPurge(Purge);
 
         await LoadAsync(_generation);
@@ -218,6 +230,10 @@
         if (!_canManage)
         {
             _creating = false;
+
+            // A Role lowered mid-carry or mid-drag ends it with nothing moved, and says where the Task is (story 2.8, open
+            // question 10).
+            Returned(EndHeld());
         }
     }
 
@@ -226,6 +242,7 @@
     {
         // A menu move's arrival focus is spent by the render that drew the card in its new place (story 2.6).
         _arrivalCard = null;
+        _saidSinceRender = false;
 
         if (_focusEmptyAction)
         {
@@ -234,6 +251,7 @@
         }
 
         await AttachDragAsync();
+        await AttachKeysAsync();
     }
 
     /// <summary>
@@ -263,6 +281,11 @@
         {
             await _drag.DisposeAsync();
         }
+
+        if (_keys is not null)
+        {
+            await _keys.DisposeAsync();
+        }
     }
 
     /// <summary>
@@ -271,10 +294,10 @@
     private void Purge()
     {
         _generation++;
-        _drag?.End();
+        EndHeld();
         _columns = null;
         _projectName = string.Empty;
-        _announcement = null;
+        Say(null);
         _creating = false;
         PurgePanel();
     }
@@ -309,7 +332,7 @@
                     _projectName = board.Project.Name;
                     _columns = [.. board.Columns.Select(column => new ColumnState(column.StatusId, column.Name, column.Total, [.. column.Tasks]))];
                     UseStatuses(board.Columns.Select(column => new TaskStatusOption(column.StatusId, column.Name)));
-                    _announcement = Localizer["BoardLoaded"];
+                    Say(Localizer["BoardLoaded"]);
                 }
 
                 return;
@@ -360,11 +383,13 @@
 
             if (await response.Content.ReadFromJsonAsync<BoardResponse>(JsonOptions, token) is { } board && generation == _generation)
             {
-                // A drag under a Board read again ends with nothing moved: the slots it was over may be gone (AC13).
-                _drag?.End();
+                // A drag or a carry under a Board read again ends with nothing moved: the slots it was over may be gone (story
+                // 2.7 AC13). Where the Task is now is said once the Board is drawn again (story 2.8, open question 10).
+                var held = EndHeld();
                 _columns = [.. board.Columns.Select(column => new ColumnState(column.StatusId, column.Name, column.Total, [.. column.Tasks.Where(task => !_deleted.Contains(task.Id))]))];
                 UseStatuses(board.Columns.Select(column => new TaskStatusOption(column.StatusId, column.Name)));
                 Readmit();
+                Returned(held);
             }
         }
         catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
@@ -409,6 +434,18 @@
 
     private void OpenCreate() => _creating = true;
 
+    /// <summary>
+    /// Says a sentence politely - the same one again included (story 2.8, AC14) - or, with <c>null</c>, clears the regions.
+    /// </summary>
+    private void Say(string? words)
+    {
+        // Two sentences said before the Board renders again - a carry ended by a re-read, then the move that caused it - are
+        // said together, in order, rather than the second hiding the first.
+        _announcement = words is not null && _saidSinceRender ? _announcement + " " + words : words;
+        _saidSinceRender = words is not null;
+        _announcements++;
+    }
+
     private void CloseCreate()
     {
         _creating = false;
@@ -439,7 +476,7 @@
 
         column.Tasks.Add(task);
         column.Total++;
-        _announcement = Localizer["TaskAdded"];
+        Say(Localizer["TaskAdded"]);
     }
 
     /// <summary>

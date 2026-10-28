@@ -4,7 +4,7 @@ baseline_commit: f2e4f72
 
 # Story 2.8: Operate the whole Board from the keyboard
 
-Status: ready-for-dev
+Status: review
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-8-operate-the-whole-board-from-the-keyboard`
@@ -122,56 +122,56 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1261-1293` (`status: final`
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Baseline, then decide the open questions** (AC: all)
-  - [ ] `dotnet build Yello.slnx` (0 warnings, 0 errors). Record the baseline from the 2.7 code review: **1232 total, 1229 passed, 0 failed, 3 skipped**, or re-measure at the ATDD commit.
-  - [ ] List any isolation row with `PendingUntil: "2.8"` in the Debug Log (expected: none).
-  - [ ] Decide Q1–Q4 before Task 2, Q5–Q10 before Task 4, Q11–Q14 before Task 7. Record each in Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each is reversible.
+- [x] **Task 1 — Baseline, then decide the open questions** (AC: all)
+  - [x] `dotnet build Yello.slnx` (0 warnings, 0 errors). Record the baseline from the 2.7 code review: **1232 total, 1229 passed, 0 failed, 3 skipped**, or re-measure at the ATDD commit.
+  - [x] List any isolation row with `PendingUntil: "2.8"` in the Debug Log (expected: none).
+  - [x] Decide Q1–Q4 before Task 2, Q5–Q10 before Task 4, Q11–Q14 before Task 7. Record each in Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each is reversible.
 
-- [ ] **Task 2 — Traversal as pure logic, unit-tested** (AC: 1, 2, 5)
-  - [ ] A small pure type in `Yello.Client/Components/` (e.g. `BoardTraversal.cs`, no Blazor dependency): given the columns' Task ids in order, the focused position (Task id, or an empty column), a key (`Up`, `Down`, `InlineStart`, `InlineEnd`), and the run's sticky origin index, return the next position and the updated origin. Rules: `↑`/`↓` clamp at the ends (no wrap) and **reset** the origin to the new index; `←`/`→` keep the origin, land at `min(origin, count-1)`, land on the **column itself** when it is empty (Q4), and stop at the first/last column; any non-arrow key or any focus change not made by the traversal resets the run.
-  - [ ] Logical direction: the module (Task 3) maps physical keys to `InlineStart`/`InlineEnd` from the Board's computed `direction` — `ArrowRight` is `InlineEnd` in LTR and `InlineStart` in RTL. The Status sequence never reverses (it is data, UX-DR42).
-  - [ ] Carry uses the same type: the carried Task is excluded from the destination's count, and entering a column lands at `min(origin, others.Count)` — `others.Count` is valid (the bottom slot), so an empty column takes slot 0 (AC5).
-  - [ ] Unit tests in `tests/Yello.Tests.Architecture` (the only suite that sees `Yello.Client` types, `TESTING-CONVENTIONS.md:34-42`): sticky origin over columns of 5, 1, 0, 3 (origin 4 → 0 → column → 3, then back → 4); `↑`/`↓` at ends; RTL mapping; carry landing and clamping; the carried Task excluded.
+- [x] **Task 2 — Traversal as pure logic, unit-tested** (AC: 1, 2, 5)
+  - [x] A small pure type in `Yello.Client/Components/` (e.g. `BoardTraversal.cs`, no Blazor dependency): given the columns' Task ids in order, the focused position (Task id, or an empty column), a key (`Up`, `Down`, `InlineStart`, `InlineEnd`), and the run's sticky origin index, return the next position and the updated origin. Rules: `↑`/`↓` clamp at the ends (no wrap) and **reset** the origin to the new index; `←`/`→` keep the origin, land at `min(origin, count-1)`, land on the **column itself** when it is empty (Q4), and stop at the first/last column; any non-arrow key or any focus change not made by the traversal resets the run.
+  - [x] Logical direction: the module (Task 3) maps physical keys to `InlineStart`/`InlineEnd` from the Board's computed `direction` — `ArrowRight` is `InlineEnd` in LTR and `InlineStart` in RTL. The Status sequence never reverses (it is data, UX-DR42).
+  - [x] Carry uses the same type: the carried Task is excluded from the destination's count, and entering a column lands at `min(origin, others.Count)` — `others.Count` is valid (the bottom slot), so an empty column takes slot 0 (AC5).
+  - [x] Unit tests in `tests/Yello.Tests.Architecture` (the only suite that sees `Yello.Client` types, `TESTING-CONVENTIONS.md:34-42`): sticky origin over columns of 5, 1, 0, 3 (origin 4 → 0 → column → 3, then back → 4); `↑`/`↓` at ends; RTL mapping; carry landing and clamping; the carried Task excluded.
 
-- [ ] **Task 3 — The Board's keyboard composite** (AC: 1, 3, 4, 6, 7, 11, 12)
-  - [ ] Per Q1/Q2: the Board is one roving tab stop. `BoardView` owns `_activeTaskId` (or the active empty column), rendered as `tabindex="0"` on exactly one element of the composite (the active card's title button, or an empty column's `<section>`) and `tabindex="-1"` on every other card title (and per Q3, the actions controls). Blazor renders every `tabindex`; JS never writes one (2.7's rule: the module never mutates what Blazor renders).
-  - [ ] The active element follows focus: a `focusin` inside the row of columns (Blazor `@onfocusin`, or reported by the module) makes the focused card the active one — so a click, a panel close (`FocusCardTitle`), a menu move's arrival and a column focus after deletion all keep exactly one stop. On first render the active card is the first card of the first non-empty column, or the first column when the Board is empty.
-  - [ ] Per Q11: a keyboard module (one ES module, no package) attached to the row of columns for **every** Role (a Viewer traverses too), separate from the drag's attach, which stays movers-only (UX-DR27; 2.7's Viewer gates must stay green unchanged). On `keydown` whose target is a card title (or the active empty column): `ArrowUp/Down/Left/Right` are `preventDefault`ed (so the column does not scroll) and reported to .NET with the Board's `direction`; `Space` is `preventDefault`ed **only for a mover's card** (so the button does not also click — prevent on `keydown`, and swallow the matching `keyup` activation if the browser still clicks) and reported; `Escape` is reported **only during a carry** and then `preventDefault`ed + `stopPropagation`ed. Every other key, and every key whose target is anything else (the actions control, the "+", an open menu or picker, the panel), is untouched (AC4).
-  - [ ] .NET (`[JSInvokable]`, e.g. on a `BoardKeys` holder beside `BoardDrag` — `BoardView` is at the S1200 dependency cap, as 2.6 and 2.7 found) moves focus with the existing request pattern (`FocusCardTitle` / `_focusCardRequests` / `FocusColumnRequest`) — by Task identity, never by element (AD-29). Focus moving into view scrolls the column and the Board (`focus()` does; add `scrollIntoView({ block: "nearest", inline: "nearest" })` only if a case shows it does not).
-  - [ ] `Enter` on a card keeps opening Task detail (2.3 Q7, 2.6 Q6); `ContextMenu`/`Shift+F10` keep opening the card menu (`TaskCard.CardKeyDownAsync`).
-  - [ ] Remove the "two tab stops per card until story 2.8" sentence from `TaskCard.razor`'s header comment and say what is true now; likewise `TaskMenu.razor:11`, `LabelOption.razor:8`, `ClientSurfaceCollection.cs:12`.
+- [x] **Task 3 — The Board's keyboard composite** (AC: 1, 3, 4, 6, 7, 11, 12)
+  - [x] Per Q1/Q2: the Board is one roving tab stop. `BoardView` owns `_activeTaskId` (or the active empty column), rendered as `tabindex="0"` on exactly one element of the composite (the active card's title button, or an empty column's `<section>`) and `tabindex="-1"` on every other card title (and per Q3, the actions controls). Blazor renders every `tabindex`; JS never writes one (2.7's rule: the module never mutates what Blazor renders).
+  - [x] The active element follows focus: a `focusin` inside the row of columns (Blazor `@onfocusin`, or reported by the module) makes the focused card the active one — so a click, a panel close (`FocusCardTitle`), a menu move's arrival and a column focus after deletion all keep exactly one stop. On first render the active card is the first card of the first non-empty column, or the first column when the Board is empty.
+  - [x] Per Q11: a keyboard module (one ES module, no package) attached to the row of columns for **every** Role (a Viewer traverses too), separate from the drag's attach, which stays movers-only (UX-DR27; 2.7's Viewer gates must stay green unchanged). On `keydown` whose target is a card title (or the active empty column): `ArrowUp/Down/Left/Right` are `preventDefault`ed (so the column does not scroll) and reported to .NET with the Board's `direction`; `Space` is `preventDefault`ed **only for a mover's card** (so the button does not also click — prevent on `keydown`, and swallow the matching `keyup` activation if the browser still clicks) and reported; `Escape` is reported **only during a carry** and then `preventDefault`ed + `stopPropagation`ed. Every other key, and every key whose target is anything else (the actions control, the "+", an open menu or picker, the panel), is untouched (AC4).
+  - [x] .NET (`[JSInvokable]`, e.g. on a `BoardKeys` holder beside `BoardDrag` — `BoardView` is at the S1200 dependency cap, as 2.6 and 2.7 found) moves focus with the existing request pattern (`FocusCardTitle` / `_focusCardRequests` / `FocusColumnRequest`) — by Task identity, never by element (AD-29). Focus moving into view scrolls the column and the Board (`focus()` does; add `scrollIntoView({ block: "nearest", inline: "nearest" })` only if a case shows it does not).
+  - [x] `Enter` on a card keeps opening Task detail (2.3 Q7, 2.6 Q6); `ContextMenu`/`Shift+F10` keep opening the card menu (`TaskCard.CardKeyDownAsync`).
+  - [x] Remove the "two tab stops per card until story 2.8" sentence from `TaskCard.razor`'s header comment and say what is true now; likewise `TaskMenu.razor:11`, `LabelOption.razor:8`, `ClientSurfaceCollection.cs:12`.
 
-- [ ] **Task 4 — Pick-up, carry, drop, cancel** (AC: 3, 5, 6, 9, 10, 11, 16, 17)
-  - [ ] Carry state in .NET (`BoardKeys` or a `_carry` record: Task id, origin Status and slot, target Status and slot excluding the carried Task, sticky origin index). Rendering per Q12: reuse `BoardColumn.DropIndex` to draw the drop zone at the target slot, and mark the carried card (a `task-card--carried` class, per Q12) — never the pointer's `task-card--lifted` (that one is `position: fixed` at coordinates only the drag module writes).
-  - [ ] `Space` on a mover's focused card with no carry → pick up (only if `_canManage`, no panel open, no menu open, no drag lifted, the Task on the Board; a lift in progress refuses the pick-up and vice versa). Announce the pick-up sentence (Q5).
-  - [ ] During a carry: arrows step the target via `BoardTraversal` (AC5), announce the step sentence (Q5), keep focus on the carried card and bring the drop zone into view (`scrollIntoView({ block: "nearest" })` on the zone, through the module); `Tab` ends the carry as a cancel (Q4) — focus never leaves with a Task in hand; `Enter`, `ContextMenu`, `Shift+F10` do nothing while carrying.
-  - [ ] `Space` → drop: same slot as now (same Status, same neighbour above, the carried Task excluded) → nothing sent, "Returned to …" (2.7 Q5); otherwise `MoveAsync(…, MoveOrigin.Keyboard)` with `afterTaskId` computed exactly as `IBoardDragHost.DropAsync` does (`BoardView.Drag.cs:83-85`) — **extract that computation into one shared helper** used by both. `MoveOrigin.Keyboard`: refusal words on the Board notice (as `Menu`/`Drag`), and focus follows the card by identity to its optimistic slot, its admitted slot and, on refusal, its returned slot (as `Menu` does with `FocusCardTitle`).
-  - [ ] `Esc` → cancel: nothing sent, "Returned to {Status}, position {n}.", focus on the card in its slot.
-  - [ ] Board-side ends (AC17, Q10): `RereadBoardAsync`, `Deleted`, `Open` (panel), a Role re-read that removes `_canManage` (`OnParametersSet`), `Purge`, `DisposeAsync` — each ends a carry exactly where they already call `_drag?.End()`; say the return per Q10.
-  - [ ] Pointer/keyboard exclusion: while a carry is active the drag cannot lift (`IBoardDragHost.CanLift` refuses), and a pick-up is refused while `_drag.LiftedTaskId` is set.
+- [x] **Task 4 — Pick-up, carry, drop, cancel** (AC: 3, 5, 6, 9, 10, 11, 16, 17)
+  - [x] Carry state in .NET (`BoardKeys` or a `_carry` record: Task id, origin Status and slot, target Status and slot excluding the carried Task, sticky origin index). Rendering per Q12: reuse `BoardColumn.DropIndex` to draw the drop zone at the target slot, and mark the carried card (a `task-card--carried` class, per Q12) — never the pointer's `task-card--lifted` (that one is `position: fixed` at coordinates only the drag module writes).
+  - [x] `Space` on a mover's focused card with no carry → pick up (only if `_canManage`, no panel open, no menu open, no drag lifted, the Task on the Board; a lift in progress refuses the pick-up and vice versa). Announce the pick-up sentence (Q5).
+  - [x] During a carry: arrows step the target via `BoardTraversal` (AC5), announce the step sentence (Q5), keep focus on the carried card and bring the drop zone into view (`scrollIntoView({ block: "nearest" })` on the zone, through the module); `Tab` ends the carry as a cancel (Q4) — focus never leaves with a Task in hand; `Enter`, `ContextMenu`, `Shift+F10` do nothing while carrying.
+  - [x] `Space` → drop: same slot as now (same Status, same neighbour above, the carried Task excluded) → nothing sent, "Returned to …" (2.7 Q5); otherwise `MoveAsync(…, MoveOrigin.Keyboard)` with `afterTaskId` computed exactly as `IBoardDragHost.DropAsync` does (`BoardView.Drag.cs:83-85`) — **extract that computation into one shared helper** used by both. `MoveOrigin.Keyboard`: refusal words on the Board notice (as `Menu`/`Drag`), and focus follows the card by identity to its optimistic slot, its admitted slot and, on refusal, its returned slot (as `Menu` does with `FocusCardTitle`).
+  - [x] `Esc` → cancel: nothing sent, "Returned to {Status}, position {n}.", focus on the card in its slot.
+  - [x] Board-side ends (AC17, Q10): `RereadBoardAsync`, `Deleted`, `Open` (panel), a Role re-read that removes `_canManage` (`OnParametersSet`), `Purge`, `DisposeAsync` — each ends a carry exactly where they already call `_drag?.End()`; say the return per Q10.
+  - [x] Pointer/keyboard exclusion: while a carry is active the drag cannot lift (`IBoardDragHost.CanLift` refuses), and a pick-up is refused while `_drag.LiftedTaskId` is set.
 
-- [ ] **Task 5 — Chained moves (AC16) and the announcement model (AC14)** (AC: 9, 14, 16)
-  - [ ] Per Q9: in `EditAsync`/`SendInTurnAsync` for a `MoveChoice` whose `AfterTaskId` names a Task whose own Status attribute is in flight or queued (`ReplicaOf(after).HasOutstanding(TaskAttribute.Status)`), the send waits until that Task's Status attribute settles (admitted, refused, unanswered or gone); the optimistic placement still renders at once. No timeout as the mechanism; a refusal of the neighbour's move leaves B's move to go and be answered as 2.6 rules. Covers picker, drag and keyboard moves alike (one write path).
-  - [ ] Per Q6: one shared live-region component (e.g. `Yello.Client/Components/LiveAnnouncement.razor`), empty from first render (the 2.3 rule), that guarantees each `Say(text)` changes what assistive technology hears even when `text` equals the previous sentence. Replace the Board's `<p role="status">@_announcement</p>` and the regions in `ProjectList.razor` and `LabelSection.razor` with it. The Board notice (`board__notice`) and the panel's refusal regions are not announcements of repeated actions and stay as they are.
-  - [ ] Keep "Board loaded." exactly as it is (UX owns its conflict with `EXPERIENCE.md:390`, `deferred-work.md:498`).
+- [x] **Task 5 — Chained moves (AC16) and the announcement model (AC14)** (AC: 9, 14, 16)
+  - [x] Per Q9: in `EditAsync`/`SendInTurnAsync` for a `MoveChoice` whose `AfterTaskId` names a Task whose own Status attribute is in flight or queued (`ReplicaOf(after).HasOutstanding(TaskAttribute.Status)`), the send waits until that Task's Status attribute settles (admitted, refused, unanswered or gone); the optimistic placement still renders at once. No timeout as the mechanism; a refusal of the neighbour's move leaves B's move to go and be answered as 2.6 rules. Covers picker, drag and keyboard moves alike (one write path).
+  - [x] Per Q6: one shared live-region component (e.g. `Yello.Client/Components/LiveAnnouncement.razor`), empty from first render (the 2.3 rule), that guarantees each `Say(text)` changes what assistive technology hears even when `text` equals the previous sentence. Replace the Board's `<p role="status">@_announcement</p>` and the regions in `ProjectList.razor` and `LabelSection.razor` with it. The Board notice (`board__notice`) and the panel's refusal regions are not announcements of repeated actions and stay as they are.
+  - [x] Keep "Board loaded." exactly as it is (UX owns its conflict with `EXPERIENCE.md:390`, `deferred-work.md:498`).
 
-- [ ] **Task 6 — The pickers and the card menu** (AC: 15)
-  - [ ] `PickerOption.razor`, `LabelOption.razor`, `MovePicker.razor`, the Status and Label `<ul role="listbox">` in `TaskDetail.razor`, `TaskMenu.razor`: one tab stop each (roving `tabindex`, or `aria-activedescendant` on the list — Q7), `↑`/`↓`/`Home`/`End`, `Space` and arrows `preventDefault`ed through the keyboard module's helper (Blazor's `:preventDefault` is static and would also swallow `Tab`), `Enter`/`Space` choose. `TaskMenu`: `role="menuitem"` items, `↑`/`↓` between them, focus on the first on open (unchanged).
-  - [ ] Preserve: no option pre-selected (`aria-selected="false"` on single-select; `aria-selected` = applied for Labels), `aria-checked` on the Status picker's current Status, `Esc` steps back / closes and returns focus (2.3, 2.6), the panel's focus trap (Tab never leaves the panel, `TaskDetailTests.Focus_is_trapped_in_the_panel_and_returns_to_the_card_on_Esc`), the picker keeping its keys to itself (`@onkeydown:stopPropagation` on `MovePicker`/`TaskMenu`), and the `LabelOption.FocusAsync` the trap may call.
+- [x] **Task 6 — The pickers and the card menu** (AC: 15)
+  - [x] `PickerOption.razor`, `LabelOption.razor`, `MovePicker.razor`, the Status and Label `<ul role="listbox">` in `TaskDetail.razor`, `TaskMenu.razor`: one tab stop each (roving `tabindex`, or `aria-activedescendant` on the list — Q7), `↑`/`↓`/`Home`/`End`, `Space` and arrows `preventDefault`ed through the keyboard module's helper (Blazor's `:preventDefault` is static and would also swallow `Tab`), `Enter`/`Space` choose. `TaskMenu`: `role="menuitem"` items, `↑`/`↓` between them, focus on the first on open (unchanged).
+  - [x] Preserve: no option pre-selected (`aria-selected="false"` on single-select; `aria-selected` = applied for Labels), `aria-checked` on the Status picker's current Status, `Esc` steps back / closes and returns focus (2.3, 2.6), the panel's focus trap (Tab never leaves the panel, `TaskDetailTests.Focus_is_trapped_in_the_panel_and_returns_to_the_card_on_Esc`), the picker keeping its keys to itself (`@onkeydown:stopPropagation` on `MovePicker`/`TaskMenu`), and the `LabelOption.FocusAsync` the trap may call.
 
-- [ ] **Task 7 — Accessible structure** (AC: 7, 12, 13)
-  - [ ] Per Q1: keep native structure — `<section aria-labelledby>` per column, `<h2>`, `<ul>`, `<li>` — with the composite's roving focus; give the row of columns a group name if Q1 says so. No `role="application"` anywhere (gate it, Task 8).
-  - [ ] Per Q8: the count chip is `aria-hidden` and the column carries a description "{n} Tasks" / "1 Task" from resx (`aria-describedby` on the `<section>`, or a visually hidden sibling inside the heading's description); each card `<li>` carries `aria-posinset` / `aria-setsize` from the column's true `Total` (AD-29; 2.9 keeps them true under paging).
-  - [ ] New resx entries with `<comment>`s: the pick-up sentence, the step sentence, the column count description (singular and plural), any group name (Q1). Never quoted in C# (`No_user_visible_copy_is_written_as_a_csharp_string_literal`).
+- [x] **Task 7 — Accessible structure** (AC: 7, 12, 13)
+  - [x] Per Q1: keep native structure — `<section aria-labelledby>` per column, `<h2>`, `<ul>`, `<li>` — with the composite's roving focus; give the row of columns a group name if Q1 says so. No `role="application"` anywhere (gate it, Task 8).
+  - [x] Per Q8: the count chip is `aria-hidden` and the column carries a description "{n} Tasks" / "1 Task" from resx (`aria-describedby` on the `<section>`, or a visually hidden sibling inside the heading's description); each card `<li>` carries `aria-posinset` / `aria-setsize` from the column's true `Total` (AD-29; 2.9 keeps them true under paging).
+  - [x] New resx entries with `<comment>`s: the pick-up sentence, the step sentence, the column count description (singular and plural), any group name (Q1). Never quoted in C# (`No_user_visible_copy_is_written_as_a_csharp_string_literal`).
 
-- [ ] **Task 8 — Gates** (AC: 4, 7, 11)
-  - [ ] Architecture gates (new partial, e.g. `DesignFoundationGateTests.Keyboard.cs` or a `KeyboardGateTests.cs`), each proved by a plant: no `role="application"` in any `.razor`/`.html`/`.js`; the keyboard module is attached for every Role and the drag module still for movers only; the `Space` branch is guarded by the mover's capability; no `tabindex` greater than 0 anywhere.
-  - [ ] JS-scanning gates (`ClientStorageBanTests.No_client_asset_reaches_browser_storage`, `SpaceSwitcherGateTests`) must cover the new module and stay green unchanged.
-  - [ ] Existing exact-count assertions to re-check before changing card markup: `BoardTests.A_Task_card_is_its_title_alone_and_carries_no_shadow` (`button, a, [tabindex]` = 2 — `tabindex="-1"` on the two buttons keeps it 2), `LabelTests:121-122` (`[tabindex]:not([tabindex='-1'])` — the active card's title alone must not push a non-active card over), E2E-003's Viewer assertions. Widen any of them only deliberately, recorded in the Debug Log as 2.6 and 2.7 did.
+- [x] **Task 8 — Gates** (AC: 4, 7, 11)
+  - [x] Architecture gates (new partial, e.g. `DesignFoundationGateTests.Keyboard.cs` or a `KeyboardGateTests.cs`), each proved by a plant: no `role="application"` in any `.razor`/`.html`/`.js`; the keyboard module is attached for every Role and the drag module still for movers only; the `Space` branch is guarded by the mover's capability; no `tabindex` greater than 0 anywhere.
+  - [x] JS-scanning gates (`ClientStorageBanTests.No_client_asset_reaches_browser_storage`, `SpaceSwitcherGateTests`) must cover the new module and stay green unchanged.
+  - [x] Existing exact-count assertions to re-check before changing card markup: `BoardTests.A_Task_card_is_its_title_alone_and_carries_no_shadow` (`button, a, [tabindex]` = 2 — `tabindex="-1"` on the two buttons keeps it 2), `LabelTests:121-122` (`[tabindex]:not([tabindex='-1'])` — the active card's title alone must not push a non-active card over), E2E-003's Viewer assertions. Widen any of them only deliberately, recorded in the Debug Log as 2.6 and 2.7 did.
 
-- [ ] **Task 9 — Browser tests** (AC: 1-17)
-  - [ ] New `tests/Yello.Tests.Client/KeyboardTests.cs` in `ClientSurfaceCollection` against `FakeYelloApi` and its 2.6 move harness (`HoldTaskMoveAsync`, `ReleaseTaskMove`, `ReleaseTaskMoveRefused`, `ReleaseTaskMoveUnanswered`, `NextTaskMoveRefusal`). **No new fixture class, no container.** Reset focus before each keyboard case (`BoardTests.cs:570` idiom). Poll; never `Task.Delay` as an oracle. Hold → assert → release → assert for every move.
-  - [ ] Cases (one behaviour each, sentence names, `Requirement` traits `UX-DR24`, `NFR-9`, `FR-29`, `UX-DR25`, …):
+- [x] **Task 9 — Browser tests** (AC: 1-17)
+  - [x] New `tests/Yello.Tests.Client/KeyboardTests.cs` in `ClientSurfaceCollection` against `FakeYelloApi` and its 2.6 move harness (`HoldTaskMoveAsync`, `ReleaseTaskMove`, `ReleaseTaskMoveRefused`, `ReleaseTaskMoveUnanswered`, `NextTaskMoveRefusal`). **No new fixture class, no container.** Reset focus before each keyboard case (`BoardTests.cs:570` idiom). Poll; never `Task.Delay` as an oracle. Hold → assert → release → assert for every move.
+  - [x] Cases (one behaviour each, sentence names, `Requirement` traits `UX-DR24`, `NFR-9`, `FR-29`, `UX-DR25`, …):
     - Tab into the Board lands on one card; a second Tab leaves the composite (or reaches the active card's actions control per Q3, then leaves); Shift+Tab returns; exactly one element inside the row of columns has `tabindex="0"` at all times (AC1, AC7).
     - `↑`/`↓` within a column, clamped at the ends; the column did not scroll by the key's default (`scrollTop` unchanged when the target is already in view) (AC1).
     - Sticky origin across columns of 5, 1, 0 and 3 cards: focus lands at index 4 → 0 → the empty column → 3, then back to 4 (AC2).
@@ -190,16 +190,16 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1261-1293` (`status: final`
     - Chained: A moved by keyboard (held), then B dropped directly after A → B's POST is not sent until A's is answered (assert by the fake's request log while A is held), then is sent and admitted (AC16). Plant: the wait removed → B's POST observed while A is held.
     - Board-side ends: a carry under a Board re-read (trigger by a `409` on another Task's held move) ends with nothing sent and the Q10 sentence; a purge (Space switch) ends it silently (AC17).
     - Nothing is announced on plain traversal or on load beyond the existing "Board loaded." (AC10).
-  - [ ] `TextSpacingTests`: a carried card and its drop zone under the 1.4.12 override and 200% text-only zoom clip nothing (each new surface adds its case, `deferred-work.md:20`).
-  - [ ] Amend 2.7's tests that assert silence on Board-side cancels if Q10 makes them speak (grep `DragTests.cs`/`TouchDragTests.cs`); `Nothing_is_announced_on_lift_or_on_crossing_columns` stays true under Q5 (a).
-  - [ ] Rebuild `Yello.Client` in **Debug** before every browser run and plant.
+  - [x] `TextSpacingTests`: a carried card and its drop zone under the 1.4.12 override and 200% text-only zoom clip nothing (each new surface adds its case, `deferred-work.md:20`).
+  - [x] Amend 2.7's tests that assert silence on Board-side cancels if Q10 makes them speak (grep `DragTests.cs`/`TouchDragTests.cs`); `Nothing_is_announced_on_lift_or_on_crossing_columns` stays true under Q5 (a).
+  - [x] Rebuild `Yello.Client` in **Debug** before every browser run and plant.
 
-- [ ] **Task 10 — Plants, runs, ledger, status** (AC: all)
-  - [ ] Plants one at a time; original held in memory and restored in a `finally`; hash compared after restore; **never** `git checkout --`, `git restore`, `git reset` or `git stash`. Each plant compiles. Record `| # | Plant | Gate | Caught |`. Minimum set: sticky origin re-derived per hop; `ArrowRight` bound physically (RTL case); `Space` prevented on every focused element (AC4 cases); `Space` pick-up allowed for a Viewer; every card title `tabindex="0"`; the keyboard drop sent as a `PATCH`; origin drop sending a POST; the chained-move wait removed; the repeated-announcement mechanism removed; `role="application"` on the row of columns; `Esc` during a carry also closing a surrounding surface.
-  - [ ] Runs (CLAUDE.md): `dotnet build Yello.slnx` (0 warnings, 0 errors), `dotnet build-server shutdown`, `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. A Client failure seen only in the full run is rerun alone (`dotnet test --project tests/Yello.Tests.Client/Yello.Tests.Client.csproj --no-build`) before it is called real. Docker readiness `docker info --format '{{.ServerVersion}}'`; `Get-Process Yello.Host` if `bin/Debug` is locked.
-  - [ ] `tests/TESTING-CONVENTIONS.md`: how keyboard cases reset focus and assert `defaultPrevented`, how RTL is forced, how a repeated announcement is observed.
-  - [ ] Ledger (`deferred-work.md`): CLOSE `:489`, `:496`, `:513`, `:517`, `:535`, `:549`, `:564`, `:579` naming the code and tests; CLOSE the 2.8 half of `:569` per Q5 (the "Drop here" copy stays with UX); UPDATE `:130` (keyboard-parity matrix written; axe still open per Q13); NOTE `:525` ("+N" is still text, nothing placed); ADD with owners anything decided against the spines (the pick-up and step sentences — owner **UX** to confirm the copy; Q2's Tab reading; Q12's carried look; the axe decision — owner **Lee**).
-  - [ ] `sprint-status.yaml`: `review` at the end of the dev phase. **Do not add review narration to source files.**
+- [x] **Task 10 — Plants, runs, ledger, status** (AC: all)
+  - [x] Plants one at a time; original held in memory and restored in a `finally`; hash compared after restore; **never** `git checkout --`, `git restore`, `git reset` or `git stash`. Each plant compiles. Record `| # | Plant | Gate | Caught |`. Minimum set: sticky origin re-derived per hop; `ArrowRight` bound physically (RTL case); `Space` prevented on every focused element (AC4 cases); `Space` pick-up allowed for a Viewer; every card title `tabindex="0"`; the keyboard drop sent as a `PATCH`; origin drop sending a POST; the chained-move wait removed; the repeated-announcement mechanism removed; `role="application"` on the row of columns; `Esc` during a carry also closing a surrounding surface.
+  - [x] Runs (CLAUDE.md): `dotnet build Yello.slnx` (0 warnings, 0 errors), `dotnet build-server shutdown`, `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. A Client failure seen only in the full run is rerun alone (`dotnet test --project tests/Yello.Tests.Client/Yello.Tests.Client.csproj --no-build`) before it is called real. Docker readiness `docker info --format '{{.ServerVersion}}'`; `Get-Process Yello.Host` if `bin/Debug` is locked.
+  - [x] `tests/TESTING-CONVENTIONS.md`: how keyboard cases reset focus and assert `defaultPrevented`, how RTL is forced, how a repeated announcement is observed.
+  - [x] Ledger (`deferred-work.md`): CLOSE `:489`, `:496`, `:513`, `:517`, `:535`, `:549`, `:564`, `:579` naming the code and tests; CLOSE the 2.8 half of `:569` per Q5 (the "Drop here" copy stays with UX); UPDATE `:130` (keyboard-parity matrix written; axe still open per Q13); NOTE `:525` ("+N" is still text, nothing placed); ADD with owners anything decided against the spines (the pick-up and step sentences — owner **UX** to confirm the copy; Q2's Tab reading; Q12's carried look; the axe decision — owner **Lee**).
+  - [x] `sprint-status.yaml`: `review` at the end of the dev phase. **Do not add review narration to source files.**
 
 ## Dev Notes
 
@@ -297,14 +297,99 @@ Each story lands as "Add story → (ATDD) → implement → Close the code revie
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 5.5 (claude-opus-5-5), dev-story phase, 2026-10-28.
 
 ### Debug Log References
 
 **Create-story phase (2026-10-28).** No isolation row is pending on 2.8 (grepped `tests/Yello.Tests.Isolation`). No ATDD scaffold exists for 2.8. Planning inputs read through a research pass over the planning documents and test design, plus a direct read of the client code (`BoardView`, `BoardView.Drag`, `BoardDrag`, `board-drag.js`, `BoardColumn`, `TaskCard`, `MovePicker`, `TaskMenu`, `PickerOption`, `LabelOption`, `TaskDetail`'s Esc ladder, `base.css` focus rules), story 2.7 and `deferred-work.md`; facts above cite paths and lines as read on 2026-10-28. No axe-core package exists. No product locale is right-to-left. No existing browser test presses `Space`.
 
+**Dev phase (2026-10-28).**
+
+- Baseline at HEAD `b87c082` (from the 2.7 code review, per the orchestrator): 1232 total, 1229 passed, 0 failed, 3 skipped. `dotnet build Yello.slnx` 0 warnings, 0 errors before any change. Isolation rows with `PendingUntil` "2.8": none (grepped `tests/Yello.Tests.Isolation`).
+- Analyzer pressure, as 2.6 and 2.7 found: `BoardView` sits at S1200's cap of 30 dependencies. A `BoardStop` record and a separate `SettleSignal` class each pushed it to 31, so the traversal works on `(int Column, int? Index)` tuples and the chained-move signal lives on the nested `TaskReplica` (its own `TaskCompletionSource`), which S1200 counts separately.
+- The copy gates scan comments and markup too: a `// ... "Task deleted." ...` comment and `var x = ...;` statements in markup were reported as user-visible literals; rewritten (no quoted copy in comments, no locals in markup).
+- First browser run of `KeyboardTests`: 30 of 33 passed. Two failures were the test's own expectation (a Task carried from position 2 into a column of 1 lands at its bottom, after Review, not before it). The third was a real interaction: the Space-switch case clicked the switcher, which moved focus off the carried card and so ended the carry with its return said - correct by design. The case now leaves the Space by in-app navigation with focus still on the card, so only the purge ends the carry. A fourth finding: a carry ended by a Board re-read said its return, and the refused move's own return in the same render hid it. `BoardView.Say` now joins sentences said before one render (recorded in `deferred-work.md` for UX).
+- Exact-count assertions checked before changing card markup: `BoardTests.A_Task_card_is_its_title_alone_and_carries_no_shadow` (`button, a, [tabindex]` = 2) and `LabelTests:121-122` stay true unchanged (the two buttons carry `tabindex` and are still two elements). E2E-003's Viewer assertions unchanged. Nothing widened.
+- 2.7's tests asserting silence on Board-side cancels: none exist (grepped `DragTests.cs`, `TouchDragTests.cs`); `Nothing_is_announced_on_lift_or_on_crossing_columns` stays true under Q5 (a).
+- Plants, one at a time, original held in memory and written back in a `finally`, hash compared after each restore (all matched); Debug `Yello.Client` rebuilt for each browser plant:
+
+| # | Plant | Gate | Caught |
+|---|---|---|---|
+| 1 | Sticky origin re-derived per hop (`Traverse` returns the clamped index as the origin) | `BoardTraversalTests.A_run_across_ragged_columns_keeps_its_sticky_origin` | yes |
+| 2 | Arrows bound physically (`board-keys.js` reports `rightToLeft = false`) | `KeyboardTests.Under_right_to_left_...` | yes |
+| 3 | Space prevented on every focused element | `KeyboardTests.Space_keeps_its_native_meaning_everywhere_but_a_movers_card` | yes |
+| 4 | Space pick-up allowed for a Viewer (module and `CanPickUp` unguarded) | `KeyboardTests.A_Viewer_traverses_...`; `KeyboardGateTests.Space_is_a_pick_up_only_for_a_mover` | yes, both |
+| 5 | Every card title `tabindex="0"` | `KeyboardTests.Tab_reaches_one_card_and_then_leaves_the_Board` | yes |
+| 6 | Keyboard drop sent as a Status `PATCH` | `KeyboardTests.A_keyboard_carry_across_columns_...` | yes |
+| 7 | Origin-slot drop sends a POST | `KeyboardTests.Dropping_on_its_own_slot_or_Esc_...(escape: False)` | yes |
+| 8 | Chained-move wait removed | `KeyboardTests.A_move_chained_after_one_still_out_waits_for_it_and_is_admitted` | yes |
+| 9 | Repeated-announcement mechanism removed (one region) | the three `..._announced_twice`/`..._again` cases | yes, 3 of 3 |
+| 10 | `role="application"` on the row of columns | `KeyboardGateTests.Nothing_in_the_client_forces_application_mode` | yes |
+| 11 | Esc during a carry also reaching the document (no `stopPropagation`) | `KeyboardTests.Dropping_on_its_own_slot_or_Esc_...(escape: True)` | yes |
+
+  The positive-`tabindex`, attach and Space-guard scans are also proved by permanent plant cases in `KeyboardGateTests`. Every plant compiled (the first attempts at plants 1, 2 and 5 tripped analyzers and were re-planted in a compiling form).
+- Full run: see Completion Notes.
+
 ### Completion Notes List
 
 - Story created 2026-10-28 by create-story: ultimate context engine analysis completed — comprehensive developer guide created. Open questions Q1–Q14 carry recommended decisions; the dev phase decides each as a reversible, recorded decision.
+- **Implemented (dev phase, 2026-10-28).** The Board is one roving tab stop for every Role (`BoardView.Keys.cs`, `BoardKeys.cs`, `js/board-keys.js`), with the arrow grammar as pure logic (`BoardTraversal.cs`, unit-tested in `BoardTraversalTests`). Space on a mover's card picks the Task up; the arrows carry it (the drop zone drawn by `BoardColumn.DropIndex`, the card marked `task-card--carried`); Space drops it through `BoardView.MoveAsync(..., MoveOrigin.Keyboard)` - the one write path, the neighbour rule shared with the drag (`DropChoice`); Esc and Tab cancel. Announcements go through `LiveAnnouncement.razor` on the Board, Space home and Space settings. The pickers and the card menu follow the listbox and menu patterns. Chained moves wait for their neighbour (`ReadyToSendAsync`). Board-side ends of a lift or carry say the return (`EndHeld`). The column is named and counted for assistive technology. No server, Contracts, migration or isolation change.
+- **Q1 - (a).** Native structure (section, heading, list per column) with one roving-tabindex composite is the "equivalent" of `role="grid"`; no `role="application"`. Cost to later stories: screen-reader users reach the arrows in focus mode only; ledger note to UX. Reversible: a grid role could be added over the same focus model.
+- **Q2 - (a).** The whole composite is one tab stop; the active card's actions control and the controls around the Board are their own stops in reading order; `←`/`→` move between columns. Cost to later stories: none; ledger note to UX.
+- **Q3 - (a).** The active card's actions control stays a tab stop (title, actions, out). Cost to later stories: two stops on the active card.
+- **Q4 - (a).** Traversal lands on an empty column (its section becomes the stop), a carry can target it, and Tab during a carry cancels it. Cost to later stories: none.
+- **Q5 - (a).** Pick-up "Picked up {title}. {Status}, position {n} of {total}."; each step "{Status}, position {n} of {total}." with the total the column would have; drop and cancel keep 2.6's sentences; pointer lifts stay silent. Cost to later stories: UX confirms the strings (ledger).
+- **Q6 - (b), not the recommended (a).** Two alternating polite regions rather than clear-then-write over two renders: Blazor can apply both renders in one browser task, which the accessibility tree may coalesce; alternation does not depend on timing. One component, used on the Board, `ProjectList` and `LabelSection`. Cost to later stories: two `[aria-live=polite]` regions per surface (tests filter by text). You can cut this line and go back to (a) if UX prefers one region.
+- **Q7 - (a).** Roving `tabindex` on options and menu items, `↑`/`↓` wrap, `Home`/`End`; Tab in the card menu left as today. The key handling lives in the Board's one keyboard module (every picker and the menu are inside the Board), so no per-picker import was needed. Cost to later stories: a picker added outside the Board needs the module attached there.
+- **Q8 - (a).** Chip `aria-hidden`, a "{n} Tasks"/"1 Task" description by `aria-describedby`, and `aria-posinset`/`aria-setsize` on every card from the true total. Cost to later stories: 2.9 keeps them true under paging.
+- **Q9 - (a).** A move naming a neighbour whose own Status change is out waits for that change to settle, then is sent; the render does not wait. It waits only for the change that was out when it began, so two moves cannot wait on each other. Cost to later stories: a move can sit behind another for one round trip.
+- **Q10 - (a).** A re-read, the panel opened, a menu opened (by pointer) or a lowered Role ends a lift or carry and says "Returned to …"; a deletion of the held Task, a purge and a disposal say nothing. Cost to later stories: none; no 2.7 case asserted silence.
+- **Q11 - (a).** One new hand-written ES module, `js/board-keys.js`, attached for every Role; the drag stays movers-only. No package. Cost to later stories: a second JS file, covered by the JS-scanning gates.
+- **Q12 - (a).** The carried card stays in its slot with the 2px emphasis border (no shadow, tilt or position change); the drop zone marks the target, drawn just before the card at its own slot. Cost to later stories: UX confirms the look (ledger).
+- **Q13 - (a).** X-4 (parity matrix) written; no axe package added (a HALT-class dependency); X-3 deferred to Lee in `deferred-work.md`. Cost to later stories: the story that adds axe runs it.
+- **Q14 - as recommended.** `Keyboard.PressAsync` from a known focus; `defaultPrevented` from a window listener; RTL by `dir="rtl"`; announcements by a `MutationObserver`; module readiness by a cancelable synthetic `ArrowUp`. No timing assertions, so no `DisableParallelization` collection. Cost to later stories: none.
+- **Tests added:** `BoardTraversalTests` (7), `KeyboardGateTests` (8), `KeyboardTests` (33 cases across 24 methods), `TextSpacingTests` mid-carry (2). Every absence assertion proved against a plant (Debug Log).
+- **Full run (2026-10-28):** `dotnet build Yello.slnx` 0 warnings, 0 errors; `dotnet build-server shutdown`; `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`: **1282 total, 1278 passed, 1 failed, 3 skipped** (the three bundle skips). The one failure was `PasswordVerificationDurationTests.An_unknown_address_costs_what_a_wrong_password_costs`, a server-side timing case that 2.8 does not touch, already in the `DisableParallelization` `PasswordDurationCollection`. Rerun once alone, it passed (4 passed, 1 skipped, 0 failed). Client: 260 passed. Architecture: all passed. Against the 1232/1229/3 baseline: +50 cases.
 
 ### File List
+
+New:
+
+- `Yello.Client/Components/BoardKey.cs`
+- `Yello.Client/Components/BoardKeys.cs`
+- `Yello.Client/Components/BoardTraversal.cs`
+- `Yello.Client/Components/BoardView.Keys.cs`
+- `Yello.Client/Components/IBoardKeysHost.cs`
+- `Yello.Client/Components/LiveAnnouncement.razor`
+- `Yello.Client/wwwroot/js/board-keys.js`
+- `tests/Yello.Tests.Architecture/BoardTraversalTests.cs`
+- `tests/Yello.Tests.Architecture/KeyboardGateTests.cs`
+- `tests/Yello.Tests.Client/KeyboardHarness.cs`
+- `tests/Yello.Tests.Client/KeyboardTests.cs`
+
+Modified:
+
+- `Yello.Client/Components/BoardColumn.razor`
+- `Yello.Client/Components/BoardView.Drag.cs`
+- `Yello.Client/Components/BoardView.razor`
+- `Yello.Client/Components/BoardView.razor.cs`
+- `Yello.Client/Components/LabelOption.razor`
+- `Yello.Client/Components/LabelSection.razor`
+- `Yello.Client/Components/MovePicker.razor`
+- `Yello.Client/Components/PickerOption.razor`
+- `Yello.Client/Components/ProjectList.razor`
+- `Yello.Client/Components/TaskCard.razor`
+- `Yello.Client/Components/TaskDetail.razor`
+- `Yello.Client/Components/TaskMenu.razor`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/wwwroot/css/components.css`
+- `tests/Yello.Tests.Client/ClientSurfaceCollection.cs`
+- `tests/Yello.Tests.Client/TextSpacingTests.cs`
+- `tests/TESTING-CONVENTIONS.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/2-8-operate-the-whole-board-from-the-keyboard.md`
+
+### Change Log
+
+- 2026-10-28 - Dev phase: the Board's keyboard composite (one roving tab stop, logical arrows with a sticky origin, Space pick-up/carry/drop through 2.6's move, Esc/Tab cancel); LiveAnnouncement (repeated sentences said again) on the Board, Space home and Space settings; listbox and menu keyboard patterns; the column's accessible count and `aria-posinset`/`aria-setsize`; chained moves wait for their neighbour; Board-side ends of a lift or carry say the return. Ledger: 9 entries closed, `:130` updated, `:525` noted, 5 added (UX x4, Lee x1).

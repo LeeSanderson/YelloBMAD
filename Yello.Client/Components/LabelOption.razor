@@ -5,15 +5,17 @@
     an option of the in-panel listbox (aria-multiselectable), selected exactly when the Task carries the Label, so
     nothing is pre-selected that is not already applied. Choosing one - click, Enter or Space - toggles it and commits
     the Task's whole new set at once (open question 1 (a)); there is nothing to confirm. The swatch is decoration: the
-    option's name is its text, and nothing depends on colour (UX-DR7). The keyboard pattern beyond this is story 2.8's
-    (deferred-work.md:515).
+    option's name is its text, and nothing depends on colour (UX-DR7). One tab stop per picker (story 2.8, AC15, open
+    question 7 (a)): only the Active option is in the tab order; ↑/↓ (wrapping), Home and End move focus between options
+    (js/board-keys.js), focusing one never toggles it, and Space toggles without scrolling the page.
 *@
 
 <li class="picker__option label-option"
     role="option"
-    tabindex="0"
+    tabindex="@(Active ? "0" : "-1")"
     aria-selected="@(Selected ? "true" : "false")"
     @onclick="ToggleAsync"
+    @onfocus="OnFocused"
     @onkeydown="KeyDownAsync"
     @ref="_element"><span class="label-swatch label-chip--@ColourClass" aria-hidden="true"></span>@Label.Name</li>
 
@@ -28,6 +30,14 @@
     /// <summary>Whether the Task carries it now.</summary>
     [Parameter]
     public bool Selected { get; set; }
+
+    /// <summary>Whether this option is its picker's one tab stop (story 2.8).</summary>
+    [Parameter]
+    public bool Active { get; set; }
+
+    /// <summary>Raised when the option takes focus, so its picker makes it the tab stop.</summary>
+    [Parameter]
+    public EventCallback OnFocused { get; set; }
 
     /// <summary>Raised with the Label's id when it is toggled.</summary>
     [Parameter]

@@ -17,6 +17,9 @@
 
     ESC STEPS BACK, INNERMOST FIRST (UX-DR12): from the positions to the Statuses, and from the Statuses out of the picker,
     which returns focus to whatever opened it. The picker keeps its keys to itself, so the panel's Esc does not also run.
+
+    ONE TAB STOP PER STEP (story 2.8, AC15): the option focus was last on, or the step's first; ↑/↓, Home and End move
+    between options (js/board-keys.js, from the list itself too), and focusing one never chooses it.
 *@
 
 <ul class="picker move-picker"
@@ -34,6 +37,8 @@
                           Option="@(new TaskStatusOption(column.StatusId, column.Name))"
                           MarksCurrent="false"
                           Note="@(column.StatusId == Item.StatusId ? Localizer["MoveCurrent"].Value : null)"
+                          Active="@IsActive(column.StatusId, Columns[0].StatusId)"
+                          OnFocused="() => _active = column.StatusId"
                           OnChoose="ChooseStatus" />
         }
     }
@@ -46,6 +51,8 @@
                           Option="@position.Option"
                           MarksCurrent="false"
                           Note="@position.Note"
+                          Active="@IsActive(position.Option.Id, Guid.Empty)"
+                          OnFocused="() => _active = position.Option.Id"
                           OnChoose="ChoosePositionAsync" />
         }
     }
@@ -55,6 +62,9 @@
     private ElementReference _list;
     private Guid? _chosen;
     private bool _focusList = true;
+
+    // The step's one tab stop (story 2.8, AC15): the option focus was last on, or the step's first.
+    private Guid? _active;
 
     /// <summary>The Board's columns - the Project's effective set, in order - with the Tasks each holds.</summary>
     [Parameter]
@@ -111,10 +121,13 @@
         return positions;
     }
 
+    private bool IsActive(Guid id, Guid first) => (_active ?? first) == id;
+
     private void ChooseStatus(Guid statusId)
     {
         _chosen = statusId;
         _focusList = true;
+        _active = null;
     }
 
     private Task ChoosePositionAsync(Guid afterTaskId)
@@ -140,6 +153,7 @@
         {
             _chosen = null;
             _focusList = true;
+            _active = null;
             return Task.CompletedTask;
         }
 

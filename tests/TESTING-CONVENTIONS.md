@@ -292,6 +292,33 @@ they share.
 - **Long-press cases run in `TouchTimingCollection`** (`DisableParallelization = true`, the same
   `ClientSurfaceFixture`): they measure time, so nothing else in the process competes with them.
 
+### Keyboard: the Board's composite - added by story 2.8
+
+`KeyboardTests` drive the Board from the keyboard; `KeyboardHarness` holds what they share (and
+`TextSpacingTests`' mid-carry case uses it too).
+
+- **Wait for the keyboard module before the first key.** `js/board-keys.js` attaches after the
+  Board's first render, asynchronously, and a key pressed before then is the browser's alone.
+  `KeyboardHarness.WaitForKeysAsync` polls by dispatching a cancelable `ArrowUp` on the Board's one
+  tab stop (the first card, top of its column, where `↑` moves nothing) until the module prevents
+  it. Never a sleep.
+- **Start each key sequence from a known focus.** Either `ResetFocusAsync` (blur, then focus the
+  body - `BoardTests`' idiom) before a Tab sequence, or `FocusCardAsync(title)` before arrows. Then
+  `PressAndFocusAsync(key, expected)` presses and polls where focus is, named by
+  `FocusedAsync`: a card's title, `actions:{title}`, `column:{Status}`, or `TAG:{accessible text}`.
+- **Assert `defaultPrevented` from a window listener.** `RecordKeys` adds a bubbling `keydown`
+  listener on `window`, which runs after the Board's, and records whether each Space was prevented;
+  it also counts each `Escape` that reaches the document, so a carry's Esc that escaped the Board is
+  caught.
+- **Force right to left with `dir="rtl"` on `<html>`** after the Board loads. No product locale is
+  right to left, and the module reads the Board's computed direction at each key.
+- **Observe announcements with a `MutationObserver`.** `RecordAnnouncements` records, in
+  `window.__said`, each non-empty text a polite region changes to. A region set to the same sentence
+  again does not change and records nothing - the defect `LiveAnnouncement` closes - so "said twice"
+  is `WaitUntilSaidAsync(sentence, 2)`. Two sentences said before one render are joined in one entry,
+  and the wait matches either.
+- **Hold → assert → release → assert** for every keyboard drop, as for the picker and the drag.
+
 ### Why it exists
 
 Story 1.3 shipped the first rendered surface and closed with 136 tests passing. The client did not

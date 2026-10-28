@@ -116,7 +116,12 @@
                     <ul class="picker" role="listbox" aria-labelledby="@StatusLabelId">
                         @foreach (var status in Statuses)
                         {
-                            <PickerOption @key="status.Id" Option="@status" Current="@(status.Id == Item.StatusId)" OnChoose="ChooseAsync" />
+                            <PickerOption @key="status.Id"
+                                          Option="@status"
+                                          Current="@(status.Id == Item.StatusId)"
+                                          Active="@(StatusStop == status.Id)"
+                                          OnFocused="() => _activeStatus = status.Id"
+                                          OnChoose="ChooseAsync" />
                         }
                     </ul>
                 }
@@ -178,7 +183,12 @@
                     <ul class="picker" role="listbox" aria-multiselectable="true" aria-labelledby="@LabelsButtonId">
                         @foreach (var label in SpaceLabels)
                         {
-                            <LabelOption @key="label.Id" Label="@label" Selected="@Item.LabelIds.Contains(label.Id)" OnToggle="ToggleLabelAsync" />
+                            <LabelOption @key="label.Id"
+                                         Label="@label"
+                                         Selected="@Item.LabelIds.Contains(label.Id)"
+                                         Active="@(LabelStop == label.Id)"
+                                         OnFocused="() => _activeLabel = label.Id"
+                                         OnToggle="ToggleLabelAsync" />
                         }
                     </ul>
                 }
@@ -268,6 +278,10 @@
     private bool _focusDelete;
     private bool _moveOpen;
     private bool _focusMoveButton;
+
+    // Each picker's one tab stop (story 2.8, AC15): the option focus was last on, or the first.
+    private Guid? _activeStatus;
+    private Guid? _activeLabel;
 
     /// <summary>The Task, as the Board's replica shows it now.</summary>
     [Parameter]
@@ -366,6 +380,11 @@
     // The Labels the Task carries, in its own (server) order; an id this tab holds no Label for is not drawn.
     private List<LabelResponse> AppliedLabels =>
         [.. Item.LabelIds.Select(id => SpaceLabels.FirstOrDefault(label => label.Id == id)).OfType<LabelResponse>()];
+
+    // The option that is its picker's tab stop: the one focus was last on while it is still offered, or the first.
+    private Guid? StatusStop => Statuses.Any(status => status.Id == _activeStatus) ? _activeStatus : Statuses.FirstOrDefault()?.Id;
+
+    private Guid? LabelStop => SpaceLabels.Any(label => label.Id == _activeLabel) ? _activeLabel : SpaceLabels.FirstOrDefault()?.Id;
 
     private string StatusName => Statuses.FirstOrDefault(status => status.Id == Item.StatusId)?.Name ?? string.Empty;
 

@@ -8,14 +8,19 @@
 
     THE MOVE PICKER (story 2.6) uses it too, marking nothing: its current Status is labelled by a note rather than
     checked, and so is its last position, so no option there is ever checked or selected.
+
+    ONE TAB STOP PER PICKER (story 2.8, AC15, open question 7 (a)): only the option its picker marks Active is in the tab
+    order; ↑/↓ (wrapping), Home and End move focus between options (js/board-keys.js), and focusing an option is never
+    choosing it. Space chooses, as Enter does, and never scrolls the page.
 *@
 
 <li class="picker__option"
     role="option"
-    tabindex="0"
+    tabindex="@(Active ? "0" : "-1")"
     aria-selected="false"
     aria-checked="@Checked"
     @onclick="ChooseAsync"
+    @onfocus="OnFocused"
     @onkeydown="KeyDownAsync">@(Note is null ? Option.Name : Option.Name + " ")@if (Note is not null)
     {
         <span class="picker__note">@Note</span>
@@ -41,6 +46,14 @@
     /// <summary>A short label after the option's name - the Move picker's current Status, or its bottom position.</summary>
     [Parameter]
     public string? Note { get; set; }
+
+    /// <summary>Whether this option is its picker's one tab stop (story 2.8).</summary>
+    [Parameter]
+    public bool Active { get; set; }
+
+    /// <summary>Raised when the option takes focus, so its picker makes it the tab stop.</summary>
+    [Parameter]
+    public EventCallback OnFocused { get; set; }
 
     /// <summary>Raised with the Status's id when it is chosen.</summary>
     [Parameter]

@@ -1,0 +1,56 @@
+@*
+    A POLITE ANNOUNCEMENT THAT IS SAID AGAIN WHEN IT REPEATS - story 2.8, AC14; UX-DR25, UX-DR38; deferred-work.md:489, :549;
+    open question 6 (b).
+
+    A live region announces a CHANGE to its content. One region given the same sentence twice in a row ("Task added.", then
+    "Task added.") does not change, so assistive technology says nothing the second time. This component keeps TWO polite
+    regions and writes each sentence into the one that does not hold the last, clearing the other in the same render: every
+    sentence is new text in an empty region, whatever was said before it. Both regions are empty from the first render
+    (story 2.3's rule), so the first sentence is announced too.
+
+    Why two regions, not one cleared and written a render later (open question 6 (a)): Blazor may apply the clearing render
+    and the writing render in one browser task, which the accessibility tree can coalesce into "no change"; two regions do
+    not depend on timing at all.
+
+    The owner says a sentence by setting Text and bumping Sequence; a Sequence it has seen is never said again, and a null
+    Text clears both regions (a purge).
+*@
+
+<p class="visually-hidden" role="status" aria-live="polite">@_texts[0]</p>
+<p class="visually-hidden" role="status" aria-live="polite">@_texts[1]</p>
+
+@code {
+    private readonly string?[] _texts = new string?[2];
+    private int _seen;
+    private int _current = 1;
+
+    /// <summary>The sentence to say, or <c>null</c> to clear.</summary>
+    [Parameter]
+    public string? Text { get; set; }
+
+    /// <summary>Bumped by the owner each time it says <see cref="Text"/>, the same sentence again included.</summary>
+    [Parameter]
+    public int Sequence { get; set; }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (Sequence == _seen)
+        {
+            return;
+        }
+
+        _seen = Sequence;
+
+        if (Text is null)
+        {
+            _texts[0] = null;
+            _texts[1] = null;
+            return;
+        }
+
+        _current = 1 - _current;
+        _texts[_current] = Text;
+        _texts[1 - _current] = null;
+    }
+}

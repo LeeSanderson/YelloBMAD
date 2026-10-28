@@ -603,6 +603,22 @@
     <value>Returned to {0}, position {1}.</value>
     <comment>Announced politely when a move or a Status change was refused or got no answer and the card went back to its last admitted slot (story 2.6, AC7, AC15): {0} is the Status name, {1} the 1-based position it returned to.</comment>
   </data>
+  <data name="TaskPickedUp" xml:space="preserve">
+    <value>Picked up {0}. {1}, position {2} of {3}.</value>
+    <comment>Announced politely when Space on a focused card picks its Task up with the keyboard (story 2.8, AC10, UX-DR25, open question 5 (a)): {0} is the Task's title, {1} its Status name, {2} its 1-based position in that column, {3} the column's true total. Never the Space or Project name (UX-DR38). The string shape is the dev phase's; UX to confirm (deferred-work.md).</comment>
+  </data>
+  <data name="TaskCarried" xml:space="preserve">
+    <value>{0}, position {1} of {2}.</value>
+    <comment>Announced politely on each step of a keyboard carry (story 2.8, AC10, UX-DR25, open question 5 (a)): {0} is the destination Status name, {1} the 1-based position the Task would take there, {2} the total that column would have with the Task in it - so the end of the column can be heard. UX to confirm (deferred-work.md).</comment>
+  </data>
+  <data name="ColumnCountOne" xml:space="preserve">
+    <value>1 Task</value>
+    <comment>A column's accessible description when its true total is one (story 2.8, AC13, open question 8 (a)): the count chip's bare number is hidden from assistive technology, and this is read instead.</comment>
+  </data>
+  <data name="ColumnCountMany" xml:space="preserve">
+    <value>{0} Tasks</value>
+    <comment>A column's accessible description for any true total but one, zero included (story 2.8, AC13, open question 8 (a)): {0} is the column's true total.</comment>
+  </data>
   <data name="TaskMove" xml:space="preserve">
     <value>Move</value>
     <comment>The Move control in the Task detail panel and the card menu's item that opens the Move picker (story 2.6, UX-DR21). A plain verb; never "Drag".</comment>

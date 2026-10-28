@@ -33,8 +33,48 @@ public sealed partial class BoardView
     /// The drop zone's slot in <paramref name="column"/>, counted without the dragged Task, or <c>null</c> when the zone is
     /// not in it.
     /// </summary>
-    private int? DropIndexIn(ColumnState column) =>
-        _drag is { LiftedTaskId: not null, TargetStatusId: { } statusId } drag && statusId == column.StatusId ? drag.TargetIndex : null;
+    private int? DropIndexIn(ColumnState column)
+    {
+        // A keyboard carry draws the same zone (story 2.8, open question 12 (a)).
+        if (_carried is not null)
+        {
+            return _carryStatusId == column.StatusId ? _carrySlot : null;
+        }
+
+        return _drag is { LiftedTaskId: not null, TargetStatusId: { } statusId } drag && statusId == column.StatusId ? drag.TargetIndex : null;
+    }
+
+    /// <summary>
+    /// The neighbour a drop names, and whether the drop is on the Task's own slot - shared by the drag and the keyboard (story
+    /// 2.8): the Task immediately above <paramref name="index"/> in <paramref name="destination"/>, counted without the dropped
+    /// Task, <c>null</c> for the top; and whether that is the same column and the same Task above it now.
+    /// </summary>
+    private static (Guid? After, bool OwnSlot) DropChoice((ColumnState Column, int Index) found, ColumnState destination, Guid taskId, int index)
+    {
+        var others = destination.Tasks.FindAll(task => task.Id != taskId);
+        var at = Math.Min(index, others.Count);
+        Guid? after = at == 0 ? null : others[at - 1].Id;
+
+        var (column, slot) = found;
+        Guid? current = slot == 0 ? null : column.Tasks[slot - 1].Id;
+
+        return (after, ReferenceEquals(column, destination) && current == after);
+    }
+
+    /// <summary>
+    /// Ends whatever the Board holds - a pointer or touch lift, a keyboard carry - with nothing moved and nothing said, and
+    /// returns the Task it held, if any: the caller says where it is when the Board has ended it on its own (open question
+    /// 10), and says nothing for a purge or a disposal.
+    /// </summary>
+    private Guid? EndHeld()
+    {
+        var held = _drag?.LiftedTaskId ?? _carried;
+
+        _drag?.End();
+        _carried = null;
+
+        return held;
+    }
 
     /// <summary>
     /// The drag is attached while the Board is drawn for a Role that may move Tasks, and only then (UX-DR27).
@@ -52,7 +92,8 @@ public sealed partial class BoardView
     /// <inheritdoc />
     bool IBoardDragHost.CanLift(Guid taskId)
     {
-        if (!_canManage || _openTaskId is not null || Locate(taskId) is null)
+        // A keyboard carry and a pointer lift never coexist (story 2.8).
+        if (!_canManage || _openTaskId is not null || _carried is not null || Locate(taskId) is null)
         {
             return false;
         }
@@ -80,14 +121,9 @@ public sealed partial class BoardView
             return;
         }
 
-        var others = destination.Tasks.FindAll(task => task.Id != taskId);
-        var at = Math.Min(index, others.Count);
-        Guid? after = at == 0 ? null : others[at - 1].Id;
+        var (after, ownSlot) = DropChoice(found, destination, taskId, index);
 
-        var (column, slot) = found;
-        Guid? current = slot == 0 ? null : column.Tasks[slot - 1].Id;
-
-        if (column.StatusId == statusId && current == after)
+        if (ownSlot)
         {
             Returned(taskId);
             StateHasChanged();
@@ -114,14 +150,14 @@ public sealed partial class BoardView
     /// <summary>
     /// A lifted Task put back where it was, with nothing sent: it settles, and its slot is announced.
     /// </summary>
-    private void Returned(Guid taskId)
+    private void Returned(Guid? taskId)
     {
-        if (Locate(taskId) is not { } found)
+        if (taskId is not { } id || Locate(id) is not { } found)
         {
             return;
         }
 
-        _settlingCard = taskId;
-        _announcement = string.Format(CultureInfo.CurrentCulture, Localizer["TaskReturned"], found.Column.Name, found.Index + 1);
+        _settlingCard = id;
+        Say(string.Format(CultureInfo.CurrentCulture, Localizer["TaskReturned"], found.Column.Name, found.Index + 1));
     }
 }

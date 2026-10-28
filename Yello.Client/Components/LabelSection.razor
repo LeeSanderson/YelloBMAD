@@ -29,7 +29,7 @@
     the page. A Label still on Tasks is refused and stays, and the row says why.
 *@
 
-<p class="visually-hidden" role="status" aria-live="polite">@_announcement</p>
+<LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
 
 <section class="label-section" aria-labelledby="label-section-heading">
     <h2 class="type-space-name label-section__heading" id="label-section-heading">@Localizer["LabelsHeading"]</h2>
@@ -119,6 +119,7 @@
 
     private List<LabelResponse>? _labels;
     private string? _announcement;
+    private int _announcements;
     private string _name = string.Empty;
     private string _colour = LabelColours.Keys[0];
     private string? _nameMessage;
@@ -163,7 +164,7 @@
     {
         _generation++;
         _labels = null;
-        _announcement = null;
+        Say(null);
         _name = string.Empty;
         _nameMessage = null;
         _defineRefusal = null;
@@ -313,7 +314,7 @@
         _labels = [.. (_labels ?? []).Append(created).OrderBy(label => label.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(label => label.Id)];
         _name = string.Empty;
         _colour = FirstUnusedColour();
-        _announcement = Localizer["LabelAdded"];
+        Say(Localizer["LabelAdded"]);
     }
 
     /// <summary>
@@ -383,7 +384,7 @@
                 case HttpStatusCode.NoContent:
                     _labels?.RemoveAll(label => label.Id == labelId);
                     _colour = FirstUnusedColour();
-                    _announcement = Localizer["LabelDeleted"];
+                    Say(Localizer["LabelDeleted"]);
                     return;
 
                 case HttpStatusCode.Unauthorized:
@@ -411,5 +412,14 @@
         {
             _deleting = null;
         }
+    }
+
+    /// <summary>
+    /// Says a sentence politely - the same one again included (story 2.8, AC14) - or, with <c>null</c>, clears the regions.
+    /// </summary>
+    private void Say(string? words)
+    {
+        _announcement = words;
+        _announcements++;
     }
 }

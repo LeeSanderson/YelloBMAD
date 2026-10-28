@@ -91,6 +91,7 @@ public sealed partial class BoardView
     // settled, so the picker stops offering a neighbour that has moved or gone.
     private bool _rereadBoard;
 
+
     /// <summary>
     /// The four attributes a Task edit can change.
     /// </summary>
@@ -104,14 +105,16 @@ public sealed partial class BoardView
 
     /// <summary>
     /// Where a move was made (story 2.7, open question 6 (a)): the panel says its own refusal; a move made on the Board - from
-    /// a card's menu or by a drag - says it on the Board. Only a menu move takes focus to the card: a pointer's focus stays
-    /// wherever the person left it.
+    /// a card's menu, by a drag or by the keyboard (story 2.8) - says it on the Board. A menu move and a keyboard drop take
+    /// focus to the card, by its identity, wherever it is drawn next (AD-29): a pointer's focus stays wherever the person
+    /// left it.
     /// </summary>
     private enum MoveOrigin
     {
         Panel,
         Menu,
         Drag,
+        Keyboard,
     }
 
     /// <summary>
@@ -135,7 +138,8 @@ public sealed partial class BoardView
     /// </summary>
     private void Open(Guid taskId)
     {
-        _drag?.End();
+        // A drag or a carry ends with nothing moved, and says where the Task is (story 2.8, open question 10).
+        Returned(EndHeld());
         _menuTaskId = null;
         _menuPicking = false;
 
@@ -171,6 +175,12 @@ public sealed partial class BoardView
     /// </summary>
     private void PurgePanel()
     {
+        // A move waiting on its neighbour's (story 2.8, open question 9) wakes, and finds the Board gone.
+        foreach (var replica in _replicas.Values)
+        {
+            replica.Settle();
+        }
+
         _replicas.Clear();
         _labels = [];
         _labelsById = new Dictionary<Guid, LabelResponse>();
@@ -192,6 +202,9 @@ public sealed partial class BoardView
         _moveOrigins.Clear();
         _boardNotice = null;
         _rereadBoard = false;
+        _activeTaskId = null;
+        _activeColumnId = null;
+        _runAt = null;
     }
 
     /// <summary>
@@ -209,6 +222,8 @@ public sealed partial class BoardView
             return;
         }
 
+        // A carry ends with nothing moved when a menu is opened by the pointer (story 2.8, open question 10).
+        Returned(EndHeld());
         _menuTaskId = taskId;
         _menuPicking = false;
         _boardNotice = null;
@@ -286,7 +301,7 @@ public sealed partial class BoardView
             _moveOrigins[taskId] = origin;
         }
 
-        if (origin == MoveOrigin.Menu)
+        if (origin is MoveOrigin.Menu or MoveOrigin.Keyboard)
         {
             FocusCardTitle(taskId);
         }
@@ -312,7 +327,7 @@ public sealed partial class BoardView
     /// </summary>
     private void AnnounceMove(Guid taskId, EditOutcome outcome)
     {
-        var fromMenu = _moveOrigins.Remove(taskId, out var origin) && origin == MoveOrigin.Menu;
+        var fromMenu = _moveOrigins.Remove(taskId, out var origin) && origin is MoveOrigin.Menu or MoveOrigin.Keyboard;
 
         // The reflow was the optimistic placement's; once the answer is in, the card is no longer the one a move just placed.
         if (_movedCard == taskId)
@@ -332,9 +347,9 @@ public sealed partial class BoardView
 
         var (column, index) = found;
 
-        _announcement = outcome == EditOutcome.Admitted
+        Say(outcome == EditOutcome.Admitted
             ? string.Format(CultureInfo.CurrentCulture, Localizer["TaskMoved"], column.Name, index + 1, column.Total)
-            : string.Format(CultureInfo.CurrentCulture, Localizer["TaskReturned"], column.Name, index + 1);
+            : string.Format(CultureInfo.CurrentCulture, Localizer["TaskReturned"], column.Name, index + 1));
 
         if (outcome != EditOutcome.Admitted && fromMenu)
         {
@@ -480,12 +495,18 @@ public sealed partial class BoardView
     {
         _deleteKeys.Remove(taskId);
         _deleted.Add(taskId);
-        _replicas.Remove(taskId);
-
-        if (_drag?.LiftedTaskId == taskId)
+        // A move waiting on this Task's own move (story 2.8, open question 9) need wait no longer.
+        if (_replicas.Remove(taskId, out var gone))
         {
-            _drag.End();
+            gone.Settle();
         }
+
+        // A drag or a carry of the deleted Task ends silently: the deletion's own sentence says what happened to it.
+        if (_drag?.LiftedTaskId == taskId || _carried == taskId)
+        {
+            EndHeld();
+        }
+
 
         // Focus moves to the column only from the panel the deletion was confirmed in; another panel keeps its focus.
         var fromItsPanel = _openTaskId == taskId;
@@ -503,7 +524,7 @@ public sealed partial class BoardView
             _focusColumnRequests++;
         }
 
-        _announcement = Localizer["TaskDeleted"];
+        Say(Localizer["TaskDeleted"]);
     }
 
     private void UseStatuses(IEnumerable<TaskStatusOption> statuses) => _statusOptions = [.. statuses];
@@ -553,7 +574,12 @@ public sealed partial class BoardView
 
         while (more)
         {
-            outcome = await SendAsync(taskId, replica, attribute, sending, generation);
+            // Purged, or deleted by this tab, while a move waited on its neighbour: nothing is sent.
+            outcome = await ReadyToSendAsync(taskId, sending, generation)
+                ? await SendAsync(taskId, replica, attribute, sending, generation)
+                : EditOutcome.Gone;
+
+            Settled(replica, attribute);
 
             more = outcome == EditOutcome.Admitted
                 && replica.Queued.Remove(attribute, out sending)
@@ -579,6 +605,52 @@ public sealed partial class BoardView
             {
                 AnnounceMove(taskId, outcome);
             }
+        }
+    }
+
+    /// <summary>
+    /// A move naming as its neighbour a Task whose own Status change is still out waits until that change settles - admitted,
+    /// refused, unanswered or gone - and is then sent (story 2.8, AC16, open question 9 (a)). Otherwise the server would
+    /// refuse it <c>409</c> for a slot this tab already shows but the server has not admitted yet. Only the send waits: the
+    /// card is already drawn in its new slot (AD-11). It waits for the change that was out when it began, never for a later
+    /// one, so two chained moves can never wait on each other.
+    /// </summary>
+    private async Task<bool> ReadyToSendAsync(Guid taskId, object? sending, int generation)
+    {
+        if (sending is not MoveChoice { AfterTaskId: { } after } || after == taskId || !_replicas.TryGetValue(after, out var neighbour))
+        {
+            return true;
+        }
+
+        var seen = neighbour.StatusSettles;
+
+        while (generation == _generation && StillOutstanding(after, neighbour, seen))
+        {
+            await neighbour.NextSettle;
+        }
+
+        return generation == _generation && !_deleted.Contains(taskId);
+    }
+
+    /// <summary>
+    /// Whether the neighbour's Status change that was out when a move began waiting is out still.
+    /// </summary>
+    private bool StillOutstanding(Guid after, TaskReplica neighbour, int seen) =>
+        neighbour.StatusSettles == seen
+        && neighbour.HasOutstanding(TaskAttribute.Status)
+        && _replicas.TryGetValue(after, out var current) && ReferenceEquals(current, neighbour);
+
+    /// <summary>
+    /// Wakes every move waiting on a neighbour's (open question 9): one has settled, the Task is gone, or the Board purged.
+    /// </summary>
+    /// <summary>
+    /// One send of a Task's Status change has settled: a move waiting on it as its neighbour checks again.
+    /// </summary>
+    private static void Settled(TaskReplica replica, TaskAttribute attribute)
+    {
+        if (attribute == TaskAttribute.Status)
+        {
+            replica.Settle();
         }
     }
 
@@ -1019,6 +1091,8 @@ public sealed partial class BoardView
     /// </summary>
     private sealed class TaskReplica(TaskResponse admitted)
     {
+        private TaskCompletionSource _settle = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
         public TaskResponse Admitted { get; set; } = admitted;
 
         public Dictionary<TaskAttribute, object?> InFlight { get; } = [];
@@ -1031,6 +1105,30 @@ public sealed partial class BoardView
         /// Whether a move put the card in a slot of its own choosing, so it goes back by key once nothing is out.
         /// </summary>
         public bool Relocated { get; set; }
+
+        /// <summary>
+        /// How many of this Task's Status attribute's sends have settled: a move waiting on this Task as its neighbour waits
+        /// for this to change (story 2.8, open question 9).
+        /// </summary>
+        public int StatusSettles { get; private set; }
+
+        /// <summary>
+        /// Completes at this Task's next <see cref="Settle"/>.
+        /// </summary>
+        public Task NextSettle => _settle.Task;
+
+        /// <summary>
+        /// One send of this Task's Status change has settled, or the Task or the Board has gone: a move waiting on it as its
+        /// neighbour checks again.
+        /// </summary>
+        public void Settle()
+        {
+            var settled = _settle;
+
+            StatusSettles++;
+            _settle = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            settled.TrySetResult();
+        }
 
         /// <summary>
         /// The move this Task's Status attribute is waiting on or has out, if that change is a move.

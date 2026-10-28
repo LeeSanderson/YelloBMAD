@@ -24,9 +24,14 @@
     disabled (UX-DR27). Always rendered, never revealed on hover (UX-DR21), at every breakpoint. It opens the card's
     menu - Open and Move - which the Board draws inside the card; so do a right-click on the card (the contextmenu
     event), the platform context-menu key and Shift+F10 on the card. Enter on the title still opens the Task. For a
-    Viewer the card carries no handler at all, and the browser's own context menu is left alone.
-    It is two tab stops per card until story 2.8 converts the Board to its keyboard grid. The card carries no shadow,
-    declared explicitly in components.css so nobody adds one back.
+    Viewer the card carries no handler at all, and the browser's own context menu is left alone. The card carries no
+    shadow, declared explicitly in components.css so nobody adds one back.
+
+    ONE ROVING TAB STOP FOR THE WHOLE BOARD (story 2.8, open questions 1 (a)-3 (a)): only the ACTIVE card's title - and,
+    for a mover, its actions control after it - is in the tab order (tabindex 0); every other card's are -1, reached by the
+    arrows (js/board-keys.js), by pointer and by the screen reader's virtual cursor. The list item states its position and
+    the column's true total (aria-posinset, aria-setsize; AD-29). A Task picked up by the keyboard stays in its slot,
+    marked task-card--carried (open question 12 (a)), while the drop zone marks where it would land.
 
     THE WHOLE CARD IS THE DRAG HANDLE (story 2.7, open question 4 (a)) for a Role that can move Tasks: it renders
     task-card--movable, which the Board's drag (js/board-drag.js) listens for and which gives it the grab cursor and its
@@ -37,17 +42,20 @@
 *@
 
 <li class="@CardClass"
+    aria-posinset="@Position"
+    aria-setsize="@SetSize"
     @oncontextmenu="ContextMenuHandler"
     @oncontextmenu:preventDefault="@CanMove"
     @onkeydown="KeyDownHandler">
     @if (CanMove)
     {
         <div class="task-card__head">
-            <button type="button" class="task-card__open" data-task-id="@TaskId" @onclick="OpenAsync" @ref="_open">
+            <button type="button" class="task-card__open" data-task-id="@TaskId" tabindex="@TabIndex" @onclick="OpenAsync" @ref="_open">
                 <span class="type-task-title task-card__title">@Item.Title</span>
             </button>
             <button type="button"
                     class="task-card__actions"
+                    tabindex="@TabIndex"
                     aria-label="@string.Format(CultureInfo.CurrentCulture, Localizer["TaskActions"], Item.Title)"
                     aria-haspopup="menu"
                     aria-expanded="@(MenuOpen ? "true" : "false")"
@@ -60,7 +68,7 @@
 
     @if (!CanMove)
     {
-        <button type="button" class="task-card__open" data-task-id="@TaskId" @onclick="OpenAsync" @ref="_open">
+        <button type="button" class="task-card__open" data-task-id="@TaskId" tabindex="@TabIndex" @onclick="OpenAsync" @ref="_open">
             <span class="type-task-title task-card__title">@Item.Title</span>
         </button>
     }
@@ -157,6 +165,22 @@
     [Parameter]
     public bool Settling { get; set; }
 
+    /// <summary>Whether the Task is carried by the keyboard: drawn carried, in its own slot (story 2.8).</summary>
+    [Parameter]
+    public bool Carried { get; set; }
+
+    /// <summary>Whether this card is the Board's one roving tab stop (story 2.8).</summary>
+    [Parameter]
+    public bool Active { get; set; }
+
+    /// <summary>The card's 1-based position in its column (AD-29).</summary>
+    [Parameter]
+    public int Position { get; set; }
+
+    /// <summary>The column's true total (AD-29) - never the number of cards drawn.</summary>
+    [Parameter]
+    public int SetSize { get; set; }
+
     /// <summary>The most chips a card shows before "+N" (UX-DR8).</summary>
     private const int MostChips = 3;
 
@@ -174,6 +198,10 @@
         if (Lifted)
         {
             yield return "task-card--lifted";
+        }
+        else if (Carried)
+        {
+            yield return "task-card--carried";
         }
         else if (Settling)
         {
@@ -202,6 +230,9 @@
             : null;
 
     private string TaskId => Item.Id.ToString("D", CultureInfo.InvariantCulture);
+
+    // Blazor renders every tabindex; the keyboard module never writes one.
+    private string TabIndex => Active ? "0" : "-1";
 
     // For a Role that cannot move Tasks the card carries no handler: the browser's own context menu is left alone.
     private EventCallback<MouseEventArgs> ContextMenuHandler =>
