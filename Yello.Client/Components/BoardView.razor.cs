@@ -84,7 +84,7 @@ public sealed partial class BoardView
     private int _focusActionsRequests;
     private Guid? _arrivalCard;
     private Guid? _movedCard;
-    private readonly HashSet<Guid> _movesFromMenu = [];
+    private readonly Dictionary<Guid, MoveOrigin> _moveOrigins = [];
     private string? _boardNotice;
 
     // Story 2.6, open question 3 (a): a move refused because its position changed re-reads the Board once its answer is
@@ -100,6 +100,18 @@ public sealed partial class BoardView
         Status,
         DueDate,
         Labels,
+    }
+
+    /// <summary>
+    /// Where a move was made (story 2.7, open question 6 (a)): the panel says its own refusal; a move made on the Board - from
+    /// a card's menu or by a drag - says it on the Board. Only a menu move takes focus to the card: a pointer's focus stays
+    /// wherever the person left it.
+    /// </summary>
+    private enum MoveOrigin
+    {
+        Panel,
+        Menu,
+        Drag,
     }
 
     /// <summary>
@@ -123,6 +135,7 @@ public sealed partial class BoardView
     /// </summary>
     private void Open(Guid taskId)
     {
+        _drag?.End();
         _menuTaskId = null;
         _menuPicking = false;
 
@@ -175,7 +188,8 @@ public sealed partial class BoardView
         _focusActions = null;
         _arrivalCard = null;
         _movedCard = null;
-        _movesFromMenu.Clear();
+        _settlingCard = null;
+        _moveOrigins.Clear();
         _boardNotice = null;
         _rereadBoard = false;
     }
@@ -244,14 +258,15 @@ public sealed partial class BoardView
         _menuTaskId = null;
         _menuPicking = false;
 
-        return MoveAsync(taskId, choice, fromMenu: true);
+        return MoveAsync(taskId, choice, MoveOrigin.Menu);
     }
 
     /// <summary>
     /// A move (story 2.6, AC15): rendered at once, then sent as the Status attribute's change. Made from a card's menu, focus
-    /// follows the card to its new place (open question 9); from the panel, it stays on the panel's Move control.
+    /// follows the card to its new place (open question 9); from the panel, it stays on the panel's Move control; by a drag
+    /// (story 2.7), it stays where it was, and the dropped card settles rather than reflows.
     /// </summary>
-    private Task MoveAsync(Guid taskId, MoveChoice choice, bool fromMenu)
+    private Task MoveAsync(Guid taskId, MoveChoice choice, MoveOrigin origin)
     {
         if (!_canManage)
         {
@@ -259,16 +274,21 @@ public sealed partial class BoardView
         }
 
         _boardNotice = null;
-        _movedCard = taskId;
+        _movedCard = origin == MoveOrigin.Drag ? null : taskId;
+        _settlingCard = origin == MoveOrigin.Drag ? taskId : null;
 
-        if (fromMenu)
+        if (origin == MoveOrigin.Panel)
         {
-            _movesFromMenu.Add(taskId);
-            FocusCardTitle(taskId);
+            _moveOrigins.Remove(taskId);
         }
         else
         {
-            _movesFromMenu.Remove(taskId);
+            _moveOrigins[taskId] = origin;
+        }
+
+        if (origin == MoveOrigin.Menu)
+        {
+            FocusCardTitle(taskId);
         }
 
         return EditAsync(taskId, TaskAttribute.Status, choice);
@@ -292,12 +312,17 @@ public sealed partial class BoardView
     /// </summary>
     private void AnnounceMove(Guid taskId, EditOutcome outcome)
     {
-        var fromMenu = _movesFromMenu.Remove(taskId);
+        var fromMenu = _moveOrigins.Remove(taskId, out var origin) && origin == MoveOrigin.Menu;
 
         // The reflow was the optimistic placement's; once the answer is in, the card is no longer the one a move just placed.
         if (_movedCard == taskId)
         {
             _movedCard = null;
+        }
+
+        if (_settlingCard == taskId)
+        {
+            _settlingCard = null;
         }
 
         if (outcome == EditOutcome.Gone || Locate(taskId) is not { } found)
@@ -456,6 +481,11 @@ public sealed partial class BoardView
         _deleteKeys.Remove(taskId);
         _deleted.Add(taskId);
         _replicas.Remove(taskId);
+
+        if (_drag?.LiftedTaskId == taskId)
+        {
+            _drag.End();
+        }
 
         // Focus moves to the column only from the panel the deletion was confirmed in; another panel keeps its focus.
         var fromItsPanel = _openTaskId == taskId;
@@ -754,7 +784,8 @@ public sealed partial class BoardView
     /// <summary>
     /// Says a refusal in the panel - only when the panel is open on the Task it is about, never in another
     /// Task's panel opened since the edit was sent. A move made from a card's menu says its own refusal on the Board
-    /// instead, where it was made (story 2.6, open question 8 (c)); another attribute's refusal is never said there.
+    /// instead, where it was made (story 2.6, open question 8 (c)) - and so does a move made by a drag (story 2.7, open
+    /// question 6 (a)); another attribute's refusal is never said there.
     /// </summary>
     private void SayInPanel(Guid taskId, TaskAttribute attribute, string words)
     {
@@ -762,13 +793,13 @@ public sealed partial class BoardView
         {
             _panelRefusal = words;
         }
-        else if (attribute == TaskAttribute.Status && _movesFromMenu.Contains(taskId))
+        else if (attribute == TaskAttribute.Status && _moveOrigins.ContainsKey(taskId))
         {
             _boardNotice = words;
         }
         else
         {
-            // Said nowhere: the panel it was about has closed, and it was not made from a menu.
+            // Said nowhere: the panel it was about has closed, and it was not made on the Board.
         }
     }
 

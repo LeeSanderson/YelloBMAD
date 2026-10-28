@@ -372,6 +372,9 @@ public sealed partial class DesignFoundationGateTests
         "radius-full",
         "border-hairline-width",
         "border-emphasis-width",
+
+        // Story 2.7: the one elevation, the lifted card's hard offset shadow (DESIGN.md:145-148).
+        "shadow-lifted",
         "motion-instant",
         "motion-quick",
         "motion-lift",
@@ -925,11 +928,17 @@ public sealed partial class DesignFoundationGateTests
     /// ladder.
     /// <para>
     /// <c>DESIGN.md:421</c> sets <c>shadow: none</c> explicitly on the task card "so nobody adds
-    /// one back". The single sanctioned exception is the lifted card under an active drag, which
-    /// <b>story 2.7 builds</b> - so today this gate asserts no shadow at all, and the story that
-    /// adds the exception has to widen it deliberately. NFR-3's 16 ms render budget at NFR-8's
-    /// 5,000-Task bound is the second reason: shadows, filters and backdrop-blur are exactly what
-    /// that budget cannot afford.
+    /// one back". NFR-3's 16 ms render budget at NFR-8's 5,000-Task bound is the second reason:
+    /// shadows, filters and backdrop-blur are exactly what that budget cannot afford.
+    /// </para>
+    /// <para>
+    /// <b>The one sanctioned exception, admitted by exactly two declarations</b> (story 2.7, AC12;
+    /// <c>DESIGN.md:145-148, :435</c>): the token <c>--shadow-lifted</c> declared in
+    /// <c>tokens.css</c>, and <c>box-shadow: var(--shadow-lifted)</c> on the selector
+    /// <c>.task-card.task-card--lifted</c> - the Task card under an active drag. Any other shadow
+    /// fails, a second rule taking the token included, and so does the lifted card taking any other
+    /// value. The widening was made deliberately, by that one card, and was proved against a planted
+    /// second shadow.
     /// </para>
     /// </remarks>
     [Fact]
@@ -947,10 +956,14 @@ public sealed partial class DesignFoundationGateTests
                 continue;
             }
 
-            // `box-shadow: none` is a removal, not a shadow, and story 2.7's lifted card will
-            // need to reset it. Refusing it would make the gate unsatisfiable for that story
-            // without also permitting the shadow itself.
+            // `box-shadow: none` is a removal, not a shadow: the Task card states it explicitly.
             if (isShadowProperty && IsNoneValue(declaration.Value))
+            {
+                continue;
+            }
+
+            // The one exception (story 2.7): the lifted card's token, and the lifted card taking it.
+            if (IsTheLiftedCardsShadow(sheet, rule, declaration))
             {
                 continue;
             }
@@ -963,8 +976,9 @@ public sealed partial class DesignFoundationGateTests
         AssertNoProblems(problems,
             "A shadow has been added.",
             "Shadow is not a hierarchy device here: on tinted, close-luminance grounds it reads " +
-            "as a smudge. The one sanctioned exception is the lifted card under an active drag, " +
-            "which story 2.7 builds - widening this gate is that story's job, deliberately.");
+            "as a smudge. The one sanctioned exception is the lifted card under an active drag - " +
+            "'box-shadow: var(--shadow-lifted)' on '.task-card.task-card--lifted' (story 2.7) - " +
+            "and nothing else may take it.");
     }
 
     /// <summary>

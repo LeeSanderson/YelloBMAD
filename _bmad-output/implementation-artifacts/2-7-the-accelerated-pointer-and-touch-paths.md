@@ -4,7 +4,7 @@ baseline_commit: 0e54a8c
 
 # Story 2.7: The accelerated pointer and touch paths
 
-Status: ready-for-dev
+Status: review
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-7-the-accelerated-pointer-and-touch-paths`
@@ -110,53 +110,53 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1219-1251` (`status: final`
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Confirm the baseline, then decide the open questions** (AC: all)
-  - [ ] `dotnet build Yello.slnx` (0 warnings, 0 errors). Record the baseline from the last full run (2.6 code review: **1185 total, 1182 passed, 0 failed, 3 skipped**) or re-measure at the ATDD commit.
-  - [ ] List any isolation row with `PendingUntil: "2.7"` in the Debug Log (expected: none).
-  - [ ] Decide Q1–Q4 before Task 2, Q5–Q11 before Task 3, Q12–Q14 before Task 6. Record each in Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each is reversible.
+- [x] **Task 1 — Confirm the baseline, then decide the open questions** (AC: all)
+  - [x] `dotnet build Yello.slnx` (0 warnings, 0 errors). Record the baseline from the last full run (2.6 code review: **1185 total, 1182 passed, 0 failed, 3 skipped**) or re-measure at the ATDD commit.
+  - [x] List any isolation row with `PendingUntil: "2.7"` in the Debug Log (expected: none).
+  - [x] Decide Q1–Q4 before Task 2, Q5–Q11 before Task 3, Q12–Q14 before Task 6. Record each in Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each is reversible.
 
-- [ ] **Task 2 — The drag engine in the browser** (AC: 1-6, 11, 13, 15)
-  - [ ] Per Q1, one ES module `Yello.Client/wwwroot/js/board-drag.js` (no bundler, no package), imported lazily by the Board through `IJSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/board-drag.js")` and disposed with the Board (`IAsyncDisposable`), with a `DotNetObjectReference` for the callbacks (disposed too).
-  - [ ] Attach **one** delegated set of listeners to the Board's columns container for movers only (`pointerdown`, `pointermove`, `pointerup`, `pointercancel`, `keydown` for `Esc`, `blur`; plus `touchstart`/`touchmove` with `{ passive: false }` for Q11's touch handling). For a Viewer the module is never attached (AC10).
-  - [ ] **Mouse/pen** (`pointerType !== "touch"`): primary button only; press records the origin; movement beyond the drag-start distance (Q3) lifts; `setPointerCapture` on lift.
-  - [ ] **Touch**: press starts a **pending** lift timer of the threshold (read `--motion-long-press-threshold` and `--motion-long-press-slop` from `getComputedStyle(document.documentElement)` so the tokens stay the single source — Q2); Euclidean distance `> slop` before the timer fires cancels the pending lift and lets the native pan proceed (AC3, axis-agnostic); timer fires → lift, `navigator.vibrate?.(…)` feature-detected (Q12), and from then `touchmove` is `preventDefault`ed so the finger drives the drag, not the page (AC4 is decided in Q9).
-  - [ ] Press never starts a drag on the actions control, the card menu, the Move picker, or any element inside them (Q4); starting a drag closes an open card menu.
-  - [ ] Hit-testing: resolve the destination column and index from bounding rects of `[data-status-id]` columns and `[data-task-id]` cards (add both attributes — Task 3), excluding the dragged card; outside every column → "no drop zone" (AC6). Back over the origin slot → origin (AC6, Q5).
-  - [ ] The dragged card follows the pointer by writing **only** two CSS custom properties on it (`--drag-x`, `--drag-y`) with `style.setProperty`; the module never inserts, removes, reorders or re-classes DOM that Blazor renders (Q1).
-  - [ ] Auto-scroll (AC5, Q13): in a `requestAnimationFrame` loop while lifted — within the edge zone of the hovered column's block edges scroll that column (`.board-column`, `overflow-y: auto`); within the edge zone of the viewport's inline edges scroll the Board (`.board__columns`, `overflow-x: auto`), and of the block edges the page; speed proportional to depth into the zone; `scrollBy` with `behavior: "instant"`; re-hit-test after each scroll.
-  - [ ] Call .NET only on: lift (`taskId`), destination change (`statusId`, `index`, or none), drop (`statusId`, `afterTaskId`) and cancel (AC15). Suppress the `click` that follows a drag (capture-phase, one-shot) (AC11).
-  - [ ] Cancel paths (AC13): `Esc`, `pointercancel`, `touchcancel`, a second pointer/touch, `blur`, `visibilitychange` hidden, and a `cancel()` export the Board calls on purge, re-read and dispose. Each releases capture, timers, the rAF loop and the custom properties.
+- [x] **Task 2 — The drag engine in the browser** (AC: 1-6, 11, 13, 15)
+  - [x] Per Q1, one ES module `Yello.Client/wwwroot/js/board-drag.js` (no bundler, no package), imported lazily by the Board through `IJSRuntime.InvokeAsync<IJSObjectReference>("import", "./js/board-drag.js")` and disposed with the Board (`IAsyncDisposable`), with a `DotNetObjectReference` for the callbacks (disposed too).
+  - [x] Attach **one** delegated set of listeners to the Board's columns container for movers only (`pointerdown`, `pointermove`, `pointerup`, `pointercancel`, `keydown` for `Esc`, `blur`; plus `touchstart`/`touchmove` with `{ passive: false }` for Q11's touch handling). For a Viewer the module is never attached (AC10).
+  - [x] **Mouse/pen** (`pointerType !== "touch"`): primary button only; press records the origin; movement beyond the drag-start distance (Q3) lifts; `setPointerCapture` on lift.
+  - [x] **Touch**: press starts a **pending** lift timer of the threshold (read `--motion-long-press-threshold` and `--motion-long-press-slop` from `getComputedStyle(document.documentElement)` so the tokens stay the single source — Q2); Euclidean distance `> slop` before the timer fires cancels the pending lift and lets the native pan proceed (AC3, axis-agnostic); timer fires → lift, `navigator.vibrate?.(…)` feature-detected (Q12), and from then `touchmove` is `preventDefault`ed so the finger drives the drag, not the page (AC4 is decided in Q9).
+  - [x] Press never starts a drag on the actions control, the card menu, the Move picker, or any element inside them (Q4); starting a drag closes an open card menu.
+  - [x] Hit-testing: resolve the destination column and index from bounding rects of `[data-status-id]` columns and `[data-task-id]` cards (add both attributes — Task 3), excluding the dragged card; outside every column → "no drop zone" (AC6). Back over the origin slot → origin (AC6, Q5).
+  - [x] The dragged card follows the pointer by writing **only** two CSS custom properties on it (`--drag-x`, `--drag-y`) with `style.setProperty`; the module never inserts, removes, reorders or re-classes DOM that Blazor renders (Q1).
+  - [x] Auto-scroll (AC5, Q13): in a `requestAnimationFrame` loop while lifted — within the edge zone of the hovered column's block edges scroll that column (`.board-column`, `overflow-y: auto`); within the edge zone of the viewport's inline edges scroll the Board (`.board__columns`, `overflow-x: auto`), and of the block edges the page; speed proportional to depth into the zone; `scrollBy` with `behavior: "instant"`; re-hit-test after each scroll.
+  - [x] Call .NET only on: lift (`taskId`), destination change (`statusId`, `index`, or none), drop (`statusId`, `afterTaskId`) and cancel (AC15). Suppress the `click` that follows a drag (capture-phase, one-shot) (AC11).
+  - [x] Cancel paths (AC13): `Esc`, `pointercancel`, `touchcancel`, a second pointer/touch, `blur`, `visibilitychange` hidden, and a `cancel()` export the Board calls on purge, re-read and dispose. Each releases capture, timers, the rAF loop and the custom properties.
 
-- [ ] **Task 3 — The Board side in .NET** (AC: 1, 6, 9, 10, 12-14)
-  - [ ] A small drag-state holder outside `BoardView.razor.cs` (S1200 dependency cap — 2.6 had to split `TaskMoveEndpoints` and `TaskMenu` for it): e.g. `Yello.Client/Components/BoardDrag.cs` owning the module reference, the `DotNetObjectReference`, `[JSInvokable]` callbacks, and the state `(Guid LiftedTaskId, Guid? TargetStatusId, int? TargetIndex)`.
-  - [ ] `BoardColumn.razor`: `data-status-id` on the `<section>`; the `<ul>` (or a drop zone container) rendered also when the column is **empty** while a drag is active, so an empty column is a drop target (today `ul` renders only when `Tasks.Count > 0`); render the drop zone element (`.drop-zone`, text from resx per Q7's copy decision — mockup says "Drop here", `board.html:170-171`) at the target index.
-  - [ ] `TaskCard.razor`: `data-task-id` on the `<li>` for movers (keep the title button's existing attribute — tests use it); a `Lifted` parameter rendering `task-card--lifted`; replace the header line "No drag handle (2.7)." with what is true now. A Viewer's card renders exactly as today.
-  - [ ] Drop → if the slot equals the Task's current slot, end the drag, send nothing (Q5); else `MoveAsync(taskId, new MoveChoice(statusId, afterTaskId), origin: Drag)` (Q6) — the existing optimistic path does the rest (AC9).
-  - [ ] Cancel after lift → announce "Returned to {Status}, position {n}." with the existing `TaskReturned` key (Q7); cancel of a pending lift → nothing.
-  - [ ] Purge (`PurgePanel` / Space purge), `RereadBoardAsync`, a Task deletion of the lifted Task, and dispose all call the module's `cancel()` and clear the state (AC13).
-  - [ ] Opening the panel (pointer-blocking layer) ends any drag; no drag can start while the panel is open.
+- [x] **Task 3 — The Board side in .NET** (AC: 1, 6, 9, 10, 12-14)
+  - [x] A small drag-state holder outside `BoardView.razor.cs` (S1200 dependency cap — 2.6 had to split `TaskMoveEndpoints` and `TaskMenu` for it): e.g. `Yello.Client/Components/BoardDrag.cs` owning the module reference, the `DotNetObjectReference`, `[JSInvokable]` callbacks, and the state `(Guid LiftedTaskId, Guid? TargetStatusId, int? TargetIndex)`.
+  - [x] `BoardColumn.razor`: `data-status-id` on the `<section>`; the `<ul>` (or a drop zone container) rendered also when the column is **empty** while a drag is active, so an empty column is a drop target (today `ul` renders only when `Tasks.Count > 0`); render the drop zone element (`.drop-zone`, text from resx per Q7's copy decision — mockup says "Drop here", `board.html:170-171`) at the target index.
+  - [x] `TaskCard.razor`: `data-task-id` on the `<li>` for movers (keep the title button's existing attribute — tests use it); a `Lifted` parameter rendering `task-card--lifted`; replace the header line "No drag handle (2.7)." with what is true now. A Viewer's card renders exactly as today.
+  - [x] Drop → if the slot equals the Task's current slot, end the drag, send nothing (Q5); else `MoveAsync(taskId, new MoveChoice(statusId, afterTaskId), origin: Drag)` (Q6) — the existing optimistic path does the rest (AC9).
+  - [x] Cancel after lift → announce "Returned to {Status}, position {n}." with the existing `TaskReturned` key (Q7); cancel of a pending lift → nothing.
+  - [x] Purge (`PurgePanel` / Space purge), `RereadBoardAsync`, a Task deletion of the lifted Task, and dispose all call the module's `cancel()` and clear the state (AC13).
+  - [x] Opening the panel (pointer-blocking layer) ends any drag; no drag can start while the panel is open.
 
-- [ ] **Task 4 — CSS: lifted card, drop zone, motion, touch** (AC: 1, 7, 10, 12)
-  - [ ] `tokens.css`: a shadow token for the lifted card (Q8 recommends `--shadow-lifted: 0 var(--…) 0 rgba(0, 0, 0, 0.6)` or the literal `0 6px 0 rgba(0,0,0,.6)` — inside the token layer, where colour functions and px are allowed). It is not a hex colour, so `The_colour_token_layer_declares_exactly_the_thirty_names_the_design_states` does not count it (it reads hex-valued custom properties only, `ColorTokenContrastTests.cs:508-519`); check `The_non_colour_token_families_are_complete` (`DesignFoundationGateTests.cs:1700`) and add the family deliberately if it pins names.
-  - [ ] `components.css`: `.task-card.task-card--lifted` — `border-width: var(--border-emphasis-width)`, `box-shadow: var(--shadow-lifted)`, `transform: translate(var(--drag-x, 0), var(--drag-y, 0)) rotate(-1deg)`, a stacking context above its siblings, `transition` on `--motion-lift` with `--motion-easing-standard`; the settle on `--motion-settle` with `--motion-easing-exit`. `.drop-zone` — `--border-emphasis-width` dashed `--focus-ring`, `color: var(--focus-ring)`, `border-radius: var(--radius-md)`, no fill, no fixed height (`No_box_is_given_a_fixed_height`; size by padding / `min-block-size` from `--space-*` or the target minimum).
-  - [ ] For movers' cards only (a class the card renders when `CanMove`): `touch-action` per Q9, `-webkit-touch-callout: none` and `user-select: none` on the card body (not on the title text's accessibility — selection only), `cursor: grab` / `grabbing` while lifted. No `:hover` rule reveals or hides anything (`No_rule_reveals_or_hides_anything_on_hover_alone`).
-  - [ ] Reduced motion: base.css's universal reset already removes every transition/animation (`base.css:280-288`, gated by `Reduced_motion_neutralises_every_transition_and_animation`); add **no** `!important` motion rule. The lifted look (border, shadow, rotation) is state and still shows (Q14).
-  - [ ] Logical properties only (`No_physical_left_or_right_property_is_used_where_a_logical_one_exists`); `transform-origin` with no left/right keyword. RTL mirroring of drag direction is 2.11's (UX-DR42) — the hit-testing works from rects, so it is direction-neutral.
+- [x] **Task 4 — CSS: lifted card, drop zone, motion, touch** (AC: 1, 7, 10, 12)
+  - [x] `tokens.css`: a shadow token for the lifted card (Q8 recommends `--shadow-lifted: 0 var(--…) 0 rgba(0, 0, 0, 0.6)` or the literal `0 6px 0 rgba(0,0,0,.6)` — inside the token layer, where colour functions and px are allowed). It is not a hex colour, so `The_colour_token_layer_declares_exactly_the_thirty_names_the_design_states` does not count it (it reads hex-valued custom properties only, `ColorTokenContrastTests.cs:508-519`); check `The_non_colour_token_families_are_complete` (`DesignFoundationGateTests.cs:1700`) and add the family deliberately if it pins names.
+  - [x] `components.css`: `.task-card.task-card--lifted` — `border-width: var(--border-emphasis-width)`, `box-shadow: var(--shadow-lifted)`, `transform: translate(var(--drag-x, 0), var(--drag-y, 0)) rotate(-1deg)`, a stacking context above its siblings, `transition` on `--motion-lift` with `--motion-easing-standard`; the settle on `--motion-settle` with `--motion-easing-exit`. `.drop-zone` — `--border-emphasis-width` dashed `--focus-ring`, `color: var(--focus-ring)`, `border-radius: var(--radius-md)`, no fill, no fixed height (`No_box_is_given_a_fixed_height`; size by padding / `min-block-size` from `--space-*` or the target minimum).
+  - [x] For movers' cards only (a class the card renders when `CanMove`): `touch-action` per Q9, `-webkit-touch-callout: none` and `user-select: none` on the card body (not on the title text's accessibility — selection only), `cursor: grab` / `grabbing` while lifted. No `:hover` rule reveals or hides anything (`No_rule_reveals_or_hides_anything_on_hover_alone`).
+  - [x] Reduced motion: base.css's universal reset already removes every transition/animation (`base.css:280-288`, gated by `Reduced_motion_neutralises_every_transition_and_animation`); add **no** `!important` motion rule. The lifted look (border, shadow, rotation) is state and still shows (Q14).
+  - [x] Logical properties only (`No_physical_left_or_right_property_is_used_where_a_logical_one_exists`); `transform-origin` with no left/right keyword. RTL mirroring of drag direction is 2.11's (UX-DR42) — the hit-testing works from rects, so it is direction-neutral.
 
-- [ ] **Task 5 — Gates that break on purpose, and the ledger's gate** (AC: 10, 12; `deferred-work.md:36, 52`)
-  - [ ] Amend deliberately, by exactly the lifted card, never loosen (record each in the Debug Log, as 2.6 did):
+- [x] **Task 5 — Gates that break on purpose, and the ledger's gate** (AC: 10, 12; `deferred-work.md:36, 52`)
+  - [x] Amend deliberately, by exactly the lifted card, never loosen (record each in the Debug Log, as 2.6 did):
     1. `DesignFoundationGateTests.No_surface_carries_a_shadow` (`:936`) — allow exactly one rule: selector `.task-card.task-card--lifted`, value `var(--shadow-lifted)`; any other shadow still fails. Update its remarks (they say widening is 2.7's job).
     2. `DesignFoundationGateTests.Board.The_Task_card_declares_no_shadow_explicitly` (`:63`) — the base `.task-card` still declares `none`; the `--lifted` compound is the only exception.
     3. `DesignFoundationGateTests.MovePicker.Only_the_moved_cards_reflow_moves_and_on_the_quick_motion_token` (`:91`) — `.task-card` motion values may also be `var(--motion-lift)` / `var(--motion-settle)` on the lifted compound; still no literal duration. Rename if its name stops being true.
     4. `BoardTests.cs:142` ("The drag handle arrives in 2.7") and E2E-003 — extend the Viewer absence assertion to the drag (AC10).
-  - [ ] New gates (partial `DesignFoundationGateTests.Drag.cs`), each proved by a plant: the lifted card takes the 2px emphasis border, the shadow token and `rotate(-1deg)`; the drop zone is dashed, `focus-ring`, `--radius-md`, has no `background`; the lifted card and drop zone take radius 3px (closes the drop-zone clause of `deferred-work.md:36`).
-  - [ ] **Ledger `:52` (opacity)** — Q8: add the "cheap interim" gate the entry names: fail any rule that both references a colour token and declares `opacity` below 1 (and any alpha colour in a rule outside the token layer is already refused by `No_colour_is_stated_as_a_literal_outside_the_token_layer`). Plant `opacity: 0.7` on `.task-card--lifted` → caught. Close the entry naming the gate, or re-own it to 7.5 if Q8 decides otherwise.
-  - [ ] `ClientStorageBanTests.No_client_asset_reaches_browser_storage` and `SpaceSwitcherGateTests` (document.title) now scan a real `.js` file — must stay green unchanged.
-  - [ ] Update `DocumentLanguage.cs:20-24` remarks ("zero JavaScript of its own") to say what is true now — no review archaeology.
+  - [x] New gates (partial `DesignFoundationGateTests.Drag.cs`), each proved by a plant: the lifted card takes the 2px emphasis border, the shadow token and `rotate(-1deg)`; the drop zone is dashed, `focus-ring`, `--radius-md`, has no `background`; the lifted card and drop zone take radius 3px (closes the drop-zone clause of `deferred-work.md:36`).
+  - [x] **Ledger `:52` (opacity)** — Q8: add the "cheap interim" gate the entry names: fail any rule that both references a colour token and declares `opacity` below 1 (and any alpha colour in a rule outside the token layer is already refused by `No_colour_is_stated_as_a_literal_outside_the_token_layer`). Plant `opacity: 0.7` on `.task-card--lifted` → caught. Close the entry naming the gate, or re-own it to 7.5 if Q8 decides otherwise.
+  - [x] `ClientStorageBanTests.No_client_asset_reaches_browser_storage` and `SpaceSwitcherGateTests` (document.title) now scan a real `.js` file — must stay green unchanged.
+  - [x] Update `DocumentLanguage.cs:20-24` remarks ("zero JavaScript of its own") to say what is true now — no review archaeology.
 
-- [ ] **Task 6 — Browser tests** (AC: 1-15)
-  - [ ] `tests/Yello.Tests.Client` against `FakeYelloApi` and its 2.6 move harness (`HoldTaskMoveAsync`, `ReleaseTaskMove`, `ReleaseTaskMoveRefused`, `ReleaseTaskMoveUnanswered`, `NextTaskMoveRefusal`). Same `ClientSurfaceCollection`, **no new fixture class**; extend `ClientSurfaceFixture.OpenAsync` with an optional `hasTouch` (and viewport) overload (Q14) — the browser is private today (`ClientSurfaceFixture.cs:73-79`).
-  - [ ] New `DragTests.cs`. Pointer via `page.Mouse.DownAsync` / `MoveAsync(x, y, new() { Steps = n })` / `UpAsync`; touch via a CDP session (`context.NewCDPSessionAsync(page)` → `Input.dispatchTouchEvent` `touchStart`/`touchMove`/`touchEnd`, Chromium only) per Q14. Cases (hold → assert → release → assert, `TESTING-CONVENTIONS.md:246-252`):
+- [x] **Task 6 — Browser tests** (AC: 1-15)
+  - [x] `tests/Yello.Tests.Client` against `FakeYelloApi` and its 2.6 move harness (`HoldTaskMoveAsync`, `ReleaseTaskMove`, `ReleaseTaskMoveRefused`, `ReleaseTaskMoveUnanswered`, `NextTaskMoveRefusal`). Same `ClientSurfaceCollection`, **no new fixture class**; extend `ClientSurfaceFixture.OpenAsync` with an optional `hasTouch` (and viewport) overload (Q14) — the browser is private today (`ClientSurfaceFixture.cs:73-79`).
+  - [x] New `DragTests.cs`. Pointer via `page.Mouse.DownAsync` / `MoveAsync(x, y, new() { Steps = n })` / `UpAsync`; touch via a CDP session (`context.NewCDPSessionAsync(page)` → `Input.dispatchTouchEvent` `touchStart`/`touchMove`/`touchEnd`, Chromium only) per Q14. Cases (hold → assert → release → assert, `TESTING-CONVENTIONS.md:246-252`):
     - Pointer drag across columns: mid-drag the card carries `task-card--lifted` with computed 2px border, the shadow and a rotation, a `.drop-zone` (dashed) sits at the target; drop with the move **held** → card already in the new slot, both totals moved, the POST body is `{statusId, afterTaskId}` with the expected neighbour and no `positionKey`; release → "Moved to …, position n of N." (AC1, AC9).
     - Reorder within a column: top, between two, bottom (`afterTaskId` null / neighbour / last) (AC9).
     - Drop on the origin slot and release outside every column → no POST recorded, card in place, totals unchanged (AC6, Q5); cancel after lift announces "Returned to …, position n." (AC14).
@@ -169,15 +169,15 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1219-1251` (`status: final`
     - Viewer: mouse drag and long-press on a card → no lift, no drop zone, no POST, no `touch-action`/`cursor: grab` on the card, `main [disabled], [aria-disabled='true']` count 0 (AC10). Plant: the drag attached for a Viewer → caught.
     - Breakpoints 320/768/1280: the Move and actions controls are still visible without hover with the drag module attached (AC8, AC10).
     - Nothing announced on lift, on crossing columns or on a pan-cancelled pending lift (AC14).
-  - [ ] `TextSpacingTests`: a lifted card and drop zone under the 1.4.12 override and 200% text-only zoom clip nothing (the `deferred-work.md:20` convention: each new surface adds its case).
-  - [ ] Rebuild `Yello.Client` in **Debug** before every browser run and plant. Never Playwright's URL wait; poll. `blur()` and reset focus before keyboard cases.
+  - [x] `TextSpacingTests`: a lifted card and drop zone under the 1.4.12 override and 200% text-only zoom clip nothing (the `deferred-work.md:20` convention: each new surface adds its case).
+  - [x] Rebuild `Yello.Client` in **Debug** before every browser run and plant. Never Playwright's URL wait; poll. `blur()` and reset focus before keyboard cases.
 
-- [ ] **Task 7 — Plants, runs, ledger, status** (AC: all)
-  - [ ] Plants one at a time; original held in memory and restored in a `finally`; tree hash compared after each; **never** `git checkout --`, `git restore`, `git reset` or `git stash`. Each plant compiles. Record `| # | Plant | Gate | Caught |`. Minimum set: a second rule carrying a shadow; `opacity: 0.7` on the lifted card; a literal duration on the lift; the drop zone filled; the slop check single-axis (vertical only) → the horizontal-pan case; a zero-tolerance slop → the jitter case; the lift committed before the threshold (timer removed) → the pan case; the drag attached for a Viewer; the click after a drag not suppressed → AC11; the drop sending a `PATCH` or a key → AC9's body case; origin drop sending a POST → AC6.
-  - [ ] Runs (CLAUDE.md): `dotnet build Yello.slnx` (0 warnings, 0 errors), `dotnet build-server shutdown`, `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. A Client failure seen only in the full run is rerun alone (`dotnet test --project tests/Yello.Tests.Client/Yello.Tests.Client.csproj --no-build`) before it is called real. Docker readiness `docker info --format '{{.ServerVersion}}'`; `Get-Process Yello.Host` if `bin/Debug` is locked.
-  - [ ] `tests/TESTING-CONVENTIONS.md`: how a pointer drag and a CDP touch gesture are driven; the "poll the drag state, never sleep" rule for the long-press threshold.
-  - [ ] Ledger (`deferred-work.md`): CLOSE `:52` per Q8; UPDATE `:36` (drop zone and lifted card radius clause added); NOTE on the 2.8 entries (identical announcements; neighbour still unadmitted) that drags repeat both; ADD with owners anything decided against the spines (Q3 drag-start distance for a mouse, Q7 drop zone copy and the missing pick-up sentence, Q9 "active lift" reading — owner **UX**); the tap-to-select-then-place fallback if touch tests badly (`.memlog.md:21`, owner **UX/Lee**); anything deferred.
-  - [ ] `sprint-status.yaml`: `review` at the end of the dev phase. **Do not add review narration to source files.**
+- [x] **Task 7 — Plants, runs, ledger, status** (AC: all)
+  - [x] Plants one at a time; original held in memory and restored in a `finally`; tree hash compared after each; **never** `git checkout --`, `git restore`, `git reset` or `git stash`. Each plant compiles. Record `| # | Plant | Gate | Caught |`. Minimum set: a second rule carrying a shadow; `opacity: 0.7` on the lifted card; a literal duration on the lift; the drop zone filled; the slop check single-axis (vertical only) → the horizontal-pan case; a zero-tolerance slop → the jitter case; the lift committed before the threshold (timer removed) → the pan case; the drag attached for a Viewer; the click after a drag not suppressed → AC11; the drop sending a `PATCH` or a key → AC9's body case; origin drop sending a POST → AC6.
+  - [x] Runs (CLAUDE.md): `dotnet build Yello.slnx` (0 warnings, 0 errors), `dotnet build-server shutdown`, `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. A Client failure seen only in the full run is rerun alone (`dotnet test --project tests/Yello.Tests.Client/Yello.Tests.Client.csproj --no-build`) before it is called real. Docker readiness `docker info --format '{{.ServerVersion}}'`; `Get-Process Yello.Host` if `bin/Debug` is locked.
+  - [x] `tests/TESTING-CONVENTIONS.md`: how a pointer drag and a CDP touch gesture are driven; the "poll the drag state, never sleep" rule for the long-press threshold.
+  - [x] Ledger (`deferred-work.md`): CLOSE `:52` per Q8; UPDATE `:36` (drop zone and lifted card radius clause added); NOTE on the 2.8 entries (identical announcements; neighbour still unadmitted) that drags repeat both; ADD with owners anything decided against the spines (Q3 drag-start distance for a mouse, Q7 drop zone copy and the missing pick-up sentence, Q9 "active lift" reading — owner **UX**); the tap-to-select-then-place fallback if touch tests badly (`.memlog.md:21`, owner **UX/Lee**); anything deferred.
+  - [x] `sprint-status.yaml`: `review` at the end of the dev phase. **Do not add review narration to source files.**
 
 ## Dev Notes
 
@@ -296,10 +296,94 @@ Claude Opus 5.5 (claude-opus-5-5), run by the unattended story-cycle orchestrato
 
 **Create-story phase (2026-10-28).** No isolation row is pending on 2.7 (grepped `tests/Yello.Tests.Isolation`). No ATDD scaffold exists for 2.7. Planning inputs read through two research passes (the planning documents; the client code, CSS, gates and browser fixture), plus story 2.6 and `deferred-work.md`; facts above cite paths and lines as read on 2026-10-28. No test design scenario names drag, touch or reduced motion for the Board (`test-design-qa.md`), so the browser cases in Task 6 are this story's own.
 
+**Dev phase (2026-10-28).** Baseline: `dotnet build Yello.slnx` 0 warnings, 0 errors at `ba2354c`; last full run 1185 total / 1182 passed / 0 failed / 3 skipped (2.6 code review). Isolation rows with `PendingUntil: "2.7"`: none (grepped `tests/Yello.Tests.Isolation`). Docker 29.5.3 (Rancher) ready.
+
+Red first: `DragTests` and `TouchDragTests` were written before the client changes; `A_pointer_drag_lifts_marks_the_drop_zone_and_moves_the_Task_through_the_move_route` failed on the lift (no `.task-card--lifted` within 30s), then went green with the module.
+
+Findings while building:
+- **Blazor lost the drop zone's attributes** when one `@key`ed `<li>` moved between the loop branch and the trailing branch (`<li>Drop here</li>` with no class or `aria-hidden`), so a zone moved to the top of a column was invisible to the tests. The zone is now unkeyed and drawn afresh at each slot.
+- **Chromium's own touch slop hides a single-axis slop rule.** A touch move beyond Chromium's touch slop starts a native pan (or a `pointercancel`) on any axis, so a 30-80px pan never lifts even with the drag's check reduced to the vertical axis (plant 5 first run: not caught). `A_move_just_beyond_the_slop_in_any_direction_never_lifts` moves 13px - beyond the drag's 10px, inside Chromium's - and catches it.
+- Gates widened by exactly the lifted card (as 2.6 recorded its own):
+  1. `No_surface_carries_a_shadow` admits exactly two declarations: `--shadow-lifted` in `tokens.css`, and `box-shadow: var(--shadow-lifted)` on `.task-card.task-card--lifted` (`IsTheLiftedCardsShadow`). Remarks rewritten. Plant 1 (a second rule taking the token) caught.
+  2. `The_Task_card_declares_no_shadow_explicitly` - the base `.task-card` still declares `none`; the lifted compound taking the token is the only exception.
+  3. `Only_the_moved_cards_reflow_moves_and_on_the_quick_motion_token` renamed `The_cards_motion_reflows_on_the_quick_token_and_states_no_literal_duration` (the old name stopped being true); its assertions are unchanged and now also hold the lift and the settle to tokens. Plant 3 caught.
+  4. `The_non_colour_token_families_are_complete` - `shadow-lifted` added to `RequiredStructuralTokens`.
+  5. `BoardTests.A_Viewer_sees_the_same_Board_with_no_create_affordance_and_nothing_disabled` (E2E-003) extended: Owner cards are `task-card--movable` with the grab cursor; Viewer cards are neither and keep `touch-action: auto`.
+- `ClientStorageBanTests.No_client_asset_reaches_browser_storage` and `SpaceSwitcherGateTests` now scan `board-drag.js`; both green unchanged (remarks of the storage gate updated: the client has one JS file now).
+
+Plants (one at a time, original held in memory and restored in a `finally`, SHA-256 of each planted file compared after restore; never `git checkout`/`restore`/`reset`/`stash`; every plant compiled; `Yello.Client` rebuilt in Debug before each browser plant and after the set):
+
+| # | Plant | Gate | Caught |
+|---|---|---|---|
+| 1 | `.drop-zone` takes `box-shadow: var(--shadow-lifted)` | `No_surface_carries_a_shadow` | yes |
+| 2 | `opacity: 0.7` on `.task-card.task-card--lifted` | `No_rule_makes_an_element_carrying_a_colour_token_translucent` | yes |
+| 3 | `110ms` for `var(--motion-lift)` on the lift | `The_lift_and_the_settle_run_on_their_motion_tokens`, `The_cards_motion_reflows_on_the_quick_token_and_states_no_literal_duration` | yes |
+| 4 | Drop zone filled (`background-color: var(--surface-column)`) | `The_drop_zone_is_dashed_in_the_focus_ring_colour_and_never_filled` | yes |
+| 5 | Slop check single-axis (vertical only) | `A_move_just_beyond_the_slop_in_any_direction_never_lifts` (the two horizontal rows) | yes (not caught by the 80px pan cases - see findings) |
+| 6 | Zero-tolerance slop | `Jitter_inside_the_slop_still_lifts` | yes |
+| 7 | Lift committed before the threshold (timer of 0) | `A_long_press_lifts_after_the_threshold_...` and all four `A_pan_beyond_the_slop_...` rows | yes |
+| 8 | Drag attached for a Viewer (module attached for every Role, every card a handle) | `DragTests.A_Viewers_card_does_not_drag_and_nothing_is_disabled`, `TouchDragTests.A_long_press_on_a_Viewers_card_lifts_nothing` | yes |
+| 9 | Drag attached for a Viewer, module only (no grab cursor; lift allowed without manage-tasks) | `A_long_press_on_a_Viewers_card_lifts_nothing` (the lift itself) | yes |
+| 10 | The click after a drag not suppressed | `Escape_mid_drag_cancels_it` (released back on the title) | yes |
+| 11 | The drop sent as a `PATCH` of the Status | `A_pointer_drag_lifts_marks_the_drop_zone_and_moves_the_Task_through_the_move_route` | yes |
+| 12 | A drop on the origin slot sends a `POST` | `Dropping_on_the_origin_or_outside_every_column_moves_nothing(outside: False)` | yes |
+
+**Runs.** `dotnet build Yello.slnx` 0 warnings, 0 errors; `dotnet build-server shutdown`; `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`: **1230 total, 1227 passed, 0 failed, 3 skipped** (the three migration-bundle skips). +45 against the baseline: `DragTests` 24, `TouchDragTests` 13, `TextSpacingTests` 2, `DesignFoundationGateTests.Drag` 6.
+
 ### Completion Notes List
 
 - Story created 2026-10-28 by create-story: ultimate context engine analysis completed — comprehensive developer guide created. Open questions Q1–Q15 carry recommended decisions; the dev phase decides each as a reversible, recorded decision.
+- **Q1 - (a).** One hand-written ES module, `Yello.Client/wwwroot/js/board-drag.js` (no bundler, no package), imported lazily by `BoardDrag` through `IJSRuntime` `import` and disposed with the Board; it writes only `--drag-x`/`--drag-y` on the dragged card and never re-classes or restructures Blazor's DOM. Cost to later stories: the repository has its first JS file; 2.8 may reuse `BoardDrag`'s state for its pick-up visuals. Cut by deleting the module, `BoardDrag.cs`, `IBoardDragHost.cs` and `BoardView.Drag.cs`.
+- **Q2 - (a).** `--motion-long-press-threshold`, `--motion-long-press-slop` and `--target-min` are read from the root's computed style at **each press** (not once at attach), falling back to 320ms / 10px / 24px. Reading per press is what lets a test lengthen the threshold with a style tag. Cost: none.
+- **Q3 - (a).** The mouse/pen drag-start distance is the same 10px slop token. Cost to later stories: ledger note to UX.
+- **Q4 - (a).** The whole card is the handle for movers (`task-card--movable`), the title button included; the actions control and anything in an open menu or picker never start a drag; a lift closes an open card menu. Cost: none.
+- **Q5 - (a).** A drop on the Task's own slot (same Status, same neighbour above, the dragged Task excluded) sends nothing and is announced as a cancel after lift. Cost: none.
+- **Q6 - (a).** `MoveAsync(…, bool fromMenu)` became `MoveAsync(…, MoveOrigin)` (`Panel`, `Menu`, `Drag`); 2.6's two call sites updated mechanically. `Drag` says a refusal on the Board notice (as `Menu`) and moves no focus. Cost: none.
+- **Q7 - (a).** Drop → 2.6's admission sentence; refusal → 2.6's return sentence; cancel after a lift → "Returned to {Status}, position {n}." (`TaskReturned`); nothing on the lift, on crossing columns or on a pan-cancelled pending lift; no pointer pick-up sentence. Drop zone copy is one resx entry `DragDropHere` ("Drop here", with `<comment>`), rendered `aria-hidden`. A cancel the Board makes itself (purge, re-read, the dragged Task deleted, the panel opened) is silent. Cost: ledger note to UX/2.8.
+- **Q8 - (a).** `--shadow-lifted: 0 6px 0 rgba(0, 0, 0, 0.6)` in `tokens.css` (one value, both themes); the lifted card and drop zone fully opaque; the ledger's interim gate added (`No_rule_makes_an_element_carrying_a_colour_token_translucent`) and `deferred-work.md:52` closed. Cost: 7.5 widens the gate for presence.
+- **Q9 - (a).** Pending: a move beyond the slop or a native scroll (`pointercancel`) cancels; active: the finger is the drag (its `touchmove`s are prevented), while a `pointercancel`, a second touch, `Esc`, window blur or a hidden page end it with nothing moved; a wheel scroll during a mouse drag is honoured and the drag re-hit-tests. Cards keep `touch-action: pan-x pan-y pinch-zoom` (pinch-zoom kept for resize, WCAG 1.4.4). The non-passive `touchmove` listener sits on the row of columns, registered at attach, because the browser decides cancelability when the touch starts. Cost: ledger note to UX.
+- **Q10.** `Esc` cancels a pending or lifted drag (innermost meaning wins), announced as a cancel after lift when lifted. Cost: none.
+- **Q11 - (a).** While a touch press is pending or lifted, and after a touch lift until the next press, `contextmenu` is swallowed at window capture; movers' cards carry `-webkit-touch-callout: none` and `user-select: none`. A mouse right-click still opens 2.6's menu. Cost: ledger note (2.6's `contextmenu` route is pointer-only on touch).
+- **Q12.** `navigator.vibrate(10)` on a touch lift only, feature-detected. Asserted once per lift with a stub. Cost: none.
+- **Q13.** Edge zone 2 × `--target-min` (48px), speed linear to 16px a frame, `scrollBy({ behavior: "instant" })` in a rAF loop: the hovered column at its block edges, the row of columns at the view's inline edges, the page at the view's block edges. Cost: ledger note to UX.
+- **Q14 - (a).** `ClientSurfaceFixture.OpenAsync(locale, timezoneId, hasTouch)` overload; touch through CDP `Input.dispatchTouchEvent`. CDP proved reliable (native pans scroll), so no synthetic `PointerEvent`s. Long-press cases run in a new `TouchTimingCollection` (`DisableParallelization = true`) that takes the existing `ClientSurfaceFixture` - no new fixture class. Reduced motion keeps the lifted look (state) and removes every transition/animation; both asserted. Cost: none.
+- **Q15.** No width restriction on cross-column drags; 2.11 limits it with the pager. Cost: 2.11 reads the ledger entry.
+- **Variances recorded:** the tilt is the CSS `rotate: -1deg` property rather than `transform: rotate(-1deg)` (DESIGN's value, a different property), so the lift's transition animates the tilt and the shadow and never the pointer-following `translate`; the drop zone and lifted card are told apart from a card by class, the column by `data-status-id` (the card keeps its title button's `data-task-id`, not a second one on the `<li>`, so no existing `[data-task-id]` query becomes ambiguous); DESIGN's 2px lifted border is used, not the mockup's 1px.
+- **What was built:** the module (pointer and touch paths, hit-testing by rects with the drop zone holding its slot, auto-scroll, cancel paths, click and context-menu suppression); `BoardDrag` (attach/detach for movers only, four `[JSInvokable]` callbacks, `End()` for the Board's own cancels) behind `IBoardDragHost`; `BoardView.Drag.cs` (lift guard, drop → `MoveAsync(…, MoveOrigin.Drag)` with `afterTaskId` computed without the dragged Task, origin drop, cancel announcement, settle); `BoardColumn` (`data-status-id`, the drop zone at its slot, the list drawn for an empty column under a drag); `TaskCard` (`task-card--movable`, `--lifted`, `--settled`); CSS (the movable card, the lifted card, the settle keyframes, the drop zone) and the shadow token. No server, Contracts, migration or isolation change; the drop goes through 2.6's `POST …/move`.
+- **Tests added:** `DragTests` (24 cases), `TouchDragTests` (13 cases incl. the 13px slop theory), `TextSpacingTests.Text_spacing_and_text_only_zoom_clip_nothing_mid_drag` (2), `DesignFoundationGateTests.Drag` (6), and the extended E2E-003; 12 plants recorded in the Debug Log.
 
 ### File List
 
+- `Yello.Client/wwwroot/js/board-drag.js` (new)
+- `Yello.Client/Components/BoardDrag.cs` (new)
+- `Yello.Client/Components/IBoardDragHost.cs` (new)
+- `Yello.Client/Components/BoardView.Drag.cs` (new)
+- `Yello.Client/Components/BoardView.razor`
+- `Yello.Client/Components/BoardView.razor.cs`
+- `Yello.Client/Components/BoardColumn.razor`
+- `Yello.Client/Components/TaskCard.razor`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Localisation/DocumentLanguage.cs`
+- `Yello.Client/wwwroot/css/tokens.css`
+- `Yello.Client/wwwroot/css/components.css`
+- `Yello.Client/wwwroot/css/base.css`
+- `tests/Yello.Tests.Client/DragHarness.cs` (new)
+- `tests/Yello.Tests.Client/DragTests.cs` (new)
+- `tests/Yello.Tests.Client/TouchDragTests.cs` (new)
+- `tests/Yello.Tests.Client/TouchTimingCollection.cs` (new)
+- `tests/Yello.Tests.Client/ClientSurfaceFixture.cs`
+- `tests/Yello.Tests.Client/BoardTests.cs`
+- `tests/Yello.Tests.Client/TextSpacingTests.cs`
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.Drag.cs` (new)
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.cs`
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.Board.cs`
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.MovePicker.cs`
+- `tests/Yello.Tests.Architecture/ClientStorageBanTests.cs`
+- `tests/TESTING-CONVENTIONS.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/2-7-the-accelerated-pointer-and-touch-paths.md`
+
 ### Change Log
+
+- 2026-10-28: Dev phase - the pointer drag and the touch long-press path (UX-DR22, UX-DR23, UX-DR6) through one ES module and `BoardDrag`; the drop is 2.6's move (`MoveOrigin.Drag`); the lifted card (the one shadow, `--shadow-lifted`) and the drop zone; gates widened by exactly the lifted card; the opacity gate closes `deferred-work.md:52`; 12 plants caught; full suite 1230/1227/0/3. Status → review.

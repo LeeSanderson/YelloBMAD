@@ -5,12 +5,14 @@
 @using Yello.Contracts.Labels
 @using Yello.Contracts.Tasks
 
-@implements IDisposable
+@implements IAsyncDisposable
+@implements IBoardDragHost
 
 @inject IStringLocalizer<ClientCopy> Localizer
 @inject HttpClient Http
 @inject ActiveSpaceState ActiveSpace
 @inject SpaceWrites Writes
+@inject IJSRuntime JS
 
 @*
     ONE PROJECT'S BOARD - story 2.2. AC1-AC7, AC13-AC15; UX-DR8, UX-DR26, UX-DR27, UX-DR31, UX-DR33,
@@ -44,6 +46,10 @@
     end of its new column and moves both totals - and the server admits or refuses it afterwards. See
     BoardView.razor.cs for the replica: each attribute keeps its last ADMITTED value, and a refusal reverts
     that attribute alone to it.
+
+    THE POINTER AND TOUCH DRAG (story 2.7) is attached to the row of columns for a Role that may move Tasks, and never
+    for a Viewer (UX-DR27). The gesture lives in js/board-drag.js; this Board renders the lifted card and the drop zone
+    from what it reports (BoardDrag), and a drop is story 2.6's move - the one write path. See BoardView.Drag.cs.
 *@
 
 <p class="visually-hidden" role="status" aria-live="polite">@_announcement</p>
@@ -83,7 +89,7 @@
             </div>
         }
 
-        <div class="board__columns">
+        <div class="board__columns" @ref="_columnsElement">
             @foreach (var column in columns)
             {
                 <BoardColumn @key="column.StatusId"
@@ -107,7 +113,10 @@
                              FocusActionsTaskId="@_focusActions"
                              FocusActionsRequest="@_focusActionsRequests"
                              ArrivalTaskId="@_arrivalCard"
-                             MovedTaskId="@_movedCard">
+                             MovedTaskId="@_movedCard"
+                             SettlingTaskId="@_settlingCard"
+                             LiftedTaskId="@_drag?.LiftedTaskId"
+                             DropIndex="@DropIndexIn(column)">
                     @if (IsFirst(column) && _canManage && _creating)
                     {
                         <TaskCreate SpaceId="@SpaceId" ProjectId="@ProjectId" OnCreated="Add" OnRefused="OnRefused" OnClose="CloseCreate" />
@@ -131,7 +140,7 @@
                         OnDueDate="due => EditAsync(open.Id, TaskAttribute.DueDate, due)"
                         OnLabels="labelIds => EditAsync(open.Id, TaskAttribute.Labels, labelIds)"
                         MoveColumns="@MoveColumns"
-                        OnMove="choice => MoveAsync(open.Id, choice, fromMenu: false)"
+                        OnMove="choice => MoveAsync(open.Id, choice, MoveOrigin.Panel)"
                         OnConfirmToggled="ConfirmToggled"
                         DeleteRefusal="@_deleteRefusal"
                         OnDelete="() => DeleteTaskAsync(open.Id)"
@@ -191,6 +200,7 @@
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()
     {
+        _drag = new BoardDrag(JS, this);
         _purgeRegistration = ActiveSpace.RegisterPurge(Purge);
 
         await LoadAsync(_generation);
@@ -222,6 +232,8 @@
             _focusEmptyAction = false;
             await _emptyAction.FocusAsync();
         }
+
+        await AttachDragAsync();
     }
 
     /// <summary>
@@ -241,11 +253,16 @@
     };
 
     /// <inheritdoc />
-    public void Dispose()
+    public async ValueTask DisposeAsync()
     {
         _generation++;
         _purgeRegistration?.Dispose();
         ActiveSpace.ClearProject();
+
+        if (_drag is not null)
+        {
+            await _drag.DisposeAsync();
+        }
     }
 
     /// <summary>
@@ -254,6 +271,7 @@
     private void Purge()
     {
         _generation++;
+        _drag?.End();
         _columns = null;
         _projectName = string.Empty;
         _announcement = null;
@@ -342,6 +360,8 @@
 
             if (await response.Content.ReadFromJsonAsync<BoardResponse>(JsonOptions, token) is { } board && generation == _generation)
             {
+                // A drag under a Board read again ends with nothing moved: the slots it was over may be gone (AC13).
+                _drag?.End();
                 _columns = [.. board.Columns.Select(column => new ColumnState(column.StatusId, column.Name, column.Total, [.. column.Tasks.Where(task => !_deleted.Contains(task.Id))]))];
                 UseStatuses(board.Columns.Select(column => new TaskStatusOption(column.StatusId, column.Name)));
                 Readmit();

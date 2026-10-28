@@ -64,7 +64,19 @@ public sealed class ClientSurfaceFixture : IAsyncLifetime
     /// <param name="locale">A BCP 47 tag, as <see cref="OpenAsync(string)"/> takes it.</param>
     /// <param name="timezoneId">An IANA zone, for example <c>Asia/Tokyo</c>, or <c>null</c> for the machine's.</param>
     /// <returns>The context and its page. Disposing the context closes the page with it.</returns>
-    public async Task<(IBrowserContext Context, IPage Page)> OpenAsync(string locale, string? timezoneId)
+    public Task<(IBrowserContext Context, IPage Page)> OpenAsync(string locale, string? timezoneId) =>
+        OpenAsync(locale, timezoneId, hasTouch: false);
+
+    /// <summary>
+    /// Opens a browser context with the given locale and time zone, as a touch device when asked, and a page in it.
+    /// Added by story 2.7 (Q14 (a)): the long-press and pan cases drive a touch screen through the Chrome DevTools
+    /// Protocol, and Chromium reports touch support to the page only for a context created with it.
+    /// </summary>
+    /// <param name="locale">A BCP 47 tag, as <see cref="OpenAsync(string)"/> takes it.</param>
+    /// <param name="timezoneId">An IANA zone, or <c>null</c> for the machine's.</param>
+    /// <param name="hasTouch">Whether the context is a touch device.</param>
+    /// <returns>The context and its page. Disposing the context closes the page with it.</returns>
+    public async Task<(IBrowserContext Context, IPage Page)> OpenAsync(string locale, string? timezoneId, bool hasTouch)
     {
         var browser = _browser
             ?? throw new InvalidOperationException(
@@ -74,6 +86,7 @@ public sealed class ClientSurfaceFixture : IAsyncLifetime
         {
             Locale = locale,
             TimezoneId = timezoneId,
+            HasTouch = hasTouch,
         }).ConfigureAwait(false);
 
         var page = await context.NewPageAsync().ConfigureAwait(false);

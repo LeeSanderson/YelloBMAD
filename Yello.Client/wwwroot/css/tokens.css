@@ -289,7 +289,7 @@
         3:1 gate.
 
         `emphasis-width` 2px carries the focus ring, and the lifted card for the duration of a
-        drag - which story 2.7 builds, not this one.
+        drag (story 2.7, `.task-card--lifted`).
 
         DEVICE-PIXEL SNAPPING - the second half of `DESIGN.md:366`, "borders snapped to device
         pixels where the platform allows" - is DEFERRED to UX, not implemented here. 1.5px is a
@@ -340,6 +340,22 @@
     --motion-easing-exit: cubic-bezier(0.4, 0, 1, 1);
     --motion-long-press-threshold: 320ms;
     --motion-long-press-slop: 10px;
+}
+
+:root {
+
+    /*
+        Elevation. There is exactly one: the Task card lifted under an active drag (story 2.7,
+        DESIGN.md:145-148 and :435), which takes a HARD offset shadow - no blur, because a blurred
+        shadow on tinted, close-luminance grounds reads as a smudge rather than a lift. It is the
+        only place an object leaves the plane, and `No_surface_carries_a_shadow` admits it on that
+        one rule alone.
+
+        One value for both themes, as DESIGN.md gives one. Its colour is an alpha black, which may
+        only be stated here in the token layer; it darkens the ground BELOW the card and never sits
+        behind any of the card's text, so no gated contrast pair is computed across it.
+    */
+    --shadow-lifted: 0 6px 0 rgba(0, 0, 0, 0.6);
 }
 
 :root {

@@ -19,9 +19,10 @@ namespace Yello.Client.Localisation;
 /// <para>
 /// <b>No JavaScript file, and no new dependency.</b> Blazor's interop resolves a dotted
 /// identifier from <c>globalThis</c> and invokes it with the preceding object as <c>this</c>, so
-/// <c>document.documentElement.setAttribute</c> is callable directly. This repository has zero
-/// JavaScript of its own and no bundler; adding a module for one attribute would have been a
-/// build step to maintain forever.
+/// <c>document.documentElement.setAttribute</c> is callable directly, and a module for one
+/// attribute would be code to maintain for nothing. The client's one JavaScript file,
+/// <c>wwwroot/js/board-drag.js</c> (story 2.7), exists because the Board's drag needs what
+/// Blazor's event system cannot do; it is a plain ES module, with no bundler and no package.
 /// </para>
 /// <para>
 /// <b>Gated, not trusted.</b> <c>The_document_language_is_set_from_the_active_culture</c> scans

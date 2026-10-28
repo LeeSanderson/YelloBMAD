@@ -139,7 +139,9 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// columns and cards, no "Add a Task" anywhere, and nothing disabled. Anchor: the Owner of the other Space,
     /// with the same Board, has the affordance. Story 2.6 extends it: the Viewer's cards carry no actions control, and
     /// <c>MoveTests.A_Viewer_is_offered_no_move_control_and_nothing_is_disabled</c> holds the rest of the Move control's
-    /// absence. The drag handle arrives in 2.7.
+    /// absence. Story 2.7 extends it to the drag: the Owner's cards are drag handles (<c>task-card--movable</c>, the grab
+    /// cursor) and the Viewer's are not - absent, not disabled. <c>DragTests.A_Viewers_card_does_not_drag_and_nothing_is_disabled</c>
+    /// and <c>TouchDragTests.A_long_press_on_a_Viewers_card_lifts_nothing</c> drive the gesture itself.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -159,6 +161,8 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
 
             Assert.True(await AddTaskControls(page).CountAsync() >= 1, "Anchor: the Owner has no create affordance.");
             Assert.True(await page.Locator(".task-card__actions").CountAsync() >= 1, "Anchor: the Owner's cards have no actions control.");
+            Assert.True(await page.Locator(".task-card--movable").CountAsync() >= 1, "Anchor: the Owner's cards are not drag handles.");
+            Assert.Equal("grab", await page.Locator(Card).First.EvaluateAsync<string>("card => getComputedStyle(card).cursor"));
 
             await page.EvaluateAsync("path => Blazor.navigateTo(path)", ClientBoard(Harbour, Beacon));
             await page.Locator(RoleChip, new PageLocatorOptions { HasText = "Viewer" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
@@ -167,6 +171,9 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
             Assert.Equal(StatusNames, await ColumnNamesAsync(page));
             Assert.Equal(0, await AddTaskControls(page).CountAsync());
             Assert.Equal(0, await page.Locator(".task-card__actions").CountAsync());
+            Assert.Equal(0, await page.Locator(".task-card--movable").CountAsync());
+            Assert.NotEqual("grab", await page.Locator(Card).First.EvaluateAsync<string>("card => getComputedStyle(card).cursor"));
+            Assert.Equal("auto", await page.Locator(Card).First.EvaluateAsync<string>("card => getComputedStyle(card).touchAction"));
             Assert.Equal(0, await page.Locator("main input").CountAsync());
             Assert.Equal(0, await page.Locator("main [disabled], main [aria-disabled='true']").CountAsync());
         }

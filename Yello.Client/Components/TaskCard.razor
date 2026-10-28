@@ -24,9 +24,16 @@
     disabled (UX-DR27). Always rendered, never revealed on hover (UX-DR21), at every breakpoint. It opens the card's
     menu - Open and Move - which the Board draws inside the card; so do a right-click on the card (the contextmenu
     event), the platform context-menu key and Shift+F10 on the card. Enter on the title still opens the Task. For a
-    Viewer the card carries no handler at all, and the browser's own context menu is left alone. No drag handle (2.7).
+    Viewer the card carries no handler at all, and the browser's own context menu is left alone.
     It is two tab stops per card until story 2.8 converts the Board to its keyboard grid. The card carries no shadow,
     declared explicitly in components.css so nobody adds one back.
+
+    THE WHOLE CARD IS THE DRAG HANDLE (story 2.7, open question 4 (a)) for a Role that can move Tasks: it renders
+    task-card--movable, which the Board's drag (js/board-drag.js) listens for and which gives it the grab cursor and its
+    touch behaviour - the actions control and an open menu or picker are never a handle. No separate grip. A press that
+    never moves is still a click on the title. While dragged the card renders task-card--lifted - the one shadow in the
+    product - and once dropped or returned task-card--settled. A Viewer's card is none of these: no drag at all, not a
+    disabled one (UX-DR27).
 *@
 
 <li class="@CardClass"
@@ -142,10 +149,45 @@
     [Parameter]
     public bool Moved { get; set; }
 
+    /// <summary>Whether the card is being dragged: drawn lifted (story 2.7, UX-DR4).</summary>
+    [Parameter]
+    public bool Lifted { get; set; }
+
+    /// <summary>Whether this is the card a drag just dropped or returned: only its settle is animated (story 2.7, UX-DR6).</summary>
+    [Parameter]
+    public bool Settling { get; set; }
+
     /// <summary>The most chips a card shows before "+N" (UX-DR8).</summary>
     private const int MostChips = 3;
 
-    private string CardClass => Moved ? "task-card task-card--moved" : "task-card";
+    private string CardClass => string.Join(' ', CardClasses());
+
+    private IEnumerable<string> CardClasses()
+    {
+        yield return "task-card";
+
+        if (CanMove)
+        {
+            yield return "task-card--movable";
+        }
+
+        if (Lifted)
+        {
+            yield return "task-card--lifted";
+        }
+        else if (Settling)
+        {
+            yield return "task-card--settled";
+        }
+        else if (Moved)
+        {
+            yield return "task-card--moved";
+        }
+        else
+        {
+            // At rest: no motion.
+        }
+    }
 
     // In the server's order (by name, then id); an id this tab does not hold a Label for is not drawn.
     private List<LabelResponse> CarriedLabels => [.. Item.LabelIds.Select(id => Labels.GetValueOrDefault(id)).OfType<LabelResponse>()];

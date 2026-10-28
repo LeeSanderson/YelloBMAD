@@ -264,6 +264,34 @@ real Chromium with **no Host, no database and no container**. The rules:
   `location.pathname` (`SpaceSwitchingTests.WaitForPathAsync`), or wait on what the destination
   renders.
 
+### Drag: pointer and touch gestures - added by story 2.7
+
+`DragTests` (pointer) and `TouchDragTests` (touch) drive the Board's drag; `DragHarness` holds what
+they share.
+
+- **A pointer drag is Playwright's mouse**: `Mouse.MoveAsync` to the grab point, `DownAsync`, a
+  move past the drag-start distance (the 10px slop token), then `MoveAsync(x, y, new() { Steps = n })`
+  to the target and `UpAsync`. Before releasing, **wait for the drop zone to be in the expected
+  slot** (`DragHarness.WaitForDropZoneAsync`): the slot reaches the page through .NET, one render
+  behind the pointer, and a release that races it drops into the previous slot.
+- **A touch gesture is the Chrome DevTools Protocol.** Playwright's touchscreen only taps. Open the
+  context with `hasTouch: true` (`ClientSurfaceFixture.OpenAsync(locale, timezoneId, hasTouch)`), then
+  `context.NewCDPSessionAsync(page)` and `Input.dispatchTouchEvent` with `touchStart`, `touchMove`
+  and `touchEnd` (`DragHarness.TouchAsync`, `SwipeAsync`). It runs through Chromium's real input
+  pipeline, so a pan begun on a card really scrolls the column or the Board. A second finger is a
+  `touchStart` naming both points. Chromium only - the only browser the suite runs.
+- **Poll the drag state; never sleep.** A lift is waited for by polling the card's
+  `task-card--lifted` class. "Never lifted" is asserted once the page's own `performance.now()` is
+  past a window measured from the press (`WaitPastLastPressAsync`), against a `MutationObserver`
+  installed before the press that records every element gaining the class (`ObserveLifts`, which
+  also stubs `navigator.vibrate` to count haptic pulses).
+- **A case that must move before the long-press threshold lengthens it first.** The module reads
+  `--motion-long-press-threshold` at each press, so a style tag (`LengthenThresholdAsync`) gives the
+  case a 1,000ms window instead of racing 320ms against a loaded machine. The lower bound of a lift
+  is then measured on the page's clock (press to lift >= threshold).
+- **Long-press cases run in `TouchTimingCollection`** (`DisableParallelization = true`, the same
+  `ClientSurfaceFixture`): they measure time, so nothing else in the process competes with them.
+
 ### Why it exists
 
 Story 1.3 shipped the first rendered surface and closed with 136 tests passing. The client did not

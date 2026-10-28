@@ -408,6 +408,52 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
         }
     }
 
+    /// <summary>
+    /// Story 2.7, <c>deferred-work.md:20</c>'s convention that every new surface adds its own case: mid-drag, the lifted
+    /// card and the drop zone under 1.4.12 text spacing and 200% text-only zoom - no text in either clipped, no card in the
+    /// list overlapping the next (the lifted card, which travels over the others by design, aside), no sideways page
+    /// scroll. Anchored: the drop zone is on screen before the check runs.
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR22")]
+    public async Task Text_spacing_and_text_only_zoom_clip_nothing_mid_drag(bool zoom)
+    {
+        var api = Seeded();
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/projects/{Atlas:D}").ToString());
+            await page.Locator(".task-card").First.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var grab = await DragHarness.PointInAsync(page.Locator("main .board-column").First.Locator(".task-card__title").Last, 0.5f);
+
+            await page.Mouse.MoveAsync(grab.X, grab.Y);
+            await page.Mouse.DownAsync();
+            await page.Mouse.MoveAsync(grab.X, grab.Y + 16, new MouseMoveOptions { Steps = 4 });
+            await page.Locator(".task-card--lifted").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var doing = page.Locator("main .board-column").Nth(1).Locator(".task-card").Last;
+
+            await DragHarness.MoveMouseToAsync(page, await DragHarness.PointInAsync(doing, 0.8f));
+            await page.Locator(".drop-zone").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping.Replace("querySelectorAll('.task-card')", "querySelectorAll('.task-card:not(.task-card--lifted)')", StringComparison.Ordinal));
+
+            await page.Keyboard.PressAsync("Escape");
+            await page.Mouse.UpAsync();
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+        }
+    }
+
     private static FakeYelloApi Seeded()
     {
         var api = new FakeYelloApi { SignedIn = true };

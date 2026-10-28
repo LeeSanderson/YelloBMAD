@@ -89,8 +89,9 @@ public sealed class ClientStorageBanTests
     /// <remarks>
     /// <c>wwwroot</c> is served as-is. An inline script in <c>index.html</c> or a <c>.js</c> file
     /// beside it would reach browser storage with nothing compiled anywhere, so the IL scan above
-    /// cannot see it. There is no JavaScript file in this client at all today, and this is what
-    /// keeps that true for the purpose it matters for.
+    /// cannot see it. Since story 2.7 the client has one JavaScript file of its own -
+    /// <c>wwwroot/js/board-drag.js</c>, the Board's pointer and touch drag - and this is what keeps
+    /// it, and any file after it, out of browser storage.
     /// </remarks>
     [Fact]
     public void No_client_asset_reaches_browser_storage()

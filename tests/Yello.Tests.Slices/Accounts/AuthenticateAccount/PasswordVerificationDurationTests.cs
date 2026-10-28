@@ -40,6 +40,7 @@ namespace Yello.Tests.Slices.Accounts.AuthenticateAccount;
 [Trait("Requirement", "AR-28")]
 [Trait("Requirement", "AD-23")]
 [Trait("Requirement", "FR-2")]
+[Collection(nameof(PasswordDurationCollection))]
 public sealed class PasswordVerificationDurationTests
 {
     private const string CorrectPassword = "a-password-nobody-else-uses-1!";
@@ -262,3 +263,11 @@ public sealed class PasswordVerificationDurationTests
             Task.CompletedTask;
     }
 }
+
+/// <summary>
+/// The password-verification duration cases run alone. Sharing the CPU with the rest of the slice
+/// suite pushed the median gap past the 20% tolerance on full runs (story 2.7 verification,
+/// 2026-10-28) while the class passed alone 3/3 - the CLAUDE.md timing-test rule.
+/// </summary>
+[CollectionDefinition(nameof(PasswordDurationCollection), DisableParallelization = true)]
+public sealed class PasswordDurationCollection;

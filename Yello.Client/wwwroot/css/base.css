@@ -17,7 +17,7 @@
 
     NO SHADOW ANYWHERE. Shadow is not a hierarchy device here - the grounds are tinted and close
     in luminance, so a shadow on them reads as a smudge rather than a lift. The single sanctioned
-    exception is the lifted card under an active drag, which story 2.7 builds.
+    exception is the lifted card under an active drag (story 2.7, `--shadow-lifted`).
 */
 
 /*

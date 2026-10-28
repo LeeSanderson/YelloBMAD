@@ -56,7 +56,9 @@ public sealed partial class DesignFoundationGateTests
 
     /// <summary>
     /// AC6, DESIGN.md:421-431 - the Task card states <c>box-shadow: none</c> explicitly, "so nobody adds one
-    /// back"; story 2.7's lifted card is the one sanctioned exception and widens this deliberately.
+    /// back". Story 2.7's lifted card is the one sanctioned exception, widened deliberately by exactly its compound
+    /// selector <c>.task-card.task-card--lifted</c> taking <c>var(--shadow-lifted)</c>: every other rule styling the card
+    /// still declares <c>none</c>, and the base rule still declares it.
     /// </summary>
     [Fact]
     [Trait("Requirement", "UX-DR8")]
@@ -67,8 +69,10 @@ public sealed partial class DesignFoundationGateTests
             .Where(d => d.Declaration.Property.Equals("box-shadow", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        Assert.NotEmpty(shadows);
-        Assert.All(shadows, d => Assert.True(IsNoneValue(d.Declaration.Value), $"{Where(d.Sheet, d.Declaration)} is '{d.Declaration.Value}'."));
+        Assert.Contains(shadows, d => d.Rule.Selector.Trim() == TaskCardClass && IsNoneValue(d.Declaration.Value));
+        Assert.All(
+            shadows.Where(d => !IsTheLiftedCardsShadow(d.Sheet, d.Rule, d.Declaration)),
+            d => Assert.True(IsNoneValue(d.Declaration.Value), $"{Where(d.Sheet, d.Declaration)} is '{d.Declaration.Value}'."));
     }
 
     /// <summary>

@@ -81,14 +81,16 @@ public sealed partial class DesignFoundationGateTests
     }
 
     /// <summary>
-    /// DSN-603 - AC15, UX-DR6, <c>DESIGN.md:517-521</c> - only the moved card's reflow moves, on <c>motion.quick</c>: a rule
+    /// DSN-603 - AC15, UX-DR6, <c>DESIGN.md:517-521</c> - the moved card's reflow runs on <c>motion.quick</c>: a rule
     /// styling the card declares a transition on <c>var(--motion-quick)</c>, and every transition or animation declared on
-    /// the card, the picker or the menu uses only <c>--motion-*</c> tokens (base.css's reduced-motion reset then removes it).
-    /// No lift, settle or drop zone (2.7).
+    /// the card, the picker or the menu uses only <c>--motion-*</c> tokens, never a literal duration (base.css's
+    /// reduced-motion reset then removes it). Story 2.7 adds the lifted card's lift on <c>--motion-lift</c> and the dropped
+    /// card's settle on <c>--motion-settle</c>, which this gate holds to the same rule; renamed from
+    /// <c>Only_the_moved_cards_reflow_moves_and_on_the_quick_motion_token</c>, which stopped being true.
     /// </summary>
     [Fact]
     [Trait("Requirement", "UX-DR6")]
-    public void Only_the_moved_cards_reflow_moves_and_on_the_quick_motion_token()
+    public void The_cards_motion_reflows_on_the_quick_token_and_states_no_literal_duration()
     {
         var motion = CssCorpus.AllDeclarations()
             .Where(d => SelectsComponent(d.Rule.Selector, TaskCardClass)

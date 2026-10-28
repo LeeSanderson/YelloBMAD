@@ -595,6 +595,10 @@
     <value>Moved to {0}, position {1} of {2}.</value>
     <comment>Announced politely, once, when the server has admitted a move or a Status change (story 2.6, AC7, open question 8): {0} is the Status name, {1} the Task's 1-based position in that column as the Board shows it after placing it by the server's key, {2} the column's true total. Never on load, never before the answer.</comment>
   </data>
+  <data name="DragDropHere" xml:space="preserve">
+    <value>Drop here</value>
+    <comment>Inside the dashed drop zone a pointer or touch drag draws in the destination column, at the slot the dragged Task would land in (story 2.7, UX-DR22; the mockup's words, board.html). Decoration only: hidden from assistive technology, because the polite live region says where a dropped Task went.</comment>
+  </data>
   <data name="TaskReturned" xml:space="preserve">
     <value>Returned to {0}, position {1}.</value>
     <comment>Announced politely when a move or a Status change was refused or got no answer and the card went back to its last admitted slot (story 2.6, AC7, AC15): {0} is the Status name, {1} the 1-based position it returned to.</comment>

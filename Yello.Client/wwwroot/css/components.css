@@ -731,7 +731,7 @@
 /*
     THE TASK CARD (DESIGN.md:137-144, :431). The title is the only content; the card sizes to it, wraps a
     long title rather than scrolling, and carries NO SHADOW - stated explicitly so nobody adds one back
-    (story 2.7's lifted card is the one sanctioned exception). The metadata row holds the Task's Labels (story
+    (story 2.7's lifted card, below, is the one sanctioned exception). The metadata row holds the Task's Labels (story
     2.4) and its due date (story 2.3), and takes no space while it holds neither; the Assignee and Presence
     join it later.
 */
@@ -820,8 +820,8 @@
 
 /*
     THE MOVED CARD'S REFLOW (story 2.6, UX-DR6; DESIGN.md:517-521): only the card a move just placed moves, on
-    motion.quick, from a little above its new slot. No lift, settle or drop zone (2.7). base.css removes it under
-    prefers-reduced-motion.
+    motion.quick, from a little above its new slot. A card a drag dropped settles instead (below). base.css removes both
+    under prefers-reduced-motion.
 */
 .task-card.task-card--moved {
     animation: task-card-reflow var(--motion-quick) var(--motion-easing-standard);
@@ -831,6 +831,77 @@
     from {
         transform: translateY(calc(-1 * var(--space-1)));
     }
+}
+
+/*
+    THE DRAG (story 2.7; UX-DR4, UX-DR5, UX-DR6, UX-DR8, UX-DR22, UX-DR23; DESIGN.md:145-148, :197-200, :435, :452,
+    :466, :506-521; EXPERIENCE.md:297-308).
+
+    A MOVER'S CARD is the handle - the whole card (open question 4 (a)); a Viewer's card renders none of this. It shows
+    the grab cursor, follows the pointer by the two custom properties js/board-drag.js writes (zero at rest), and keeps
+    the browser's pans and pinch-zoom while giving up double-tap zoom, so a pan begun on it scrolls as before (AC3, AC4).
+    A long-press on it opens no text selection or callout (open question 11 (a)). Nothing here is revealed on hover.
+*/
+.task-card.task-card--movable {
+    cursor: grab;
+    touch-action: pan-x pan-y pinch-zoom;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    translate: var(--drag-x, 0) var(--drag-y, 0);
+}
+
+/*
+    THE LIFTED CARD - task-card-lifted, the one exception to "no shadow anywhere": the 2px emphasis border, the hard
+    offset shadow and a 1-degree tilt, lifting on motion.lift. Fully opaque, like everything carrying a contrast pair
+    (deferred-work.md:52). It stays in the stacking order above its neighbours while it travels over them. The tilt is the
+    `rotate` property rather than part of a `transform`, so the transition animates the tilt and the shadow and never
+    the pointer-following translation. The look is state, not motion: reduced motion removes the transition (base.css)
+    and keeps the look (AC7).
+*/
+.task-card.task-card--lifted {
+    position: relative;
+    z-index: 1;
+    border-width: var(--border-emphasis-width);
+    box-shadow: var(--shadow-lifted);
+    rotate: -1deg;
+    cursor: grabbing;
+    transition:
+        rotate var(--motion-lift) var(--motion-easing-standard),
+        box-shadow var(--motion-lift) var(--motion-easing-standard);
+}
+
+.task-card.task-card--lifted .task-card__open {
+    cursor: grabbing;
+}
+
+/* THE SETTLE: the dropped or returned card comes to rest from the tilt on motion.settle (UX-DR6). */
+.task-card.task-card--settled {
+    animation: task-card-settle var(--motion-settle) var(--motion-easing-exit);
+}
+
+@keyframes task-card-settle {
+    from {
+        rotate: -1deg;
+    }
+}
+
+/*
+    THE DROP ZONE - drop-zone: the 2px dashed focus-ring border, focus-ring words, 3px corners, and NEVER filled, so the
+    order around it stays readable mid-drag (DESIGN.md:466). Sized by its padding and its one line of text, never a fixed
+    height. Decoration (aria-hidden): the live region says where a dropped Task went.
+*/
+.drop-zone {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-block: var(--space-2);
+    padding-inline: var(--space-2);
+    color: var(--focus-ring);
+    border: var(--border-emphasis-width) dashed var(--focus-ring);
+    border-radius: var(--radius-md);
+    list-style: none;
+    overflow-wrap: anywhere;
 }
 
 /*
