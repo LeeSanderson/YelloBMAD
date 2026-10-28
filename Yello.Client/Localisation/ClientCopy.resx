@@ -657,7 +657,23 @@
   </data>
   <data name="TaskPositionUnavailable" xml:space="preserve">
     <value>That position has changed. Choose it again.</value>
-    <comment>409 task-position-unavailable (story 2.6, open question 3 (a)): the Task chosen as the neighbour has moved or gone, or the gap has no room. Said where the move was made; the card goes back. Never says why or where the neighbour went.</comment>
+    <comment>409 task-position-unavailable (story 2.6, open question 3 (a)): the Task chosen as the neighbour has moved or gone. Said where the move was made; the card goes back. Never says why or where the neighbour went.</comment>
+  </data>
+  <data name="TaskPositionFull" xml:space="preserve">
+    <value>There is no room at that position. Choose another position.</value>
+    <comment>409 task-position-full (story 2.9, AC18, open question 11 (a)): no position key fits after the chosen neighbour, so choosing it again would be refused again. Said where the move was made; the card goes back. Copy to UX for confirmation.</comment>
+  </data>
+  <data name="BoardShowMore" xml:space="preserve">
+    <value>Show more Tasks</value>
+    <comment>The control at the foot of a partly loaded Board column that loads its next page (story 2.9, AC11, open question 5 (a)). No count in it (no nudges). Copy and placement to UX.</comment>
+  </data>
+  <data name="BoardShowMoreName" xml:space="preserve">
+    <value>Show more Tasks in {0}</value>
+    <comment>The accessible name of a column's "Show more Tasks" control (story 2.9, open question 5 (a)): {0} is the Status's name. Starts with the visible label.</comment>
+  </data>
+  <data name="MoveMorePositions" xml:space="preserve">
+    <value>Show more positions</value>
+    <comment>The Move picker's last option for a partly loaded column (story 2.9, AC11): loads the column's next page and extends the list. Not a position; "Bottom of column" is offered only once the column is fully loaded.</comment>
   </data>
   <data name="TaskEditNotSent" xml:space="preserve">
     <value>Not sent.</value>

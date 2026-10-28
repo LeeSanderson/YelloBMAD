@@ -279,12 +279,10 @@ internal static class IsolationCases
             },
             Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable))),
 
-        // Story 2.9 - the column-page route (Q1 (a), AC9, Task 3; 1.9-GATE-002 on both surfaces), pending until the dev phase
-        // maps it (GATE-003: every one live before 2.9 reaches review). The rows name ColumnRoute, the scaffold constant for
-        // the template story Task 2 adds to BoardRoutes; switch it (and ColumnOf) when that exists. The route is a read every
+        // Story 2.9 - the column-page route (Q1 (a), AC9, Task 3; 1.9-GATE-002 on both surfaces). The route is a read every
         // Role holds (ReadProjectsAndTasks), so both surfaces get the same expectation. Seeded through the product.
         new(
-            "ISO-DIRECT-BOARD-COLUMN", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, ColumnRoute,
+            "ISO-DIRECT-BOARD-COLUMN", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, BoardRoutes.Column,
             async world =>
             {
                 var (foreign, _) = await SeedProjectWithTaskAsync(world.B);
@@ -293,15 +291,13 @@ internal static class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Get,
-                    [new(ColumnOf(world.B.SpaceId, foreign, theirStatus), ColumnOf(Guid.NewGuid(), foreign, theirStatus))],
+                    [new(BoardRoutes.ColumnOf(world.B.SpaceId, foreign, theirStatus), BoardRoutes.ColumnOf(Guid.NewGuid(), foreign, theirStatus))],
                     world.B.SpaceId);
             },
-            Both(new BoundaryNotFound()),
-            PendingUntil: "2.9",
-            PendingReason: "GET …/projects/{projectId}/board/columns/{statusId} is mapped by story 2.9 Task 2"),
+            Both(new BoundaryNotFound())),
 
         new(
-            "ISO-BOARD-COLUMN-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Get, ColumnRoute,
+            "ISO-BOARD-COLUMN-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Get, BoardRoutes.Column,
             async world =>
             {
                 var (own, _) = await SeedProjectWithTaskAsync(world.A);
@@ -309,40 +305,36 @@ internal static class IsolationCases
                 var ownStatus = (await StatusIdsAsync(world.A))[0];
                 var theirStatus = (await StatusIdsAsync(world.B))[0];
 
-                // B's Project (with B's Status) and B's Status (in A's own Project) each in A's own Space: only the Task's,
-                // Project's and Status's query filters and FILTER predicates stand between A and them - the dev phase plants
-                // the drop of the Task's two layers (the Session row fails), then each alone (green) - story Task 3.
+                // B's Project (with B's Status) and B's Status (in A's own Project) each in A's own Space: the Project's and the
+                // Status's query filters and FILTER predicates stand between A and them, ahead of the Task's own two layers -
+                // the handler answers no page for a Project it cannot find or a Status outside the effective set. Planted in
+                // story 2.9: the handler's two checks skipped - the row fails on both surfaces.
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Get,
                     [
-                        new(ColumnOf(world.A.SpaceId, foreign, theirStatus), ColumnOf(world.A.SpaceId, Guid.NewGuid(), theirStatus)),
-                        new(ColumnOf(world.A.SpaceId, own, theirStatus), ColumnOf(world.A.SpaceId, own, Guid.NewGuid())),
-                        new(ColumnOf(world.A.SpaceId, foreign, ownStatus), ColumnOf(world.A.SpaceId, Guid.NewGuid(), ownStatus)),
+                        new(BoardRoutes.ColumnOf(world.A.SpaceId, foreign, theirStatus), BoardRoutes.ColumnOf(world.A.SpaceId, Guid.NewGuid(), theirStatus)),
+                        new(BoardRoutes.ColumnOf(world.A.SpaceId, own, theirStatus), BoardRoutes.ColumnOf(world.A.SpaceId, own, Guid.NewGuid())),
+                        new(BoardRoutes.ColumnOf(world.A.SpaceId, foreign, ownStatus), BoardRoutes.ColumnOf(world.A.SpaceId, Guid.NewGuid(), ownStatus)),
                     ],
                     TargetSpaceId: null);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable)),
-            PendingUntil: "2.9",
-            PendingReason: "GET …/projects/{projectId}/board/columns/{statusId} is mapped by story 2.9 Task 2; the two-layer plant is Task 3's"),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable))),
 
         new(
-            "ISO-BOARD-COLUMN-AGGREGATE", "I-3 (includes Board column counts), FR-28", IsolationVector.Aggregate, HttpMethod.Get, ColumnRoute,
+            "ISO-BOARD-COLUMN-AGGREGATE", "I-3 (includes Board column counts), FR-28", IsolationVector.Aggregate, HttpMethod.Get, BoardRoutes.Column,
             async world =>
             {
                 var (own, _) = await SeedProjectWithTaskAsync(world.A);
                 _ = await SeedProjectWithTaskAsync(world.B);
 
-                return await OwnAsync(world, ColumnOf(world.A.SpaceId, own, (await StatusIdsAsync(world.A))[0]));
+                return await OwnAsync(world, BoardRoutes.ColumnOf(world.A.SpaceId, own, (await StatusIdsAsync(world.A))[0]));
             },
-            Both(new Served(HttpStatusCode.OK, ColumnPageHoldsExactlyTheCallersTasksAsync, "200, the page's total and Tasks are A's only, none of B's ids or titles")),
-            PendingUntil: "2.9",
-            PendingReason: "GET …/projects/{projectId}/board/columns/{statusId} is mapped by story 2.9 Task 2"),
+            Both(new Served(HttpStatusCode.OK, ColumnPageHoldsExactlyTheCallersTasksAsync, "200, the page's total and Tasks are A's only, none of B's ids or titles"))),
 
-        // Story 2.9 - the Board read itself, once it pages (AC9): ISO-BOARD-AGGREGATE's checker asserts every Task is returned
-        // (a column's tasks == its total), which stops being true above 50. This row is its paged successor - 51 Tasks in
-        // one column, so the first page is full and a cursor follows - and walking the pages must yield exactly A's Tasks.
-        // On activation, fold ISO-BOARD-AGGREGATE's `tasks == total` line into this rule rather than keeping both.
+        // Story 2.9 - the Board read itself, once it pages (AC9): ISO-BOARD-AGGREGATE's `tasks == total` rule stopped being
+        // true above 50 and is folded into the paged rule both rows now share. This row is about more than one page - 51
+        // Tasks in one column, so the first page is full and a cursor follows - and walking the pages must yield exactly A's.
         new(
             "ISO-BOARD-AGGREGATE-PAGED", "I-3 (includes Board column counts), FR-28, AC9 (2.9)", IsolationVector.Aggregate, HttpMethod.Get, BoardRoutes.Board,
             async world =>
@@ -354,9 +346,7 @@ internal static class IsolationCases
 
                 return await OwnAsync(world, BoardRoutes.BoardOf(world.A.SpaceId, own));
             },
-            Both(new Served(HttpStatusCode.OK, BoardPagesHoldExactlyTheCallersTasksAsync, "200, each column at most 50 with a cursor iff more follow; walking the pages yields exactly A's Tasks")),
-            PendingUntil: "2.9",
-            PendingReason: "the Board read pages its columns and the column-page route is mapped by story 2.9 Task 2"),
+            Both(new Served(HttpStatusCode.OK, BoardPagesHoldExactlyTheCallersTasksAsync, "200, each column at most 50 with a cursor iff more follow; walking the pages yields exactly A's Tasks"))),
 
         new(
             "ISO-WRITE-TASK-FOREIGN-PROJECT-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Post, TaskRoutes.Create,
@@ -1266,50 +1256,20 @@ internal static class IsolationCases
     }
 
     /// <summary>
-    /// I-3 with Board column counts: A's Board holds exactly A's Tasks of that Project, its column totals sum to
-    /// their number, and none of B's Task ids or titles appear - anchored both ways, since both Spaces hold
-    /// Tasks.
+    /// I-3 with Board column counts: A's Board holds exactly A's Tasks of that Project, each column's total is A's own,
+    /// and none of B's Task ids or titles appear - anchored both ways, since both Spaces hold Tasks. Story 2.9 folded 2.2's
+    /// "every Task is returned (Q6)" (a column's Tasks == its total) into the paged rule
+    /// (<see cref="BoardPagesHoldExactlyTheCallersTasksAsync"/>): a column holds at most a page, with a cursor exactly when
+    /// more follow, and walking its pages yields exactly its total.
     /// </summary>
-    private static async Task BoardHoldsExactlyTheCallersTasksAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
-    {
-        var projectId = Guid.Parse(request.Paths[0].Path.Split('/')[^2]);
-        var own = (await world.Database.TasksInAsync(world.A.SpaceId)).Where(task => task.ProjectId == projectId).ToList();
-        var theirs = await world.Database.TasksInAsync(world.B.SpaceId);
-
-        Assert.NotEmpty(own);
-        Assert.NotEmpty(theirs);
-
-        using var document = JsonDocument.Parse(answer.Body);
-        var columns = document.RootElement.GetProperty("columns").EnumerateArray().ToList();
-        var listed = columns.SelectMany(column => column.GetProperty("tasks").EnumerateArray()).Select(task => task.GetProperty("id").GetGuid()).ToList();
-
-        Assert.Equal(own.Count, columns.Sum(column => column.GetProperty("total").GetInt32()));
-
-        // Each column's own total, not just their sum: every Task is returned (Q6), so a total that also
-        // counted B's Tasks would exceed the column's listed Tasks.
-        Assert.All(columns, column => Assert.Equal(column.GetProperty("tasks").GetArrayLength(), column.GetProperty("total").GetInt32()));
-        Assert.Equal(own.Select(task => task.Id).Order(), listed.Order());
-        Assert.Empty(listed.Intersect(theirs.Select(task => task.Id)));
-        Assert.All(theirs, task => Assert.DoesNotContain(task.Title, answer.Body, StringComparison.Ordinal));
-    }
+    private static Task BoardHoldsExactlyTheCallersTasksAsync(IsolationWorld world, CaseRequest request, WireResponse answer) =>
+        WalkTheBoardsPagesAsync(world, request, answer);
 
     /// <summary>
-    /// The column-page route's template - story 2.9 Task 2 adds it to <c>BoardRoutes</c> (Q1 (a)). A scaffold constant until
-    /// then, so the pending rows name the exact <c>(Method, Route)</c> GATE-002 will look for; replace it with the contract
-    /// constant when that exists.
-    /// </summary>
-    private const string ColumnRoute = "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/board/columns/{statusId:guid}";
-
-    /// <summary>
-    /// AR-22's page size (an assumption, spine <c>:259</c>) - story 2.9 Task 2 states it once as <c>BoardPage.Size</c>.
+    /// AR-22's page size (an assumption, spine <c>:259</c>), stated once in Application as <c>BoardPage.Size</c>; this
+    /// suite sees only the Host and Contracts, so the number is restated here.
     /// </summary>
     private const int PageSize = 50;
-
-    /// <summary>
-    /// One column's page path, as the contract's builder will state it; the cursor is the last loaded Task's position key.
-    /// </summary>
-    private static string ColumnOf(Guid spaceId, Guid projectId, Guid statusId, string? after = null) =>
-        BoardRoutes.BoardOf(spaceId, projectId) + $"/columns/{statusId:D}" + (after is null ? string.Empty : "?after=" + Uri.EscapeDataString(after));
 
     /// <summary>
     /// <paramref name="count"/> more Tasks in <paramref name="owner"/>'s Project, created through the product one request
@@ -1372,11 +1332,25 @@ internal static class IsolationCases
     private static async Task BoardPagesHoldExactlyTheCallersTasksAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
     {
         var projectId = Guid.Parse(request.Paths[0].Path.Split('/')[^2]);
+        var own = (await world.Database.TasksInAsync(world.A.SpaceId)).Count(task => task.ProjectId == projectId);
+
+        Assert.True(own > PageSize, $"The row's Project holds {own} Tasks; the case is about more than one page.");
+
+        await WalkTheBoardsPagesAsync(world, request, answer);
+    }
+
+    /// <summary>
+    /// The paged I-3 rule both Board rows share (story 2.9): each column at most a page with a cursor iff more follow, each
+    /// column's walk exactly its total, all of them exactly A's Tasks of the Project, none of B's ids or titles.
+    /// </summary>
+    private static async Task WalkTheBoardsPagesAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
+    {
+        var projectId = Guid.Parse(request.Paths[0].Path.Split('/')[^2]);
         var own = (await world.Database.TasksInAsync(world.A.SpaceId)).Where(task => task.ProjectId == projectId).ToList();
         var theirs = await world.Database.TasksInAsync(world.B.SpaceId);
         var walked = new List<Guid>();
 
-        Assert.True(own.Count > PageSize, $"The row's Project holds {own.Count} Tasks; the case is about more than one page.");
+        Assert.NotEmpty(own);
         Assert.NotEmpty(theirs);
 
         using var document = JsonDocument.Parse(answer.Body);
@@ -1396,7 +1370,7 @@ internal static class IsolationCases
 
             while (after is not null)
             {
-                var page = await world.A.SendAsync(IsolationSurface.Session, HttpMethod.Get, ColumnOf(world.A.SpaceId, projectId, statusId, after));
+                var page = await world.A.SendAsync(IsolationSurface.Session, HttpMethod.Get, BoardRoutes.ColumnOf(world.A.SpaceId, projectId, statusId, after));
 
                 Assert.True(page.StatusCode == HttpStatusCode.OK, $"Walking A's own column: {page.StatusCode} {page.Body}");
                 Assert.All(theirs, task => Assert.DoesNotContain(task.Title, page.Body, StringComparison.Ordinal));

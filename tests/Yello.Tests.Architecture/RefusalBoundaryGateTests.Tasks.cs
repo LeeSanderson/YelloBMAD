@@ -143,19 +143,20 @@ public sealed partial class RefusalBoundaryGateTests
                 && type.Name.EndsWith("Response", StringComparison.Ordinal))
             .ToList();
 
-        // Vacuity guard: the four Task 3 names.
+        // Vacuity guard: the four Task 3 names, and story 2.9's column page.
         Assert.Equal(
-            ["BoardColumnResponse", "BoardProjectResponse", "BoardResponse", "TaskResponse"],
+            ["BoardColumnPageResponse", "BoardColumnResponse", "BoardProjectResponse", "BoardResponse", "TaskResponse"],
             responses.Select(type => type.Name).Order(StringComparer.Ordinal));
 
         Assert.All(responses, response => Assert.DoesNotContain(
             response.GetProperties(BindingFlags.Public | BindingFlags.Instance),
             property => property.Name.Equals("SpaceId", StringComparison.OrdinalIgnoreCase)));
 
-        var column = responses.Single(type => type.Name == "BoardColumnResponse");
-
-        Assert.Equal(typeof(int), column.GetProperty("Total")?.PropertyType);
-        Assert.NotNull(column.GetProperty("Tasks"));
+        foreach (var column in responses.Where(type => type.Name is "BoardColumnResponse" or "BoardColumnPageResponse"))
+        {
+            Assert.Equal(typeof(int), column.GetProperty("Total")?.PropertyType);
+            Assert.NotNull(column.GetProperty("Tasks"));
+        }
     }
 
     /// <summary>

@@ -307,8 +307,9 @@ internal sealed class FakeYelloApi
     /// written before 2.9 was served. Set (to 50, AR-22's page size), the Board answers each column's first page with
     /// <c>nextAfter</c> - the last served Task's key, <c>null</c> when none follows - and
     /// <c>GET …/board/columns/{statusId}?after={key}</c> answers the next page by the same rule, ordinal on the key (Q1 (a)).
-    /// The bodies are anonymous objects shaped as story Task 2's contract until <c>BoardColumnResponse.NextAfter</c> and
-    /// <c>BoardColumnPageResponse</c> exist; switch to the contract types on activation.
+    /// The bodies stay anonymous objects in the contract's shape (<c>BoardColumnResponse</c> with <c>NextAfter</c>,
+    /// <c>BoardColumnPageResponse</c>): the fake's Tasks are <see cref="FakeTask"/>, whose serialised members are
+    /// <c>TaskResponse</c>'s, so the bytes are the contract's either way (dev-phase note on the ATDD "switch on activation").
     /// </summary>
     public int? PageSize { get; set; }
 

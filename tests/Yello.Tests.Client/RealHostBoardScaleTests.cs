@@ -46,7 +46,7 @@ public sealed class RealHostBoardScaleTests(RealHostFixture world)
     /// are drawn, each once.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the real column-page route and the client's paging arrive with story Tasks 2-5; Nightly tier (Q13)")]
+    [Fact(Explicit = true)]
     public async Task Down_from_the_first_of_5000_real_Tasks_reaches_the_last_with_focus_on_each_in_turn()
     {
         RealHostFixture.SkipUnlessAnEngineIsConfigured();

@@ -128,9 +128,26 @@ public sealed partial class BoardView
     }
 
     /// <summary>
-    /// The open panel's Task, as the replica shows it now; <c>null</c> when no panel is open or its card is gone.
+    /// The open panel's Task, as the replica shows it now; <c>null</c> when no panel is open or its Task is gone. A Task held
+    /// out past a cursor by its own Status change has no card, and the panel stays open on its replica (story 2.9, AC12).
     /// </summary>
-    private TaskResponse? OpenTask => _openTaskId is { } id && Locate(id) is { } found ? found.Column.Tasks[found.Index] : null;
+    private TaskResponse? OpenTask
+    {
+        get
+        {
+            if (_openTaskId is not { } id)
+            {
+                return null;
+            }
+
+            if (Locate(id) is { } found)
+            {
+                return found.Column.Tasks[found.Index];
+            }
+
+            return _heldOut.ContainsKey(id) && _replicas.TryGetValue(id, out var replica) ? replica.Displayed() : null;
+        }
+    }
 
     /// <summary>
     /// Opens the panel on a card, replacing any panel already open - never a second one.
@@ -154,19 +171,36 @@ public sealed partial class BoardView
     }
 
     /// <summary>
-    /// Closes the panel and returns focus to the card that opened it.
+    /// Closes the panel and returns focus to the card that opened it - or, when the Task has no loaded card (held out past a
+    /// cursor), to the column that counts it, never the page body (story 2.9, AC12, open question 7 (a)).
     /// </summary>
     private void Close()
     {
         if (_openTaskId is { } taskId)
         {
-            _focusCard = taskId;
-            _focusCardRequests++;
+            ReturnFocusFromPanel(taskId);
         }
 
         _openTaskId = null;
         _panelRefusal = null;
         _deleteRefusal = null;
+    }
+
+    /// <summary>
+    /// Focus back from a closing panel: to its Task's card, or to the column that counts it when it has none (story 2.9).
+    /// </summary>
+    private void ReturnFocusFromPanel(Guid taskId)
+    {
+        if (Locate(taskId) is null && CountedIn(taskId) is { } statusId)
+        {
+            _focusColumn = statusId;
+            _focusColumnRequests++;
+        }
+        else
+        {
+            _focusCard = taskId;
+            _focusCardRequests++;
+        }
     }
 
     /// <summary>
@@ -207,9 +241,17 @@ public sealed partial class BoardView
     }
 
     /// <summary>
-    /// The Board's columns as the Move picker offers them: each Status and the Tasks it holds now, in order.
+    /// The Board's columns as the Move picker offers them: each Status and the Tasks it has loaded, in order, and - for a
+    /// partly loaded column - the way to load its next page into the Board's own column state (story 2.9, AC11).
     /// </summary>
-    private List<MoveColumn> MoveColumns => [.. (_columns ?? []).Select(column => new MoveColumn(column.StatusId, column.Name, column.Tasks))];
+    private List<MoveColumn> MoveColumns =>
+    [
+        .. (_columns ?? []).Select(column => new MoveColumn(
+            column.StatusId,
+            column.Name,
+            column.Tasks,
+            column.After is null ? null : () => MorePositionsAsync(column.StatusId))),
+    ];
 
     /// <summary>
     /// Opens a card's menu (story 2.6, open question 6 (a)) - replacing any other card's; it takes focus itself.
@@ -339,8 +381,14 @@ public sealed partial class BoardView
             _settlingCard = null;
         }
 
-        if (outcome == EditOutcome.Gone || Locate(taskId) is not { } found)
+        if (outcome == EditOutcome.Gone)
         {
+            return;
+        }
+
+        if (Locate(taskId) is not { } found)
+        {
+            AnnounceHeldOut(taskId, outcome);
             return;
         }
 
@@ -351,6 +399,18 @@ public sealed partial class BoardView
             : string.Format(CultureInfo.CurrentCulture, Localizer["TaskReturned"], column.Name, index + 1));
 
         RefocusAfterAnswer(taskId, outcome, fromMenu);
+    }
+
+    /// <summary>
+    /// A Status change admitted into a partly loaded column past its cursor (story 2.9) is said as any move is: it lands
+    /// last, so its ordinal is the column's total.
+    /// </summary>
+    private void AnnounceHeldOut(Guid taskId, EditOutcome outcome)
+    {
+        if (outcome == EditOutcome.Admitted && _heldOut.TryGetValue(taskId, out var statusId) && Column(statusId) is { } counted)
+        {
+            Say(string.Format(CultureInfo.CurrentCulture, Localizer["TaskMoved"], counted.Name, counted.Total, counted.Total));
+        }
     }
 
     /// <summary>
@@ -791,7 +851,8 @@ public sealed partial class BoardView
             await RefreshLabelsAsync(generation, token);
         }
 
-        if (problemType == ProblemTypes.TaskPositionUnavailable)
+        // A full gap (story 2.9, AC18) is read again too: the picker offers what the server holds now.
+        if (problemType == ProblemTypes.TaskPositionUnavailable || problemType == ProblemTypes.TaskPositionFull)
         {
             _rereadBoard = true;
         }
@@ -907,12 +968,19 @@ public sealed partial class BoardView
     /// <summary>
     /// Puts the card where the replica says it is now: in place for a title or due date, at the end of its new
     /// column for an outstanding Status change, and back in its place by key when a Status change is reverted.
-    /// Both columns' totals move with it.
+    /// Both columns' totals move with it. In a partly loaded column a card whose key sorts after the cursor is held out -
+    /// counted, not drawn (story 2.9, AC10).
     /// </summary>
     private void Place(Guid taskId, TaskReplica replica)
     {
-        if (Locate(taskId) is not { } found || _columns is not { } columns)
+        if (_columns is not { } columns)
         {
+            return;
+        }
+
+        if (Locate(taskId) is not { } found)
+        {
+            PlaceHeldOut(taskId, replica);
             return;
         }
 
@@ -944,7 +1012,7 @@ public sealed partial class BoardView
             // An admitted Status change gave the card a new key in the column it already shows in (moved away
             // and back while the first move was out): it goes where its new key puts it.
             column.Tasks.RemoveAt(index);
-            InsertByKey(column, displayed);
+            InsertOrHold(column, displayed);
             return;
         }
 
@@ -959,11 +1027,55 @@ public sealed partial class BoardView
 
         if (displayed.StatusId == replica.Admitted.StatusId)
         {
-            InsertByKey(destination, displayed);
+            InsertOrHold(destination, displayed);
         }
         else
         {
-            destination.Tasks.Add(displayed);
+            AppendOrHold(destination, displayed);
+        }
+    }
+
+    /// <summary>
+    /// <see cref="Place"/> for a Task this tab counts but does not draw (story 2.9): a move draws it after its neighbour; a
+    /// Status change moves its count and draws it only inside the loaded prefix.
+    /// </summary>
+    private void PlaceHeldOut(Guid taskId, TaskReplica replica)
+    {
+        if (!_heldOut.TryGetValue(taskId, out var countedIn) || Column(countedIn) is not { } from)
+        {
+            return;
+        }
+
+        var displayed = replica.Displayed();
+        var move = replica.OutstandingMove();
+
+        if (Column(move?.StatusId ?? displayed.StatusId) is not { } destination)
+        {
+            return;
+        }
+
+        _heldOut.Remove(taskId);
+
+        if (!ReferenceEquals(from, destination))
+        {
+            from.Total--;
+            destination.Total++;
+        }
+
+        if (move is not null)
+        {
+            var at = move.AfterTaskId is { } after ? destination.Tasks.FindIndex(task => task.Id == after) + 1 : 0;
+
+            destination.Tasks.Insert(at, displayed);
+            replica.Relocated = true;
+        }
+        else if (displayed.StatusId == replica.Admitted.StatusId)
+        {
+            InsertOrHold(destination, displayed);
+        }
+        else
+        {
+            AppendOrHold(destination, displayed);
         }
     }
 
@@ -995,9 +1107,11 @@ public sealed partial class BoardView
 
     /// <summary>
     /// A card a move placed, once nothing is outstanding: by its admitted key in its admitted column - the server's slot
-    /// after an admission, its last admitted slot after a refusal - with both totals moved when the column changes.
+    /// after an admission, its last admitted slot after a refusal - with both totals moved when the column changes. A move
+    /// placed directly after a partly loaded column's last card is admitted between the cursor and the next key, so the
+    /// cursor advances to it and the prefix stays contiguous (story 2.9, AC10); any other key past the cursor is held out.
     /// </summary>
-    private static void Relocate((ColumnState Column, int Index) found, TaskResponse displayed, List<ColumnState> columns)
+    private void Relocate((ColumnState Column, int Index) found, TaskResponse displayed, List<ColumnState> columns)
     {
         if (columns.Find(candidate => candidate.StatusId == displayed.StatusId) is not { } destination)
         {
@@ -1014,28 +1128,43 @@ public sealed partial class BoardView
             destination.Total++;
         }
 
-        InsertByKey(destination, displayed);
+        if (!Fits(destination, displayed.PositionKey) && ReferenceEquals(column, destination) && index == column.Tasks.Count)
+        {
+            destination.After = displayed.PositionKey;
+        }
+
+        InsertOrHold(destination, displayed);
     }
 
-    private static void InsertByKey(ColumnState column, TaskResponse task)
+    /// <summary>
+    /// Draws a card where its key puts it in a column's loaded prefix, or holds it out past the cursor (story 2.9).
+    /// </summary>
+    private void InsertOrHold(ColumnState column, TaskResponse task)
     {
+        if (!Fits(column, task.PositionKey))
+        {
+            HoldOut(task.Id, column);
+            return;
+        }
+
         var at = column.Tasks.FindIndex(candidate => string.CompareOrdinal(candidate.PositionKey, task.PositionKey) > 0);
         column.Tasks.Insert(at < 0 ? column.Tasks.Count : at, task);
     }
 
-    private (ColumnState Column, int Index)? Locate(Guid taskId)
+    /// <summary>
+    /// Draws a card at the end of a fully loaded column - where an outstanding Status change lands - or holds it out of a
+    /// partly loaded one, whose end is not loaded (story 2.9).
+    /// </summary>
+    private void AppendOrHold(ColumnState column, TaskResponse task)
     {
-        foreach (var column in _columns ?? [])
+        if (column.After is null)
         {
-            var index = column.Tasks.FindIndex(task => task.Id == taskId);
-
-            if (index >= 0)
-            {
-                return (column, index);
-            }
+            column.Tasks.Add(task);
         }
-
-        return null;
+        else
+        {
+            HoldOut(task.Id, column);
+        }
     }
 
     /// <summary>

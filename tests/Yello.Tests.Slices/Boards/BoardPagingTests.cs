@@ -36,8 +36,8 @@ namespace Yello.Tests.Slices.Boards;
 /// still held is the pass, being blocked is the failure. The held transaction is rolled back in a <c>finally</c>.
 /// </para>
 /// <para>
-/// <b>Scaffold constants</b> (<see cref="BoardPageWire"/>): swap them for the contract members when Task 2 and Task 10
-/// add them, and change nothing else.
+/// <b>Contract members</b> (<see cref="BoardPageWire"/>): the ATDD run's scaffold constants are swapped for
+/// <c>BoardRoutes.Column</c>, <c>BoardPage.Size</c> and the two <c>ProblemTypes</c> entries.
 /// </para>
 /// </remarks>
 /// <param name="fixture">This class's migrated database on the shared engine.</param>
@@ -54,6 +54,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
 
     private static readonly string[] ColumnProperties = ["name", "nextAfter", "statusId", "tasks", "total"];
     private static readonly string[] PageProperties = ["nextAfter", "statusId", "tasks", "total"];
+    private static readonly (string Page, string Cursor)[] DepthCursors = [("2", "000050"), ("50", "002450"), ("99", "004900"), ("100", "004950")];
 
     /// <summary>
     /// PG-01 (AC9, AC4) - the Board answers each column's first page: at most 50 Tasks, the true total, and a cursor that
@@ -61,7 +62,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// cursor) and 3.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the Board read returns every Task and no cursor until story Task 2 pages it")]
+    [Fact]
     public async Task The_Board_answers_each_columns_first_page_with_its_true_total_and_a_cursor_only_when_more_follow()
     {
         var database = Available();
@@ -95,7 +96,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// widens by exactly <c>nextAfter</c> in the same change.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - BoardColumnResponse has no NextAfter until story Task 2 appends it")]
+    [Fact]
     [Trait("Requirement", "AD-19")]
     public async Task A_Board_column_keeps_every_field_it_had_and_gains_only_the_cursor()
     {
@@ -122,7 +123,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// ordinal order across page boundaries, the last cursor <c>null</c> - and the walk is the database's own order.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - no column-page route and no cursor until story Task 2")]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     public async Task Walking_a_column_of_5000_reads_100_pages_and_every_Task_exactly_once_in_key_order()
     {
@@ -169,7 +170,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// Task of the Project, each in exactly one column, the column of its own Status.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - no column-page route until story Task 2")]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     public async Task Five_thousand_Tasks_over_three_Statuses_each_appear_in_exactly_one_column()
     {
@@ -213,7 +214,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// Task shape, and the Space's id appears nowhere in it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - no column-page route until story Task 2")]
+    [Fact]
     [Trait("Requirement", "AD-19")]
     public async Task A_column_page_answers_exactly_the_contracts_properties_and_no_SpaceId()
     {
@@ -250,7 +251,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// </summary>
     /// <param name="cursor">A malformed cursor.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - no column-page route and no invalid-board-cursor type until story Task 2")]
+    [Theory]
     [InlineData("V 000")]
     [InlineData("V000-")]
     [InlineData("Vé00")]
@@ -279,7 +280,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
         });
 
         Assert.True(refused?.StatusCode == HttpStatusCode.BadRequest, $"{refused?.StatusCode} {refused?.Body}");
-        Assert.Equal(InvalidBoardCursor, Problem(refused!)?.Type);
+        Assert.Equal(ProblemTypes.InvalidBoardCursor, Problem(refused!)?.Type);
         Assert.Empty(refusals);
         Assert.Equal(HttpStatusCode.OK, anchor?.StatusCode);
     }
@@ -290,7 +291,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// record nothing. Anchor: the Project's own Status is served.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - no column-page route until story Task 2")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     public async Task A_Status_outside_the_effective_set_or_an_unknown_Project_answers_the_boundary_404_and_records_nothing()
     {
@@ -334,7 +335,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// requires <c>ReadProjectsAndTasks</c>, which every Role holds.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - no column-page route until story Task 2")]
+    [Fact]
     [Trait("Requirement", "AD-4")]
     public async Task A_Viewer_is_served_the_same_page_as_a_Member_on_both_surfaces()
     {
@@ -377,7 +378,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// </summary>
     /// <param name="parameter">A page-size parameter a client might try.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - no column-page route until story Task 2")]
+    [Theory]
     [InlineData("limit")]
     [InlineData("pageSize")]
     [InlineData("size")]
@@ -409,7 +410,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// next page still starts at the first key after it, and no Task is skipped or repeated.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - no column-page route until story Task 2")]
+    [Fact]
     public async Task A_cursor_naming_a_key_no_Task_holds_any_more_still_seeks_to_the_next_key()
     {
         var database = Available();
@@ -439,25 +440,35 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
 
     /// <summary>
     /// PG-11 (AC1, AC2 deterministic half; P-2; P0) - the page seek reads as much at the end of a column of 5,000 as near
-    /// its start: the logical reads of the product's own statement for page 2 and for page 100 differ by at most a small
-    /// constant (the B-tree's depth is the same; only the cursor moves). An <c>OFFSET</c> or <c>Skip()</c> reads every
-    /// row it skips, so page 100's reads grow by the 4,950 rows above it.
+    /// its start: the logical reads of the product's own statement for page 2, page 50, page 99 and page 100 differ by at
+    /// most a small constant (the B-tree's depth is the same; only the cursor moves, and each row costs one key lookup of
+    /// the clustered index's fixed depth). An <c>OFFSET</c> or <c>Skip()</c> reads every row it skips, so the deep pages'
+    /// reads grow by the rows above them.
     /// </summary>
     /// <remarks>
-    /// <b>Plant owed by the dev phase</b> (story Task 3): an <c>OFFSET</c>/<c>Skip()</c> implementation - page 100's reads
-    /// must grow and this case fail; and an <c>nvarchar</c> cursor parameter - PG-12 must fail. Restored in a
-    /// <c>finally</c>, never by <c>git checkout</c>.
+    /// <para>
+    /// <b>Warmed first, and a constant that counts rows</b> (dev-phase corrections): the statement's first execution read
+    /// 128 pages against 108-111 for every later one at any depth - compilation's own reads, not depth - so page 2 is read
+    /// once to warm the plan, then measured; and each row read costs a clustered key lookup, so the last page (50 rows, no
+    /// look-ahead) reads about three fewer than a full one. The ATDD constant of 2 did not allow for either.
+    /// </para>
+    /// <para>
+    /// <b>Plant</b> (story Task 3, Task 13): an <c>OFFSET</c>/<c>Skip()</c> implementation - the deep pages' reads grow and
+    /// this case fails; an <c>nvarchar</c> cursor parameter - PG-12 fails. Restored in a <c>finally</c>, never by
+    /// <c>git checkout</c>.
+    /// </para>
     /// </remarks>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - no keyset page seek runs until story Task 2")]
+    [Fact]
     [Trait("Requirement", "NFR-5")]
     public async Task The_page_seek_reads_as_much_at_the_end_of_a_column_as_near_its_start()
     {
-        const long smallConstant = 2;
+        // One clustered key lookup (depth 3 at most here) for the look-ahead row the last page lacks, plus a leaf-page
+        // boundary the 51-key range may or may not cross. Measured: 110, 110, 111, 108. An OFFSET adds thousands.
+        const long smallConstant = 5;
 
         var database = Available();
-        long nearTheStart = 0;
-        long atTheEnd = 0;
+        var reads = new List<(string Page, long Reads)>();
 
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
@@ -470,22 +481,27 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
 
             var first = ColumnsOf(await BoardAsync(owner, owner.SpaceId, projectId))[0];
 
+            // Warm the statement's plan: its first execution carries compilation's reads.
             _ = PageOf(await PageAsync(owner, owner.SpaceId, projectId, statusId, first.NextAfter));
-            nearTheStart = await LastLogicalReadsOfThePageSeekAsync(database);
 
-            // The cursor of page 99 is the key of the 4,950th Task: "0" then 04950 (TaskWire.SeedTasksAsync's keys).
-            var last = PageOf(await PageAsync(owner, owner.SpaceId, projectId, statusId, "004950"));
+            // Page 2, page 50, page 99 (each reads a page and the row after it) and page 100, the last: "0" then the
+            // 5-digit ordinal of the cursor's Task (TaskWire.SeedTasksAsync's keys).
+            foreach (var (page, cursor) in DepthCursors)
+            {
+                var served = PageOf(await PageAsync(owner, owner.SpaceId, projectId, statusId, cursor));
 
-            atTheEnd = await LastLogicalReadsOfThePageSeekAsync(database);
-
-            Assert.Equal(PageSize, last.Tasks.Count);
-            Assert.Null(last.NextAfter);
+                reads.Add((page, await LastLogicalReadsOfThePageSeekAsync(database)));
+                Assert.Equal(PageSize, served.Tasks.Count);
+                Assert.Equal(page == "100", served.NextAfter is null);
+            }
         });
 
-        Assert.True(nearTheStart > 0, "The page seek reported no logical reads.");
+        TestContext.Current.TestOutputHelper?.WriteLine(string.Join(", ", reads.Select(entry => $"page {entry.Page}: {entry.Reads} logical reads")));
+
+        Assert.True(reads.TrueForAll(entry => entry.Reads > 0), "The page seek reported no logical reads.");
         Assert.True(
-            Math.Abs(atTheEnd - nearTheStart) <= smallConstant,
-            $"Page 2 read {nearTheStart} pages and page 100 read {atTheEnd}: the seek's work depends on its depth (AC1).");
+            reads.Max(entry => entry.Reads) - reads.Min(entry => entry.Reads) <= smallConstant,
+            $"The seek's work depends on its depth (AC1): {string.Join(", ", reads.Select(entry => $"page {entry.Page} read {entry.Reads}"))}.");
     }
 
     /// <summary>
@@ -494,7 +510,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// <c>varchar(128)</c>, the column's own type under BIN2.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - no keyset page seek runs until story Task 2")]
+    [Fact]
     [Trait("Requirement", "AD-15")]
     public async Task The_page_seek_uses_the_position_index_and_never_converts_the_key()
     {
@@ -525,7 +541,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// exactly the three applied.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - no column-page route until story Task 2")]
+    [Fact]
     public async Task Each_paged_Task_carries_its_Labels_at_the_first_page_and_the_last()
     {
         var database = Available();
@@ -559,7 +575,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// fails.
     /// </remarks>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - READ_COMMITTED_SNAPSHOT is off until story Task 8's migration")]
+    [Fact]
     [Trait("Requirement", "NFR-5")]
     public async Task A_Board_read_and_the_Project_listing_do_not_wait_on_an_uncommitted_Project_deletion()
     {
@@ -612,10 +628,14 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     }
 
     /// <summary>
-    /// PG-15 (AC13; <c>deferred-work.md:313</c>) - with another Account's presence insert held uncommitted in the Space, the
-    /// Owner's Board read answers while it is still held: the presence count does not wait behind it.
+    /// PG-15 (AC13; <c>deferred-work.md:313</c>) - with another Account's presence insert held uncommitted in the Space, a
+    /// Board read by a Member entering the Space - whose resolution counts the Space's live presence - answers while it is
+    /// still held: the presence count does not wait behind it.
     /// </summary>
     /// <remarks>
+    /// <b>Dev-phase correction</b>: the ATDD case read as the Owner, who was already present, so the count never ran and
+    /// the case passed with RCSI off (planted: green). The reader is now a second Member who has never been present in
+    /// the Owner's Space, so <c>SpacePresenceRegister.TryEnterAsync</c> counts; with RCSI off it waits (planted: red).
     /// If the presence count is taken under <c>UPDLOCK, HOLDLOCK</c> (the presence bound, <c>:298</c>), RCSI does not
     /// release it and this case stays red after Task 8: record that, and the decision, rather than loosening the case.
     /// <b>Seed constraints checked</b>: <c>dbo.[SpacePresence] (SpaceId, AccountId, ExpiresAt)</c>, key
@@ -623,7 +643,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// <c>FK SpaceId</c> to <c>Space</c> holds (the Owner's Personal Space); the row is written under that Space's key.
     /// </remarks>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - READ_COMMITTED_SNAPSHOT is off until story Task 8's migration")]
+    [Fact]
     public async Task A_Board_read_does_not_wait_on_another_Accounts_uncommitted_presence()
     {
         var database = Available();
@@ -634,9 +654,11 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
         {
             var owner = await RegisterAsync(client, database);
             var member = await RegisterAsync(client, database);
+            var entering = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Read beside a presence");
 
             await AddMemberAsync(database, owner.SpaceId, member.AccountId, "Member");
+            await AddMemberAsync(database, owner.SpaceId, entering.AccountId, "Member");
             Assert.Equal(HttpStatusCode.OK, (await BoardAsync(owner, owner.SpaceId, projectId)).StatusCode);
 
             await using var holder = await database.OpenForSpaceAsync(owner.SpaceId, cancellationToken);
@@ -655,7 +677,8 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
                     Assert.Equal(1, await insert.ExecuteNonQueryAsync(cancellationToken));
                 }
 
-                var reading = BoardAsync(owner, owner.SpaceId, projectId);
+                // The entering Member has no presence in the Owner's Space, so its resolution counts the live presence.
+                var reading = BoardAsync(entering, owner.SpaceId, projectId);
 
                 await LabelWire.WaitUntilBlockedOrAnsweredAsync(observer, 1, reading, cancellationToken);
                 Assert.True(reading.IsCompleted, "The Board read waited on another Account's uncommitted presence (AC13, :313).");
@@ -677,7 +700,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// Space's writer queues on. Deterministic - A held, B completes - never timed.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC17 - a 5,000-Task deletion may escalate to an OBJECT X lock until story Task 9 / Q15 decides")]
+    [Fact]
     [Trait("Requirement", "NFR-1")]
     public async Task A_Task_write_in_another_Space_completes_while_a_5000_Task_Project_deletion_is_held()
     {
@@ -712,7 +735,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
                 await LabelWire.WaitUntilBlockedOrAnsweredAsync(observer, 1, writing, cancellationToken);
                 Assert.True(
                     writing.IsCompleted,
-                    $"Space B's creation waited on Space A's held deletion (AC17). Object-level locks held: [{string.Join(", ", objectLocks)}].");
+                    $"Space B's creation waited on Space A's held deletion (AC17). Object-level locks held: [{string.Join(", ", objectLocks)}]. Waiting: {await WaitsAsync(observer, cancellationToken)}");
                 created = await writing;
             }
             finally
@@ -731,14 +754,12 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// own creation queues on it - the anchor that the product takes it - while a creation in Space B answers <c>201</c>.
     /// </summary>
     /// <remarks>
-    /// Today A's creation takes no applock and answers at once, so the anchor fails ("answered without waiting"). The
-    /// cross-Space wait the ledger records (B queued on <c>LCK_M_RS_U</c> at the end-of-range key) is the plant the dev
-    /// phase owes (story Task 9): the old <c>UPDLOCK, HOLDLOCK</c> range count restored in the product for B - B then waits
-    /// on A's real creation and the case fails. If Q14 is decided otherwise, rewrite <see cref="ProjectsPerSpaceLock"/>'s
-    /// hold to the product's new shape and record it.
+    /// The product takes this lock since story 2.9 (<c>ApplicationLocks.ProjectsPerSpace</c>), so A's creation queues on the
+    /// test's hold - the anchor. Planted (the old <c>UPDLOCK, HOLDLOCK</c> range count, no applock): A's creation no longer
+    /// queues on the hold and the case fails at the anchor.
     /// </remarks>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC17 - the Projects-per-Space count takes a range lock that reaches other Spaces until story Task 9 / Q14")]
+    [Fact]
     [Trait("Requirement", "NFR-1")]
     public async Task A_Project_creation_in_another_Space_does_not_wait_on_one_counting_its_Projects()
     {
@@ -799,7 +820,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// character. The changed-neighbour refusal keeps <c>task-position-unavailable</c> (2.6's MOV-07, unchanged).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC18 - a full gap is refused as task-position-unavailable until story Task 10")]
+    [Fact]
     [Trait("Requirement", "AD-15")]
     public async Task A_move_into_a_gap_no_key_fits_is_refused_with_its_own_type_and_moves_nothing()
     {
@@ -823,7 +844,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
         });
 
         Assert.True(refused?.StatusCode == HttpStatusCode.Conflict, $"{refused?.StatusCode} {refused?.Body}");
-        Assert.Equal(TaskPositionFull, Problem(refused!)?.Type);
+        Assert.Equal(ProblemTypes.TaskPositionFull, Problem(refused!)?.Type);
         Assert.NotEqual(ProblemTypes.TaskPositionUnavailable, Problem(refused!)?.Type);
         Assert.Equal("V0000", await MoveWire.KeyOfAsync(database, owner!.SpaceId, moverId));
     }
@@ -844,16 +865,23 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
     /// Every <c>OBJECT</c>-level <c>X</c> lock held on <c>Task</c> or <c>TaskLabel</c> in this database, as
     /// "table mode" - an escalated deletion (Q15).
     /// </summary>
+    /// <remarks>
+    /// Dev-phase correction: the ATDD query called <c>OBJECT_NAME</c> on every lock row's
+    /// <c>resource_associated_entity_id</c>, a <c>bigint</c> hobt id for key and page locks, before the <c>OBJECT</c>
+    /// filter applied - an arithmetic overflow. The name is now taken for object locks only.
+    /// </remarks>
     private static async Task<IReadOnlyList<string>> ObjectLocksHeldAsync(Microsoft.Data.SqlClient.SqlConnection observer, CancellationToken cancellationToken)
     {
         await using var command = observer.CreateCommand();
 
         command.CommandText =
             """
-            SELECT OBJECT_NAME(l.resource_associated_entity_id) + N' ' + l.request_mode
-            FROM sys.dm_tran_locks l
-            WHERE l.resource_database_id = DB_ID() AND l.resource_type = N'OBJECT' AND l.request_mode = N'X'
-              AND OBJECT_NAME(l.resource_associated_entity_id) IN (N'Task', N'TaskLabel')
+            SELECT o.name + N' ' + o.request_mode
+            FROM (
+                SELECT CASE WHEN l.resource_type = N'OBJECT' THEN OBJECT_NAME(CAST(l.resource_associated_entity_id AS int)) END AS name, l.request_mode
+                FROM sys.dm_tran_locks l
+                WHERE l.resource_database_id = DB_ID() AND l.resource_type = N'OBJECT' AND l.request_mode = N'X') o
+            WHERE o.name IN (N'Task', N'TaskLabel')
             """;
 
         var locks = new List<string>();
@@ -866,6 +894,34 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
         }
 
         return locks;
+    }
+
+    /// <summary>
+    /// Every request in this database waiting on a lock: what it waits for, and its statement - the failure message's
+    /// evidence of which lock reached across.
+    /// </summary>
+    private static async Task<string> WaitsAsync(Microsoft.Data.SqlClient.SqlConnection observer, CancellationToken cancellationToken)
+    {
+        await using var command = observer.CreateCommand();
+
+        command.CommandText =
+            """
+            SELECT CONCAT(r.wait_type, N' on ', r.wait_resource, N' in: ', LEFT(t.text, 300))
+            FROM sys.dm_exec_requests r
+            CROSS APPLY sys.dm_exec_sql_text(r.sql_handle) t
+            WHERE r.database_id = DB_ID() AND r.blocking_session_id <> 0 AND r.wait_type LIKE N'LCK_M_%'
+            """;
+
+        var waits = new List<string>();
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            waits.Add(reader.GetString(0));
+        }
+
+        return string.Join(" | ", waits);
     }
 
     private static List<string> Names(JsonElement element) =>

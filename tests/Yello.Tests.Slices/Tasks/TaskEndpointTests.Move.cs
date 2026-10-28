@@ -567,7 +567,8 @@ public sealed partial class TaskEndpointTests
     /// <summary>
     /// MOV-11 (AC10, Q10) - a gap with no room left: two neighbours of 128 characters (<c>PositionKey.MaxLength</c>) that
     /// differ only in their last character, so any key between them would be 129 or longer. A move into it answers the
-    /// documented refusal (<c>409 task-position-unavailable</c>) - never a <c>500</c>, never a sibling renumber - and nothing
+    /// documented refusal - <c>409 task-position-full</c> since story 2.9 (AC18, open question 11 (a)), a type of its own
+    /// rather than 2.6's <c>task-position-unavailable</c> - never a <c>500</c>, never a sibling renumber - and nothing
     /// changes.
     /// </summary>
     /// <returns>A task.</returns>
@@ -602,7 +603,7 @@ public sealed partial class TaskEndpointTests
 
         Assert.NotNull(owner);
         Assert.True(answer?.StatusCode == HttpStatusCode.Conflict, $"{answer?.StatusCode} {answer?.Body}");
-        Assert.Equal(TaskPositionUnavailable, Problem(answer!)?.Type);
+        Assert.Equal(ProblemTypes.TaskPositionFull, Problem(answer!)?.Type);
         Assert.Equal(before, await PlacementsAsync(database, owner.SpaceId, projectId));
     }
 

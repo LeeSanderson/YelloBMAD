@@ -101,12 +101,13 @@ public sealed class DatabaseIdentityTests(MigratedDatabaseFixture fixture) : ICl
     /// until a migration turns it on.
     /// </summary>
     /// <remarks>
-    /// Written red by the story 2.9 ATDD run. <c>MigrationBundleEquivalenceTests</c> gains the same column in its catalogue
-    /// comparison in the same change (story Task 8), so the bundle is held to it as well. The behavioural proof is
+    /// Written red by the story 2.9 ATDD run; green with <c>20261028120526_ReadCommittedSnapshot</c>.
+    /// <c>MigrationBundleEquivalenceTests</c> holds the same column in its catalogue comparison (<c>rcsi|1</c>), so the
+    /// bundle is held to it as well. The behavioural proof is
     /// <c>BoardPagingTests</c>' PG-14 and PG-15.
     /// </remarks>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - no migration turns READ_COMMITTED_SNAPSHOT on until story Task 8")]
+    [Fact]
     [Trait("Requirement", "NFR-5")]
     public async Task Every_migrated_database_reads_committed_data_from_a_snapshot()
     {
@@ -118,6 +119,26 @@ public sealed class DatabaseIdentityTests(MigratedDatabaseFixture fixture) : ICl
         await admin.OpenAsync(cancellationToken);
 
         Assert.Equal(1, await ScalarAsync(admin, "SELECT CAST(is_read_committed_snapshot_on AS int) FROM sys.databases WHERE name = DB_NAME()", cancellationToken));
+    }
+
+    /// <summary>
+    /// 2.9-SCH-902 (story 2.9 AC17, open question 15 (a)) - <c>Task</c> and <c>TaskLabel</c> never escalate a statement's
+    /// locks to a table lock, so a 5,000-Task Project deletion holds rows, not the table another Space writes to. The
+    /// behavioural proof is <c>BoardPagingTests</c>' PG-16 (it failed on the escalated <c>OBJECT X</c> before the migration).
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "NFR-1")]
+    public async Task The_Task_tables_never_escalate_to_a_table_lock()
+    {
+        Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? string.Empty);
+
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var admin = new SqlConnection(fixture.ConnectionString!);
+        await admin.OpenAsync(cancellationToken);
+
+        Assert.Equal(2, await ScalarAsync(admin, "SELECT COUNT(*) FROM sys.tables WHERE name IN (N'Task', N'TaskLabel') AND lock_escalation_desc = N'DISABLE'", cancellationToken));
     }
 
     private static async Task CreateDataOnlyIdentityAsync(string administrator, string login, string password, CancellationToken cancellationToken)

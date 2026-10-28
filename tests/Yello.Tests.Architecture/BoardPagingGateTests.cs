@@ -84,7 +84,7 @@ public sealed partial class BoardPagingGateTests
     /// <summary>
     /// AC9, AD-19 - <c>BoardColumnResponse</c> keeps every member it had and gains only the cursor, a nullable string.
     /// </summary>
-    [Fact(Skip = "red: AC9 - BoardColumnResponse has no NextAfter until story Task 2 appends it")]
+    [Fact]
     [Trait("Requirement", "AD-19")]
     public void The_Board_column_contract_keeps_every_member_and_appends_only_the_cursor()
     {
@@ -100,7 +100,7 @@ public sealed partial class BoardPagingGateTests
     /// AC9, Q1 (a) - the column page is its own contract type, <c>BoardColumnPageResponse</c>, with exactly
     /// <c>{StatusId, Total, Tasks, NextAfter}</c>.
     /// </summary>
-    [Fact(Skip = "red: AC9 - BoardColumnPageResponse does not exist until story Task 2")]
+    [Fact]
     public void The_column_page_contract_is_its_own_type_with_its_Status_total_Tasks_and_cursor()
     {
         var page = typeof(BoardResponse).Assembly.GetType("Yello.Contracts.Boards.BoardColumnPageResponse");
@@ -112,7 +112,7 @@ public sealed partial class BoardPagingGateTests
     /// <summary>
     /// AC9, Q1 (a) - the column-page route is stated once, beside the Board route, in <c>BoardRoutes</c>.
     /// </summary>
-    [Fact(Skip = "red: AC9 - BoardRoutes has no column-page route until story Task 2")]
+    [Fact]
     public void The_column_page_route_is_stated_once_beside_the_Board_route()
     {
         var routes = typeof(BoardRoutes).GetProperties(BindingFlags.Public | BindingFlags.Static)
@@ -127,7 +127,7 @@ public sealed partial class BoardPagingGateTests
     /// AR-22 (an assumption, spine <c>:259</c>: "the seek shape is the invariant, the page size is not") - the page size is
     /// one named constant, <c>BoardPage.Size</c>, of 50, in Application or Contracts.
     /// </summary>
-    [Fact(Skip = "red: AC9 - no BoardPage.Size until story Task 2")]
+    [Fact]
     [Trait("Assumption", "AR-22")]
     public void The_page_size_is_one_named_constant_of_fifty()
     {
@@ -147,7 +147,7 @@ public sealed partial class BoardPagingGateTests
     /// AC9, AC18 - the malformed cursor and the full gap each have a problem type of their own, beside the changed
     /// neighbour's <c>task-position-unavailable</c>.
     /// </summary>
-    [Fact(Skip = "red: AC9, AC18 - the two problem types arrive with story Tasks 2 and 10")]
+    [Fact]
     public void The_malformed_cursor_and_the_full_gap_each_have_their_own_problem_type()
     {
         var types = typeof(ProblemTypes).GetProperties(BindingFlags.Public | BindingFlags.Static)

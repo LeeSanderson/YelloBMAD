@@ -98,10 +98,16 @@ public sealed record TaskMove(TaskMoveOutcome Outcome, TaskItem? Task)
     public static TaskMove NotFound { get; } = new(TaskMoveOutcome.NotFound, null);
 
     /// <summary>
-    /// The position asked for is not one: the neighbour is not a Task of the destination column of the same Project, or
-    /// no key fits in the gap. Nothing was written.
+    /// The position asked for is not one: the neighbour is not a Task of the destination column of the same Project.
+    /// Nothing was written.
     /// </summary>
     public static TaskMove PositionUnavailable { get; } = new(TaskMoveOutcome.PositionUnavailable, null);
+
+    /// <summary>
+    /// The neighbour is there, but no key of at most <see cref="PositionKey.MaxLength"/> characters fits between it and its
+    /// successor (story 2.9, AC18). Nothing was written.
+    /// </summary>
+    public static TaskMove PositionFull { get; } = new(TaskMoveOutcome.PositionFull, null);
 
     /// <summary>
     /// The Task is where it was asked to go.
@@ -127,10 +133,16 @@ public enum TaskMoveOutcome
     NotFound,
 
     /// <summary>
-    /// The neighbour is absent, another Space's, another Project's or column's, deleted, or the moved Task itself; or no
-    /// position key fits between it and its successor (story 2.6, open questions 3 and 10).
+    /// The neighbour is absent, another Space's, another Project's or column's, deleted, or the moved Task itself (story
+    /// 2.6, open question 3).
     /// </summary>
     PositionUnavailable,
+
+    /// <summary>
+    /// The neighbour is a Task of the destination column, but no position key fits between it and its successor (story 2.6,
+    /// open question 10; told apart by story 2.9, AC18, open question 11 (a)). Choosing it again would be refused again.
+    /// </summary>
+    PositionFull,
 }
 
 /// <summary>

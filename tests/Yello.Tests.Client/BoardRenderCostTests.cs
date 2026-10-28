@@ -45,7 +45,7 @@ public sealed class BoardRenderCostTests(ClientSurfaceFixture surface)
     /// <c>focusin</c> has a p95 within 90 ms over 21 steps; pick-up, a carried step and the heap are recorded.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - no paging, so no 5,000 loaded cards, until story Tasks 4-5; the budget is Task 7's; Nightly tier (Q13)")]
+    [Fact(Explicit = true)]
     public async Task A_keyboard_step_at_the_foot_of_5000_loaded_cards_lands_within_the_near_instant_budget()
     {
         var api = TwoSpaces(Northwind, Harbour);

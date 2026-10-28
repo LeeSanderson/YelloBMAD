@@ -104,18 +104,38 @@ internal static class DeleteWire
         (await LabelWire.ApplicationsAsync(database, spaceId)).Count(row => taskIds.Contains(row.TaskId));
 
     /// <summary>
-    /// Takes the Project's Task range in the caller's open transaction - the statement a creation's bound count, a
-    /// Status edit's key placement and (story Task 3) a deletion all take, in the same shape, so they meet on it.
+    /// Takes the Project's Tasks lock in the caller's open transaction - the lock a creation's bound count, a Status edit's
+    /// key placement, a move and a deletion all take, so they meet on it. Story 2.9 made it the Project's own application
+    /// lock (<c>Yello/ProjectTasks/{projectId}</c>, <c>ApplicationLocks</c>); it was the Project's Task range under
+    /// <c>UPDLOCK, HOLDLOCK</c>, whose last key could lie in another Space.
     /// </summary>
     public static async Task HoldProjectRangeAsync(SqlConnection connection, DbTransaction transaction, Guid projectId, CancellationToken cancellationToken)
     {
         await using DbCommand command = connection.CreateCommand();
 
         command.Transaction = transaction;
-        command.CommandText = "SELECT COUNT(*) FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = @project";
-        command.Parameters.Add(new SqlParameter("@project", projectId));
+        command.CommandText = "EXEC sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction'";
+        command.Parameters.Add(new SqlParameter("@resource", $"Yello/ProjectTasks/{projectId:D}"));
 
-        await command.ExecuteScalarAsync(cancellationToken);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Takes the connection's Space's Projects-per-Space lock in the caller's open transaction - the lock a Project creation's
+    /// bound count and a Project deletion take first (story 2.9, open question 14 (a)).
+    /// </summary>
+    public static async Task HoldProjectsPerSpaceAsync(SqlConnection connection, DbTransaction transaction, CancellationToken cancellationToken)
+    {
+        await using DbCommand command = connection.CreateCommand();
+
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            DECLARE @resource nvarchar(255) = CONCAT(N'Yello/ProjectsPerSpace/', LOWER(CONVERT(nvarchar(36), CAST(SESSION_CONTEXT(N'SpaceId') AS uniqueidentifier))));
+            EXEC sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction';
+            """;
+
+        await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>
@@ -168,12 +188,13 @@ internal static class DeleteWire
     }
 
     /// <summary>
-    /// The whole Project deletion story Task 3 recommends, played by the test in its open transaction: the Project row,
-    /// the Project's Task range, then the row deleted - its Tasks and their applications go by the database's cascades.
-    /// Left uncommitted for the caller.
+    /// The whole Project deletion story Task 3 recommends, played by the test in its open transaction: the Space's
+    /// Projects-per-Space lock (story 2.9), the Project row, the Project's Tasks lock, then the row deleted - its Tasks and
+    /// their applications go by the database's cascades. Left uncommitted for the caller.
     /// </summary>
     public static async Task DeleteProjectRowAsync(SqlConnection connection, DbTransaction transaction, Guid projectId, CancellationToken cancellationToken)
     {
+        await HoldProjectsPerSpaceAsync(connection, transaction, cancellationToken);
         await HoldProjectRowAsync(connection, transaction, projectId, cancellationToken);
         await HoldProjectRangeAsync(connection, transaction, projectId, cancellationToken);
 

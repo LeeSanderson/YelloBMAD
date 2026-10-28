@@ -7,7 +7,7 @@ namespace Yello.Application.Boards.ViewBoard;
 
 /// <summary>
 /// Reads one Project's Board: one column per Status of its effective set, in effective order, each with
-/// the true total for that Status and its Tasks. FR-28; story 2.2, AC1, AC4, AC5.
+/// the true total for that Status and its first page of Tasks. FR-28; story 2.2, AC1, AC4, AC5; story 2.9, AC1, AC9.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -15,13 +15,24 @@ namespace Yello.Application.Boards.ViewBoard;
 /// and checked the read capability, which every Role holds, so a Viewer is served exactly a Member's Board.
 /// </para>
 /// <para>
-/// <b>A column's total is the database's count, never the number of Tasks placed in it</b> (AD-29). Today
-/// every Task is returned (open question 6 (a)); story 2.9 pages them, and the totals do not move.
+/// <b>A column's total is the database's count, never the number of Tasks placed in it</b> (AD-29): one grouped
+/// <c>COUNT</c> for every column.
 /// </para>
 /// <para>
-/// <b>Each Task lands in exactly one column</b> (AC4): the column of its own Status. A Task whose Status is
-/// outside the effective set cannot exist (AD-17: a composite foreign key and a create that takes the first
-/// Status), so meeting one is a broken invariant and fails loudly rather than dropping the Task.
+/// <b>First paint is one bounded seek per column</b> (story 2.9, AC1, test design P-2): a loop over the effective
+/// Statuses - three to five statements, each a <c>TOP (51)</c> keyset seek of one column - never a
+/// <c>ROW_NUMBER() OVER (PARTITION BY StatusId)</c>, which would read the whole Project. Each column carries
+/// <see cref="BoardPage.Size"/> Tasks at most and its cursor; the rest is <c>ViewBoardColumnHandler</c>'s.
+/// </para>
+/// <para>
+/// <b>Statements, not one snapshot</b> (story 2.9, AC13, open question 10 (a)): under <c>READ_COMMITTED_SNAPSHOT</c> the
+/// totals, each column's page and the Labels each read their own committed snapshot, never waiting on a writer. They may
+/// disagree by the writes that commit between them - bounded to concurrent change, and corrected by the next read.
+/// </para>
+/// <para>
+/// <b>Each Task lands in exactly one column</b> (AC4): each column is read by its own Status, so a Task appears only in
+/// the column of its Status. A Task whose Status is outside the effective set cannot exist (AD-17: a composite foreign
+/// key and a create that takes the first Status), and no column would read it.
 /// </para>
 /// </remarks>
 /// <param name="reader">Reads the Project, its counts and its Tasks.</param>
@@ -43,23 +54,19 @@ public sealed class ViewBoardHandler(IBoardReader reader, IStatusDefinitionReade
 
         var effective = EffectiveStatusSet.Of(await statuses.ListAsync(cancellationToken).ConfigureAwait(false));
         var totals = await reader.CountTasksByStatusAsync(projectId, cancellationToken).ConfigureAwait(false);
-        var tasks = await reader.ListTasksAsync(projectId, cancellationToken).ConfigureAwait(false);
-        var labels = await reader.LabelIdsOfAsync([.. tasks.Select(task => task.Id)], cancellationToken).ConfigureAwait(false);
+        var pages = new List<(StatusDefinition Status, IReadOnlyList<TaskItem> Tasks, string? NextAfter)>();
 
-        var placed = effective.ToDictionary(status => status.Id, _ => new List<TaskItem>());
-
-        foreach (var task in tasks)
+        foreach (var status in effective)
         {
-            if (!placed.TryGetValue(task.StatusId, out var column))
-            {
-                throw new InvalidOperationException("A Task holds a Status outside its Project's effective set (AD-17).");
-            }
+            var (tasks, nextAfter) = await BoardPage.ReadAsync(reader, projectId, status.Id, after: null, cancellationToken).ConfigureAwait(false);
 
-            column.Add(task);
+            pages.Add((status, tasks, nextAfter));
         }
 
-        var columns = effective
-            .Select(status => new BoardColumnView(status, totals.GetValueOrDefault(status.Id), placed[status.Id]))
+        var labels = await reader.LabelIdsOfAsync([.. pages.SelectMany(page => page.Tasks).Select(task => task.Id)], cancellationToken).ConfigureAwait(false);
+
+        var columns = pages
+            .Select(page => new BoardColumnView(page.Status, totals.GetValueOrDefault(page.Status.Id), page.Tasks, page.NextAfter))
             .ToList();
 
         return new BoardView(project, columns, labels);
@@ -85,5 +92,6 @@ public sealed record BoardView(
 /// </summary>
 /// <param name="Status">The column's Status.</param>
 /// <param name="Total">The true number of the Project's Tasks in that Status, counted by the database.</param>
-/// <param name="Tasks">The Tasks placed in it, by position key and then id.</param>
-public sealed record BoardColumnView(StatusDefinition Status, int Total, IReadOnlyList<TaskItem> Tasks);
+/// <param name="Tasks">Its first page of Tasks, by position key.</param>
+/// <param name="NextAfter">The cursor: the last Task's key when another follows, otherwise <c>null</c> (story 2.9).</param>
+public sealed record BoardColumnView(StatusDefinition Status, int Total, IReadOnlyList<TaskItem> Tasks, string? NextAfter);

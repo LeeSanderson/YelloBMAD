@@ -39,7 +39,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
 {
     private static readonly string[] BoardProperties = ["columns", "project"];
     private static readonly string[] ProjectProperties = ["id", "name"];
-    private static readonly string[] ColumnProperties = ["name", "statusId", "tasks", "total"];
+    private static readonly string[] ColumnProperties = ["name", "nextAfter", "statusId", "tasks", "total"];
     // Story 2.3 appended dueDate and story 2.4 labelIds (AD-19: adding a field is legal in v1); the set is still
     // pinned exactly.
     private static readonly string[] TaskProperties = ["createdAt", "dueDate", "id", "labelIds", "positionKey", "statusId", "title"];

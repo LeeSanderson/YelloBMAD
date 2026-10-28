@@ -1,6 +1,4 @@
-using System.Data.Common;
 using System.Net;
-using Microsoft.Data.SqlClient;
 using Xunit;
 using Yello.Contracts;
 using Yello.Domain;
@@ -22,11 +20,10 @@ namespace Yello.Tests.Slices.Tasks;
 /// </para>
 /// <para>
 /// <b>The race case does not depend on the race happening to race</b> (Task 7, story 2.1 review P11). The
-/// test takes the bound's own range lock first, sends both creations, waits until both are blocked on a
-/// lock, then lets go. With the count's <c>UPDLOCK, HOLDLOCK</c> both queue on the count; without it both
-/// counts read 4,999 through the test's <c>RangeS-U</c> and both inserts wait on <c>RangeI-N</c> until it
-/// commits, so both succeed and the case fails every time. It waits on "blocked on any lock", never on one
-/// wait type, so the plant is caught at the insert.
+/// test takes the bound's own lock first - the Project's Tasks lock, an application lock since story 2.9 - sends both
+/// creations, waits until both are blocked on a lock, then lets go. Both queue on the lock; without it both counts would
+/// read 4,999 and both creations succeed, so the case fails every time. It waits on "blocked on any lock", never on one
+/// wait type.
 /// </para>
 /// </remarks>
 public sealed partial class TaskEndpointTests
@@ -184,13 +181,8 @@ public sealed partial class TaskEndpointTests
             await using var observer = await database.OpenWithoutSpaceContextAsync(cancellationToken);
             await using var held = await holder.BeginTransactionAsync(cancellationToken);
 
-            await using (DbCommand count = holder.CreateCommand())
-            {
-                count.Transaction = held;
-                count.CommandText = "SELECT COUNT(*) FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = @project";
-                count.Parameters.Add(new SqlParameter("@project", projectId));
-                await count.ExecuteNonQueryAsync(cancellationToken);
-            }
+            // The Project's Tasks lock both creations' counts take (story 2.9: an application lock of the Project's own).
+            await DeleteWire.HoldProjectRangeAsync(holder, held, projectId, cancellationToken);
 
             var racing = Task.WhenAll(
                 CreateTaskAsync(owner, owner.SpaceId, projectId, "Racer one"),

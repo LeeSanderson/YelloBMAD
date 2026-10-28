@@ -11,6 +11,7 @@ using Yello.Application.Projects.DeleteProject;
 using Yello.Application.Projects.ListProjects;
 using Yello.Application.Projects.RenameProject;
 using Yello.Application.Boards.ViewBoard;
+using Yello.Application.Boards.ViewBoardColumn;
 using Yello.Application.Labels.DefineLabel;
 using Yello.Application.Labels.DeleteLabel;
 using Yello.Application.Labels.ListLabels;
@@ -110,6 +111,7 @@ builder.Services.AddScoped<EditTaskAttributesHandler>();
 builder.Services.AddScoped<DeleteTaskHandler>();
 builder.Services.AddScoped<MoveTaskHandler>();
 builder.Services.AddScoped<ViewBoardHandler>();
+builder.Services.AddScoped<ViewBoardColumnHandler>();
 builder.Services.AddScoped<ListLabelsHandler>();
 builder.Services.AddScoped<DefineLabelHandler>();
 builder.Services.AddScoped<DeleteLabelHandler>();
@@ -399,6 +401,7 @@ api.MapDeleteProject();
 // Board under the read capability every Role holds. Space-scoped on both surfaces.
 api.MapCreateTask();
 api.MapBoard();
+api.MapBoardColumn();
 
 // One Task (story 2.3). GET and PATCH /api/v1/spaces/{spaceId}/tasks/{taskId} read it under the read
 // capability and edit its title, Status, due date and Labels (story 2.4) under ManageTasks. No bound on the

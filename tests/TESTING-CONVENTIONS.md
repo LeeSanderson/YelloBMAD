@@ -44,7 +44,7 @@ architecture edit; it should be taken deliberately, by a story that needs it, no
 ## Trait vocabulary
 
 CI tiering selects on these filters, so they exist from story 1.1 rather than being
-retrofitted. Four names, and only these four:
+retrofitted. Five names, and only these five (`Tier` added by story 2.9, open question 13 (a)):
 
 | Trait | Values | Meaning |
 |---|---|---|
@@ -52,6 +52,7 @@ retrofitted. Four names, and only these four:
 | `Priority` | `P0`, `P1`, `P2` | selection tier. `P0` is release-gating |
 | `Requirement` | e.g. `AR-1`, `AR-2`, `AR-4`, `NFR-1`, `FR-34` | the requirement the case traces to |
 | `Assumption` | e.g. `PRD-12-2` — source document, then location within it | the assumption the case hardens into an assertion |
+| `Tier` | `Nightly`, `Weekly` | the scheduled stage that runs the case; absent for the PR stage. A tiered case is also `Explicit = true` |
 
 `Assumption` was unused until story 1.3, which carries the first one: `PRD-12-1`, on
 `RegisterAccountHandlerTests.The_Space_is_named_through_the_naming_port_from_the_display_name`.
@@ -708,10 +709,35 @@ and an absent bundle are local conditions, so the classes skip with a reason.
 | `YELLO_MIGRATION_BUNDLE` | The path of the migration bundle that `MigrationBundleEquivalenceTests` runs. When it is unset, the class skips and says why. To run it locally, build `dotnet ef migrations bundle --project Yello.Infrastructure --startup-project Yello.Infrastructure --self-contained -r win-x64 -o artifacts/efbundle-win-x64/efbundle.exe`. |
 | `YELLO_REQUIRE_MIGRATION_BUNDLE=1` | A missing bundle FAILS the equivalence test instead of skipping it. |
 
-**Nightly and Weekly do not exist yet.** They arrive with their first suites in story 2.9
-(`deferred-work.md`). A stage with no suites would pass without testing anything. Do **not** build
-smoke, P0 or P1 tiers. The test design's checklist settled that contradiction in favour of the
-three-stage shape.
+## CI: the Nightly and Weekly stages - built by story 2.9
+
+The three-stage shape is complete: the PR stage (`ci.yml`), `nightly.yml` and `weekly.yml`. Do **not** build smoke, P0
+or P1 tiers; the test design's checklist settled that in favour of the three stages.
+
+- **Selection.** A case belongs to a stage by `[Trait("Tier", "Nightly")]` or `[Trait("Tier", "Weekly")]`, and every
+  tiered case is declared `[Fact(Explicit = true)]`. Explicit is what keeps it out of a plain `dotnet test Yello.slnx`
+  - the PR run and the local full run CLAUDE.md prescribes - so the default run stays inside the memory budget and its
+  time. `ci.yml` also excludes both tiers by trait (`--filter-not-trait "Tier=Nightly" --filter-not-trait "Tier=Weekly"`).
+  `DeploymentShapeTests` holds all of it: `Every_Tier_trait_is_Nightly_or_Weekly`, `Every_tiered_test_is_Explicit`,
+  `The_PR_run_excludes_the_Nightly_and_Weekly_tiers` and the two workflows' shape.
+- **Running a tier.** Per project, with the tier filter and `--explicit on`, one module at a time:
+
+  ```
+  dotnet test --project tests/Yello.Tests.Slices/Yello.Tests.Slices.csproj --no-build --max-parallel-test-modules 1 -- --filter-trait "Tier=Nightly" --explicit on
+  ```
+
+  Only the projects that hold the tier's cases are run: a filter that selects nothing exits 8 (the zero-tests trap
+  above). Nightly: Slices (`BoardScaleTimingTests`) and Client (`BoardRenderCostTests`, `RealHostBoardScaleTests` - the
+  Client cases need the Debug client build). Weekly: Slices (`EnvelopeLoadTests`). The workflows run them per project
+  for the same reason, which also keeps `dotnet test Yello.slnx` a single job for the promotion gate.
+- **Local engines only** (R13): the scheduled workflows log in nowhere, read no secret and name no deployment target.
+  Their figures are a local engine's, warm - never production evidence (R18) - and every report says so.
+- **The scale collections.** Timed scale cases share `BoardScaleCollection` (`DisableParallelization`), each class on a
+  database of its own on the suite's one engine; the browser's timed case uses `TouchTimingCollection`. A p95 is the
+  nearest rank of at least 100 samples (`Yello.Tests.Shared.Percentile`, with its own `PercentileTests`), measured by the
+  Host's own request-finished figure (`RunningHost.ServerDurationOfAsync`) after a warm-up.
+- **No timer touches the database** (AD-10), not even here: the envelope load runs a fixed number of iterations, never a
+  duration.
 
 ## The deployment's own tests - added by story 1.10
 

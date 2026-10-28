@@ -62,7 +62,7 @@ public sealed class EnvelopeLoadTests(MigratedDatabaseFixture fixture) : IClassF
     /// lengths per column (<c>:557</c>) and the <c>Task</c> clustered index's fragmentation (<c>:219</c>).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC16 - no column-page route until story Task 2; Weekly tier (Q13), excluded from the PR stage once Task 11 adds the filter")]
+    [Fact(Explicit = true)]
     public async Task At_the_envelope_every_operation_class_meets_its_p95_budget()
     {
         Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? string.Empty);
@@ -169,7 +169,7 @@ public sealed class EnvelopeLoadTests(MigratedDatabaseFixture fixture) : IClassF
     /// the output: Azure SQL's resume from auto-pause (up to about a minute) and Container Apps' scale from zero.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - the cold-start record and AR-40b's decision are story Task 11; Weekly tier (Q13)")]
+    [Fact(Explicit = true)]
     [Trait("Priority", "P2")]
     [Trait("Requirement", "AR-40")]
     public async Task The_cold_path_to_the_first_Space_scoped_response_is_characterised_and_recorded()

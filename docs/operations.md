@@ -99,7 +99,17 @@ Procedure (P5), before the first production deploy:
 
 ## 7. AR-40b: cold start against NFR-5 (open question 6)
 
-**Provisional statement: NFR-5 is measured warm, and the cold path is exempt until story 2.9 measures it.** The Host runs with `minReplicas: 0`, so the cost stays near zero (section 2). A request after an idle spell pays two costs: the container's cold start, and the database's resume if it auto-paused after 15 idle minutes (up to about a minute). Story 2.9 owns the measurement and the decision. One parameter, `minReplicas`, moves to 1 at about £12–15 per month. This statement is recorded here so the exemption is never silent (spine `:425`).
+**Decision (story 2.9, AC8, open question 9 (a), 2026-10-28): NFR-5 is measured warm, and the cold path is exempt.** The Host keeps `minReplicas: 0`. NFR-5's budgets - reads 300 ms, writes 500 ms, p95, server-side - apply to a warm Host on an awake database. The first request after an idle spell is outside them, and this is stated, not silent (spine `:425`, closed by this decision).
+
+Why not pin `minReplicas: 1`. A request after an idle spell pays two costs: the container's cold start, and the database's resume when it has auto-paused after 15 idle minutes (up to about a minute). One replica removes only the first. The second dominates, and AD-10 forbids the keep-alive that would prevent it. So pinning would cost about £12–15 per month (section 2) without making the cold path meet 300 ms.
+
+What is measured, and where:
+
+- **Warm, locally:** the Weekly stage's envelope load (`EnvelopeLoadTests`, P-1) asserts each operation class's p95 against NFR-5 on a local engine with `MAXDOP = 1` and `READ_COMMITTED_SNAPSHOT` on. The Nightly stage holds the Board at 5,000 Tasks (P-2). These are a local engine's figures, never production evidence (R18).
+- **Cold, locally:** the Weekly stage's P-11 case records the time from a fresh Host process to its first Space-scoped response (key-ring load, EF model build, first query), and asserts nothing about time.
+- **Cold, on the deploy target:** one observation at P6 (section 10) - the first request after scale to zero, with the database paused and with it awake. That is Lee's, after the first deploy.
+
+Revisit when the P6 observation is taken, and after any change to `MAXDOP` (AR-40c, section 6, step 5): R3 and R5 make `MAXDOP = 1` unrelaxable to buy latency (`test-design-architecture.md:630`).
 
 ## 8. NFR-6: encryption in transit
 

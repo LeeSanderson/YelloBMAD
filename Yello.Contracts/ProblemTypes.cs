@@ -274,6 +274,26 @@ public static class ProblemTypes
     public static string TaskPositionUnavailable => "urn:yello:problem:task-position-unavailable";
 
     /// <summary>
+    /// A move into a gap where no position key of at most 128 characters fits between its neighbours. Answered
+    /// <c>409</c>; nothing is written. Story 2.9, AC18, open question 11 (a).
+    /// </summary>
+    /// <remarks>
+    /// <b>Not <see cref="TaskPositionUnavailable"/></b>: the neighbour is there, and choosing the same position again would
+    /// be refused again, so the person is asked to choose another position. Never a renumber of the column (AD-15).
+    /// </remarks>
+    public static string TaskPositionFull => "urn:yello:problem:task-position-full";
+
+    /// <summary>
+    /// A Board column page whose <c>after</c> cursor is not a position key - empty, longer than 128 characters, or holding
+    /// a character outside the key alphabet. Answered <c>400</c>. Story 2.9, AC9.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never a statement about a stored key</b>: it depends only on the cursor as sent. A well-formed key no Task holds
+    /// is served - the page after it.
+    /// </remarks>
+    public static string InvalidBoardCursor => "urn:yello:problem:invalid-board-cursor";
+
+    /// <summary>
     /// An <c>Idempotency-Key</c> header that is empty or longer than
     /// <see cref="Idempotency.MaxKeyLength"/> characters. Answered <c>400</c>; nothing is applied.
     /// </summary>

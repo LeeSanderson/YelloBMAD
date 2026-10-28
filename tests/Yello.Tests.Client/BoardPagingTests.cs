@@ -62,7 +62,7 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <remarks>Plant owed by the dev phase (story Task 12): render a page by replacing the list, or key cards by index.</remarks>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the Board neither reads nextAfter nor fetches a page until story Tasks 4-5")]
+    [Fact]
     public async Task Down_on_the_last_loaded_card_loads_the_next_page_and_focus_lands_on_the_next_Task_by_identity()
     {
         var api = PagedSpaces();
@@ -108,7 +108,7 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
     /// the same Task id, the first 50 in their places; no element is reused for another Task.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - no Show more control and no paging until story Tasks 4-5")]
+    [Fact]
     public async Task Paging_appends_cards_and_never_reuses_an_element_for_another_Task()
     {
         var api = PagedSpaces();
@@ -154,7 +154,7 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
     /// column rather than duplicating it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - no paging until story Tasks 4-5")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "UX-DR25")]
     public async Task With_150_of_5000_loaded_every_card_states_its_true_ordinal_and_the_true_total()
@@ -190,7 +190,7 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <remarks>Plant owed by the dev phase (story Task 5): say "Loaded." on append - this case must catch it.</remarks>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - no paging until story Tasks 4-5")]
+    [Fact]
     [Trait("Requirement", "UX-DR38")]
     public async Task Nothing_is_announced_when_a_page_loads_or_the_window_grows()
     {
@@ -221,7 +221,7 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
     /// moves to 121, "Task added." is said once, no card appears; paging to the end draws it last, exactly once.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the Board appends a created Task to a partly loaded column until story Task 4's hold-out rule")]
+    [Fact]
     public async Task A_Task_created_in_a_partly_loaded_column_is_counted_but_not_drawn_until_paging_reaches_it()
     {
         var api = PagedSpaces();
@@ -260,7 +260,7 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
     /// cursor) moves that card to the page's position - newer read wins - and never draws it twice.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - no paging and no de-duplication until story Task 4")]
+    [Fact]
     [Trait("Requirement", "FR-28")]
     public async Task A_page_holding_a_Task_already_drawn_moves_its_card_and_never_draws_it_twice()
     {
@@ -272,6 +272,13 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
         {
             await OpenAsync(api, page, Northwind, Atlas);
             await WaitForCardCountAsync(page, "Todo", PageSize);
+
+            // The element drawing Card 11, tagged: when Card 10's card moves, every card after it shifts up one place, and
+            // an element keyed by its place rather than its Task would come to draw Card 12 (dev-phase addition - AC3's
+            // plant "key cards by index" is caught here, where a page reorders, not where it only appends).
+            await page.EvaluateAsync(
+                "id => { window.__eleven = document.querySelector(`[data-task-id='${id}']`).closest('.task-card'); }",
+                tasks["Card 11"].Id.ToString("D"));
 
             // Another Session moves Card 10 to directly after Card 60: a key between theirs, past the cursor.
             var column = api.Boards[(Northwind, Atlas)].Columns[0];
@@ -290,6 +297,11 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
             Assert.Single(titles, title => title == "Card 10");
             Assert.Equal(titles.IndexOf("Card 60") + 1, titles.IndexOf("Card 10"));
             Assert.Equal(titles.Count, titles.Distinct(StringComparer.Ordinal).Count());
+            Assert.True(
+                await page.EvaluateAsync<bool>(
+                    "id => window.__eleven.isConnected && window.__eleven.querySelector('[data-task-id]').dataset.taskId === id",
+                    tasks["Card 11"].Id.ToString("D")),
+                "The element that drew Card 11 now draws another Task, or was replaced (AC3).");
         }
     }
 
@@ -298,7 +310,7 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
     /// page is out the drop zone stays last; once it lands the zone is before Card 52 (after Card 51).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - a carry stops at the last loaded card until story Task 5")]
+    [Fact]
     [Trait("Requirement", "FR-29")]
     public async Task A_carried_Task_stepped_down_past_the_last_loaded_card_loads_the_next_page_first()
     {
@@ -334,7 +346,7 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
     /// once the column is fully loaded the control is gone.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - no Show more control until story Task 5")]
+    [Fact]
     [Trait("Requirement", "UX-DR26")]
     public async Task Show_more_appends_the_next_page_and_moves_focus_to_its_first_Task()
     {
@@ -365,7 +377,7 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
     /// AC11, UX-DR27 - "Show more" is a read and every Role has it: a Viewer pages a column as a mover does.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - no Show more control until story Task 5")]
+    [Fact]
     [Trait("Priority", "P1")]
     public async Task A_Viewer_pages_a_column_too()
     {
@@ -379,6 +391,9 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
 
             await ShowMore(page, "Todo").ClickAsync(new LocatorClickOptions { Timeout = WaitMs });
             await WaitForCardCountAsync(page, "Todo", 80);
+
+            // Fully loaded now: the control is gone for the Viewer too (dev-phase addition: the scaffold asserted nothing).
+            Assert.Equal(0, await ShowMore(page, "Todo").CountAsync());
         }
     }
 
@@ -388,7 +403,7 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
     /// loaded, because <c>afterTaskId</c> must name a concrete neighbour.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the picker lists loaded Tasks only and always offers Bottom until story Task 5")]
+    [Fact]
     [Trait("Requirement", "FR-29")]
     public async Task The_Move_picker_extends_its_positions_page_by_page_and_offers_Bottom_only_when_fully_loaded()
     {
@@ -428,7 +443,7 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <remarks>Plant owed by the dev phase (story Task 6): no focus request - focus lands on <c>body</c> and this fails.</remarks>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - a Task with no loaded card moves focus nowhere until story Task 6 (deferred-work.md:551)")]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     public async Task Closing_the_panel_on_a_Task_held_out_past_the_cursor_focuses_its_column()
     {
@@ -456,7 +471,7 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
     /// moves focus to the column that held it, never to <c>&lt;body&gt;</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - a deletion with no loaded card moves focus nowhere until story Task 6 (deferred-work.md:551)")]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     public async Task Deleting_a_Task_whose_card_is_not_loaded_focuses_its_column()
     {
@@ -489,7 +504,7 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <remarks>Plant owed by the dev phase (story Task 5): the per-frame <c>#hitTest</c> restored - the count grows and this fails.</remarks>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - board-drag.js reads every card's rect on every frame until story Task 5")]
+    [Fact]
     [Trait("Requirement", "NFR-3")]
     public async Task A_lifted_card_reads_no_card_rects_while_the_pointer_is_still()
     {

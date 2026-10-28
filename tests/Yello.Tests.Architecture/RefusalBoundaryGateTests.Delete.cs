@@ -97,7 +97,8 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>The_routes_under_a_Project_are_its_rename_its_Task_creation_and_its_Board</c>: under one Project the Host maps
     /// its deletion, its rename, its Task creation and its Board, and nothing that lists its Tasks flat (2.2's AC5 total
     /// would then be the client's to derive) and nothing that moves a Project. It replaced 2.2's gate when story 2.5
-    /// mapped the deletion.
+    /// mapped the deletion. Story 2.9 widened it by exactly the Board's column page (<c>GET …/board/columns/{statusId}</c>,
+    /// one column read by keyset seek - still never a flat list of the Project's Tasks).
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-19")]
@@ -115,6 +116,7 @@ public sealed partial class RefusalBoundaryGateTests
             [
                 $"DELETE {ProjectPattern}",
                 $"GET {ProjectPattern}/board",
+                $"GET {ProjectPattern}/board/columns/{{statusId:guid}}",
                 $"PATCH {ProjectPattern}",
                 $"POST {ProjectPattern}/tasks",
             ],

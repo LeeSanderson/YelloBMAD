@@ -20,8 +20,9 @@ namespace Yello.Infrastructure.Persistence;
 /// </para>
 /// <para>
 /// <b>A creation's and a Status edit's position key is the column's last plus one</b> (<see cref="PositionKey.After"/>),
-/// and <b>every writer that places a key takes the same lock first</b>: the Project's Tasks under
-/// <c>UPDLOCK, HOLDLOCK</c>. A creation takes it in the pipeline (the Tasks-per-Project bound,
+/// and <b>every writer that places a key takes the same lock first</b>: the Project's Tasks lock - until story 2.9 the
+/// Project's Tasks under <c>UPDLOCK, HOLDLOCK</c>, since then an application lock of the Project's own
+/// (<see cref="ApplicationLocks"/>), because the range's last key could lie in another Space. A creation takes it in the pipeline (the Tasks-per-Project bound,
 /// <see cref="BoundCounter"/>); a Status change takes it here, in <see cref="EditAsync"/>, with the same range
 /// over the same <c>SpaceId</c>-leading index. So an edit and a creation into one column, or two edits, queue
 /// at that range, and the second reads the first's key as the last (story 2.3 Task 6, AC9).
@@ -142,8 +143,13 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
 
     private async Task<TaskItem?> ApplyAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken)
     {
+        // A locking read (story 2.9, AC13): under READ_COMMITTED_SNAPSHOT a plain read would see the last committed row
+        // while a deletion of it is uncommitted, and the edit's UPDATE would then find nothing to update - a 500.
+        // READCOMMITTEDLOCK waits for that writer, as every read did before RCSI, and releases its shared lock at the
+        // statement's end, so it adds no lock to the order the key placers keep.
         var task = await dbContext.Tasks
-            .SingleOrDefaultAsync(candidate => candidate.Id == taskId, cancellationToken)
+            .FromSql($"SELECT * FROM dbo.[Task] WITH (READCOMMITTEDLOCK) WHERE Id = {taskId}")
+            .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
         if (task is null)
@@ -237,8 +243,11 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
             }
         }
 
+        // A locking read (story 2.9, AC13): every writer of this Task's applications holds its row lock, taken above, but a
+        // read that waits on an uncommitted application rather than reading past it keeps the set exactly the committed
+        // one whatever wrote it - as before READ_COMMITTED_SNAPSHOT.
         var current = await dbContext.Set<TaskLabel>()
-            .Where(application => application.TaskId == taskId)
+            .FromSql($"SELECT * FROM dbo.[TaskLabel] WITH (READCOMMITTEDLOCK) WHERE TaskId = {taskId}")
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
@@ -347,8 +356,8 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
 
         if (Placed(lower, upper) is not { } key)
         {
-            // No key fits the gap: refused, never a renumber of the siblings (AD-15, open question 10).
-            return TaskMove.PositionUnavailable;
+            // No key fits the gap: refused in its own words (story 2.9, AC18), never a renumber of the siblings (AD-15).
+            return TaskMove.PositionFull;
         }
 
         task.StatusId = statusId;
@@ -422,23 +431,25 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
     }
 
     /// <summary>
-    /// Takes the Project's Task range under <c>UPDLOCK, HOLDLOCK</c> in the statement a creation's bound count takes
-    /// (<see cref="BoundCounter"/>): the same index and the same range, so a deletion and a move meet a creation and a
-    /// Status edit on it in one order.
+    /// Takes the Project's Tasks lock, the one a creation's bound count takes (<see cref="BoundCounter"/>), so a deletion
+    /// and a move meet a creation and a Status edit on it in one order. Story 2.9 made it an application lock of the
+    /// Project's own: the <c>UPDLOCK, HOLDLOCK</c> range it replaced could lock another Space's first key.
     /// </summary>
     private Task TakeTheProjectRangeAsync(Guid projectId, CancellationToken cancellationToken) =>
-        dbContext.Database
-            .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = {projectId}")
-            .SingleAsync(cancellationToken);
+        ApplicationLocks.TakeProjectTasksAsync(dbContext, projectId, cancellationToken);
 
     /// <summary>
-    /// Takes the Project's Task range under <c>UPDLOCK, HOLDLOCK</c> - the range a creation's bound count
-    /// takes - and reads the destination column's last key in the same statement. The row-level security
-    /// policy narrows it to the request's Space; raw SQL lives only in this ring, and every value is a
-    /// parameter.
+    /// Takes the Project's Tasks lock - the one a creation's bound count takes - then reads the destination column's last
+    /// key in a statement of its own, which sees every placement committed before the lock was granted. The row-level
+    /// security policy narrows it to the request's Space; raw SQL lives only in this ring, and every value is a parameter.
     /// </summary>
-    private Task<string?> LastKeyUnderTheProjectLockAsync(Guid projectId, Guid statusId, CancellationToken cancellationToken) =>
-        dbContext.Database
-            .SqlQuery<string?>($"SELECT MAX(CASE WHEN StatusId = {statusId} THEN PositionKey END) AS [Value] FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = {projectId}")
-            .SingleAsync(cancellationToken);
+    private async Task<string?> LastKeyUnderTheProjectLockAsync(Guid projectId, Guid statusId, CancellationToken cancellationToken)
+    {
+        await ApplicationLocks.TakeProjectTasksAsync(dbContext, projectId, cancellationToken).ConfigureAwait(false);
+
+        return await dbContext.Database
+            .SqlQuery<string?>($"SELECT MAX(PositionKey) AS [Value] FROM dbo.[Task] WHERE ProjectId = {projectId} AND StatusId = {statusId}")
+            .SingleAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
 }

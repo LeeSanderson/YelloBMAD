@@ -36,7 +36,7 @@ namespace Yello.Tests.Slices.Deployment;
 /// <c>sys.security_policies</c> and <c>sys.security_predicates</c> (definition text, FILTER/BLOCK,
 /// operation), every index with its <c>filter_definition</c>, foreign keys with their columns and
 /// referential actions, default, check and key constraints (by definition, and by name unless the
-/// engine named them), every module's definition (the predicate function), the <c>MAXDOP</c>
+/// engine named them), every module's definition (the predicate function), <c>READ_COMMITTED_SNAPSHOT</c> and each table's lock escalation (story 2.9), the <c>MAXDOP</c>
 /// database-scoped configuration, and the history rows. Anchors: the comparison finds
 /// <c>SpaceIsolationPolicy</c>, <c>UX_Membership_SpaceId_Owner</c>, a foreign key and a key constraint
 /// before it asserts equality.
@@ -102,6 +102,8 @@ public sealed class MigrationBundleEquivalenceTests(SqlServerEngine engine)
         """,
         "SELECT CONCAT('module|', OBJECT_NAME(object_id) COLLATE DATABASE_DEFAULT, '|', definition COLLATE DATABASE_DEFAULT) FROM sys.sql_modules",
         "SELECT CONCAT('scoped|', name COLLATE DATABASE_DEFAULT, '|', CAST(value AS nvarchar(32)) COLLATE DATABASE_DEFAULT) FROM sys.database_scoped_configurations WHERE name = 'MAXDOP'",
+        "SELECT CONCAT('rcsi|', CAST(is_read_committed_snapshot_on AS int)) FROM sys.databases WHERE name = DB_NAME()",
+        "SELECT CONCAT('escalation|', name COLLATE DATABASE_DEFAULT, '|', lock_escalation_desc COLLATE DATABASE_DEFAULT) FROM sys.tables",
         "SELECT CONCAT('history|', MigrationId COLLATE DATABASE_DEFAULT, '|', ProductVersion COLLATE DATABASE_DEFAULT) FROM dbo.__EFMigrationsHistory",
     ];
 
@@ -130,6 +132,8 @@ public sealed class MigrationBundleEquivalenceTests(SqlServerEngine engine)
             Assert.Contains(fromMigrate, line => line.StartsWith("policy|SpaceIsolationPolicy|1", StringComparison.Ordinal));
             Assert.Contains(fromMigrate, line => line.Contains("|UX_Membership_SpaceId_Owner|1|1|", StringComparison.Ordinal));
             Assert.Contains("scoped|MAXDOP|1", fromMigrate);
+            Assert.Contains("rcsi|1", fromMigrate);
+            Assert.Contains("escalation|Task|DISABLE", fromMigrate);
             Assert.Contains(fromMigrate, line => line.StartsWith("fk|", StringComparison.Ordinal));
             Assert.Contains(fromMigrate, line => line.StartsWith("key|", StringComparison.Ordinal));
 

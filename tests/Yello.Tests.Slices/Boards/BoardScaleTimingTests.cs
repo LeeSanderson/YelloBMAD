@@ -52,7 +52,7 @@ public sealed class BoardScaleTimingTests(MigratedDatabaseFixture fixture) : ICl
     /// indistinguishable from the first in duration.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - no column-page route until story Task 2; Nightly tier (Q13), excluded from the PR stage once Task 11 adds the filter")]
+    [Fact(Explicit = true)]
     public async Task The_last_page_of_a_5000_Task_column_meets_the_read_budget_as_the_first_does()
     {
         Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? string.Empty);

@@ -25,7 +25,11 @@
 
     COLUMNS ARE THE PROJECT'S EFFECTIVE STATUS SET, IN ITS ORDER, as the server sends them (BoardColumn).
     Each column's chip shows the server's TRUE TOTAL for its Status - never the number of cards rendered,
-    which story 2.9's paging will make smaller (AD-29) - and moves only with the person's own creation.
+    which paging makes smaller (AD-29) - and moves with the person's own changes and with a page's count.
+
+    EACH COLUMN IS A CONTIGUOUS LOADED PREFIX (story 2.9): its first page arrives with the Board, and the next page after
+    its cursor by "Show more Tasks", by the arrows past its last loaded card, by a carried step, or by the Move picker.
+    Cards are appended and never recycled. See BoardView.Paging.cs.
 
     CREATION LIVES IN THE FIRST COLUMN (open questions 4 (b) and 8 (a)). A new Task takes the first Status
     (AC2), so the create affordance is in the first column's head only, and the other columns' slot is empty
@@ -125,7 +129,9 @@
                              CarriedTaskId="@_carried"
                              ActiveTaskId="@stop.TaskId"
                              ColumnActive="@(stop.StatusId == column.StatusId)"
-                             DropIndex="@DropIndexIn(column)">
+                             DropIndex="@DropIndexIn(column)"
+                             HasMore="@(column.After is not null)"
+                             OnShowMore="() => ShowMoreAsync(column.StatusId)">
                     @if (IsFirst(column) && _canManage && _creating)
                     {
                         <TaskCreate SpaceId="@SpaceId" ProjectId="@ProjectId" OnCreated="Add" OnRefused="OnRefused" OnClose="CloseCreate" />
@@ -296,6 +302,7 @@
         _generation++;
         EndHeld();
         _columns = null;
+        _heldOut.Clear();
         _projectName = string.Empty;
         Say(null);
         _creating = false;
@@ -330,8 +337,11 @@
                 {
                     UseLabels(labels);
                     _projectName = board.Project.Name;
-                    _columns = [.. board.Columns.Select(column => new ColumnState(column.StatusId, column.Name, column.Total, [.. column.Tasks]))];
+                    _columns = [.. board.Columns.Select(column => new ColumnState(column.StatusId, column.Name, column.Total, [.. column.Tasks], column.NextAfter))];
                     UseStatuses(board.Columns.Select(column => new TaskStatusOption(column.StatusId, column.Name)));
+
+                    // Said once, on the cold load only: a page appended or a Board read again says nothing (story 2.9, AC6,
+                    // open question 8 (a)).
                     Say(Localizer["BoardLoaded"]);
                 }
 
@@ -364,9 +374,11 @@
 
     /// <summary>
     /// After <c>task-position-unavailable</c> the Board is read again (story 2.6, open question 3 (a)): the neighbour the
-    /// move named has moved or gone, and the picker must stop offering it. Each column takes the server's Tasks and true
-    /// total, and the replicas are re-admitted over them. A read that fails leaves the Board as it was - the refusal has
-    /// already been said - and nothing is announced: the move's own sentence follows.
+    /// move named has moved or gone, and the picker must stop offering it. Each column takes the server's first page, cursor
+    /// and true total, and the replicas are re-admitted over them. The column that holds the carried, active or focused Task
+    /// is paged until that Task is drawn again (story 2.9, open question 3 (a)); if it cannot be, focus goes to its column
+    /// (AC12). A read that fails leaves the Board as it was - the refusal has already been said - and nothing is announced:
+    /// the move's own sentence follows.
     /// </summary>
     private async Task RereadBoardAsync(int generation)
     {
@@ -383,13 +395,7 @@
 
             if (await response.Content.ReadFromJsonAsync<BoardResponse>(JsonOptions, token) is { } board && generation == _generation)
             {
-                // A drag or a carry under a Board read again ends with nothing moved: the slots it was over may be gone (story
-                // 2.7 AC13). Where the Task is now is said once the Board is drawn again (story 2.8, open question 10).
-                var held = EndHeld();
-                _columns = [.. board.Columns.Select(column => new ColumnState(column.StatusId, column.Name, column.Total, [.. column.Tasks.Where(task => !_deleted.Contains(task.Id))]))];
-                UseStatuses(board.Columns.Select(column => new TaskStatusOption(column.StatusId, column.Name)));
-                Readmit();
-                Returned(held);
+                await UseRereadBoardAsync(board, generation);
             }
         }
         catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
@@ -463,7 +469,8 @@
 
     /// <summary>
     /// The created Task joins the bottom of its Status's column - its position key is the column's last -
-    /// and that column's total grows by one: the person's own creation, and the only live change to a count.
+    /// and that column's total grows by one: the person's own creation. In a partly loaded column it is counted at once
+    /// and drawn only when paging reaches it (story 2.9, AC10): its key sorts after the cursor.
     /// </summary>
     private void Add(TaskResponse task)
     {
@@ -474,7 +481,15 @@
 
         var column = columns.Find(candidate => candidate.StatusId == task.StatusId) ?? columns[0];
 
-        column.Tasks.Add(task);
+        if (column.After is null)
+        {
+            column.Tasks.Add(task);
+        }
+        else
+        {
+            HoldOut(task.Id, column);
+        }
+
         column.Total++;
         Say(Localizer["TaskAdded"]);
     }
@@ -487,6 +502,13 @@
     {
         if (Locate(taskId) is not { } found)
         {
+            // A Task held out past a cursor (story 2.9) leaves the count of the column it was counted in.
+            if (_heldOut.Remove(taskId, out var statusId) && Column(statusId) is { } counted)
+            {
+                counted.Total--;
+                return counted;
+            }
+
             return null;
         }
 
@@ -497,9 +519,10 @@
     }
 
     /// <summary>
-    /// One column as this Board holds it: its total moves with the person's own creation and deletion.
+    /// One column as this Board holds it: its total moves with the person's own creation and deletion, and its Tasks are
+    /// the loaded prefix up to its cursor (story 2.9).
     /// </summary>
-    private sealed class ColumnState(Guid statusId, string name, int total, List<TaskResponse> tasks)
+    private sealed class ColumnState(Guid statusId, string name, int total, List<TaskResponse> tasks, string? after)
     {
         public Guid StatusId { get; } = statusId;
 
@@ -508,5 +531,15 @@
         public int Total { get; set; } = total;
 
         public List<TaskResponse> Tasks { get; } = tasks;
+
+        /// <summary>
+        /// The cursor - the last loaded Task's key - or <c>null</c> when every Task of the column is loaded.
+        /// </summary>
+        public string? After { get; set; } = after;
+
+        /// <summary>
+        /// Whether a page of this column is out: a second request waits for it rather than queueing past the boundary.
+        /// </summary>
+        public bool Loading { get; set; }
     }
 }

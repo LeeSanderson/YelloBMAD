@@ -241,6 +241,32 @@
     private EventCallback<KeyboardEventArgs> KeyDownHandler =>
         CanMove ? EventCallback.Factory.Create<KeyboardEventArgs>(this, CardKeyDownAsync) : default;
 
+    /// <summary>
+    /// Every input the card draws, as it was drawn last (story 2.9, open question 12 (a)).
+    /// </summary>
+    private CardInputs? _drawn;
+
+    /// <summary>
+    /// Draws again only when something it draws has changed (story 2.9, AC14, open question 12 (a)). The card's event
+    /// callbacks and its Task are complex parameters, so without this every render of the Board re-rendered every card - at
+    /// 5,000 loaded cards a keyboard step cost about 230 ms. An open menu or picker is always drawn again: its fragment is
+    /// the Board's own state.
+    /// </summary>
+    /// <returns>Whether the card renders.</returns>
+    protected override bool ShouldRender()
+    {
+        var inputs = new CardInputs(
+            Item, Labels, FocusRequest, FocusOnArrival, CanMove, MenuOpen, FocusActionsRequest, Moved, Lifted, Settling, Carried, Active, Position, SetSize);
+
+        if (MenuContent is null && inputs == _drawn)
+        {
+            return false;
+        }
+
+        _drawn = inputs;
+        return true;
+    }
+
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -303,4 +329,23 @@
         { Key: "Escape" } when MenuOpen => OnMenuClose.InvokeAsync(),
         _ => Task.CompletedTask,
     };
+
+    /// <summary>
+    /// What a card draws, compared by value: the Task by record equality (a new Label list is a new value).
+    /// </summary>
+    private sealed record CardInputs(
+        TaskResponse Item,
+        IReadOnlyDictionary<Guid, LabelResponse> Labels,
+        int FocusRequest,
+        bool FocusOnArrival,
+        bool CanMove,
+        bool MenuOpen,
+        int FocusActionsRequest,
+        bool Moved,
+        bool Lifted,
+        bool Settling,
+        bool Carried,
+        bool Active,
+        int Position,
+        int SetSize);
 }

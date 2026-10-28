@@ -10,7 +10,7 @@
 #
 # Exactly one deployment target, the GitHub environment `azure` (AC4). Azure login is OIDC federation
 # to the deploy identity the infrastructure creates; no Azure secret is stored in GitHub (P3). The
-# Nightly and Weekly stages arrive with their first suites (deferred-work.md, story 2.9).
+# Nightly and Weekly stages are nightly.yml and weekly.yml (story 2.9); their tiers never run here.
 #
 # Every third-party action is pinned to a full commit SHA, with its version in a trailing comment.
 
@@ -76,8 +76,9 @@ jobs:
       - name: Architecture suite (first, and fails fast)
         run: dotnet test --project tests/Yello.Tests.Architecture/Yello.Tests.Architecture.csproj -c Release --no-build
 
+      # The Nightly and Weekly tiers (story 2.9) are Explicit and excluded besides, so the PR stage stays under 15 minutes.
       - name: Every suite
-        run: dotnet test Yello.slnx -c Release --no-build -- --report-xunit-trx --results-directory "$GITHUB_WORKSPACE/TestResults"
+        run: dotnet test Yello.slnx -c Release --no-build -- --filter-not-trait "Tier=Nightly" --filter-not-trait "Tier=Weekly" --report-xunit-trx --results-directory "$GITHUB_WORKSPACE/TestResults"
 
       - name: Test results
         if: always()

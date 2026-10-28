@@ -17,6 +17,12 @@ namespace Yello.Client.Components;
 /// <c>role="application"</c> (AC7, UX-DR21).
 /// </para>
 /// <para>
+/// <b>The keyboard drives the window</b> (story 2.9, AC7, AC11): <c>↓</c> on a partly loaded column's last loaded card, or a
+/// carried step past it, fetches the next page first and then lands on the next Task by its identity. While that page is
+/// out, a further <c>↓</c> in the column is ignored, never queued past the boundary. <see cref="BoardTraversal"/> stays a
+/// pure function over the loaded counts; the boundary is handled here. Nothing is announced for the page.
+/// </para>
+/// <para>
 /// <b>Focus by identity</b> (AD-29): every focus move is a request naming a Task (or a column's Status), honoured by whichever
 /// card is drawn with that Task next - never a stored element.
 /// </para>
@@ -156,7 +162,7 @@ public sealed partial class BoardView
         switch (key)
         {
             case BoardKey.Up or BoardKey.Down or BoardKey.InlineStart or BoardKey.InlineEnd:
-                Traverse(key, taskId, statusId);
+                await TraverseOrPageAsync(key, taskId, statusId);
                 break;
 
             case BoardKey.Space when taskId is { } id:
@@ -188,6 +194,28 @@ public sealed partial class BoardView
             await keys.RevealAsync();
         }
     }
+
+    /// <summary>
+    /// One arrow on a stop: <c>↓</c> on the last loaded card of a partly loaded column fetches the next page first (story
+    /// 2.9, AC7, AC11); every other arrow is the grammar's.
+    /// </summary>
+    private Task TraverseOrPageAsync(BoardKey key, Guid? taskId, Guid? statusId)
+    {
+        if (key == BoardKey.Down && taskId is { } id && LastLoadedOfAPartlyLoadedColumn(id) is { } partly)
+        {
+            return StepPastTheLoadedAsync(partly, id);
+        }
+
+        Traverse(key, taskId, statusId);
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// The column whose last loaded card is <paramref name="taskId"/>'s, when more Tasks follow it (story 2.9).
+    /// </summary>
+    private ColumnState? LastLoadedOfAPartlyLoadedColumn(Guid taskId) =>
+        Locate(taskId) is { } found && found.Column.After is not null && found.Index == found.Column.Tasks.Count - 1 ? found.Column : null;
 
     /// <summary>
     /// One arrow on a stop (AC1, AC2): focus moves to the card or empty column the grammar names, by its identity.
@@ -224,6 +252,28 @@ public sealed partial class BoardView
         }
 
         _runOrigin = nextOrigin;
+        StateHasChanged();
+    }
+
+    /// <summary>
+    /// <c>↓</c> on a partly loaded column's last loaded card (story 2.9, AC7, AC11): the next page is appended, then focus
+    /// lands on the Task after <paramref name="taskId"/>, by its identity, the run's origin with it. While the page is out
+    /// the key is ignored; a page that brought nothing leaves focus where it is. Nothing is announced (AC6).
+    /// </summary>
+    private async Task StepPastTheLoadedAsync(ColumnState column, Guid taskId)
+    {
+        if (column.Loading || !await LoadMoreAsync(column) || Locate(taskId) is not { } found || found.Index + 1 >= found.Column.Tasks.Count)
+        {
+            return;
+        }
+
+        var next = found.Column.Tasks[found.Index + 1].Id;
+
+        _activeTaskId = next;
+        _activeColumnId = null;
+        FocusCardTitle(next);
+        _runAt = next;
+        _runOrigin = found.Index + 1;
         StateHasChanged();
     }
 
@@ -283,7 +333,7 @@ public sealed partial class BoardView
     {
         if (key is BoardKey.Up or BoardKey.Down or BoardKey.InlineStart or BoardKey.InlineEnd)
         {
-            Step(key);
+            await StepAsync(key);
         }
         else if (key == BoardKey.Space)
         {
@@ -303,18 +353,20 @@ public sealed partial class BoardView
 
     /// <summary>
     /// One carried step (AC5, AC10): the slot moves by the grammar, the drop zone follows it into view, and the step sentence
-    /// says the Status, the ordinal and the total the column would have with the Task in it.
+    /// says the Status, the ordinal and the total the column would have with the Task in it. A <c>↓</c> from the slot after
+    /// a partly loaded column's last loaded card fetches the next page first, then steps (story 2.9, AC11); the sentence
+    /// still carries the true total.
     /// </summary>
-    private void Step(BoardKey key)
+    private async Task StepAsync(BoardKey key)
     {
-        if (_columns is not { } columns || _carried is not { } carried || Locate(carried) is not { } found)
+        if (_columns is not { } columns || _carried is not { } carried)
         {
             return;
         }
 
         var at = columns.FindIndex(column => column.StatusId == _carryStatusId);
 
-        if (at < 0)
+        if (at < 0 || !await ReachTheNextSlotAsync(key, columns[at], carried) || Locate(carried) is not { } found)
         {
             return;
         }
@@ -338,6 +390,21 @@ public sealed partial class BoardView
 
         Say(string.Format(CultureInfo.CurrentCulture, Localizer["TaskCarried"], destination.Name, slot + 1, total));
         StateHasChanged();
+    }
+
+    /// <summary>
+    /// Before a carried <c>↓</c> (story 2.9, AC11): from the slot after a partly loaded column's last loaded card, the next
+    /// page is appended first. Answers whether the step may go on - not while a page is out, nor when none came, nor when
+    /// the carry ended meanwhile.
+    /// </summary>
+    private async Task<bool> ReachTheNextSlotAsync(BoardKey key, ColumnState column, Guid carried)
+    {
+        if (key != BoardKey.Down || column.After is null || _carrySlot < column.Tasks.Count(task => task.Id != carried))
+        {
+            return true;
+        }
+
+        return !column.Loading && await LoadMoreAsync(column) && _carried == carried && Locate(carried) is not null;
     }
 
     /// <summary>

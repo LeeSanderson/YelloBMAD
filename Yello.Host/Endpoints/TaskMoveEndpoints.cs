@@ -70,6 +70,7 @@ public static class TaskMoveEndpoints
             // Not recorded: validation refusals inside the Space, the same bytes for a random id and a foreign one (I-13).
             MoveTaskOutcome.StatusOutsideTheEffectiveSet => TaskEditBody.InvalidStatus(),
             MoveTaskOutcome.PositionUnavailable => TaskMoveBody.PositionUnavailable(),
+            MoveTaskOutcome.PositionFull => TaskMoveBody.PositionFull(),
 
             // Not recorded: an in-Space not-found crossed no boundary (AD-20). The body is the boundary's.
             _ => BoundaryProblems.NotAvailable(),

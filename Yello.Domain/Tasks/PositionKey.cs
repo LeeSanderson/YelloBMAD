@@ -58,6 +58,16 @@ public static class PositionKey
     public static int MaxLength => Longest;
 
     /// <summary>
+    /// Whether <paramref name="key"/> could be a position key: one to <see cref="MaxLength"/> characters, every one of them
+    /// in the alphabet. Story 2.9, AC9: a Board column page's cursor is checked by it, so a cursor is always compared as
+    /// the column's own <c>varchar</c> BIN2 type, never something it would have to convert.
+    /// </summary>
+    /// <param name="key">The candidate.</param>
+    /// <returns>Whether it is well formed. It says nothing about whether a Task holds it.</returns>
+    public static bool IsWellFormed(string? key) =>
+        key is { Length: > 0 and <= Longest } && InAlphabet(key);
+
+    /// <summary>
     /// A key strictly after <paramref name="last"/> in ordinal order.
     /// </summary>
     /// <remarks>

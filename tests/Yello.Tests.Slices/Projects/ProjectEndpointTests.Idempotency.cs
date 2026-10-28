@@ -268,8 +268,8 @@ public sealed partial class ProjectEndpointTests
     /// <summary>
     /// AC9, Q7 - a concurrent first use of one key is applied once and the loser is told so. The same
     /// Account sends the same create with the same key on its Session and on its Token while the test holds
-    /// the Space's bound-count lock. Both have looked the key up and found nothing, and both then wait at
-    /// the count. Released, one commits its Project and its record; the other counts it, creates, fails
+    /// the Space's bound-count lock (its application lock since story 2.9). Both have looked the key up and found nothing,
+    /// and both then wait at the count. Released, one commits its Project and its record; the other counts it, creates, fails
     /// the record's unique index, and answers <c>409 idempotency-key-in-flight</c> with no <c>Location</c>,
     /// its Project rolled back.
     /// </summary>
@@ -294,10 +294,12 @@ public sealed partial class ProjectEndpointTests
             await using var observer = await database.OpenWithoutSpaceContextAsync(cancellationToken);
             await using var held = await holder.BeginTransactionAsync(cancellationToken);
 
+            // The product's bound lock since story 2.9 (open question 14 (a)): the Space's own application lock.
             await using (DbCommand count = holder.CreateCommand())
             {
                 count.Transaction = held;
-                count.CommandText = "SELECT COUNT(*) FROM dbo.[Project] WITH (UPDLOCK, HOLDLOCK)";
+                count.CommandText = "EXEC sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction'";
+                count.Parameters.Add(new SqlParameter("@resource", $"Yello/ProjectsPerSpace/{owner.SpaceId:D}"));
                 await count.ExecuteNonQueryAsync(cancellationToken);
             }
 
@@ -307,7 +309,7 @@ public sealed partial class ProjectEndpointTests
                 CreateOnAsync(IsolationSurface.Session, owner, token, "Sent twice at once", key),
                 CreateOnAsync(IsolationSurface.ApiToken, owner, token, "Sent twice at once", key));
 
-            // Both requests are waiting for the count's range lock - the second queued behind the first,
+            // Both requests are waiting for the Space's bound lock - the second queued behind the first,
             // which waits on the holder - so both looked the key up before either can commit.
             var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
 
@@ -347,13 +349,14 @@ public sealed partial class ProjectEndpointTests
     }
 
     /// <summary>
-    /// Requests waiting for a range update lock - the bound count's <c>UPDLOCK, HOLDLOCK</c>.
+    /// Requests waiting for the Space's Projects-per-Space application lock - the bound count's lock since story 2.9 (open
+    /// question 14 (a)); before it, a range update lock (<c>LCK_M_RS_U</c>).
     /// </summary>
     private static async Task<int> WaitingForTheCountAsync(SqlConnection connection, CancellationToken cancellationToken)
     {
         await using var command = connection.CreateCommand();
 
-        command.CommandText = "SELECT COUNT(*) FROM sys.dm_exec_requests WHERE database_id = DB_ID() AND blocking_session_id <> 0 AND wait_type = 'LCK_M_RS_U'";
+        command.CommandText = "SELECT COUNT(*) FROM sys.dm_exec_requests WHERE database_id = DB_ID() AND blocking_session_id <> 0 AND wait_type = 'LCK_M_X' AND wait_resource LIKE 'APPLICATION:%ProjectsPerSpace%'";
 
         return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
     }

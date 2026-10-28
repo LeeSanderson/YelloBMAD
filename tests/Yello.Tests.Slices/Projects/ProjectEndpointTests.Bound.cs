@@ -101,9 +101,9 @@ public sealed partial class ProjectEndpointTests
             await AddMemberAsync(database, owner.SpaceId, member.AccountId, "Member");
             await SeedProjectsAsync(database, owner.SpaceId, ProjectsPerSpace - 1);
 
-            // Presence first. An Account's first request in a Space inserts its SpacePresence row, and the
-            // second Account's presence count then waits on that uncommitted row - which serialises the pair
-            // before either reaches the bound count, so a missing count lock would go unseen.
+            // Presence first. An Account's first request in a Space inserts its SpacePresence row; before story 2.9's
+            // READ_COMMITTED_SNAPSHOT the second Account's presence count waited on that uncommitted row, which would have
+            // serialised the pair before either reached the bound count, so a missing count lock would go unseen.
             Assert.Equal(HttpStatusCode.OK, (await owner.Session.GetAsync(Yello.Contracts.Projects.ProjectRoutes.ListIn(owner.SpaceId))).StatusCode);
             Assert.Equal(HttpStatusCode.OK, (await member.Session.GetAsync(Yello.Contracts.Projects.ProjectRoutes.ListIn(owner.SpaceId))).StatusCode);
 
@@ -111,10 +111,13 @@ public sealed partial class ProjectEndpointTests
             await using var observer = await database.OpenWithoutSpaceContextAsync(cancellationToken);
             await using var held = await holder.BeginTransactionAsync(cancellationToken);
 
+            // The product's bound lock since story 2.9 (open question 14 (a)): the Space's own application lock, which both
+            // creations take before they count.
             await using (System.Data.Common.DbCommand count = holder.CreateCommand())
             {
                 count.Transaction = held;
-                count.CommandText = "SELECT COUNT(*) FROM dbo.[Project] WITH (UPDLOCK, HOLDLOCK)";
+                count.CommandText = "EXEC sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction'";
+                count.Parameters.Add(new Microsoft.Data.SqlClient.SqlParameter("@resource", $"Yello/ProjectsPerSpace/{owner.SpaceId:D}"));
                 await count.ExecuteNonQueryAsync(cancellationToken);
             }
 

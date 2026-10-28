@@ -729,6 +729,31 @@
 }
 
 /*
+    "SHOW MORE TASKS" (story 2.9, AC11, open question 5 (a)): an explicit page boundary at a partly loaded column's foot -
+    never load-on-scroll, which is infinite scroll (UX-DR26). The quiet secondary look, full width, at least the 24px
+    target (WCAG 2.5.8). Out of the roving tab order: the keyboard pages with the arrows; pointer, touch and browse mode
+    reach it here.
+*/
+.board-column__more {
+    display: block;
+    inline-size: 100%;
+    min-inline-size: var(--target-min);
+    min-block-size: var(--target-min);
+    margin-block-start: var(--space-card-stack-gap);
+    appearance: none;
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    padding-block: 0;
+    padding-inline: var(--space-2);
+    font-family: var(--type-body-family);
+    font-size: var(--type-body-size);
+    line-height: var(--type-body-line-height);
+    cursor: pointer;
+}
+
+/*
     THE TASK CARD (DESIGN.md:137-144, :431). The title is the only content; the card sizes to it, wraps a
     long title rather than scrolling, and carries NO SHADOW - stated explicitly so nobody adds one back
     (story 2.7's lifted card, below, is the one sanctioned exception). The metadata row holds the Task's Labels (story

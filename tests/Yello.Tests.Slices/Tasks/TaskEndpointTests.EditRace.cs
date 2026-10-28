@@ -239,19 +239,15 @@ public sealed partial class TaskEndpointTests
     }
 
     /// <summary>
-    /// Takes the destination column's key range in the test's own transaction - the statement Task 6 has the
-    /// edit run before it places a key.
+    /// Takes, in the test's own transaction, the lock the edit takes before it places a key: until story 2.9 the destination
+    /// column's key range under <c>UPDLOCK, HOLDLOCK</c>, a subset of the Project's range; since 2.9 the Project's Tasks
+    /// application lock, which every key placer of the Project takes first (<c>ApplicationLocks</c>).
     /// </summary>
-    private static async Task HoldColumnAsync(SqlConnection holder, DbTransaction held, Guid projectId, Guid statusId, CancellationToken cancellationToken)
+    private static Task HoldColumnAsync(SqlConnection holder, DbTransaction held, Guid projectId, Guid statusId, CancellationToken cancellationToken)
     {
-        await using DbCommand column = holder.CreateCommand();
+        _ = statusId;
 
-        column.Transaction = held;
-        column.CommandText = "SELECT PositionKey FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = @project AND StatusId = @status";
-        column.Parameters.Add(new SqlParameter("@project", projectId));
-        column.Parameters.Add(new SqlParameter("@status", statusId));
-
-        await column.ExecuteNonQueryAsync(cancellationToken);
+        return DeleteWire.HoldProjectRangeAsync(holder, held, projectId, cancellationToken);
     }
 
     private static string LastKey(IReadOnlyList<TaskRow> rows, Guid statusId) =>

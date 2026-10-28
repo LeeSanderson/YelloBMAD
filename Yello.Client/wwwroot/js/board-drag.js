@@ -37,6 +37,12 @@
     AUTO-SCROLL (AC5, story 2.7 Q13): while lifted, a requestAnimationFrame loop scrolls the hovered column near its block
     edges, the Board's row near the view's inline edges, and the page near the view's block edges - in proportion to the
     depth into an edge zone of twice --target-min. Direct manipulation, not animation, so reduced motion leaves it alone.
+
+    LAYOUT IS READ ONLY WHEN SOMETHING MOVED (story 2.9, AC14; deferred-work.md:578). The rects hit-testing reads - the
+    Board's, each column's, the drop zone's and the middle of every card - are measured once and cached until something
+    moves them: a scroll anywhere, a resize, or Blazor adding or removing a node in the row of columns (a drop zone drawn, a
+    page of cards appended). A frame in which the pointer has not moved, nothing scrolled and nothing changed reads no
+    layout at all, so a lifted card over a column of 5,000 costs nothing while the pointer rests.
 */
 
 const FALLBACK_THRESHOLD_MS = 320;
@@ -238,6 +244,9 @@ class BoardDrag {
             slop: readToken('--motion-long-press-slop', FALLBACK_SLOP_PX),
             edge: 2 * readToken('--target-min', FALLBACK_TARGET_PX),
             lifted: false,
+            dirty: true,
+            layout: null,
+            watcher: null,
             timer: 0,
             grabX: 0,
             grabY: 0,
@@ -270,6 +279,7 @@ class BoardDrag {
         gesture.y = event.clientY;
 
         if (gesture.lifted) {
+            gesture.dirty = true;
             return;
         }
 
@@ -333,7 +343,24 @@ class BoardDrag {
                 // The Board has gone: there is nobody left to tell.
             });
 
+        // Anything that moves the layout under a still pointer - a scroll, a resize, a node Blazor adds or removes - makes the
+        // cached rects stale (story 2.9, AC14).
+        gesture.watcher = new MutationObserver(this.#invalidate);
+        gesture.watcher.observe(this.#root, { childList: true, subtree: true });
+        window.addEventListener('scroll', this.#invalidate, true);
+        window.addEventListener('resize', this.#invalidate);
+
         this.#frame = requestAnimationFrame(this.#step);
+    };
+
+    /**
+     * The layout the next frame reads is no longer the cached one.
+     */
+    #invalidate = () => {
+        if (this.#gesture) {
+            this.#gesture.layout = null;
+            this.#gesture.dirty = true;
+        }
     };
 
     #step = () => {
@@ -343,18 +370,51 @@ class BoardDrag {
             return;
         }
 
-        this.#autoScroll(gesture);
-        this.#follow(gesture);
+        // A still pointer over a still Board reads nothing (story 2.9, AC14): the target it had is the target it has.
+        // An auto-scroll that moved anything raises a scroll event, which marks the next frame dirty, so it goes on while
+        // it scrolls; one that hit the end of what can scroll raises none, and the frames go still.
+        if (gesture.dirty) {
+            gesture.dirty = false;
+            this.#autoScroll(gesture);
+            this.#follow(gesture);
 
-        const target = this.#hitTest(gesture);
+            const target = this.#hitTest(gesture);
 
-        if (!this.#same(target, gesture.target)) {
-            gesture.target = target;
-            this.#tell('Targeted', target ? target.statusId : null, target ? target.index : -1);
+            if (!this.#same(target, gesture.target)) {
+                gesture.target = target;
+                this.#tell('Targeted', target ? target.statusId : null, target ? target.index : -1);
+            }
         }
 
         this.#frame = requestAnimationFrame(this.#step);
     };
+
+    /**
+     * The rects hit-testing and auto-scroll read, measured once and kept until #invalidate: the Board's, and each column's
+     * with its drop zone's and the middle of each of its cards other than the dragged one.
+     */
+    #layoutOf(gesture) {
+        if (!gesture.layout) {
+            gesture.layout = {
+                root: this.#root.getBoundingClientRect(),
+                columns: [...this.#root.querySelectorAll(COLUMN)].map(column => {
+                    const zone = column.querySelector(DROP_ZONE);
+
+                    return {
+                        element: column,
+                        statusId: column.getAttribute('data-status-id'),
+                        rect: column.getBoundingClientRect(),
+                        zone: zone ? zone.getBoundingClientRect() : null,
+                        middles: [...column.querySelectorAll(CARD)]
+                            .filter(card => card !== gesture.card)
+                            .map(card => centreOf(card.getBoundingClientRect()).y),
+                    };
+                }),
+            };
+        }
+
+        return gesture.layout;
+    }
 
     /**
      * Keeps the card under the pointer where it was grabbed. Its layout slot can move under it - a drop zone drawn above
@@ -371,17 +431,18 @@ class BoardDrag {
         gesture.card.style.setProperty('--drag-y', `${gesture.dragY}px`);
     }
 
+    /**
+     * Scrolls whatever the pointer is near the edge of.
+     */
     #autoScroll(gesture) {
         const { x, y, edge } = gesture;
 
-        for (const column of this.#root.querySelectorAll(COLUMN)) {
-            const rect = column.getBoundingClientRect();
-
-            if (inside(rect, x, y)) {
-                const step = edgeStep(y, rect.top, rect.bottom, edge);
+        for (const column of this.#layoutOf(gesture).columns) {
+            if (inside(column.rect, x, y)) {
+                const step = edgeStep(y, column.rect.top, column.rect.bottom, edge);
 
                 if (step !== 0) {
-                    column.scrollBy({ top: step, behavior: 'instant' });
+                    column.element.scrollBy({ top: step, behavior: 'instant' });
                 }
 
                 break;
@@ -403,32 +464,24 @@ class BoardDrag {
 
     #hitTest(gesture) {
         const { x, y } = gesture;
+        const layout = this.#layoutOf(gesture);
 
-        if (!inside(this.#root.getBoundingClientRect(), x, y)) {
+        if (!inside(layout.root, x, y)) {
             return null;
         }
 
-        for (const column of this.#root.querySelectorAll(COLUMN)) {
-            if (!inside(column.getBoundingClientRect(), x, y)) {
+        for (const column of layout.columns) {
+            if (!inside(column.rect, x, y)) {
                 continue;
             }
 
-            const statusId = column.getAttribute('data-status-id');
-            const zone = column.querySelector(DROP_ZONE);
+            const statusId = column.statusId;
 
-            if (zone && gesture.target && gesture.target.statusId === statusId && inside(zone.getBoundingClientRect(), x, y)) {
+            if (column.zone && gesture.target && gesture.target.statusId === statusId && inside(column.zone, x, y)) {
                 return gesture.target;
             }
 
-            let index = 0;
-
-            for (const card of column.querySelectorAll(CARD)) {
-                if (card !== gesture.card && centreOf(card.getBoundingClientRect()).y < y) {
-                    index++;
-                }
-            }
-
-            return { statusId, index };
+            return { statusId, index: column.middles.filter(middle => middle < y).length };
         }
 
         return null;
@@ -453,6 +506,7 @@ class BoardDrag {
 
         gesture.x = event.clientX;
         gesture.y = event.clientY;
+        gesture.layout = null;
 
         const target = this.#hitTest(gesture);
 
@@ -559,8 +613,14 @@ class BoardDrag {
         window.removeEventListener('pointercancel', this.#onPointerCancel, true);
         window.removeEventListener('keydown', this.#onKey, true);
         window.removeEventListener('blur', this.#onBlur);
+        window.removeEventListener('scroll', this.#invalidate, true);
+        window.removeEventListener('resize', this.#invalidate);
         document.removeEventListener('visibilitychange', this.#onVisibility);
         document.removeEventListener('selectstart', this.#onSelectStart, true);
+
+        if (gesture.watcher) {
+            gesture.watcher.disconnect();
+        }
 
         if (gesture.lifted) {
             this.#suppressClick = true;

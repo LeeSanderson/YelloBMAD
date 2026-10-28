@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Xunit;
+using Yello.Application.Boards;
 using Yello.Contracts.Boards;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
@@ -16,10 +17,10 @@ namespace Yello.Tests.Slices.Boards;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Scaffold constants until the contract exists.</b> <see cref="ColumnRoute"/>, <see cref="InvalidBoardCursor"/>,
-/// <see cref="TaskPositionFull"/> and <see cref="PageSize"/> are the story's recommended names (Q1 (a), Task 2, Q11 (a),
-/// AR-22). When Task 2 adds <c>BoardRoutes</c>' page route, <c>ProblemTypes</c>' two entries and the page-size constant,
-/// replace each with the contract member and change nothing else. The wire member is <c>nextAfter</c> (Q1 (a)).
+/// <b>The contract members</b>: the page route is <see cref="BoardRoutes.Column"/>, the two refusals are
+/// <c>ProblemTypes.InvalidBoardCursor</c> and <c>ProblemTypes.TaskPositionFull</c>, and the page size is
+/// <see cref="BoardPage.Size"/> (the ATDD run's scaffold constants, swapped on activation). The wire member is
+/// <c>nextAfter</c> (Q1 (a)).
 /// </para>
 /// <para>
 /// <b>Seed constraints checked</b> for <see cref="ApplyLabelsToEveryTaskAsync"/> against
@@ -37,32 +38,16 @@ internal static partial class BoardPageWire
 {
     /// <summary>
     /// AR-22's initial page size - an assumption, "the seek shape is the invariant, the page size is not" (spine
-    /// <c>:259</c>). Task 2 states it once as <c>BoardPage.Size</c>.
+    /// <c>:259</c>), stated once as <see cref="BoardPage.Size"/>.
     /// </summary>
-    public const int PageSize = 50;
+    public static int PageSize => BoardPage.Size;
 
     /// <summary>
-    /// The column-page route's template, as story 2.9 Q1 (a) shapes it. Task 2 adds it to <c>BoardRoutes</c>.
-    /// </summary>
-    public const string ColumnRoute = "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/board/columns/{statusId:guid}";
-
-    /// <summary>
-    /// The refusal of a malformed cursor (AC9, Task 2). Task 2 adds it to <c>ProblemTypes</c>.
-    /// </summary>
-    public const string InvalidBoardCursor = "urn:yello:problem:invalid-board-cursor";
-
-    /// <summary>
-    /// The refusal of a move into a gap no key of at most 128 characters fits (AC18, Q11 (a)). Task 10 adds it to
-    /// <c>ProblemTypes</c>.
-    /// </summary>
-    public const string TaskPositionFull = "urn:yello:problem:task-position-full";
-
-    /// <summary>
-    /// One column's page path, as a client calls it: the Board's path, then <c>/columns/{statusId}</c>, then the cursor (the
-    /// last loaded Task's position key) when there is one.
+    /// One column's page path, as a client calls it (<see cref="BoardRoutes.ColumnOf(Guid, Guid, Guid, string)"/>): the
+    /// first page when <paramref name="after"/> is <c>null</c>.
     /// </summary>
     public static string ColumnOf(Guid spaceId, Guid projectId, Guid statusId, string? after = null) =>
-        BoardRoutes.BoardOf(spaceId, projectId) + $"/columns/{statusId:D}" + (after is null ? string.Empty : "?after=" + Uri.EscapeDataString(after));
+        after is null ? BoardRoutes.ColumnOf(spaceId, projectId, statusId) : BoardRoutes.ColumnOf(spaceId, projectId, statusId, after);
 
     public static Task<WireResponse> PageAsync(Actor actor, Guid spaceId, Guid projectId, Guid statusId, string? after = null) =>
         actor.Session.GetAsync(ColumnOf(spaceId, projectId, statusId, after));

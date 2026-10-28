@@ -32,6 +32,11 @@
 
     A KEYBOARD CARRY (story 2.8, open question 12 (a)) draws the same drop zone at its slot; the carried card stays in its
     own slot, and the zone at that slot is drawn just before it, where the Task is now.
+
+    A PARTLY LOADED COLUMN (story 2.9, AC11, open question 5 (a)) ends with "Show more Tasks": an explicit page boundary,
+    for every Role, appending the next page. It is not a roving stop (tabindex -1) - the keyboard pages with the arrows -
+    and pointer, touch and screen-reader browse mode reach it. Its name says which column; it carries no count (no nudges).
+    Gone once the column is fully loaded. Cards are appended and never recycled: each is keyed by its Task's id.
 *@
 
 <section class="board-column" aria-labelledby="@HeadingId" aria-describedby="@CountId" data-status-id="@StatusIdText" tabindex="@(ColumnActive ? "0" : "-1")" @ref="_section">
@@ -85,6 +90,15 @@
             }
         </ul>
     }
+
+    @if (HasMore)
+    {
+        <button type="button"
+                class="board-column__more"
+                tabindex="-1"
+                aria-label="@string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer["BoardShowMoreName"], Name)"
+                @onclick="OnShowMore">@Localizer["BoardShowMore"]</button>
+    }
 </section>
 
 @code {
@@ -103,12 +117,12 @@
     [EditorRequired]
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>The server's true total for the Status - never <c>Tasks.Count</c> (AD-29).</summary>
+    /// <summary>The server's true total for the Status - never <c>Tasks.Count</c> (AD-29), which paging makes smaller.</summary>
     [Parameter]
     [EditorRequired]
     public int Total { get; set; }
 
-    /// <summary>The Tasks placed in the column, by position key.</summary>
+    /// <summary>The column's loaded prefix, by position key (story 2.9, AC10): each card's index + 1 is its true ordinal.</summary>
     [Parameter]
     [EditorRequired]
     public IReadOnlyList<TaskResponse> Tasks { get; set; } = [];
@@ -207,6 +221,17 @@
     /// </summary>
     [Parameter]
     public int? DropIndex { get; set; }
+
+    /// <summary>
+    /// Whether Tasks follow the loaded ones (the column's cursor is not <c>null</c>): the column ends with its show-more control (<c>BoardShowMore</c>)
+    /// (story 2.9, AC11).
+    /// </summary>
+    [Parameter]
+    public bool HasMore { get; set; }
+
+    /// <summary>Raised when the show-more control is activated (story 2.9).</summary>
+    [Parameter]
+    public EventCallback OnShowMore { get; set; }
 
     /// <summary>The Space's Labels by id, so each card can name the Labels it carries (story 2.4).</summary>
     [Parameter]

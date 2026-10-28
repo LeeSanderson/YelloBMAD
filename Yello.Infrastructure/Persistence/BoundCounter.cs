@@ -10,20 +10,22 @@ namespace Yello.Infrastructure.Persistence;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b><c>UPDLOCK, HOLDLOCK</c>, and that is the whole point.</b> The count takes key-range update locks
-/// on the rows it reads and keeps them until the transaction ends, so a second creation in the same
-/// Space (or Project) waits at its own count until the first has committed, and then counts the first's
-/// row. Two creations at one below the limit therefore cannot both pass - the race story 1.6 left open
-/// for presence is not repeated for a bound whose whole point is the number.
+/// <b>A lock held to the transaction's end, and that is the whole point.</b> Each count takes its scope's application lock
+/// first - the Space's for Projects, the Project's for Tasks (<see cref="ApplicationLocks"/>, story 2.9, open question 14
+/// (a)) - and then counts in a statement of its own, which reads the last committed state. So a second creation in the
+/// same Space (or Project) waits until the first has committed, and then counts the first's row. Two creations at one
+/// below the limit therefore cannot both pass - the race story 1.6 left open for presence is not repeated for a bound
+/// whose whole point is the number. Until story 2.9 both were <c>UPDLOCK, HOLDLOCK</c> range scans, whose last key could
+/// lie in another Space.
 /// </para>
 /// <para>
 /// <b>The same lock serialises Task creation within a Project</b>, which the position key relies on:
 /// <c>TaskStore</c> reads the column's last key and appends after it, and no second creation in that
 /// Project can read the same last key while the first is uncommitted (story 2.2, open question 2 (a)).
 /// A Status change is the second writer that places a key, and <c>TaskStore.EditAsync</c> takes this same
-/// Project range before it does (story 2.3 Task 6), so an edit and a creation queue at one lock. A Task
-/// deletion takes the same range before its row, and a Project deletion takes it after the Project row
-/// (story 2.5), so neither can commit between a creation's count and its insert.
+/// Project lock before it does (story 2.3 Task 6), so an edit and a creation queue at one lock. A Task
+/// deletion and a move take the same lock before their row, and a Project deletion takes it after the Project row
+/// (story 2.5), so none can commit between a creation's count and its insert.
 /// </para>
 /// <para>
 /// <b>No <c>Where</c> on <c>SpaceId</c>.</b> The row-level security policy narrows the statement to
@@ -48,13 +50,9 @@ internal sealed class BoundCounter(YelloDbContext dbContext) : IBoundCounter
     public Task<int> CountAsync(Bound bound, Guid? scopeId, CancellationToken cancellationToken) =>
         bound switch
         {
-            Bound.ProjectsPerSpace => dbContext.Database
-                .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM dbo.[Project] WITH (UPDLOCK, HOLDLOCK)")
-                .SingleAsync(cancellationToken),
+            Bound.ProjectsPerSpace => CountProjectsAsync(cancellationToken),
 
-            Bound.TasksPerProject when scopeId is { } projectId => dbContext.Database
-                .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = {projectId}")
-                .SingleAsync(cancellationToken),
+            Bound.TasksPerProject when scopeId is { } projectId => CountTasksAsync(projectId, cancellationToken),
 
             Bound.TasksPerProject => throw new ArgumentException(
                 "Tasks per Project is counted within one Project, and none was given.",
@@ -65,4 +63,33 @@ internal sealed class BoundCounter(YelloDbContext dbContext) : IBoundCounter
                 bound,
                 "No creation endpoint consults this bound through the pipeline yet; add its count here when one does."),
         };
+
+    /// <summary>
+    /// The Space's Projects, counted under the Space's own lock (story 2.9, open question 14 (a)): the second creation in a
+    /// Space waits at the lock until the first has committed, then its count - a statement of its own, reading the last
+    /// committed state - sees the first's row. Another Space's creation takes another lock and never waits here.
+    /// </summary>
+    private async Task<int> CountProjectsAsync(CancellationToken cancellationToken)
+    {
+        await ApplicationLocks.TakeProjectsPerSpaceAsync(dbContext, cancellationToken).ConfigureAwait(false);
+
+        return await dbContext.Database
+            .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM dbo.[Project]")
+            .SingleAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The Project's Tasks, counted under the Project's own lock (story 2.9): the lock every key placer of the Project takes,
+    /// so the count sees every committed creation and no Task is placed between the count and this creation's insert.
+    /// </summary>
+    private async Task<int> CountTasksAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        await ApplicationLocks.TakeProjectTasksAsync(dbContext, projectId, cancellationToken).ConfigureAwait(false);
+
+        return await dbContext.Database
+            .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM dbo.[Task] WHERE ProjectId = {projectId}")
+            .SingleAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
 }

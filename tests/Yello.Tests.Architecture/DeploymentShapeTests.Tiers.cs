@@ -17,10 +17,16 @@ namespace Yello.Tests.Architecture;
 /// "Four names, and only these four" is amended in the same change (story Task 11).
 /// </para>
 /// <para>
-/// <b>Gate that goes red by design</b>: <see cref="The_revision_is_promoted_only_after_the_migration_job_and_only_after_green_tests"/>
-/// takes <c>Assert.Single</c> over the jobs that run <c>dotnet test Yello.slnx</c>; a scheduled workflow that runs the same
-/// command makes it two. Either run the tier per project (<c>dotnet test --project …</c>) or narrow that gate to
-/// <c>ci.yml</c> in the same change - and record which.
+/// <b>The promotion gate stays as it was</b>: <see cref="The_revision_is_promoted_only_after_the_migration_job_and_only_after_green_tests"/>
+/// takes <c>Assert.Single</c> over the jobs that run <c>dotnet test Yello.slnx</c>, so the scheduled workflows run their
+/// tier per project (<c>dotnet test --project …</c>) - which also keeps a filter from selecting zero tests in a project
+/// that holds none (exit code 8).
+/// </para>
+/// <para>
+/// <b>Every tiered test is Explicit</b> (dev-phase decision, recorded with Q13): a plain <c>dotnet test Yello.slnx</c> - the
+/// local full run CLAUDE.md prescribes - never starts the 5,000-Task suites, so the default run stays inside the memory
+/// budget and its time. The scheduled workflows pass <c>--explicit on</c> with their tier filter; the PR run also excludes
+/// both tiers by trait. <see cref="Every_tiered_test_is_Explicit"/> holds it.
 /// </para>
 /// </remarks>
 public sealed partial class DeploymentShapeTests
@@ -34,7 +40,7 @@ public sealed partial class DeploymentShapeTests
     /// </summary>
     /// <param name="tier">The tier.</param>
     /// <param name="file">Its workflow file.</param>
-    [Theory(Skip = "red: AC15 - no Nightly or Weekly workflow until story Task 11")]
+    [Theory]
     [InlineData("Nightly", "nightly.yml")]
     [InlineData("Weekly", "weekly.yml")]
     [Trait("Priority", "P1")]
@@ -58,7 +64,7 @@ public sealed partial class DeploymentShapeTests
     /// 2.9-ARCH-902 (AC15) - the PR stage's <c>dotnet test Yello.slnx</c> excludes both tiers, so it still finishes under
     /// 15 minutes while the scale suites exist.
     /// </summary>
-    [Fact(Skip = "red: AC15 - ci.yml excludes no tier until story Task 11")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "AR-35")]
     public void The_PR_run_excludes_the_Nightly_and_Weekly_tiers()
@@ -95,6 +101,46 @@ public sealed partial class DeploymentShapeTests
     }
 
     /// <summary>
+    /// 2.9-ARCH-904 (AC15, Q13) - every test in a file that carries a <c>Tier</c> trait is declared <c>Explicit = true</c>, so
+    /// no tiered test runs in a plain <c>dotnet test</c> - the PR run, or a developer's full run under the memory budget.
+    /// </summary>
+    [Fact]
+    [Trait("Priority", "P1")]
+    [Trait("Requirement", "AR-35")]
+    public void Every_tiered_test_is_Explicit()
+    {
+        var tiered = RepositoryLayout.EnumerateSourceFiles("*.cs")
+            .Where(file => RepositoryLayout.RelativePath(file).StartsWith("tests/", StringComparison.Ordinal))
+            .Select(file => (File: RepositoryLayout.RelativePath(file), Text: File.ReadAllText(file.FullName)))
+            .Where(file => TierTrait.IsMatch(file.Text))
+            .ToList();
+
+        // Anchor: the scale suites carry the trait, so "every one is Explicit" is about something.
+        Assert.NotEmpty(tiered);
+
+        var problems = tiered
+            .SelectMany(file => TestAttribute.Matches(file.Text)
+                .Where(attribute => !attribute.Value.Contains("Explicit = true", StringComparison.Ordinal))
+                .Select(attribute => $"{file.File}: {attribute.Value}"))
+            .ToList();
+
+        Assert.True(problems.Count == 0, "A tiered test a plain run would start:\n" + string.Join('\n', problems));
+    }
+
+    /// <summary>
+    /// The detector behind <see cref="Every_tiered_test_is_Explicit"/>, fired on planted text.
+    /// </summary>
+    [Fact]
+    [Trait("Priority", "P1")]
+    public void The_Explicit_scan_reads_a_planted_attribute()
+    {
+        Assert.Matches(TestAttribute, "[Fact]");
+        Assert.Matches(TestAttribute, "[Theory(Skip = \"later\")]");
+        Assert.DoesNotContain("Explicit = true", TestAttribute.Match("[Fact(Timeout = 5)]").Value, StringComparison.Ordinal);
+        Assert.Contains("Explicit = true", TestAttribute.Match("[Fact(Explicit = true)]").Value, StringComparison.Ordinal);
+    }
+
+    /// <summary>
     /// The detector behind <see cref="Every_Tier_trait_is_Nightly_or_Weekly"/>, fired on planted text.
     /// </summary>
     [Fact]
@@ -112,4 +158,7 @@ public sealed partial class DeploymentShapeTests
 
     [GeneratedRegex("""Trait\s*\(\s*"Tier"\s*,\s*"(?<tier>[^"]*)"\s*\)""", RegexOptions.None, 1000)]
     private static partial Regex TierTrait { get; }
+
+    [GeneratedRegex(@"\[(?:Fact|Theory)(?:\([^\]]*\))?\]", RegexOptions.None, 1000)]
+    private static partial Regex TestAttribute { get; }
 }

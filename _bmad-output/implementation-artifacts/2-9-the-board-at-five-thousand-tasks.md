@@ -4,7 +4,7 @@ baseline_commit: 4ccba9f
 
 # Story 2.9: The Board at five thousand Tasks
 
-Status: ready-for-dev
+Status: review
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-9-the-board-at-five-thousand-tasks`
@@ -138,89 +138,89 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1303-1336` (`status: final`
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Baseline, then decide the open questions** (AC: all)
-  - [ ] `dotnet tool restore`; `dotnet build Yello.slnx` (0 warnings, 0 errors); `dotnet build-server shutdown`; record the full-run baseline with `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1` (expected 1284 total / 1281 passed / 0 failed / 3 skipped, from 2.8's review). Check Docker readiness first (`docker info --format '{{.ServerVersion}}'`).
-  - [ ] Decide open questions 1-16 below; record each in Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each is reversible.
+- [x] **Task 1 — Baseline, then decide the open questions** (AC: all)
+  - [x] `dotnet tool restore`; `dotnet build Yello.slnx` (0 warnings, 0 errors); `dotnet build-server shutdown`; record the full-run baseline with `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1` (expected 1284 total / 1281 passed / 0 failed / 3 skipped, from 2.8's review). Check Docker readiness first (`docker info --format '{{.ServerVersion}}'`).
+  - [x] Decide open questions 1-16 below; record each in Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each is reversible.
 
-- [ ] **Task 2 — Server: the column page and the paged Board read** (AC: 1, 4, 5, 9)
-  - [ ] Domain port `IBoardReader` (`Yello.Domain/Boards/IBoardReader.cs`): replace `ListTasksAsync(projectId)` (all Tasks, project-wide order) with a per-column seek, e.g. `PageAsync(Guid projectId, Guid statusId, string? after, int size, CancellationToken)` returning up to `size + 1` rows so the adapter knows whether a cursor follows. Keep `CountTasksByStatusAsync` (AD-29's separate count) and `LabelIdsOfAsync` (already "one statement for the whole page"). Add a column count for one Status for the page route (`COUNT` over the same predicate).
-  - [ ] Adapter `Yello.Infrastructure/Persistence/BoardReader.cs`: `Where(ProjectId == p && StatusId == s && PositionKey > after)` → `OrderBy(PositionKey)` → `Take(size + 1)`, `AsNoTracking`. **Verify in the logged SQL** that (a) there is no `OFFSET`; (b) the `@after` parameter is `varchar(128)`, not `nvarchar` — an `nvarchar` parameter against the `varchar` BIN2 column forces a conversion and loses the seek; (c) the plan seeks `IX_Task_SpaceId_ProjectId_StatusId_PositionKey` (RLS adds the leading `SpaceId` predicate). Use `string.Compare(t.PositionKey, after) > 0` (EF translates it to `>`); the column's BIN2 collation makes the comparison ordinal. The index is unique on `(SpaceId, ProjectId, StatusId, PositionKey)`, so no `Id` tiebreaker is needed — say so in the remarks.
-  - [ ] Board read (`ViewBoardHandler`): first page per Status — **one bounded seek per column** (P-2: "first paint one bounded seek per column"); never `ROW_NUMBER() OVER (PARTITION BY StatusId …)`, which reads the whole Project. A loop over the effective Statuses (3-5 statements) or one statement applying a `TOP` seek per Status are both acceptable; measure and record which. Remove the remark "every Task is returned (open question 6 (a)); story 2.9 pages them" and the matching remarks at `IBoardReader.cs:13`, `BoardRoutes.cs:8`, `BoardResponse.cs:28`.
-  - [ ] New slice `Yello.Application/Boards/ViewBoardColumn/` (handler + validation of the cursor through `PositionKey`'s alphabet and `MaxLength` 128): Project not found or Status outside the Project's effective set (`EffectiveStatusSet`) → `null` → `BoundaryProblems.NotAvailable()`; malformed cursor → `400` with a new `ProblemTypes` entry (e.g. `urn:yello:problem:invalid-board-cursor`), added to `RefusalCopy`/`ClientCopy.resx` if the client can meet it.
-  - [ ] Host: `BoardEndpoints.MapBoard` gains the page route with `.RequiresCapability(Capability.ReadProjectsAndTasks)` (every Role, Viewers included); register the handler in `Program.cs` beside `ViewBoardHandler` (`:112`). Space resolution attaches because the route carries `{spaceId}` (`SpaceScopedRouteCheck`, `Program.cs:436`).
-  - [ ] Contracts (append only): `BoardColumnResponse` gains `string? NextAfter` (name per Q1); new `BoardColumnPageResponse` and a `BoardRoutes` entry + builder. Update `PersistenceModelGateTests`/contract gates if they enumerate routes or response types.
-  - [ ] Page size: one constant (e.g. `BoardPage.Size = 50`) in Application or Contracts, cited to AR-22 and spine `:259` as an assumption.
+- [x] **Task 2 — Server: the column page and the paged Board read** (AC: 1, 4, 5, 9)
+  - [x] Domain port `IBoardReader` (`Yello.Domain/Boards/IBoardReader.cs`): replace `ListTasksAsync(projectId)` (all Tasks, project-wide order) with a per-column seek, e.g. `PageAsync(Guid projectId, Guid statusId, string? after, int size, CancellationToken)` returning up to `size + 1` rows so the adapter knows whether a cursor follows. Keep `CountTasksByStatusAsync` (AD-29's separate count) and `LabelIdsOfAsync` (already "one statement for the whole page"). Add a column count for one Status for the page route (`COUNT` over the same predicate).
+  - [x] Adapter `Yello.Infrastructure/Persistence/BoardReader.cs`: `Where(ProjectId == p && StatusId == s && PositionKey > after)` → `OrderBy(PositionKey)` → `Take(size + 1)`, `AsNoTracking`. **Verify in the logged SQL** that (a) there is no `OFFSET`; (b) the `@after` parameter is `varchar(128)`, not `nvarchar` — an `nvarchar` parameter against the `varchar` BIN2 column forces a conversion and loses the seek; (c) the plan seeks `IX_Task_SpaceId_ProjectId_StatusId_PositionKey` (RLS adds the leading `SpaceId` predicate). Use `string.Compare(t.PositionKey, after) > 0` (EF translates it to `>`); the column's BIN2 collation makes the comparison ordinal. The index is unique on `(SpaceId, ProjectId, StatusId, PositionKey)`, so no `Id` tiebreaker is needed — say so in the remarks.
+  - [x] Board read (`ViewBoardHandler`): first page per Status — **one bounded seek per column** (P-2: "first paint one bounded seek per column"); never `ROW_NUMBER() OVER (PARTITION BY StatusId …)`, which reads the whole Project. A loop over the effective Statuses (3-5 statements) or one statement applying a `TOP` seek per Status are both acceptable; measure and record which. Remove the remark "every Task is returned (open question 6 (a)); story 2.9 pages them" and the matching remarks at `IBoardReader.cs:13`, `BoardRoutes.cs:8`, `BoardResponse.cs:28`.
+  - [x] New slice `Yello.Application/Boards/ViewBoardColumn/` (handler + validation of the cursor through `PositionKey`'s alphabet and `MaxLength` 128): Project not found or Status outside the Project's effective set (`EffectiveStatusSet`) → `null` → `BoundaryProblems.NotAvailable()`; malformed cursor → `400` with a new `ProblemTypes` entry (e.g. `urn:yello:problem:invalid-board-cursor`), added to `RefusalCopy`/`ClientCopy.resx` if the client can meet it.
+  - [x] Host: `BoardEndpoints.MapBoard` gains the page route with `.RequiresCapability(Capability.ReadProjectsAndTasks)` (every Role, Viewers included); register the handler in `Program.cs` beside `ViewBoardHandler` (`:112`). Space resolution attaches because the route carries `{spaceId}` (`SpaceScopedRouteCheck`, `Program.cs:436`).
+  - [x] Contracts (append only): `BoardColumnResponse` gains `string? NextAfter` (name per Q1); new `BoardColumnPageResponse` and a `BoardRoutes` entry + builder. Update `PersistenceModelGateTests`/contract gates if they enumerate routes or response types.
+  - [x] Page size: one constant (e.g. `BoardPage.Size = 50`) in Application or Contracts, cited to AR-22 and spine `:259` as an assumption.
 
-- [ ] **Task 3 — Prove the seek and the budget at 5,000** (AC: 1, 2, 4, 5, 9; P-2, I-3)
-  - [ ] PR tier (Slices, `BoardEndpointTests` or a new `BoardPagingTests` partial): seed 5,000 Tasks in one column with `TaskWire.SeedTasksAsync` (one set-based INSERT; ~ms) and walk every page: assert 100 pages, every Task id exactly once, keys strictly ascending, each page's `Total` 5,000, last cursor `null`. Second case: 5,000 split over three Statuses — every Task in exactly one column (AC5).
-  - [ ] Deterministic depth-independence (PR tier, no timing): read `SET STATISTICS IO`-equivalent logical reads (or `sys.dm_exec_query_stats` for the statement) for the first and the last page; assert they are equal within a small constant. **Plant** an `OFFSET`/`Skip()` implementation: the last page's reads must grow and the case must fail. Restore in a `finally` (never `git checkout`/`restore`).
-  - [ ] Nightly tier (P-2, Slices, a new `DisableParallelization` collection e.g. `BoardScaleCollection`): server-side p95 of the first and the last page over ≥ 100 interleaved samples each after a warm-up, measured with `RunningHost.ServerDurationOfAsync` (the Host's own request-finished figure). Assert both ≤ 300 ms, and depth independence with `DurationIndistinguishability.CompareMeasuredAsync` (medians, 20% tolerance — reuse it; do not write another). Add a nearest-rank percentile helper to `Yello.Tests.Shared` (none exists) with its own unit tests in Architecture or Slices.
-  - [ ] Seed the scale cases with Labels applied (e.g. three per Task, via raw `WireDatabase` insert into `TaskLabel`) so the Labels read is inside the measured read (`deferred-work.md:523`'s measurement half). Record key lengths of seeded vs product-placed keys.
-  - [ ] Isolation (`tests/Yello.Tests.Isolation/IsolationCases.cs`): change `BoardHoldsExactlyTheCallersTasksAsync` to assert `tasks ≤ 50`, cursor null iff the column fits, and that walking the pages yields exactly `total` of the caller's Tasks (I-3 includes Board column counts). Add rows for the page route on both surfaces: foreign Space (`ISO-DIRECT-BOARD-COLUMN`), a foreign Project id / foreign Status id inside one's own Space (`ISO-BOARD-COLUMN-FOREIGN-ID-IN-OWN-SPACE`, `SameAsAnchor(404, not-available)`, no refusal row), the page's `Total` counts no foreign row (`ISO-BOARD-COLUMN-AGGREGATE`), and a timing row if `IsolationCases.TimingRows` covers every Space-scoped `GET` (follow `ISO-TIMING-IN-SPACE`). Prove each new row against a plant that drops the Task's layers (`IgnoreQueryFilters()` + the FILTER predicate), as 2.3 did.
+- [x] **Task 3 — Prove the seek and the budget at 5,000** (AC: 1, 2, 4, 5, 9; P-2, I-3)
+  - [x] PR tier (Slices, `BoardEndpointTests` or a new `BoardPagingTests` partial): seed 5,000 Tasks in one column with `TaskWire.SeedTasksAsync` (one set-based INSERT; ~ms) and walk every page: assert 100 pages, every Task id exactly once, keys strictly ascending, each page's `Total` 5,000, last cursor `null`. Second case: 5,000 split over three Statuses — every Task in exactly one column (AC5).
+  - [x] Deterministic depth-independence (PR tier, no timing): read `SET STATISTICS IO`-equivalent logical reads (or `sys.dm_exec_query_stats` for the statement) for the first and the last page; assert they are equal within a small constant. **Plant** an `OFFSET`/`Skip()` implementation: the last page's reads must grow and the case must fail. Restore in a `finally` (never `git checkout`/`restore`).
+  - [x] Nightly tier (P-2, Slices, a new `DisableParallelization` collection e.g. `BoardScaleCollection`): server-side p95 of the first and the last page over ≥ 100 interleaved samples each after a warm-up, measured with `RunningHost.ServerDurationOfAsync` (the Host's own request-finished figure). Assert both ≤ 300 ms, and depth independence with `DurationIndistinguishability.CompareMeasuredAsync` (medians, 20% tolerance — reuse it; do not write another). Add a nearest-rank percentile helper to `Yello.Tests.Shared` (none exists) with its own unit tests in Architecture or Slices.
+  - [x] Seed the scale cases with Labels applied (e.g. three per Task, via raw `WireDatabase` insert into `TaskLabel`) so the Labels read is inside the measured read (`deferred-work.md:523`'s measurement half). Record key lengths of seeded vs product-placed keys.
+  - [x] Isolation (`tests/Yello.Tests.Isolation/IsolationCases.cs`): change `BoardHoldsExactlyTheCallersTasksAsync` to assert `tasks ≤ 50`, cursor null iff the column fits, and that walking the pages yields exactly `total` of the caller's Tasks (I-3 includes Board column counts). Add rows for the page route on both surfaces: foreign Space (`ISO-DIRECT-BOARD-COLUMN`), a foreign Project id / foreign Status id inside one's own Space (`ISO-BOARD-COLUMN-FOREIGN-ID-IN-OWN-SPACE`, `SameAsAnchor(404, not-available)`, no refusal row), the page's `Total` counts no foreign row (`ISO-BOARD-COLUMN-AGGREGATE`), and a timing row if `IsolationCases.TimingRows` covers every Space-scoped `GET` (follow `ISO-TIMING-IN-SPACE`). Prove each new row against a plant that drops the Task's layers (`IgnoreQueryFilters()` + the FILTER predicate), as 2.3 did.
 
-- [ ] **Task 4 — Client: the paged column state** (AC: 3, 4, 5, 10)
-  - [ ] `BoardView.razor` `ColumnState` gains the cursor (`string? After`), a loading flag, and a Task-id index so `Locate` (`BoardView.razor.cs:1026-1039`, a linear scan of every column) becomes O(1) at 5,000 loaded cards. Keep `@key="task.Id"` on every `TaskCard` and `@key="column.StatusId"` on columns.
-  - [ ] Append a page: for each Task, if its id is already rendered anywhere, apply AC10's rule (move the card to the page's position unless `_replicas` holds an unsettled write for it — then the replica wins); otherwise append. Advance the cursor to the page's cursor. Never remove, reorder or reuse an element for a different Task id.
-  - [ ] Hold-out rule (AC10): `Add` (`BoardView.razor:468-480`) appends only when the column's cursor is `null`; otherwise `Total++` and no card. Status edits and `InsertByKey`/`Relocate` (`BoardView.razor.cs:1020-1024`, `912-994`) render a Task in a partly loaded column only when its key ≤ the cursor; a move placed directly after the last loaded card renders at once (optimistic) and, on admission, sets the cursor to the admitted key (it is strictly below the old successor, so the prefix stays contiguous). Totals keep moving with the card as today (`column.Total--/destination.Total++`).
-  - [ ] The page's `Total` (Q2): adopt it for a column only when no write touching that column is unsettled in `_replicas`.
-  - [ ] Re-read after `409` (`RereadBoardAsync`, `:371-399`, replaces `_columns` wholesale): apply Q3's decision; whatever it is, the focused/active/held Task identity must be present after the re-read or focus moves to its column (AC12), and nothing is announced except 2.8's "Returned to …" for a held Task.
-  - [ ] Add a gate in `tests/Yello.Tests.Architecture` (beside `KeyboardGateTests`) that no `Virtualize` component and no `ItemsProvider` is used anywhere in `Yello.Client`, with a permanent plant case (AC3).
+- [x] **Task 4 — Client: the paged column state** (AC: 3, 4, 5, 10)
+  - [x] `BoardView.razor` `ColumnState` gains the cursor (`string? After`), a loading flag, and a Task-id index so `Locate` (`BoardView.razor.cs:1026-1039`, a linear scan of every column) becomes O(1) at 5,000 loaded cards. Keep `@key="task.Id"` on every `TaskCard` and `@key="column.StatusId"` on columns.
+  - [x] Append a page: for each Task, if its id is already rendered anywhere, apply AC10's rule (move the card to the page's position unless `_replicas` holds an unsettled write for it — then the replica wins); otherwise append. Advance the cursor to the page's cursor. Never remove, reorder or reuse an element for a different Task id.
+  - [x] Hold-out rule (AC10): `Add` (`BoardView.razor:468-480`) appends only when the column's cursor is `null`; otherwise `Total++` and no card. Status edits and `InsertByKey`/`Relocate` (`BoardView.razor.cs:1020-1024`, `912-994`) render a Task in a partly loaded column only when its key ≤ the cursor; a move placed directly after the last loaded card renders at once (optimistic) and, on admission, sets the cursor to the admitted key (it is strictly below the old successor, so the prefix stays contiguous). Totals keep moving with the card as today (`column.Total--/destination.Total++`).
+  - [x] The page's `Total` (Q2): adopt it for a column only when no write touching that column is unsettled in `_replicas`.
+  - [x] Re-read after `409` (`RereadBoardAsync`, `:371-399`, replaces `_columns` wholesale): apply Q3's decision; whatever it is, the focused/active/held Task identity must be present after the re-read or focus moves to its column (AC12), and nothing is announced except 2.8's "Returned to …" for a held Task.
+  - [x] Add a gate in `tests/Yello.Tests.Architecture` (beside `KeyboardGateTests`) that no `Virtualize` component and no `ItemsProvider` is used anywhere in `Yello.Client`, with a permanent plant case (AC3).
 
-- [ ] **Task 5 — Client: keyboard, picker, drag and the "Show more" control drive the window** (AC: 6, 7, 11)
-  - [ ] `BoardView.Keys.cs` `Traverse` (`:195-228`): `↓` on the last loaded card of a column with a cursor fetches the next page, then requests focus on the next Task by id (`FocusCardTitle`). While a fetch is out, further `↓` in that column is ignored (never queued past the boundary). `BoardTraversal` (pure) stays over loaded counts; feed it the loaded counts and handle the boundary in `BoardView`, or extend it with a `HasMore` flag — record which. The sticky origin (`_runOrigin`) survives the fetch.
-  - [ ] Carry (`Step`, `:308-341`): a carried `↓` past the last loaded card in a column with a cursor fetches the next page first, then steps. Announced totals stay the true `Total` (+1 when entering another column), as today.
-  - [ ] "Show more" control at each partly loaded column's foot (`BoardColumn.razor`), for pointer, touch and screen-reader browse mode (Q5). Activating it appends a page and moves focus to the first newly loaded Task. Copy in `ClientCopy.resx` (localisation gate); no count in it (no nudges, `epics.md:1049`). Present for every Role.
-  - [ ] Move picker (`MovePicker.razor:108-120`, `MoveColumns` `BoardView.razor.cs:212`): the position list for a partly loaded column ends with an option that loads the next page into the Board's column state (one data source) and extends the list; "Bottom of column" appears only when the column's cursor is `null` (AC11). Keep the picker's one-tab-stop roving pattern (2.8 Q7).
-  - [ ] Drag (`board-drag.js`): drops still target loaded cards only (ledger `:557` 2.7 note — record as accepted; the "Show more" control is the pointer route deeper). Fix the per-frame cost (`deferred-work.md:578`, `#step` `:339-357`, `#hitTest` `:404-435`): cache the hovered column's card rects at lift and on scroll/auto-scroll/append, and skip `#follow`/`#hitTest` on frames with no pointer movement and no auto-scroll. Planted: per-frame `getBoundingClientRect` calls on a still pointer must be zero (count them through a test hook, as 2.7's harness reads page state).
-  - [ ] AC6: no `Say` on page fetch, page append, "Show more", cursor advance or re-read. Assert with `KeyboardHarness.RecordAnnouncements` (`window.__said`) and a plant (say "Loaded." on append) that the case catches.
+- [x] **Task 5 — Client: keyboard, picker, drag and the "Show more" control drive the window** (AC: 6, 7, 11)
+  - [x] `BoardView.Keys.cs` `Traverse` (`:195-228`): `↓` on the last loaded card of a column with a cursor fetches the next page, then requests focus on the next Task by id (`FocusCardTitle`). While a fetch is out, further `↓` in that column is ignored (never queued past the boundary). `BoardTraversal` (pure) stays over loaded counts; feed it the loaded counts and handle the boundary in `BoardView`, or extend it with a `HasMore` flag — record which. The sticky origin (`_runOrigin`) survives the fetch.
+  - [x] Carry (`Step`, `:308-341`): a carried `↓` past the last loaded card in a column with a cursor fetches the next page first, then steps. Announced totals stay the true `Total` (+1 when entering another column), as today.
+  - [x] "Show more" control at each partly loaded column's foot (`BoardColumn.razor`), for pointer, touch and screen-reader browse mode (Q5). Activating it appends a page and moves focus to the first newly loaded Task. Copy in `ClientCopy.resx` (localisation gate); no count in it (no nudges, `epics.md:1049`). Present for every Role.
+  - [x] Move picker (`MovePicker.razor:108-120`, `MoveColumns` `BoardView.razor.cs:212`): the position list for a partly loaded column ends with an option that loads the next page into the Board's column state (one data source) and extends the list; "Bottom of column" appears only when the column's cursor is `null` (AC11). Keep the picker's one-tab-stop roving pattern (2.8 Q7).
+  - [x] Drag (`board-drag.js`): drops still target loaded cards only (ledger `:557` 2.7 note — record as accepted; the "Show more" control is the pointer route deeper). Fix the per-frame cost (`deferred-work.md:578`, `#step` `:339-357`, `#hitTest` `:404-435`): cache the hovered column's card rects at lift and on scroll/auto-scroll/append, and skip `#follow`/`#hitTest` on frames with no pointer movement and no auto-scroll. Planted: per-frame `getBoundingClientRect` calls on a still pointer must be zero (count them through a test hook, as 2.7's harness reads page state).
+  - [x] AC6: no `Say` on page fetch, page append, "Show more", cursor advance or re-read. Assert with `KeyboardHarness.RecordAnnouncements` (`window.__said`) and a plant (say "Loaded." on append) that the case catches.
 
-- [ ] **Task 6 — Client: focus destinations for a Task with no loaded card** (AC: 12)
-  - [ ] `Deleted` (`BoardView.razor.cs:502-535`): when `Remove` finds no card, raise the column focus request for the Status the panel's Task was in (the panel holds the `TaskResponse`). Same for the panel's `Close()` when the card is held out after a Status change.
-  - [ ] Browser cases (FakeYelloApi): a deletion and a Status change on a Task beyond the loaded page each leave `document.activeElement` inside that column's `<section>`; planted (no request) → `<body>` → caught.
+- [x] **Task 6 — Client: focus destinations for a Task with no loaded card** (AC: 12)
+  - [x] `Deleted` (`BoardView.razor.cs:502-535`): when `Remove` finds no card, raise the column focus request for the Status the panel's Task was in (the panel holds the `TaskResponse`). Same for the panel's `Close()` when the card is held out after a Status change.
+  - [x] Browser cases (FakeYelloApi): a deletion and a Status change on a Task beyond the loaded page each leave `document.activeElement` inside that column's `<section>`; planted (no request) → `<body>` → caught.
 
-- [ ] **Task 7 — Client render cost at 5,000 loaded cards** (AC: 14)
-  - [ ] Measure first: in a browser case with one column paged to all 5,000 (FakeYelloApi serving pages), record per page append time, input-to-focus latency of `↓` at the bottom, pick-up, carried step, and the JS heap. Record the numbers in the Debug Log.
-  - [ ] Expected hot spot: every `BoardView` render re-renders every `TaskCard`, because `TaskResponse` is a complex parameter (and `LabelIds` is a list, defeating record equality). Give `TaskCard` (and `BoardColumn`) a `ShouldRender` that compares the inputs it draws (id, title, Status, due date, Label ids sequence, `Active`, `Position`, `SetSize`, request counters, carried/lifted flags). Re-measure.
-  - [ ] Gate the keyboard step at the near-instant budget measured on the page's own `performance.now()` (2.7's pattern), in a `DisableParallelization` collection (e.g. reuse `TouchTimingCollection` or add `BoardScaleTimingCollection`) — Nightly tier if the 5,000-card setup is slow. If the budget cannot be met append-only, stop and raise the AD-29 amendment (AC14), recording it as a blocker rather than shipping a window.
+- [x] **Task 7 — Client render cost at 5,000 loaded cards** (AC: 14)
+  - [x] Measure first: in a browser case with one column paged to all 5,000 (FakeYelloApi serving pages), record per page append time, input-to-focus latency of `↓` at the bottom, pick-up, carried step, and the JS heap. Record the numbers in the Debug Log.
+  - [x] Expected hot spot: every `BoardView` render re-renders every `TaskCard`, because `TaskResponse` is a complex parameter (and `LabelIds` is a list, defeating record equality). Give `TaskCard` (and `BoardColumn`) a `ShouldRender` that compares the inputs it draws (id, title, Status, due date, Label ids sequence, `Active`, `Position`, `SetSize`, request counters, carried/lifted flags). Re-measure.
+  - [x] Gate the keyboard step at the near-instant budget measured on the page's own `performance.now()` (2.7's pattern), in a `DisableParallelization` collection (e.g. reuse `TouchTimingCollection` or add `BoardScaleTimingCollection`) — Nightly tier if the 5,000-card setup is slow. If the budget cannot be met append-only, stop and raise the AD-29 amendment (AC14), recording it as a blocker rather than shipping a window.
 
-- [ ] **Task 8 — Snapshot and RCSI** (AC: 13)
-  - [ ] New migration (`dotnet ef migrations add …` with the local `dotnet-ef` 10.0.11): `suppressTransaction: true`, guarded — `IF (SELECT is_read_committed_snapshot_on FROM sys.databases WHERE name = DB_NAME()) = 0 ALTER DATABASE CURRENT SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;` (Azure SQL already defaults it on, so the guard makes production a no-op). `Down` turns it off the same way. Follow the shape of `20260925132825_ActiveSpaceResolution.cs:58-60` (MAXDOP).
-  - [ ] Assert it: extend `DatabaseIdentityTests` (`:94` asserts MAXDOP) and `MigrationBundleEquivalenceTests` (`:132`) with `is_read_committed_snapshot_on = 1`; confirm the migration bundle still builds (`YELLO_MIGRATION_BUNDLE` cases skip locally unless set — run them once with it set, per CLAUDE.md).
-  - [ ] **Re-run every race class** after the migration (`TaskEndpointTests.MoveRace/EditRace/DeleteRace/LabelsRace`, `ProjectEndpointTests.DeleteRace`, the `Bound` races, `TaskWire.WaitUntilBlockedOnALockAsync` users — 40 call sites). Hinted reads (`UPDLOCK, HOLDLOCK`) still lock under RCSI; a race whose *waiting* side is an unhinted read will no longer block and must be re-examined, not loosened.
-  - [ ] Deterministic proof (AC13): hold an uncommitted presence insert / a Project deletion of 5,000 Tasks open on a `WireDatabase` connection; a Board read and a Project listing in the same Space complete while it is held. Plant: RCSI off for that database → the read waits (`LCK_M_S`) → caught.
-  - [ ] Record Q10's snapshot decision in the remarks of `ViewBoardHandler`, the page handler and `ListProjectsHandler`, and in the ledger (`:495`, `:547`).
+- [x] **Task 8 — Snapshot and RCSI** (AC: 13)
+  - [x] New migration (`dotnet ef migrations add …` with the local `dotnet-ef` 10.0.11): `suppressTransaction: true`, guarded — `IF (SELECT is_read_committed_snapshot_on FROM sys.databases WHERE name = DB_NAME()) = 0 ALTER DATABASE CURRENT SET READ_COMMITTED_SNAPSHOT ON WITH ROLLBACK IMMEDIATE;` (Azure SQL already defaults it on, so the guard makes production a no-op). `Down` turns it off the same way. Follow the shape of `20260925132825_ActiveSpaceResolution.cs:58-60` (MAXDOP).
+  - [x] Assert it: extend `DatabaseIdentityTests` (`:94` asserts MAXDOP) and `MigrationBundleEquivalenceTests` (`:132`) with `is_read_committed_snapshot_on = 1`; confirm the migration bundle still builds (`YELLO_MIGRATION_BUNDLE` cases skip locally unless set — run them once with it set, per CLAUDE.md).
+  - [x] **Re-run every race class** after the migration (`TaskEndpointTests.MoveRace/EditRace/DeleteRace/LabelsRace`, `ProjectEndpointTests.DeleteRace`, the `Bound` races, `TaskWire.WaitUntilBlockedOnALockAsync` users — 40 call sites). Hinted reads (`UPDLOCK, HOLDLOCK`) still lock under RCSI; a race whose *waiting* side is an unhinted read will no longer block and must be re-examined, not loosened.
+  - [x] Deterministic proof (AC13): hold an uncommitted presence insert / a Project deletion of 5,000 Tasks open on a `WireDatabase` connection; a Board read and a Project listing in the same Space complete while it is held. Plant: RCSI off for that database → the read waits (`LCK_M_S`) → caught.
+  - [x] Record Q10's snapshot decision in the remarks of `ViewBoardHandler`, the page handler and `ListProjectsHandler`, and in the ledger (`:495`, `:547`).
 
-- [ ] **Task 9 — Locks at scale** (AC: 17)
-  - [ ] Project deletion (`ProjectStore.DeleteAsync:92-117`, `deferred-work.md:541`): seed 5,000 Tasks with three Labels each; run the product's delete statement shape inside a held `WireDatabase` transaction and read `sys.dm_tran_locks` for an `OBJECT`-level `X` on `Task`/`TaskLabel`. If it escalates, apply Q15's decision and prove a Task write in another Space completes while the deletion is held. Keep atomicity (never half a Project — 2.5 AC3); `A_Project_of_5000_Tasks_is_deleted_whole_by_one_request` keeps asserting nothing about time.
-  - [ ] Projects-per-Space count (`BoundCounter.cs:48-67`, `deferred-work.md:471`, `:476-477`): reproduce the cross-Space wait deterministically (Space A's creation held at the count; Space B's creation queues on `LCK_M_RS_U` at the end-of-range key — the review's observation), then apply Q14 and prove B completes while A is held. Re-run RACE-* and BND-* cases; the Tasks-per-Project count is already Space-led (`:471` NOTE) and stays.
+- [x] **Task 9 — Locks at scale** (AC: 17)
+  - [x] Project deletion (`ProjectStore.DeleteAsync:92-117`, `deferred-work.md:541`): seed 5,000 Tasks with three Labels each; run the product's delete statement shape inside a held `WireDatabase` transaction and read `sys.dm_tran_locks` for an `OBJECT`-level `X` on `Task`/`TaskLabel`. If it escalates, apply Q15's decision and prove a Task write in another Space completes while the deletion is held. Keep atomicity (never half a Project — 2.5 AC3); `A_Project_of_5000_Tasks_is_deleted_whole_by_one_request` keeps asserting nothing about time.
+  - [x] Projects-per-Space count (`BoundCounter.cs:48-67`, `deferred-work.md:471`, `:476-477`): reproduce the cross-Space wait deterministically (Space A's creation held at the count; Space B's creation queues on `LCK_M_RS_U` at the end-of-range key — the review's observation), then apply Q14 and prove B completes while A is held. Re-run RACE-* and BND-* cases; the Tasks-per-Project count is already Space-led (`:471` NOTE) and stays.
 
-- [ ] **Task 10 — The full-gap refusal** (AC: 18)
-  - [ ] `TaskStore.MoveAsync`/`Placed` (`:300-375`): distinguish "neighbour not in the destination column" (`TaskMove.PositionUnavailable`, unchanged) from "no key fits" (new outcome) — today both return `PositionUnavailable` (`:337`, `:351`). New `ProblemTypes` entry (e.g. `urn:yello:problem:task-position-full`), mapped in `TaskMoveEndpoints.cs:72`/`TaskMoveBody.cs:92`, `RefusalCopy` + `ClientCopy.resx` with Q11's copy; the client re-reads the Board for it as for the other `409`. `RefusalCopyTests` and the refusal gates updated.
-  - [ ] Case: `PositionKeyBetweenTests`'s 718-placement growth (`:77`) reused to fill one gap through the endpoint (or seed two neighbours whose keys leave no room) → the new type; the changed-neighbour case keeps the old type.
-  - [ ] Record real key lengths after the Weekly load (max and p99 length per column) in the Debug Log and the ledger (`:557`).
+- [x] **Task 10 — The full-gap refusal** (AC: 18)
+  - [x] `TaskStore.MoveAsync`/`Placed` (`:300-375`): distinguish "neighbour not in the destination column" (`TaskMove.PositionUnavailable`, unchanged) from "no key fits" (new outcome) — today both return `PositionUnavailable` (`:337`, `:351`). New `ProblemTypes` entry (e.g. `urn:yello:problem:task-position-full`), mapped in `TaskMoveEndpoints.cs:72`/`TaskMoveBody.cs:92`, `RefusalCopy` + `ClientCopy.resx` with Q11's copy; the client re-reads the Board for it as for the other `409`. `RefusalCopyTests` and the refusal gates updated.
+  - [x] Case: `PositionKeyBetweenTests`'s 718-placement growth (`:77`) reused to fill one gap through the endpoint (or seed two neighbours whose keys leave no room) → the new type; the changed-neighbour case keeps the old type.
+  - [x] Record real key lengths after the Weekly load (max and p99 length per column) in the Debug Log and the ledger (`:557`).
 
-- [ ] **Task 11 — Nightly and Weekly stages** (AC: 15, 16, 8)
-  - [ ] Tier selection (Q13): a way to tag Nightly and Weekly tests that `TestingConventionTests` permits, and a PR run that excludes them (`dotnet test Yello.slnx … -- --filter-not-trait …` under MTP/xunit v3 — verify the multi-value semantics). Beware the exit-code-8 trap: a filtered run of a project with zero selected tests exits 8 (`TESTING-CONVENTIONS.md:520-562`); run only the projects that hold tier tests.
-  - [ ] Workflows: `.github/workflows/nightly.yml` and `weekly.yml` (or jobs in `ci.yml` — Q13), `schedule` + `workflow_dispatch`, same restore/build/Playwright steps as `ci.yml`'s `test` job, `--max-parallel-test-modules 1`, TRX upload. `actionlint` 1.7.12 clean; extend `DeploymentShapeTests` to hold the new files' shape (triggers, no Azure login, no secrets, no deploy steps).
-  - [ ] Weekly LOAD (P-1, AC16) in Slices (`RunningHost` in-process, the suite's one engine — no new container class; `ContainerTopologyGateTests` budget 5 unchanged): 5,000 Tasks with Labels in one Project, 50 Sessions (one Account signed in 50 times; presence bound 50), a fixed mix of Board reads, column pages (first and deepest), creates, edits, moves and deletes for a fixed number of iterations (not a duration — no timers). p95 per operation class from the Host's request-finished figures; assert read ≤ 300 ms, write ≤ 500 ms; print the measurement condition line (engine, `MAXDOP = 1`, RCSI on, warm, local, "not production evidence" — R18). Include the two `404` paths' p95 for `NotAvailableFloor` (`deferred-work.md:488`) and the Space home listing at 50 Projects × 100 Tasks plus one 5,000-Task Project (`:548`). Runs in a `DisableParallelization` collection; never in parallel with another timing class.
-  - [ ] Weekly P-11 (cold-start characterisation, local): time from Host process start to the first Space-scoped response (key-ring load `KeyRingStore`, EF model build, first query) for several fresh Hosts; record, assert nothing (`test-design-qa.md:388`). Note what local cannot show: Azure SQL resume (up to ~1 minute) and Container Apps scale-from-zero.
-  - [ ] AR-40b (AC8, Q9): record the decision in `docs/operations.md` §7 (replace the provisional sentence), and close the spine's deferral row (`ARCHITECTURE-SPINE.md:425`) with the decision, date and the R3/R5 note (`MAXDOP = 1` stays unrelaxable; re-measure after AR-40c — `test-design-architecture.md:630`). `OperationsRecordTests` may hold §7's wording — update it with the text. Fix the $/£ inconsistency in passing only if that row is edited (spine says $12–15; operations.md says £12–15).
-  - [ ] Update `tests/TESTING-CONVENTIONS.md:711-714` ("Nightly and Weekly do not exist yet …") to describe the stages, tier selection, the percentile helper and the scale collections.
+- [x] **Task 11 — Nightly and Weekly stages** (AC: 15, 16, 8)
+  - [x] Tier selection (Q13): a way to tag Nightly and Weekly tests that `TestingConventionTests` permits, and a PR run that excludes them (`dotnet test Yello.slnx … -- --filter-not-trait …` under MTP/xunit v3 — verify the multi-value semantics). Beware the exit-code-8 trap: a filtered run of a project with zero selected tests exits 8 (`TESTING-CONVENTIONS.md:520-562`); run only the projects that hold tier tests.
+  - [x] Workflows: `.github/workflows/nightly.yml` and `weekly.yml` (or jobs in `ci.yml` — Q13), `schedule` + `workflow_dispatch`, same restore/build/Playwright steps as `ci.yml`'s `test` job, `--max-parallel-test-modules 1`, TRX upload. `actionlint` 1.7.12 clean; extend `DeploymentShapeTests` to hold the new files' shape (triggers, no Azure login, no secrets, no deploy steps).
+  - [x] Weekly LOAD (P-1, AC16) in Slices (`RunningHost` in-process, the suite's one engine — no new container class; `ContainerTopologyGateTests` budget 5 unchanged): 5,000 Tasks with Labels in one Project, 50 Sessions (one Account signed in 50 times; presence bound 50), a fixed mix of Board reads, column pages (first and deepest), creates, edits, moves and deletes for a fixed number of iterations (not a duration — no timers). p95 per operation class from the Host's request-finished figures; assert read ≤ 300 ms, write ≤ 500 ms; print the measurement condition line (engine, `MAXDOP = 1`, RCSI on, warm, local, "not production evidence" — R18). Include the two `404` paths' p95 for `NotAvailableFloor` (`deferred-work.md:488`) and the Space home listing at 50 Projects × 100 Tasks plus one 5,000-Task Project (`:548`). Runs in a `DisableParallelization` collection; never in parallel with another timing class.
+  - [x] Weekly P-11 (cold-start characterisation, local): time from Host process start to the first Space-scoped response (key-ring load `KeyRingStore`, EF model build, first query) for several fresh Hosts; record, assert nothing (`test-design-qa.md:388`). Note what local cannot show: Azure SQL resume (up to ~1 minute) and Container Apps scale-from-zero.
+  - [x] AR-40b (AC8, Q9): record the decision in `docs/operations.md` §7 (replace the provisional sentence), and close the spine's deferral row (`ARCHITECTURE-SPINE.md:425`) with the decision, date and the R3/R5 note (`MAXDOP = 1` stays unrelaxable; re-measure after AR-40c — `test-design-architecture.md:630`). `OperationsRecordTests` may hold §7's wording — update it with the text. Fix the $/£ inconsistency in passing only if that row is edited (spine says $12–15; operations.md says £12–15).
+  - [x] Update `tests/TESTING-CONVENTIONS.md:711-714` ("Nightly and Weekly do not exist yet …") to describe the stages, tier selection, the percentile helper and the scale collections.
 
-- [ ] **Task 12 — Browser suites for paging** (AC: 3-7, 10-12; X-5, X-6)
-  - [ ] `FakeYelloApi` (`tests/Yello.Tests.Client/FakeYelloApi.cs`): serve the Board's first page per column (50) and the page route with cursors from `FakeColumn`; record requests; keep `HoldBoardAsync`/`ReleaseBoard` and add a hold for a page answer (`TaskCompletionSource`, "hold, assert, release, assert"). `DragHarness.Many(count)` (`:139`) seeds large columns.
-  - [ ] X-5 (P0): focus identity survives paging — focus on the last loaded card, `↓` loads the next page and focus lands on Task 51 by `data-task-id`; the previously focused element is still the same Task's card; plant (render a page by replacing the list / key by index) → caught.
-  - [ ] X-6 (P1): with 120 of 5,000 loaded, every card's `aria-posinset` equals its true ordinal and `aria-setsize` 5,000; the column description reads "5000 Tasks" (or the locale's formatting — check `ColumnCountMany`); extend `KeyboardTests.Each_column_is_named_by_its_Status_and_described_by_its_true_total` rather than duplicating it.
-  - [ ] AC10 cases: creation in a partly loaded column → no card, total +1, "Task added." said once; a page containing an already-rendered Task (moved by "another Session" in the fake) → one card, at the page's position.
-  - [ ] AC11 cases: carry `↓` across a page boundary; "Show more"; the Move picker's extension and the absent "Bottom of column".
-  - [ ] Nightly real-Host case (`RealHostCollection`): 5,000 Tasks in one column; keyboard traversal from the first to the last Task asserting focus lands on the intended Task at each step (`test-design-architecture.md:467`). Long; Nightly only.
-  - [ ] Build `Yello.Client` in **Debug** before any browser run (`TESTING-CONVENTIONS.md:253-257`); rerun a Client failure seen only in the full run alone before calling it real (memory: full-run starvation).
+- [x] **Task 12 — Browser suites for paging** (AC: 3-7, 10-12; X-5, X-6)
+  - [x] `FakeYelloApi` (`tests/Yello.Tests.Client/FakeYelloApi.cs`): serve the Board's first page per column (50) and the page route with cursors from `FakeColumn`; record requests; keep `HoldBoardAsync`/`ReleaseBoard` and add a hold for a page answer (`TaskCompletionSource`, "hold, assert, release, assert"). `DragHarness.Many(count)` (`:139`) seeds large columns.
+  - [x] X-5 (P0): focus identity survives paging — focus on the last loaded card, `↓` loads the next page and focus lands on Task 51 by `data-task-id`; the previously focused element is still the same Task's card; plant (render a page by replacing the list / key by index) → caught.
+  - [x] X-6 (P1): with 120 of 5,000 loaded, every card's `aria-posinset` equals its true ordinal and `aria-setsize` 5,000; the column description reads "5000 Tasks" (or the locale's formatting — check `ColumnCountMany`); extend `KeyboardTests.Each_column_is_named_by_its_Status_and_described_by_its_true_total` rather than duplicating it.
+  - [x] AC10 cases: creation in a partly loaded column → no card, total +1, "Task added." said once; a page containing an already-rendered Task (moved by "another Session" in the fake) → one card, at the page's position.
+  - [x] AC11 cases: carry `↓` across a page boundary; "Show more"; the Move picker's extension and the absent "Bottom of column".
+  - [x] Nightly real-Host case (`RealHostCollection`): 5,000 Tasks in one column; keyboard traversal from the first to the last Task asserting focus lands on the intended Task at each step (`test-design-architecture.md:467`). Long; Nightly only.
+  - [x] Build `Yello.Client` in **Debug** before any browser run (`TESTING-CONVENTIONS.md:253-257`); rerun a Client failure seen only in the full run alone before calling it real (memory: full-run starvation).
 
-- [ ] **Task 13 — Plants, runs, ledger, status** (AC: all, 19)
-  - [ ] Plants, one at a time, original saved in memory and restored in a `finally`, hash compared after restore: `OFFSET` seek; `nvarchar` cursor parameter (logical reads or plan shows a scan); posinset from a page-local index; card element reused across Task ids (key by index); announcement on append; no column focus for an unloaded deleted Task; RCSI off; per-frame rect reads on a still pointer; full gap mapped to the old type; Projects-per-Space count with the old range lock. Record the table `| # | Plant | Gate | Caught |`.
-  - [ ] `dotnet build Yello.slnx` 0/0; `dotnet build-server shutdown`; full run with `--max-parallel-test-modules 1` (never two `dotnet test` at once); Nightly/Weekly tests run once locally by their filter and their numbers recorded.
-  - [ ] Ledger: for every entry in the header, write CLOSED (with the test/evidence) or RE-OWNED (owner, reason) **in `deferred-work.md` itself**. Recommended dispositions are in "Ledger dispositions" below. Add new entries for anything deferred here, with owners.
-  - [ ] `sprint-status.yaml`: `2-9-the-board-at-five-thousand-tasks: review`.
+- [x] **Task 13 — Plants, runs, ledger, status** (AC: all, 19)
+  - [x] Plants, one at a time, original saved in memory and restored in a `finally`, hash compared after restore: `OFFSET` seek; `nvarchar` cursor parameter (logical reads or plan shows a scan); posinset from a page-local index; card element reused across Task ids (key by index); announcement on append; no column focus for an unloaded deleted Task; RCSI off; per-frame rect reads on a still pointer; full gap mapped to the old type; Projects-per-Space count with the old range lock. Record the table `| # | Plant | Gate | Caught |`.
+  - [x] `dotnet build Yello.slnx` 0/0; `dotnet build-server shutdown`; full run with `--max-parallel-test-modules 1` (never two `dotnet test` at once); Nightly/Weekly tests run once locally by their filter and their numbers recorded.
+  - [x] Ledger: for every entry in the header, write CLOSED (with the test/evidence) or RE-OWNED (owner, reason) **in `deferred-work.md` itself**. Recommended dispositions are in "Ledger dispositions" below. Add new entries for anything deferred here, with owners.
+  - [x] `sprint-status.yaml`: `2-9-the-board-at-five-thousand-tasks: review`.
 
 ## Dev Notes
 
@@ -398,14 +398,156 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, run unattended by the story-cycle orchestrator.
+
 ### Debug Log References
+
+**Baseline** (orchestrator, ATDD commit `428dcc5`): 1340 total, 1293 passed, 0 failed, 47 skipped. Not re-run before work began; the build was 0/0.
+
+**AC14 measured first** (activation order 1). Fake with `PageSize = null` (all 5,000 cards at once - paging's end state), Debug client, local Chromium: keyboard step p95 **229.8 ms**, pick-up 219.7 ms, carried step 230.5 ms, JS heap 16.3 MB - every card re-rendered on every Board render (complex parameters). With `TaskCard.ShouldRender` (Q12 (a)): step p95 **56.1 ms**, pick-up 64.7, carried 58.5, heap 20.7 MB. Scaffold restored (hash matched). Activated as written once "Show more" existed (99 activations to 5,000): step p95 **75.6 ms**, then **56.6 ms** after the page-append index fix (below); pick-up 63.2 ms; carried step 57.6 ms; heap 23.4 MB. Inside the 90 ms budget append-only - no AD-29 amendment needed. Append of a page at 4,950 loaded: p95 3.7 s, then 3.1 s after fixing `Locate` rebuilding its index per page Task (deferred, owner Lee).
+
+**Server seek (PG-11, PG-12).** Logical reads of the product's page statement: page 2 / 50 / 99 / 100 = 110 / 110 / 111 / 108 (and 110 / 110 / 110 / 110 on later runs). Plan seeks `IX_Task_SpaceId_ProjectId_StatusId_PositionKey`, `@after varchar(128)`, no conversion. Board first paint is a loop of one `TOP (51)` seek per effective Status (3-5 statements), chosen over one statement (`ROW_NUMBER()` reads the Project).
+
+**Scaffold corrections** (each kept, corrected, recorded):
+1. PG-11 - the statement's first execution read 128 pages (compilation) against 108-111 later at any depth: a warm-up read added; the tolerance 2 -> 5 (the last page lacks the look-ahead row: one clustered key lookup fewer; plus a leaf boundary). OFFSET grows it to thousands.
+2. PG-15 - read as the Owner, already present, so the presence count never ran: with RCSI planted off the case still passed. The reader is now a second Member entering the Space; planted off, it fails.
+3. PG-16 - `ObjectLocksHeldAsync` called `OBJECT_NAME` on every lock row's `bigint` hobt id before the `OBJECT` filter (arithmetic overflow); now names object locks only. `WaitsAsync` added to the failure message (wait type, resource, statement).
+4. ISO-BOARD-COLUMN-FOREIGN-ID-IN-OWN-SPACE - the scaffold's plant (drop the Task's two layers) cannot fail on this route: the Project and Status checks stand in front. The plant is the handler's two checks skipped (caught on both surfaces).
+5. `ViewBoardHandlerTests` - 2.2's "a Task outside the effective set fails loudly" cannot hold once each column reads only its Status; replaced by `First_paint_is_one_bounded_seek_per_column_of_the_effective_set` (+3 unit cases for the cursor and the page handler).
+6. Client `A_Viewer_pages_a_column_too` asserted nothing (S2699): now asserts the control is gone once fully loaded.
+7. Client `A_page_holding_a_Task_already_drawn_...` - the key-by-index plant was not caught by any append-only case (appending at the end never shifts an index); the case now tags Card 11's element and asserts it still draws Card 11 after the reorder.
+8. `BoardPageWire`, `IsolationCases` - scaffold constants swapped for `BoardRoutes.Column`/`ColumnOf`, `BoardPage.Size`, `ProblemTypes.*` (Isolation keeps a local `PageSize = 50`: it references Host and Contracts only). `FakeYelloApi` keeps anonymous bodies: `FakeTask` serialises to `TaskResponse`'s members, so the bytes are the contract's.
+9. Gates amended by exactly 2.9's addition: `BoardEndpointTests` column pin +`nextAfter`; ARCH-503 route list +`GET …/board/columns/{statusId:guid}`; `RefusalBoundaryGateTests.Tasks` vacuity guard +`BoardColumnPageResponse`; MOV-11 now expects `task-position-full`. Each went red first.
+
+**RCSI fallout (Task 8's "re-run every race class").** First full Slices run after the migration: 603, 2 failed. (a) `A_Labels_edit_queued_behind_a_deletion_answers_404_...` - a **real regression**: the edit's unhinted read saw the committed row past an uncommitted deletion and answered `400 invalid-task-labels`, not `404`; a title edit would have reached a 0-row UPDATE (`500`). (b) `A_deletion_racing_an_application_...` - the edit's current-set read no longer waited. Fix: `READCOMMITTEDLOCK` on `TaskStore.ApplyAsync`'s first read and `ReplaceAsync`'s current-set read (shared locks released at statement end, so no new lock order). Both green.
+
+**Locks at scale (Task 9).** PG-16 observed escalation: `OBJECT X` on `Task` and `TaskLabel` (5,000 Tasks x 3 Labels) -> Q15 (a), migration `20261028123715_TaskLockEscalationDisabled`. Still red: B's creation waited on `LCK_M_RS_U` at a key of A's - the Tasks-per-Project count's `UPDLOCK, HOLDLOCK` range locked the next key after B's range, which was A's first (adjacent Space ids). Q17 below: every key placer takes the Project's own application lock instead of the range. Test holders that played "the Project's range" moved to the lock (`DeleteWire.HoldProjectRangeAsync`, `HoldProjectsPerSpaceAsync`, `TaskEndpointTests.Bound`, `EditRace.HoldColumnAsync`, `ProjectEndpointTests.Bound`/`Idempotency` - the last waited on `LCK_M_RS_U`, now `LCK_M_X APPLICATION`).
+
+**Drag (AC14 half).** First run read 10 rects over 10 still frames: `#follow` ran on "scrolling" frames while the pointer sat in an edge zone that could not scroll. Auto-scroll now continues only on real scroll events.
+
+**Plants** (one at a time; original saved, restored in a `finally` and touched - Copy-Item had kept an old timestamp once and MSBuild skipped the rebuild, so the binary kept a plant until touched; hashes compared after restore):
+
+| # | Plant | Gate | Caught |
+|---|---|---|---|
+| 1 | `OFFSET`/`Skip()` page (statement still `> @floor`) | PG-11 (reads 216 / 5,343 / 10,572 / 10,678), PG-12 | yes |
+| 2 | `nvarchar(128)` cursor parameter | PG-12 ("converts PositionKey implicitly"); PG-11 green - a mismatched-type range still seeks | yes |
+| 3 | Column-page handler skips the Project and effective-set checks | ISO-BOARD-COLUMN-FOREIGN-ID-IN-OWN-SPACE, Session and ApiToken | yes, both surfaces |
+| 4 | RCSI off (migration's `ALTER` replaced) | SCH-901, PG-14, PG-15 (after correction 2) | yes |
+| 5 | Announcement on append ("Loaded.") | `Nothing_is_announced_when_a_page_loads_...` | yes |
+| 6 | Cards keyed by index | `A_page_holding_a_Task_already_drawn_...` (after correction 7) | yes |
+| 7 | No column focus for an unloaded Task | `Closing_the_panel_on_a_Task_held_out_...` | yes |
+| 8 | Rects read every frame | `A_lifted_card_reads_no_card_rects_...` (2,060 reads over 10 frames) | yes |
+| 9 | `aria-posinset` from a page-local index | X-6 (index 50: expected `51/5000`) | yes |
+| 10 | Full gap answered `task-position-unavailable` | PG-18 (`Strings differ`, expected `task-position-full`) | yes |
+| 11 | Projects-per-Space count with the old range lock, no applock | PG-17 (A's creation no longer queued on the held lock) | yes |
+| - | Lock escalation on (before Q15's migration) | PG-16 (`OBJECT X` listed) | yes (the red state) |
+
+**Tier runs** (by filter, `--explicit on`; local engine, warm - never production evidence):
+- Nightly P-2 (`BoardScaleTimingTests`, 5,000 Tasks x 3 Labels, 100 interleaved samples): Board read p95 14.9 ms, page 1 12.8 ms, page 100 12.2 ms; depth medians 10.1 vs 10.2 ms (0.6 %).
+- Nightly AC14 (`BoardRenderCostTests`): see above.
+- Nightly X-5 real Host (`RealHostBoardScaleTests`): 4,999 presses through the real client, Host and column-page route, focus on Seeded 2 … 5,000 in turn, all 5,000 cards drawn once - passed in 2 m 58 s.
+- Weekly P-1 (`EnvelopeLoadTests`, 50 Sessions, 100 samples per class): Board 12.8, page-first 10.8, page-last 10.3, listing 7.8, Board on a Token 11.9, 404-boundary 65.3, 404-in-Space 62.6; create 26.4, edit 15.7, move 18.6, delete 13.0 ms p95. Key length in the 5,000-Task column max 7, avg 6. `Task` clustered index 98.8 % fragmented over 248 pages (the seeded `NEWID()` rows).
+- Weekly P-11 (cold path, 3 fresh Hosts): listening after 1,180-1,214 ms; first Space-scoped response after 1,684-1,806 ms.
+
+**Bundle.** `artifacts/efbundle-win-x64/efbundle.exe` rebuilt with both migrations; `MigrationBundleEquivalenceTests` 2/2 with `YELLO_MIGRATION_BUNDLE` set (catalogue holds `rcsi|1` and `escalation|Task|DISABLE`).
+
+**Runs.** `dotnet build Yello.slnx` 0 warnings, 0 errors; `dotnet build-server shutdown`. First full run (`dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`): 1360 total, 1350 passed, **2 failed**, 8 skipped, 17 m 52 s - `DesignFoundationGateTests`: three doc comments quoted the new copy ("Show more …") as C# string literals, and `.board-column__more` declared a block-axis target floor without the inline one; fixed (comments name the copy keys; `min-inline-size: var(--target-min)`). The rerun of the whole solution was stopped by the host for low memory (the user's browser held about 9 GB; nothing in the run itself), so - once, as the orchestrator allows - the same binaries were run one project at a time: Architecture 333/333, Merge 0 (empty by design), Revocation 17/17, Isolation 127/127, Client 279 (277 passed, 2 skipped), Slices 604 in two halves by namespace (223/223; 381 with 375 passed, 6 skipped). **Total 1360, 1352 passed, 0 failed, 8 skipped.** The 8 skips: the three migration-bundle cases (`YELLO_MIGRATION_BUNDLE` unset; run separately above, 2/2 + the bundle-backed SLC cases) and the five Explicit Nightly/Weekly cases (run by their tier filter above, all green). No isolation row is pending (`PendingUntil: "2.9"` none).
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created (create-story, 2026-10-28).
+- **Implemented**: per-column keyset paging (`IBoardReader.PageAsync`, `BoardPage`, `ViewBoardColumnHandler`, `GET …/board/columns/{statusId}?after=`), `BoardColumnResponse.NextAfter` appended, `BoardColumnPageResponse`, `invalid-board-cursor` and `task-position-full`; the client's contiguous loaded prefix (hold-out rule, de-duplication, cursor advance on a move after the last loaded card, page totals adopted when nothing is unsettled), every route to the next page (`↓`, carried `↓`, "Show more Tasks", the Move picker's "Show more positions"; "Bottom of column" only when fully loaded), AC12 focus destinations, `TaskCard.ShouldRender` and a card index, the drag's cached rects; RCSI and lock-escalation migrations; application locks for Projects-per-Space and for each Project's Tasks; Nightly and Weekly workflows; AR-40b decided; 26 ledger entries settled.
+- Q1 - (a) the Board answers each column's first page plus `nextAfter`; `GET …/board/columns/{statusId}?after={key}` answers the next. No client page size. Cost to later stories: one more route on both isolation surfaces; Epic 8's API docs list it.
+- Q2 - (a) a page carries the column's `COUNT`; the client adopts it only when no write of its own touching the column is unsettled. Cost: one more seek per page.
+- Q3 - (a) a re-read after `409` loads every column's first page, then pages only the column holding the carried, active or focused Task until it is drawn again; if it cannot be, focus goes to its column. Cost: deep columns elsewhere collapse to 50.
+- Q4 - (a) a page holding a drawn Task moves that card (newer read wins) unless its own write is unsettled; never twice. Cost: a Task moved above the cursor by another Session is seen on the next Board read (Epic 7's push).
+- Q5 - (a) a "Show more Tasks" button at a partly loaded column's foot, `tabindex -1`, accessible name "Show more Tasks in {Status}", every Role. Cost: a pointer user clicks once per 50; copy and placement ledgered to UX.
+- Q6 - (a) a drag drops among loaded cards only; auto-scroll does not load. Ledgered to UX.
+- Q7 - (a) focus for a Task with no loaded card goes to the column that counts it (deletion and panel close).
+- Q8 - (a) "Board loaded." stays once on the cold load; page loads and re-reads say nothing. Reading noted on `:498` for UX; reversal is one line plus its assertions.
+- Q9 - (a) NFR-5 measured warm, cold path exempt, `minReplicas: 0` (`docs/operations.md` §7; spine row closed). Cost: a first request after idle is slow and exempt.
+- Q10 - (a) RCSI everywhere, statement-level snapshots, disagreement bounded; recorded in `BoardReader`, `ViewBoardHandler` and `ViewBoardColumnHandler`. Snapshot-per-request rejected (presence writes would meet 3960).
+- Q11 - (a) `409 task-position-full`, "There is no room at that position. Choose another position."; no rebalancing (PM entry). Copy to UX.
+- Q12 - (a) applied: measured the full re-render (229.8 ms), `ShouldRender` brought it to 56 ms.
+- Q13 - (a) a fifth trait `Tier` (`Nightly`/`Weekly`), `nightly.yml` and `weekly.yml` run per project, `ci.yml` excludes both tiers by trait; **plus** every tiered test is `Explicit = true` (gate `Every_tiered_test_is_Explicit`) so a plain local `dotnet test Yello.slnx` never starts the 5,000-Task suites. Cost: a tier is run with `--explicit on`; the promotion gate's single `dotnet test Yello.slnx` job is untouched.
+- Q14 - (a) `sp_getapplock` `Yello/ProjectsPerSpace/{spaceId}` before the count (no range hints); Project deletion takes it too.
+- Q15 - (a) escalation observed, `LOCK_ESCALATION = DISABLE` on `Task` and `TaskLabel`; deletion stays one statement.
+- Q16 - (a) a .NET harness over `RunningHost`, no new dependency; one request at a time across 50 Sessions (ledgered: parallel load needs an approved tool).
+- Q17 (new, cut-able) - the Project's Task range lock (`UPDLOCK, HOLDLOCK WHERE ProjectId`) became an application lock `Yello/ProjectTasks/{projectId}` taken by every key placer (creation's bound count, Status edit, move, Task deletion, Project deletion), with plain reads after it under RCSI. Reason: the range's next key reached the adjacent Space, so AC17 failed even with escalation disabled. Cost: race tests hold the lock, not the range.
+- Q18 (new, cut-able) - `READCOMMITTEDLOCK` on the two write-path reads that relied on waiting (`TaskStore.ApplyAsync`, `ReplaceAsync`). Reason: RCSI turned a held Task deletion into a `400`/`500` for a racing edit.
+- Q19 (new, cut-able) - every tiered test is `Explicit` (see Q13); `TESTING-CONVENTIONS.md` documents running a tier.
 
 ### File List
+
+- `.github/workflows/ci.yml`
+- (new) `.github/workflows/nightly.yml`
+- (new) `.github/workflows/weekly.yml`
+- (new) `Yello.Application/Boards/BoardPage.cs`
+- `Yello.Application/Boards/ViewBoard/ViewBoardHandler.cs`
+- (new) `Yello.Application/Boards/ViewBoardColumn/ViewBoardColumnHandler.cs`
+- `Yello.Application/Tasks/MoveTask/MoveTaskHandler.cs`
+- `Yello.Client/Components/BoardColumn.razor`
+- `Yello.Client/Components/BoardView.Keys.cs`
+- (new) `Yello.Client/Components/BoardView.Paging.cs`
+- `Yello.Client/Components/BoardView.razor`
+- `Yello.Client/Components/BoardView.razor.cs`
+- `Yello.Client/Components/MoveChoice.cs`
+- `Yello.Client/Components/MovePicker.razor`
+- `Yello.Client/Components/TaskCard.razor`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Refusals/RefusalCopy.cs`
+- `Yello.Client/wwwroot/css/components.css`
+- `Yello.Client/wwwroot/js/board-drag.js`
+- `Yello.Contracts/Boards/BoardResponse.cs`
+- `Yello.Contracts/Boards/BoardRoutes.cs`
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Domain/Boards/IBoardReader.cs`
+- `Yello.Domain/Tasks/ITaskStore.cs`
+- `Yello.Domain/Tasks/PositionKey.cs`
+- `Yello.Host/Endpoints/BoardEndpoints.cs`
+- `Yello.Host/Endpoints/TaskMoveBody.cs`
+- `Yello.Host/Endpoints/TaskMoveEndpoints.cs`
+- `Yello.Host/Program.cs`
+- (new) `Yello.Infrastructure/Persistence/ApplicationLocks.cs`
+- `Yello.Infrastructure/Persistence/BoardReader.cs`
+- `Yello.Infrastructure/Persistence/BoundCounter.cs`
+- (new) `Yello.Infrastructure/Persistence/Migrations/20261028120526_ReadCommittedSnapshot.Designer.cs`
+- (new) `Yello.Infrastructure/Persistence/Migrations/20261028120526_ReadCommittedSnapshot.cs`
+- (new) `Yello.Infrastructure/Persistence/Migrations/20261028123715_TaskLockEscalationDisabled.Designer.cs`
+- (new) `Yello.Infrastructure/Persistence/Migrations/20261028123715_TaskLockEscalationDisabled.cs`
+- `Yello.Infrastructure/Persistence/ProjectStore.cs`
+- `Yello.Infrastructure/Persistence/TaskStore.cs`
+- `_bmad-output/implementation-artifacts/2-9-the-board-at-five-thousand-tasks.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md`
+- `docs/operations.md`
+- `tests/TESTING-CONVENTIONS.md`
+- `tests/Yello.Tests.Architecture/BoardPagingGateTests.cs`
+- `tests/Yello.Tests.Architecture/DeploymentShapeTests.Tiers.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Delete.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Tasks.cs`
+- `tests/Yello.Tests.Client/BoardPagingTests.cs`
+- `tests/Yello.Tests.Client/BoardRenderCostTests.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.cs`
+- `tests/Yello.Tests.Client/RealHostBoardScaleTests.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.cs`
+- `tests/Yello.Tests.Slices/Boards/BoardEndpointTests.cs`
+- `tests/Yello.Tests.Slices/Boards/BoardPageWire.cs`
+- `tests/Yello.Tests.Slices/Boards/BoardPagingTests.cs`
+- `tests/Yello.Tests.Slices/Boards/BoardScaleTimingTests.cs`
+- `tests/Yello.Tests.Slices/Boards/EnvelopeLoadTests.cs`
+- `tests/Yello.Tests.Slices/Boards/ViewBoard/ViewBoardHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Deployment/DatabaseIdentityTests.cs`
+- `tests/Yello.Tests.Slices/Deployment/MigrationBundleEquivalenceTests.cs`
+- `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.Bound.cs`
+- `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.Idempotency.cs`
+- `tests/Yello.Tests.Slices/Tasks/DeleteWire.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Bound.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.EditRace.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Move.cs`
 
 ### Change Log
 
 - 2026-10-28 - Story created (create-story): ACs 1-8 verbatim from `epics.md:1303-1336`, ACs 9-19 derived; 16 open questions with recommendations; 26 ledger entries folded or with recommended re-owners.
+- 2026-10-28 - Implemented (dev-story): keyset paging server and client, page contract and refusals, RCSI and lock-escalation migrations, application locks for Projects-per-Space and Project Tasks, full-gap refusal, Nightly/Weekly stages, AR-40b decided, ledger settled. Status -> review.

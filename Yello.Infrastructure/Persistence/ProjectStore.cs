@@ -30,7 +30,8 @@ namespace Yello.Infrastructure.Persistence;
 /// <para>
 /// <b>One statement, cascades in the database.</b> <c>ExecuteDelete</c> on the Project; <c>FK_Task_Project_SpaceId_ProjectId</c>
 /// and <c>TaskLabel</c>'s key to <c>Task</c> are <c>CASCADE</c> and carry <c>SpaceId</c>, so they cannot leave the Space.
-/// Never batched: atomicity wins over lock escalation on a large Project (ledgered to story 2.9).
+/// Never batched: atomicity wins, and since story 2.9 the Task tables never escalate (LOCK_ESCALATION = DISABLE), so a large
+/// deletion holds rows, not the tables other Spaces write to.
 /// </para>
 /// </remarks>
 /// <param name="dbContext">The request's unit of work.</param>
@@ -91,6 +92,10 @@ internal sealed class ProjectStore(YelloDbContext dbContext, IIdentifierGenerato
     /// <inheritdoc />
     public async Task<ProjectDeletion> DeleteAsync(Guid projectId, CancellationToken cancellationToken)
     {
+        // The Space's Projects-per-Space lock first, as a creation's count takes it (story 2.9, open question 14 (a)), so a
+        // deletion and a creation in one Space queue at one lock and no Space waits on another's.
+        await ApplicationLocks.TakeProjectsPerSpaceAsync(dbContext, cancellationToken).ConfigureAwait(false);
+
         var locked = await dbContext.Projects
             .FromSql($"SELECT * FROM dbo.[Project] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {projectId}")
             .AsNoTracking()
@@ -102,11 +107,9 @@ internal sealed class ProjectStore(YelloDbContext dbContext, IIdentifierGenerato
             return ProjectDeletion.NotFound;
         }
 
-        // The Project's Task range, in the statement shape a creation's bound count takes, so the two meet on it.
-        _ = await dbContext.Database
-            .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = {projectId}")
-            .SingleAsync(cancellationToken)
-            .ConfigureAwait(false);
+        // The Project's Tasks lock, as a creation's bound count and every key placer take it, so the two meet on it (story
+        // 2.9: a lock of its own, where a range scan's last key reached another Space).
+        await ApplicationLocks.TakeProjectTasksAsync(dbContext, projectId, cancellationToken).ConfigureAwait(false);
 
         var deleted = await dbContext.Projects
             .Where(project => project.Id == projectId)

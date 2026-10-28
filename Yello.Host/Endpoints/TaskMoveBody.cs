@@ -85,8 +85,8 @@ internal static class TaskMoveBody
     }
 
     /// <summary>
-    /// <c>409 task-position-unavailable</c>: the neighbour is not a Task of the destination column, or no key fits. One
-    /// body for a random id and another Space's real id alike (I-13).
+    /// <c>409 task-position-unavailable</c>: the neighbour is not a Task of the destination column. One body for a random
+    /// id and another Space's real id alike (I-13).
     /// </summary>
     /// <returns>The refusal.</returns>
     internal static IResult PositionUnavailable() =>
@@ -94,6 +94,18 @@ internal static class TaskMoveBody
             statusCode: StatusCodes.Status409Conflict,
             type: ProblemTypes.TaskPositionUnavailable,
             title: "That position is not available. Choose the position again.");
+
+    /// <summary>
+    /// <c>409 task-position-full</c> (story 2.9, AC18, open question 11 (a)): the neighbour is there, but no position key
+    /// fits after it. Reachable only for a neighbour the caller can see in its own column, so it tells nothing about
+    /// another Space.
+    /// </summary>
+    /// <returns>The refusal.</returns>
+    internal static IResult PositionFull() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status409Conflict,
+            type: ProblemTypes.TaskPositionFull,
+            title: "There is no room at that position. Choose another position.");
 
     private static IResult InvalidMove() =>
         Results.Problem(

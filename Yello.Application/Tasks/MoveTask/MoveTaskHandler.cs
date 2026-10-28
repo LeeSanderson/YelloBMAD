@@ -55,7 +55,12 @@ public sealed class MoveTaskHandler(ITaskStore store, IStatusDefinitionReader st
 
         if (move.Outcome != TaskMoveOutcome.Moved)
         {
-            return move.Outcome == TaskMoveOutcome.NotFound ? MoveTaskResult.NotFound : MoveTaskResult.PositionUnavailable;
+            return move.Outcome switch
+            {
+                TaskMoveOutcome.NotFound => MoveTaskResult.NotFound,
+                TaskMoveOutcome.PositionFull => MoveTaskResult.PositionFull,
+                _ => MoveTaskResult.PositionUnavailable,
+            };
         }
 
         var labels = await store.LabelIdsOfAsync([taskId], cancellationToken).ConfigureAwait(false);
@@ -83,9 +88,14 @@ public sealed record MoveTaskResult(MoveTaskOutcome Outcome, TaskItem? Task, IRe
     public static MoveTaskResult StatusOutsideTheEffectiveSet { get; } = new(MoveTaskOutcome.StatusOutsideTheEffectiveSet, null, []);
 
     /// <summary>
-    /// The neighbour is not a Task of the destination column, or the gap has no room; nothing was written.
+    /// The neighbour is not a Task of the destination column; nothing was written.
     /// </summary>
     public static MoveTaskResult PositionUnavailable { get; } = new(MoveTaskOutcome.PositionUnavailable, null, []);
+
+    /// <summary>
+    /// The gap after the neighbour has no room for another key (story 2.9, AC18); nothing was written.
+    /// </summary>
+    public static MoveTaskResult PositionFull { get; } = new(MoveTaskOutcome.PositionFull, null, []);
 
     /// <summary>
     /// The move was applied, or the Task was already there.
@@ -117,7 +127,12 @@ public enum MoveTaskOutcome
     StatusOutsideTheEffectiveSet,
 
     /// <summary>
-    /// The neighbour is not one, or no key fits (story 2.6, open questions 3 and 10).
+    /// The neighbour is not one (story 2.6, open question 3).
     /// </summary>
     PositionUnavailable,
+
+    /// <summary>
+    /// No key fits after the neighbour (story 2.6, open question 10; story 2.9, AC18).
+    /// </summary>
+    PositionFull,
 }

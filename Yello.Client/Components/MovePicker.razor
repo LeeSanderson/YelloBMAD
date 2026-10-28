@@ -20,6 +20,11 @@
 
     ONE TAB STOP PER STEP (story 2.8, AC15): the option focus was last on, or the step's first; ↑/↓, Home and End move
     between options (js/board-keys.js, from the list itself too), and focusing one never chooses it.
+
+    A PARTLY LOADED COLUMN (story 2.9, AC11) lists the positions its loaded Tasks offer, then "Show more positions", which
+    loads the column's next page into the Board's own column state - one data source - and extends the list, the active
+    option moving to the first new position. "Bottom of column" is offered only once the column is fully loaded: a move
+    names a concrete neighbour, and the true last Task of a partly loaded column is not known here.
 *@
 
 <ul class="picker move-picker"
@@ -59,6 +64,11 @@
 </ul>
 
 @code {
+    /// <summary>
+    /// The id the show-more option (<c>MoveMorePositions</c>) is offered under: no Task's, and not the top's empty id (story 2.9).
+    /// </summary>
+    private static readonly Guid MorePositions = new("ffffffff-ffff-ffff-ffff-ffffffffffff");
+
     private ElementReference _list;
     private Guid? _chosen;
     private bool _focusList = true;
@@ -107,15 +117,22 @@
     /// </summary>
     private List<(TaskStatusOption Option, string? Note)> Positions(Guid statusId)
     {
-        var others = Columns.FirstOrDefault(column => column.StatusId == statusId)?.Tasks.Where(task => task.Id != Item.Id).ToList() ?? [];
+        var column = Columns.FirstOrDefault(candidate => candidate.StatusId == statusId);
+        var others = column?.Tasks.Where(task => task.Id != Item.Id).ToList() ?? [];
         var positions = new List<(TaskStatusOption Option, string? Note)> { (new TaskStatusOption(Guid.Empty, Localizer["MoveTop"]), null) };
+        var fullyLoaded = column?.LoadMore is null;
 
         for (var index = 0; index < others.Count; index++)
         {
             var text = string.Format(CultureInfo.CurrentCulture, Localizer["MovePosition"], index + 2, others[index].Title);
-            var note = index == others.Count - 1 ? Localizer["MoveBottom"].Value : null;
+            var note = fullyLoaded && index == others.Count - 1 ? Localizer["MoveBottom"].Value : null;
 
             positions.Add((new TaskStatusOption(others[index].Id, text), note));
+        }
+
+        if (!fullyLoaded)
+        {
+            positions.Add((new TaskStatusOption(MorePositions, Localizer["MoveMorePositions"]), null));
         }
 
         return positions;
@@ -147,16 +164,43 @@
         _active = null;
     }
 
-    private Task ChoosePositionAsync(Guid afterTaskId)
+    private async Task ChoosePositionAsync(Guid afterTaskId)
     {
         if (_chosen is not { } statusId)
         {
-            return Task.CompletedTask;
+            return;
+        }
+
+        if (afterTaskId == MorePositions)
+        {
+            await ShowMorePositionsAsync(statusId);
+            return;
         }
 
         Guid? after = afterTaskId == Guid.Empty ? null : afterTaskId;
 
-        return OnChoose.InvokeAsync(new MoveChoice(statusId, after));
+        await OnChoose.InvokeAsync(new MoveChoice(statusId, after));
+    }
+
+    /// <summary>
+    /// The show-more option (story 2.9, AC11): the column's next page, loaded by the Board; the step's stop moves to the
+    /// first position it added, and focus stays in the list.
+    /// </summary>
+    private async Task ShowMorePositionsAsync(Guid statusId)
+    {
+        if (Columns.FirstOrDefault(column => column.StatusId == statusId)?.LoadMore is not { } loadMore)
+        {
+            return;
+        }
+
+        var before = Positions(statusId).Count - 1;
+
+        await loadMore();
+
+        var after = Positions(statusId);
+
+        _active = before < after.Count ? after[before].Option.Id : null;
+        _focusList = true;
     }
 
     private Task KeyDownAsync(KeyboardEventArgs args)
