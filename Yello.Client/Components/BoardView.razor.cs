@@ -91,7 +91,6 @@ public sealed partial class BoardView
     // settled, so the picker stops offering a neighbour that has moved or gone.
     private bool _rereadBoard;
 
-
     /// <summary>
     /// The four attributes a Task edit can change.
     /// </summary>
@@ -351,7 +350,16 @@ public sealed partial class BoardView
             ? string.Format(CultureInfo.CurrentCulture, Localizer["TaskMoved"], column.Name, index + 1, column.Total)
             : string.Format(CultureInfo.CurrentCulture, Localizer["TaskReturned"], column.Name, index + 1));
 
-        if (outcome != EditOutcome.Admitted && fromMenu)
+        RefocusAfterAnswer(taskId, outcome, fromMenu);
+    }
+
+    /// <summary>
+    /// A refused menu or keyboard move puts focus back on its card; a card picked up again while its last move was out keeps
+    /// focus wherever the answer draws it (AD-29).
+    /// </summary>
+    private void RefocusAfterAnswer(Guid taskId, EditOutcome outcome, bool fromMenu)
+    {
+        if ((outcome != EditOutcome.Admitted && fromMenu) || _carried == taskId)
         {
             FocusCardTitle(taskId);
         }
@@ -507,7 +515,6 @@ public sealed partial class BoardView
             EndHeld();
         }
 
-
         // Focus moves to the column only from the panel the deletion was confirmed in; another panel keeps its focus.
         var fromItsPanel = _openTaskId == taskId;
 
@@ -574,12 +581,18 @@ public sealed partial class BoardView
 
         while (more)
         {
-            // Purged, or deleted by this tab, while a move waited on its neighbour: nothing is sent.
-            outcome = await ReadyToSendAsync(taskId, sending, generation)
-                ? await SendAsync(taskId, replica, attribute, sending, generation)
-                : EditOutcome.Gone;
-
-            Settled(replica, attribute);
+            try
+            {
+                // Purged, or deleted by this tab, while a move waited on its neighbour: nothing is sent.
+                outcome = await ReadyToSendAsync(taskId, sending, generation)
+                    ? await SendAsync(taskId, replica, attribute, sending, generation)
+                    : EditOutcome.Gone;
+            }
+            finally
+            {
+                // Settled however the send ended, so a move waiting on this Task as its neighbour never waits for ever.
+                Settled(replica, attribute);
+            }
 
             more = outcome == EditOutcome.Admitted
                 && replica.Queued.Remove(attribute, out sending)
@@ -640,9 +653,6 @@ public sealed partial class BoardView
         && neighbour.HasOutstanding(TaskAttribute.Status)
         && _replicas.TryGetValue(after, out var current) && ReferenceEquals(current, neighbour);
 
-    /// <summary>
-    /// Wakes every move waiting on a neighbour's (open question 9): one has settled, the Task is gone, or the Board purged.
-    /// </summary>
     /// <summary>
     /// One send of a Task's Status change has settled: a move waiting on it as its neighbour checks again.
     /// </summary>

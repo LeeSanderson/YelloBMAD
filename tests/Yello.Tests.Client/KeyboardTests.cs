@@ -116,6 +116,7 @@ public sealed class KeyboardTests(ClientSurfaceFixture surface)
         await using (context)
         {
             await OpenAsync(api, page, Northwind, Atlas);
+            await page.EvaluateAsync(RecordKeys);
             await FocusCardAsync(page, "First");
 
             foreach (var (key, expected) in new[] { ("ArrowDown", "Second"), ("ArrowDown", "Third"), ("ArrowDown", "Third"), ("ArrowUp", "Second"), ("ArrowUp", "First"), ("ArrowUp", "First") })
@@ -123,7 +124,8 @@ public sealed class KeyboardTests(ClientSurfaceFixture surface)
                 await PressAndFocusAsync(page, key, expected);
             }
 
-            Assert.Equal(0, await ColumnNamed(page, "Todo").EvaluateAsync<double>("column => column.scrollTop"));
+            // Every arrow was the Board's - prevented, so no column or page scrolled by its default - even at the ends.
+            Assert.Equal([true, true, true, true, true, true], await ArrowsAsync(page));
             Assert.Equal(0, await page.EvaluateAsync<double>("() => window.scrollY"));
         }
     }
@@ -921,6 +923,12 @@ public sealed class KeyboardTests(ClientSurfaceFixture surface)
             await page.Keyboard.PressAsync("Enter");
             await page.Locator(".move-picker [role='option']").First.WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
 
+            // Focus opens on the list itself: Space there chooses nothing and scrolls nothing.
+            await page.WaitForFunctionAsync("() => document.activeElement?.matches('.move-picker')", null, new PageWaitForFunctionOptions { Timeout = WaitMs, PollingInterval = 50 });
+            await page.Keyboard.PressAsync(" ");
+
+            Assert.Equal(0, await page.Locator(".move-picker [role='option']", new PageLocatorOptions { HasText = "Top of column" }).CountAsync());
+
             await PressAndFocusAsync(page, "ArrowDown", "LI:Todo Current");
             await PressAndFocusAsync(page, "End", "LI:Done");
             await PressAndFocusAsync(page, "ArrowUp", "LI:Doing");
@@ -936,7 +944,7 @@ public sealed class KeyboardTests(ClientSurfaceFixture surface)
             await page.Locator(LiveRegion, new PageLocatorOptions { HasText = "Moved to Doing, position 1 of 2." })
                 .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = WaitMs });
 
-            Assert.Equal([true, true], await SpacesAsync(page));
+            Assert.Equal([true, true, true], await SpacesAsync(page));
         }
     }
 
@@ -1037,6 +1045,84 @@ public sealed class KeyboardTests(ClientSurfaceFixture surface)
 
             Assert.Equal(0, await page.Locator(DropZone).CountAsync());
             Assert.DoesNotContain(Moves(api), move => move.Path == FakeYelloApi.MovePathOf(Northwind, tasks["Draft the brief"].Id));
+        }
+    }
+
+    /// <summary>
+    /// AC17, open question 10 (a) - a pointer lift under a Board read again ends too, with nothing sent for it, and its return
+    /// is said, as a keyboard carry's is.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    public async Task A_pointer_lift_under_a_Board_read_again_ends_and_says_the_return()
+    {
+        var api = TwoSpaces(Northwind, Harbour);
+        var tasks = Seed(api, Northwind, Atlas, ThreeStatuses, ["Draft the brief", "Book the room"], ["Review"]);
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenAsync(api, page, Northwind, Atlas);
+            await page.EvaluateAsync(RecordAnnouncements);
+
+            var held = api.HoldTaskMoveAsync();
+
+            await FocusCardAsync(page, "Book the room");
+            await page.Keyboard.PressAsync(" ");
+            await page.Keyboard.PressAsync("ArrowRight");
+            await WaitForDropZoneAsync(page, "Doing", null);
+            await page.Keyboard.PressAsync(" ");
+            await held.WaitAsync(TimeSpan.FromMilliseconds(WaitMs), TestContext.Current.CancellationToken);
+
+            await LiftWithMouseAsync(page, "Draft the brief");
+
+            api.ReleaseTaskMoveRefused(409, FakeYelloApi.TaskPositionUnavailableType);
+
+            await WaitUntilSaidAsync(page, "Returned to Todo, position 1.");
+            await page.Locator(Lifted).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = WaitMs });
+            await page.Mouse.UpAsync();
+
+            Assert.DoesNotContain(Moves(api), move => move.Path == FakeYelloApi.MovePathOf(Northwind, tasks["Draft the brief"].Id));
+        }
+    }
+
+    /// <summary>
+    /// AC6, open question 4 (a), Task 4 - during a carry Shift+F10 and the context-menu key do nothing, and Tab ends the carry
+    /// as a cancel: nothing sent, the return said, the card in its slot, and focus goes on.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    public async Task During_a_carry_the_menu_keys_do_nothing_and_Tab_cancels_it()
+    {
+        var api = TwoSpaces(Northwind, Harbour);
+        _ = Seed(api, Northwind, Atlas, ThreeStatuses, ["Draft the brief", "Book the room"], ["Review"]);
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenAsync(api, page, Northwind, Atlas);
+            await page.EvaluateAsync(RecordAnnouncements);
+            await FocusCardAsync(page, "Book the room");
+
+            await page.Keyboard.PressAsync(" ");
+            await page.Keyboard.PressAsync("ArrowRight");
+            await WaitForDropZoneAsync(page, "Doing", null);
+
+            await page.Keyboard.PressAsync("Shift+F10");
+            await page.Keyboard.PressAsync("ContextMenu");
+
+            Assert.Equal(0, await page.Locator(Menu).CountAsync());
+            Assert.Equal(1, await page.Locator(Carried).CountAsync());
+            Assert.Equal("Book the room", await FocusedAsync(page));
+
+            await PressAndFocusAsync(page, "Tab", "actions:Book the room");
+            await WaitUntilSaidAsync(page, "Returned to Todo, position 2.");
+
+            Assert.Empty(Moves(api));
+            Assert.Equal(0, await page.Locator(Carried).CountAsync());
+            Assert.Equal(0, await page.Locator(DropZone).CountAsync());
+            Assert.Equal(0, await page.Locator(Menu).CountAsync());
+            Assert.Equal(["Draft the brief", "Book the room"], await TitlesInAsync(page, "Todo"));
         }
     }
 

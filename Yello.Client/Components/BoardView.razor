@@ -96,7 +96,7 @@
         }
 
         <div class="board__columns" @ref="_columnsElement">
-            @foreach (var column in columns)
+            @foreach (var (column, stop) in WithActiveStop(columns))
             {
                 <BoardColumn @key="column.StatusId"
                              StatusId="@column.StatusId"
@@ -123,8 +123,8 @@
                              SettlingTaskId="@_settlingCard"
                              LiftedTaskId="@_drag?.LiftedTaskId"
                              CarriedTaskId="@_carried"
-                             ActiveTaskId="@ActiveStop.TaskId"
-                             ColumnActive="@(ActiveStop.StatusId == column.StatusId)"
+                             ActiveTaskId="@stop.TaskId"
+                             ColumnActive="@(stop.StatusId == column.StatusId)"
                              DropIndex="@DropIndexIn(column)">
                     @if (IsFirst(column) && _canManage && _creating)
                     {

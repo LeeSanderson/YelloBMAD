@@ -31,13 +31,13 @@
     @ref="_list">
     @if (_chosen is null)
     {
-        @foreach (var column in Columns)
+        @foreach (var (column, active) in StatusesWithStop())
         {
             <PickerOption @key="column.StatusId"
                           Option="@(new TaskStatusOption(column.StatusId, column.Name))"
                           MarksCurrent="false"
                           Note="@(column.StatusId == Item.StatusId ? Localizer["MoveCurrent"].Value : null)"
-                          Active="@IsActive(column.StatusId, Columns[0].StatusId)"
+                          Active="@active"
                           OnFocused="() => _active = column.StatusId"
                           OnChoose="ChooseStatus" />
         }
@@ -45,13 +45,13 @@
 
     @if (_chosen is { } chosenStatus)
     {
-        @foreach (var position in Positions(chosenStatus))
+        @foreach (var (position, active) in PositionsWithStop(chosenStatus))
         {
             <PickerOption @key="position.Option.Id"
                           Option="@position.Option"
                           MarksCurrent="false"
                           Note="@position.Note"
-                          Active="@IsActive(position.Option.Id, Guid.Empty)"
+                          Active="@active"
                           OnFocused="() => _active = position.Option.Id"
                           OnChoose="ChoosePositionAsync" />
         }
@@ -121,7 +121,24 @@
         return positions;
     }
 
-    private bool IsActive(Guid id, Guid first) => (_active ?? first) == id;
+    // The step's one tab stop: the option focus was last on while it is still offered, otherwise the step's first - so a
+    // re-render that moves or removes the remembered option never leaves the step without a stop.
+    private IEnumerable<(MoveColumn Item, bool Active)> StatusesWithStop() => WithStop(Columns, offered => offered.StatusId);
+
+    private IEnumerable<((TaskStatusOption Option, string? Note) Item, bool Active)> PositionsWithStop(Guid statusId) =>
+        WithStop(Positions(statusId), offered => offered.Option.Id);
+
+    private IEnumerable<(T Item, bool Active)> WithStop<T>(IReadOnlyList<T> items, Func<T, Guid> idOf)
+    {
+        Guid? stop = items.Count > 0 ? idOf(items[0]) : null;
+
+        if (_active is { } active && items.Any(item => idOf(item) == active))
+        {
+            stop = active;
+        }
+
+        return items.Select(item => (item, idOf(item) == stop));
+    }
 
     private void ChooseStatus(Guid statusId)
     {

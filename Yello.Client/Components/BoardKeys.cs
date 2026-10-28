@@ -184,8 +184,9 @@ public sealed class BoardKeys : IAsyncDisposable
 
             _attached = attached;
         }
-        catch (JSException)
+        catch (Exception exception) when (exception is JSException or ObjectDisposedException or InvalidOperationException or OperationCanceledException)
         {
+            // A fault here would otherwise poison the queue for every later attach, detach and disposal.
             // The module could not be loaded or attached: this Board has no arrow grammar, and Tab, Enter and the Move
             // control stay the way through it (UX-DR21). The Board is still recorded, so that every render does not try again.
         }

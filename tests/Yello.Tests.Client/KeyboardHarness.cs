@@ -40,15 +40,18 @@ internal static class KeyboardHarness
         """;
 
     /// <summary>
-    /// Installs the Space recorder: <c>window.__space</c> gains, for each Space <c>keydown</c> that reaches the window, whether
-    /// it was prevented; <c>window.__escapes</c> counts each <c>Escape</c> that reaches the document.
+    /// Installs the key recorder: <c>window.__space</c> and <c>window.__arrows</c> gain, for each Space or arrow <c>keydown</c>
+    /// that reaches the window, whether it was prevented; <c>window.__escapes</c> counts each <c>Escape</c> that reaches the
+    /// document.
     /// </summary>
     public const string RecordKeys =
         """
         () => {
             window.__space = [];
+            window.__arrows = [];
             window.__escapes = 0;
             window.addEventListener('keydown', event => { if (event.key === ' ') window.__space.push(event.defaultPrevented); });
+            window.addEventListener('keydown', event => { if (event.key.startsWith('Arrow')) window.__arrows.push(event.defaultPrevented); });
             document.addEventListener('keydown', event => { if (event.key === 'Escape') window.__escapes++; });
         }
         """;
@@ -158,6 +161,11 @@ internal static class KeyboardHarness
     /// Whether each Space that reached the window since <see cref="RecordKeys"/> ran was prevented.
     /// </summary>
     public static async Task<List<bool>> SpacesAsync(IPage page) => [.. await page.EvaluateAsync<bool[]>("() => window.__space")];
+
+    /// <summary>
+    /// Whether each arrow that reached the window since <see cref="RecordKeys"/> ran was prevented.
+    /// </summary>
+    public static async Task<List<bool>> ArrowsAsync(IPage page) => [.. await page.EvaluateAsync<bool[]>("() => window.__arrows")];
 
     /// <summary>
     /// How many <c>Escape</c>s reached the document since <see cref="RecordKeys"/> ran.

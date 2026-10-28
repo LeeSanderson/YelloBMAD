@@ -59,6 +59,7 @@ class BoardKeys {
         root.addEventListener('keyup', this.#onKeyUp);
         root.addEventListener('focusin', this.#onFocusIn);
         root.addEventListener('focusout', this.#onFocusOut);
+        root.addEventListener('contextmenu', this.#onContextMenu);
     }
 
     /**
@@ -80,6 +81,7 @@ class BoardKeys {
         this.#root.removeEventListener('keyup', this.#onKeyUp);
         this.#root.removeEventListener('focusin', this.#onFocusIn);
         this.#root.removeEventListener('focusout', this.#onFocusOut);
+        this.#root.removeEventListener('contextmenu', this.#onContextMenu);
     }
 
     #onKeyDown = event => {
@@ -151,9 +153,24 @@ class BoardKeys {
     }
 
     #onKeyUp = event => {
-        if (event.key === ' ' && this.#swallowKeyUp !== null && event.target === this.#swallowKeyUp) {
-            event.preventDefault();
+        if (event.key === ' ' && this.#swallowKeyUp !== null) {
+            if (event.target === this.#swallowKeyUp) {
+                event.preventDefault();
+            }
+
+            // Spent either way: a drop may have drawn the card afresh, so the keyup lands on another element.
             this.#swallowKeyUp = null;
+        }
+    };
+
+    // The context-menu key raises its contextmenu event apart from its keydown (on keyup, on Windows): while a Task is
+    // carried, the one aimed at the carried card does nothing either, so the card menu never opens over a carry.
+    #onContextMenu = event => {
+        const target = event.target;
+
+        if (target instanceof Element && target.closest(CARRIED_CARD) && this.#root.contains(target)) {
+            event.preventDefault();
+            event.stopPropagation();
         }
     };
 
@@ -168,7 +185,8 @@ class BoardKeys {
             return false;
         }
 
-        if (event.key === ' ' && target.matches('[role="option"]')) {
+        // Space on an option, or on the list itself (the Move picker focuses it on opening), never scrolls (AC15).
+        if (event.key === ' ' && (target === list || target.matches('[role="option"]'))) {
             event.preventDefault();
             return true;
         }
@@ -248,6 +266,12 @@ class BoardKeys {
 
     #onFocusOut = event => {
         const next = event.relatedTarget;
+
+        // The window losing focus (another application, the browser's own UI) leaves focus where it was in the document:
+        // a carry outlives it, and the arrows go on from the same card when the window comes back.
+        if (next === null && !document.hasFocus()) {
+            return;
+        }
 
         if (!(next instanceof Element) || !this.#root.contains(next)) {
             this.#invoke('Focused', null, null);

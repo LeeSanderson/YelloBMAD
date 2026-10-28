@@ -79,10 +79,22 @@ public sealed partial class BoardView
         }
     }
 
+    /// <summary>
+    /// Each column with the Board's one tab stop, worked out once per render rather than once per column.
+    /// </summary>
+    private IEnumerable<(ColumnState Column, (Guid? TaskId, Guid? StatusId) Stop)> WithActiveStop(List<ColumnState> columns)
+    {
+        var stop = ActiveStop;
+
+        return columns.Select(column => (column, stop));
+    }
+
     /// <inheritdoc />
     void IBoardKeysHost.Focused(Guid? taskId, Guid? statusId)
     {
         var changed = false;
+
+        EndRunUnlessAt(taskId, statusId);
 
         // Focus never leaves with a Task in hand: anywhere but the carried card ends the carry, said as a return.
         if (_carried is { } carried && taskId != carried)
@@ -112,6 +124,18 @@ public sealed partial class BoardView
         if (changed)
         {
             StateHasChanged();
+        }
+    }
+
+    /// <summary>
+    /// A focus move the arrows did not make - a click, Tab out and back, a panel closing - starts a new run (AC2): the
+    /// arrows' own moves land focus on the stop they recorded.
+    /// </summary>
+    private void EndRunUnlessAt(Guid? taskId, Guid? statusId)
+    {
+        if ((taskId ?? statusId) != _runAt)
+        {
+            _runAt = null;
         }
     }
 

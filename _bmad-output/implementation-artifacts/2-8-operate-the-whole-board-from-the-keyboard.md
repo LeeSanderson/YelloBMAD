@@ -4,7 +4,7 @@ baseline_commit: f2e4f72
 
 # Story 2.8: Operate the whole Board from the keyboard
 
-Status: review
+Status: done
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-8-operate-the-whole-board-from-the-keyboard`
@@ -201,6 +201,42 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1261-1293` (`status: final`
   - [x] Ledger (`deferred-work.md`): CLOSE `:489`, `:496`, `:513`, `:517`, `:535`, `:549`, `:564`, `:579` naming the code and tests; CLOSE the 2.8 half of `:569` per Q5 (the "Drop here" copy stays with UX); UPDATE `:130` (keyboard-parity matrix written; axe still open per Q13); NOTE `:525` ("+N" is still text, nothing placed); ADD with owners anything decided against the spines (the pick-up and step sentences — owner **UX** to confirm the copy; Q2's Tab reading; Q12's carried look; the axe decision — owner **Lee**).
   - [x] `sprint-status.yaml`: `review` at the end of the dev phase. **Do not add review narration to source files.**
 
+### Review Findings
+
+Code review 2026-10-28 (commit range `f2e4f72..HEAD`, review_mode full): Blind Hunter, Edge Case Hunter and Acceptance Auditor raised 31 findings, which deduplicate to 22. 0 decision-needed, 13 patch, 0 defer, 9 dismissed.
+
+- [x] [Review][Patch] Space on the Move picker's focused list scrolls its container. Focus sits on the `ul role=listbox` when the picker opens and after each step, and `#inList` prevents Space only on an option (AC15) [Yello.Client/wwwroot/js/board-keys.js:171]
+- [x] [Review][Patch] The sticky origin survives a focus move that the arrows did not make. `Focused` never clears `_runAt`, so a click away and back (or Tab out and in) reuses a stale origin (AC2; Task 2's "any focus change not made by the traversal resets the run") [Yello.Client/Components/BoardView.Keys.cs:83]
+- [x] [Review][Patch] The carried card can lose focus when the answer to its own earlier move re-places it. A Task whose move is still out can be picked up; when the answer re-draws its card, focus is not requested back by identity (AD-29) [Yello.Client/Components/BoardView.razor.cs:354]
+- [x] [Review][Patch] Pressing the context-menu key during a carry can still open the card menu. Keydown is prevented, but the `contextmenu` event that the Menu key raises (on keyup on Windows) is not, and it reaches `TaskCard`'s handler (Task 4: "do nothing while carrying") [Yello.Client/wwwroot/js/board-keys.js:147]
+- [x] [Review][Patch] Leaving the window ends a carry. When the window blurs, `focusout` reports `relatedTarget === null`, so the module reports that focus left the Board, although focus in the document has not moved [Yello.Client/wwwroot/js/board-keys.js:249]
+- [x] [Review][Patch] The `#swallowKeyUp` target is never cleared when the Space keyup lands on another element (a drop re-draws the card) [Yello.Client/wwwroot/js/board-keys.js:153]
+- [x] [Review][Patch] A faulted send never settles the replica, so moves waiting on that Task as a neighbour hang. `Settled` runs only when `SendAsync` returns; make it a `finally` [Yello.Client/Components/BoardView.razor.cs:578]
+- [x] [Review][Patch] One non-`JSException` failure in attach poisons the keyboard's attach/detach/dispose queue for good. The fault reaches `OnAfterRenderAsync` on every later render. `BoardDrag` has the same queue [Yello.Client/Components/BoardKeys.cs:150]
+- [x] [Review][Patch] The Move picker loses its only tab stop when the remembered option leaves the list. A Board re-render moves or removes that option; `Columns[0]` also throws on an empty list [Yello.Client/Components/MovePicker.razor:40]
+- [x] [Review][Patch] `ActiveStop` is recomputed (scanning every card) twice per column on every render. Compute it once per render [Yello.Client/Components/BoardView.razor:126]
+- [x] [Review][Patch] Stray artefacts: an orphaned duplicate `<summary>` above `Settled`, and two double blank lines [Yello.Client/Components/BoardView.razor.cs:643]
+- [x] [Review][Patch] The "column did not scroll" assertion cannot fail, because the seeded column is not scrollable. Assert instead that the arrows were `defaultPrevented` (AC1) [tests/Yello.Tests.Client/KeyboardTests.cs:126]
+- [x] [Review][Patch] Missing cases:
+  - Tab during a carry cancels it and says the return (Q4, AC6).
+  - Shift+F10 and the context-menu key do nothing during a carry (Task 4).
+  - A pointer lift ended by a Board re-read says the return (Q10 for lifts) [tests/Yello.Tests.Client/KeyboardTests.cs]
+
+All 13 patches were applied in the review. Two new cases were added: `A_pointer_lift_under_a_Board_read_again_ends_and_says_the_return` and `During_a_carry_the_menu_keys_do_nothing_and_Tab_cancels_it`. The arrow case now asserts `defaultPrevented`, and the Move picker case presses Space on the list itself. Two plants were each caught and restored in a `finally`, with the hash matched after restore:
+- the menu keys left unsuppressed during a carry;
+- the arrows left unprevented.
+
+Dismissed (9):
+- **JS reads "carrying" from the DOM class.** In WebAssembly the `[JSInvokable]` runs, and its render is applied, synchronously inside the keydown, so no gap exists before the next key.
+- **A chained move is sent after its neighbour's refusal and gets a guaranteed `409`.** AC16 says B then "follows 2.6's rules".
+- **Mid-carry keys ignore the stop they came from.** Focus leaving the carried card ends the carry first, synchronously.
+- **Space is eaten on a mover's card when the pick-up is refused.** This happens only with a menu open or a pointer lift in progress. Nothing wrong happens.
+- **The gates match literal spellings.** That is the repository's source-scanning gate style, and each gate is proved by a plant.
+- **The plural is hard-coded.** The story chose two resx keys (English-only copy, Dev Notes).
+- **Keys other than Esc are reported outside a carry.** They reset the run, as AC2 needs.
+- **The module is attached to `div.board`, not the row of columns.** This is required for the pickers in the panel and is documented in the module.
+- **The purge-silence test is weak.** The code path was verified by reading: `Purge` calls `EndHeld()` alone and then clears the regions.
+
 ## Dev Notes
 
 ### The shape of the story in one paragraph
@@ -393,3 +429,16 @@ Modified:
 ### Change Log
 
 - 2026-10-28 - Dev phase: the Board's keyboard composite (one roving tab stop, logical arrows with a sticky origin, Space pick-up/carry/drop through 2.6's move, Esc/Tab cancel); LiveAnnouncement (repeated sentences said again) on the Board, Space home and Space settings; listbox and menu keyboard patterns; the column's accessible count and `aria-posinset`/`aria-setsize`; chained moves wait for their neighbour; Board-side ends of a lift or carry say the return. Ledger: 9 entries closed, `:130` updated, `:525` noted, 5 added (UX x4, Lee x1).
+- 2026-10-28 - Code review (`f2e4f72..HEAD`). 31 raw findings, 22 after deduplication: 13 patched, 9 dismissed, none deferred.
+  - Space on the Move picker's list is prevented.
+  - A focus move the arrows did not make resets the sticky run.
+  - A carried card keeps focus when its earlier move is answered.
+  - The context-menu key does nothing during a carry.
+  - A window blur no longer ends a carry.
+  - The Space keyup swallow always ends.
+  - A send settles its neighbour waiters in a `finally`.
+  - The attach queues of `BoardKeys` and `BoardDrag` survive non-JS faults.
+  - The Move picker always has one tab stop.
+  - `ActiveStop` is computed once per render.
+  - Two new keyboard cases were added, and the arrow and picker cases were tightened.
+  - Full run: 1284 total, 1281 passed, 0 failed, 3 skipped.

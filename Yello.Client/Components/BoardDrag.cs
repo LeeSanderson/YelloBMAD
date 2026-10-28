@@ -293,9 +293,10 @@ public sealed class BoardDrag : IAsyncDisposable
 
             _attached = attached;
         }
-        catch (JSException)
+        catch (Exception exception) when (exception is JSException or ObjectDisposedException or InvalidOperationException or OperationCanceledException)
         {
-            // The module could not be loaded or attached. This Board has no drag, and the Move control stays the way to
+            // The module could not be loaded or attached - and a fault here would otherwise poison the queue for every later
+            // attach, detach and disposal. This Board has no drag, and the Move control stays the way to
             // move a Task (UX-DR21). The columns are still recorded, so that every render does not try again.
         }
 
