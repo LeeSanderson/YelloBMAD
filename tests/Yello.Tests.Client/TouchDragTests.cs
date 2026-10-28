@@ -117,6 +117,7 @@ public sealed class TouchDragTests(ClientSurfaceFixture surface)
             await page.EvaluateAsync("() => { document.querySelector('.board__columns').scrollLeft = 120; ColumnScroller().scrollTop = 200; function ColumnScroller() { return [...document.querySelectorAll('main .board-column')][1]; } }");
 
             var before = await ScrollAsync(page);
+            var announcedBefore = await AnnouncedAsync(page);
             var start = await GrabPointAsync(page, "Card 08");
             var session = await context.NewCDPSessionAsync(page);
 
@@ -128,6 +129,9 @@ public sealed class TouchDragTests(ClientSurfaceFixture surface)
             Assert.Equal(0, await LiftCountAsync(page));
             Assert.Equal(0, await page.EvaluateAsync<int>("() => window.__vibrations.length"));
             Assert.Empty(Moves(api));
+
+            // A pending lift a pan cancelled says nothing (AC14).
+            Assert.Equal(announcedBefore, await AnnouncedAsync(page));
 
             var after = await ScrollAsync(page);
 
@@ -292,6 +296,42 @@ public sealed class TouchDragTests(ClientSurfaceFixture surface)
 
             Assert.Equal(0, await page.Locator("[role='menu']").CountAsync());
             Assert.Equal(0, await page.Locator("[role='dialog']").CountAsync());
+            Assert.Empty(Moves(api));
+        }
+    }
+
+    /// <summary>
+    /// AC8, AC11 - a touch drag swallows only its own click: the next keyboard activation after it, which no press comes
+    /// before, still opens the Task. The keyboard path is never derived from the gesture.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR21")]
+    public async Task After_a_touch_drag_the_keyboard_still_opens_a_Task()
+    {
+        var api = TwoSpaces(Northwind, Harbour);
+        _ = Seed(api, Northwind, Atlas, ThreeStatuses, ["Draft the brief"]);
+        var (context, page) = await surface.OpenAsync(EnglishLocale, timezoneId: null, hasTouch: true);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await OpenBoardAsync(page, surface.BaseAddress, Northwind, Atlas);
+
+            var session = await context.NewCDPSessionAsync(page);
+            var start = await GrabPointAsync(page, "Draft the brief");
+
+            await TouchAsync(session, "touchStart", start);
+            await page.Locator(Lifted).WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
+            await SwipeAsync(session, start, (start.X, start.Y + 30), 3);
+            await TouchAsync(session, "touchEnd");
+            await page.Locator(Lifted).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = WaitMs });
+
+            await CardNamed(page, "Draft the brief").Locator(".task-card__open").FocusAsync();
+            await page.Keyboard.PressAsync("Enter");
+
+            await page.Locator("[role='dialog']").WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
             Assert.Empty(Moves(api));
         }
     }

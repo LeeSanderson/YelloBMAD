@@ -73,6 +73,9 @@ public sealed partial class BoardView
     {
         if (!_canManage || Locate(taskId) is not { } found || _columns?.Find(column => column.StatusId == statusId) is not { } destination)
         {
+            // The column has gone, or the Role no longer moves Tasks: nothing is sent, and like any cancel after a lift the
+            // Task's place is said (AC14).
+            Returned(taskId);
             StateHasChanged();
             return;
         }

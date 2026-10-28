@@ -20,7 +20,14 @@ namespace Yello.Client.Components;
 /// </para>
 /// <para>
 /// <b>The Board ends a drag itself</b> when it purges, reads itself again, loses the dragged Task or opens the panel
-/// (AC13): <see cref="End"/> clears the state and tells the module, silently - the Board already knows.
+/// (AC13): <see cref="End"/> clears the state and tells the module to end any gesture, pending or lifted, silently - the
+/// Board already knows. A lift already on its way when that happens is reported back as abandoned.
+/// </para>
+/// <para>
+/// <b>Attaching and detaching run one at a time</b>, in the order asked: the Board asks after every render, and renders
+/// overlap, so an attach still awaiting the module must not be raced by a second one (two listener sets) or outlived by
+/// a dispose (listeners on a dead Board). A module that cannot be loaded leaves the Board without the drag - the Move
+/// control is the canonical path (UX-DR21) - and is not retried on every render.
 /// </para>
 /// </remarks>
 public sealed class BoardDrag : IAsyncDisposable
@@ -34,6 +41,7 @@ public sealed class BoardDrag : IAsyncDisposable
     private IJSObjectReference? _attached;
     private string? _attachedTo;
     private bool _disposed;
+    private Task _queue = Task.CompletedTask;
 
     /// <summary>
     /// Creates the drag for one Board.
@@ -67,51 +75,36 @@ public sealed class BoardDrag : IAsyncDisposable
     /// </summary>
     /// <param name="columns">The row of columns.</param>
     /// <returns>A task.</returns>
-    public async Task AttachAsync(ElementReference columns)
+    public Task AttachAsync(ElementReference columns)
     {
-        if (_disposed || string.Equals(_attachedTo, columns.Id, StringComparison.Ordinal))
+        if (_disposed || (_queue.IsCompleted && string.Equals(_attachedTo, columns.Id, StringComparison.Ordinal)))
         {
-            return;
+            return Task.CompletedTask;
         }
 
-        await DetachAsync();
-
-        _module ??= await _js.InvokeAsync<IJSObjectReference>("import", ModulePath);
-        _self ??= DotNetObjectReference.Create(this);
-        _attached = await _module.InvokeAsync<IJSObjectReference>("attach", columns, _self);
-        _attachedTo = columns.Id;
+        return EnqueueAsync(() => AttachNowAsync(columns));
     }
 
     /// <summary>
     /// Ends any drag and lets go of the module's listeners: the Board is gone, or its Role no longer moves Tasks.
     /// </summary>
     /// <returns>A task.</returns>
-    public async Task DetachAsync()
+    public Task DetachAsync()
     {
         Clear();
 
-        if (_attached is not { } attached)
-        {
-            return;
-        }
-
-        _attached = null;
-        _attachedTo = null;
-
-        await DisposeQuietlyAsync(attached, dispose: true);
+        return _queue.IsCompleted && _attached is null && _attachedTo is null ? Task.CompletedTask : EnqueueAsync(DetachNowAsync);
     }
 
     /// <summary>
-    /// Ends any drag from the Board's side - a purge, a re-read, the dragged Task deleted, the panel opened - with nothing
-    /// moved and nothing said.
+    /// Ends any drag from the Board's side - a purge, a re-read, the dragged Task deleted, the panel opened - pending or
+    /// lifted, with nothing moved and nothing said.
     /// </summary>
     public void End()
     {
-        var dragging = LiftedTaskId is not null;
-
         Clear();
 
-        if (dragging && _attached is { } attached)
+        if (_attached is { } attached)
         {
             _ = CancelQuietlyAsync(attached);
         }
@@ -121,20 +114,38 @@ public sealed class BoardDrag : IAsyncDisposable
     /// The module: a lift has committed on a Task's card.
     /// </summary>
     /// <param name="taskId">The Task.</param>
+    /// <returns>Whether the lift was taken; when it was not, the module has been told to end the gesture.</returns>
     [JSInvokable]
-    public void Lifted(string taskId)
+    public bool Lifted(string taskId)
     {
         if (!Guid.TryParse(taskId, out var id) || !_host.CanLift(id))
         {
             Clear();
             _ = CancelAttachedAsync();
-            return;
+            return false;
         }
 
         LiftedTaskId = id;
         TargetStatusId = null;
         TargetIndex = 0;
         _host.DragChanged();
+
+        return true;
+    }
+
+    /// <summary>
+    /// The module: a lift taken here belonged to a gesture the Board had already ended - its <see cref="Lifted"/> was on
+    /// its way when <see cref="End"/> ran. It is let go of, with nothing said.
+    /// </summary>
+    /// <param name="taskId">The Task.</param>
+    [JSInvokable]
+    public void Abandoned(string taskId)
+    {
+        if (Guid.TryParse(taskId, out var id) && LiftedTaskId == id)
+        {
+            Clear();
+            _host.DragChanged();
+        }
     }
 
     /// <summary>
@@ -198,17 +209,22 @@ public sealed class BoardDrag : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _disposed = true;
+        Clear();
 
-        await DetachAsync();
-
-        if (_module is { } module)
+        // Queued behind any attach still in flight, so that what that attach made is let go of too.
+        await EnqueueAsync(async () =>
         {
-            _module = null;
-            await DisposeQuietlyAsync(module, dispose: false);
-        }
+            await DetachNowAsync();
 
-        _self?.Dispose();
-        _self = null;
+            if (_module is { } module)
+            {
+                _module = null;
+                await DisposeQuietlyAsync(module, dispose: false);
+            }
+
+            _self?.Dispose();
+            _self = null;
+        });
     }
 
     private static async Task CancelQuietlyAsync(IJSObjectReference attached)
@@ -238,6 +254,66 @@ public sealed class BoardDrag : IAsyncDisposable
         {
             // The module has gone with the page: there is nothing left to let go of.
         }
+    }
+
+    private static async Task RunAfterAsync(Task previous, Func<Task> work)
+    {
+        await previous;
+        await work();
+    }
+
+    private Task EnqueueAsync(Func<Task> work)
+    {
+        _queue = RunAfterAsync(_queue, work);
+
+        return _queue;
+    }
+
+    private async Task AttachNowAsync(ElementReference columns)
+    {
+        if (_disposed || string.Equals(_attachedTo, columns.Id, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        await DetachNowAsync();
+
+        try
+        {
+            _module ??= await _js.InvokeAsync<IJSObjectReference>("import", ModulePath);
+            _self ??= DotNetObjectReference.Create(this);
+
+            var attached = await _module.InvokeAsync<IJSObjectReference>("attach", columns, _self);
+
+            if (_disposed)
+            {
+                await DisposeQuietlyAsync(attached, dispose: true);
+                return;
+            }
+
+            _attached = attached;
+        }
+        catch (JSException)
+        {
+            // The module could not be loaded or attached. This Board has no drag, and the Move control stays the way to
+            // move a Task (UX-DR21). The columns are still recorded, so that every render does not try again.
+        }
+
+        _attachedTo = columns.Id;
+    }
+
+    private async Task DetachNowAsync()
+    {
+        _attachedTo = null;
+
+        if (_attached is not { } attached)
+        {
+            return;
+        }
+
+        _attached = null;
+
+        await DisposeQuietlyAsync(attached, dispose: true);
     }
 
     private Task CancelAttachedAsync() => _attached is { } attached ? CancelQuietlyAsync(attached) : Task.CompletedTask;

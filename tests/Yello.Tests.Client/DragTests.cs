@@ -73,8 +73,25 @@ public sealed class DragTests(ClientSurfaceFixture surface)
             await OpenBoardAsync(page, surface.BaseAddress, Northwind, Atlas);
 
             await LiftWithMouseAsync(page, "Draft the brief");
-            await MoveMouseToAsync(page, await PointInAsync(CardNamed(page, "Review"), 0.8f));
+
+            var over = await PointInAsync(CardNamed(page, "Review"), 0.8f);
+
+            await MoveMouseToAsync(page, over);
             await WaitForDropZoneAsync(page, "Doing", "Ship");
+
+            // The card in hand is drawn over the destination column, never clipped by the column it came from; and its lift
+            // has finished before its look is read.
+            double overX = over.X;
+            double overY = over.Y;
+
+            await page.WaitForFunctionAsync(
+                "([x, y]) => { const hit = document.elementFromPoint(x, y); return !!hit && !!hit.closest('.task-card--lifted'); }",
+                new[] { overX, overY },
+                new PageWaitForFunctionOptions { Timeout = WaitMs, PollingInterval = 50 });
+            await page.WaitForFunctionAsync(
+                "() => { const card = document.querySelector('.task-card--lifted'); return !!card && card.getAnimations().length === 0; }",
+                null,
+                new PageWaitForFunctionOptions { Timeout = WaitMs, PollingInterval = 50 });
 
             var lifted = await page.Locator(Lifted).EvaluateAsync<JsonElement>(
                 "card => { const s = getComputedStyle(card); return { border: s.borderTopWidth, shadow: s.boxShadow, rotate: s.rotate, transform: s.transform, title: card.querySelector('.task-card__title').textContent.trim() }; }");
@@ -250,7 +267,8 @@ public sealed class DragTests(ClientSurfaceFixture surface)
             }
             else
             {
-                await MoveMouseToAsync(page, origin);
+                // The lifted card's own slot has closed, so its origin is the slot above the card that followed it.
+                await MoveMouseToAsync(page, (origin.X, (await BoxAsync(CardNamed(page, "Book the room"))).Y + 2));
                 await WaitForDropZoneAsync(page, "Todo", "Book the room");
             }
 
@@ -266,6 +284,44 @@ public sealed class DragTests(ClientSurfaceFixture surface)
             Assert.Equal(0, await page.Locator(Lifted).CountAsync());
             Assert.Equal(0, await page.Locator(Dialog).CountAsync());
             Assert.Equal(0, await page.Locator(Menu).CountAsync());
+        }
+    }
+
+    /// <summary>
+    /// AC11, AC13, Q10 - Esc during a mouse press that has not yet lifted ends it, and the release that follows is not a
+    /// click: Task detail does not open, and nothing is sent.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    public async Task Esc_before_the_lift_ends_the_press_without_opening_the_Task()
+    {
+        var api = TwoSpaces(Northwind, Harbour);
+        _ = Seed(api, Northwind, Atlas, ThreeStatuses, ["Draft the brief"]);
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await OpenBoardAsync(page, surface.BaseAddress, Northwind, Atlas);
+
+            var (x, y) = await GrabPointAsync(page, "Draft the brief");
+
+            await page.Mouse.MoveAsync(x, y);
+            await page.Mouse.DownAsync();
+            await page.Keyboard.PressAsync("Escape");
+            await page.Mouse.UpAsync();
+
+            // A click that got through would open the dialog on Blazor's next render; the Board is asked to render after it.
+            await page.EvaluateAsync("() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))");
+
+            Assert.Equal(0, await page.Locator(Dialog).CountAsync());
+            Assert.Equal(0, await page.Locator(Lifted).CountAsync());
+            Assert.Empty(Moves(api));
+
+            // The next click is a click again.
+            await page.Mouse.ClickAsync(x, y);
+            await page.Locator(Dialog).WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
         }
     }
 

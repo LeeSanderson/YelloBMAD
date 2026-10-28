@@ -7,7 +7,8 @@ namespace Yello.Tests.Architecture;
 /// <summary>
 /// Story 2.7's design gates on the drag: the lifted card takes <c>task-card-lifted</c> - the 2px emphasis border, the
 /// one shadow in the product from its token, the 1-degree tilt - and lifts on <c>motion.lift</c>; the dropped card settles
-/// on <c>motion.settle</c>; the drop zone takes <c>drop-zone</c> - dashed, <c>focus-ring</c>, 3px, never filled; and no rule
+/// on <c>motion.settle</c>; the drop zone takes <c>drop-zone</c> - dashed in <c>focus-ring</c>, its words in
+/// <c>text-primary</c>, 3px, never filled; and no rule
 /// makes a surface carrying a colour token translucent. AC1, AC7, AC12; UX-DR4, UX-DR5, UX-DR6, UX-DR8;
 /// <c>DESIGN.md:145-148, :197-200, :435, :452, :466, :506-521</c>; <c>deferred-work.md:36, :52</c>.
 /// </summary>
@@ -69,12 +70,15 @@ public sealed partial class DesignFoundationGateTests
 
     /// <summary>
     /// AC1, AC12, UX-DR5, <c>DESIGN.md:197-200, :466</c> - the drop zone is the 2px dashed <c>focus-ring</c> border with
-    /// <c>focus-ring</c> words and 3px corners, and NEVER filled: no rule styling it sets a background, so the order around
-    /// it stays readable mid-drag.
+    /// 3px corners, and NEVER filled: no rule styling it sets a background, so the order around it stays readable mid-drag.
+    /// Its words are <c>text-primary</c>, not the <c>focus-ring</c> DESIGN.md:199 names: <c>focus-ring</c> on
+    /// <c>surface-column</c> is 3.97:1 in the light theme, short of the 4.5:1 text needs (NFR-9; recorded for UX in
+    /// <c>deferred-work.md</c>).
     /// </summary>
     [Fact]
     [Trait("Requirement", "UX-DR5")]
     [Trait("Requirement", "UX-DR22")]
+    [Trait("Requirement", "NFR-9")]
     public void The_drop_zone_is_dashed_in_the_focus_ring_colour_and_never_filled()
     {
         var declarations = CssCorpus.AllDeclarations()
@@ -86,7 +90,8 @@ public sealed partial class DesignFoundationGateTests
             && d.Value.Contains("var(--border-emphasis-width)", StringComparison.Ordinal)
             && d.Value.Contains("dashed", StringComparison.Ordinal)
             && d.Value.Contains("var(--focus-ring)", StringComparison.Ordinal));
-        Assert.Contains(declarations, d => d.Property == "color" && d.Value == "var(--focus-ring)");
+        Assert.Contains(declarations, d => d.Property == "color" && d.Value == "var(--text-primary)");
+        Assert.DoesNotContain(declarations, d => d.Property == "color" && d.Value == "var(--focus-ring)");
         Assert.Contains(declarations, d => d.Property == "border-radius" && d.Value == "var(--radius-md)");
         Assert.DoesNotContain(declarations, d => d.Property.StartsWith("background", StringComparison.Ordinal));
     }

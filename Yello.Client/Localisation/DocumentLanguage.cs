@@ -17,7 +17,7 @@ namespace Yello.Client.Localisation;
 /// detects the inertness either".
 /// </para>
 /// <para>
-/// <b>No JavaScript file, and no new dependency.</b> Blazor's interop resolves a dotted
+/// <b>No JavaScript of its own, and no new dependency.</b> Blazor's interop resolves a dotted
 /// identifier from <c>globalThis</c> and invokes it with the preceding object as <c>this</c>, so
 /// <c>document.documentElement.setAttribute</c> is callable directly, and a module for one
 /// attribute would be code to maintain for nothing. The client's one JavaScript file,

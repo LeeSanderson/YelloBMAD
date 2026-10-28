@@ -4,7 +4,7 @@ baseline_commit: 0e54a8c
 
 # Story 2.7: The accelerated pointer and touch paths
 
-Status: review
+Status: done
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-7-the-accelerated-pointer-and-touch-paths`
@@ -178,6 +178,27 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1219-1251` (`status: final`
   - [x] `tests/TESTING-CONVENTIONS.md`: how a pointer drag and a CDP touch gesture are driven; the "poll the drag state, never sleep" rule for the long-press threshold.
   - [x] Ledger (`deferred-work.md`): CLOSE `:52` per Q8; UPDATE `:36` (drop zone and lifted card radius clause added); NOTE on the 2.8 entries (identical announcements; neighbour still unadmitted) that drags repeat both; ADD with owners anything decided against the spines (Q3 drag-start distance for a mouse, Q7 drop zone copy and the missing pick-up sentence, Q9 "active lift" reading — owner **UX**); the tap-to-select-then-place fallback if touch tests badly (`.memlog.md:21`, owner **UX/Lee**); anything deferred.
   - [x] `sprint-status.yaml`: `review` at the end of the dev phase. **Do not add review narration to source files.**
+
+### Review Findings
+
+Code review 2026-10-28 (diff `0e54a8c..211c388`; Blind Hunter, Edge Case Hunter, Acceptance Auditor). 38 raw findings, 16 after triage, 8 dismissed.
+
+- [x] [Review][Decision] **Resolved by Lee: (a).** The lifted card is now `position: fixed` at the box it lifted from (`--drag-top`, `--drag-start`, `--drag-width`, written by the module at the lift) and translated from there. Its origin slot closes, and the drop zone alone marks the destination. `DragTests` asserts by `elementFromPoint` that the card in hand is drawn over the destination column; planting `position: relative` back makes that case fail. Original finding: The lifted card is clipped by its origin column once dragged into another column — `.board-column` has `overflow-y: auto` (`components.css:665`), so its `overflow-x` computes to `auto` and it clips both ways. The card moves only by `translate` and stays inside its origin column, and `position: relative; z-index: 1` cannot escape an overflow clip. So the card in your hand vanishes at the origin column's edge on every cross-column drag (AC1, AC12, UX-DR22). It also feeds a runaway auto-scroll in the origin column: the translated card adds to the column's scrollable overflow, so scrolling near the bottom edge keeps growing the scroll range into empty space. The tests read computed style only, and `TextSpacingTests` deliberately leaves the lifted card out of its clip check. Options: (a) while lifted the card is `position: fixed` at viewport coordinates, with its width from a custom property the module writes, so it leaves the flow and its origin slot closes (the drop zone marks the destination); (b) the module draws a drag image (a clone) outside Blazor's tree, and the origin card stays in its slot; (c) the origin column drops its overflow clip while lifted, which loses its own scroll and auto-scroll.
+- [x] [Review][Decision] **Resolved by Lee: (a).** The words are `text-primary`, and the dashed border stays `focus-ring`. The gate asserts both, and the variance from DESIGN.md:199 is recorded in `deferred-work.md` for UX. Original finding: The drop zone's "Drop here" words fail 4.5:1 in the light theme — DESIGN.md:199 gives the drop zone `foreground: {colors.focus-ring}`. `focus-ring` on `surface-column` is 3.97:1 light (`ColorTokenContrastTests.cs:241`), and it is gated only as non-text (3:1). The words are visible `type-meta` text. `aria-hidden` does not exempt visible text from WCAG 1.4.3, so this conflicts with NFR-9. Options: (a) keep the dashed `focus-ring` border and set the words in `text-primary`, recording the variance against DESIGN.md:199 for UX; (b) drop the words and keep a border-only zone with a minimum block size; (c) ship as DESIGN.md says and record the NFR-9 conflict for UX.
+- [x] [Review][Patch] `AttachAsync` can run twice when renders overlap, can attach after dispose, and lets an import failure escape `OnAfterRenderAsync` [`Yello.Client/Components/BoardDrag.cs:70-83`]
+- [x] [Review][Patch] The click and context-menu suppression flags outlive the drag. The next keyboard or assistive-technology click with no `pointerdown` before it is swallowed app-wide [`Yello.Client/wwwroot/js/board-drag.js:145-151, 423-439, 475-478`]
+- [x] [Review][Patch] Esc during a pending mouse press ends the press, but the release still opens Task detail [`Yello.Client/wwwroot/js/board-drag.js:398-405`]
+- [x] [Review][Patch] A right-click during a mouse drag opens 2.6's card menu while the drag continues [`Yello.Client/wwwroot/js/board-drag.js:432-439`]
+- [x] [Review][Patch] Board-side interruptions do not end a pending lift. A `Lifted` already on its way when `End()` runs leaves a lifted card with no gesture behind it (AC13) [`Yello.Client/Components/BoardDrag.cs:108-138`]
+- [x] [Review][Patch] A drop into a column the Board no longer has, or after a demotion, ends with no "Returned to…" and no settle (AC14) [`Yello.Client/Components/BoardView.Drag.cs:74-78`]
+- [x] [Review][Patch] The lifted-look assertions read `rotate` and `box-shadow` while the 110ms lift transition may still be running [`tests/Yello.Tests.Client/DragTests.cs:79-85`]
+- [x] [Review][Patch] `TextSpacingTests` patches its script with `string.Replace`, and nothing checks that the replacement happened [`tests/Yello.Tests.Client/TextSpacingTests.cs`]
+- [x] [Review][Patch] The pan-cancel case never asserts that nothing is announced (AC14) [`tests/Yello.Tests.Client/TouchDragTests.cs`]
+- [x] [Review][Patch] Stale heading: "No JavaScript file, and no new dependency." sits above a paragraph that now names one [`Yello.Client/Localisation/DocumentLanguage.cs:20`]
+- [x] [Review][Patch] The `PasswordDurationCollection` remark is run narration, and the File List does not record the change [`tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/PasswordVerificationDurationTests.cs:267-271`]
+- [x] [Review][Defer] Every animation frame forces layout and measures every column and every card in the hovered column [`Yello.Client/wwwroot/js/board-drag.js:263-359`] — deferred to story 2.9 (the 5,000-Task Board)
+- [x] [Review][Defer] Board-side cancels after a lift (purge, re-read, the Task deleted, the panel opened) say nothing, unlike AC14's "Returned to…" [`Yello.Client/Components/BoardDrag.cs:108-118`] — deferred to story 2.8 with UX (announcement grammar)
+- [x] [Review][Defer] Three other duration-measuring Slices classes sit outside a `DisableParallelization` collection [`tests/Yello.Tests.Slices/Accounts/RegisterAccount/RegistrationDurationTests.cs`, `SessionEndpointTests.cs`, `ActiveSpaceEndpointTests.Tokens.cs`] — deferred, pre-existing; owner the Epic 2 retrospective
 
 ## Dev Notes
 
@@ -379,6 +400,7 @@ Plants (one at a time, original held in memory and restored in a `finally`, SHA-
 - `tests/Yello.Tests.Architecture/DesignFoundationGateTests.Board.cs`
 - `tests/Yello.Tests.Architecture/DesignFoundationGateTests.MovePicker.cs`
 - `tests/Yello.Tests.Architecture/ClientStorageBanTests.cs`
+- `tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/PasswordVerificationDurationTests.cs` (moved into `PasswordDurationCollection`, `DisableParallelization = true`, during dev-phase verification under the CLAUDE.md timing-test rule; outside the story's scope)
 - `tests/TESTING-CONVENTIONS.md`
 - `_bmad-output/implementation-artifacts/deferred-work.md`
 - `_bmad-output/implementation-artifacts/sprint-status.yaml`
@@ -387,3 +409,14 @@ Plants (one at a time, original held in memory and restored in a `finally`, SHA-
 ### Change Log
 
 - 2026-10-28: Dev phase - the pointer drag and the touch long-press path (UX-DR22, UX-DR23, UX-DR6) through one ES module and `BoardDrag`; the drop is 2.6's move (`MoveOrigin.Drag`); the lifted card (the one shadow, `--shadow-lifted`) and the drop zone; gates widened by exactly the lifted card; the opacity gate closes `deferred-work.md:52`; 12 plants caught; full suite 1230/1227/0/3. Status → review.
+- 2026-10-28: Code review. 38 raw findings, 16 after triage: 2 decisions (Lee chose (a) for both), 11 patches applied, 3 deferred, 8 dismissed.
+  - The lifted card is now fixed to the view at its lift box, so its column no longer clips it, and the runaway auto-scroll is gone. The JS module also writes `--drag-top`, `--drag-start` and `--drag-width`, and the origin slot closes.
+  - The drop-zone words are `text-primary`.
+  - Attach and detach are serialised, which covers renders that overlap, disposal and a failed import.
+  - Click suppression ends once the input has been dispatched, or at the next key.
+  - Esc before a lift opens nothing on release.
+  - A right-click mid-drag opens no menu.
+  - `End()` cancels a pending lift, and a late lift is reported back as abandoned.
+  - A drop on a missing column announces the return.
+  - Tests: an `elementFromPoint` visibility check (the plant was caught), a wait for the lift transition, a keyboard Enter after a touch drag, Esc before the lift, a pan-cancel that says nothing, and a check that the `TextSpacingTests` replacement applied.
+  - Full suite: 1232 total, 1229 passed, 0 failed, 3 skipped. Status → done.

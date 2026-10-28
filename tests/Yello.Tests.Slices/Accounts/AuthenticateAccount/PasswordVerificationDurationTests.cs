@@ -265,9 +265,9 @@ public sealed class PasswordVerificationDurationTests
 }
 
 /// <summary>
-/// The password-verification duration cases run alone. Sharing the CPU with the rest of the slice
-/// suite pushed the median gap past the 20% tolerance on full runs (story 2.7 verification,
-/// 2026-10-28) while the class passed alone 3/3 - the CLAUDE.md timing-test rule.
+/// The password-verification duration cases run alone, because they measure time (the CLAUDE.md
+/// timing-test rule). When they share the CPU with the rest of the slice suite, the median gap can
+/// drift past the 20% tolerance for reasons that have nothing to do with the code under test.
 /// </summary>
 [CollectionDefinition(nameof(PasswordDurationCollection), DisableParallelization = true)]
 public sealed class PasswordDurationCollection;

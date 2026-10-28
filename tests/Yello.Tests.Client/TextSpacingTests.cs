@@ -445,7 +445,11 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
             await DragHarness.MoveMouseToAsync(page, await DragHarness.PointInAsync(doing, 0.8f));
             await page.Locator(".drop-zone").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
-            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping.Replace("querySelectorAll('.task-card')", "querySelectorAll('.task-card:not(.task-card--lifted)')", StringComparison.Ordinal));
+            var withoutTheLiftedCard = ClippedOrOverlapping.Replace("querySelectorAll('.task-card')", "querySelectorAll('.task-card:not(.task-card--lifted)')", StringComparison.Ordinal);
+
+            Assert.NotEqual(ClippedOrOverlapping, withoutTheLiftedCard);
+
+            var problems = await page.EvaluateAsync<string[]>(withoutTheLiftedCard);
 
             await page.Keyboard.PressAsync("Escape");
             await page.Mouse.UpAsync();

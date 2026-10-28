@@ -7,9 +7,15 @@
     So the gesture lives here, and .NET is told only four things - a lift, a change of destination slot, a drop and a
     cancel (AC15). Nothing reaches the network from this file: the drop is story 2.6's move, sent by the Board.
 
-    IT NEVER CHANGES WHAT BLAZOR RENDERS. It writes two custom properties on the dragged card (--drag-x, --drag-y) and
-    nothing else: no node inserted, removed or reordered, no class added. The lifted look and the drop zone are rendered
-    by Blazor from the state this module reports, so the two never fight over the DOM.
+    IT NEVER CHANGES WHAT BLAZOR RENDERS. It writes custom properties on the dragged card and nothing else: --drag-x and
+    --drag-y, the translation that keeps it under the pointer, and --drag-top, --drag-start and --drag-width, the box it
+    had when it lifted. No node is inserted, removed or reordered, and no class is added. The lifted look and the drop zone
+    are rendered by Blazor from the state this module reports, so the two never fight over the DOM.
+
+    THE LIFTED CARD LEAVES ITS COLUMN. A column scrolls inside itself, so it clips whatever overflows it - a card that only
+    translated would vanish at its own column's edge on every cross-column drag. The lifted card is therefore fixed to the
+    view (components.css), placed at the box it lifted from and translated from there: it is drawn above every column, its
+    slot in its own column closes, and the drop zone alone marks where it will land.
 
     POINTER (mouse, pen): primary button only; a press lifts once the pointer has moved past the drag-start distance - the
     same --motion-long-press-slop as touch (story 2.7 Q3 (a)), so a click that wobbles a few pixels is still a click.
@@ -44,6 +50,7 @@ const CARD = '.task-card';
 const COLUMN = '[data-status-id]';
 const DROP_ZONE = '.drop-zone';
 const OPENER = '[data-task-id]';
+const DRAG_PROPERTIES = ['--drag-x', '--drag-y', '--drag-top', '--drag-start', '--drag-width'];
 
 // Never a handle: the actions control and anything inside an open menu or picker (story 2.7 Q4 (a)).
 const NOT_A_HANDLE = '.task-card__actions, .task-menu, .move-picker, [role="menu"], [role="listbox"]';
@@ -106,6 +113,7 @@ class BoardDrag {
     #frame = 0;
     #suppressClick = false;
     #suppressMenu = false;
+    #clearing = 0;
 
     constructor(root, board) {
         this.#root = root;
@@ -118,15 +126,21 @@ class BoardDrag {
         root.addEventListener('touchmove', this.#onTouchMove, { passive: false });
 
         window.addEventListener('pointerdown', this.#onAnyPress, true);
+        window.addEventListener('pointerup', this.#onAnyRelease, true);
+        window.addEventListener('keydown', this.#onAnyKey, true);
         window.addEventListener('click', this.#onClick, true);
         window.addEventListener('contextmenu', this.#onContextMenu, true);
     }
 
     /**
-     * Ends any drag silently - the Board has purged, read itself again, lost the dragged Task or opened the panel, and
-     * already knows.
+     * Ends any drag, pending or lifted, silently - the Board has purged, read itself again, lost the dragged Task or opened
+     * the panel, and already knows.
      */
     cancel() {
+        if (this.#gesture) {
+            this.#gesture.silenced = true;
+        }
+
         this.#end(false);
     }
 
@@ -135,9 +149,12 @@ class BoardDrag {
      */
     dispose() {
         this.#end(false);
+        clearTimeout(this.#clearing);
         this.#root.removeEventListener('pointerdown', this.#onPress);
         this.#root.removeEventListener('touchmove', this.#onTouchMove, { passive: false });
         window.removeEventListener('pointerdown', this.#onAnyPress, true);
+        window.removeEventListener('pointerup', this.#onAnyRelease, true);
+        window.removeEventListener('keydown', this.#onAnyKey, true);
         window.removeEventListener('click', this.#onClick, true);
         window.removeEventListener('contextmenu', this.#onContextMenu, true);
     }
@@ -145,8 +162,7 @@ class BoardDrag {
     #onAnyPress = event => {
         // A new press starts afresh: the click and context menu a finished drag would have raised are long gone.
         if (!this.#gesture) {
-            this.#suppressClick = false;
-            this.#suppressMenu = false;
+            this.#stopSuppressing();
             return;
         }
 
@@ -155,6 +171,46 @@ class BoardDrag {
             this.#end(true);
         }
     };
+
+    /**
+     * The release of any pointer. The click a release raises is dispatched before a timer can run, so a click the finished
+     * drag owes is still swallowed - and nothing after it is.
+     */
+    #onAnyRelease = event => {
+        if (event.pointerType !== 'touch') {
+            this.#stopSuppressingSoon();
+        }
+    };
+
+    /**
+     * Any key: a keyboard or assistive-technology activation is never a drag's leftover click or menu (AC8, AC11).
+     */
+    #onAnyKey = () => {
+        if (!this.#gesture) {
+            this.#stopSuppressing();
+        }
+    };
+
+    #stopSuppressing() {
+        clearTimeout(this.#clearing);
+        this.#suppressClick = false;
+        this.#suppressMenu = false;
+    }
+
+    /**
+     * Stops swallowing once the current mouse or pen input has been dispatched. A touch long-press raises its click and
+     * its context menu after the release, as gestures of their own (Chromium does), so after a touch both stay swallowed
+     * until the next press or key.
+     */
+    #stopSuppressingSoon() {
+        clearTimeout(this.#clearing);
+        this.#clearing = setTimeout(() => {
+            if (!this.#gesture) {
+                this.#suppressClick = false;
+                this.#suppressMenu = false;
+            }
+        }, 0);
+    }
 
     #onPress = event => {
         if (this.#gesture || !event.isPrimary || (event.pointerType !== 'touch' && event.button !== 0)) {
@@ -239,10 +295,19 @@ class BoardDrag {
         clearTimeout(gesture.timer);
         gesture.lifted = true;
 
-        const centre = centreOf(gesture.card.getBoundingClientRect());
+        const box = gesture.card.getBoundingClientRect();
+        const centre = centreOf(box);
+        const rightToLeft = getComputedStyle(gesture.card).direction === 'rtl';
+        const style = gesture.card.style;
 
         gesture.grabX = gesture.startX - centre.x;
         gesture.grabY = gesture.startY - centre.y;
+
+        // The box the fixed, lifted card is placed at, in logical terms: in a right-to-left Board its inline start is its
+        // right edge's distance from the view's.
+        style.setProperty('--drag-top', `${box.top}px`);
+        style.setProperty('--drag-start', `${rightToLeft ? document.documentElement.clientWidth - box.right : box.left}px`);
+        style.setProperty('--drag-width', `${box.width}px`);
 
         if (gesture.touch) {
             if (typeof navigator.vibrate === 'function') {
@@ -256,7 +321,18 @@ class BoardDrag {
             }
         }
 
-        this.#tell('Lifted', gesture.taskId);
+        // A lift .NET accepts after the Board has already ended the gesture would leave a lifted card with nothing behind
+        // it, so the Board is told the gesture was abandoned.
+        this.#board.invokeMethodAsync('Lifted', gesture.taskId)
+            .then(accepted => {
+                if (accepted && gesture.silenced) {
+                    this.#tell('Abandoned', gesture.taskId);
+                }
+            })
+            .catch(() => {
+                // The Board has gone: there is nobody left to tell.
+            });
+
         this.#frame = requestAnimationFrame(this.#step);
     };
 
@@ -392,14 +468,27 @@ class BoardDrag {
     #onPointerCancel = event => {
         if (this.#gesture && event.pointerId === this.#gesture.pointerId) {
             this.#end(true);
+
+            // The platform took a mouse or pen pointer: no click follows.
+            if (event.pointerType !== 'touch') {
+                this.#stopSuppressingSoon();
+            }
         }
     };
 
     #onKey = event => {
-        if (event.key === 'Escape' && this.#gesture) {
-            // The innermost meaning wins: Esc ends the drag and nothing else.
+        const gesture = this.#gesture;
+
+        if (event.key === 'Escape' && gesture) {
+            // The innermost meaning wins: Esc ends the drag and nothing else - and a mouse press it ends before any lift
+            // does not become a click on release.
             event.preventDefault();
             event.stopPropagation();
+
+            if (!gesture.lifted && !gesture.touch) {
+                this.#suppressClick = true;
+            }
+
             this.#end(true);
         }
     };
@@ -431,8 +520,9 @@ class BoardDrag {
 
     #onContextMenu = event => {
         // A long-press raises the platform's context menu; while a touch lift is pending or held, and after it, the press is
-        // the drag's - never 2.6's card menu, never the browser's (story 2.7 Q11 (a)). A mouse right-click is untouched.
-        if ((this.#gesture && this.#gesture.touch) || this.#suppressMenu) {
+        // the drag's - never 2.6's card menu, never the browser's (story 2.7 Q11 (a)). A mouse right-click is untouched,
+        // except in the middle of a mouse drag, where it would open a menu on a card that is still travelling.
+        if ((this.#gesture && (this.#gesture.touch || this.#gesture.lifted)) || this.#suppressMenu) {
             event.preventDefault();
             event.stopImmediatePropagation();
         }
@@ -484,8 +574,9 @@ class BoardDrag {
                 // Already released.
             }
 
-            gesture.card.style.removeProperty('--drag-x');
-            gesture.card.style.removeProperty('--drag-y');
+            for (const property of DRAG_PROPERTIES) {
+                gesture.card.style.removeProperty(property);
+            }
         }
     }
 
