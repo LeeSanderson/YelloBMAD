@@ -194,7 +194,7 @@ public sealed class ListViewGateTests
     /// reads them, and none of them uses <c>Virtualize</c> or an <c>ItemsProvider</c>.
     /// </summary>
     [Fact]
-    [Trait("Requirement", "UX-DR24")]
+    [Trait("Requirement", "AD-29")]
     public void The_List_View_is_inside_the_virtualisation_scan_and_virtualises_nothing()
     {
         var files = RepositoryLayout.EnumerateSourceFiles("*.razor")

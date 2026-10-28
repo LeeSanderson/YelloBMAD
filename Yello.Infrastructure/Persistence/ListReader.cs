@@ -162,6 +162,13 @@ internal sealed class ListReader(YelloDbContext dbContext) : IListReader
             after = null;
         }
 
+        // A cursor in the dated segment precedes every undated Task, so the undated segment is read from its start - also
+        // when "No due date" left the dated segment unread.
+        if (after?.DueDate is not null)
+        {
+            after = null;
+        }
+
         if (rows.Count < take && readsUndated)
         {
             rows.AddRange(await Undated(matching, after)

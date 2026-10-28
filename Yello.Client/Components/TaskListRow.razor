@@ -20,18 +20,21 @@
     <td class="task-list__status">@StatusName</td>
     <td class="task-list__due">@DueText</td>
     <td class="type-meta task-list__labels">
-        @foreach (var label in ShownLabels)
-        {
-            <LabelChip @key="label.Id" Name="@label.Name" Colour="@label.Colour" />
-        }
+        @* The flex box is this wrapper, never the cell: a cell given display: flex leaves table layout. *@
+        <span class="task-list__chips">
+            @foreach (var label in ShownLabels)
+            {
+                <LabelChip @key="label.Id" Name="@label.Name" Colour="@label.Colour" />
+            }
 
-        @if (MoreLabels > 0)
-        {
-            <span class="label-more">
-                <span aria-hidden="true">@string.Format(CultureInfo.CurrentCulture, Localizer["LabelsMore"], MoreLabels)</span>
-                <span class="visually-hidden">@string.Format(CultureInfo.CurrentCulture, Localizer["LabelsMoreName"], MoreLabels)</span>
-            </span>
-        }
+            @if (MoreLabels > 0)
+            {
+                <span class="label-more">
+                    <span aria-hidden="true">@string.Format(CultureInfo.CurrentCulture, Localizer["LabelsMore"], MoreLabels)</span>
+                    <span class="visually-hidden">@string.Format(CultureInfo.CurrentCulture, Localizer["LabelsMoreName"], MoreLabels)</span>
+                </span>
+            }
+        </span>
     </td>
 </tr>
 

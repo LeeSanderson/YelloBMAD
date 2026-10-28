@@ -410,7 +410,9 @@ internal static class IsolationCases
 
         // A filter naming B's real Label id, or B's real Status id, in A's own Project matches nothing and answers bytes
         // identical to a random id's (AC15, the I-13 shape of 2.3 and 2.4) - it reveals neither that the id exists nor whose
-        // it is. Plant owed by 2.10 Task 7: the handler's narrowing of filter ids skipped.
+        // it is. Plant owed by 2.10 Task 7: the handler's narrowing of filter ids skipped - caught 0/2 here, masked (TaskLabel's
+        // own two layers and the Project predicate already hide a foreign id's rows), so ViewListHandlerTests holds the
+        // narrowing itself (2/2). This row holds the bytes; the narrowing's proof is the handler test's.
         new(
             "ISO-LIST-FOREIGN-FILTER-IN-OWN-SPACE", "I-13, I-4", IsolationVector.DeepLink, HttpMethod.Get, ListRoute,
             async world =>
@@ -1609,6 +1611,21 @@ internal static class IsolationCases
         Assert.NotEmpty(theirs);
         Assert.NotEmpty(theirLabels);
         Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+
+        // The page served on the surface under test (the Token surface included) holds only A's Tasks of this Project, A's
+        // total, and nothing of B's - the walk below reads on A's Session, so this is the surface's own evidence (AC21).
+        Assert.All(theirs, task => Assert.DoesNotContain(task.Title, answer.Body, StringComparison.Ordinal));
+        Assert.All(theirLabels, label => Assert.DoesNotContain(label.Name, answer.Body, StringComparison.Ordinal));
+
+        using (var served = JsonDocument.Parse(answer.Body))
+        {
+            var servedIds = served.RootElement.GetProperty("tasks").EnumerateArray().Select(task => task.GetProperty("id").GetGuid()).ToList();
+
+            Assert.Equal(own.Count, served.RootElement.GetProperty("total").GetInt32());
+            Assert.NotEmpty(servedIds);
+            Assert.True(servedIds.Count <= PageSize, $"The surface served {servedIds.Count} Tasks; a page is at most {PageSize}.");
+            Assert.Empty(servedIds.Except(own));
+        }
 
         foreach (var sort in OfferedListSorts)
         {

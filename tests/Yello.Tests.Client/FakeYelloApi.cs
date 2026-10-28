@@ -1351,7 +1351,7 @@ internal sealed class FakeYelloApi
         {
             "status" => tasks.OrderBy(task => order.GetValueOrDefault(task.StatusId)),
             "due-date" => tasks.OrderBy(task => task.DueDate is null ? 1 : 0).ThenBy(task => task.DueDate),
-            _ => tasks.OrderBy(task => FirstLabelName(task) is null ? 1 : 0).ThenBy(FirstLabelName, StringComparer.OrdinalIgnoreCase),
+            _ => tasks.OrderBy(task => FirstLabelName(task) is null ? 1 : 0).ThenBy(FirstLabelName, StringComparer.Ordinal), // Latin1_General_100_BIN2: ordinal, case-sensitive
         };
 
         return [.. sorted.ThenBy(task => new System.Data.SqlTypes.SqlGuid(task.Id))];

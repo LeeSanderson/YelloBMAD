@@ -4,7 +4,7 @@ baseline_commit: e541bb1
 
 # Story 2.10: View a Project as a filterable, sortable list
 
-Status: review
+Status: done
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-10-view-a-project-as-a-filterable-sortable-list`
@@ -425,7 +425,26 @@ AC1 to AC9 are reproduced **verbatim** from `epics.md:1346-1384` (`status: final
 
 ### Review Findings
 
-*(Empty until code review.)*
+Code review 2026-10-28 (bmad-code-review, diff `e4cd50d..HEAD`, full mode): 36 raw findings (Blind Hunter 15, Edge Case Hunter 11, Acceptance Auditor 10), triaged to 1 decision, 12 patches, 5 deferrals and 11 dismissed.
+
+- [x] [Review][Decision] The Label sort's cursor carries the first Label's name in the List route's query string — `ListCursorText` encodes `FirstLabelName` as base64url text with no protection, so every "Show more Tasks" request under the Label sort puts a Label name (Space content, I-17) in an API URL. The Host logs no request lines (`Microsoft.AspNetCore` at Warning), and the I-17 log slice passes, but an ingress, proxy or APM log that records query strings would hold the name. "No names in URLs" (Dev Notes, UX-DR33) was written for client routes. Options: (a) accept it, and state that the cursor is an opaque API parameter and not a route; (b) protect the cursor with the Host's existing Data Protection key ring, so a key rotation turns old cursors into `400 invalid-list-cursor`; (c) carry no value, and have the server read the cursor Task's current `FirstLabelName`, which needs a fallback when that Task is gone or has moved. **Resolved: (a), decided by Lee.** Recorded in Completion Notes; query-string logging is ledgered to Lee.
+- [x] [Review][Patch] A due-date cursor in the dated segment, replayed with "No due date", skips undated Tasks with lower ids: `after` is never cleared [Yello.Infrastructure/Persistence/ListReader.cs:150]
+- [x] [Review][Patch] When the count and the page disagree (concurrent writes, between statements), the list renders blank (total > 0 with no rows), "Showing 51 of 50", or "Showing 100 of 300" with no "Show more Tasks" [Yello.Client/Components/TaskListView.razor.cs:344]
+- [x] [Review][Patch] An unfiltered empty Project announces "No Tasks match." while the page shows "Nothing here yet." (Q11 (a)), on a sort change or when the last filter is cleared [Yello.Client/Components/TaskListView.razor.cs:232]
+- [x] [Review][Patch] "Between dates" with no date entered counts as filtered, so an empty Project says "No Tasks match." [Yello.Client/Components/TaskListFilters.cs:69]
+- [x] [Review][Patch] A `200` whose JSON body is `null` leaves the skeleton up for good, with no refusal [Yello.Client/Components/TaskListView.razor.cs:320]
+- [x] [Review][Patch] ISO-LIST-AGGREGATE never checks the body served on the surface under test (the Token surface): every page it checks is re-read on A's Session (AC21, both surfaces) [tests/Yello.Tests.Isolation/IsolationCases.cs:1599]
+- [x] [Review][Patch] ISO-LIST-FOREIGN-FILTER-IN-OWN-SPACE's comment names a plant it cannot catch (0/2, masked); `ViewListHandlerTests` is what catches it [tests/Yello.Tests.Isolation/IsolationCases.cs:411]
+- [x] [Review][Patch] Two `Requirement` traits name the wrong requirement: LV-19 says AD-15 (position keys), and the virtualisation gate says UX-DR24 (keyboard) [tests/Yello.Tests.Slices/Lists/ListPagingTests.cs:935, tests/Yello.Tests.Architecture/ListViewGateTests.cs:197]
+- [x] [Review][Patch] No test pins the cursor parser's refusal branches (wrong part count, unknown sort or segment, a non-GUID id, an over-long or empty Label value, a non-round-trip date) [tests/Yello.Tests.Slices/Lists/ViewList/ListCursorTextTests.cs]
+- [x] [Review][Patch] `display: flex` on the Labels `<td>` takes the cell out of table layout; the flex belongs on an inner wrapper [Yello.Client/wwwroot/css/components.css:1491, Yello.Client/Components/TaskListRow.razor:22]
+- [x] [Review][Patch] The Board/List toggle matches address segments case-sensitively, so it disappears on `/Spaces/.../List`, an address Blazor's router accepts [Yello.Client/Components/ViewToggle.razor:40]
+- [x] [Review][Patch] The browser fake sorts by Label with `OrdinalIgnoreCase`, but the database orders by `Latin1_General_100_BIN2`, which is ordinal [tests/Yello.Tests.Client/FakeYelloApi.cs:1354]
+- [x] [Review][Defer] A Status-sort cursor whose Status has left the effective set, or a reorder between pages, ends or skips the walk; and the count and the page diverge once the effective set differs per Project [Yello.Infrastructure/Persistence/ListReader.cs:110] — deferred to story 6.1/6.2 (unreachable today: AD-17 makes every Project's set the Space's)
+- [x] [Review][Defer] The migration blocks `dbo.[Task]` while it runs: the policy change, the set-based backfill (with row locks, since lock escalation is off) and three offline index builds share one transaction [Yello.Infrastructure/Persistence/Migrations/20261028194820_ListViewSortKeys.cs:77] — deferred, owner Lee (deploy)
+- [x] [Review][Defer] Client read paths do not catch `NotSupportedException` (a 200 with a body that is not JSON) [Yello.Client/Components/TaskListView.razor.cs:205] — deferred, pre-existing in every component, owner Lee
+- [x] [Review][Defer] The keys queue stays faulted after an exception type its filters miss [Yello.Client/Components/ListKeys.cs:134] — deferred, pre-existing `BoardKeys` pattern, owner Lee
+- [x] [Review][Defer] A day bound that falls in a DST gap at local midnight takes the offset of a time that does not exist [Yello.Client/Components/TaskListFilters.cs:136] — deferred, pre-existing in `TaskDates.TryFromInputValue` (story 2.3), owner Lee
 
 ## Dev Notes
 
@@ -853,6 +872,7 @@ Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended story cycle.
   - An appended page skips a Task already drawn (a concurrent edit can move one past the cursor), so a row is never drawn twice and `@key` stays unique.
   - Sort changes announce the count as filter changes do (Task 5 (c)).
   - No spine change: AD-29 already states the pair keyset, the NULL end and the index rule.
+  - **Code review D1 - (a), decided by Lee (2026-10-28):** the Label-sort cursor stays an opaque API parameter. Its base64url text carries the first Label's name, and it is not encrypted. "No names in URLs" (UX-DR33) governs client routes, not the List API's `after=` value. The Host logs no request lines. Query-string logging at ingress or APM is ledgered to Lee in `deferred-work.md`.
 - **Implemented:** `FirstLabelName` + migration `ListViewSortKeys` (backfill, three indexes, a correct `Down`); the Labels edit keeps the key true in its transaction; `IListReader`/`ListReader` (pair keyset, NULL last, per-Status seeks, filters, count); `ListPage`, `ListCursorText`, `ViewListHandler`; `ListEndpoints` + `ListQueryReading` (query, then cursor, then 404); Contracts `ListRoutes`, `ListSorts`, `ListQuery`, `ListPageResponse`, `ListStatusResponse`; two problem types and their client copy; the client page, view toggle, list view, row and choice components, `ListTraversal`, `ListKeys` + `list-keys.js`, copy and CSS.
 - **Tests added or activated:** ListPagingTests 48 (47 scaffolded + LV-20), ViewListHandlerTests 6, ListCursorTextTests 2, ListViewGateTests 8, ListTraversalTests 11, ListViewTests 18, 8 isolation cases, the Nightly timing case; MigrationBundleEquivalenceTests now compares each index's key and included columns.
 - **FR-30 is not delivered** - the Assignee dimension is 4.6's (ledgered).

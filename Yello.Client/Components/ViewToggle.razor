@@ -37,14 +37,24 @@
         _projectId = null;
         _isList = false;
 
-        if (segments is ["spaces", var space, "projects", var project, .. var rest]
+        // Literal segments compared ignoring case, as the router matches them.
+        if (segments is [var spaces, var space, var projects, var project, .. var rest]
+            && IsProjectView(spaces, projects, rest)
             && Guid.TryParse(space, out var spaceId)
-            && Guid.TryParse(project, out var projectId)
-            && rest is [] or ["list"])
+            && Guid.TryParse(project, out var projectId))
         {
             _spaceId = spaceId;
             _projectId = projectId;
-            _isList = rest is ["list"];
+            _isList = rest is [_];
         }
     }
+
+    private static bool IsProjectView(string spaces, string projects, string[] rest) =>
+        Is(spaces, "spaces") && Is(projects, "projects") && IsView(rest);
+
+    // The Board's address ends at the Project; the List's adds "list".
+    private static bool IsView(string[] rest) => rest is [] || (rest is [var view] && Is(view, "list"));
+
+    private static bool Is(string segment, string literal) =>
+        string.Equals(segment, literal, StringComparison.OrdinalIgnoreCase);
 }

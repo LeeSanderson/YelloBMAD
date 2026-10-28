@@ -54,6 +54,48 @@ public sealed class ListCursorTextTests
         Assert.False(ListCursorText.TryRead(ListSort.DueDate, anotherVersion, out _));
     }
 
+    /// <summary>
+    /// Each refusal branch of the text form, on its own (the 400-versus-500 boundary): a wrong part count, an unknown
+    /// segment flag, a malformed Task id, a value the sort's column cannot hold, a valued trailing segment, and bytes that
+    /// are not UTF-8. Anchor: the well-formed text of each sort reads.
+    /// </summary>
+    /// <param name="sort">The sort the cursor is read under.</param>
+    /// <param name="text">The cursor's decoded text, before base64url.</param>
+    /// <param name="reads">Whether the route issued it.</param>
+    [Theory]
+    [InlineData(ListSort.Status, "1\nstatus\n{0}\nv\n8d5a4c3e-1f2b-4a6d-9e8c-7b6a5d4c3b2a", true)]
+    [InlineData(ListSort.DueDate, "1\ndue-date\n{0}\nv\n2026-11-05T00:00:00.0000000+00:00", true)]
+    [InlineData(ListSort.Label, "1\nlabel\n{0}\nv\nAlpha", true)]
+    [InlineData(ListSort.Label, "1\nlabel\n{0}\nn\n", true)]
+    [InlineData(ListSort.Label, "1\nlabel\n{0}\nv", false)]
+    [InlineData(ListSort.Label, "1\nlabel\n{0}\nx\nAlpha", false)]
+    [InlineData(ListSort.Label, "1\nlabel\nnot-a-guid\nv\nAlpha", false)]
+    [InlineData(ListSort.Label, "1\nlabel\n{0}\nv\n", false)]
+    [InlineData(ListSort.Label, "1\nlabel\n{0}\nv\n" + "abcdefghijabcdefghijabcdefghijabcdefghijabcdefghijX", false)]
+    [InlineData(ListSort.Label, "1\nlabel\n{0}\nn\nAlpha", false)]
+    [InlineData(ListSort.Status, "1\nstatus\n{0}\nv\nnot-a-guid", false)]
+    [InlineData(ListSort.DueDate, "1\ndue-date\n{0}\nv\n2026-11-05", false)]
+    [InlineData(ListSort.DueDate, "1\nDUE-DATE\n{0}\nn\n", false)]
+    public void Each_refusal_branch_of_the_text_form_refuses_on_its_own(ListSort sort, string text, bool reads)
+    {
+        var sent = Base64Url.EncodeToString(Encoding.UTF8.GetBytes(string.Format(System.Globalization.CultureInfo.InvariantCulture, text, TaskId.ToString("N"))));
+
+        Assert.Equal(reads, ListCursorText.TryRead(sort, sent, out var cursor));
+        Assert.Equal(reads, cursor is not null);
+    }
+
+    /// <summary>
+    /// Bytes that are base64url but not UTF-8 are refused, never thrown on.
+    /// </summary>
+    [Fact]
+    public void A_cursor_that_is_not_UTF8_is_refused()
+    {
+        var sent = Base64Url.EncodeToString([0x31, 0x0A, 0xFF, 0xFE, 0xC0]);
+
+        Assert.False(ListCursorText.TryRead(ListSort.Label, sent, out var cursor));
+        Assert.Null(cursor);
+    }
+
     private static ListCursor? RoundTrip(ListSort sort, ListCursor cursor)
     {
         Assert.True(ListCursorText.TryRead(sort, ListCursorText.Write(sort, cursor), out var read));

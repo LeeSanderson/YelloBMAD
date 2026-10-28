@@ -932,7 +932,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     [InlineData(SortStatus, "IX_Task_SpaceId_ProjectId_StatusId_Id", "StatusId")]
     [InlineData(SortDueDate, "IX_Task_SpaceId_ProjectId_DueDate_Id", "DueDate")]
     [InlineData(SortLabel, "IX_Task_SpaceId_ProjectId_FirstLabelName_Id", "FirstLabelName")]
-    [Trait("Requirement", "AD-15")]
+    [Trait("Requirement", "AR-22")]
     public async Task Each_sort_seeks_its_own_composite_index_and_never_converts_its_column(string sort, string index, string column)
     {
         var database = Available();

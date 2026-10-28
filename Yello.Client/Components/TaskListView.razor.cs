@@ -229,7 +229,7 @@ public sealed partial class TaskListView
             if (await ReadPageAsync(generation, read, after: null, token) is { } page)
             {
                 Take(page, append: false);
-                Say(CountSentence(page.Total));
+                Say(CountSentence(_total));
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -319,7 +319,18 @@ public sealed partial class TaskListView
 
         var page = await response.Content.ReadFromJsonAsync<ListPageResponse>(token);
 
-        return generation == _generation && read == _read ? page : null;
+        if (generation != _generation || read != _read)
+        {
+            return null;
+        }
+
+        if (page is null)
+        {
+            // A 200 with a null body is no page: refused like a malformed one, never a skeleton left up.
+            await OnRefused.InvokeAsync(null);
+        }
+
+        return page;
     }
 
     private async Task RefuseAsync(HttpResponseMessage response, CancellationToken token)
@@ -343,18 +354,28 @@ public sealed partial class TaskListView
     /// </summary>
     private void Take(ListPageResponse page, bool append)
     {
-        _total = page.Total;
         _after = page.NextAfter;
 
         if (!append || _rows is null)
         {
             _rows = [.. page.Tasks];
-            return;
+        }
+        else
+        {
+            var drawn = _rows.Select(row => row.Id).ToHashSet();
+
+            _rows.AddRange(page.Tasks.Where(task => drawn.Add(task.Id)));
         }
 
-        var drawn = _rows.Select(row => row.Id).ToHashSet();
+        // The count and the page are separate statements (ViewListHandler), so concurrent writes can make them disagree.
+        // With no page after this one, every row is drawn and their number is the total; otherwise the total is never less
+        // than what is drawn - so the list is never blank beside a non-zero count, nor "51 of 50".
+        _total = page.Total;
 
-        _rows.AddRange(page.Tasks.Where(task => drawn.Add(task.Id)));
+        if (_after is null || _total < _rows.Count)
+        {
+            _total = _rows.Count;
+        }
     }
 
     private Task ToggleStatusAsync(Guid statusId)
@@ -451,9 +472,10 @@ public sealed partial class TaskListView
         _announcements++;
     }
 
+    // The empty sentence is the one the page shows (Q11 (a)): an unfiltered empty Project says BoardEmpty, not ListMatchNone.
     private string CountSentence(int total) => total switch
     {
-        0 => Localizer["ListMatchNone"],
+        0 => _filters.Filtered ? Localizer["ListMatchNone"] : Localizer["BoardEmpty"],
         1 => Localizer["ListMatchOne"],
         _ => string.Format(CultureInfo.CurrentCulture, Localizer["ListMatchMany"], total),
     };

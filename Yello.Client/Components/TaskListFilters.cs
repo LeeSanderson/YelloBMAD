@@ -66,7 +66,12 @@ public sealed class TaskListFilters
     /// <summary>
     /// Whether any filter is set: an empty answer is then "No Tasks match." rather than the empty Project's copy.
     /// </summary>
-    public bool Filtered => Statuses.Count > 0 || Labels.Count > 0 || Due != DueAny;
+    /// <remarks>
+    /// "Between dates" with neither day chosen sends no bound, so it filters nothing.
+    /// </remarks>
+    public bool Filtered => Statuses.Count > 0 || Labels.Count > 0 || DueFiltered;
+
+    private bool DueFiltered => Due == DueNone || (Due == DueRange && ToQuery() is { DueFrom: not null } or { DueTo: not null });
 
     /// <summary>
     /// Adds <paramref name="id"/> to <paramref name="chosen"/>, or takes it out if it is there.
