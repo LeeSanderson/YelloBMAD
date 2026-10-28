@@ -732,6 +732,75 @@ It uses `.RequiresCapability(Capability.ReadProjectsAndTasks)`. Registrations ar
 - `deferred-work.md:524`
 - `sprint-change-proposal-2026-09-13.md`: no List View content (checked)
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+**Checklist:** `_bmad-output/test-artifacts/atdd-checklist-2-10-view-a-project-as-a-filterable-sortable-list.md` (scenario map, seed constraints checked, assumed markup, gates that go red by design).
+
+**Scaffold files.** Every case is skipped `red: AC<n> - <why>` unless marked green.
+
+- `tests/Yello.Tests.Slices/Lists/ListWire.cs`: the active harness. It holds the path builder, page reader and walk; seeds with ties and NULLs; the expected order of every sort computed **in SQL**; the `FirstLabelName` reads; and logical reads and plans per request. Its scaffold constants are `ListRoute`, `PageSize`, `SortStatus`/`SortDueDate`/`SortLabel` (`status`/`due-date`/`label`), `InvalidListQuery` and `InvalidListCursor`. Swap each for the contract member on activation.
+- `tests/Yello.Tests.Slices/Lists/ListPagingTests.cs`: 19 methods, 47 cases (LV-01..LV-19).
+  - P-3, the five sorts, ties and NULL crossings: AC4, AC5, AC13, AC14.
+  - Filters and the true total: AC11, AC15.
+  - A deleted Label stops matching: AC15.
+  - Stale cursor x4: AC12.
+  - Bad cursor x3, bad query x8, check order, page size x3: AC12, AC2.
+  - Viewer on both surfaces: AC16.
+  - Contract shape: AC22.
+  - Unknown Project 404: AC3.
+  - `FirstLabelName` maintenance x4 and its race: AC13.
+  - Logical reads first vs last x6: AC10.
+  - Plan seeks its index with no implicit conversion x3: AC6.
+- `tests/Yello.Tests.Slices/Lists/ListScaleTimingTests.cs`: 1 case, the timed half of AC10. `Tier=Nightly`, `Explicit`, in `BoardScaleCollection`.
+- `tests/Yello.Tests.Isolation/IsolationCases.cs`: 4 rows x 2 surfaces, **pending on 2.10**. They must be live before `review` (GATE-003). AC3, AC15, AC21.
+  - `ISO-DIRECT-LIST`
+  - `ISO-LIST-FOREIGN-ID-IN-OWN-SPACE`
+  - `ISO-LIST-AGGREGATE`
+  - `ISO-LIST-FOREIGN-FILTER-IN-OWN-SPACE`
+- `tests/Yello.Tests.Architecture/ListViewGateTests.cs`: 8 cases. AC2, AC6, AC12, AC18, AC22.
+  - P-4: every sort has `(SpaceId, ProjectId, column, Id)`.
+  - P-4's detector plant.
+  - Three sorts, none Assignee.
+  - The route is stated once.
+  - The contract members.
+  - `ListPage.Size` is 50.
+  - The two problem types.
+  - The virtualisation scan covers `TaskListView.razor`.
+- `tests/Yello.Tests.Client/ListViewTests.cs`: 14 methods, 18 cases. AC1, AC7-AC9, AC11, AC12, AC16-AC20.
+  - The toggle.
+  - Row content.
+  - The count announced once.
+  - "No Tasks match." alone.
+  - Show more appends.
+  - `↓` by identity.
+  - X-6 `aria-rowcount`.
+  - Viewer.
+  - Purge and Web Storage.
+  - No name in the URL or title.
+  - 404.
+  - 320px x2.
+  - Locales x4.
+  - The sort change replaces rows.
+- `tests/Yello.Tests.Client/FakeYelloApi.cs`: the active harness. It answers the List route, sorting, filtering and paging as the Host will, with an opaque cursor bound to its sort and a page hold. No earlier case requests the route, so their bytes are unchanged.
+
+**Green today:** one case, `ListViewGateTests.The_sort_index_detector_reports_a_planted_sort_with_no_index_and_finds_an_existing_one`. It is a standing gate and the P-4 detector's permanent plant. Every other scaffold needs the route, the column or the page.
+
+**Not scaffolded:** the handler and `ListTraversal` unit tests. Their types do not exist, so the dev phase writes them beside `ViewBoardHandlerTests` and `BoardTraversalTests`.
+
+**Activation order, riskiest assumption first:**
+
+1. LV-02, `Sorted_by_due_date_a_page_boundary_inside_120_tied_dates_skips_and_repeats_nothing`, with LV-19's due-date row.
+   - It tests whether EF expresses the `(DueDate, Id)` pair seek with the `uniqueidentifier` tiebreaker compared in SQL, as a bounded index seek, and whether the two-segment NULL-last cursor composes.
+   - Read the generated SQL and record it. The fallback is `FromSql`.
+2. The ARCH P-4 gate with Task 2's schema. Then LV-16 and LV-17.
+3. LV-03, LV-01, LV-04 and LV-05. Then LV-18 with its `OFFSET` and dropped-index plants, and the rest of LV-19.
+4. LV-06..LV-15, then the remaining ARCH gates.
+5. The isolation rows, one at a time, each against its plant.
+6. The browser cases, `↓` by identity first.
+7. `ListScaleTimingTests`, once, with `--explicit on`.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

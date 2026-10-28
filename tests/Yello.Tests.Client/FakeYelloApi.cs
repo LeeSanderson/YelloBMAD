@@ -70,6 +70,8 @@ internal sealed class FakeYelloApi
     private readonly ConcurrentDictionary<string, string> _createdTaskByKey = new(StringComparer.Ordinal);
     private TaskCompletionSource? _heldColumnPage;
     private TaskCompletionSource? _arrivedColumnPage;
+    private TaskCompletionSource? _heldListPage;
+    private TaskCompletionSource? _arrivedListPage;
     private TaskCompletionSource? _heldRename;
     private TaskEditHold? _taskEditHold;
     private TaskEditHold? _lastTaskEditHold;
@@ -341,6 +343,42 @@ internal sealed class FakeYelloApi
     /// Lets a held column-page answer go.
     /// </summary>
     public void ReleaseColumnPage() => _heldColumnPage?.TrySetResult();
+
+    /// <summary>
+    /// Story 2.10's List page size (Q2 (a): 50, server-owned). The List route is answered for every case that asks for it;
+    /// no case written before 2.10 does.
+    /// </summary>
+    public int ListPageSize { get; set; } = 50;
+
+    /// <summary>
+    /// The List path of one Project, without its query (story 2.10 Q1 (a)), for a case to assert a List request was (or was
+    /// never) sent.
+    /// </summary>
+    public static string ListPathOf(Guid spaceId, Guid projectId) =>
+        ProjectRoutes.ListIn(spaceId) + $"/{projectId:D}/list";
+
+    /// <summary>
+    /// Every List request answered so far, in order. Story 2.10.
+    /// </summary>
+    public IReadOnlyList<FakeRequest> ListRequests =>
+        [.. _requests.Where(request => request.Method == "GET" && request.Path.EndsWith("/list", StringComparison.Ordinal))];
+
+    /// <summary>
+    /// Holds the next List answer until <see cref="ReleaseListPage"/> (hold, assert, release, assert). Returns a task that
+    /// completes when that request arrives. Story 2.10.
+    /// </summary>
+    public Task HoldListPageAsync()
+    {
+        _heldListPage = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _arrivedListPage = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        return _arrivedListPage.Task;
+    }
+
+    /// <summary>
+    /// Lets a held List answer go.
+    /// </summary>
+    public void ReleaseListPage() => _heldListPage?.TrySetResult();
 
     /// <summary>
     /// Holds the next Board answer for <paramref name="projectId"/> until <see cref="ReleaseBoard"/>. Story 2.2.
@@ -661,6 +699,11 @@ internal sealed class FakeYelloApi
             // Story 2.9 - one column's next page, by its cursor.
             case ("GET", var path) when TryColumnPage(path, out var pageSpace, out var pageProject, out var pageStatus):
                 return await ColumnPageAsync(pageSpace, pageProject, pageStatus, request.Query).ConfigureAwait(false);
+
+            // Story 2.10 - the List View's page (Q1 (a)). No case written before 2.10 sends this path, so every earlier case is
+            // served the bytes it always was.
+            case ("GET", var path) when TryUnderProject(path, "list", out var listSpace, out var listProject):
+                return await ListPageAsync(listSpace, listProject, request.Query).ConfigureAwait(false);
 
             // Story 2.2 - the Board and Task routes.
             case ("GET", var path) when TryUnderProject(path, "board", out var boardSpace, out var boardProject):
@@ -1226,6 +1269,117 @@ internal sealed class FakeYelloApi
     }
 
     /// <summary>
+    /// Story 2.10: one page of the Project's Tasks as rows (Q1 (a)) - <c>{project, statuses, total, tasks, nextAfter}</c> -
+    /// sorted (<c>status</c>: the Board's column order, then the id in SQL Server's <c>uniqueidentifier</c> order; <c>due-date</c>
+    /// and <c>label</c>: ascending with <c>NULL</c> last, then the id) and filtered (any-of Statuses, any-of Labels, a due
+    /// range or "No due date"), with the true filtered total. The cursor is the fake's own opaque string, bound to its sort;
+    /// one issued for another sort, or garbage, answers <c>400 invalid-list-cursor</c>, and an unknown sort <c>400
+    /// invalid-list-query</c>. A Board the fake does not hold answers the boundary's <c>404</c>. Held when a case armed
+    /// <see cref="HoldListPageAsync"/>. Sort codes and problem types are the ATDD run's scaffold strings - swap for
+    /// <c>ListSorts</c> and <c>ProblemTypes</c> on activation.
+    /// </summary>
+    private async Task<(int Status, string Body)> ListPageAsync(Guid spaceId, Guid projectId, string query)
+    {
+        if (_heldListPage is { } held)
+        {
+            _arrivedListPage?.TrySetResult();
+            await held.Task.ConfigureAwait(false);
+            _heldListPage = null;
+        }
+
+        if (!Boards.TryGetValue((spaceId, projectId), out var board))
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        var request = FakeListQuery.Parse(query);
+
+        if (request.Sort is not ("status" or "due-date" or "label"))
+        {
+            return (400, Problem(InvalidListQueryType));
+        }
+
+        var offset = 0;
+
+        if (request.After is { } after && !TryReadListCursor(after, request.Sort, out offset))
+        {
+            return (400, Problem(InvalidListCursorType));
+        }
+
+        var matching = board.Columns.SelectMany(column => column.Tasks).Where(request.Matches).ToList();
+        var sorted = Sorted(board, matching, request.Sort, LabelsIn(spaceId));
+        var sort = request.Sort;
+        var page = sorted.Skip(offset).Take(ListPageSize).ToList();
+        var next = offset + page.Count < matching.Count ? WriteListCursor(sort, offset + page.Count) : null;
+        var body = new
+        {
+            project = board.Project,
+            statuses = board.Columns.Select(column => new { id = column.StatusId, name = column.Name }),
+            total = matching.Count,
+            tasks = page,
+            nextAfter = next,
+        };
+
+        return (200, JsonSerializer.Serialize(body, JsonOptions));
+    }
+
+    /// <summary>
+    /// Story 2.10 Task 4 (c)'s refusal of an unknown sort or a malformed filter - a scaffold string for the
+    /// <c>ProblemTypes</c> entry.
+    /// </summary>
+    public const string InvalidListQueryType = "urn:yello:problem:invalid-list-query";
+
+    /// <summary>
+    /// Story 2.10 Task 4 (c)'s refusal of a cursor not issued for this sort - a scaffold string for the <c>ProblemTypes</c>
+    /// entry.
+    /// </summary>
+    public const string InvalidListCursorType = "urn:yello:problem:invalid-list-cursor";
+
+    /// <summary>
+    /// <paramref name="tasks"/> in <paramref name="sort"/>'s order: the Board's column order for <c>status</c>, the due date
+    /// for <c>due-date</c>, the first Label's name in chip order for <c>label</c> - <c>NULL</c> last - and then the id in SQL
+    /// Server's <c>uniqueidentifier</c> order (<see cref="System.Data.SqlTypes.SqlGuid"/>), never .NET's.
+    /// </summary>
+    private static List<FakeTask> Sorted(FakeBoard board, List<FakeTask> tasks, string sort, List<FakeLabel> spaceLabels)
+    {
+        var order = board.Columns.Select((column, index) => (column.StatusId, index)).ToDictionary(entry => entry.StatusId, entry => entry.index);
+
+        string? FirstLabelName(FakeTask task) =>
+            spaceLabels.Find(label => (task.LabelIds ?? []).Contains(label.Id))?.Name;
+
+        var sorted = sort switch
+        {
+            "status" => tasks.OrderBy(task => order.GetValueOrDefault(task.StatusId)),
+            "due-date" => tasks.OrderBy(task => task.DueDate is null ? 1 : 0).ThenBy(task => task.DueDate),
+            _ => tasks.OrderBy(task => FirstLabelName(task) is null ? 1 : 0).ThenBy(FirstLabelName, StringComparer.OrdinalIgnoreCase),
+        };
+
+        return [.. sorted.ThenBy(task => new System.Data.SqlTypes.SqlGuid(task.Id))];
+    }
+
+    private static string WriteListCursor(string sort, int offset) =>
+        Base64Url.EncodeToString(Encoding.UTF8.GetBytes(string.Create(System.Globalization.CultureInfo.InvariantCulture, $"fake|{sort}|{offset}")));
+
+    private static bool TryReadListCursor(string cursor, string sort, out int offset)
+    {
+        offset = 0;
+
+        try
+        {
+            var parts = Encoding.UTF8.GetString(Base64Url.DecodeFromChars(cursor)).Split('|');
+
+            return parts.Length == 3
+                && parts[0] == "fake"
+                && parts[1] == sort
+                && int.TryParse(parts[2], System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out offset);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// The Tasks of <paramref name="column"/> whose key sorts after <paramref name="after"/> (all, when <c>null</c>),
     /// ordinal on the key as the Host's BIN2 seek is, at most <paramref name="size"/>, and the cursor: the last one's key
     /// when another follows, otherwise <c>null</c>.
@@ -1763,6 +1917,87 @@ internal sealed record FakeRequest(string Method, string Path, IReadOnlyDictiona
     /// <returns>The value.</returns>
     public string? Header(string name) =>
         Headers.FirstOrDefault(header => string.Equals(header.Key, name, StringComparison.OrdinalIgnoreCase)).Value;
+}
+
+/// <summary>
+/// A List request's query as the fake reads it (story 2.10 Task 4 (a)): <c>sort</c>, repeatable <c>status</c> and
+/// <c>label</c>, <c>dueFrom</c>, <c>dueTo</c>, <c>dueNone</c> and <c>after</c>.
+/// </summary>
+/// <param name="Sort">The sort code, or empty.</param>
+/// <param name="StatusIds">Any-of Statuses; empty for all.</param>
+/// <param name="LabelIds">Any-of Labels; empty for any.</param>
+/// <param name="DueFrom">The range's inclusive start.</param>
+/// <param name="DueTo">The range's exclusive end.</param>
+/// <param name="DueNone">Only Tasks with no due date.</param>
+/// <param name="After">The cursor, or <c>null</c>.</param>
+internal sealed record FakeListQuery(
+    string Sort,
+    IReadOnlyList<Guid> StatusIds,
+    IReadOnlyList<Guid> LabelIds,
+    DateTimeOffset? DueFrom,
+    DateTimeOffset? DueTo,
+    bool DueNone,
+    string? After)
+{
+    /// <summary>
+    /// Reads a query string (with or without its leading <c>?</c>).
+    /// </summary>
+    /// <param name="query">The query string.</param>
+    /// <returns>The query.</returns>
+    public static FakeListQuery Parse(string query)
+    {
+        var parameters = query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)
+            .Select(pair => pair.Split('=', 2))
+            .Select(pair => (Name: pair[0], Value: pair.Length == 2 ? Uri.UnescapeDataString(pair[1]) : string.Empty))
+            .ToList();
+
+        string? Single(string name) => parameters.Where(parameter => parameter.Name == name).Select(parameter => parameter.Value).FirstOrDefault();
+        List<Guid> Ids(string name) => [.. parameters.Where(parameter => parameter.Name == name).Select(parameter => Guid.TryParse(parameter.Value, out var id) ? id : Guid.Empty)];
+
+        return new FakeListQuery(
+            Single("sort") ?? string.Empty,
+            Ids("status"),
+            Ids("label"),
+            Instant(Single("dueFrom")),
+            Instant(Single("dueTo")),
+            string.Equals(Single("dueNone"), "true", StringComparison.OrdinalIgnoreCase),
+            Single("after"));
+    }
+
+    /// <summary>
+    /// Whether <paramref name="task"/> passes every filter.
+    /// </summary>
+    /// <param name="task">The Task.</param>
+    /// <returns>Whether it matches.</returns>
+    public bool Matches(FakeTask task) =>
+        InStatus(task) && CarriesALabel(task) && IsDue(task);
+
+    private bool InStatus(FakeTask task) => StatusIds.Count == 0 || StatusIds.Contains(task.StatusId);
+
+    private bool CarriesALabel(FakeTask task) => LabelIds.Count == 0 || (task.LabelIds ?? []).Any(LabelIds.Contains);
+
+    private bool IsDue(FakeTask task)
+    {
+        if (DueNone)
+        {
+            return task.DueDate is null;
+        }
+
+        var afterStart = DueFrom is not { } from || task.DueDate >= from;
+        var beforeEnd = DueTo is not { } to || task.DueDate < to;
+
+        return afterStart && beforeEnd;
+    }
+
+    private static DateTimeOffset? Instant(string? value)
+    {
+        if (DateTimeOffset.TryParse(value, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var instant))
+        {
+            return instant;
+        }
+
+        return null;
+    }
 }
 
 /// <summary>

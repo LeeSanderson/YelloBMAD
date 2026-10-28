@@ -348,6 +348,96 @@ internal static class IsolationCases
             },
             Both(new Served(HttpStatusCode.OK, BoardPagesHoldExactlyTheCallersTasksAsync, "200, each column at most 50 with a cursor iff more follow; walking the pages yields exactly A's Tasks"))),
 
+        // Story 2.10 - the List View route (Q1 (a), AC21, Task 7; 1.9-GATE-002 on both surfaces). A read every Role holds
+        // (ReadProjectsAndTasks), so both surfaces get the same expectation. Seeded through the product. Pending until the
+        // route is mapped (GATE-003: live before 2.10 reaches review). The route is the ATDD run's scaffold constant
+        // (ListRoute) - swap it for the ListRoutes contract member on activation and change nothing else.
+        new(
+            "ISO-DIRECT-LIST", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, ListRoute,
+            async world =>
+            {
+                var (foreign, _) = await SeedProjectWithTaskAsync(world.B);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Get,
+                    [new(ListOf(world.B.SpaceId, foreign), ListOf(Guid.NewGuid(), foreign))],
+                    world.B.SpaceId);
+            },
+            Both(new BoundaryNotFound()),
+            PendingUntil: "2.10",
+            PendingReason: "GET …/projects/{projectId}/list is mapped by story 2.10 Task 4"),
+
+        new(
+            "ISO-LIST-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Get, ListRoute,
+            async world =>
+            {
+                var (foreign, _) = await SeedProjectWithTaskAsync(world.B);
+
+                // B's Project in A's own Space: the Project's query filter and FILTER predicate stand between A and it, ahead
+                // of the Task's two layers - the handler answers no page for a Project it cannot find. Plant owed by 2.10
+                // Task 7: the handler's Project check skipped - the row must fail on both surfaces.
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Get,
+                    [new(ListOf(world.A.SpaceId, foreign), ListOf(world.A.SpaceId, Guid.NewGuid()))],
+                    TargetSpaceId: null);
+            },
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable)),
+            PendingUntil: "2.10",
+            PendingReason: "GET …/projects/{projectId}/list is mapped by story 2.10 Task 4"),
+
+        // More than one page of A's Tasks, every one carrying A's Label, and B's Project with a Task carrying B's Label: walking
+        // every page under every sort with A's own Label as the filter yields exactly A's Tasks, the total is exactly A's, and
+        // nothing of B's - id, title or Label name - appears. Plant owed by 2.10 Task 7: the Task's two layers dropped (query
+        // filter and FILTER predicate) - the row must fail on both surfaces.
+        new(
+            "ISO-LIST-AGGREGATE", "I-3 (includes the List View page and its total), FR-30", IsolationVector.Aggregate, HttpMethod.Get, ListRoute,
+            async world =>
+            {
+                var (own, first) = await SeedProjectWithTaskAsync(world.A);
+                var ownLabel = await SeedLabelAsync(world.A);
+
+                await ApplyLabelThroughTheProductAsync(world.A, first, ownLabel);
+                await SeedLabelledTasksThroughTheProductAsync(world.A, own, ownLabel, PageSize);
+
+                var (_, theirs) = await SeedProjectWithTaskAsync(world.B);
+
+                await ApplyLabelThroughTheProductAsync(world.B, theirs, await SeedLabelAsync(world.B));
+
+                return await OwnAsync(world, ListOf(world.A.SpaceId, own, ListSortStatus, labelId: ownLabel));
+            },
+            Both(new Served(HttpStatusCode.OK, ListPagesHoldExactlyTheCallersTasksAsync, "200, under every sort each page at most 50, the total A's own, the walk exactly A's Tasks, none of B's ids, titles or Label names")),
+            PendingUntil: "2.10",
+            PendingReason: "GET …/projects/{projectId}/list is mapped by story 2.10 Task 4; the two-layer plant is Task 7's"),
+
+        // A filter naming B's real Label id, or B's real Status id, in A's own Project matches nothing and answers bytes
+        // identical to a random id's (AC15, the I-13 shape of 2.3 and 2.4) - it reveals neither that the id exists nor whose
+        // it is. Plant owed by 2.10 Task 7: the handler's narrowing of filter ids skipped.
+        new(
+            "ISO-LIST-FOREIGN-FILTER-IN-OWN-SPACE", "I-13, I-4", IsolationVector.DeepLink, HttpMethod.Get, ListRoute,
+            async world =>
+            {
+                var (own, _) = await SeedProjectWithTaskAsync(world.A);
+                var (_, theirs) = await SeedProjectWithTaskAsync(world.B);
+                var theirLabel = await SeedLabelAsync(world.B);
+                var theirStatus = (await StatusIdsAsync(world.B))[0];
+
+                await ApplyLabelThroughTheProductAsync(world.B, theirs, theirLabel);
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Get,
+                    [
+                        new(ListOf(world.A.SpaceId, own, ListSortStatus, labelId: theirLabel), ListOf(world.A.SpaceId, own, ListSortStatus, labelId: Guid.NewGuid())),
+                        new(ListOf(world.A.SpaceId, own, ListSortStatus, statusId: theirStatus), ListOf(world.A.SpaceId, own, ListSortStatus, statusId: Guid.NewGuid())),
+                    ],
+                    TargetSpaceId: null);
+            },
+            Both(new SameAsAnchor(HttpStatusCode.OK)),
+            PendingUntil: "2.10",
+            PendingReason: "GET …/projects/{projectId}/list is mapped by story 2.10 Task 4; the filter narrowing is Task 3 (c)"),
+
         new(
             "ISO-WRITE-TASK-FOREIGN-PROJECT-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Post, TaskRoutes.Create,
             async world =>
@@ -1389,6 +1479,134 @@ internal static class IsolationCases
         Assert.Equal(own.Select(task => task.Id).Order(), walked.Order());
         Assert.Empty(walked.Intersect(theirs.Select(task => task.Id)));
         Assert.All(theirs, task => Assert.DoesNotContain(task.Title, answer.Body, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Story 2.10 Q1 (a)'s List route - the ATDD run's scaffold constant. Swap for the <c>ListRoutes</c> contract member on
+    /// activation; the gap gate reads the Host's own route table, so a pattern that differs from the one mapped shows there.
+    /// </summary>
+    private const string ListRoute = "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/list";
+
+    /// <summary>
+    /// Story 2.10's Status sort code (Q7 (a)) - a scaffold constant for <c>ListSorts.Status</c>.
+    /// </summary>
+    private const string ListSortStatus = "status";
+
+    /// <summary>
+    /// Every sort story 2.10 offers (Q3, Q5, Q7) - scaffold constants for <c>ListSorts</c>.
+    /// </summary>
+    private static readonly string[] ListSorts = [ListSortStatus, "due-date", "label"];
+
+    /// <summary>
+    /// One Project's List path as a client calls it (story 2.10 Task 4 (a)): a sort, an optional Label or Status filter, and
+    /// an optional cursor, every value escaped.
+    /// </summary>
+    private static string ListOf(Guid spaceId, Guid projectId, string sort = ListSortStatus, Guid? labelId = null, Guid? statusId = null, string? after = null)
+    {
+        var path = $"/api/v1/spaces/{spaceId:D}/projects/{projectId:D}/list?sort={Uri.EscapeDataString(sort)}";
+
+        if (labelId is { } label)
+        {
+            path += $"&label={label:D}";
+        }
+
+        if (statusId is { } status)
+        {
+            path += $"&status={status:D}";
+        }
+
+        return after is null ? path : path + "&after=" + Uri.EscapeDataString(after);
+    }
+
+    /// <summary>
+    /// Sets exactly <paramref name="labelId"/> on a Task through the product's Labels edit (story 2.4 Q1 (a)), so the
+    /// product maintains the Task's Label sort key itself. Story 2.10.
+    /// </summary>
+    private static async Task ApplyLabelThroughTheProductAsync(ProductActor owner, Guid taskId, Guid labelId)
+    {
+        var applied = await owner.SendAsync(IsolationSurface.Session, HttpMethod.Patch, TaskRoutes.TaskOf(owner.SpaceId, taskId), LabelIdsBody(labelId), headers: null);
+
+        Assert.True(applied.StatusCode == HttpStatusCode.OK, $"Applying a Label through the product: {applied.StatusCode} {applied.Body}");
+    }
+
+    /// <summary>
+    /// <paramref name="count"/> more Tasks in <paramref name="owner"/>'s Project, each created and then labelled
+    /// <paramref name="labelId"/> through the product, every title unique and held as a secret (I-17). Story 2.10.
+    /// </summary>
+    private static async Task SeedLabelledTasksThroughTheProductAsync(ProductActor owner, Guid projectId, Guid labelId, int count)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            var title = $"Task {Guid.NewGuid():N}";
+
+            owner.HoldsTaskTitled(title);
+
+            var created = await owner.SendAsync(
+                IsolationSurface.Session,
+                HttpMethod.Post,
+                TaskRoutes.CreateIn(owner.SpaceId, projectId),
+                JsonContent.Create(new { title }, options: JsonOptions),
+                headers: null);
+
+            Assert.True(created.StatusCode == HttpStatusCode.Created, $"Seeding a Task through the product: {created.StatusCode} {created.Body}");
+
+            using var document = JsonDocument.Parse(created.Body);
+
+            await ApplyLabelThroughTheProductAsync(owner, document.RootElement.GetProperty("id").GetGuid(), labelId);
+        }
+    }
+
+    /// <summary>
+    /// I-3 for the List View (story 2.10 AC21): the row's Project holds more than a page of A's Tasks; under every offered
+    /// sort, walking A's own pages with the row's Label filter (on A's own Session) gives pages of at most 50, a total on
+    /// every page equal to A's Tasks of that Project, and a walk of exactly those Tasks, each once; nothing of B's - Task id,
+    /// title or Label name - appears in any page. Anchored both ways: both Spaces hold labelled Tasks.
+    /// </summary>
+    private static async Task ListPagesHoldExactlyTheCallersTasksAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
+    {
+        var path = request.Paths[0].Path;
+        var projectId = Guid.Parse(path.Split('?')[0].Split('/')[^2]);
+        var labelId = Guid.Parse(path.Split("label=")[1].Split('&')[0]);
+        var own = (await world.Database.TasksInAsync(world.A.SpaceId)).Where(task => task.ProjectId == projectId).Select(task => task.Id).ToList();
+        var theirs = await world.Database.TasksInAsync(world.B.SpaceId);
+        var theirLabels = await world.Database.LabelsInAsync(world.B.SpaceId);
+
+        Assert.True(own.Count > PageSize, $"The row's Project holds {own.Count} Tasks; the case is about more than one page.");
+        Assert.NotEmpty(theirs);
+        Assert.NotEmpty(theirLabels);
+        Assert.Equal(HttpStatusCode.OK, answer.StatusCode);
+
+        foreach (var sort in ListSorts)
+        {
+            var walked = new List<Guid>();
+            string? after = null;
+            var pages = 0;
+
+            do
+            {
+                var page = await world.A.SendAsync(IsolationSurface.Session, HttpMethod.Get, ListOf(world.A.SpaceId, projectId, sort, labelId: labelId, after: after));
+
+                Assert.True(page.StatusCode == HttpStatusCode.OK, $"Walking A's own List under {sort}: {page.StatusCode} {page.Body}");
+                Assert.All(theirs, task => Assert.DoesNotContain(task.Title, page.Body, StringComparison.Ordinal));
+                Assert.All(theirLabels, label => Assert.DoesNotContain(label.Name, page.Body, StringComparison.Ordinal));
+
+                using var document = JsonDocument.Parse(page.Body);
+                var tasks = document.RootElement.GetProperty("tasks").EnumerateArray().Select(task => task.GetProperty("id").GetGuid()).ToList();
+                var cursor = document.RootElement.GetProperty("nextAfter");
+
+                Assert.Equal(own.Count, document.RootElement.GetProperty("total").GetInt32());
+                Assert.True(tasks.Count <= PageSize, $"A List page served {tasks.Count} Tasks; a page is at most {PageSize}.");
+
+                walked.AddRange(tasks);
+                after = cursor.ValueKind == JsonValueKind.Null ? null : cursor.GetString();
+                Assert.True(++pages <= own.Count, "The List's cursor never reached null.");
+            }
+            while (after is not null);
+
+            Assert.Equal(walked.Count, walked.Distinct().Count());
+            Assert.Equal(own.Order(), walked.Order());
+            Assert.Empty(walked.Intersect(theirs.Select(task => task.Id)));
+        }
     }
 
     private static async Task NoTokenWrittenInTheForeignSpaceAsync(IsolationWorld world, CaseRequest request) =>
