@@ -264,8 +264,36 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
 
         await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
+        await RecomputeFirstLabelNameAsync(taskId, cancellationToken).ConfigureAwait(false);
+
         return true;
     }
+
+    /// <summary>
+    /// Sets the Task's List View Label sort key (story 2.10, AC13, open question 3 (a)) to the first name, in chip order, of
+    /// the Labels it carries now - <c>NULL</c> when it carries none.
+    /// </summary>
+    /// <remarks>
+    /// <b>One statement, after the replace, in the same unit of work</b>: its subquery reads the set this transaction just
+    /// wrote, and the Task's row lock taken first in <see cref="ReplaceAsync"/> keeps every other Labels edit of the Task
+    /// waiting until this one commits - so the key is always the final set's, never a snapshot from before it (story 2.9:
+    /// <c>READ_COMMITTED_SNAPSHOT</c>). The order is <see cref="TaskLabelReads"/>' - name, then id, in the database's
+    /// collation - so the first chip is the sort key. Composed through EF, so both isolation layers still narrow it.
+    /// </remarks>
+    private Task<int> RecomputeFirstLabelNameAsync(Guid taskId, CancellationToken cancellationToken) =>
+        dbContext.Tasks
+            .Where(task => task.Id == taskId)
+            .ExecuteUpdateAsync(
+                setters => setters.SetProperty(
+                    task => task.FirstLabelName,
+                    task => dbContext.Set<TaskLabel>()
+                        .Where(application => application.TaskId == task.Id)
+                        .Join(dbContext.Labels, application => application.LabelId, label => label.Id, (_, label) => label)
+                        .OrderBy(label => label.Name)
+                        .ThenBy(label => label.Id)
+                        .Select(label => label.Name)
+                        .FirstOrDefault()),
+                cancellationToken);
 
     /// <inheritdoc />
     public async Task<TaskDeletion> DeleteAsync(Guid taskId, CancellationToken cancellationToken)

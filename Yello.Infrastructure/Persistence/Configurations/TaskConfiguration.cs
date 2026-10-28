@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Yello.Domain.Labels;
 using Yello.Domain.Projects;
 using Yello.Domain.Statuses;
 using Yello.Domain.Tasks;
@@ -62,8 +63,14 @@ internal sealed class TaskConfiguration(YelloDbContext context) : IEntityTypeCon
         builder.Property(task => task.CreatedAt).IsRequired();
 
         // Optional (prd.md:387), and nullable is also what keeps story 2.3's migration expand-only: the
-        // revision still serving inserts Tasks without naming it. No index - sorting by due date is 2.10's.
+        // revision still serving inserts Tasks without naming it. Story 2.10's due-date sort seeks the index below.
         builder.Property(task => task.DueDate).IsRequired(false);
+
+        // Story 2.10's Label sort key (open question 3 (a)): the first Label's name in chip order. The column type of
+        // Label.Name - nvarchar(50) in the database's default collation - so its order is the chips' order.
+        builder.Property(task => task.FirstLabelName)
+            .IsRequired(false)
+            .HasMaxLength(LabelName.MaxLength);
 
         // AR-8: story 2.4's TaskLabel references a Task through (SpaceId, Id), so an application can never point
         // at a Task in another Space.
@@ -86,5 +93,19 @@ internal sealed class TaskConfiguration(YelloDbContext context) : IEntityTypeCon
         // Unique, because a position key is unique within its (Project, Status) (AD-15).
         builder.HasIndex(task => new { task.SpaceId, task.ProjectId, task.StatusId, task.PositionKey })
             .IsUnique();
+
+        // Story 2.10's List View (AR-22, AD-29, AC6): one composite index per offered sort, the sort column then Id - the
+        // pair keyset's tiebreaker - after the leading (SpaceId, ProjectId), so every seek stays inside one Project of one
+        // Space. ListSortColumns states which column each sort reads; ListViewGateTests holds the two to each other. The
+        // INCLUDEd columns are the other filters' (open question 4 (a)), so a filter under another sort is tested in the
+        // index, never by a lookup per candidate row.
+        builder.HasIndex(task => new { task.SpaceId, task.ProjectId, task.StatusId, task.Id })
+            .IncludeProperties(task => task.DueDate);
+
+        builder.HasIndex(task => new { task.SpaceId, task.ProjectId, task.DueDate, task.Id })
+            .IncludeProperties(task => task.StatusId);
+
+        builder.HasIndex(task => new { task.SpaceId, task.ProjectId, task.FirstLabelName, task.Id })
+            .IncludeProperties(task => new { task.StatusId, task.DueDate });
     }
 }

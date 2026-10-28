@@ -1,0 +1,92 @@
+@using System.Globalization
+@using Yello.Client.Spaces
+@using Yello.Contracts.Labels
+@using Yello.Contracts.Tasks
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    ONE ROW OF THE LIST VIEW - story 2.10, AC18, AC20, open question 8 (a). The card's metadata, mirrored (UX-DR8,
+    DESIGN.md:451): the title, the Status's name, the due date in the viewer's own locale and zone (or nothing when there is
+    none), and at most three Label chips in the server's order followed by "+N".
+
+    ONE TASK FOR ITS LIFE: the list keys this row by its Task's id and never re-points it (AD-29). Its aria-rowindex is its
+    true ordinal plus the header row (AC11, X-6). The title cell is the row's stop in the list's one roving tab stop
+    (data-list-stop; js/list-keys.js): tabindex 0 on the active row, -1 on every other. Blazor renders every tabindex.
+*@
+
+<tr data-task-id="@Item.Id.ToString("D", CultureInfo.InvariantCulture)" aria-rowindex="@RowIndex">
+    <th scope="row" class="type-task-title task-list__title" data-list-stop tabindex="@(Active ? "0" : "-1")">@Item.Title</th>
+    <td class="task-list__status">@StatusName</td>
+    <td class="task-list__due">@DueText</td>
+    <td class="type-meta task-list__labels">
+        @foreach (var label in ShownLabels)
+        {
+            <LabelChip @key="label.Id" Name="@label.Name" Colour="@label.Colour" />
+        }
+
+        @if (MoreLabels > 0)
+        {
+            <span class="label-more">
+                <span aria-hidden="true">@string.Format(CultureInfo.CurrentCulture, Localizer["LabelsMore"], MoreLabels)</span>
+                <span class="visually-hidden">@string.Format(CultureInfo.CurrentCulture, Localizer["LabelsMoreName"], MoreLabels)</span>
+            </span>
+        }
+    </td>
+</tr>
+
+@code {
+    private const int MostChips = 3;
+
+    // The header row is the table's first, so a Task's aria-rowindex is its ordinal (from 1) plus one.
+    private const int FirstRowIndex = 2;
+
+    /// <summary>
+    /// The Task this row shows.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public TaskResponse Item { get; set; }
+
+    /// <summary>
+    /// Its <c>aria-rowindex</c>: its true ordinal in the list, plus one for the header row.
+    /// </summary>
+    [Parameter]
+    public int RowIndex { get; set; }
+
+    /// <summary>
+    /// Its Status's name.
+    /// </summary>
+    [Parameter]
+    public string StatusName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// The Space's Labels by id, so the row names the Labels its Task carries.
+    /// </summary>
+    [Parameter]
+    public IReadOnlyDictionary<Guid, LabelResponse> Labels { get; set; } = new Dictionary<Guid, LabelResponse>();
+
+    /// <summary>
+    /// Whether this row is the list's one tab stop.
+    /// </summary>
+    [Parameter]
+    public bool Active { get; set; }
+
+    // In the server's order (by name, then id); an id this tab does not hold a Label for is not drawn - the card's rule.
+    private List<LabelResponse> CarriedLabels => [.. Item.LabelIds.Select(id => Labels.GetValueOrDefault(id)).OfType<LabelResponse>()];
+
+    private IEnumerable<LabelResponse> ShownLabels => CarriedLabels.Take(MostChips);
+
+    private int MoreLabels => Math.Max(0, CarriedLabels.Count - MostChips);
+
+    private string DueText => Item.DueDate is { } due ? TaskDates.DayAndMonth(due) : string.Empty;
+
+    /// <summary>
+    /// The loaded rows, each with its <c>aria-rowindex</c>: its true ordinal plus one for the header row (AC11, X-6). The
+    /// rows are a contiguous loaded prefix of the list, so a row's position among them is its ordinal.
+    /// </summary>
+    /// <param name="rows">The loaded rows, in order.</param>
+    /// <returns>Each row and its index.</returns>
+    public static IEnumerable<(TaskResponse Row, int RowIndex)> Indexed(IReadOnlyList<TaskResponse> rows) =>
+        rows.Select((row, index) => (row, index + FirstRowIndex));
+}

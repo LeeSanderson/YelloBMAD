@@ -1,0 +1,40 @@
+@*
+    ONE CHECKBOX OF A LIST VIEW FILTER - story 2.10, open question 4 (a). A native checkbox with its visible label: a Status
+    or a Label by its name, which is user data and never transformed. Toggling it raises OnToggle with its id; the list
+    reads afresh.
+*@
+
+<label class="task-list__choice">
+    <input type="checkbox" checked="@Checked" @onchange="ToggleAsync" />
+    <span>@Name</span>
+</label>
+
+@code {
+    /// <summary>
+    /// The Status or Label this choice stands for.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid Id { get; set; }
+
+    /// <summary>
+    /// Its name, as the checkbox's visible label.
+    /// </summary>
+    [Parameter]
+    [EditorRequired]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Whether it is chosen.
+    /// </summary>
+    [Parameter]
+    public bool Checked { get; set; }
+
+    /// <summary>
+    /// Raised with <see cref="Id"/> when it is toggled.
+    /// </summary>
+    [Parameter]
+    public EventCallback<Guid> OnToggle { get; set; }
+
+    private Task ToggleAsync() => OnToggle.InvokeAsync(Id);
+}

@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Data.SqlClient;
 using Xunit;
+using Yello.Contracts;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
 using Yello.Tests.Slices.Tasks;
@@ -20,10 +21,11 @@ namespace Yello.Tests.Slices.Lists;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Scaffold constants, swapped on activation</b> (none of these members exists yet): <see cref="ListRoute"/> for
-/// <c>ListRoutes</c>' pattern, <see cref="PageSize"/> for <c>ListPage.Size</c>, the three sort codes for
-/// <c>ListSorts.Status</c>, <c>.DueDate</c> and <c>.Label</c>, and the two problem types for the
-/// <c>ProblemTypes</c> entries Task 4 (c) adds. The query parameter names are Task 4 (a)'s: <c>sort</c>, <c>status</c>
+/// <b>Contract members</b>: <see cref="PageSize"/> is <c>ListPage.Size</c> and the two problem types are
+/// <c>ProblemTypes</c>' entries. The three sort codes stay literal constants, because <c>[InlineData]</c> arguments must
+/// be compile-time constants and <c>ListSorts</c>' codes are properties (S2339); a code that drifted from
+/// <c>ListSorts</c> is refused <c>400 invalid-list-query</c> by every case here, and <c>ListViewGateTests</c> pins the
+/// codes themselves. The query parameter names are Task 4 (a)'s: <c>sort</c>, <c>status</c>
 /// and <c>label</c> (repeatable), <c>dueFrom</c>, <c>dueTo</c>, <c>dueNone</c> and <c>after</c>. Swap each for the
 /// contract member and change nothing else; a different decision is recorded in the Debug Log.
 /// </para>
@@ -55,14 +57,9 @@ namespace Yello.Tests.Slices.Lists;
 internal static class ListWire
 {
     /// <summary>
-    /// Q1 (a)'s route. Swap for <c>ListRoutes</c>' pattern on activation.
+    /// Q2 (a)'s page size, one named server constant.
     /// </summary>
-    public const string ListRoute = "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/list";
-
-    /// <summary>
-    /// Q2 (a)'s page size, one named server constant. Swap for <c>ListPage.Size</c> on activation.
-    /// </summary>
-    public const int PageSize = 50;
+    public static int PageSize => Application.Lists.ListPage.Size;
 
     /// <summary>
     /// The Status sort code (Q7 (a): effective order, then <c>TaskId</c>). Swap for <c>ListSorts.Status</c>.
@@ -82,12 +79,12 @@ internal static class ListWire
     /// <summary>
     /// Task 4 (c)'s refusal of an unknown sort, a malformed id or a malformed or out-of-range due bound.
     /// </summary>
-    public const string InvalidListQuery = "urn:yello:problem:invalid-list-query";
+    public static string InvalidListQuery => ProblemTypes.InvalidListQuery;
 
     /// <summary>
     /// Task 4 (c)'s refusal of a cursor this route did not issue for this sort.
     /// </summary>
-    public const string InvalidListCursor = "urn:yello:problem:invalid-list-cursor";
+    public static string InvalidListCursor => ProblemTypes.InvalidListCursor;
 
     /// <summary>
     /// Every offered sort, for the cases that run over all three.
@@ -396,7 +393,9 @@ internal static class ListWire
     /// connection with no Space context. Deterministic where a duration is not (AC10, 2.9 PG-11): the same statements serve
     /// the first page and the last, so their reads compare the work of one seek at two depths, and an <c>OFFSET</c> reads
     /// every row it skips. Run the request once to warm its plans before measuring (2.9: a first execution carries
-    /// compilation's reads). Nothing else runs in this database while a class's case runs.
+    /// compilation's reads). Nothing else runs in this database while a class's case runs. An automatic statistics update
+    /// the request happens to trigger (<c>SELECT StatMan(…) FROM … [Task]</c>) is the engine's housekeeping, not the
+    /// request's read, and is left out: it once added 13,000 reads to one side of a comparison.
     /// </summary>
     public static async Task<long> LogicalReadsOfAsync(RegistrationDatabase database, Func<Task> request)
     {
@@ -466,6 +465,7 @@ internal static class ListWire
             WHERE pa.attribute = N'dbid' AND CAST(pa.value AS int) = DB_ID()
               AND st.text LIKE N'%Task]%'
               AND st.text NOT LIKE N'%dm_exec_query_stats%'
+              AND st.text NOT LIKE N'%StatMan%'
             """;
 
         return Convert.ToInt64(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken), CultureInfo.InvariantCulture);

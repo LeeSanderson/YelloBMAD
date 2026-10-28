@@ -15,6 +15,7 @@ using Yello.Application.Boards.ViewBoardColumn;
 using Yello.Application.Labels.DefineLabel;
 using Yello.Application.Labels.DeleteLabel;
 using Yello.Application.Labels.ListLabels;
+using Yello.Application.Lists.ViewList;
 using Yello.Application.Spaces.ListSpaces;
 using Yello.Application.Statuses.ListStatuses;
 using Yello.Application.Tasks.CreateTask;
@@ -112,6 +113,7 @@ builder.Services.AddScoped<DeleteTaskHandler>();
 builder.Services.AddScoped<MoveTaskHandler>();
 builder.Services.AddScoped<ViewBoardHandler>();
 builder.Services.AddScoped<ViewBoardColumnHandler>();
+builder.Services.AddScoped<ViewListHandler>();
 builder.Services.AddScoped<ListLabelsHandler>();
 builder.Services.AddScoped<DefineLabelHandler>();
 builder.Services.AddScoped<DeleteLabelHandler>();
@@ -402,6 +404,10 @@ api.MapDeleteProject();
 api.MapCreateTask();
 api.MapBoard();
 api.MapBoardColumn();
+
+// The List View (story 2.10). GET /api/v1/spaces/{spaceId}/projects/{projectId}/list reads one page of the Project's
+// Tasks under a sort and filters, under the read capability every Role holds; Space-scoped on both surfaces.
+api.MapList();
 
 // One Task (story 2.3). GET and PATCH /api/v1/spaces/{spaceId}/tasks/{taskId} read it under the read
 // capability and edit its title, Status, due date and Labels (story 2.4) under ManageTasks. No bound on the

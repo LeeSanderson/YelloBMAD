@@ -107,6 +107,16 @@ public static class RefusalCopy
     public static string TaskPositionFullKey => "TaskPositionFull";
 
     /// <summary>
+    /// The copy key for <c>400 invalid-list-query</c> (story 2.10): a List View query the server could not read.
+    /// </summary>
+    public static string InvalidListQueryKey => "ListQueryInvalid";
+
+    /// <summary>
+    /// The copy key for <c>400 invalid-list-cursor</c> (story 2.10): a cursor the server did not issue for the sort.
+    /// </summary>
+    public static string InvalidListCursorKey => "ListCursorInvalid";
+
+    /// <summary>
     /// The resource a refusal is rendered with.
     /// </summary>
     /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
@@ -175,6 +185,8 @@ public static class RefusalCopy
         [ProblemTypes.InvalidTaskLabels] = InvalidTaskLabelsKey,
         [ProblemTypes.TaskPositionUnavailable] = TaskPositionUnavailableKey,
         [ProblemTypes.TaskPositionFull] = TaskPositionFullKey,
+        [ProblemTypes.InvalidListQuery] = InvalidListQueryKey,
+        [ProblemTypes.InvalidListCursor] = InvalidListCursorKey,
     };
 
     private static string? OwnKey(string? type) =>

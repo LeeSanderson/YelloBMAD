@@ -108,6 +108,16 @@ public static class ClientRoutes
     public static string Board(Guid spaceId, Guid projectId) => $"/spaces/{spaceId:D}/projects/{projectId:D}";
 
     /// <summary>
+    /// A Project's List View (story 2.10, open question 6 (a)): the Board's address with <c>/list</c> after it. Ids only -
+    /// no filter, sort or name ever reaches it (UX-DR33) - and the Space leads, so <see cref="SpaceIn"/> reads it and the
+    /// purge hook covers it unchanged.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="projectId">The Project.</param>
+    /// <returns>The path.</returns>
+    public static string List(Guid spaceId, Guid projectId) => $"/spaces/{spaceId:D}/projects/{projectId:D}/list";
+
+    /// <summary>
     /// A Space's settings (story 2.4, open question 7): its Labels today. Ids only (UX-DR33); the Space leads, so the
     /// purge hook covers it as it covers Space home.
     /// </summary>

@@ -1,0 +1,50 @@
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject NavigationManager Navigation
+
+@*
+    THE BOARD/LIST VIEW TOGGLE - story 2.10, AC1, open question 6 (a). Two links in a nav, "Board" and "List", the current
+    one marked aria-current="page" and the other unmarked. Links, not tabs: each view has its own address, so Back works,
+    SpaceArrival and the purge hook cover both, and switching views starts the other afresh - filter state does not survive
+    the trip (AC17, intended).
+
+    PARAMETERLESS, so the Board adds no dependency for it (BoardView is at its dependency cap, story 2.9): the Space and
+    the Project are read from the address both views live at, and the current view is whichever of the two that address
+    is. Rendered by both views under the page heading. Absent - never disabled - when the address names no Project.
+*@
+
+@if (_projectId is { } projectId && _spaceId is { } spaceId)
+{
+    <nav class="view-toggle" aria-label="@Localizer["ViewToggleName"]">
+        <a class="view-toggle__link" href="@ClientRoutes.Board(spaceId, projectId)" aria-current="@(_isList ? null : "page")">@Localizer["ViewBoard"]</a>
+        <a class="view-toggle__link" href="@ClientRoutes.List(spaceId, projectId)" aria-current="@(_isList ? "page" : null)">@Localizer["ViewList"]</a>
+    </nav>
+}
+
+@code {
+    private static readonly char[] PathEnds = ['?', '#'];
+
+    private Guid? _spaceId;
+    private Guid? _projectId;
+    private bool _isList;
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        var path = Navigation.ToBaseRelativePath(Navigation.Uri).Split(PathEnds)[0].Trim('/');
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+
+        _spaceId = null;
+        _projectId = null;
+        _isList = false;
+
+        if (segments is ["spaces", var space, "projects", var project, .. var rest]
+            && Guid.TryParse(space, out var spaceId)
+            && Guid.TryParse(project, out var projectId)
+            && rest is [] or ["list"])
+        {
+            _spaceId = spaceId;
+            _projectId = projectId;
+            _isList = rest is ["list"];
+        }
+    }
+}

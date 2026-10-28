@@ -851,4 +851,116 @@
     <value>Project deleted.</value>
     <comment>Announced politely once the server has deleted a Project (story 2.5, open question 11). Never before.</comment>
   </data>
+  <data name="ViewToggleName" xml:space="preserve">
+    <value>Views</value>
+    <comment>The accessible name of the Board/List view toggle (story 2.10, open question 6 (a)).</comment>
+  </data>
+  <data name="ViewBoard" xml:space="preserve">
+    <value>Board</value>
+    <comment>The view toggle's link to the Project's Board (story 2.10).</comment>
+  </data>
+  <data name="ViewList" xml:space="preserve">
+    <value>List</value>
+    <comment>The view toggle's link to the Project's List View (story 2.10).</comment>
+  </data>
+  <data name="ListLoading" xml:space="preserve">
+    <value>Loading the list.</value>
+    <comment>Visually hidden inside the List View's cold-load skeleton (UX-DR35; story 2.10).</comment>
+  </data>
+  <data name="ListLoaded" xml:space="preserve">
+    <value>List loaded.</value>
+    <comment>Announced politely, once, when the List View has answered (UX-DR35; story 2.10, AC19). Paging says nothing.</comment>
+  </data>
+  <data name="ListFilterStatus" xml:space="preserve">
+    <value>Status</value>
+    <comment>The legend of the List View's Status filter (story 2.10, open question 4 (a)): any of the checked Statuses.</comment>
+  </data>
+  <data name="ListFilterLabel" xml:space="preserve">
+    <value>Label</value>
+    <comment>The legend of the List View's Label filter (story 2.10, open question 4 (a)): any of the checked Labels.</comment>
+  </data>
+  <data name="ListFilterDue" xml:space="preserve">
+    <value>Due</value>
+    <comment>The label of the List View's due-date filter (story 2.10, open question 4 (a)).</comment>
+  </data>
+  <data name="ListDueAny" xml:space="preserve">
+    <value>Any due date</value>
+    <comment>The due-date filter's default: every Task, dated or not (story 2.10).</comment>
+  </data>
+  <data name="ListDueNone" xml:space="preserve">
+    <value>No due date</value>
+    <comment>The due-date filter's choice of Tasks with no due date (story 2.10).</comment>
+  </data>
+  <data name="ListDueRange" xml:space="preserve">
+    <value>Between dates</value>
+    <comment>The due-date filter's choice of a day range in the viewer's zone (story 2.10).</comment>
+  </data>
+  <data name="ListDueFrom" xml:space="preserve">
+    <value>From</value>
+    <comment>The first day of the due-date range, inclusive (story 2.10).</comment>
+  </data>
+  <data name="ListDueTo" xml:space="preserve">
+    <value>To</value>
+    <comment>The last day of the due-date range, inclusive (story 2.10).</comment>
+  </data>
+  <data name="ListSort" xml:space="preserve">
+    <value>Sort by</value>
+    <comment>The label of the List View's sort control (story 2.10). Its accessible name starts with 'Sort'.</comment>
+  </data>
+  <data name="ListSortStatus" xml:space="preserve">
+    <value>Status</value>
+    <comment>The sort by the Board's column order (story 2.10, open question 7 (a)); the view's initial order.</comment>
+  </data>
+  <data name="ListSortDueDate" xml:space="preserve">
+    <value>Due date</value>
+    <comment>The sort by due date, soonest first, Tasks with none last (story 2.10, open question 5 (a)).</comment>
+  </data>
+  <data name="ListSortLabel" xml:space="preserve">
+    <value>Label</value>
+    <comment>The sort by the first Label's name, Tasks with none last (story 2.10, open question 3 (a)).</comment>
+  </data>
+  <data name="ListColumnTask" xml:space="preserve">
+    <value>Task</value>
+    <comment>The List View's title column header (story 2.10).</comment>
+  </data>
+  <data name="ListColumnStatus" xml:space="preserve">
+    <value>Status</value>
+    <comment>The List View's Status column header (story 2.10).</comment>
+  </data>
+  <data name="ListColumnDue" xml:space="preserve">
+    <value>Due</value>
+    <comment>The List View's due-date column header (story 2.10).</comment>
+  </data>
+  <data name="ListColumnLabels" xml:space="preserve">
+    <value>Labels</value>
+    <comment>The List View's Labels column header (story 2.10).</comment>
+  </data>
+  <data name="ListShowing" xml:space="preserve">
+    <value>Showing {0} of {1}</value>
+    <comment>The List View's stated page size under the table (UX-DR19; story 2.10, open question 2 (a)): {0} rows loaded of the true total {1}.</comment>
+  </data>
+  <data name="ListShowMore" xml:space="preserve">
+    <value>Show more Tasks</value>
+    <comment>The control under a partly loaded List View that appends the next page (story 2.10, open question 2 (a)). No count in it.</comment>
+  </data>
+  <data name="ListMatchMany" xml:space="preserve">
+    <value>{0} Tasks match.</value>
+    <comment>Announced politely once when a filter or sort change settles (story 2.10, AC9): {0} is the true total.</comment>
+  </data>
+  <data name="ListMatchOne" xml:space="preserve">
+    <value>1 Task matches.</value>
+    <comment>Announced politely once when a filter or sort change settles on exactly one Task (story 2.10, AC9).</comment>
+  </data>
+  <data name="ListMatchNone" xml:space="preserve">
+    <value>No Tasks match.</value>
+    <comment>A filter matching nothing: stated alone, with no suggestion and no count (story 2.10, AC8), and announced (AC9).</comment>
+  </data>
+  <data name="ListQueryInvalid" xml:space="preserve">
+    <value>This list could not be read.</value>
+    <comment>The refusal for 400 invalid-list-query (story 2.10, Task 4 (c)). The client only sends queries it built, so this is said, never explained.</comment>
+  </data>
+  <data name="ListCursorInvalid" xml:space="preserve">
+    <value>The next Tasks could not be loaded.</value>
+    <comment>The refusal for 400 invalid-list-cursor (story 2.10, Task 4 (c)): a cursor the server did not issue for the sort.</comment>
+  </data>
 </root>

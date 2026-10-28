@@ -54,7 +54,7 @@ public sealed class ListScaleTimingTests(MigratedDatabaseFixture fixture) : ICla
     /// Labels and a four-day range, each meet the 300 ms p95 server-side read budget over 100 interleaved samples.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Explicit = true, Skip = "red: AC10 - the List route, its reader and its three indexes do not exist yet (story Tasks 2, 3, 4)")]
+    [Fact(Explicit = true)]
     public async Task The_first_and_last_page_of_every_sort_meet_the_read_budget_at_5000_Tasks()
     {
         Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? string.Empty);

@@ -34,7 +34,8 @@ namespace Yello.Tests.Slices.Deployment;
 /// <b>The catalogue compared</b> is read from <c>sys.*</c>, not from EF's model: tables and columns
 /// (type, length, precision, scale, nullability, identity, computed, collation),
 /// <c>sys.security_policies</c> and <c>sys.security_predicates</c> (definition text, FILTER/BLOCK,
-/// operation), every index with its <c>filter_definition</c>, foreign keys with their columns and
+/// operation), every index with its <c>filter_definition</c> and its key and included columns in order (story 2.10's
+/// sort indexes), foreign keys with their columns and
 /// referential actions, default, check and key constraints (by definition, and by name unless the
 /// engine named them), every module's definition (the predicate function), <c>READ_COMMITTED_SNAPSHOT</c> and each table's lock escalation (story 2.9), the <c>MAXDOP</c>
 /// database-scoped configuration, and the history rows. Anchors: the comparison finds
@@ -78,6 +79,14 @@ public sealed class MigrationBundleEquivalenceTests(SqlServerEngine engine)
         SELECT CONCAT('index|', OBJECT_NAME(i.object_id) COLLATE DATABASE_DEFAULT, '|', i.name COLLATE DATABASE_DEFAULT, '|', i.is_unique, '|', i.has_filter, '|', i.filter_definition COLLATE DATABASE_DEFAULT)
         FROM sys.indexes i
         JOIN sys.tables t ON t.object_id = i.object_id
+        WHERE i.name IS NOT NULL
+        """,
+        """
+        SELECT CONCAT('indexcol|', OBJECT_NAME(ic.object_id) COLLATE DATABASE_DEFAULT, '|', i.name COLLATE DATABASE_DEFAULT, '|', c.name COLLATE DATABASE_DEFAULT, '|', ic.key_ordinal, '|', ic.is_included_column)
+        FROM sys.index_columns ic
+        JOIN sys.indexes i ON i.object_id = ic.object_id AND i.index_id = ic.index_id
+        JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
+        JOIN sys.tables t ON t.object_id = ic.object_id
         WHERE i.name IS NOT NULL
         """,
         """
@@ -134,6 +143,8 @@ public sealed class MigrationBundleEquivalenceTests(SqlServerEngine engine)
             Assert.Contains("scoped|MAXDOP|1", fromMigrate);
             Assert.Contains("rcsi|1", fromMigrate);
             Assert.Contains("escalation|Task|DISABLE", fromMigrate);
+            Assert.Contains("indexcol|Task|IX_Task_SpaceId_ProjectId_FirstLabelName_Id|FirstLabelName|3|0", fromMigrate);
+            Assert.Contains("indexcol|Task|IX_Task_SpaceId_ProjectId_DueDate_Id|StatusId|0|1", fromMigrate);
             Assert.Contains(fromMigrate, line => line.StartsWith("fk|", StringComparison.Ordinal));
             Assert.Contains(fromMigrate, line => line.StartsWith("key|", StringComparison.Ordinal));
 

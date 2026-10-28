@@ -1,0 +1,37 @@
+@page "/spaces/{SpaceId:guid}/projects/{ProjectId:guid}/list"
+
+@*
+    A PROJECT'S LIST VIEW - story 2.10. FR-30 (partial: the Assignee completes in 4.6); AC1, AC7-AC9, AC11, AC16-AC20;
+    UX-DR19, UX-DR31, UX-DR33, UX-DR35.
+
+    ARRIVES LIKE EVERY SPACE-SCOPED PAGE, through SpaceArrival, exactly as the Board does: an unlisted Space is refused
+    with no request, the active Space is asked first, nothing of the list renders before the server has answered, and
+    every 404 renders the one refusal surface.
+
+    THE ADDRESS HOLDS IDS ONLY (UX-DR33): the filters and the sort are this page's state, never the URL's, and no Status or
+    Label name reaches the address or the document's title. Named TaskListPage so it cannot be confused with Space home's
+    list of Projects (Components/ProjectList.razor).
+
+    THE LIST ITSELF is TaskListView's, keyed on (Space, Project) so another Project starts a new list.
+*@
+
+<SpaceArrival SpaceId="@SpaceId" Context="arrival">
+    <TaskListView @key="(SpaceId, ProjectId)"
+                  SpaceId="@SpaceId"
+                  ProjectId="@ProjectId"
+                  OnRefused="arrival.Refuse" />
+</SpaceArrival>
+
+@code {
+    /// <summary>
+    /// The Space this route names.
+    /// </summary>
+    [Parameter]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>
+    /// The Project whose List View this is.
+    /// </summary>
+    [Parameter]
+    public Guid ProjectId { get; set; }
+}

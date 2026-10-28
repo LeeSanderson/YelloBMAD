@@ -62,7 +62,7 @@ public sealed class ListViewGateTests
     /// key columns are exactly <c>(SpaceId, ProjectId, &lt;sort column&gt;, Id)</c>, in that order, with the sort column
     /// read from the one map Infrastructure states.
     /// </summary>
-    [Fact(Skip = "red: AC6 - ListSorts, the sort-to-column map and the three composite indexes do not exist yet (story Tasks 2 (b), 4 (b), 9)")]
+    [Fact]
     public void Every_offered_sort_has_a_composite_index_on_SpaceId_ProjectId_its_column_and_Id()
     {
         var sorts = SortCodes();
@@ -97,7 +97,7 @@ public sealed class ListViewGateTests
     /// AC2 (AR-22's staging; FR-30 completes in 4.6) - the sorts offered are exactly Status, due date and Label: three
     /// stable codes, and none names the Assignee, which no Task holds until Epic 4.
     /// </summary>
-    [Fact(Skip = "red: AC2 - ListSorts does not exist yet (story Task 4 (b))")]
+    [Fact]
     public void The_offered_sorts_are_exactly_three_and_none_is_the_Assignee()
     {
         var sorts = SortCodes();
@@ -110,7 +110,7 @@ public sealed class ListViewGateTests
     /// <summary>
     /// AC22, Q1 (a) - the List route is stated once in <c>Yello.Contracts</c>, beside the Board's.
     /// </summary>
-    [Fact(Skip = "red: AC22 - the List route is not stated in Yello.Contracts yet (story Task 4 (a))")]
+    [Fact]
     public void The_List_route_is_stated_once_in_Contracts()
     {
         var routes = typeof(BoardRoutes).Assembly.GetTypes()
@@ -128,7 +128,7 @@ public sealed class ListViewGateTests
     /// each Status is <c>ListStatusResponse(Id, Name)</c>, the cursor a nullable string, and nothing carries a
     /// <c>SpaceId</c>.
     /// </summary>
-    [Fact(Skip = "red: AC22 - ListPageResponse and ListStatusResponse do not exist yet (story Task 4 (b))")]
+    [Fact]
     [Trait("Requirement", "AD-19")]
     public void The_List_page_contract_has_exactly_its_members_reuses_TaskResponse_and_carries_no_SpaceId()
     {
@@ -154,7 +154,7 @@ public sealed class ListViewGateTests
     /// AC12, Q2 (a) (AR-22 "the page size is not the invariant") - the List page size is one named constant,
     /// <c>ListPage.Size</c>, of 50, and the List route has no size parameter.
     /// </summary>
-    [Fact(Skip = "red: AC12 - ListPage does not exist yet (story Task 3 (b))")]
+    [Fact]
     [Trait("Assumption", "AR-22")]
     public void The_List_page_size_is_one_named_constant_of_fifty()
     {
@@ -174,7 +174,7 @@ public sealed class ListViewGateTests
     /// AC12, Task 4 (c) - a malformed query and a cursor not issued for this sort each have a problem type of their own,
     /// distinct from the Board's cursor refusal and from every other type.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the two List problem types do not exist yet (story Task 4 (c))")]
+    [Fact]
     public void The_malformed_query_and_the_foreign_cursor_each_have_their_own_problem_type()
     {
         var types = typeof(ProblemTypes).GetProperties(BindingFlags.Public | BindingFlags.Static)
@@ -193,7 +193,7 @@ public sealed class ListViewGateTests
     /// List View files exist under <c>Yello.Client/</c>, so <c>BoardPagingGateTests.Nothing_in_the_client_virtualises_a_list</c>
     /// reads them, and none of them uses <c>Virtualize</c> or an <c>ItemsProvider</c>.
     /// </summary>
-    [Fact(Skip = "red: AC18 - the List View component does not exist yet (story Task 5 (c))")]
+    [Fact]
     [Trait("Requirement", "UX-DR24")]
     public void The_List_View_is_inside_the_virtualisation_scan_and_virtualises_nothing()
     {

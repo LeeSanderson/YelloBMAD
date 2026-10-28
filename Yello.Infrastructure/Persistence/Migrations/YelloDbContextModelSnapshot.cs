@@ -295,6 +295,10 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset?>("DueDate")
                         .HasColumnType("datetimeoffset");
 
+                    b.Property<string>("FirstLabelName")
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
+
                     b.Property<string>("PositionKey")
                         .IsRequired()
                         .HasMaxLength(128)
@@ -320,6 +324,18 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("SpaceId", "StatusId");
+
+                    b.HasIndex("SpaceId", "ProjectId", "DueDate", "Id");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("SpaceId", "ProjectId", "DueDate", "Id"), new[] { "StatusId" });
+
+                    b.HasIndex("SpaceId", "ProjectId", "FirstLabelName", "Id");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("SpaceId", "ProjectId", "FirstLabelName", "Id"), new[] { "StatusId", "DueDate" });
+
+                    b.HasIndex("SpaceId", "ProjectId", "StatusId", "Id");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("SpaceId", "ProjectId", "StatusId", "Id"), new[] { "DueDate" });
 
                     b.HasIndex("SpaceId", "ProjectId", "StatusId", "PositionKey")
                         .IsUnique();

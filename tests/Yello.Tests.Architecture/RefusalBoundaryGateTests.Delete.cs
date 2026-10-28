@@ -98,7 +98,9 @@ public sealed partial class RefusalBoundaryGateTests
     /// its deletion, its rename, its Task creation and its Board, and nothing that lists its Tasks flat (2.2's AC5 total
     /// would then be the client's to derive) and nothing that moves a Project. It replaced 2.2's gate when story 2.5
     /// mapped the deletion. Story 2.9 widened it by exactly the Board's column page (<c>GET …/board/columns/{statusId}</c>,
-    /// one column read by keyset seek - still never a flat list of the Project's Tasks).
+    /// one column read by keyset seek - still never a flat list of the Project's Tasks). Story 2.10 widened it by exactly
+    /// the List View's page (<c>GET …/list</c>): one bounded page by pair keyset seek with its true total from its own
+    /// count, so the client still derives no total - never the whole of the Project's Tasks.
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-19")]
@@ -117,6 +119,7 @@ public sealed partial class RefusalBoundaryGateTests
                 $"DELETE {ProjectPattern}",
                 $"GET {ProjectPattern}/board",
                 $"GET {ProjectPattern}/board/columns/{{statusId:guid}}",
+                $"GET {ProjectPattern}/list",
                 $"PATCH {ProjectPattern}",
                 $"POST {ProjectPattern}/tasks",
             ],

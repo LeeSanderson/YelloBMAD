@@ -294,6 +294,27 @@ public static class ProblemTypes
     public static string InvalidBoardCursor => "urn:yello:problem:invalid-board-cursor";
 
     /// <summary>
+    /// A List View query that is not one the route reads: a <c>sort</c> that is not an offered code (the Assignee among
+    /// them, until story 4.6), a <c>status</c> or <c>label</c> that is not an id, a due bound that is not an instant with
+    /// an offset inside 2000-2100, or "No due date" together with a range. Answered <c>400</c>. Story 2.10, AC12.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never a statement about a stored Status or Label</b>: it depends only on the query as sent. A well-formed id
+    /// that names nothing in the Space is not refused - it matches nothing (AC15).
+    /// </remarks>
+    public static string InvalidListQuery => "urn:yello:problem:invalid-list-query";
+
+    /// <summary>
+    /// A List View page whose <c>after</c> cursor is not one the route issued for the requested sort - not the route's
+    /// form, too long, or issued for another sort. Answered <c>400</c>. Story 2.10, AC12.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never a statement about a stored Task</b>: it depends only on the cursor as sent. A cursor whose Task has since
+    /// been deleted or changed is served - the page after its pair.
+    /// </remarks>
+    public static string InvalidListCursor => "urn:yello:problem:invalid-list-cursor";
+
+    /// <summary>
     /// An <c>Idempotency-Key</c> header that is empty or longer than
     /// <see cref="Idempotency.MaxKeyLength"/> characters. Answered <c>400</c>; nothing is applied.
     /// </summary>

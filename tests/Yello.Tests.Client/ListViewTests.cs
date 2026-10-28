@@ -76,7 +76,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// Board; on each, <c>aria-current="page"</c> marks the current view and only it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the List View page and the view toggle do not exist yet (story Task 5 (a), (b))")]
+    [Fact]
     public async Task The_toggle_opens_the_List_from_the_Board_and_returns_with_aria_current_on_each()
     {
         var api = TwoSpaces(Northwind, Harbour);
@@ -111,7 +111,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// chips followed by "+N".
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC20 - the List View's rows do not exist yet (story Task 5 (c))")]
+    [Fact]
     public async Task A_row_shows_its_title_Status_due_date_in_the_viewers_zone_and_three_chips_then_plus_N()
     {
         var api = TwoSpaces(Northwind, Harbour);
@@ -132,7 +132,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
             var bare = RowOf(page, tasks[1].Id);
 
             Assert.Contains(tasks[0].Title, await labelled.InnerTextAsync(), StringComparison.Ordinal);
-            Assert.Contains("Todo", await labelled.InnerTextAsync(), StringComparison.Ordinal);
+            Assert.Contains(api.Boards[(Northwind, Atlas)].Columns.Single(column => column.StatusId == tasks[0].StatusId).Name, await labelled.InnerTextAsync(), StringComparison.Ordinal);
             Assert.Contains("2 Nov", await labelled.InnerTextAsync(), StringComparison.Ordinal);
             Assert.Equal(3, await labelled.Locator(".label-chip").CountAsync());
             Assert.Contains("+2", await labelled.InnerTextAsync(), StringComparison.Ordinal);
@@ -147,7 +147,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// number.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the List View's filters and count announcement do not exist yet (story Task 5 (c))")]
+    [Fact]
     public async Task A_filter_change_announces_the_true_count_once()
     {
         var api = TwoSpaces(Northwind, Harbour);
@@ -175,7 +175,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// suggestion to broaden - and that sentence is what is announced.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - the List View's empty filter state does not exist yet (story Task 5 (c))")]
+    [Fact]
     public async Task A_filter_matching_nothing_states_No_Tasks_match_and_nothing_else()
     {
         var api = TwoSpaces(Northwind, Harbour);
@@ -195,7 +195,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
             await WaitUntilSaidAsync(page, NoTasksMatch);
             await page.Locator("main table").WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = WaitMs });
 
-            var region = await page.GetByText(NoTasksMatch, new PageGetByTextOptions { Exact = true }).InnerTextAsync();
+            var region = await page.Locator("main p:not([aria-live])").GetByText(NoTasksMatch, new LocatorGetByTextOptions { Exact = true }).InnerTextAsync();
 
             Assert.Equal(NoTasksMatch, region.Trim());
             Assert.DoesNotContain("Showing", await page.Locator("main").InnerTextAsync(), StringComparison.Ordinal);
@@ -208,7 +208,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// 812", and nothing is announced.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the List View's paging does not exist yet (story Task 5 (c))")]
+    [Fact]
     public async Task Show_more_appends_rows_never_recycles_one_states_the_page_size_and_says_nothing()
     {
         var api = TwoSpaces(Northwind, Harbour);
@@ -249,7 +249,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// held Task 50 is still Task 50's, 100 rows are drawn, and nothing was said.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the List View's keyboard row traversal does not exist yet (story Task 6)")]
+    [Fact]
     public async Task Down_on_the_last_loaded_row_loads_the_next_page_and_focus_lands_on_the_next_Task_by_identity()
     {
         var api = TwoSpaces(Northwind, Harbour);
@@ -297,7 +297,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// row) and each row's <c>aria-rowindex</c> is its true ordinal plus one.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the List View's table semantics do not exist yet (story Task 5 (c))")]
+    [Fact]
     public async Task With_150_of_5000_loaded_the_table_states_the_true_total_and_each_rows_true_ordinal()
     {
         var api = TwoSpaces(Northwind, Harbour);
@@ -326,7 +326,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// in <c>main</c> is disabled.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC16 - the List View page does not exist yet (story Task 5)")]
+    [Fact]
     public async Task A_Viewer_gets_the_same_List_and_no_disabled_control()
     {
         var api = TwoSpaces(Northwind, Harbour);
@@ -352,7 +352,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// unchecked on return, and nothing was written to <c>localStorage</c> or <c>sessionStorage</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC17 - the List View's purge does not exist yet (story Task 5 (c))")]
+    [Fact]
     [Trait("Requirement", "UX-DR31")]
     public async Task Leaving_the_Space_purges_the_filter_and_rows_before_any_render_and_stores_nothing()
     {
@@ -396,7 +396,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// routes carry ids only and the title stays fixed.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC17 - the List View's filters do not exist yet (story Task 5 (c))")]
+    [Fact]
     [Trait("Requirement", "UX-DR33")]
     public async Task No_Label_or_Status_name_reaches_the_address_or_the_title()
     {
@@ -416,11 +416,11 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
             var title = await page.TitleAsync();
 
             await page.GetByRole(AriaRole.Checkbox, new PageGetByRoleOptions { Name = label.Name, Exact = true }).CheckAsync(new LocatorCheckOptions { Timeout = WaitMs });
-            await page.GetByRole(AriaRole.Checkbox, new PageGetByRoleOptions { Name = "Doing", Exact = true }).CheckAsync(new LocatorCheckOptions { Timeout = WaitMs });
+            await page.GetByRole(AriaRole.Checkbox, new PageGetByRoleOptions { Name = "Todo", Exact = true }).CheckAsync(new LocatorCheckOptions { Timeout = WaitMs });
             await WaitForTextAsync(page, NoTasksMatch);
 
             Assert.DoesNotContain("Confidential", page.Url, StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("Doing", page.Url, StringComparison.Ordinal);
+            Assert.DoesNotContain("Todo", page.Url, StringComparison.Ordinal);
             Assert.Equal(title, await page.TitleAsync());
         }
     }
@@ -430,7 +430,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// available." rather than appending nothing silently.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the List View's refusal handling does not exist yet (story Task 5 (c))")]
+    [Fact]
     public async Task A_page_answered_404_raises_the_refusal_surface()
     {
         var api = TwoSpaces(Northwind, Harbour);
@@ -445,6 +445,8 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
 
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { NameRegex = ShowMoreName }).ClickAsync(new LocatorClickOptions { Timeout = WaitMs });
             await page.Locator("main").GetByText(NotAvailableCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
+
+            Assert.Equal(0, await page.Locator(Rows).CountAsync());
         }
     }
 
@@ -454,7 +456,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="spacing">Whether the 1.4.12 text-spacing override is applied as well.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC20 - the List View's narrow layout does not exist yet (story Task 5 (c), Q10)")]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "UX-DR40")]
@@ -491,7 +493,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="locale">The browser locale.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC19 - the List View page does not exist yet (story Task 5 (c))")]
+    [Theory]
     [MemberData(nameof(BrowserLocales.All), MemberType = typeof(BrowserLocales))]
     [Trait("Requirement", "UX-DR35")]
     public async Task The_List_renders_and_says_List_loaded_in_every_browser_locale(string locale)
@@ -520,7 +522,7 @@ public sealed class ListViewTests(ClientSurfaceFixture surface)
     /// last.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC18 - the List View's sort control does not exist yet (story Task 5 (c))")]
+    [Fact]
     public async Task Changing_the_sort_replaces_the_rows_and_Status_is_the_initial_order()
     {
         var api = TwoSpaces(Northwind, Harbour);

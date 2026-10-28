@@ -1,5 +1,7 @@
 using System.Net;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Xunit;
 using Yello.Contracts;
 using Yello.Tests.Shared;
@@ -68,7 +70,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// differently (the anchor that the case can tell them apart).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the List route, its handler and its reader do not exist yet (story Tasks 3, 4)")]
+    [Fact]
     [Trait("Requirement", "AD-16")]
     public async Task Sorted_by_Status_every_Task_appears_once_in_effective_order_then_TaskId()
     {
@@ -102,7 +104,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// 20 Tasks are due earlier, one per day, and 20 have no due date and come last.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the List route, its handler and its reader do not exist yet (story Tasks 3, 4)")]
+    [Fact]
     public async Task Sorted_by_due_date_a_page_boundary_inside_120_tied_dates_skips_and_repeats_nothing()
     {
         var database = Available();
@@ -144,7 +146,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// Server's default of first.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the List route, its handler and its reader do not exist yet (story Tasks 3, 4)")]
+    [Fact]
     public async Task Sorted_by_due_date_a_page_crossing_into_the_undated_Tasks_keeps_them_last_and_skips_nothing()
     {
         var database = Available();
@@ -187,7 +189,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// the one the product's Labels edit maintained.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - FirstLabelName, its index and the List route do not exist yet (story Tasks 2, 3, 4)")]
+    [Fact]
     public async Task Sorted_by_Label_a_page_boundary_inside_70_tied_first_Labels_lists_each_Task_once()
     {
         var database = Available();
@@ -238,7 +240,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// the unlabelled segment at row 71, which is fixed last (AC13: the same rule as AC5).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - FirstLabelName, its index and the List route do not exist yet (story Tasks 2, 3, 4)")]
+    [Fact]
     public async Task Sorted_by_Label_a_page_crossing_into_the_unlabelled_Tasks_keeps_them_last_and_skips_nothing()
     {
         var database = Available();
@@ -286,7 +288,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// </summary>
     /// <param name="filter">Which filter.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11 - the List route, its filters and its count do not exist yet (story Tasks 3, 4)")]
+    [Theory]
     [InlineData("status")]
     [InlineData("label-any-of")]
     [InlineData("due-range")]
@@ -363,7 +365,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// nothing, and beside a live Label it changes nothing - never a <c>400</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - the List route and its filter narrowing do not exist yet (story Tasks 3, 4)")]
+    [Fact]
     public async Task A_Label_deleted_while_chosen_stops_matching_and_is_never_refused()
     {
         var database = Available();
@@ -407,7 +409,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// <param name="change">What happens to the cursor's Task between the pages.</param>
     /// <param name="sort">The sort the walk is under.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC12 - the List route and its pair cursor do not exist yet (story Tasks 3, 4)")]
+    [Theory]
     [InlineData("deleted", SortDueDate)]
     [InlineData("due-date-changed", SortDueDate)]
     [InlineData("labels-changed", SortLabel)]
@@ -468,7 +470,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// </summary>
     /// <param name="cursor">Which bad cursor.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC12 - the List route and its cursor validation do not exist yet (story Task 4 (c))")]
+    [Theory]
     [InlineData("garbage")]
     [InlineData("too-long")]
     [InlineData("another-sorts")]
@@ -518,7 +520,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// </summary>
     /// <param name="query">The raw query string.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC12 - the List route and its query validation do not exist yet (story Task 4 (c))")]
+    [Theory]
     [InlineData("sort=assignee")]
     [InlineData("sort=")]
     [InlineData("sort=title")]
@@ -555,7 +557,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// cursor's refusal, not the 404, because the handler never ran.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the List route and its validation order do not exist yet (story Task 4 (c))")]
+    [Fact]
     public async Task The_query_is_checked_before_the_cursor_and_both_before_the_Project()
     {
         var database = Available();
@@ -581,7 +583,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// </summary>
     /// <param name="parameter">A page-size parameter a client might try.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC12 - the List route does not exist yet (story Tasks 3, 4)")]
+    [Theory]
     [InlineData("limit")]
     [InlineData("pageSize")]
     [InlineData("size")]
@@ -613,7 +615,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// its Session and on its Token: the route requires <c>ReadProjectsAndTasks</c>, which every Role holds.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC16 - the List route does not exist yet (story Task 4)")]
+    [Fact]
     [Trait("Requirement", "AD-4")]
     public async Task A_Viewer_is_served_a_Members_List_on_both_surfaces()
     {
@@ -656,7 +658,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// Board's <c>TaskResponse</c> shape; the Space's id appears nowhere in it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC22 - ListPageResponse and the List route do not exist yet (story Task 4 (b))")]
+    [Fact]
     [Trait("Requirement", "AD-19")]
     public async Task A_List_page_answers_exactly_the_contracts_properties_and_no_SpaceId()
     {
@@ -701,7 +703,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// served.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the List route does not exist yet (story Task 4 (c))")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     public async Task An_unknown_Project_answers_the_boundary_404_and_records_nothing()
     {
@@ -741,7 +743,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// </summary>
     /// <param name="edit">Which Labels edit.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC13 - FirstLabelName and its maintenance in TaskStore.ReplaceAsync do not exist yet (story Task 2 (a), (d))")]
+    [Theory]
     [InlineData("apply")]
     [InlineData("remove-first")]
     [InlineData("replace-all")]
@@ -812,7 +814,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// or answered.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - FirstLabelName and its maintenance in TaskStore.ReplaceAsync do not exist yet (story Task 2 (d))")]
+    [Fact]
     public async Task Two_Labels_edits_released_together_leave_the_key_equal_to_the_final_sets_first_name()
     {
         var database = Available();
@@ -873,7 +875,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// <param name="sort">The sort.</param>
     /// <param name="filtered">Whether under the heaviest filter combination (Q4).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC10 - the List route, its reader and its three indexes do not exist yet (story Tasks 2, 3)")]
+    [Theory]
     [InlineData(SortStatus, false)]
     [InlineData(SortDueDate, false)]
     [InlineData(SortLabel, false)]
@@ -926,7 +928,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
     /// <param name="index">The composite index story Task 2 (b) names for it, by EF's naming convention.</param>
     /// <param name="column">The sort column.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC6 - the three composite indexes and the List reader do not exist yet (story Tasks 2 (b), 3 (d))")]
+    [Theory]
     [InlineData(SortStatus, "IX_Task_SpaceId_ProjectId_StatusId_Id", "StatusId")]
     [InlineData(SortDueDate, "IX_Task_SpaceId_ProjectId_DueDate_Id", "DueDate")]
     [InlineData(SortLabel, "IX_Task_SpaceId_ProjectId_FirstLabelName_Id", "FirstLabelName")]
@@ -951,6 +953,64 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         Assert.NotEmpty(plans);
         Assert.Contains(plans, plan => plan.Contains("SeekPredicates", StringComparison.Ordinal));
         Assert.All(plans, plan => Assert.False(ConvertsImplicitly(plan, column), $"A plan converts {column} implicitly: the parameter is not the column's own type."));
+    }
+
+    /// <summary>
+    /// LV-20 (Task 2 (c), AC13; story 1.10's expand-only rule) - the sort-key migration is safe on data that exists before
+    /// it: taken down to the migration before it, the column and the three indexes are gone and nothing else; brought up
+    /// again, the backfill gives every existing labelled Task its first chip's name - whatever Space it is in, although a
+    /// migration's connection names no Space - leaves an unlabelled Task <c>NULL</c>, and leaves the Space policy on.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AD-2")]
+    public async Task The_sort_key_migration_backfills_existing_Labels_and_its_Down_removes_exactly_what_it_added()
+    {
+        var database = Available();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Actor? owner = null;
+        var labelled = Guid.Empty;
+        var bare = Guid.Empty;
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            owner = await RegisterAsync(client, database);
+
+            var projectId = await CreateProjectAsync(owner, "Backfilled");
+
+            labelled = IdOf(await CreateTaskAsync(owner, owner.SpaceId, projectId, "Labelled before"));
+            bare = IdOf(await CreateTaskAsync(owner, owner.SpaceId, projectId, "Bare before"));
+
+            var zulu = await SeedAsync(owner, owner.SpaceId, "Zulu " + Unique());
+            var alpha = await SeedAsync(owner, owner.SpaceId, "Alpha " + Unique());
+
+            await SetLabelsAsync(owner, owner.SpaceId, labelled, zulu, alpha);
+        });
+
+        var expected = await FirstAppliedLabelNameAsync(database, owner!.SpaceId, labelled);
+        IReadOnlyList<string> afterDown;
+
+        try
+        {
+            await using (var context = database.CreateContext())
+            {
+                await context.GetService<IMigrator>().MigrateAsync(MigrationBeforeTheSortKeys, cancellationToken: cancellationToken);
+            }
+
+            afterDown = await SortKeySchemaAsync(database);
+        }
+        finally
+        {
+            // Back up whatever happened, so every later case in this class's database meets the current schema.
+            await database.MigrateAsync(cancellationToken);
+        }
+
+        Assert.Empty(afterDown);
+        Assert.Equal(SortKeySchema, await SortKeySchemaAsync(database));
+        Assert.NotNull(expected);
+        Assert.Equal(expected, await FirstLabelNameAsync(database, owner.SpaceId, labelled));
+        Assert.Null(await FirstLabelNameAsync(database, owner.SpaceId, bare));
+        Assert.True(await SpacePolicyIsOnAsync(database), "The migration left the Space isolation policy switched off.");
     }
 
     /// <summary>
@@ -1012,6 +1072,64 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         Assert.Null(pages[^1].NextAfter);
         Assert.Equal(walked.Count, walked.Distinct().Count());
         Assert.Equal(expected, walked);
+    }
+
+    /// <summary>
+    /// What story 2.10's migration adds to <c>dbo.[Task]</c>, by name, as <see cref="SortKeySchemaAsync"/> reads it.
+    /// </summary>
+    private static readonly string[] SortKeySchema =
+    [
+        "column FirstLabelName",
+        "index IX_Task_SpaceId_ProjectId_DueDate_Id",
+        "index IX_Task_SpaceId_ProjectId_FirstLabelName_Id",
+        "index IX_Task_SpaceId_ProjectId_StatusId_Id",
+    ];
+
+    /// <summary>
+    /// The migration before <c>ListViewSortKeys</c> - the schema the revision before story 2.10 runs against.
+    /// </summary>
+    private const string MigrationBeforeTheSortKeys = "20261028123715_TaskLockEscalationDisabled";
+
+    /// <summary>
+    /// Which of story 2.10's column and indexes <c>dbo.[Task]</c> holds now, read from the catalogue.
+    /// </summary>
+    private static async Task<IReadOnlyList<string>> SortKeySchemaAsync(RegistrationDatabase database)
+    {
+        await using var connection = await database.OpenWithoutSpaceContextAsync(TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText =
+            """
+            SELECT CONCAT('column ', c.name) FROM sys.columns c WHERE c.object_id = OBJECT_ID(N'dbo.[Task]') AND c.name = N'FirstLabelName'
+            UNION ALL
+            SELECT CONCAT('index ', i.name) FROM sys.indexes i
+            WHERE i.object_id = OBJECT_ID(N'dbo.[Task]')
+              AND i.name IN (N'IX_Task_SpaceId_ProjectId_StatusId_Id', N'IX_Task_SpaceId_ProjectId_DueDate_Id', N'IX_Task_SpaceId_ProjectId_FirstLabelName_Id')
+            """;
+
+        var found = new List<string>();
+
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+        {
+            found.Add(reader.GetString(0));
+        }
+
+        return [.. found.Order(StringComparer.Ordinal)];
+    }
+
+    /// <summary>
+    /// Whether the Space isolation policy is enabled.
+    /// </summary>
+    private static async Task<bool> SpacePolicyIsOnAsync(RegistrationDatabase database)
+    {
+        await using var connection = await database.OpenWithoutSpaceContextAsync(TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT is_enabled FROM sys.security_policies WHERE name = N'SpaceIsolationPolicy'";
+
+        return await command.ExecuteScalarAsync(TestContext.Current.CancellationToken) is true;
     }
 
     private static string Unique() => Guid.NewGuid().ToString("N")[..8];

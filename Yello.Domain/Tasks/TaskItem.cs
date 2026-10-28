@@ -67,4 +67,17 @@ public sealed class TaskItem
     /// When the Task was created, in UTC.
     /// </summary>
     public required DateTimeOffset CreatedAt { get; init; }
+
+    /// <summary>
+    /// The name of the first Label the Task carries, in chip order (Label name, then id, in the database's collation -
+    /// story 2.4, open question 12), or <c>null</c> when it carries none: the List View's Label sort key (story 2.10, open
+    /// question 3 (a); AR-22). At most <c>LabelName.MaxLength</c> characters.
+    /// </summary>
+    /// <remarks>
+    /// <b>Maintained by Infrastructure, never by a request</b>: the Labels edit recomputes it from the final set in the
+    /// same transaction that replaces the set, and a new Task starts with none. No request contract carries it, and no
+    /// response does - a row shows the Labels themselves. Kept on the Task because a many-to-many value has no single key
+    /// an index can serve until one is chosen (AC6: a sort without its composite index is a defect).
+    /// </remarks>
+    public string? FirstLabelName { get; set; }
 }

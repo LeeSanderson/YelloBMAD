@@ -1,0 +1,148 @@
+@using Yello.Client.Spaces
+@using Yello.Contracts.Lists
+
+@implements IAsyncDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+@inject ActiveSpaceState ActiveSpace
+@inject IJSRuntime JS
+
+@*
+    ONE PROJECT'S LIST VIEW - story 2.10. FR-30 (partial: no Assignee until 4.6); AC1, AC7-AC9, AC11, AC16-AC20; UX-DR19,
+    UX-DR24, UX-DR26, UX-DR27, UX-DR31, UX-DR35, UX-DR38-UX-DR40, UX-DR42; AD-29.
+
+    THE SAME TASKS AS ROWS, read 50 at a time from the List route (open questions 1 (a), 2 (a)). Nothing in it writes, so
+    every Role sees exactly the same view and no control in it is disabled for a Role (AC16, UX-DR27).
+
+    RENDERED ONLY AFTER THE SERVER HAS ANSWERED (UX-DR31, UX-DR35): until the first page answers, a skeleton marked
+    aria-busy; completion is said politely once, "List loaded.", and nothing else is said on loading or paging (AC19).
+
+    FILTERS AND SORT (open questions 4 (a), 5 (a), 7 (a)) are native controls with visible labels: any of the effective
+    Statuses, any of the Space's Labels, a due-date choice, and the sort - Status preselected as the view's initial order. A
+    sort is a view order, not a consequential choice, so the pickers' no-default rule (EXPERIENCE.md:211) does not apply. A
+    change to any of them is a new list: the old rows are removed, never re-pointed (the body is keyed on the read), the
+    first page is read, and once it settles its true total is said once (AC9) - a superseded answer is dropped.
+
+    ROWS (open question 8 (a)) are a native table: aria-rowcount is the true total plus the header row, each row's
+    aria-rowindex its true ordinal plus one (AC11, X-6). Each row is keyed by its Task's id and never reused for another
+    (AC18): "Show more Tasks", and ↓ past the last loaded row, append the next 50, and focus lands on the next Task by its
+    identity. "Showing {loaded} of {total}" states the page size (UX-DR19). No infinite scroll, no virtualising (AD-29).
+
+    THE ROWS ARE ONE ROVING TAB STOP - the active row's title cell; ↑/↓ and Home/End move between loaded rows (Task 6;
+    js/list-keys.js, ListTraversal).
+
+    PURGED WITH THE SPACE, synchronously, and never written to browser storage (AC17): the filters, the sort, the rows, the
+    cursor and the announcement all go. No Status or Label name reaches the address or the title (UX-DR33).
+*@
+
+<LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
+
+@if (_statuses is null)
+{
+    <div class="task-list task-list--loading" aria-busy="true">
+        <p class="visually-hidden">@Localizer["ListLoading"]</p>
+        <div class="task-list__skeleton" aria-hidden="true"></div>
+    </div>
+}
+
+@if (Loaded)
+{
+    <div class="task-list" @ref="_listElement">
+        <PageHeading>@_projectName</PageHeading>
+
+        <ViewToggle />
+
+        <div class="task-list__controls">
+            <fieldset class="task-list__filter">
+                <legend class="type-meta">@Localizer["ListFilterStatus"]</legend>
+                @foreach (var status in _statuses ?? [])
+                {
+                    <TaskListChoice @key="status.Id" Id="@status.Id" Name="@status.Name" Checked="@_filters.Statuses.Contains(status.Id)" OnToggle="ToggleStatusAsync" />
+                }
+            </fieldset>
+
+            @if (_labels.Count > 0)
+            {
+                <fieldset class="task-list__filter">
+                    <legend class="type-meta">@Localizer["ListFilterLabel"]</legend>
+                    @foreach (var label in _labels)
+                    {
+                        <TaskListChoice @key="label.Id" Id="@label.Id" Name="@label.Name" Checked="@_filters.Labels.Contains(label.Id)" OnToggle="ToggleLabelAsync" />
+                    }
+                </fieldset>
+            }
+
+            <div class="task-list__field">
+                <label class="type-meta" for="@DueId">@Localizer["ListFilterDue"]</label>
+                <select id="@DueId" value="@_filters.Due" @onchange="ChangeDueAsync">
+                    <option value="@TaskListFilters.DueAny">@Localizer["ListDueAny"]</option>
+                    <option value="@TaskListFilters.DueNone">@Localizer["ListDueNone"]</option>
+                    <option value="@TaskListFilters.DueRange">@Localizer["ListDueRange"]</option>
+                </select>
+            </div>
+
+            @if (_filters.Due == TaskListFilters.DueRange)
+            {
+                <div class="task-list__field">
+                    <label class="type-meta" for="@DueFromId">@Localizer["ListDueFrom"]</label>
+                    <input id="@DueFromId" type="date" value="@_filters.DueFrom" @onchange="ChangeDueFromAsync" />
+                </div>
+                <div class="task-list__field">
+                    <label class="type-meta" for="@DueToId">@Localizer["ListDueTo"]</label>
+                    <input id="@DueToId" type="date" value="@_filters.DueTo" @onchange="ChangeDueToAsync" />
+                </div>
+            }
+
+            <div class="task-list__field">
+                <label class="type-meta" for="@SortId">@Localizer["ListSort"]</label>
+                <select id="@SortId" value="@_filters.Sort" @onchange="ChangeSortAsync">
+                    <option value="@ListSorts.Status">@Localizer["ListSortStatus"]</option>
+                    <option value="@ListSorts.DueDate">@Localizer["ListSortDueDate"]</option>
+                    <option value="@ListSorts.Label">@Localizer["ListSortLabel"]</option>
+                </select>
+            </div>
+        </div>
+
+        @if (_rows is null)
+        {
+            @* A new list is being read: its rows are gone already, and nothing is said until its total settles (AC9). *@
+            <div class="task-list__reading" aria-busy="true"></div>
+        }
+
+        @if (_rows is not null && _total == 0)
+        {
+            @* AC8: a filter matching nothing states this and nothing else. Q11 (a): an unfiltered empty Project is the
+               Board's empty copy, with no action - creation lives on the Board. *@
+            <p class="task-list__empty">@(_filters.Filtered ? Localizer["ListMatchNone"] : Localizer["BoardEmpty"])</p>
+        }
+
+        @if (_rows is { Count: > 0 } rows && _total > 0)
+        {
+            <table class="task-list__table" aria-rowcount="@(_total + 1)">
+                <caption class="visually-hidden">@_projectName</caption>
+                <thead>
+                    <tr aria-rowindex="1">
+                        <th scope="col">@Localizer["ListColumnTask"]</th>
+                        <th scope="col">@Localizer["ListColumnStatus"]</th>
+                        <th scope="col">@Localizer["ListColumnDue"]</th>
+                        <th scope="col">@Localizer["ListColumnLabels"]</th>
+                    </tr>
+                </thead>
+                <tbody @key="_read">
+                    @foreach (var (row, rowIndex) in TaskListRow.Indexed(rows))
+                    {
+                        <TaskListRow @key="row.Id" Item="@row" RowIndex="@rowIndex" StatusName="@StatusName(row.StatusId)" Labels="@_labelsById" Active="@(row.Id == ActiveTaskId)" />
+                    }
+                </tbody>
+            </table>
+
+            <p class="type-meta task-list__showing">@string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer["ListShowing"], rows.Count, _total)</p>
+
+            @if (_after is not null)
+            {
+                <button type="button" class="task-list__more" @onclick="ShowMoreAsync">@Localizer["ListShowMore"]</button>
+            }
+        }
+    </div>
+}

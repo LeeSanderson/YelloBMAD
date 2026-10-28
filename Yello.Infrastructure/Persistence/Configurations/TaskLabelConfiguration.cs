@@ -23,7 +23,9 @@ namespace Yello.Infrastructure.Persistence.Configurations;
 /// </para>
 /// <para>
 /// <b>Indexed <c>(SpaceId, LabelId, TaskId)</c></b> for the deletion's in-use probe, which takes its range lock
-/// there, inside one Space - and for story 2.10's filter by Label.
+/// there, inside one Space. Story 2.10's filter by Label does not use it: the List View tests each candidate Task for
+/// any of the chosen Labels with an <c>EXISTS</c> on the primary key <c>(SpaceId, TaskId, LabelId)</c>, because the
+/// sort's own index drives the read (AR-22).
 /// </para>
 /// </remarks>
 /// <param name="context">The context whose request-scoped Space the query filter closes over.</param>
