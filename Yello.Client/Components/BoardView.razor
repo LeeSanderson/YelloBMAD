@@ -60,6 +60,11 @@
     empty column) is the one stop, the arrows move focus by logical direction with a sticky origin index, and Space on a
     mover's card picks the Task up, carries it and drops it through the same move. The keys live in js/board-keys.js; see
     BoardView.Keys.cs. Announcements go through LiveAnnouncement, so a sentence said twice is heard twice.
+
+    BELOW 768PX (story 2.11) the Board is one column at a time behind the Status pager (StatusPager), a tablist over the
+    effective Status set whose panel is the column. Every column stays mounted: CSS hides the unselected ones by construction
+    at the media query, and the tablist, the tabpanel roles and hidden are rendered once the keys module has said the
+    viewport is narrow. See BoardView.Pager.cs.
 *@
 
 <LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
@@ -71,7 +76,7 @@
 
         @* Skeleton columns in the Board's own shape, holding no text (UX-DR35 cold load, UX-DR31). *@
         <div class="board__columns" aria-hidden="true">
-            <div class="board-column board-column--skeleton"></div>
+            <div class="board-column board-column--skeleton" data-pager-selected></div>
             <div class="board-column board-column--skeleton"></div>
             <div class="board-column board-column--skeleton"></div>
         </div>
@@ -100,6 +105,15 @@
                     <button type="button" class="button-primary board__empty-action" @onclick="OpenCreate" @ref="_emptyAction">@Localizer["TaskAdd"]</button>
                 }
             </div>
+        }
+
+        @if (_narrow && SelectedColumn is { } shown)
+        {
+            <StatusPager Label="@Localizer["PagerName"]"
+                         Tabs="@PagerTabs"
+                         SelectedStatusId="@shown.StatusId"
+                         OnSelect="SelectTab"
+                         FocusRequest="@_focusTabRequests" />
         }
 
         <div class="board__columns" @ref="_columnsElement">
@@ -134,7 +148,9 @@
                              ColumnActive="@(stop.StatusId == column.StatusId)"
                              DropIndex="@DropIndexIn(column)"
                              HasMore="@(column.After is not null)"
-                             OnShowMore="() => ShowMoreAsync(column.StatusId)">
+                             OnShowMore="() => ShowMoreAsync(column.StatusId)"
+                             Narrow="@_narrow"
+                             Selected="@IsSelected(column)">
                     @if (IsFirst(column) && _canManage && _creating)
                     {
                         <TaskCreate SpaceId="@SpaceId" ProjectId="@ProjectId" OnCreated="Add" OnRefused="OnRefused" OnClose="CloseCreate" />
@@ -495,6 +511,9 @@
         }
 
         column.Total++;
+
+        // The pager shows the column the Task went into (story 2.11, AC15): the Board's own change, unsaid.
+        _selectedStatusId = column.StatusId;
         Say(Localizer["TaskAdded"]);
     }
 

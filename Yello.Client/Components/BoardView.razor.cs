@@ -178,6 +178,8 @@ public sealed partial class BoardView
     {
         if (_openTaskId is { } taskId)
         {
+            // Below 768px the card is in the column the pager shows (story 2.11, AC5): the Board's own change, unsaid.
+            Follow(taskId);
             ReturnFocusFromPanel(taskId);
         }
 
@@ -238,6 +240,10 @@ public sealed partial class BoardView
         _activeTaskId = null;
         _activeColumnId = null;
         _runAt = null;
+
+        // The Status pager's selection is Space-scoped (story 2.11, AC20): a Board opened again starts on its first tab.
+        _selectedStatusId = null;
+        _focusTabRequests = 0;
     }
 
     /// <summary>
@@ -619,11 +625,24 @@ public sealed partial class BoardView
         {
             replica.Queued[attribute] = value;
             Place(taskId, replica);
+
+            if (attribute == TaskAttribute.Status)
+            {
+                Follow(taskId);
+            }
+
             return;
         }
 
         replica.InFlight[attribute] = value;
         Place(taskId, replica);
+
+        // A move - from any origin, a Status edit included - takes the pager with the Task before the first await (story
+        // 2.11, AC5), so the destination tab is already selected while the move is out. The Board's own change: unsaid.
+        if (attribute == TaskAttribute.Status)
+        {
+            Follow(taskId);
+        }
 
         await SendInTurnAsync(taskId, replica, attribute, value);
     }
@@ -672,13 +691,30 @@ public sealed partial class BoardView
 
         if (generation == _generation)
         {
-            Place(taskId, replica);
-
-            if (attribute == TaskAttribute.Status)
-            {
-                AnnounceMove(taskId, outcome);
-            }
+            Answered(taskId, replica, attribute, outcome);
         }
+    }
+
+    /// <summary>
+    /// The last answer of an attribute's sends is in: the card goes where the replica says, and a move is said.
+    /// </summary>
+    private void Answered(Guid taskId, TaskReplica replica, TaskAttribute attribute, EditOutcome outcome)
+    {
+        Place(taskId, replica);
+
+        if (attribute != TaskAttribute.Status)
+        {
+            return;
+        }
+
+        // A move refused or unanswered puts the card back, and the pager follows it there (story 2.11, AC5); an admitted
+        // one leaves the selection the person has now.
+        if (outcome != EditOutcome.Admitted)
+        {
+            Follow(taskId);
+        }
+
+        AnnounceMove(taskId, outcome);
     }
 
     /// <summary>

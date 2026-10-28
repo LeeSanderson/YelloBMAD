@@ -4,7 +4,7 @@ baseline_commit: f37b5b9
 
 # Story 2.11: The Board on a small viewport
 
-Status: ready-for-dev
+Status: review
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-11-the-board-on-a-small-viewport`
@@ -219,60 +219,60 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1394-1428` (`status: final
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: decide the open questions** (all ACs)
-  - [ ] Read Dev Notes → Open questions. Decide each as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default.
-- [ ] **Task 2: viewport awareness without a new injection** (AC3, AC11, AC14; Q1)
-  - [ ] (a) Add a `matchMedia('(max-width: 47.9375em)')` watcher inside `board-keys.js`. That module is already attached for every Role (`BoardKeys.cs:53-61`). On attach and on every `change` it calls a new `[JSInvokable]` on `BoardKeys` (for example `NarrowAsync(bool)`). `BoardKeys` forwards it to `IBoardKeysHost`.
+- [x] **Task 1: decide the open questions** (all ACs)
+  - [x] Read Dev Notes → Open questions. Decide each as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default.
+- [x] **Task 2: viewport awareness without a new injection** (AC3, AC11, AC14; Q1)
+  - [x] (a) Add a `matchMedia('(max-width: 47.9375em)')` watcher inside `board-keys.js`. That module is already attached for every Role (`BoardKeys.cs:53-61`). On attach and on every `change` it calls a new `[JSInvokable]` on `BoardKeys` (for example `NarrowAsync(bool)`). `BoardKeys` forwards it to `IBoardKeysHost`.
     - `BoardView` is at S1200's 30-dependency cap: **add no injection** (`ViewToggle.razor:10`; 2.10 Dev Notes). New state lives in a holder type (as `BoardDrag`/`BoardKeys` do) or as plain fields on the partial.
-  - [ ] (b) Put the breakpoint in **em** in both CSS and JS (`48em` / `47.9375em`, `80em` / `79.9375em`), as `components.css:594-609` already does. No px literal enters the CSS corpus.
-  - [ ] (c) Remove the listener on dispose. A disposed module must never call into .NET. Copy the existing dispose pattern in `BoardKeys.DisposeAsync`.
-- [ ] **Task 3: the pager** (AC3, AC4, AC9, AC10, AC11, AC15, AC20; Q1-Q4, Q7)
-  - [ ] (a) Add a new `Yello.Client/Components/StatusPager.razor`. It takes parameters only (columns: id, name, true total; selected id; `OnSelect`), never an injection. `BoardView.razor` renders it above `.board__columns` **only while narrow**.
+  - [x] (b) Put the breakpoint in **em** in both CSS and JS (`48em` / `47.9375em`, `80em` / `79.9375em`), as `components.css:594-609` already does. No px literal enters the CSS corpus.
+  - [x] (c) Remove the listener on dispose. A disposed module must never call into .NET. Copy the existing dispose pattern in `BoardKeys.DisposeAsync`.
+- [x] **Task 3: the pager** (AC3, AC4, AC9, AC10, AC11, AC15, AC20; Q1-Q4, Q7)
+  - [x] (a) Add a new `Yello.Client/Components/StatusPager.razor`. It takes parameters only (columns: id, name, true total; selected id; `OnSelect`), never an injection. `BoardView.razor` renders it above `.board__columns` **only while narrow**.
     - It renders `role="tablist"` with `aria-label` (Q4 copy), and tabs as native `<button type="button" role="tab">`. Each tab shows the Status name and its true count, reusing the `.column-count` element and class (Q4), so `--radius-full` keeps exactly one CSS consumer (`DesignFoundationGateTests` `:1194`).
-  - [ ] (b) Render every `BoardColumn` always. **Never unmount a hidden one**: `BoardColumn.razor:285` and `TaskCard.razor:277-288` ignore focus requests on first render, so a remounted column would drop them, and remounting would discard loaded pages.
+  - [x] (b) Render every `BoardColumn` always. **Never unmount a hidden one**: `BoardColumn.razor:285` and `TaskCard.razor:277-288` ignore focus requests on first render, so a remounted column would drop them, and remounting would discard loaded pages.
     - Give the selected column a stable marker (for example `data-pager-selected`) at every width.
     - While narrow, put `role="tabpanel"` and `aria-labelledby` on the column `<section>`, plus `hidden` on the unselected ones.
     - Also add a CSS rule under `@media (max-width: 47.9375em)` that hides `.board-column:not([data-pager-selected])`. That gives the first paint one column (AC11). The rule needs no hover and no `!important`.
-  - [ ] (c) Make the column full width while narrow (`inline-size: auto` / `flex: 1 1 auto`), with no `.board__columns` horizontal scroll. Logical properties only.
-  - [ ] (d) Pager keys: the tablist's `←`/`→`/`Home`/`End` are handled in `board-keys.js`, reusing its per-key `rightToLeft` read (`#tell`, `:281-285`). They go to .NET as `BoardKey` values; add `Home`/`End` to `BoardKey.cs` if they are absent. The selection logic is a pure helper: extend `BoardTraversal` or add `PagerTraversal`, and record which. Tab activation is automatic (Q3).
+  - [x] (c) Make the column full width while narrow (`inline-size: auto` / `flex: 1 1 auto`), with no `.board__columns` horizontal scroll. Logical properties only.
+  - [x] (d) Pager keys: the tablist's `←`/`→`/`Home`/`End` are handled in `board-keys.js`, reusing its per-key `rightToLeft` read (`#tell`, `:281-285`). They go to .NET as `BoardKey` values; add `Home`/`End` to `BoardKey.cs` if they are absent. The selection logic is a pure helper: extend `BoardTraversal` or add `PagerTraversal`, and record which. Tab activation is automatic (Q3).
     - Focus moves to the newly selected tab. The Board composite's active stop moves into the newly visible column (its first card, or the column when it is empty), so `Tab` never lands on a hidden element. `ActiveStop` (`BoardView.Keys.cs:63-86`) must never return an element in a hidden column while narrow.
-  - [ ] (e) Announce on a person's tab change only: Q4's sentence through `Say`, with the true `ColumnState.Total`. Write the copy in `ClientCopy.resx` with a `<comment>` naming 2.11 and the AC. Pluralise as `ColumnCountOne`/`ColumnCountMany` do.
-  - [ ] (f) Selected-tab state: `null` means the first column. `Purge()` (`BoardView.razor:303`) and `PurgePanel` reset it. Never persist it.
-- [ ] **Task 4: follow the Task** (AC5, AC14, AC15; Q2, Q5)
-  - [ ] (a) In `MoveAsync` (`BoardView.razor.cs:325-351`), the one write path, set the selected tab to `choice.StatusId` beside `FocusCardTitle`, before the first await, for **every** origin. A Panel move keeps focus in the panel, and closing the panel then returns focus to the card in the visible column.
-  - [ ] (b) In `AnnounceMove`'s non-admitted branch (`:369-402`), set the selected tab to the column the card returned to, so the pager follows the Task's identity both ways.
-  - [ ] (c) A Task created from the first column while narrow selects the first tab (Q7).
-  - [ ] (d) Going narrow (Task 2's callback): select the column of `_carried`, else of `_activeTaskId`/`_activeColumnId`, else keep the current tab. If a pointer or touch lift is held, end it as a cancel through `EndHeld` (`BoardView.Drag.cs:69-77`) with 2.7's "Returned to …".
-- [ ] **Task 5: the keyboard and the drag below 768px** (AC12, AC13; Q5, Q6; `deferred-work.md:574`)
-  - [ ] (a) Pass `narrow` with each key, as `rightToLeft` is passed (read `matchMedia` at the key, as the module reads `direction`). In `BoardTraversal.Traverse` and `Carry`, `InlineStart`/`InlineEnd` move nothing while narrow; the key is still consumed. Carried `↑`/`↓`, `Space` and `Esc` are unchanged.
-  - [ ] (b) Write unit tests in `tests/Yello.Tests.Architecture/BoardTraversalTests.cs`:
+  - [x] (e) Announce on a person's tab change only: Q4's sentence through `Say`, with the true `ColumnState.Total`. Write the copy in `ClientCopy.resx` with a `<comment>` naming 2.11 and the AC. Pluralise as `ColumnCountOne`/`ColumnCountMany` do.
+  - [x] (f) Selected-tab state: `null` means the first column. `Purge()` (`BoardView.razor:303`) and `PurgePanel` reset it. Never persist it.
+- [x] **Task 4: follow the Task** (AC5, AC14, AC15; Q2, Q5)
+  - [x] (a) In `MoveAsync` (`BoardView.razor.cs:325-351`), the one write path, set the selected tab to `choice.StatusId` beside `FocusCardTitle`, before the first await, for **every** origin. A Panel move keeps focus in the panel, and closing the panel then returns focus to the card in the visible column.
+  - [x] (b) In `AnnounceMove`'s non-admitted branch (`:369-402`), set the selected tab to the column the card returned to, so the pager follows the Task's identity both ways.
+  - [x] (c) A Task created from the first column while narrow selects the first tab (Q7).
+  - [x] (d) Going narrow (Task 2's callback): select the column of `_carried`, else of `_activeTaskId`/`_activeColumnId`, else keep the current tab. If a pointer or touch lift is held, end it as a cancel through `EndHeld` (`BoardView.Drag.cs:69-77`) with 2.7's "Returned to …".
+- [x] **Task 5: the keyboard and the drag below 768px** (AC12, AC13; Q5, Q6; `deferred-work.md:574`)
+  - [x] (a) Pass `narrow` with each key, as `rightToLeft` is passed (read `matchMedia` at the key, as the module reads `direction`). In `BoardTraversal.Traverse` and `Carry`, `InlineStart`/`InlineEnd` move nothing while narrow; the key is still consumed. Carried `↑`/`↓`, `Space` and `Esc` are unchanged.
+  - [x] (b) Write unit tests in `tests/Yello.Tests.Architecture/BoardTraversalTests.cs`:
     - narrow traverse and carry with `InlineStart`/`InlineEnd` (nothing moves);
     - narrow `↑`/`↓` unchanged;
     - pager keys under LTR and RTL, with `Home`/`End`, the ends clamped (no wrap, Q3) and the Status order unchanged.
-  - [ ] (c) In `board-drag.js`, `#layoutOf` (`:396-417`) and `#hitTest` (`:465-488`) consider only columns that are rendered. Skip a column whose box is empty, or that has `hidden`, or that lacks `data-pager-selected` while narrow. Auto-scroll's sideways step (`:452-455`) does nothing while narrow. Update the header comment (`:32-35`) to say what 2.11 decided.
-  - [ ] (d) RTL drag at 768–1279px: prove with a browser case that hit-testing (rect-based, direction-neutral) and the sideways auto-scroll (`edgeStep` on physical `clientX`, then `scrollBy({ left })`) carry a drag to the inline-end column under `dir="rtl"`. Chromium's RTL `scrollLeft` is negative and `scrollBy` is physical, so the pair is consistent. Change the code only if the case fails, and record what you did. The lifted card's `translate: var(--drag-x)` follows the finger's physical delta, which is correct in both directions.
-- [ ] **Task 6: the context bar** (AC1, AC2, AC6, AC16; Q8)
-  - [ ] (a) Widen the existing Project-name rule (`components.css:605-609`) to every width below 80em.
-  - [ ] (b) Below 30em, visually hide `.context-bar__switch-label` with the existing visually-hidden utility, so the switcher button's accessible name still includes it. Never use `display: none`, and never remove the Role chip.
-  - [ ] (c) Confirm that `.context-bar` wraps (`flex-wrap`) and has no fixed width. A long Space name wraps inside `.context-bar__space-name`; use `overflow-wrap: anywhere` if needed. Never use `text-overflow: ellipsis` on the Space name, which would lose content.
-  - [ ] (d) Radius sweep (`deferred-work.md:36`): add `The_context_bar_takes_the_3px_radius` and `The_Role_chip_takes_the_2px_radius` to `DesignFoundationGateTests.Board.cs` (or a new partial `.SmallViewport.cs`). Fix the CSS if either fails. Prove each against a plant.
-- [ ] **Task 7: the columns at ≥1280px** (AC1, AC17; Q9)
-  - [ ] (a) At ≥80em, let columns share the row: `flex: 1 1 0` with `min-inline-size` in rem, sized so five fit in 1280px less the Board padding and gutters. Arithmetic: 1280 − 2×12 − 4×9 = 1220px; 5 × 14rem = 1120px fits. Between 48em and 80em keep `17rem` and the horizontal scroll.
-  - [ ] (b) `FakeYelloApi` may already accept a Status list from the test (`DragHarness.Seed(..., statuses, ...)`). Use five Statuses there; no contract change.
-- [ ] **Task 8: tests** (all ACs; see Testing requirements)
-  - [ ] (a) Add a new `tests/Yello.Tests.Client/SmallViewportTests.cs` with the cases listed in Dev Notes → Testing requirements. Reuse `DragHarness`, `KeyboardHarness` and `FakeYelloApi`. **No new fixture type.**
-  - [ ] (b) Add to `TextSpacingTests`: the pager under both adaptations at 320px (AC19), and the context bar at 320px with a 50-character Space name (AC16).
-  - [ ] (c) Add to `TouchDragTests` (in `TouchTimingCollection`): a long-press reorder within the visible column at 375px, and a drag toward a hidden column's direction that drops nothing outside the visible column (AC13).
-  - [ ] (d) Add the gates listed in Dev Notes → Testing requirements, each proved against a plant.
-  - [ ] (e) Re-run the existing narrow cases unchanged and keep them green: `DragTests:603-615` and `MoveTests:581-593` (320/768/1280), `LabelTests:146` (320), `ListViewTests` (320), and `DragTests:692` (768, sideways auto-scroll, still valid at 768). If a 320 case relied on a second column being visible, correct the case to select its tab first, and record the correction in the Debug Log.
-- [ ] **Task 9: ledger, conventions, verification**
-  - [ ] (a) `deferred-work.md`: apply Dev Notes → Ledger dispositions.
-  - [ ] (b) `tests/TESTING-CONVENTIONS.md`: add a short "Viewport and the pager - added by story 2.11" subsection covering:
+  - [x] (c) In `board-drag.js`, `#layoutOf` (`:396-417`) and `#hitTest` (`:465-488`) consider only columns that are rendered. Skip a column whose box is empty, or that has `hidden`, or that lacks `data-pager-selected` while narrow. Auto-scroll's sideways step (`:452-455`) does nothing while narrow. Update the header comment (`:32-35`) to say what 2.11 decided.
+  - [x] (d) RTL drag at 768–1279px: prove with a browser case that hit-testing (rect-based, direction-neutral) and the sideways auto-scroll (`edgeStep` on physical `clientX`, then `scrollBy({ left })`) carry a drag to the inline-end column under `dir="rtl"`. Chromium's RTL `scrollLeft` is negative and `scrollBy` is physical, so the pair is consistent. Change the code only if the case fails, and record what you did. The lifted card's `translate: var(--drag-x)` follows the finger's physical delta, which is correct in both directions.
+- [x] **Task 6: the context bar** (AC1, AC2, AC6, AC16; Q8)
+  - [x] (a) Widen the existing Project-name rule (`components.css:605-609`) to every width below 80em.
+  - [x] (b) Below 30em, visually hide `.context-bar__switch-label` with the existing visually-hidden utility, so the switcher button's accessible name still includes it. Never use `display: none`, and never remove the Role chip.
+  - [x] (c) Confirm that `.context-bar` wraps (`flex-wrap`) and has no fixed width. A long Space name wraps inside `.context-bar__space-name`; use `overflow-wrap: anywhere` if needed. Never use `text-overflow: ellipsis` on the Space name, which would lose content.
+  - [x] (d) Radius sweep (`deferred-work.md:36`): add `The_context_bar_takes_the_3px_radius` and `The_Role_chip_takes_the_2px_radius` to `DesignFoundationGateTests.Board.cs` (or a new partial `.SmallViewport.cs`). Fix the CSS if either fails. Prove each against a plant.
+- [x] **Task 7: the columns at ≥1280px** (AC1, AC17; Q9)
+  - [x] (a) At ≥80em, let columns share the row: `flex: 1 1 0` with `min-inline-size` in rem, sized so five fit in 1280px less the Board padding and gutters. Arithmetic: 1280 − 2×12 − 4×9 = 1220px; 5 × 14rem = 1120px fits. Between 48em and 80em keep `17rem` and the horizontal scroll.
+  - [x] (b) `FakeYelloApi` may already accept a Status list from the test (`DragHarness.Seed(..., statuses, ...)`). Use five Statuses there; no contract change.
+- [x] **Task 8: tests** (all ACs; see Testing requirements)
+  - [x] (a) Add a new `tests/Yello.Tests.Client/SmallViewportTests.cs` with the cases listed in Dev Notes → Testing requirements. Reuse `DragHarness`, `KeyboardHarness` and `FakeYelloApi`. **No new fixture type.**
+  - [x] (b) Add to `TextSpacingTests`: the pager under both adaptations at 320px (AC19), and the context bar at 320px with a 50-character Space name (AC16).
+  - [x] (c) Add to `TouchDragTests` (in `TouchTimingCollection`): a long-press reorder within the visible column at 375px, and a drag toward a hidden column's direction that drops nothing outside the visible column (AC13).
+  - [x] (d) Add the gates listed in Dev Notes → Testing requirements, each proved against a plant.
+  - [x] (e) Re-run the existing narrow cases unchanged and keep them green: `DragTests:603-615` and `MoveTests:581-593` (320/768/1280), `LabelTests:146` (320), `ListViewTests` (320), and `DragTests:692` (768, sideways auto-scroll, still valid at 768). If a 320 case relied on a second column being visible, correct the case to select its tab first, and record the correction in the Debug Log.
+- [x] **Task 9: ledger, conventions, verification**
+  - [x] (a) `deferred-work.md`: apply Dev Notes → Ledger dispositions.
+  - [x] (b) `tests/TESTING-CONVENTIONS.md`: add a short "Viewport and the pager - added by story 2.11" subsection covering:
     - the breakpoint sizes the suite uses (320×256, 375×667, 1024×800, 1280×800);
     - how to select a tab before acting in a hidden column;
     - the 1.4.10 measurement helper;
     - that RTL is forced by `dir="rtl"`.
-  - [ ] (c) Run `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are 3 bundle cases plus the Explicit tiers.
+  - [x] (c) Run `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are 3 bundle cases plus the Explicit tiers.
 
 ## Dev Notes
 
@@ -662,14 +662,77 @@ Every column stays mounted, so paging, true totals, focus identity and 2.9's app
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended phase of the story cycle.
+
 ### Debug Log References
+
+- **Red first.** The `BoardTraversalTests` additions (narrow traverse/carry, narrow ↑/↓, pager keys LTR/RTL with `Home`/`End` and clamping) were written before `BoardTraversal.Pager` and the `narrow` overloads existed (red as a compile failure), then turned green. The browser cases were written against the design and run once the client compiled; they went green on the first run, so their teeth were proved by plants instead (below).
+- **Analyzer-driven shapes.** S4136 (overloads adjacent), S1541/S3776/S1067/S3358 (`KeyOf` split with `Named`; the narrow `ActiveStop` branch extracted to `StopIn`; `SendInTurnAsync`'s tail extracted to `Answered`), S3872 (`Narrow(bool belowMiddle, …)`), S6802 (a lambda in a loop - each tab is its own `StatusPagerTab` component), S1135 (a Status name read as a to-do marker in a test comment). Gates: `No_user_visible_copy_is_written_as_a_csharp_string_literal` (a doc comment quoting the count copy) and `The_interactive_target_floor_is_declared_and_never_lowered` (the tab needed an inline floor too). S1200 on `BoardView` did not fire: no injection was added, and the new types are a child component and a partial.
+- **Plants** (a scratch script: each file saved, planted, built, the named tests run, and restored in a `finally` from the saved text - never git):
+  - the narrow media rule removed: gate `Below_768px_an_unselected_column_is_hidden_by_construction` CAUGHT; case 3 (`At_375px_one_column_…`) CAUGHT; case 14 (reflow) not caught - with every column shown but flexing, nothing overflows, so 1.4.10 still holds; case 3 is the one that owns it.
+  - a tab sentence on a Board-made follow: case 6 (`A_move_from_the_card_menu_…`) CAUGHT.
+  - the pager saying `Tasks.Count` instead of the true total: case 4 CAUGHT.
+  - `←`/`→` in the narrow composite switching columns: unit test CAUGHT; browser case 7 not caught, even after strengthening it (each inline arrow is now followed by `↓`/`↑` to a known card). The CSS hides the destination column, so focus cannot land there, and `ActiveStop` keeps the stop in the shown column: the behaviour stays correct by two other layers, and the pure helper is what the unit test holds.
+  - the drag hit-testing hidden columns (the `isTarget` filter removed): case 8 not caught - a `display: none` column has an empty rect, which `inside()` can never contain, so the explicit filter is belt and braces behind the CSS. Recorded rather than faked.
+  - `display: none` on the Role chip below 30em: gate CAUGHT, case 13 CAUGHT.
+  - a px breakpoint (`1279px`): gate CAUGHT.
+  - `overflow-x: auto` and a fixed column kept at narrow width: case 14 CAUGHT. (Plain 17rem fits 320px less the Board's padding - 272px into 296px - so the plant used 19rem to make the kept width overflow; with 17rem nothing scrolls and 1.4.10 is met.)
+  - a 3px pager tab: gate CAUGHT.
+  - the pager selection not purged: not plantable in a browser - `Board.razor` keys `BoardView` by `(SpaceId, ProjectId)`, so every Space switch, lease end or sign-out builds a new Board that starts on its first tab whether or not `PurgePanel` resets it. The reset is kept as defence in depth; case 15 holds the observable half (first tab after a switch, nothing in storage, the address or the title).
+- **Task 8 (e).** No existing narrow case needed a correction: `DragTests`' 320/768/1280 case lifts a card in the first column, which is the selected one; 768px is not narrow (`47.9375em` is 767px), so `DragTests`' sideways auto-scroll at 768 is unchanged; `LabelTests`, `ListViewTests` and `MoveTests` at 320 act only on the first column. All stay green in the full run.
 
 ### Completion Notes List
 
 - Story context created by bmad-create-story (2026-10-28). The context engine analysis is complete and a developer guide has been written. The open questions above are to be decided in Task 1 as reversible, recorded decisions.
+- **Decisions (Task 1).** Each is the story's recommendation, reversible, and a line Lee can cut:
+  - Q1 - (a): CSS hides unselected columns by construction under `@media (max-width: 47.9375em)`; `board-keys.js` reports `matchMedia` to .NET; every column stays mounted. Cost: CSS and JS must agree on `47.9375em` (gate on the CSS, comment cross-reference in both scripts). Added on the way: the column that holds focus is spared (`:not(:focus-within)`) until .NET selects it, so crossing 768px never drops focus to the body.
+  - Q2 - (a): first tab on load; kept across re-reads and paging; going narrow selects the active stop's (or the carried Task's) column; a move follows the Task; reset by the purge; never stored.
+  - Q3 - (a): automatic activation; ends clamp; `Home`/`End` supported. Ledgered to UX.
+  - Q4 - (a): tablist "Statuses"; tab = name + count chip, named "{Status} {n} Tasks"; a person's change says "{Status}, {n} Tasks." with the true total (`PagerShown`). Ledgered to UX.
+  - Q5 - (a): `←`/`→` consumed and inert below 768px, traversing and carrying; in-column carry kept; a refused carried arrow says nothing. Ledgered to UX.
+  - Q6 - (a): only the pager's shown column is a drop target; no sideways auto-scroll while narrow. Closes `deferred-work.md:574`.
+  - Q7 - (a): "+" stays on the first column, so it shows on the first tab only. Ledgered to UX.
+  - Q8 - (a): Project name dropped below 1280px; "Switch Space" visually hidden below 30em, kept in the button's name; the Role chip never touched. No chevron glyph invented; ledgered to UX.
+  - Q9 - (a): at ≥80em columns share the row (`flex: 1 1 0`, `min-inline-size: 14rem`); 17rem with row scroll at 48-80em. Ledgered to UX / 6.1.
+  - Q10 - (a): 1.4.10 measured at 320×256 and 375×667 in every tab and with the panel open. Ledgered to UX (the cramped 256px column).
+  - Q11 - (a): `overflow-x`/`translate` left alone; added an em-breakpoint gate and a physical-scroll JS gate allowing exactly the drag's `scrollBy({ left })`, proved under RTL.
+  - Q12 - (a): tabs reuse `button-secondary`'s tokens at `--radius-sm`; selected = 2px emphasis border + primary text + `aria-selected`; a wrapping row. Ledgered to UX.
+- **Follow-the-Task placement.** The story put the follow in `MoveAsync` and `AnnounceMove`'s non-admitted branch. It is in `EditAsync` (for every Status change, before the first await - which covers `MoveAsync`'s every origin and the panel's Status select too) and in the answer's tail for a non-admitted outcome. An admitted answer leaves whatever tab the person chose meanwhile. Closing the panel and creating a Task also follow. None of these says a tab sentence.
+- **Pager selection logic** is `BoardTraversal.Pager` (folded into `BoardTraversal`, no `PagerTraversal`). `BoardKey` gained `Home` and `End`; on the composite they end a run as any other key did.
+- **RTL drag (Task 5 (d))** needed no code change: the browser case passes at 1024px under `dir="rtl"`.
+- **Ledger** (`deferred-work.md`): `:574` closed; `:20` and `:36` updated; `:573` touched (still open, Lee and UX/Lee); a new 2.11 section adds six UX / 6.1 entries and one for story 5.1 (the Offer indicator at every breakpoint).
 
 ### File List
+
+New:
+- `Yello.Client/Components/BoardView.Pager.cs`
+- `Yello.Client/Components/StatusPager.razor`
+- `Yello.Client/Components/StatusPagerTab.razor`
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.SmallViewport.cs`
+- `tests/Yello.Tests.Client/SmallViewportTests.cs`
+
+Modified:
+- `Yello.Client/Components/BoardColumn.razor`
+- `Yello.Client/Components/BoardKey.cs`
+- `Yello.Client/Components/BoardKeys.cs`
+- `Yello.Client/Components/BoardTraversal.cs`
+- `Yello.Client/Components/BoardView.Keys.cs`
+- `Yello.Client/Components/BoardView.razor`
+- `Yello.Client/Components/BoardView.razor.cs`
+- `Yello.Client/Components/IBoardKeysHost.cs`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/wwwroot/css/components.css`
+- `Yello.Client/wwwroot/js/board-drag.js`
+- `Yello.Client/wwwroot/js/board-keys.js`
+- `tests/Yello.Tests.Architecture/BoardTraversalTests.cs`
+- `tests/Yello.Tests.Client/TextSpacingTests.cs`
+- `tests/Yello.Tests.Client/TouchDragTests.cs`
+- `tests/TESTING-CONVENTIONS.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/2-11-the-board-on-a-small-viewport.md`
 
 ### Change Log
 
 - 2026-10-28: Story created (ready-for-dev).
+- 2026-10-28: Implemented (bmad-dev-story). The Status pager below 768px (tablist, tabpanel columns, keys, true-total announcement, follow-the-Task, breakpoint crossing), the narrow keyboard and drag limits, the context bar's drop order, shared columns at ≥1280px; 22 `SmallViewportTests` cases, 4 `TextSpacingTests` and 2 `TouchDragTests` cases, 3 `BoardTraversalTests` and 10 design gates; ledger and conventions updated. Build 0 warnings, 0 errors; full run (`--max-parallel-test-modules 1`) 1,521 total, 1,512 passed, 0 failed, 9 skipped (3 bundle cases plus the Explicit tiers, as at 2.10). Status set to review.

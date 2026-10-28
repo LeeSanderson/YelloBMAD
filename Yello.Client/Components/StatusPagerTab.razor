@@ -1,0 +1,71 @@
+@*
+    ONE TAB OF THE STATUS PAGER - story 2.11, AC9, open question 4 (a). See StatusPager. A native button with role="tab":
+    the Status name, then its TRUE total in the column's count chip (the one pill), the bare number hidden from assistive
+    technology and the total read in words instead. Its own component so the click handler is not a lambda in a loop.
+*@
+
+<button type="button"
+        class="status-pager__tab"
+        role="tab"
+        id="@StatusPager.TabIdOf(StatusId)"
+        aria-selected="@(Selected ? "true" : "false")"
+        aria-controls="@StatusPager.PanelIdOf(StatusId)"
+        tabindex="@(Selected ? "0" : "-1")"
+        data-pager-status="@StatusId.ToString("D", System.Globalization.CultureInfo.InvariantCulture)"
+        @onclick="SelectAsync"
+        @ref="_tab">
+    <span class="type-column-head status-pager__name">@Name</span>
+    <span class="type-meta column-count" aria-hidden="true">@Total</span>
+    <span class="visually-hidden">@CountText</span>
+</button>
+
+@code {
+    private ElementReference _tab;
+    private int _focusRequestsSeen = -1;
+
+    /// <summary>The tab's Status.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid StatusId { get; set; }
+
+    /// <summary>The Status's name.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string Name { get; set; } = string.Empty;
+
+    /// <summary>The column's true total (AD-29).</summary>
+    [Parameter]
+    public int Total { get; set; }
+
+    /// <summary>The true total in words, as ColumnCountOne or ColumnCountMany words it.</summary>
+    [Parameter]
+    public string CountText { get; set; } = string.Empty;
+
+    /// <summary>Whether this tab is the selected one.</summary>
+    [Parameter]
+    public bool Selected { get; set; }
+
+    /// <summary>Raised with the tab's Status when it is clicked or tapped.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnSelect { get; set; }
+
+    /// <summary>Bumped by the Board to move focus to the selected tab; every tab sees it, and only the selected one acts.</summary>
+    [Parameter]
+    public int FocusRequest { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // A tab drawn afresh notes the request it was drawn with and never acts on it, as BoardColumn does.
+        var requested = !firstRender && FocusRequest != _focusRequestsSeen && Selected;
+
+        _focusRequestsSeen = FocusRequest;
+
+        if (requested)
+        {
+            await _tab.FocusAsync();
+        }
+    }
+
+    private Task SelectAsync() => OnSelect.InvokeAsync(StatusId);
+}

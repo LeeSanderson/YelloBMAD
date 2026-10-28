@@ -133,4 +133,73 @@ public sealed class BoardTraversalTests
         Assert.Equal((0, 1, 1), BoardTraversal.Carry(others, 0, 1, BoardKey.InlineStart, 1));
         Assert.Equal((2, 3, 9), BoardTraversal.Carry(others, 2, 3, BoardKey.InlineEnd, 9));
     }
+
+    /// <summary>
+    /// Story 2.11, AC12, open question 5 (a) - below 768px the pager is the only route to another Status: <c>←</c>/<c>→</c>
+    /// in the composite move nothing, traversing or carrying, from a card or from an empty column, and keep the origin.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "UX-DR20")]
+    [Trait("Requirement", "UX-DR41")]
+    public void Below_768px_the_inline_keys_move_nothing_traversing_or_carrying()
+    {
+        foreach (var key in new[] { BoardKey.InlineStart, BoardKey.InlineEnd })
+        {
+            Assert.Equal(((1, 0), 3), BoardTraversal.Traverse(Ragged, (1, 0), key, 3, narrow: true));
+            Assert.Equal(((2, null), 1), BoardTraversal.Traverse(Ragged, (2, null), key, 1, narrow: true));
+            Assert.Equal((1, 1, 2), BoardTraversal.Carry([4, 1, 5], 1, 1, key, 2, narrow: true));
+        }
+
+        // The same keys at 768px and above are 2.8's, unchanged.
+        Assert.Equal(((2, null), 3), BoardTraversal.Traverse(Ragged, (1, 0), BoardKey.InlineEnd, 3, narrow: false));
+        Assert.Equal((2, 2, 2), BoardTraversal.Carry([4, 1, 5], 1, 1, BoardKey.InlineEnd, 2, narrow: false));
+    }
+
+    /// <summary>
+    /// Story 2.11, AC12 - below 768px <c>↑</c>/<c>↓</c> traverse and carry within the column exactly as at any width.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "UX-DR20")]
+    public void Below_768px_up_and_down_are_unchanged()
+    {
+        foreach (var key in new[] { BoardKey.Up, BoardKey.Down })
+        {
+            Assert.Equal(BoardTraversal.Traverse(Ragged, (0, 2), key, 4), BoardTraversal.Traverse(Ragged, (0, 2), key, 4, narrow: true));
+            Assert.Equal(BoardTraversal.Carry([4, 1, 5], 0, 2, key, 2), BoardTraversal.Carry([4, 1, 5], 0, 2, key, 2, narrow: true));
+        }
+    }
+
+    /// <summary>
+    /// Story 2.11, AC4, AC8, AC9, open question 3 (a) - the pager's keys: the inline keys step one tab by logical direction,
+    /// <c>Home</c>/<c>End</c> go to the first and last, and the ends clamp (no wrap). Under right to left the physical arrows
+    /// mirror through <see cref="BoardTraversal.KeyOf"/>; the tab order - the Status sequence - never does.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "UX-DR20")]
+    [Trait("Requirement", "UX-DR42")]
+    public void The_pager_keys_step_clamp_and_mirror_under_right_to_left()
+    {
+        Assert.Equal(BoardKey.Home, BoardTraversal.KeyOf("Home", rightToLeft: false));
+        Assert.Equal(BoardKey.End, BoardTraversal.KeyOf("End", rightToLeft: true));
+
+        // Left to right: → is the next Status, ← the previous.
+        Assert.Equal(2, BoardTraversal.Pager(5, 1, BoardTraversal.KeyOf("ArrowRight", rightToLeft: false)));
+        Assert.Equal(0, BoardTraversal.Pager(5, 1, BoardTraversal.KeyOf("ArrowLeft", rightToLeft: false)));
+
+        // Right to left: ← is the next Status, → the previous.
+        Assert.Equal(2, BoardTraversal.Pager(5, 1, BoardTraversal.KeyOf("ArrowLeft", rightToLeft: true)));
+        Assert.Equal(0, BoardTraversal.Pager(5, 1, BoardTraversal.KeyOf("ArrowRight", rightToLeft: true)));
+
+        // The ends clamp.
+        Assert.Equal(0, BoardTraversal.Pager(5, 0, BoardKey.InlineStart));
+        Assert.Equal(4, BoardTraversal.Pager(5, 4, BoardKey.InlineEnd));
+
+        // Home and End, either direction.
+        Assert.Equal(0, BoardTraversal.Pager(5, 3, BoardKey.Home));
+        Assert.Equal(4, BoardTraversal.Pager(5, 1, BoardKey.End));
+
+        // Any other key leaves the selection where it is.
+        Assert.Equal(3, BoardTraversal.Pager(5, 3, BoardKey.Up));
+        Assert.Equal(3, BoardTraversal.Pager(5, 3, BoardKey.Other));
+    }
 }

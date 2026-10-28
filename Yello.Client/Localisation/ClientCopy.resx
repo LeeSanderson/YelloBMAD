@@ -619,6 +619,14 @@
     <value>{0} Tasks</value>
     <comment>A column's accessible description for any true total but one, zero included (story 2.8, AC13, open question 8 (a)): {0} is the column's true total.</comment>
   </data>
+  <data name="PagerName" xml:space="preserve">
+    <value>Statuses</value>
+    <comment>The accessible name of the Status pager, the tablist that shows one column at a time below 768px (story 2.11, AC9, open question 4 (a)).</comment>
+  </data>
+  <data name="PagerShown" xml:space="preserve">
+    <value>{0}, {1}.</value>
+    <comment>Said politely when the person changes the Status pager's tab (story 2.11, AC4, AC10, open question 4 (a)): {0} is the Status's name and {1} its TRUE total in words (ColumnCountOne or ColumnCountMany), never the number of loaded cards.</comment>
+  </data>
   <data name="TaskMove" xml:space="preserve">
     <value>Move</value>
     <comment>The Move control in the Task detail panel and the card menu's item that opens the Move picker (story 2.6, UX-DR21). A plain verb; never "Drag".</comment>

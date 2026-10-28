@@ -93,12 +93,42 @@ public sealed class BoardKeys : IAsyncDisposable
     /// </summary>
     /// <param name="key">The DOM <c>KeyboardEvent.key</c>.</param>
     /// <param name="rightToLeft">Whether the Board's computed direction is right to left.</param>
+    /// <param name="narrow">Whether the viewport is below 768px at the key (story 2.11), read as the direction is.</param>
     /// <param name="taskId">The card's Task, or <c>null</c>.</param>
     /// <param name="statusId">The column's Status, or <c>null</c>.</param>
     /// <returns>A task.</returns>
     [JSInvokable("Key")]
-    public Task KeyAsync(string key, bool rightToLeft, string? taskId, string? statusId) =>
-        _host.KeyAsync(BoardTraversal.KeyOf(key, rightToLeft), IdOf(taskId), IdOf(statusId));
+    public Task KeyAsync(string key, bool rightToLeft, bool narrow, string? taskId, string? statusId) =>
+        _host.KeyAsync(BoardTraversal.KeyOf(key, rightToLeft), narrow, IdOf(taskId), IdOf(statusId));
+
+    /// <summary>
+    /// The module: an arrow, <c>Home</c> or <c>End</c> on one of the Status pager's tabs (story 2.11, AC4, AC9).
+    /// </summary>
+    /// <param name="key">The DOM <c>KeyboardEvent.key</c>.</param>
+    /// <param name="rightToLeft">Whether the Board's computed direction is right to left.</param>
+    /// <param name="statusId">The tab's Status.</param>
+    [JSInvokable]
+    public void PagerKey(string key, bool rightToLeft, string? statusId)
+    {
+        if (!_disposed && IdOf(statusId) is { } id)
+        {
+            _host.PagerKey(BoardTraversal.KeyOf(key, rightToLeft), id);
+        }
+    }
+
+    /// <summary>
+    /// The module: the viewport crossed 768px, or was first measured on attaching (story 2.11, AC14, open question 1 (a)).
+    /// </summary>
+    /// <param name="belowMiddle">Whether the viewport is below 768px.</param>
+    /// <param name="fromPager">Whether focus was on one of the Status pager's tabs.</param>
+    [JSInvokable]
+    public void Narrow(bool belowMiddle, bool fromPager)
+    {
+        if (!_disposed)
+        {
+            _host.Narrowed(belowMiddle, fromPager);
+        }
+    }
 
     /// <summary>
     /// The module: focus moved to a stop, or left the Board.

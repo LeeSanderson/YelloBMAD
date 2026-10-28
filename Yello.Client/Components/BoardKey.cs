@@ -44,4 +44,14 @@ public enum BoardKey
     /// <c>Tab</c> during a carry: cancel it, so focus never leaves with a Task in hand.
     /// </summary>
     Tab,
+
+    /// <summary>
+    /// <c>Home</c> on the Status pager: its first tab (story 2.11, AC9). On the composite it ends a run, as any other key.
+    /// </summary>
+    Home,
+
+    /// <summary>
+    /// <c>End</c> on the Status pager: its last tab (story 2.11, AC9). On the composite it ends a run, as any other key.
+    /// </summary>
+    End,
 }

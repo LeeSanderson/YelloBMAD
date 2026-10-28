@@ -499,6 +499,90 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
         }
     }
 
+    /// <summary>
+    /// Story 2.11, AC19, <c>deferred-work.md:20</c>'s convention that every new surface adds its own case: the Status pager
+    /// at 320px with long Status names, under 1.4.12 text spacing and 200% text-only zoom - no text clipped, no tab
+    /// overlapping another, the selected tab still drawn by its 2px border, and no sideways page scroll. Anchored: the
+    /// tablist is on screen before the check runs.
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR20")]
+    [Trait("Requirement", "UX-DR40")]
+    public async Task Text_spacing_and_text_only_zoom_clip_nothing_in_the_Status_pager(bool zoom)
+    {
+        var api = DragHarness.TwoSpaces(Northwind, Guid.NewGuid());
+        _ = DragHarness.Seed(api, Northwind, Atlas, ["Waiting on someone outside the team", "In Progress for a long while", "Done and dusted at last"], ["Short one"], ["Another"], ["A third"]);
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(320, 800);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/projects/{Atlas:D}").ToString());
+            await page.Locator("main [role='tablist']").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var problems = (await page.EvaluateAsync<string[]>(ClippedOrOverlapping)).ToList();
+
+            problems.AddRange(await page.EvaluateAsync<string[]>(
+                """
+                () => {
+                    const problems = [];
+                    const tabs = [...document.querySelectorAll("main [role='tab']")].map(tab => tab.getBoundingClientRect());
+                    for (let i = 0; i < tabs.length; i++) {
+                        for (let j = i + 1; j < tabs.length; j++) {
+                            const a = tabs[i], b = tabs[j];
+                            if (a.left < b.right - 1 && b.left < a.right - 1 && a.top < b.bottom - 1 && b.top < a.bottom - 1) problems.push('tabs overlap');
+                        }
+                    }
+                    const selected = document.querySelector("main [role='tab'][aria-selected='true']");
+                    if (!selected || getComputedStyle(selected).borderTopWidth !== '2px') problems.push('the selected tab is not drawn by its 2px border');
+                    return problems;
+                }
+                """));
+
+            Assert.True(problems.Count == 0, string.Join("; ", problems));
+        }
+    }
+
+    /// <summary>
+    /// Story 2.11, AC16, <c>deferred-work.md:20</c>: the context bar at 320px with a 50-character Space name, under 1.4.12
+    /// text spacing and 200% text-only zoom - no text clipped, the Role chip still on screen, and no sideways page scroll.
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR9")]
+    [Trait("Requirement", "UX-DR41")]
+    public async Task Text_spacing_and_text_only_zoom_clip_nothing_in_the_context_bar_at_320px(bool zoom)
+    {
+        var api = Seeded();
+
+        api.Switcher[0] = (Northwind, "Northwind Redesign and the Quarterly Planning Team");
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(320, 800);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/projects/{Atlas:D}").ToString());
+            await page.Locator("main [role='tablist']").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+            Assert.True(await page.Locator("nav.context-bar .role-chip").IsVisibleAsync(), "The Role chip is not on screen.");
+        }
+    }
+
     private static FakeYelloApi Seeded()
     {
         var api = new FakeYelloApi { SignedIn = true };

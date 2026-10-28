@@ -30,9 +30,15 @@
     source, and a test can lengthen the threshold without racing the clock.
 
     HIT-TESTING is by bounding rects of the [data-status-id] columns and the .task-card elements in them, the dragged card
-    excluded - direction-neutral, so RTL needs nothing here (UX-DR42 is story 2.11's). The slot is the number of cards
-    whose middle is above the pointer; the pointer inside the drop zone keeps the slot it has, so the zone cannot chase
-    itself. Outside every column there is no drop zone, and a release there moves nothing (AC6).
+    excluded - direction-neutral, so RTL needs nothing here: story 2.11 (AC13, UX-DR42) proved it with a right-to-left drag
+    to the inline-end column at 1024px. The slot is the number of cards whose middle is above the pointer; the pointer inside
+    the drop zone keeps the slot it has, so the zone cannot chase itself. Outside every column there is no drop zone, and a
+    release there moves nothing (AC6).
+
+    BELOW 768PX (story 2.11, AC13, open question 6 (a); deferred-work.md:574) only the column the Status pager shows is a
+    drop target: a hidden column - no box, the hidden attribute, or not the pager's selected column - is never hit-tested,
+    previewed or dropped into, and the Board's row never auto-scrolls sideways. A cross-Status move at that width is the
+    Move control's. The query is the one js/board-keys.js and components.css use.
 
     AUTO-SCROLL (AC5, story 2.7 Q13): while lifted, a requestAnimationFrame loop scrolls the hovered column near its block
     edges, the Board's row near the view's inline edges, and the page near the view's block edges - in proportion to the
@@ -55,6 +61,8 @@ const MOVABLE_CARD = '.task-card--movable';
 const CARD = '.task-card';
 const COLUMN = '[data-status-id]';
 const DROP_ZONE = '.drop-zone';
+const SELECTED = 'data-pager-selected';
+const NARROW = '(max-width: 47.9375em)';
 const OPENER = '[data-task-id]';
 const DRAG_PROPERTIES = ['--drag-x', '--drag-y', '--drag-top', '--drag-start', '--drag-width'];
 
@@ -86,6 +94,19 @@ function readToken(name, fallback) {
     }
 
     return value;
+}
+
+/**
+ * Whether a column can take a drop: it is drawn, and - below 768px - it is the column the Status pager shows.
+ */
+function isTarget(column, narrow) {
+    if (column.hidden || (narrow && !column.hasAttribute(SELECTED))) {
+        return false;
+    }
+
+    const rect = column.getBoundingClientRect();
+
+    return rect.width > 0 && rect.height > 0;
 }
 
 function centreOf(rect) {
@@ -395,9 +416,12 @@ class BoardDrag {
      */
     #layoutOf(gesture) {
         if (!gesture.layout) {
+            const narrow = window.matchMedia(NARROW).matches;
+
             gesture.layout = {
                 root: this.#root.getBoundingClientRect(),
-                columns: [...this.#root.querySelectorAll(COLUMN)].map(column => {
+                narrow,
+                columns: [...this.#root.querySelectorAll(COLUMN)].filter(column => isTarget(column, narrow)).map(column => {
                     const zone = column.querySelector(DROP_ZONE);
 
                     return {
@@ -449,7 +473,9 @@ class BoardDrag {
             }
         }
 
-        const sideways = edgeStep(x, 0, window.innerWidth, edge);
+        // Physical on both sides, and so consistent under RTL: clientX's edge step, then scrollBy's physical left, whose
+        // negative scrollLeft Chromium uses in a right-to-left row (story 2.11, AC13). Never below 768px (open question 6).
+        const sideways = this.#layoutOf(gesture).narrow ? 0 : edgeStep(x, 0, window.innerWidth, edge);
 
         if (sideways !== 0) {
             this.#root.scrollBy({ left: sideways, behavior: 'instant' });

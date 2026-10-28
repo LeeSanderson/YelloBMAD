@@ -369,6 +369,100 @@ public sealed class TouchDragTests(ClientSurfaceFixture surface)
         }
     }
 
+    /// <summary>
+    /// Story 2.11, AC13, UX-DR41 - at 375px a long-press lifts a card in the visible column and the finger reorders it within
+    /// that column; a finger taken to the view's inline edge on the way previews nothing in a hidden column, and the drop is
+    /// sent as a move within the same Status. Chromium-emulated touch; a real phone is still unverified
+    /// (<c>deferred-work.md:573</c>).
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR41")]
+    [Trait("Requirement", "UX-DR20")]
+    public async Task At_375px_a_long_press_reorders_within_the_visible_column_only()
+    {
+        var api = TwoSpaces(Northwind, Harbour);
+        var tasks = Seed(api, Northwind, Atlas, ThreeStatuses, ["Draft the brief", "Book the room", "Send the invite"], ["Review"]);
+        var (context, page) = await surface.OpenAsync(EnglishLocale, timezoneId: null, hasTouch: true);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(375, 667);
+            await api.InstallAsync(page);
+            await OpenBoardAsync(page, surface.BaseAddress, Northwind, Atlas);
+            await page.Locator("main [role='tablist']").WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
+
+            var session = await context.NewCDPSessionAsync(page);
+            var start = await GrabPointAsync(page, "Draft the brief");
+
+            await TouchAsync(session, "touchStart", start);
+            await page.Locator(Lifted).WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
+
+            var edge = (X: 373f, start.Y + 30);
+
+            await SwipeAsync(session, start, edge, 8);
+
+            Assert.Equal(0, await page.Locator("main .board-column:not([data-pager-selected]) .drop-zone").CountAsync());
+            Assert.Equal(0, await page.EvaluateAsync<double>("() => document.querySelector('.board__columns').scrollLeft"));
+
+            var target = await PointInAsync(CardNamed(page, "Book the room"), 0.8f);
+
+            await SwipeAsync(session, edge, target, 8);
+            await WaitForDropZoneAsync(page, "Todo", "Send the invite");
+            await TouchAsync(session, "touchEnd");
+
+            await page.Locator(LiveRegion, new PageLocatorOptions { HasText = "Moved to Todo, position 2 of 3." })
+                .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = WaitMs });
+
+            using var body = JsonDocument.Parse(Assert.Single(Moves(api)).Body ?? "{}");
+
+            Assert.Equal(StatusOf(api, Northwind, Atlas, "Todo"), body.RootElement.GetProperty("statusId").GetGuid());
+            Assert.Equal(tasks["Book the room"].Id, body.RootElement.GetProperty("afterTaskId").GetGuid());
+            Assert.Equal(["Book the room", "Draft the brief", "Send the invite"], await TitlesInAsync(page, "Todo"));
+        }
+    }
+
+    /// <summary>
+    /// Story 2.11, AC13, Q6 (a), <c>deferred-work.md:574</c> - at 375px a touch drag released at the view's inline edge,
+    /// outside every card of the visible column's row, drops nothing outside the visible column: no cross-Status move is ever
+    /// sent.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR41")]
+    public async Task At_375px_a_touch_drag_toward_a_hidden_column_moves_nothing_across_Statuses()
+    {
+        var api = TwoSpaces(Northwind, Harbour);
+        _ = Seed(api, Northwind, Atlas, ThreeStatuses, ["Draft the brief", "Book the room"], ["Review"]);
+        var (context, page) = await surface.OpenAsync(EnglishLocale, timezoneId: null, hasTouch: true);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(375, 667);
+            await api.InstallAsync(page);
+            await OpenBoardAsync(page, surface.BaseAddress, Northwind, Atlas);
+            await page.Locator("main [role='tablist']").WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
+
+            var session = await context.NewCDPSessionAsync(page);
+            var start = await GrabPointAsync(page, "Draft the brief");
+            var todo = StatusOf(api, Northwind, Atlas, "Todo");
+
+            await TouchAsync(session, "touchStart", start);
+            await page.Locator(Lifted).WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
+            await SwipeAsync(session, start, (373, start.Y), 10);
+            await TouchAsync(session, "touchEnd");
+            await page.Locator(Lifted).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = WaitMs });
+
+            Assert.All(Moves(api), move =>
+            {
+                using var body = JsonDocument.Parse(move.Body ?? "{}");
+
+                Assert.Equal(todo, body.RootElement.GetProperty("statusId").GetGuid());
+            });
+            Assert.Equal(["Review"], await TitlesInAsync(page, "Doing"));
+        }
+    }
+
     private static async Task<(double Board, double Column)> ScrollAsync(IPage page)
     {
         var scroll = await page.EvaluateAsync<JsonElement>("() => ({ board: document.querySelector('.board__columns').scrollLeft, column: [...document.querySelectorAll('main .board-column')][1].scrollTop })");

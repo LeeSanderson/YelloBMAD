@@ -69,6 +69,13 @@ public sealed partial class BoardView
                 return (null, null);
             }
 
+            // Below 768px the stop is always in the column the pager shows, so Tab never lands on a hidden element (story
+            // 2.11, AC9): the active card when it is there, else that column's first card, else the column itself.
+            if (_narrow && SelectedColumn is { } shown)
+            {
+                return StopIn(shown);
+            }
+
             if (_activeTaskId is { } taskId && Locate(taskId) is not null)
             {
                 return (taskId, null);
@@ -146,7 +153,7 @@ public sealed partial class BoardView
     }
 
     /// <inheritdoc />
-    async Task IBoardKeysHost.KeyAsync(BoardKey key, Guid? taskId, Guid? statusId)
+    async Task IBoardKeysHost.KeyAsync(BoardKey key, bool narrow, Guid? taskId, Guid? statusId)
     {
         if (_columns is null)
         {
@@ -155,14 +162,14 @@ public sealed partial class BoardView
 
         if (_carried is not null)
         {
-            await CarryKeyAsync(key);
+            await CarryKeyAsync(key, narrow);
             return;
         }
 
         switch (key)
         {
             case BoardKey.Up or BoardKey.Down or BoardKey.InlineStart or BoardKey.InlineEnd:
-                await TraverseOrPageAsync(key, taskId, statusId);
+                await TraverseOrPageAsync(key, narrow, taskId, statusId);
                 break;
 
             case BoardKey.Space when taskId is { } id:
@@ -199,14 +206,14 @@ public sealed partial class BoardView
     /// One arrow on a stop: <c>↓</c> on the last loaded card of a partly loaded column fetches the next page first (story
     /// 2.9, AC7, AC11); every other arrow is the grammar's.
     /// </summary>
-    private Task TraverseOrPageAsync(BoardKey key, Guid? taskId, Guid? statusId)
+    private Task TraverseOrPageAsync(BoardKey key, bool narrow, Guid? taskId, Guid? statusId)
     {
         if (key == BoardKey.Down && taskId is { } id && LastLoadedOfAPartlyLoadedColumn(id) is { } partly)
         {
             return StepPastTheLoadedAsync(partly, id);
         }
 
-        Traverse(key, taskId, statusId);
+        Traverse(key, narrow, taskId, statusId);
 
         return Task.CompletedTask;
     }
@@ -218,9 +225,10 @@ public sealed partial class BoardView
         Locate(taskId) is { } found && found.Column.After is not null && found.Index == found.Column.Tasks.Count - 1 ? found.Column : null;
 
     /// <summary>
-    /// One arrow on a stop (AC1, AC2): focus moves to the card or empty column the grammar names, by its identity.
+    /// One arrow on a stop (AC1, AC2): focus moves to the card or empty column the grammar names, by its identity. Below 768px
+    /// <c>←</c>/<c>→</c> move nothing (story 2.11, AC12): the pager is the only route to another Status.
     /// </summary>
-    private void Traverse(BoardKey key, Guid? taskId, Guid? statusId)
+    private void Traverse(BoardKey key, bool narrow, Guid? taskId, Guid? statusId)
     {
         if (_columns is not { } columns || StopOf(columns, taskId, statusId) is not { } stop)
         {
@@ -229,7 +237,7 @@ public sealed partial class BoardView
 
         var here = taskId ?? statusId;
         var origin = _runAt == here ? _runOrigin : stop.Index.GetValueOrDefault();
-        var (next, nextOrigin) = BoardTraversal.Traverse(columns.ConvertAll(column => column.Tasks.Count), stop, key, origin);
+        var (next, nextOrigin) = BoardTraversal.Traverse(columns.ConvertAll(column => column.Tasks.Count), stop, key, origin, narrow);
         var column = columns[next.Column];
 
         if (next.Index is { } index)
@@ -329,11 +337,11 @@ public sealed partial class BoardView
     /// <summary>
     /// A key during a carry: an arrow steps the destination, Space drops, Esc and Tab cancel; anything else does nothing.
     /// </summary>
-    private async Task CarryKeyAsync(BoardKey key)
+    private async Task CarryKeyAsync(BoardKey key, bool narrow)
     {
         if (key is BoardKey.Up or BoardKey.Down or BoardKey.InlineStart or BoardKey.InlineEnd)
         {
-            await StepAsync(key);
+            await StepAsync(key, narrow);
         }
         else if (key == BoardKey.Space)
         {
@@ -355,9 +363,10 @@ public sealed partial class BoardView
     /// One carried step (AC5, AC10): the slot moves by the grammar, the drop zone follows it into view, and the step sentence
     /// says the Status, the ordinal and the total the column would have with the Task in it. A <c>↓</c> from the slot after
     /// a partly loaded column's last loaded card fetches the next page first, then steps (story 2.9, AC11); the sentence
-    /// still carries the true total.
+    /// still carries the true total. Below 768px a carried <c>←</c>/<c>→</c> leaves the Task in its column and says nothing
+    /// (story 2.11, AC12, open question 5 (a)): a cross-Status move is the Move control's.
     /// </summary>
-    private async Task StepAsync(BoardKey key)
+    private async Task StepAsync(BoardKey key, bool narrow)
     {
         if (_columns is not { } columns || _carried is not { } carried)
         {
@@ -372,7 +381,7 @@ public sealed partial class BoardView
         }
 
         var others = columns.ConvertAll(column => column.Tasks.Count(task => task.Id != carried));
-        var (next, slot, origin) = BoardTraversal.Carry(others, at, _carrySlot, key, _carryOrigin);
+        var (next, slot, origin) = BoardTraversal.Carry(others, at, _carrySlot, key, _carryOrigin, narrow);
 
         _carryOrigin = origin;
 

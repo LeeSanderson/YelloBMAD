@@ -33,9 +33,40 @@ public static class BoardTraversal
         "ArrowDown" => BoardKey.Down,
         " " => BoardKey.Space,
         "Escape" => BoardKey.Escape,
-        "Tab" => BoardKey.Tab,
-        _ => BoardKey.Other,
+        _ => Named(key),
     };
+
+    /// <summary>
+    /// The Status pager's selection after a key (story 2.11, AC4, AC9, open question 3 (a)): the inline keys step one tab by
+    /// logical direction - already mirrored by <see cref="KeyOf"/> - and clamp at the ends, never wrapping; <c>Home</c> and
+    /// <c>End</c> go to the first and last. The tabs are the Status sequence, which never reverses.
+    /// </summary>
+    /// <param name="count">How many tabs there are.</param>
+    /// <param name="selected">The selected tab's position.</param>
+    /// <param name="key">The key.</param>
+    /// <returns>The position of the tab selected next.</returns>
+    public static int Pager(int count, int selected, BoardKey key) => key switch
+    {
+        BoardKey.InlineStart => Math.Max(selected - 1, 0),
+        BoardKey.InlineEnd => Math.Min(selected + 1, count - 1),
+        BoardKey.Home => 0,
+        BoardKey.End => count - 1,
+        _ => selected,
+    };
+
+    /// <summary>
+    /// One traversal step at a width (story 2.11, AC12, open question 5 (a)): below 768px the pager is the only route to
+    /// another Status, so <c>←</c>/<c>→</c> move nothing - the key is still consumed by the caller - and every other key is
+    /// <see cref="Traverse(IReadOnlyList{int}, ValueTuple{int, int?}, BoardKey, int)"/>'s.
+    /// </summary>
+    /// <param name="counts">Each column's number of Tasks, in the Board's order.</param>
+    /// <param name="stop">Where focus stands.</param>
+    /// <param name="key">The key.</param>
+    /// <param name="origin">The run's sticky origin index.</param>
+    /// <param name="narrow">Whether the viewport is below 768px.</param>
+    /// <returns>Where focus goes, and the run's origin after the step.</returns>
+    public static ((int Column, int? Index) Stop, int Origin) Traverse(IReadOnlyList<int> counts, (int Column, int? Index) stop, BoardKey key, int origin, bool narrow) =>
+        narrow && IsInline(key) ? (stop, origin) : Traverse(counts, stop, key, origin);
 
     /// <summary>
     /// One traversal step.
@@ -83,6 +114,20 @@ public static class BoardTraversal
     }
 
     /// <summary>
+    /// One carried step at a width (story 2.11, AC12): below 768px a carried <c>←</c>/<c>→</c> leaves the Task's destination
+    /// where it is - a cross-Status move is the Move control's - and <c>↑</c>/<c>↓</c> reorder within the column as always.
+    /// </summary>
+    /// <param name="others">Each column's number of Tasks other than the carried one, in the Board's order.</param>
+    /// <param name="column">The destination column's position.</param>
+    /// <param name="slot">The destination slot in it.</param>
+    /// <param name="key">The key.</param>
+    /// <param name="origin">The carry's sticky origin index.</param>
+    /// <param name="narrow">Whether the viewport is below 768px.</param>
+    /// <returns>The new destination column, slot and origin.</returns>
+    public static (int Column, int Slot, int Origin) Carry(IReadOnlyList<int> others, int column, int slot, BoardKey key, int origin, bool narrow) =>
+        narrow && IsInline(key) ? (column, slot, origin) : Carry(others, column, slot, key, origin);
+
+    /// <summary>
     /// One step of a carried Task's destination slot.
     /// </summary>
     /// <param name="others">Each column's number of Tasks other than the carried one, in the Board's order.</param>
@@ -110,6 +155,16 @@ public static class BoardTraversal
                 return (column, slot, origin);
         }
     }
+
+    private static BoardKey Named(string key) => key switch
+    {
+        "Tab" => BoardKey.Tab,
+        "Home" => BoardKey.Home,
+        "End" => BoardKey.End,
+        _ => BoardKey.Other,
+    };
+
+    private static bool IsInline(BoardKey key) => key is BoardKey.InlineStart or BoardKey.InlineEnd;
 
     private static BoardKey Horizontal(bool right, bool rightToLeft) =>
         right != rightToLeft ? BoardKey.InlineEnd : BoardKey.InlineStart;

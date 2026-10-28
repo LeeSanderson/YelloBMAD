@@ -97,7 +97,7 @@ development_status:
   2-8-operate-the-whole-board-from-the-keyboard: done
   2-9-the-board-at-five-thousand-tasks: done
   2-10-view-a-project-as-a-filterable-sortable-list: done
-  2-11-the-board-on-a-small-viewport: ready-for-dev
+  2-11-the-board-on-a-small-viewport: review
   epic-2-retrospective: optional
 
   # Epic 3: Several Spaces, cleanly separated

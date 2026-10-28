@@ -1,0 +1,63 @@
+@*
+    THE STATUS PAGER - story 2.11. AC3, AC4, AC9, AC10, AC15; UX-DR20, UX-DR41, UX-DR42; EXPERIENCE.md:218; WAI-ARIA tabs.
+
+    Below 768px the Board shows one column at a time, and this is the ONLY route to another Status: a tablist over the
+    Project's effective Status set, in its order, each tab (StatusPagerTab) controlling its column - the column is the
+    tabpanel (BoardColumn). The product's only tablist; the Board/List toggle is links, deliberately (ViewToggle).
+
+    ONE TAB STOP: the selected tab is tabindex 0 and the others -1. ←/→ move by LOGICAL direction (they mirror under RTL;
+    the Status sequence does not), Home and End go to the ends, the ends clamp, and activation is automatic - the keys live
+    in js/board-keys.js and the selection in BoardView.Pager.cs, which moves focus to the selected tab with FocusRequest.
+
+    A WRAPPING ROW: it never scrolls sideways (1.4.10). PARAMETERS ONLY - no injection: the Board passes the words, the tabs
+    and the selection, and is told of a click or a tap.
+*@
+
+<div class="status-pager" role="tablist" aria-label="@Label">
+    @foreach (var tab in Tabs)
+    {
+        <StatusPagerTab @key="tab.StatusId"
+                        StatusId="@tab.StatusId"
+                        Name="@tab.Name"
+                        Total="@tab.Total"
+                        CountText="@tab.CountText"
+                        Selected="@(tab.StatusId == SelectedStatusId)"
+                        OnSelect="OnSelect"
+                        FocusRequest="@FocusRequest" />
+    }
+</div>
+
+@code {
+    /// <summary>The tablist's accessible name.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>The tabs, in the Status order: each Status, its name, its true total and that total in words.</summary>
+    [Parameter]
+    [EditorRequired]
+    public IReadOnlyList<(Guid StatusId, string Name, int Total, string CountText)> Tabs { get; set; } = [];
+
+    /// <summary>The selected tab's Status.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SelectedStatusId { get; set; }
+
+    /// <summary>Raised with a tab's Status when it is clicked or tapped.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnSelect { get; set; }
+
+    /// <summary>Bumped by the Board to move focus to the selected tab - after an arrow, Home or End on the tablist.</summary>
+    [Parameter]
+    public int FocusRequest { get; set; }
+
+    /// <summary>The id of the tab for a Status, which labels its column.</summary>
+    /// <param name="statusId">The Status.</param>
+    /// <returns>The id.</returns>
+    public static string TabIdOf(Guid statusId) => "t" + statusId.ToString("N", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>The id of a Status's column, which its tab controls.</summary>
+    /// <param name="statusId">The Status.</param>
+    /// <returns>The id.</returns>
+    public static string PanelIdOf(Guid statusId) => "p" + statusId.ToString("N", System.Globalization.CultureInfo.InvariantCulture);
+}

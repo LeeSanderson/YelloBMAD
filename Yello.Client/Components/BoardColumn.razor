@@ -33,13 +33,26 @@
     A KEYBOARD CARRY (story 2.8, open question 12 (a)) draws the same drop zone at its slot; the carried card stays in its
     own slot, and the zone at that slot is drawn just before it, where the Task is now.
 
+    BELOW 768PX (story 2.11) the column is the Status pager's tabpanel, labelled by its tab, and hidden unless selected. The
+    selected column carries data-pager-selected at every width, so the CSS that hides the others fires by construction at
+    the media query before .NET knows the width; the column is never unmounted (BoardView.Pager.cs).
+
     A PARTLY LOADED COLUMN (story 2.9, AC11, open question 5 (a)) ends with "Show more Tasks": an explicit page boundary,
     for every Role, appending the next page. It is not a roving stop (tabindex -1) - the keyboard pages with the arrows -
     and pointer, touch and screen-reader browse mode reach it. Its name says which column; it carries no count (no nudges).
     Gone once the column is fully loaded. Cards are appended and never recycled: each is keyed by its Task's id.
 *@
 
-<section class="board-column" aria-labelledby="@HeadingId" aria-describedby="@CountId" data-status-id="@StatusIdText" tabindex="@(ColumnActive ? "0" : "-1")" @ref="_section">
+<section class="board-column"
+         id="@PanelId"
+         role="@(Narrow ? "tabpanel" : null)"
+         aria-labelledby="@(Narrow ? TabId : HeadingId)"
+         aria-describedby="@CountId"
+         data-status-id="@StatusIdText"
+         data-pager-selected="@Selected"
+         hidden="@(Narrow && !Selected)"
+         tabindex="@(ColumnActive ? "0" : "-1")"
+         @ref="_section">
     <div class="board-column__head">
         <h2 class="type-column-head board-column__name" id="@HeadingId">@Name</h2>
         <span class="type-meta column-count" aria-hidden="true">@Total</span>
@@ -233,6 +246,14 @@
     [Parameter]
     public EventCallback OnShowMore { get; set; }
 
+    /// <summary>Whether the viewport is below 768px: the column is the Status pager's tabpanel (story 2.11).</summary>
+    [Parameter]
+    public bool Narrow { get; set; }
+
+    /// <summary>Whether the Status pager shows this column - true for exactly one column at every width (story 2.11).</summary>
+    [Parameter]
+    public bool Selected { get; set; }
+
     /// <summary>The Space's Labels by id, so each card can name the Labels it carries (story 2.4).</summary>
     [Parameter]
     public IReadOnlyDictionary<Guid, LabelResponse> Labels { get; set; } = new Dictionary<Guid, LabelResponse>();
@@ -242,6 +263,11 @@
     public RenderFragment? ChildContent { get; set; }
 
     private string HeadingId => "h" + StatusId.ToString("N", System.Globalization.CultureInfo.InvariantCulture);
+
+    // The pager's ids (StatusPager): the tab that labels this panel, and this panel, which the tab controls.
+    private string TabId => StatusPager.TabIdOf(StatusId);
+
+    private string PanelId => StatusPager.PanelIdOf(StatusId);
 
     private string StatusIdText => StatusId.ToString("D", System.Globalization.CultureInfo.InvariantCulture);
 

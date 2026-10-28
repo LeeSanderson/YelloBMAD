@@ -593,18 +593,38 @@
 
 /*
     THE CONTEXT BAR'S PROJECT NAME, on the Board (DESIGN.md:454): metadata, muted, after the Space name.
-    Dropped at 768-1279px, where the bar has the least room for it (EXPERIENCE.md:413-419); the Role chip
-    is never dropped. The breakpoints are in em - 48em and 80em against the 16px initial size - so no px
-    literal enters the corpus. Below 768px is story 2.11's.
+    Dropped below 1280px (story 2.11, AC6, AC16, open question 8 (a); EXPERIENCE.md:413-419): the drop order
+    is the Project name first, then the switcher's "Switch Space" label, and NEVER the Role chip. The
+    breakpoints are in em - 30em, 48em and 80em against the 16px initial size - so no px literal enters the
+    corpus.
 */
 .context-bar__project {
     color: var(--text-muted);
     overflow-wrap: anywhere;
 }
 
-@media (min-width: 48em) and (max-width: 79.9375em) {
+/* A long Space name wraps inside the switcher rather than widening the bar (AC16): never an ellipsis, which loses content. */
+.context-bar__space-name {
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 79.9375em) {
     .context-bar__project {
         display: none;
+    }
+}
+
+/*
+    Below 480px "Switch Space" goes VISUALLY only (open question 8 (a)): clipped as .visually-hidden is, so it stays in the
+    switcher button's accessible name. The bar still wraps rather than scrolling, and nothing goes behind a menu (UX-DR9).
+*/
+@media (max-width: 29.9375em) {
+    .context-bar__switch-label {
+        position: absolute;
+        inset-inline: 0;
+        overflow: hidden;
+        white-space: nowrap;
+        clip-path: inset(50%);
     }
 }
 
@@ -668,6 +688,79 @@
     color: var(--text-primary);
     border: var(--border-hairline-width) solid var(--border-hairline);
     border-radius: var(--radius-md);
+}
+
+/*
+    At 1280px and wider every column shares the row (story 2.11, AC1, AC17, open question 9 (a)): three to five Statuses all
+    show without a horizontal Board scroll - 5 x 14rem fits 1280px less the Board's padding and gutters. Between 768px and
+    1279px the 17rem columns and the row's own horizontal scroll stay.
+*/
+@media (min-width: 80em) {
+    .board-column {
+        flex: 1 1 0;
+        inline-size: auto;
+        min-inline-size: 14rem;
+    }
+}
+
+/*
+    THE STATUS PAGER (story 2.11; UX-DR20, UX-DR41; open questions 1 (a) and 12 (a)). Below 768px the Board is one column at
+    a time: every unselected column is hidden BY CONSTRUCTION at this media query - the selected one carries
+    data-pager-selected at every width - so the first paint at 320px is already one column, before .NET knows the width.
+    The column holding focus is spared until .NET has selected it, so crossing the breakpoint never drops focus on the page
+    body (AC14). The visible column takes the full width and the row has no horizontal scroll: 1.4.10's horizontal axis is
+    eliminated rather than exempted (AC7). The query is js/board-keys.js's too, and the two must agree.
+*/
+@media (max-width: 47.9375em) {
+    .board__columns {
+        overflow-x: visible;
+    }
+
+    .board-column {
+        flex: 1 1 auto;
+        inline-size: auto;
+    }
+
+    .board-column:not([data-pager-selected]):not(:focus-within) {
+        display: none;
+    }
+}
+
+/*
+    The tabs reuse button-secondary's quiet look on a wrapping row that never scrolls sideways (AC18). The selected tab is
+    drawn by the 2px emphasis border and primary text - never by colour alone (1.4.1) - and aria-selected says it. The 2px
+    chip radius (deferred-work.md:36). No transition, so reduced motion has nothing to neutralise.
+*/
+.status-pager {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.status-pager__tab {
+    display: inline-flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+    min-inline-size: var(--target-min);
+    min-block-size: var(--target-min);
+    appearance: none;
+    background-color: transparent;
+    color: var(--text-muted);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-sm);
+    padding-block: var(--space-control-pad-y);
+    padding-inline: var(--space-control-pad-x);
+    cursor: pointer;
+}
+
+.status-pager__tab[aria-selected="true"] {
+    color: var(--text-primary);
+    border-width: var(--border-emphasis-width);
+}
+
+.status-pager__name {
+    overflow-wrap: anywhere;
 }
 
 /* The cold-load skeleton: a column's surface holding no text, given its depth by spacing alone. */

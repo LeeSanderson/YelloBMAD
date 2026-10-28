@@ -30,6 +30,17 @@
     FOCUS is reported as it moves into a stop (or a card's actions control), so the Board keeps exactly one roving tab stop
     whichever route moved focus - a click, a panel closing, a move's arrival - and as it leaves the Board, so a carry never
     outlives focus.
+
+    THE VIEWPORT (story 2.11, open question 1 (a)): below 768px the Board shows one column at a time behind the Status pager.
+    CSS hides the unselected columns by construction at the same media query (components.css, "THE STATUS PAGER"), so the
+    first paint is already one column; this module watches the query and tells .NET on attaching and on every crossing, so
+    .NET renders the pager's ARIA and behaviour. Each key carries whether the viewport is narrow, read at the key as the
+    direction is. The query is in em, as the CSS one is - 47.9375em is 767px against the 16px initial size - and the two
+    must agree (DesignFoundationGateTests.SmallViewport holds the CSS literal).
+
+    THE STATUS PAGER'S TABS ([role=tab][data-pager-status]; WAI-ARIA tabs pattern, automatic activation): ←/→, Home and End
+    are prevented and reported with the Board's computed direction, so they mirror under RTL; .NET selects the tab and moves
+    focus to it. Every other key on a tab keeps its native meaning (Tab leaves the tablist, Enter and Space click it).
 */
 
 const CARD = '.task-card';
@@ -44,22 +55,34 @@ const ITEM = '[role="option"], [role="menuitem"]';
 
 const ARROWS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
 const LIST_KEYS = new Set(['ArrowUp', 'ArrowDown', 'Home', 'End']);
+const TAB = '[role="tab"][data-pager-status]';
+const PAGER_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'Home', 'End']);
+
+// Below 768px: the same query as components.css's pager rule, in em (see the header).
+const NARROW = '(max-width: 47.9375em)';
 const MODIFIERS = new Set(['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'CapsLock']);
 
 class BoardKeys {
     #root;
     #board;
     #swallowKeyUp = null;
+    #media;
+    #disposed = false;
 
     constructor(root, board) {
         this.#root = root;
         this.#board = board;
+        this.#media = window.matchMedia(NARROW);
 
         root.addEventListener('keydown', this.#onKeyDown);
         root.addEventListener('keyup', this.#onKeyUp);
         root.addEventListener('focusin', this.#onFocusIn);
         root.addEventListener('focusout', this.#onFocusOut);
         root.addEventListener('contextmenu', this.#onContextMenu);
+        this.#media.addEventListener('change', this.#onMedia);
+
+        // The width as it is now: .NET does not know it until told.
+        this.#onMedia();
     }
 
     /**
@@ -77,6 +100,9 @@ class BoardKeys {
      * Lets go of every listener: the Board is gone.
      */
     dispose() {
+        // A disposed module never calls into .NET again (story 2.11, Task 2 (c)).
+        this.#disposed = true;
+        this.#media.removeEventListener('change', this.#onMedia);
         this.#root.removeEventListener('keydown', this.#onKeyDown);
         this.#root.removeEventListener('keyup', this.#onKeyUp);
         this.#root.removeEventListener('focusin', this.#onFocusIn);
@@ -90,6 +116,10 @@ class BoardKeys {
         }
 
         if (this.#inList(event)) {
+            return;
+        }
+
+        if (this.#onTabKey(event)) {
             return;
         }
 
@@ -151,6 +181,32 @@ class BoardKeys {
             event.stopPropagation();
         }
     }
+
+    /**
+     * A key on one of the Status pager's tabs: the pager's own keys are prevented and reported. Returns whether the target
+     * was a tab.
+     */
+    #onTabKey(event) {
+        const target = event.target;
+
+        if (!(target instanceof Element) || !target.matches(TAB) || !this.#root.contains(target)) {
+            return false;
+        }
+
+        if (PAGER_KEYS.has(event.key) && !event.shiftKey) {
+            event.preventDefault();
+            this.#invoke('PagerKey', event.key, this.#rightToLeft(), target.getAttribute('data-pager-status'));
+        }
+
+        return true;
+    }
+
+    #onMedia = () => {
+        const active = document.activeElement;
+        const fromPager = active instanceof Element && active.matches(TAB) && this.#root.contains(active);
+
+        this.#invoke('Narrow', this.#media.matches, fromPager);
+    };
 
     #onKeyUp = event => {
         if (event.key === ' ' && this.#swallowKeyUp !== null) {
@@ -279,12 +335,18 @@ class BoardKeys {
     };
 
     #tell(key, stop) {
-        const rightToLeft = getComputedStyle(this.#root).direction === 'rtl';
+        this.#invoke('Key', key, this.#rightToLeft(), this.#media.matches, stop.taskId, stop.statusId);
+    }
 
-        this.#invoke('Key', key, rightToLeft, stop.taskId, stop.statusId);
+    #rightToLeft() {
+        return getComputedStyle(this.#root).direction === 'rtl';
     }
 
     #invoke(method, ...args) {
+        if (this.#disposed) {
+            return;
+        }
+
         this.#board.invokeMethodAsync(method, ...args).catch(() => {
             // The Board has gone (disposed or purged): there is nobody left to tell.
         });

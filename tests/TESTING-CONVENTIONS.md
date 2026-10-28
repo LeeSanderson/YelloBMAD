@@ -339,6 +339,32 @@ they share.
   and the wait matches either.
 - **Hold → assert → release → assert** for every keyboard drop, as for the picker and the drag.
 
+### Viewport and the pager - added by story 2.11
+
+`SmallViewportTests` drive the Board at each breakpoint; `TextSpacingTests` and `TouchDragTests` carry
+the pager's 1.4.12 and touch cases.
+
+- **State the viewport in every case** with `SetViewportSizeAsync`. The suite's sizes are 320×256
+  (1280×1024 at 400% - Playwright cannot apply page zoom, and the CSS viewport is what 1.4.10
+  measures), 375×667 (a phone), 1024×800 (the middle band, with five Statuses so the row scrolls) and
+  1280×800 (the wide band). The default context is 1280×720. The breakpoints themselves are 48em and
+  80em (768px and 1280px); `47.9375em` is 767px.
+- **Wait for the tablist before acting below 768px.** The CSS hides every unselected column from the
+  first paint, but the tablist and the `tabpanel`/`hidden` ARIA appear only once `js/board-keys.js`
+  has measured the viewport and told the Board, after its first render. Wait for
+  `main [role='tablist']`.
+- **Select a tab before acting in a hidden column.** A hidden column is `display: none`: its cards
+  have no box and cannot be clicked, focused or dragged to. Click its tab (or focus a tab and press
+  the arrows, `Home` or `End`), then wait until `[role='tab'][aria-selected='true']` names it. An
+  existing case that relied on a second column being visible at 320px must do this first. Reading a
+  hidden column's titles with `AllTextContentsAsync` still works.
+- **The 1.4.10 measurement** is `SmallViewportTests.Reflow`: `document.scrollingElement` must not be
+  wider than its client, and no element in `main`, the context bar or an open dialog whose
+  `overflow-x` is `auto` or `scroll` may be wider than its client. Run it in every tab and with the
+  Task detail panel open.
+- **Force right to left with `dir="rtl"`** on `<html>` after the Board loads, as for the keyboard: the
+  pager's arrows and the drag's direction mirror; the Status order never does.
+
 ### Why it exists
 
 Story 1.3 shipped the first rendered surface and closed with 136 tests passing. The client did not
