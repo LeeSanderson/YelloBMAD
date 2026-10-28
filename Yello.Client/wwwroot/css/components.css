@@ -1101,6 +1101,11 @@
     color: var(--text-primary);
 }
 
+/* Empty, the status region stays in the accessibility tree but takes no place in the Board's flow (no gap). */
+.board__notice:empty {
+    position: absolute;
+}
+
 .picker__option[aria-checked="true"] {
     font-weight: var(--type-task-title-weight);
 }

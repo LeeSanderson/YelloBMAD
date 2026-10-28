@@ -928,9 +928,10 @@ internal sealed class FakeYelloApi
     }
 
     /// <summary>
-    /// A move body read as the Host reads it: unreadable, not an object, carrying a <c>positionKey</c> member, or an
-    /// <c>afterTaskId</c> that is not a GUID is <c>invalid-task-edit</c>; a <c>statusId</c> outside the Board is
-    /// <c>invalid-task-status</c>; <c>afterTaskId</c> absent or <c>null</c> is the top.
+    /// A move body read as the Host reads it (<c>TaskMoveBody</c>): unreadable, not an object, carrying a
+    /// <c>positionKey</c> member, leaving out either member, or an <c>afterTaskId</c> that is neither a GUID nor <c>null</c>
+    /// is <c>invalid-task-edit</c>; a <c>statusId</c> that is not one of the Board's is <c>invalid-task-status</c>;
+    /// <c>afterTaskId: null</c> is the top.
     /// </summary>
     private static (string? Refusal, FakeColumn? Destination, Guid? AfterTaskId) ReadMove(FakeBoard board, string body)
     {
@@ -947,17 +948,20 @@ internal sealed class FakeYelloApi
             return (ProblemTypes.InvalidTaskEdit, null, null);
         }
 
-        if (members.ValueKind != JsonValueKind.Object || members.TryGetProperty("positionKey", out _))
+        if (members.ValueKind != JsonValueKind.Object
+            || members.TryGetProperty("positionKey", out _)
+            || !members.TryGetProperty("statusId", out var statusValue)
+            || !members.TryGetProperty("afterTaskId", out var afterValue))
         {
             return (ProblemTypes.InvalidTaskEdit, null, null);
         }
 
-        if (!members.TryGetProperty("statusId", out var statusValue) || ColumnOf(board, statusValue) is not { } destination)
+        if (ColumnOf(board, statusValue) is not { } destination)
         {
             return (ProblemTypes.InvalidTaskStatus, null, null);
         }
 
-        if (!members.TryGetProperty("afterTaskId", out var afterValue) || afterValue.ValueKind == JsonValueKind.Null)
+        if (afterValue.ValueKind == JsonValueKind.Null)
         {
             return (null, destination, null);
         }

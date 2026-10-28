@@ -24,6 +24,11 @@ namespace Yello.Infrastructure.Persistence.Migrations;
 /// become a duplicate. SQL Server cannot alter a column's collation while an index is built on it, so the index is
 /// dropped and built again around the change, in the same migration's transaction.
 /// </para>
+/// <para>
+/// <b><c>Down</c> is not safe on every database</b>: once BIN2 has admitted two addresses that only the old collation
+/// equates (full-width and ASCII letters, say), rebuilding the unique index under the database default would fail. So
+/// <c>Down</c> first looks for such a pair and stops with an error naming the cause, before it changes anything.
+/// </para>
 /// </remarks>
 public partial class EmailIndexBinaryCollation : Migration
 {
@@ -62,6 +67,10 @@ public partial class EmailIndexBinaryCollation : Migration
     protected override void Down(MigrationBuilder migrationBuilder)
     {
         ArgumentNullException.ThrowIfNull(migrationBuilder);
+
+        migrationBuilder.Sql(
+            "IF EXISTS (SELECT 1 FROM dbo.[Account] GROUP BY NormalizedEmailAddress COLLATE DATABASE_DEFAULT HAVING COUNT(*) > 1) "
+            + "THROW 50000, 'EmailIndexBinaryCollation cannot be reverted: two Accounts hold addresses the database default collation treats as equal.', 1;");
 
         migrationBuilder.DropIndex(name: Index, table: Table);
 

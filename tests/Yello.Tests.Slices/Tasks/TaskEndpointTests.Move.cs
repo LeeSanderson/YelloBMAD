@@ -436,15 +436,17 @@ public sealed partial class TaskEndpointTests
     }
 
     /// <summary>
-    /// MOV-08 (AC9, Q2 (a)) - an unreadable body, a body with no <c>statusId</c>, a <c>statusId</c> that is not an id, and
-    /// a body carrying a <c>positionKey</c> member each answer a documented <c>400</c> problem, never a <c>500</c>, and
-    /// nothing moves: a client can never believe it wrote a key.
+    /// MOV-08 (AC9, Q2 (a)) - an unreadable body, a body with no <c>statusId</c>, a body with no <c>afterTaskId</c> (the
+    /// position has no default), a <c>statusId</c> that is not an id, and a body carrying a <c>positionKey</c> member each
+    /// answer a documented <c>400</c> problem, never a <c>500</c>, and nothing moves: a client can never believe it wrote a
+    /// key.
     /// </summary>
     /// <param name="shape">Which malformed body is sent.</param>
     /// <returns>A task.</returns>
     [Theory]
     [InlineData("unreadable")]
     [InlineData("no statusId")]
+    [InlineData("no afterTaskId")]
     [InlineData("statusId not an id")]
     [InlineData("positionKey")]
     [Trait("Requirement", "FR-35")]
@@ -468,6 +470,7 @@ public sealed partial class TaskEndpointTests
             {
                 "unreadable" => "{ \"statusId\": ",
                 "no statusId" => "{ \"afterTaskId\": null }",
+                "no afterTaskId" => $$"""{ "statusId": "{{status}}" }""",
                 "statusId not an id" => "{ \"statusId\": \"not-an-id\", \"afterTaskId\": null }",
                 _ => $$"""{ "statusId": "{{status}}", "afterTaskId": null, "positionKey": "0" }""",
             };
@@ -479,6 +482,12 @@ public sealed partial class TaskEndpointTests
         Assert.NotNull(board);
         Assert.True(answer?.StatusCode == HttpStatusCode.BadRequest, $"{shape}: {answer?.StatusCode} {answer?.Body}");
         Assert.StartsWith("urn:yello:problem:", Problem(answer!)?.Type ?? string.Empty, StringComparison.Ordinal);
+
+        if (shape == "no afterTaskId")
+        {
+            Assert.Equal(ProblemTypes.InvalidTaskEdit, Problem(answer!)?.Type);
+        }
+
         Assert.Equal(before, await PlacementsAsync(database, owner.SpaceId, board.ProjectId));
         Assert.Empty(await RefusalKindsAsync(database, owner.AccountId, owner.SpaceId));
     }

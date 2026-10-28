@@ -67,11 +67,9 @@
     <div class="board">
         <PageHeading>@_projectName</PageHeading>
 
-        @if (_boardNotice is { } notice)
-        {
-            @* A refused move made from a card's menu, said on the Board where it was made (story 2.6). *@
-            <p class="type-meta board__notice">@notice</p>
-        }
+        @* A refused move made from a card's menu, said on the Board where it was made (story 2.6). Present from the start,
+           as the panel's refusal is, so its words are announced when they arrive. *@
+        <p class="type-meta board__notice" role="status">@_boardNotice</p>
 
         @if (IsEmpty)
         {
@@ -320,6 +318,38 @@
         catch (JsonException)
         {
             await RefuseUnlessLeftAsync(generation);
+        }
+    }
+
+    /// <summary>
+    /// After <c>task-position-unavailable</c> the Board is read again (story 2.6, open question 3 (a)): the neighbour the
+    /// move named has moved or gone, and the picker must stop offering it. Each column takes the server's Tasks and true
+    /// total, and the replicas are re-admitted over them. A read that fails leaves the Board as it was - the refusal has
+    /// already been said - and nothing is announced: the move's own sentence follows.
+    /// </summary>
+    private async Task RereadBoardAsync(int generation)
+    {
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(BoardRoutes.BoardOf(SpaceId, ProjectId), UriKind.Relative), token);
+
+            if (!response.IsSuccessStatusCode || generation != _generation || token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (await response.Content.ReadFromJsonAsync<BoardResponse>(JsonOptions, token) is { } board && generation == _generation)
+            {
+                _columns = [.. board.Columns.Select(column => new ColumnState(column.StatusId, column.Name, column.Total, [.. column.Tasks.Where(task => !_deleted.Contains(task.Id))]))];
+                UseStatuses(board.Columns.Select(column => new TaskStatusOption(column.StatusId, column.Name)));
+                Readmit();
+            }
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // Left as it was; see above.
         }
     }
 

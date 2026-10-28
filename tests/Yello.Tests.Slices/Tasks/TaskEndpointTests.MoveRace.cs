@@ -275,6 +275,52 @@ public sealed partial class TaskEndpointTests
     }
 
     /// <summary>
+    /// RACE-M4 (b) (AC11) - the test holds a move of the Task in the product's shape (the range, the Task row on its
+    /// clustered key, then the row moved to the top of the empty second column); a real Status <c>PATCH</c> of the same
+    /// Task to the third column queues on the range in its own <c>MAX(CASE…)</c> shape; the test commits; the edit answers
+    /// <c>200</c> - never 1205, never a <c>500</c> - and the Task ends in the third column, the later writer winning by its
+    /// own outcome (code review of story 2.6: M4 (a) held a move, not the edit's own statement).
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AR-34")]
+    [Trait("Requirement", "FR-20")]
+    public async Task A_Status_edit_queued_behind_a_move_of_the_same_Task_lands_after_it_commits()
+    {
+        var database = Available();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Actor? owner = null;
+        MoveBoard? board = null;
+        WireResponse? answer = null;
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            owner = await RegisterAsync(client, database);
+            board = await MoveBoardAsync(database, owner, todo: 2, doing: 0);
+
+            Assert.Equal(HttpStatusCode.OK, (await BoardAsync(owner, owner.SpaceId, board.ProjectId)).StatusCode);
+
+            await using var holder = await database.OpenForSpaceAsync(owner.SpaceId, cancellationToken);
+            await using var observer = await database.OpenWithoutSpaceContextAsync(cancellationToken);
+            await using var held = await holder.BeginTransactionAsync(cancellationToken);
+
+            await HoldMoveAsync(holder, held, board.ProjectId, board.Todo[0], board.Doing, PositionKey.First, cancellationToken);
+
+            var racing = EditTaskAsync(owner, owner.SpaceId, board.Todo[0], Body(new { statusId = board.Done }));
+
+            await WaitUntilBlockedOnALockAsync(observer, 1, racing, cancellationToken);
+            await held.CommitAsync(cancellationToken);
+
+            answer = await racing;
+        });
+
+        Assert.NotNull(owner);
+        Assert.NotNull(board);
+        Assert.True(answer?.StatusCode == HttpStatusCode.OK, $"{answer?.StatusCode} {answer?.Body}");
+        Assert.Equal(board.Done, (await RowAsync(database, owner.SpaceId, board.Todo[0]))?.StatusId);
+    }
+
+    /// <summary>
     /// RACE-M5 (a) (AC11) - the test holds a deletion of the Task, uncommitted (range, row, delete); a move of it queues; the
     /// test commits; the move answers <c>404 not-available</c> - never <c>200</c> on a Task that is gone (the 2.3 review
     /// finding, repeated for the move), never a <c>500</c> - and no row is written back.

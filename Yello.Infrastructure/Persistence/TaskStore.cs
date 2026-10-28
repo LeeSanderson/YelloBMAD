@@ -65,8 +65,8 @@ namespace Yello.Infrastructure.Persistence;
 /// (AD-15). A move to where the Task already is writes nothing but still took the locks. Measured by story 2.6's
 /// RACE-M1..M8, which hold each side and wait on the other: reading the neighbours before the range, or the range
 /// without its hints, is caught 3/3 by the read race (RACE-M2); the row's <c>INDEX(1)</c> and its
-/// <c>UPDLOCK, HOLDLOCK</c> are each masked 0/3 - the range already serialises every key placer - and kept as every
-/// Task writer's row lock.
+/// <c>UPDLOCK, HOLDLOCK</c> are each masked 0/3 - the range already serialises every key placer - and kept as the row
+/// lock the Labels edit and the deletion take too. A Status edit takes no row lock: it re-reads the row under the range.
 /// </para>
 /// <para>
 /// <b>Saves its own effect</b>, as every store does, so the idempotency record is the only thing the

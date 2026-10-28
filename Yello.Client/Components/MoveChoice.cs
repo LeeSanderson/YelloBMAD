@@ -8,7 +8,15 @@ namespace Yello.Client.Components;
 /// </summary>
 /// <param name="StatusId">The destination Status.</param>
 /// <param name="AfterTaskId">The Task to land after, or <c>null</c> for the top.</param>
-public sealed record MoveChoice(Guid StatusId, Guid? AfterTaskId);
+public sealed record MoveChoice(Guid StatusId, Guid? AfterTaskId)
+{
+    /// <summary>
+    /// The body the move is sent with: the <see cref="MoveTaskRequest"/> contract itself, so the wire members are the
+    /// contract's and never a second spelling of them - <c>afterTaskId</c> written out as <c>null</c> for the top.
+    /// </summary>
+    /// <returns>The request.</returns>
+    public MoveTaskRequest ToRequest() => new(StatusId, AfterTaskId);
+}
 
 /// <summary>
 /// One column as the Move picker offers it: its Status, its name and the Tasks it holds now, in the Board's order.

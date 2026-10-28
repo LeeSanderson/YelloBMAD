@@ -87,6 +87,10 @@ public sealed partial class BoardView
     private readonly HashSet<Guid> _movesFromMenu = [];
     private string? _boardNotice;
 
+    // Story 2.6, open question 3 (a): a move refused because its position changed re-reads the Board once its answer is
+    // settled, so the picker stops offering a neighbour that has moved or gone.
+    private bool _rereadBoard;
+
     /// <summary>
     /// The four attributes a Task edit can change.
     /// </summary>
@@ -173,6 +177,7 @@ public sealed partial class BoardView
         _movedCard = null;
         _movesFromMenu.Clear();
         _boardNotice = null;
+        _rereadBoard = false;
     }
 
     /// <summary>
@@ -288,6 +293,12 @@ public sealed partial class BoardView
     private void AnnounceMove(Guid taskId, EditOutcome outcome)
     {
         var fromMenu = _movesFromMenu.Remove(taskId);
+
+        // The reflow was the optimistic placement's; once the answer is in, the card is no longer the one a move just placed.
+        if (_movedCard == taskId)
+        {
+            _movedCard = null;
+        }
 
         if (outcome == EditOutcome.Gone || Locate(taskId) is not { } found)
         {
@@ -524,6 +535,12 @@ public sealed partial class BoardView
             }
         }
 
+        if (generation == _generation && _rereadBoard)
+        {
+            _rereadBoard = false;
+            await RereadBoardAsync(generation);
+        }
+
         if (generation == _generation)
         {
             Place(taskId, replica);
@@ -643,14 +660,53 @@ public sealed partial class BoardView
 
             default:
                 replica.Queued.Remove(attribute);
-                SayInPanel(taskId, RefusalText.Of(Localizer, answer.Problem));
-
-                if (answer.Problem?.Type == ProblemTypes.InvalidTaskLabels)
-                {
-                    await RefreshLabelsAsync(generation, token);
-                }
+                SayInPanel(taskId, attribute, RefusalText.Of(Localizer, answer.Problem));
+                await AfterRefusalAsync(answer.Problem?.Type, generation, token);
 
                 return EditOutcome.Refused;
+        }
+    }
+
+    /// <summary>
+    /// What a refusal's type says about the Board this tab holds: after <c>invalid-task-labels</c> the Label list is read
+    /// again; after <c>task-position-unavailable</c> the Board is, once the move's answer is settled (story 2.6, open
+    /// question 3 (a)).
+    /// </summary>
+    private async Task AfterRefusalAsync(string? problemType, int generation, CancellationToken token)
+    {
+        if (problemType == ProblemTypes.InvalidTaskLabels)
+        {
+            await RefreshLabelsAsync(generation, token);
+        }
+
+        if (problemType == ProblemTypes.TaskPositionUnavailable)
+        {
+            _rereadBoard = true;
+        }
+    }
+
+    /// <summary>
+    /// After the Board is read again: a Task with nothing outstanding takes the server's values as admitted, and one with a
+    /// change still out keeps it laid over them.
+    /// </summary>
+    private void Readmit()
+    {
+        foreach (var (taskId, replica) in _replicas)
+        {
+            if (Locate(taskId) is not { } found)
+            {
+                continue;
+            }
+
+            if (replica.InFlight.Count == 0 && replica.Queued.Count == 0)
+            {
+                replica.Admitted = found.Column.Tasks[found.Index];
+                replica.Relocated = false;
+            }
+            else
+            {
+                Place(taskId, replica);
+            }
         }
     }
 
@@ -690,23 +746,23 @@ public sealed partial class BoardView
 
         replica.InFlight.Remove(attribute);
         replica.Queued.Remove(attribute);
-        SayInPanel(taskId, Localizer["TaskEditNotSent"]);
+        SayInPanel(taskId, attribute, Localizer["TaskEditNotSent"]);
 
         return EditOutcome.Unanswered;
     }
 
     /// <summary>
     /// Says a refusal in the panel - only when the panel is open on the Task it is about, never in another
-    /// Task's panel opened since the edit was sent. A move made from a card's menu says it on the Board instead, where it
-    /// was made (story 2.6, open question 8 (c)).
+    /// Task's panel opened since the edit was sent. A move made from a card's menu says its own refusal on the Board
+    /// instead, where it was made (story 2.6, open question 8 (c)); another attribute's refusal is never said there.
     /// </summary>
-    private void SayInPanel(Guid taskId, string words)
+    private void SayInPanel(Guid taskId, TaskAttribute attribute, string words)
     {
         if (_openTaskId == taskId)
         {
             _panelRefusal = words;
         }
-        else if (_movesFromMenu.Contains(taskId))
+        else if (attribute == TaskAttribute.Status && _movesFromMenu.Contains(taskId))
         {
             _boardNotice = words;
         }
@@ -879,13 +935,14 @@ public sealed partial class BoardView
             : Equals(first, second);
 
     /// <summary>
-    /// The body a change is sent with: a merge patch naming its one member, or - for a move - <c>MoveTaskRequest</c>'s two
-    /// members, the destination Status and the neighbour, never a key (story 2.6, open question 2 (a)).
+    /// The body a change is sent with: a merge patch naming its one member, or - for a move - the move contract itself
+    /// (<c>MoveChoice.ToRequest</c>), the destination Status and the neighbour, never a key (story 2.6, open
+    /// question 2 (a)).
     /// </summary>
-    private static Dictionary<string, object?> BodyOf(TaskAttribute attribute, object? value) =>
+    private static object BodyOf(TaskAttribute attribute, object? value) =>
         value is MoveChoice move
-            ? new(StringComparer.Ordinal) { ["statusId"] = move.StatusId, ["afterTaskId"] = move.AfterTaskId }
-            : new(StringComparer.Ordinal) { [MemberOf(attribute)] = value };
+            ? move.ToRequest()
+            : new Dictionary<string, object?>(StringComparer.Ordinal) { [MemberOf(attribute)] = value };
 
     private static string MemberOf(TaskAttribute attribute) => attribute switch
     {

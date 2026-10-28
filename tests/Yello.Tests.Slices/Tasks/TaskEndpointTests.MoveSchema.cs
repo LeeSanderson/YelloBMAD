@@ -2,8 +2,10 @@ using System.Net;
 using System.Text;
 using Microsoft.Data.SqlClient;
 using Xunit;
+using Yello.Contracts.Accounts;
 using Yello.Domain.Accounts;
 using Yello.Tests.Shared;
+using Yello.Tests.Slices.Accounts.RegisterAccount;
 using static Yello.Tests.Slices.Tasks.DeleteWire;
 using static Yello.Tests.Slices.Tasks.MoveWire;
 using static Yello.Tests.Slices.Tasks.TaskWire;
@@ -138,7 +140,8 @@ public sealed partial class TaskEndpointTests
     /// SCH-604 (AC16, Q12 (a), FR-1) - an address <see cref="EmailAddressNormalisation.Normalise"/> maps to a <b>different</b>
     /// string from a registered one - the same letters in full-width forms - is not equal to it in the column the unique
     /// index compares, so it could never collide with the registered Account (AD-23 would answer that collision as a
-    /// silent <c>204</c>). Under the default, width-insensitive collation the two compare equal and this fails.
+    /// silent <c>204</c>): registered through the product, it becomes an Account of its own. Under the default,
+    /// width-insensitive collation the two compare equal and this fails.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -148,21 +151,28 @@ public sealed partial class TaskEndpointTests
     {
         var database = Available();
         Actor? owner = null;
+        string? stored = null;
+        HttpStatusCode? lookalike = null;
 
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
+            stored = await StoredAddressAsync(database, owner.AccountId);
+
+            // The full-width form registered through the product (code review of story 2.6): the unique index must admit it
+            // as a second Account rather than answer it as AD-23's silent duplicate.
+            var session = new WireSession(client);
+
+            await session.FetchAntiforgeryTokenAsync();
+            lookalike = (await session.RegisterAsync(new RegisterAccountRequest("Wide-" + Guid.NewGuid().ToString("N")[..8], FullWidth(stored), Password))).StatusCode;
         });
 
         Assert.NotNull(owner);
+        Assert.NotNull(stored);
+        Assert.Equal(HttpStatusCode.NoContent, lookalike);
 
         await using var connection = await database.OpenWithoutSpaceContextAsync(TestContext.Current.CancellationToken);
-        await using var read = connection.CreateCommand();
 
-        read.CommandText = "SELECT NormalizedEmailAddress FROM dbo.[Account] WHERE Id = @id";
-        read.Parameters.Add(new SqlParameter("@id", owner.AccountId));
-
-        var stored = Assert.IsType<string>(await read.ExecuteScalarAsync(TestContext.Current.CancellationToken));
         var widened = EmailAddressNormalisation.Normalise(FullWidth(stored));
 
         // Anchor: the function really does map the two to different strings.
@@ -170,18 +180,42 @@ public sealed partial class TaskEndpointTests
 
         await using var probe = connection.CreateCommand();
 
-        probe.CommandText = "SELECT COUNT(*) FROM dbo.[Account] WHERE NormalizedEmailAddress = @widened";
+        probe.CommandText = "SELECT COUNT(*) FROM dbo.[Account] WHERE Id = @owner AND NormalizedEmailAddress = @widened";
+        probe.Parameters.Add(new SqlParameter("@owner", owner.AccountId));
         probe.Parameters.Add(new SqlParameter("@widened", System.Data.SqlDbType.NVarChar, 256) { Value = widened });
 
+        // The registered Account is not equal to the lookalike in the column the index compares.
         Assert.Equal(0, Convert.ToInt32(await probe.ExecuteScalarAsync(TestContext.Current.CancellationToken), System.Globalization.CultureInfo.InvariantCulture));
+
+        // And the lookalike was stored as an Account of its own - under a width-insensitive index its insert collides and
+        // nothing but the registered Account exists.
+        await using var second = connection.CreateCommand();
+
+        second.CommandText = "SELECT COUNT(*) FROM dbo.[Account] WHERE Id <> @owner AND NormalizedEmailAddress = @widened";
+        second.Parameters.Add(new SqlParameter("@owner", owner.AccountId));
+        second.Parameters.Add(new SqlParameter("@widened", System.Data.SqlDbType.NVarChar, 256) { Value = widened });
+
+        Assert.Equal(1, Convert.ToInt32(await second.ExecuteScalarAsync(TestContext.Current.CancellationToken), System.Globalization.CultureInfo.InvariantCulture));
 
         // Anchor: the exact stored value is found, so a zero above is about the collation, not the query.
         await using var exact = connection.CreateCommand();
 
-        exact.CommandText = "SELECT COUNT(*) FROM dbo.[Account] WHERE NormalizedEmailAddress = @stored";
+        exact.CommandText = "SELECT COUNT(*) FROM dbo.[Account] WHERE Id = @owner AND NormalizedEmailAddress = @stored";
+        exact.Parameters.Add(new SqlParameter("@owner", owner.AccountId));
         exact.Parameters.Add(new SqlParameter("@stored", System.Data.SqlDbType.NVarChar, 256) { Value = stored });
 
         Assert.Equal(1, Convert.ToInt32(await exact.ExecuteScalarAsync(TestContext.Current.CancellationToken), System.Globalization.CultureInfo.InvariantCulture));
+    }
+
+    private static async Task<string> StoredAddressAsync(RegistrationDatabase database, Guid accountId)
+    {
+        await using var connection = await database.OpenWithoutSpaceContextAsync(TestContext.Current.CancellationToken);
+        await using var read = connection.CreateCommand();
+
+        read.CommandText = "SELECT NormalizedEmailAddress FROM dbo.[Account] WHERE Id = @id";
+        read.Parameters.Add(new SqlParameter("@id", accountId));
+
+        return Assert.IsType<string>(await read.ExecuteScalarAsync(TestContext.Current.CancellationToken));
     }
 
     /// <summary>

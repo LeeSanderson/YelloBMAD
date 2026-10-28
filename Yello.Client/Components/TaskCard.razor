@@ -44,7 +44,7 @@
                     aria-label="@string.Format(CultureInfo.CurrentCulture, Localizer["TaskActions"], Item.Title)"
                     aria-haspopup="menu"
                     aria-expanded="@(MenuOpen ? "true" : "false")"
-                    @onclick="OpenMenuAsync"
+                    @onclick="ToggleMenuAsync"
                     @ref="_actions">
                 <svg class="task-card__actions-icon" aria-hidden="true" focusable="false" viewBox="0 0 16 16"><circle cx="3" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="13" cy="8" r="1.5" /></svg>
             </button>
@@ -213,7 +213,12 @@
 
     private Task OpenAsync() => OnOpen.InvokeAsync(Item.Id);
 
-    private Task OpenMenuAsync() => OnMenu.InvokeAsync(Item.Id);
+    // A right-click, the context-menu key or Shift+F10 inside an open menu or picker leaves it as it is - never back to the
+    // menu's first step.
+    private Task OpenMenuAsync() => MenuOpen ? Task.CompletedTask : OnMenu.InvokeAsync(Item.Id);
+
+    // The actions control says aria-expanded, so it closes what it opened (focus returns to it).
+    private Task ToggleMenuAsync() => MenuOpen ? OnMenuClose.InvokeAsync() : OnMenu.InvokeAsync(Item.Id);
 
     /// <summary>
     /// The platform's context-menu key and Shift+F10 open the card's menu (UX-DR24); Esc closes it while it is open. Every

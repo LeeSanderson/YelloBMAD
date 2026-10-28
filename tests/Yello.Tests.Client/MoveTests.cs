@@ -314,6 +314,54 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// E2E-617. AC15, Q3 (a) - a move whose neighbour went while it was out is refused <c>409 task-position-unavailable</c>;
+    /// the card goes back, the copy says so, and the Board is read again, so the column shows the server's Tasks and true
+    /// total and the picker no longer offers the neighbour that is gone (code review of story 2.6).
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-29")]
+    [Trait("Requirement", "UX-DR32")]
+    public async Task A_move_refused_because_its_position_changed_reads_the_Board_again()
+    {
+        var api = TwoSpaces();
+        var tasks = SeedBoard(api, Northwind, Atlas, ["Draft the brief", "Book the room"], ["Review", "Ship"]);
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenBoardAsync(api, page, Northwind, Atlas);
+            await OpenPanelAsync(page, tasks["Draft the brief"].Id);
+
+            var held = api.HoldTaskMoveAsync();
+
+            await MoveFromPanelAsync(page, "Doing", "Position 2, after Review");
+            await held.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+
+            // Another participant deletes the neighbour while the move is out.
+            var doing = api.Boards[(Northwind, Atlas)].Columns[1];
+
+            doing.Tasks.RemoveAll(task => task.Id == tasks["Review"].Id);
+            doing.Total--;
+
+            api.ReleaseTaskMove();
+
+            await page.Locator(Dialog).GetByText(PositionChangedCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.Locator(LiveRegion, new PageLocatorOptions { HasText = "Returned to Todo, position 1." })
+                .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = Timeout });
+
+            Assert.Equal(["Draft the brief", "Book the room"], await TitlesInAsync(page, "Todo"));
+            Assert.Equal(["Ship"], await TitlesInAsync(page, "Doing"));
+            Assert.Equal("1", await TotalOfAsync(page, "Doing"));
+
+            await PanelMoveControl(page).ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await ChooseStatusStepAsync(page, "Doing");
+
+            Assert.Equal(0, await page.Locator(PickerOption, new PageLocatorOptions { HasText = "after Review" }).CountAsync());
+        }
+    }
+
+    /// <summary>
     /// E2E-606. AC15, NFR-5, AR-25 - a move that gets no answer says "Not sent.", reverts the card and the totals, and
     /// announces the return; choosing the same destination again resends the identical body under the same
     /// <c>Idempotency-Key</c>, and that answer lands the card.

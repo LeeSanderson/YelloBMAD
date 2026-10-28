@@ -4,7 +4,7 @@ baseline_commit: 12eba8d
 
 # Story 2.6: Move and reorder a Task by explicit control
 
-Status: review
+Status: done
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-6-move-and-reorder-a-task-by-explicit-control`
@@ -243,6 +243,27 @@ AC1–AC7 are reproduced **verbatim** from `epics.md:1174-1209` (`status: final`
   - [x] `tests/TESTING-CONVENTIONS.md`: the move race pattern (who holds what; the read-race shape), the new counts.
   - [x] Ledger (`deferred-work.md`): CLOSE `:494` (moves and the midpoint built; the lock order measured), `:543` (decided by RACE-M5/M6 plants: caught → gate named; masked → kept and why), `:550` (a 2.6 move never changes `ProjectId`; the move re-checks `ProjectId` under its row lock; re-own any residue to **6.5**), `:198` (per Q12). UPDATE `:490` (DESIGN.md's "+" in every column: a later column's "+" would be a create-then-move — still UX's), `:517`/`:549` (the Move picker repeats the picker keyboard pattern and the identical-announcement pattern — owner 2.8). ADD with owners: any Q decided against the UX spine or the mockup (owner **UX**: Q4 position list vs the mockup's Top/Bottom, Q6 `Enter` and the actions control, Q8 announcement on a Status change); the position-key length ceiling and same-gap growth (owner **2.9**, measured under load, Q10); the picker's position list at 5,000 Tasks (owner **2.9**, paging); Board push of another participant's move (owner **Epic 7** — no 7.x story names it today, `epics.md:2654-2657`; flag to PM); Q13's digest pin decision if deferred.
   - [x] `sprint-status.yaml`: set `review` at the end of the dev phase. **Do not add review narration to source files.**
+
+### Review Findings
+
+Code review 2026-10-28 (Blind Hunter, Edge Case Hunter, Acceptance Auditor; diff `d898527..HEAD`): 34 raw findings, 25 after de-duplication - 0 decision-needed, 13 patch, 3 defer, 9 dismissed.
+
+- [x] [Review][Patch] A `409 task-position-unavailable` does not re-read the Board, so the picker keeps offering the neighbour that is gone and "Choose it again." loops (Q3 (a) chose "reverts, says … and re-reads the Board") [Yello.Client/Components/BoardView.razor.cs:644]
+- [x] [Review][Patch] `_movedCard` is never cleared after the move settles, so the card replays the reflow whenever it is drawn again (UX-DR6) [Yello.Client/Components/BoardView.razor.cs:257]
+- [x] [Review][Patch] The actions control (`aria-expanded`) cannot close its own menu, and a right-click, context-menu key or Shift+F10 inside an open picker resets it to the menu [Yello.Client/Components/TaskCard.razor:216]
+- [x] [Review][Patch] The Board notice for a refused menu move is not a live region, unlike the panel's refusal (`role="status"`, present from the start) [Yello.Client/Components/BoardView.razor:70]
+- [x] [Review][Patch] Any attribute's refusal for a Task with an outstanding menu move is said on the Board, not only the move's [Yello.Client/Components/BoardView.razor.cs:703]
+- [x] [Review][Patch] The fake API accepts a move body without `afterTaskId` (and answers a missing `statusId` with the wrong type) where the Host refuses it `400 invalid-task-edit`; no wire case covers a missing `afterTaskId` [tests/Yello.Tests.Client/FakeYelloApi.cs:955]
+- [x] [Review][Patch] The client sends a hand-built dictionary rather than the `MoveTaskRequest` contract, so a member rename drifts silently [Yello.Client/Components/BoardView.razor.cs:885]
+- [x] [Review][Patch] Remarks say what is not true: the Status edit takes the range in the `MAX(CASE…)` shape, not "that one statement shape", and takes no row lock [Yello.Domain/Tasks/PositionKey.cs:15; Yello.Infrastructure/Persistence/TaskStore.cs:66]
+- [x] [Review][Patch] The move-race paragraph runs into the next one (missing blank line) [tests/TESTING-CONVENTIONS.md]
+- [x] [Review][Patch] The email migration's `Down` can fail on rows BIN2 admitted that collide under the default collation; neither guarded nor documented [Yello.Infrastructure/Persistence/Migrations/20261027233311_EmailIndexBinaryCollation.cs:62]
+- [x] [Review][Patch] RACE-M4 holds a move, not the Status `PATCH`'s own shape; no case queues a real Status `PATCH` behind a held move (AC11) [tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.MoveRace.cs:242]
+- [x] [Review][Patch] SCH-604 probes column equality only; no case registers the ASCII and full-width addresses through the product (Task 4) [tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.MoveSchema.cs]
+- [x] [Review][Patch] Ledger `:543` says the deletion's row hints were "measured again", but under RACE-M5/M6/M7 (b) the deletion queues on the range the held move owns, so 0/3 was certain by construction [_bmad-output/implementation-artifacts/deferred-work.md:543]
+- [x] [Review][Defer] A full gap (key exhaustion) gets the same "Choose it again." copy as a changed neighbour, though choosing it again cannot succeed (Q10) [Yello.Infrastructure/Persistence/TaskStore.cs:348] — deferred to story 2.9, which owns the key-length ceiling
+- [x] [Review][Defer] Under BIN2 a full-width lookalike of an existing address registers as a separate Account (the spec's intended Q12 outcome; NFKC folding is a product decision) [Yello.Domain/Accounts/EmailAddressNormalisation.cs] — deferred to story 4.1, the first story that addresses people by email
+- [x] [Review][Defer] A neighbour whose own optimistic move into the column is still unadmitted is offered, and the server answers a spurious 409 [Yello.Client/Components/MovePicker.razor:100] — deferred to story 2.8, whose keyboard moves chain quickly
 
 ## Dev Notes
 
@@ -537,4 +558,5 @@ Every plant held its original bytes in memory and restored them in a `finally`, 
 ### Change Log
 
 - 2026-10-28: Dev phase - move and reorder a Task by explicit control (FR-29, FR-35 position clause, AR-21/AD-15, UX-DR21, UX-DR25); email unique index pinned to `Latin1_General_100_BIN2` (ledger :198); five isolation rows live; Status set to review.
+- 2026-10-28: Code review - 34 raw findings, 25 after de-duplication: 13 patched, 3 deferred (2.9, 4.1, 2.8), 9 dismissed. Main fix: a `409 task-position-unavailable` now re-reads the Board (Q3 (a)); new E2E-617 caught the planted removal 1/1. Also the card menu toggle, the Board notice as a status region, `_movedCard` cleared on settle, the client sending `MoveTaskRequest`, the fake matching the Host's body rules, MOV-08 "no afterTaskId", RACE-M4 (b) against a real Status `PATCH`, SCH-604 registering the lookalike through the product, a guarded `Down` for the email migration, and corrected remarks and ledger. Full run: 1185 total, 1182 passed, 0 failed, 3 skipped. Status set to done.
 

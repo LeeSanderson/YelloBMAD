@@ -13,9 +13,9 @@ namespace Yello.Domain.Tasks;
 /// </para>
 /// <para>
 /// <b>Every key placer takes one lock first</b>: the Project's Task range under <c>UPDLOCK, HOLDLOCK</c> - a creation in
-/// the pipeline's bound count (<c>BoundCounter</c>), and a Status edit, a deletion and a move in the task store, in that
-/// one statement shape - so two placements into one column serialise there and the second reads the first's key. A move
-/// reads its neighbours only after it holds that range. The jitter is a second line behind the lock, not the convergence
+/// the pipeline's bound count (<c>BoundCounter</c>), a deletion and a move in the task store in that count's statement
+/// shape, and a Status edit in a <c>MAX(CASE…)</c> read of the same index and range - so two placements into one column
+/// serialise there and the second reads the first's key. A move reads its neighbours only after it holds that range. The jitter is a second line behind the lock, not the convergence
 /// mechanism.
 /// </para>
 /// <para>
