@@ -102,7 +102,8 @@ to unpick later".
 **A race is controlled, never hoped for - added by story 2.2.** A case about two requests that race
 (a creation bound, a key's first use) holds the contended range itself and lets the requests queue on
 it: the test opens a connection under the Space's session key, begins a transaction, takes the same
-lock the product takes (`SELECT COUNT(*) ... WITH (UPDLOCK, HOLDLOCK)`), sends both requests, polls
+lock the product takes (since story 2.9 the scope's application lock - see below; before it a
+`SELECT COUNT(*) ... WITH (UPDLOCK, HOLDLOCK)` range), sends both requests, polls
 `sys.dm_exec_requests` with a deadline until both are blocked on any `LCK_M_%` wait
 (`TaskWire.WaitUntilBlockedOnALockAsync`), then commits. Wait on "blocked on a lock", not on one wait
 type, so a plant that drops the product's hint is caught at the insert instead. Make every racing
@@ -122,8 +123,9 @@ in three.
 
 **A race about a lock held between two statements holds the request between them - added by story 2.4.**
 When the guarded interleaving is "the request read X, then something changed X before it wrote", holding X
-itself cannot show it: a read-committed read already waits on the other writer's uncommitted change and
-reads the right answer, so removing the hint is caught zero runs in three (story 2.4's
+itself cannot show it: a locking read already waits on the other writer's uncommitted change and reads
+the right answer (since story 2.9's RCSI, only a read hinted `READCOMMITTEDLOCK` or taken under a lock
+waits - an unhinted read sees the last committed version), so removing the hint is caught zero runs in three (story 2.4's
 `An_application_racing_a_deletion_that_commits_first_answers_400_invalid_task_labels`). Hold something the
 request touches *after* its locked read instead (`A_deletion_racing_an_application_that_has_read_its_Labels_waits_and_answers_409`
 holds an uncommitted application of another Label to the same Task), send the competing request, and wait
@@ -135,11 +137,13 @@ met. Name the index in a lock hint that two writers must share (`INDEX(1)`).
 
 **A deletion races every writer on its rows, from both sides - added by story 2.5.** `DeleteWire` plays each
 competing writer in the product's own statement shape, so the test and the request meet on one key: the
-Project's Task range (`SELECT COUNT(*) ... WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = @p`, the bound count's
-shape), a Task or Project row (`WITH (UPDLOCK, HOLDLOCK, INDEX(1))`), a Status move, a creation's insert, and
+Project's Tasks lock (since story 2.9 the application lock `Yello/ProjectTasks/{spaceId}/{projectId}`; it was
+the range `SELECT COUNT(*) ... WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = @p`, the bound count's shape - the
+name `HoldProjectRangeAsync` is kept), a Task or Project row (`WITH (UPDLOCK, HOLDLOCK, INDEX(1))`), a Status move, a creation's insert, and
 the whole deletion held uncommitted. Write both directions for each pair. *The other writer holds, the request
 is the deletion* (RACE-T1, T3 (a), T5, P1 (a), P2 (a)): this is where a lock-order cycle shows - RACE-T1 caught
-a deletion that took the Task row before the range as a 1205, 3 runs in 3. *The deletion holds, the request is
+a deletion that took the Task row before the range as a 1205, 3 runs in 3 (the order stands with the
+application lock: the Project's lock, then the row). *The deletion holds, the request is
 the other writer* (RACE-T2, T3 (b), T4, P1 (b), P2 (b)): this is where a writer answering `200` or `500` on a
 row that has gone shows. For the Project, hold the creation **between its statements** - counted under the
 range and read its Project, insert not yet sent - and wait until the deletion is blocked or has answered
@@ -149,7 +153,7 @@ range and read its Project, insert not yet sent - and wait until the deletion is
 
 **A move is a key placer that reads its neighbours, so its decisive race is the read race - added by story
 2.6.** `MoveWire.HoldMoveAsync` plays a move in the product's shape (the Project's Task range in the count
-shape, then the Task row `INDEX(1)`, then the one `UPDATE`), and the existing writers are played by
+shape - the Project's application lock since story 2.9 - then the Task row `INDEX(1)`, then the one `UPDATE`), and the existing writers are played by
 `DeleteWire` and `LabelWire`, so every pair meets on one key. *The test holds, the request is the move*
 (RACE-M1..M3, M4 (a)..M8 (a)); *the move is held, the request is the other writer* (M4 (b)..M8 (b), M4 (b) a
 real Status `PATCH` in its own `MAX(CASE…)` range shape). The case
@@ -159,6 +163,21 @@ X and commits - a move that read X's successor before the lock lands after the n
 3 runs in 3, and the same case caught the range taken without its hints 3/3. Two moves into one gap held on the
 range (RACE-M1) pass even with the range hint removed: the moves then queue on the index at their `UPDATE`, and
 jitter keeps their keys apart - the jitter is the second line, so the read race, not M1, is the gate.
+
+**Under RCSI a read that decides a write takes a lock, and the scope locks are application locks - added by
+story 2.9.** `READ_COMMITTED_SNAPSHOT` is on in every database (migration `ReadCommittedSnapshot`): an unhinted
+read no longer waits on an uncommitted writer, it reads the last committed version. So a check-then-write either
+reads after its scope's application lock - every writer that could change what it read takes the same lock first,
+so the read, a statement of its own, sees their commits - or carries `READCOMMITTEDLOCK` (`TaskStore.ApplyAsync`,
+`ReplaceAsync`'s current set, `IdempotencyStore.FindAsync`). The key placers' and the bound counts' locks are
+`sp_getapplock` resources owned by the transaction and named for the Space (`Yello/ProjectsPerSpace/{spaceId}`,
+`Yello/ProjectTasks/{spaceId}/{projectId}`), not key ranges: a serializable range locks the first key past it,
+which can be another Space's, and a name without the Space lets a request naming another Space's id queue on it
+(`BoardPagingTests` PG-16, PG-17, PG-19). A race case holds one with `sp_getapplock` on a holder opened for the
+Space (`DeleteWire.HoldProjectRangeAsync`, `HoldProjectsPerSpaceAsync`), and a waiter shows as `LCK_M_X` on
+`APPLICATION:…` - `WaitUntilBlockedOnALockAsync` still sees it. The order keeps its shape: the scope's
+application lock, then row locks. The Project's lock covers the whole Project, so a hold on it proves
+Project-level serialisation, never a column's (`EditRace.HoldColumnAsync` takes the Project lock).
 
 **Randomised data where identity does not matter; fixed where an assertion depends on it.**
 

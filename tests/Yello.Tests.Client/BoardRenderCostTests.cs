@@ -33,7 +33,9 @@ public sealed class BoardRenderCostTests(ClientSurfaceFixture surface)
 {
     private const int Scale = 5_000;
     private const int PageSize = 50;
-    private const int Steps = 21;
+    // A p95 is the nearest rank of at least 100 samples (TESTING-CONVENTIONS.md; story 2.9 code review - it was 21, where
+    // rank 20 of 21 is nearly the maximum and one pause fails the run).
+    private const int Steps = 100;
     private const double MotionInstantMilliseconds = 90;
 
     private static readonly Guid Northwind = Guid.NewGuid();
@@ -42,7 +44,7 @@ public sealed class BoardRenderCostTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC14 - at the foot of 5,000 loaded cards, a keyboard step's time from <c>keydown</c> to the next card's
-    /// <c>focusin</c> has a p95 within 90 ms over 21 steps; pick-up, a carried step and the heap are recorded.
+    /// <c>focusin</c> has a p95 within 90 ms over 100 steps; pick-up, a carried step and the heap are recorded.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact(Explicit = true)]

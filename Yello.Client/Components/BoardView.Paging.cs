@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Yello.Client.Spaces;
@@ -84,7 +85,9 @@ public sealed partial class BoardView
 
     /// <summary>
     /// The page of a column after a cursor, or <c>null</c> when it was refused, unanswered or unreadable - the column then
-    /// keeps its cursor, and the next route to it asks again - or the tab left the Space meanwhile.
+    /// keeps its cursor, and the next route to it asks again - or the tab left the Space meanwhile. A <c>404</c> raises the
+    /// page's one refusal surface, as the Board's own read does: the Space, the Project or the Status is not there (story
+    /// 2.9 code review - the control used to stay, doing nothing).
     /// </summary>
     private async Task<BoardColumnPageResponse?> ReadPageAsync(Guid statusId, string after)
     {
@@ -95,7 +98,18 @@ public sealed partial class BoardView
         {
             using var response = await Http.GetAsync(new Uri(BoardRoutes.ColumnOf(SpaceId, ProjectId, statusId, after), UriKind.Relative), token);
 
-            return response.IsSuccessStatusCode && generation == _generation && !token.IsCancellationRequested
+            if (generation != _generation || token.IsCancellationRequested)
+            {
+                return null;
+            }
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                await OnRefused.InvokeAsync(await SpaceWrites.ProblemOfAsync(response, token));
+                return null;
+            }
+
+            return response.IsSuccessStatusCode
                 ? await response.Content.ReadFromJsonAsync<BoardColumnPageResponse>(JsonOptions, token)
                 : null;
         }

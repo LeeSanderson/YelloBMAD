@@ -276,7 +276,8 @@ public sealed class EnvelopeLoadTests(MigratedDatabaseFixture fixture) : IClassF
         await using (var connection = await database.OpenForSpaceAsync(spaceId, TestContext.Current.CancellationToken))
         await using (var command = connection.CreateCommand())
         {
-            command.CommandText = "SELECT CONCAT(StatusId, ': max ', MAX(LEN(PositionKey)), ', avg ', AVG(LEN(PositionKey))) FROM dbo.[Task] GROUP BY StatusId";
+            // Max, p99 (discrete: a length some key has) and average, per Status - story Task 10 asks for the p99.
+            command.CommandText = "SELECT CONCAT(StatusId, ': max ', MAX(KeyLength), ', p99 ', MAX(P99), ', avg ', AVG(KeyLength)) FROM (SELECT StatusId, LEN(PositionKey) AS KeyLength, PERCENTILE_DISC(0.99) WITHIN GROUP (ORDER BY LEN(PositionKey)) OVER (PARTITION BY StatusId) AS P99 FROM dbo.[Task]) AS lengths GROUP BY StatusId";
 
             await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
 

@@ -30,6 +30,13 @@ namespace Yello.Infrastructure.Persistence;
 /// refuses to run with any other change pending in the unit of work, so the one statement that can fail on
 /// a unique index is this record's insert.
 /// </para>
+/// <para>
+/// <b>The lookup is a locking read</b> (<c>READCOMMITTEDLOCK</c>; story 2.9 code review, the open question 18 class). Under
+/// <c>READ_COMMITTED_SNAPSHOT</c> a plain read sees past a first use's record that is inserted but not yet committed, so a
+/// retry overlapping that commit would run the effect again and lose on the unique index (<c>409 in flight</c>) where it
+/// used to wait and replay. The hint makes it wait on that row, as every read did before RCSI; its shared lock ends with
+/// the statement.
+/// </para>
 /// </remarks>
 /// <param name="dbContext">The request's unit of work.</param>
 /// <param name="identifiers">Produces the record's identity.</param>
@@ -53,6 +60,7 @@ internal sealed class IdempotencyStore(YelloDbContext dbContext, IIdentifierGene
         var oldest = clock.GetUtcNow() - IIdempotencyStore.Retention;
 
         return await dbContext.Set<IdempotencyRecord>()
+            .FromSql($"SELECT * FROM dbo.[IdempotencyRecord] WITH (READCOMMITTEDLOCK)")
             .AsNoTracking()
             .Where(record => record.AccountId == accountId && record.Key == key && record.CreatedAt > oldest)
             .Select(record => new RecordedResponse(record.Fingerprint, record.StatusCode, record.ContentType, record.Location, record.Body))

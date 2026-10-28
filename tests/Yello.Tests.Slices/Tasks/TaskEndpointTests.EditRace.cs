@@ -16,9 +16,9 @@ namespace Yello.Tests.Slices.Tasks;
 /// <remarks>
 /// <para>
 /// <b>The interleaving is the test's</b> (TESTING-CONVENTIONS "A race is controlled, never hoped for"): the
-/// test opens a connection under the Space's key, takes the destination column's range itself
-/// (<c>WITH (UPDLOCK, HOLDLOCK)</c> over <c>ProjectId = @p AND StatusId = @s</c>, a subset of the
-/// Project-wide range the edit and the creation both take, so either queues behind it), sends both requests,
+/// test opens a connection under the Space's key, takes the lock the edit and the creation both take itself
+/// (since story 2.9 the Project's Tasks application lock, so the hold covers the whole Project, not one column; until
+/// then the destination column's range <c>WITH (UPDLOCK, HOLDLOCK)</c>, a subset of the Project-wide range), sends both requests,
 /// waits until both are blocked on any <c>LCK_M_%</c>
 /// (<see cref="TaskWire.WaitUntilBlockedOnALockAsync"/>), then commits. Both Accounts read the Board first, so
 /// neither writes its <c>SpacePresence</c> row inside the race (the 2.2 ATDD finding).
@@ -27,16 +27,17 @@ namespace Yello.Tests.Slices.Tasks;
 /// <b>What a missing lock looks like:</b> both placements read the same last key, compute the same
 /// <c>PositionKey.After(last)</c>, and the unique index <c>(SpaceId, ProjectId, StatusId, PositionKey)</c>
 /// refuses the second as a <c>500</c>. The dev phase measured that a column range would also serialise an
-/// edit against a creation, and chose the Project-wide range for one lock order (<c>TaskStore</c>'s remarks).
-/// These two cases catch the hint's removal only by timing; the case that holds the column and inserts under
-/// it, <c>A_Status_edit_reads_the_last_key_of_its_new_column_only_under_the_lock</c>, catches it every run.
+/// edit against a creation, and chose the Project-wide range for one lock order (<c>TaskStore</c>'s remarks); story 2.9
+/// made it the Project's application lock. These two cases prove Project-level serialisation and catch the lock's
+/// removal only by timing; the case that holds the lock and inserts under it,
+/// <c>A_Status_edit_reads_the_last_key_of_its_new_column_only_under_the_lock</c>, catches it every run.
 /// </para>
 /// </remarks>
 public sealed partial class TaskEndpointTests
 {
     /// <summary>
     /// AC9 (a) - an edit moving a Task into the first column and a creation into that same column, both
-    /// queued on the held column range, are both admitted (<c>200</c>, <c>201</c>) with distinct keys, each
+    /// queued on the held Project lock, are both admitted (<c>200</c>, <c>201</c>) with distinct keys, each
     /// after the column's previous last key.
     /// </summary>
     /// <returns>A task.</returns>
@@ -98,7 +99,7 @@ public sealed partial class TaskEndpointTests
 
     /// <summary>
     /// AC9 (b) - two edits by two Accounts, each moving a different Task into the third column, both queued on
-    /// the held column range, are both admitted with distinct keys after the column's previous last key.
+    /// the held Project lock, are both admitted with distinct keys after the column's previous last key.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]

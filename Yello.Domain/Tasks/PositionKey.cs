@@ -12,11 +12,11 @@ namespace Yello.Domain.Tasks;
 /// the moved Task's key is ever written - no generator renumbers a sibling.
 /// </para>
 /// <para>
-/// <b>Every key placer takes one lock first</b>: the Project's Task range under <c>UPDLOCK, HOLDLOCK</c> - a creation in
-/// the pipeline's bound count (<c>BoundCounter</c>), a deletion and a move in the task store in that count's statement
-/// shape, and a Status edit in a <c>MAX(CASE…)</c> read of the same index and range - so two placements into one column
-/// serialise there and the second reads the first's key. A move reads its neighbours only after it holds that range. The jitter is a second line behind the lock, not the convergence
-/// mechanism.
+/// <b>Every key placer takes one lock first</b>: the Project's Tasks lock, an application lock named for the Space and
+/// the Project since story 2.9 (until then the Project's Task range under <c>UPDLOCK, HOLDLOCK</c>) - a creation in the
+/// pipeline's bound count (<c>BoundCounter</c>), and a Status edit, a deletion and a move in the task store - so two
+/// placements into one column serialise there and the second reads the first's key. A move reads its neighbours only
+/// after it holds that lock. The jitter is a second line behind the lock, not the convergence mechanism.
 /// </para>
 /// <para>
 /// <b>The alphabet is base 62 in ordinal order</b> - digits, then upper case, then lower case, which is

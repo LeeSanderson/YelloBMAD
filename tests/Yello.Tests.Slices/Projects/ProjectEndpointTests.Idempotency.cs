@@ -7,6 +7,7 @@ using Yello.Contracts;
 using Yello.Contracts.ApiTokens;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
+using Yello.Tests.Slices.Tasks;
 
 namespace Yello.Tests.Slices.Projects;
 
@@ -336,6 +337,75 @@ public sealed partial class ProjectEndpointTests
         Assert.Equal(ProblemTypes.IdempotencyKeyInFlight, Problem(loser)?.Type);
         Assert.Null(loser.Header("Location"));
         Assert.Single(await ProjectRowsAsync(database, owner.SpaceId));
+    }
+
+    /// <summary>
+    /// AR-25, AD-18 (story 2.9 code review, the open question 18 class) - a lookup that meets a first use's record inserted
+    /// but not yet committed waits for it and then answers from it, as it did before <c>READ_COMMITTED_SNAPSHOT</c>. The
+    /// test holds an uncommitted record for the key with another request's fingerprint; the create sent with that key waits,
+    /// and once the record commits it is refused <c>422 idempotency-key-reused</c> and applies nothing.
+    /// </summary>
+    /// <remarks>
+    /// Planted (the lookup without <c>READCOMMITTEDLOCK</c>): under RCSI the lookup reads past the uncommitted record, the
+    /// create runs, and it loses on the unique index - <c>409 idempotency-key-in-flight</c> - and the case fails.
+    /// </remarks>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AR-25")]
+    [Trait("Requirement", "AD-18")]
+    public async Task A_lookup_meeting_an_uncommitted_record_of_its_key_waits_and_answers_from_it()
+    {
+        var database = Available();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        Actor? owner = null;
+        WireResponse? answer = null;
+        var key = Guid.NewGuid().ToString("D");
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            owner = await RegisterAsync(client, database);
+            var token = await IssueTokenAsync(owner, owner.SpaceId);
+
+            await using var holder = await database.OpenForSpaceAsync(owner.SpaceId, cancellationToken);
+            await using var observer = await database.OpenWithoutSpaceContextAsync(cancellationToken);
+            await using var held = await holder.BeginTransactionAsync(cancellationToken);
+            Task<WireResponse>? creating = null;
+
+            try
+            {
+                await using (DbCommand insert = holder.CreateCommand())
+                {
+                    insert.Transaction = held;
+                    insert.CommandText =
+                        """
+                        INSERT dbo.[IdempotencyRecord] (Id, SpaceId, AccountId, [Key], Fingerprint, StatusCode, ContentType, Location, Body, CreatedAt)
+                        VALUES (NEWID(), @space, @account, @key, REPLICATE(N'0', 64), 201, N'application/json', NULL, N'{}', SYSDATETIMEOFFSET())
+                        """;
+                    insert.Parameters.Add(new SqlParameter("@space", owner.SpaceId));
+                    insert.Parameters.Add(new SqlParameter("@account", owner.AccountId));
+                    insert.Parameters.Add(new SqlParameter("@key", key));
+
+                    Assert.Equal(1, await insert.ExecuteNonQueryAsync(cancellationToken));
+                }
+
+                creating = CreateOnAsync(IsolationSurface.Session, owner, token, "Sent while the first was committing", key);
+
+                await TaskWire.WaitUntilBlockedOnALockAsync(observer, 1, creating, cancellationToken);
+                await held.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                await held.RollbackAsync(CancellationToken.None);
+                throw;
+            }
+
+            answer = await creating;
+        });
+
+        Assert.NotNull(owner);
+        Assert.True(answer?.StatusCode == HttpStatusCode.UnprocessableEntity, $"{answer?.StatusCode} {answer?.Body}");
+        Assert.Equal(ProblemTypes.IdempotencyKeyReused, Problem(answer!)?.Type);
+        Assert.Empty(await ProjectRowsAsync(database, owner.SpaceId));
     }
 
     private static async Task<int> SessionOfAsync(SqlConnection connection, DbTransaction transaction, CancellationToken cancellationToken)

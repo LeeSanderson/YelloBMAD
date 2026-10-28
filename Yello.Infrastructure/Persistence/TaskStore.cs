@@ -20,18 +20,18 @@ namespace Yello.Infrastructure.Persistence;
 /// </para>
 /// <para>
 /// <b>A creation's and a Status edit's position key is the column's last plus one</b> (<see cref="PositionKey.After"/>),
-/// and <b>every writer that places a key takes the same lock first</b>: the Project's Tasks lock - until story 2.9 the
-/// Project's Tasks under <c>UPDLOCK, HOLDLOCK</c>, since then an application lock of the Project's own
-/// (<see cref="ApplicationLocks"/>), because the range's last key could lie in another Space. A creation takes it in the pipeline (the Tasks-per-Project bound,
-/// <see cref="BoundCounter"/>); a Status change takes it here, in <see cref="EditAsync"/>, with the same range
-/// over the same <c>SpaceId</c>-leading index. So an edit and a creation into one column, or two edits, queue
-/// at that range, and the second reads the first's key as the last (story 2.3 Task 6, AC9).
+/// and <b>every writer that places a key takes the same lock first</b>: the Project's Tasks lock - an application lock
+/// named for the request's Space and the Project (<see cref="ApplicationLocks"/>, story 2.9). Until story 2.9 it was the
+/// Project's Tasks under <c>UPDLOCK, HOLDLOCK</c>, whose last key could lie in another Space. A creation takes it in the
+/// pipeline (the Tasks-per-Project bound, <see cref="BoundCounter"/>); a Status change takes it here, in
+/// <see cref="EditAsync"/>. So an edit and a creation into one column, or two edits, queue at that lock, and the second -
+/// reading the last key in a statement of its own after it, under <c>READ_COMMITTED_SNAPSHOT</c> the last committed
+/// state - reads the first's key as the last (story 2.3 Task 6, AC9).
 /// </para>
 /// <para>
-/// <b>Why the Project's range and not only the column's.</b> Both scan the index in one order, so every key
-/// placer takes its key-range locks in the same order and none can hold one column while waiting on another
-/// that the first holds - a column-only lock taken by the edit would interleave with the creation's
-/// Project-wide scan and could deadlock.
+/// <b>Why the Project's lock and not only the column's.</b> One lock per Project means every key placer takes it once,
+/// before any row lock, and none can hold one column while waiting on another that the first holds. A Status change
+/// names a column it does not hold yet; column locks would need two in a varying order and could deadlock.
 /// </para>
 /// <para>
 /// <b>Applying Labels locks them first</b> (story 2.4, AC10): the submitted Labels are read under
@@ -40,7 +40,7 @@ namespace Yello.Infrastructure.Persistence;
 /// policy both still narrow it - and a set with any Label missing is refused before a <c>TaskLabel</c> row is
 /// written, so the composite foreign key never answers it as a <c>500</c>. A deletion that committed first is then
 /// simply missing; one that comes second waits on the Label lock and then finds the application
-/// (<see cref="LabelStore"/>). <b>Lock order</b>: an edit takes the Project's Task range (a Status change only), then
+/// (<see cref="LabelStore"/>). <b>Lock order</b>: an edit takes the Project's Tasks lock (a Status change only), then
 /// the Task's own row, then the Labels in the server's id order, then reads the Task's <c>TaskLabel</c> rows; a
 /// deletion takes the Label, then its <c>TaskLabel</c> range. Label before TaskLabel in both, and a deletion never
 /// takes a Task lock, so the two cannot wait on each other in a cycle - measured by the story's race cases, which
@@ -48,26 +48,27 @@ namespace Yello.Infrastructure.Persistence;
 /// whole-set replacement stays one request's set.
 /// </para>
 /// <para>
-/// <b>A deletion takes the edit's locks in the edit's order</b> (story 2.5, open question 5): the Project's Task range
-/// first - the statement a creation's bound count and a Status edit take, so the same index and the same range - then the
-/// Task's own row on its clustered key (<c>INDEX(1)</c>, the Labels edit's Task lock), then the delete; the database's
-/// <c>TaskLabel</c> cascade removes the applications inside that statement. Range before row, as every key placer: a
-/// Status edit holds the range and then writes the row, so a deletion that locked the row first would hold what the edit
-/// needs while waiting for what it has. A Label deletion takes the Label and then its <c>TaskLabel</c> range and never a
+/// <b>A deletion takes the edit's locks in the edit's order</b> (story 2.5, open question 5): the Project's Tasks lock
+/// first - the one a creation's bound count and a Status edit take - then the Task's own row on its clustered key
+/// (<c>INDEX(1)</c>, the Labels edit's Task lock), then the delete; the database's <c>TaskLabel</c> cascade removes the
+/// applications inside that statement. The Project's lock before the row, as every key placer: a Status edit holds the
+/// lock and then writes the row, so a deletion that locked the row first would hold what the edit needs while waiting for
+/// what it has. A Label deletion takes the Label and then its <c>TaskLabel</c> range and never a
 /// Task lock, so it queues behind the cascade's removed rows and never cycles. A deletion writes no position key and
 /// renumbers no sibling (AD-15). Measured by story 2.5's RACE-T1..T5, which hold each side and wait on the other.
 /// </para>
 /// <para>
 /// <b>A move is the fourth key placer and takes the same locks in the same order</b> (story 2.6, AC11): the Project's
-/// Task range in the creation count's statement shape, then the Task's own row on its clustered key (<c>INDEX(1)</c>),
-/// re-read under it - gone, or no longer in the Project whose range is held, is not found - then, only now, the
+/// Tasks lock, then the Task's own row on its clustered key (<c>INDEX(1)</c>), re-read under it - gone, or no longer in
+/// the Project whose lock is held, is not found - then, only now, the
 /// neighbour and the first key after it in the destination column, the moved Task left out. Its key is placed strictly
 /// between the two (<see cref="PositionKey.Between"/>) and only its own row is written; no sibling's key ever changes
 /// (AD-15). A move to where the Task already is writes nothing but still took the locks. Measured by story 2.6's
-/// RACE-M1..M8, which hold each side and wait on the other: reading the neighbours before the range, or the range
-/// without its hints, is caught 3/3 by the read race (RACE-M2); the row's <c>INDEX(1)</c> and its
-/// <c>UPDLOCK, HOLDLOCK</c> are each masked 0/3 - the range already serialises every key placer - and kept as the row
-/// lock the Labels edit and the deletion take too. A Status edit takes no row lock: it re-reads the row under the range.
+/// RACE-M1..M8, which hold each side and wait on the other: reading the neighbours before the lock (in 2.6, before the
+/// range, or the range without its hints) is caught 3/3 by the read race (RACE-M2); the row's <c>INDEX(1)</c> and its
+/// <c>UPDLOCK, HOLDLOCK</c> are each masked 0/3 - the Project's lock already serialises every key placer - and kept as the
+/// row lock the Labels edit and the deletion take too. A Status edit takes no row lock: it re-reads the row under the
+/// Project's lock.
 /// </para>
 /// <para>
 /// <b>Saves its own effect</b>, as every store does, so the idempotency record is the only thing the
@@ -143,10 +144,12 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
 
     private async Task<TaskItem?> ApplyAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken)
     {
-        // A locking read (story 2.9, AC13): under READ_COMMITTED_SNAPSHOT a plain read would see the last committed row
-        // while a deletion of it is uncommitted, and the edit's UPDATE would then find nothing to update - a 500.
-        // READCOMMITTEDLOCK waits for that writer, as every read did before RCSI, and releases its shared lock at the
-        // statement's end, so it adds no lock to the order the key placers keep.
+        // A locking read (story 2.9, AC13, open question 18): under READ_COMMITTED_SNAPSHOT a plain read would see the last
+        // committed row while a deletion that has already deleted it is uncommitted, and the edit would go on to a 400 or a
+        // 0-row UPDATE (a 500). READCOMMITTEDLOCK waits for that writer, as every read did before RCSI, and releases its
+        // shared lock at the statement's end, so it adds no lock to the order the key placers keep. It does not close the
+        // earlier half - a deletion that has locked the row (UPDLOCK, compatible with this read) but not yet deleted it -
+        // which was open before RCSI too (deferred-work.md, story 2.9 code review, owner story 7.4).
         var task = await dbContext.Tasks
             .FromSql($"SELECT * FROM dbo.[Task] WITH (READCOMMITTEDLOCK) WHERE Id = {taskId}")
             .SingleOrDefaultAsync(cancellationToken)
@@ -281,11 +284,11 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
 
         var project = owner.ProjectId;
 
-        // The Project's Task range, in the statement shape a creation's bound count takes, so every key placer meets on it.
+        // The Project's Tasks lock, the one a creation's bound count takes, so every key placer meets on it.
         await TakeTheProjectRangeAsync(project, cancellationToken).ConfigureAwait(false);
 
         // The Task's own row, on the clustered key every other Task locker names. Gone by now (deleted while this waited
-        // on the range) is not found - never Deleted, never a 500.
+        // on the Project's lock) is not found - never Deleted, never a 500.
         var locked = await dbContext.Tasks
             .FromSql($"SELECT * FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {taskId}")
             .AsNoTracking()
@@ -322,11 +325,11 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
 
         var project = owner.ProjectId;
 
-        // Range before row, as every key placer: the Project's Task range in the creation count's statement shape.
+        // The Project's lock before the row, as every key placer.
         await TakeTheProjectRangeAsync(project, cancellationToken).ConfigureAwait(false);
 
         // The Task's own row, on the clustered key every other Task locker names, read again under it: gone by now - or
-        // no longer in the Project whose range this holds - is not found, never Moved.
+        // no longer in the Project whose lock this holds - is not found, never Moved.
         var task = await dbContext.Tasks
             .FromSql($"SELECT * FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {taskId}")
             .SingleOrDefaultAsync(cancellationToken)
@@ -337,7 +340,7 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
             return TaskMove.NotFound;
         }
 
-        // The neighbours, read only now that the range is held: nothing in this Project can be placed, moved or
+        // The neighbours, read only now that the Project's lock is held: nothing in this Project can be placed, moved or
         // deleted until this commits, so the gap read here is the gap written into.
         var (available, lower) = await NeighbourKeyAsync(project, statusId, taskId, afterTaskId, cancellationToken).ConfigureAwait(false);
 

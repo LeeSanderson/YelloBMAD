@@ -20,9 +20,9 @@ namespace Yello.Tests.Architecture;
 /// with <c>@key</c> by Task id means an element only ever represents one Task.
 /// </para>
 /// <para>
-/// <b>The contract gates reach unwritten members by name</b> (reflection), so they compile today and go green when story
-/// Task 2 and Task 10 add them. The virtualisation gate is green today and stays a standing gate; its detector is proved
-/// against planted text, as every absence assertion here is (<c>TESTING-CONVENTIONS.md</c>).
+/// <b>The contract gates reach their members by name</b> (reflection), as they did when written red by the ATDD run;
+/// story 2.9's Tasks 2 and 10 added the members and they stand as gates now. The virtualisation gate is a standing gate;
+/// its detector is proved against planted text, as every absence assertion here is (<c>TESTING-CONVENTIONS.md</c>).
 /// </para>
 /// </remarks>
 [Trait("Suite", "Architecture")]

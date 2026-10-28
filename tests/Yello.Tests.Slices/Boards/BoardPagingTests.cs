@@ -32,8 +32,9 @@ namespace Yello.Tests.Slices.Boards;
 /// <para>
 /// <b>Races are held, never hoped for</b> (<c>TESTING-CONVENTIONS.md</c>): every "does not wait" case holds the other
 /// writer's transaction open on a <c>WireDatabase</c>-shaped connection, sends the request, and waits until it is blocked
-/// on a lock or has answered (<see cref="LabelWire.WaitUntilBlockedOrAnsweredAsync"/>); answering while the other side is
-/// still held is the pass, being blocked is the failure. The held transaction is rolled back in a <c>finally</c>.
+/// by the held side or has answered (<c>WaitUntilBlockedByTheHolderOrAnsweredAsync</c>, which counts only waits that lead
+/// to the holder's session - a transient wait on anything else is not the race); answering while the other side is
+/// still held is the pass, being blocked by it is the failure. The held transaction is rolled back in a <c>finally</c>.
 /// </para>
 /// <para>
 /// <b>Contract members</b> (<see cref="BoardPageWire"/>): the ATDD run's scaffold constants are swapped for
@@ -607,13 +608,13 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
 
                 var reading = BoardAsync(owner, owner.SpaceId, other);
 
-                await LabelWire.WaitUntilBlockedOrAnsweredAsync(observer, 1, reading, cancellationToken);
+                await WaitUntilBlockedByTheHolderOrAnsweredAsync(observer, holder, held, 1, reading, cancellationToken);
                 Assert.True(reading.IsCompleted, "The Board read waited on the uncommitted Project deletion (AC13).");
                 board = await reading;
 
                 var listingRead = owner.Session.GetAsync(ProjectRoutes.ListIn(owner.SpaceId));
 
-                await LabelWire.WaitUntilBlockedOrAnsweredAsync(observer, 1, listingRead, cancellationToken);
+                await WaitUntilBlockedByTheHolderOrAnsweredAsync(observer, holder, held, 1, listingRead, cancellationToken);
                 Assert.True(listingRead.IsCompleted, "The Project listing waited on the uncommitted Project deletion (AC13).");
                 listing = await listingRead;
             }
@@ -680,7 +681,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
                 // The entering Member has no presence in the Owner's Space, so its resolution counts the live presence.
                 var reading = BoardAsync(entering, owner.SpaceId, projectId);
 
-                await LabelWire.WaitUntilBlockedOrAnsweredAsync(observer, 1, reading, cancellationToken);
+                await WaitUntilBlockedByTheHolderOrAnsweredAsync(observer, holder, held, 1, reading, cancellationToken);
                 Assert.True(reading.IsCompleted, "The Board read waited on another Account's uncommitted presence (AC13, :313).");
                 board = await reading;
             }
@@ -732,7 +733,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
 
                 var writing = CreateTaskAsync(spaceB, spaceB.SpaceId, elsewhere, "Written beside a large deletion");
 
-                await LabelWire.WaitUntilBlockedOrAnsweredAsync(observer, 1, writing, cancellationToken);
+                await WaitUntilBlockedByTheHolderOrAnsweredAsync(observer, holder, held, 1, writing, cancellationToken);
                 Assert.True(
                     writing.IsCompleted,
                     $"Space B's creation waited on Space A's held deletion (AC17). Object-level locks held: [{string.Join(", ", objectLocks)}]. Waiting: {await WaitsAsync(observer, cancellationToken)}");
@@ -797,7 +798,7 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
 
                 var creatingInB = CreateProjectRequestAsync(spaceB, "Not queued in B");
 
-                await LabelWire.WaitUntilBlockedOrAnsweredAsync(observer, 2, creatingInB, cancellationToken);
+                await WaitUntilBlockedByTheHolderOrAnsweredAsync(observer, holder, held, 2, creatingInB, cancellationToken);
                 Assert.True(creatingInB.IsCompleted, "Space B's Project creation waited while Space A's count was held (AC17).");
                 inB = await creatingInB;
             }
@@ -810,6 +811,69 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
         });
 
         Assert.True(inB?.StatusCode == HttpStatusCode.Created, $"{inB?.StatusCode} {inB?.Body}");
+        Assert.True(inA?.StatusCode == HttpStatusCode.Created, $"{inA?.StatusCode} {inA?.Body}");
+    }
+
+    /// <summary>
+    /// PG-19 (AC17, AD-3; story 2.9 code review) - a Task creation in Space B that names Space A's Project id does not wait
+    /// on A's held Project Tasks lock: it answers <c>404 not-available</c> while A is still held. A's own creation in that
+    /// Project queues on the hold - the anchor that the product takes the lock. The Tasks-per-Project count takes the lock
+    /// from the route before anything checks the Project, so a lock named for the Project alone would make B's request
+    /// wait on A's writers: a cross-tenant wait, and a timing signal that the id exists.
+    /// </summary>
+    /// <remarks>
+    /// Planted (the lock named <c>Yello/ProjectTasks/{projectId}</c>, no Space): B's request queues on A's hold and the
+    /// case fails.
+    /// </remarks>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "NFR-1")]
+    public async Task A_Task_creation_naming_another_Spaces_Project_does_not_wait_on_that_Projects_lock()
+    {
+        var database = Available();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        WireResponse? inA = null;
+        WireResponse? fromB = null;
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            var spaceA = await RegisterAsync(client, database);
+            var spaceB = await RegisterAsync(client, database);
+            var projectOfA = await CreateProjectAsync(spaceA, "A's Project");
+
+            _ = IdOf(await CreateTaskAsync(spaceA, spaceA.SpaceId, projectOfA, "Warm"));
+
+            await using var holder = await database.OpenForSpaceAsync(spaceA.SpaceId, cancellationToken);
+            await using var observer = await database.OpenWithoutSpaceContextAsync(cancellationToken);
+            await using var held = await holder.BeginTransactionAsync(cancellationToken);
+            Task<WireResponse>? creatingInA = null;
+
+            try
+            {
+                await DeleteWire.HoldProjectRangeAsync(holder, held, projectOfA, cancellationToken);
+
+                creatingInA = CreateTaskAsync(spaceA, spaceA.SpaceId, projectOfA, "Queued in A");
+
+                await WaitUntilBlockedOnALockAsync(observer, 1, creatingInA, cancellationToken);
+
+                var naming = CreateTaskAsync(spaceB, spaceB.SpaceId, projectOfA, "Named from B");
+
+                await WaitUntilBlockedByTheHolderOrAnsweredAsync(observer, holder, held, 2, naming, cancellationToken);
+                Assert.True(
+                    naming.IsCompleted,
+                    $"Space B's creation naming A's Project waited on A's held Project lock (AC17, AD-3). Waiting: {await WaitsAsync(observer, cancellationToken)}");
+                fromB = await naming;
+            }
+            finally
+            {
+                await held.RollbackAsync(CancellationToken.None);
+            }
+
+            inA = await creatingInA;
+        });
+
+        Assert.True(fromB?.StatusCode == HttpStatusCode.NotFound, $"{fromB?.StatusCode} {fromB?.Body}");
+        Assert.Equal(ProblemTypes.NotAvailable, Problem(fromB!)?.Type);
         Assert.True(inA?.StatusCode == HttpStatusCode.Created, $"{inA?.StatusCode} {inA?.Body}");
     }
 
@@ -894,6 +958,61 @@ public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFi
         }
 
         return locks;
+    }
+
+    /// <summary>
+    /// Waits until at least <paramref name="expected"/> requests are blocked on a lock by the test's own held transaction -
+    /// directly, or behind a request it blocks - or until <paramref name="racing"/> has answered. Never a delay.
+    /// </summary>
+    /// <remarks>
+    /// Story 2.9 code review: <see cref="LabelWire.WaitUntilBlockedOrAnsweredAsync"/> counts any request in the database
+    /// blocked on any lock, so a transient wait that has nothing to do with the held side (seen under the full suite's
+    /// load: PG-16 failed 2 runs in 3 with no wait left to report a moment later) read as "the request waited on the
+    /// other Space". Counting only waits that lead to the holder's session makes the case deterministic again: being
+    /// blocked by the held side is the failure, nothing else is.
+    /// </remarks>
+    private static async Task WaitUntilBlockedByTheHolderOrAnsweredAsync(
+        Microsoft.Data.SqlClient.SqlConnection observer,
+        Microsoft.Data.SqlClient.SqlConnection holder,
+        DbTransaction held,
+        int expected,
+        Task racing,
+        CancellationToken cancellationToken)
+    {
+        int holderSession;
+
+        await using (DbCommand session = holder.CreateCommand())
+        {
+            session.Transaction = held;
+            session.CommandText = "SELECT @@SPID";
+            holderSession = Convert.ToInt32(await session.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+
+        while (!racing.IsCompleted)
+        {
+            await using var command = observer.CreateCommand();
+
+            command.CommandText =
+                """
+                WITH chain AS (
+                    SELECT session_id FROM sys.dm_exec_requests
+                    WHERE blocking_session_id = @holder AND wait_type LIKE N'LCK_M_%'
+                    UNION ALL
+                    SELECT r.session_id FROM sys.dm_exec_requests r JOIN chain c ON r.blocking_session_id = c.session_id
+                    WHERE r.wait_type LIKE N'LCK_M_%')
+                SELECT COUNT(*) FROM chain OPTION (MAXRECURSION 16)
+                """;
+            command.Parameters.Add(new Microsoft.Data.SqlClient.SqlParameter("@holder", holderSession));
+
+            if (Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture) >= expected)
+            {
+                return;
+            }
+
+            Assert.True(DateTimeOffset.UtcNow < deadline, $"Fewer than {expected} requests ever waited on the held side, and the racing one never answered.");
+        }
     }
 
     /// <summary>

@@ -23,8 +23,10 @@ namespace Yello.Tests.Slices.Tasks;
 /// </para>
 /// <para>
 /// <b>Each holder takes exactly what story Task 3 says the product takes, in the product's statement shape</b>
-/// (<c>TaskStore.cs:21-46</c>, <c>BoundCounter.cs:46-62</c>): the Project's Task range is
-/// <c>SELECT COUNT(*) FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = @p</c>; a Task or a Project row is locked
+/// (<c>TaskStore</c>, <c>BoundCounter</c>): the Project's Tasks lock is the application lock
+/// <c>Yello/ProjectTasks/{spaceId}/{projectId}</c> since story 2.9 (it was the range
+/// <c>SELECT COUNT(*) FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = @p</c>, and the helpers keep "range" in
+/// their names); a Task or a Project row is locked
 /// <c>WITH (UPDLOCK, HOLDLOCK, INDEX(1))</c> on its clustered key, so the test and the request meet on the same key (the
 /// 2.4 deadlock was two lockers on two indexes of one row).
 /// </para>
@@ -105,17 +107,24 @@ internal static class DeleteWire
 
     /// <summary>
     /// Takes the Project's Tasks lock in the caller's open transaction - the lock a creation's bound count, a Status edit's
-    /// key placement, a move and a deletion all take, so they meet on it. Story 2.9 made it the Project's own application
-    /// lock (<c>Yello/ProjectTasks/{projectId}</c>, <c>ApplicationLocks</c>); it was the Project's Task range under
-    /// <c>UPDLOCK, HOLDLOCK</c>, whose last key could lie in another Space.
+    /// key placement, a move and a deletion all take, so they meet on it. Story 2.9 made it an application lock named for
+    /// the connection's Space and the Project (<c>Yello/ProjectTasks/{spaceId}/{projectId}</c>, <c>ApplicationLocks</c>); it
+    /// was the Project's Task range under <c>UPDLOCK, HOLDLOCK</c>, whose last key could lie in another Space. The Space is
+    /// the connection's <c>SESSION_CONTEXT</c>, so the holder is opened for the Project's Space (the name is built as
+    /// <see cref="HoldProjectsPerSpaceAsync"/> builds its own).
     /// </summary>
     public static async Task HoldProjectRangeAsync(SqlConnection connection, DbTransaction transaction, Guid projectId, CancellationToken cancellationToken)
     {
         await using DbCommand command = connection.CreateCommand();
 
         command.Transaction = transaction;
-        command.CommandText = "EXEC sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction'";
-        command.Parameters.Add(new SqlParameter("@resource", $"Yello/ProjectTasks/{projectId:D}"));
+        command.CommandText =
+            """
+            DECLARE @resource nvarchar(255) = CONCAT(N'Yello/ProjectTasks/', LOWER(CONVERT(nvarchar(36), CAST(SESSION_CONTEXT(N'SpaceId') AS uniqueidentifier))), N'/', LOWER(CONVERT(nvarchar(36), @project)));
+            IF SESSION_CONTEXT(N'SpaceId') IS NULL THROW 51001, 'The holder is not opened for a Space.', 1;
+            EXEC sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction';
+            """;
+        command.Parameters.Add(new SqlParameter("@project", projectId));
 
         await command.ExecuteNonQueryAsync(cancellationToken);
     }

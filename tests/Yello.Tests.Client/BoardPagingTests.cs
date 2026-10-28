@@ -22,10 +22,10 @@ namespace Yello.Tests.Client;
 /// assert, release, assert. No new fixture, no container.
 /// </para>
 /// <para>
-/// <b>Assumed markup and copy</b> (story Q5 (a), Q7 (a), Task 5), to be corrected to what the dev phase builds and each
-/// correction recorded: a "Show more Tasks" button at a partly loaded column's foot whose accessible name starts with that
-/// text (<see cref="ShowMoreName"/>); the Move picker's position list ends, for a partly loaded column, with an option
-/// starting "Show more" (<see cref="MorePositionsName"/>); "Bottom of column" only when the column is fully loaded.
+/// <b>The markup and copy built</b> (story Q5 (a), Q7 (a), Task 5): a "Show more Tasks" button at a partly loaded column's
+/// foot whose accessible name starts with that text (<see cref="ShowMoreName"/>); the Move picker's position list ends, for
+/// a partly loaded column, with an option starting "Show more" (<see cref="MorePositionsName"/>); "Bottom of column" only
+/// when the column is fully loaded.
 /// </para>
 /// <para>
 /// <b>Why append and never recycle</b> (AC3): a recycled row re-points keyboard focus at a different Task, so the next
@@ -370,6 +370,80 @@ public sealed class BoardPagingTests(ClientSurfaceFixture surface)
             await WaitForCardCountAsync(page, "Todo", 120);
 
             Assert.Equal(0, await ShowMore(page, "Todo").CountAsync());
+        }
+    }
+
+    /// <summary>
+    /// AC10 (story 2.9 code review: the clause had no case) - a move placed directly after a partly loaded column's last
+    /// loaded card is admitted between the cursor and the next key, so the cursor advances to the moved Task's key: the card
+    /// stays drawn last after admission, and the next page starts after it - Card 51 next, the moved Task never twice.
+    /// </summary>
+    /// <remarks>
+    /// Planted (no cursor advance in <c>Relocate</c>): on admission the key sorts past the old cursor, the card is held out
+    /// and disappears, and the case fails at the first count.
+    /// </remarks>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-29")]
+    public async Task A_move_placed_after_the_last_loaded_card_advances_the_cursor_and_stays_drawn()
+    {
+        var api = PagedSpaces();
+        _ = Seed(api, Northwind, Atlas, ThreeStatuses, ["Mover"], Many(120));
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenAsync(api, page, Northwind, Atlas);
+            await page.EvaluateAsync(RecordAnnouncements);
+
+            await CardNamed(page, "Mover").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Actions for Mover", Exact = true }).ClickAsync();
+            await page.Locator("[role='menu'] [role='menuitem']", new PageLocatorOptions { HasText = "Move" }).ClickAsync();
+            await page.Locator(".move-picker [role='option']", new PageLocatorOptions { HasText = "Doing" }).ClickAsync();
+            await page.Locator(".move-picker [role='option']", new PageLocatorOptions { HasText = "Position 51, after Card 50" }).ClickAsync(new LocatorClickOptions { Timeout = WaitMs });
+            await WaitUntilSaidAsync(page, "Moved to Doing, position 51 of 121.");
+
+            var admitted = await TitlesInAsync(page, "Doing");
+
+            Assert.Equal(PageSize + 1, admitted.Count);
+            Assert.Equal("Mover", admitted[^1]);
+            Assert.Equal("121", await TotalOfAsync(page, "Doing"));
+
+            await ShowMore(page, "Doing").ClickAsync(new LocatorClickOptions { Timeout = WaitMs });
+            await WaitForCardCountAsync(page, "Doing", (2 * PageSize) + 1);
+
+            var titles = await TitlesInAsync(page, "Doing");
+
+            Assert.Single(titles, title => title == "Mover");
+            Assert.Equal("Card 51", titles[titles.IndexOf("Mover") + 1]);
+            Assert.Equal(titles.Count, titles.Distinct(StringComparer.Ordinal).Count());
+        }
+    }
+
+    /// <summary>
+    /// AD-3, AR-10 (story 2.9 code review) - a column page answered <c>404</c> raises the Board's one refusal surface, as
+    /// the Board's own read does, rather than leaving a control that does nothing.
+    /// </summary>
+    /// <remarks>Planted (the page's <c>404</c> swallowed): nothing is shown and the case fails waiting for the copy.</remarks>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AR-10")]
+    public async Task A_column_page_answered_404_raises_the_Boards_refusal_surface()
+    {
+        var api = PagedSpaces();
+        _ = Seed(api, Northwind, Atlas, ThreeStatuses, Many(120));
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenAsync(api, page, Northwind, Atlas);
+
+            // The Project is gone by the time the next page is asked for: the route answers 404 not-available.
+            Assert.True(api.Boards.Remove((Northwind, Atlas)));
+
+            await ShowMore(page, "Todo").ClickAsync(new LocatorClickOptions { Timeout = WaitMs });
+            await page.GetByText("Not available.").WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
+
+            Assert.Single(api.ColumnPageRequests);
         }
     }
 

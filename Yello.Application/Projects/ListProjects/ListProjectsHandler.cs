@@ -15,6 +15,14 @@ namespace Yello.Application.Projects.ListProjects;
 /// <b>The count is a true total</b> (AD-29), read in one grouped statement for the whole Space, so the deletion confirm
 /// can name it when it opens (story 2.5, open question 2 (a)).
 /// </para>
+/// <para>
+/// <b>Two statements, not one snapshot</b> (story 2.9, AC13, open question 10 (a)): under <c>READ_COMMITTED_SNAPSHOT</c>
+/// the Project list and the grouped count each read the last state committed before they began, and neither waits on a
+/// writer. A creation, deletion or move that commits between them can leave a count one off the list for this read only
+/// (a Project listed with the count it had, or a count for a Project the list no longer holds, which is dropped);
+/// the next read corrects it. Snapshot isolation for the request was rejected: presence writes in every resolution would
+/// meet update conflict 3960.
+/// </para>
 /// </remarks>
 /// <param name="store">Reads the Projects of the Space the unit of work is scoped to.</param>
 public sealed class ListProjectsHandler(IProjectStore store)

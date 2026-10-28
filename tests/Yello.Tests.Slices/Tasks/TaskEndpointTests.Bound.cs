@@ -22,8 +22,9 @@ namespace Yello.Tests.Slices.Tasks;
 /// <b>The race case does not depend on the race happening to race</b> (Task 7, story 2.1 review P11). The
 /// test takes the bound's own lock first - the Project's Tasks lock, an application lock since story 2.9 - sends both
 /// creations, waits until both are blocked on a lock, then lets go. Both queue on the lock; without it both counts would
-/// read 4,999 and both creations succeed, so the case fails every time. It waits on "blocked on any lock", never on one
-/// wait type.
+/// read 4,999, both pass the bound, and the case fails every time - the second creation then meets the first at the
+/// column's last key (the same <c>PositionKey.After</c>) and the unique index answers <c>500</c>, or, keys apart, the
+/// Project ends at 5,001. It waits on "blocked on any lock", never on one wait type.
 /// </para>
 /// </remarks>
 public sealed partial class TaskEndpointTests

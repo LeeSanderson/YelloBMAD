@@ -23,8 +23,17 @@ namespace Yello.Infrastructure.Persistence;
 /// released it. Every writer that a count or a key placement must see takes the same lock first.
 /// </para>
 /// <para>
-/// <b>The names are ids, lower case</b> (<c>Yello/ProjectsPerSpace/{spaceId:D}</c>, <c>Yello/ProjectTasks/{projectId:D}</c>):
-/// resource names compare binary, so every taker spells them the same way. Released when the request's transaction ends.
+/// <b>The names are ids, lower case</b> (<c>Yello/ProjectsPerSpace/{spaceId:D}</c>,
+/// <c>Yello/ProjectTasks/{spaceId:D}/{projectId:D}</c>): resource names compare binary, so every taker spells them the same
+/// way. Released when the request's transaction ends.
+/// </para>
+/// <para>
+/// <b>Both carry the request's Space.</b> An application lock is a name, not a row: the security policy does not narrow it.
+/// The Tasks-per-Project count takes the Project's lock from the route before anything has checked that the Project is the
+/// caller's, so a name of the Project alone would let a request in Space B that names Space A's Project queue behind A's
+/// writers - a cross-tenant wait, and a timing signal that the id exists (story 2.9 code review). Named for the request's
+/// Space as well, B's request takes a lock of B's own and answers <c>404</c> at once. A Project's writers all run in its
+/// Space, so they still meet on one name.
 /// </para>
 /// </remarks>
 internal static class ApplicationLocks
@@ -38,11 +47,12 @@ internal static class ApplicationLocks
 
     /// <summary>
     /// The lock every key placer of one Project's Tasks takes first - a creation (the Tasks-per-Project count), a Status
-    /// edit, a move, a Task deletion - and a Project deletion before it removes them.
+    /// edit, a move, a Task deletion - and a Project deletion before it removes them. Named for the requesting Space too.
     /// </summary>
+    /// <param name="spaceId">The request's Space.</param>
     /// <param name="projectId">The Project.</param>
     /// <returns>The resource name.</returns>
-    internal static string ProjectTasks(Guid projectId) => $"Yello/ProjectTasks/{projectId:D}";
+    internal static string ProjectTasks(Guid spaceId, Guid projectId) => $"Yello/ProjectTasks/{spaceId:D}/{projectId:D}";
 
     /// <summary>
     /// Takes the request's Space's Projects-per-Space lock.
@@ -59,14 +69,19 @@ internal static class ApplicationLocks
     }
 
     /// <summary>
-    /// Takes one Project's Tasks lock.
+    /// Takes one Project's Tasks lock, named for the request's Space and the Project.
     /// </summary>
-    /// <param name="dbContext">The request's unit of work, inside its transaction.</param>
+    /// <param name="dbContext">The request's unit of work, scoped to a Space and inside its transaction.</param>
     /// <param name="projectId">The Project.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>A task.</returns>
-    internal static Task TakeProjectTasksAsync(YelloDbContext dbContext, Guid projectId, CancellationToken cancellationToken) =>
-        TakeAsync(dbContext, ProjectTasks(projectId), cancellationToken);
+    internal static Task TakeProjectTasksAsync(YelloDbContext dbContext, Guid projectId, CancellationToken cancellationToken)
+    {
+        var spaceId = dbContext.ScopedSpaceId
+            ?? throw new InvalidOperationException("A Project's Tasks lock is taken only inside a Space-scoped unit of work.");
+
+        return TakeAsync(dbContext, ProjectTasks(spaceId, projectId), cancellationToken);
+    }
 
     /// <summary>
     /// Takes a lock exclusively, owned by the current transaction - waiting while another transaction holds it. Throws when

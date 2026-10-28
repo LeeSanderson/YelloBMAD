@@ -18,10 +18,11 @@ namespace Yello.Infrastructure.Persistence;
 /// <c>Name</c>: the statement cannot touch the Space, and the database would refuse it if it did.
 /// </para>
 /// <para>
-/// <b>A deletion locks the Project row, then the Project's Task range, then deletes</b> (story 2.5, open question 5).
-/// The range is what serialises it against a Task creation in that Project: a creation counts under that range in the
-/// pipeline (the Tasks-per-Project bound, <see cref="BoundCounter"/>), then reads the Project, then inserts through the
-/// composite foreign key. Without the range a deletion could commit between the creation's read and its insert, which
+/// <b>A deletion takes the Space's Projects-per-Space lock, then locks the Project row, then the Project's Tasks lock,
+/// then deletes</b> (story 2.5, open question 5; the two locks are application locks since story 2.9, where they were
+/// key ranges). The Project's Tasks lock is what serialises it against a Task creation in that Project: a creation counts
+/// under that lock in the pipeline (the Tasks-per-Project bound, <see cref="BoundCounter"/>), then reads the Project, then
+/// inserts through the composite foreign key. Without it a deletion could commit between the creation's read and its insert, which
 /// would meet the foreign key (547) as a <c>500</c>; with it the deletion waits, and then takes the new Task with it. A
 /// creation queued behind a deletion finds no Project and answers the boundary's <c>404</c>. The row's update lock is
 /// compatible with the shared lock the creation's foreign-key check takes, so the order cannot cycle - measured by story

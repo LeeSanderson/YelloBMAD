@@ -106,7 +106,7 @@ Why not pin `minReplicas: 1`. A request after an idle spell pays two costs: the 
 What is measured, and where:
 
 - **Warm, locally:** the Weekly stage's envelope load (`EnvelopeLoadTests`, P-1) asserts each operation class's p95 against NFR-5 on a local engine with `MAXDOP = 1` and `READ_COMMITTED_SNAPSHOT` on. The Nightly stage holds the Board at 5,000 Tasks (P-2). These are a local engine's figures, never production evidence (R18).
-- **Cold, locally:** the Weekly stage's P-11 case records the time from a fresh Host process to its first Space-scoped response (key-ring load, EF model build, first query), and asserts nothing about time.
+- **Cold, locally:** the Weekly stage's P-11 case records the time from a fresh Host to its first Space-scoped response (key-ring load, EF model build, first query), and asserts nothing about time. The Host is started in the test's own process, three times in a row, so the runtime's JIT and static caches are already warm after the first. The figure is a lower bound on a real cold start, not a measurement of one.
 - **Cold, on the deploy target:** one observation at P6 (section 10) - the first request after scale to zero, with the database paused and with it awake. That is Lee's, after the first deploy.
 
 Revisit when the P6 observation is taken, and after any change to `MAXDOP` (AR-40c, section 6, step 5): R3 and R5 make `MAXDOP = 1` unrelaxable to buy latency (`test-design-architecture.md:630`).

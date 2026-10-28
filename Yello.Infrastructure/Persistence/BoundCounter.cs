@@ -30,8 +30,9 @@ namespace Yello.Infrastructure.Persistence;
 /// <para>
 /// <b>No <c>Where</c> on <c>SpaceId</c>.</b> The row-level security policy narrows the statement to
 /// the request's Space; raw SQL is not subject to the query filter, so the policy is the layer here,
-/// and it is the one the lock follows. For Tasks, the <c>(SpaceId, ProjectId, ...)</c> index the policy
-/// and the Project predicate seek keeps the range lock inside one Project's range. Raw SQL lives only in
+/// and the count reads only the request's Space. The locks are named for the request's Space
+/// (<see cref="ApplicationLocks"/>), which the policy cannot narrow - a name is not a row - so a count naming another
+/// Space's Project takes a lock of its own Space's and waits on nothing of the other's. Raw SQL lives only in
 /// this ring (A-13), and every value is a parameter.
 /// </para>
 /// <para>

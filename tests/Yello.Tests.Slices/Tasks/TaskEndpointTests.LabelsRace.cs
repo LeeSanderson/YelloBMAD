@@ -179,8 +179,9 @@ public sealed partial class TaskEndpointTests
     /// (the test holds an uncommitted application of another Label to the same Task, which the edit's read of the
     /// Task's current set waits on); a <c>DELETE</c> of the Label then queues on the edit's lock on it; the test rolls
     /// back; the edit answers <c>200</c> and the deletion <c>409 label-in-use</c>, never a <c>500</c>. Added by the dev
-    /// phase: RACE-002 cannot see the apply's <c>UPDLOCK, HOLDLOCK</c> - a read-committed read already waits on the
-    /// deleted, uncommitted row - so this is the interleaving the hint exists for. Without it the deletion commits
+    /// phase: RACE-002 cannot see the apply's <c>UPDLOCK, HOLDLOCK</c> - a locking read already waits on the deleted,
+    /// uncommitted row (under RCSI since story 2.9, the edit's reads carry <c>READCOMMITTEDLOCK</c> for this) - so this
+    /// is the interleaving the hint exists for. Without it the deletion commits
     /// under the held edit, whose insert then meets the composite foreign key: a <c>500</c>.
     /// </summary>
     /// <returns>A task.</returns>

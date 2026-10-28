@@ -1600,9 +1600,6 @@ internal sealed class FakeYelloApi
     }
 
     /// <summary>
-    /// Whether <paramref name="path"/> is <c>/api/v1/spaces/{s}/projects/{p}/{leaf}</c>.
-    /// </summary>
-    /// <summary>
     /// <c>…/projects/{projectId}/board/columns/{statusId}</c> - story 2.9's column-page route.
     /// </summary>
     private static bool TryColumnPage(string path, out Guid spaceId, out Guid projectId, out Guid statusId)
@@ -1619,6 +1616,9 @@ internal sealed class FakeYelloApi
             && TryUnderProject(string.Join('/', segments[..^2]), "board", out spaceId, out projectId);
     }
 
+    /// <summary>
+    /// Whether <paramref name="path"/> is <c>/api/v1/spaces/{s}/projects/{p}/{leaf}</c>.
+    /// </summary>
     private static bool TryUnderProject(string path, string leaf, out Guid spaceId, out Guid projectId)
     {
         var segments = path.Split('/');

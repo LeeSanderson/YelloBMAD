@@ -41,8 +41,8 @@ namespace Yello.Tests.Slices.Tasks;
 /// is typed <c>varchar(128)</c> so a 128-character key is never truncated by the client.
 /// </para>
 /// <para>
-/// <b>The held move is the product's statement shape</b> (story Task 3's recommended order): the Project's Task range in the
-/// count shape every key placer takes (<see cref="DeleteWire.HoldProjectRangeAsync"/>), then the Task row on its clustered
+/// <b>The held move is the product's statement shape</b> (story Task 3's recommended order): the Project's Tasks lock every
+/// key placer takes (<see cref="DeleteWire.HoldProjectRangeAsync"/>; an application lock since story 2.9), then the Task row on its clustered
 /// key (<see cref="DeleteWire.HoldTaskRowAsync"/>), then one <c>UPDATE</c> of that row alone. Story Task 7 makes the move
 /// the request in half the races and this holder the competing writer in the other half.
 /// </para>
@@ -160,8 +160,8 @@ internal static class MoveWire
     }
 
     /// <summary>
-    /// The whole move story Task 3 recommends, played by the test in its open transaction: the Project's Task range (count
-    /// shape), the Task row on its clustered key, then the row alone updated to <paramref name="statusId"/> at
+    /// The whole move story Task 3 recommends, played by the test in its open transaction: the Project's Tasks lock, the
+    /// Task row on its clustered key, then the row alone updated to <paramref name="statusId"/> at
     /// <paramref name="positionKey"/>. Left uncommitted for the caller to commit or roll back.
     /// </summary>
     public static async Task HoldMoveAsync(SqlConnection connection, DbTransaction transaction, Guid projectId, Guid taskId, Guid statusId, string positionKey, CancellationToken cancellationToken)

@@ -4,7 +4,7 @@ baseline_commit: 4ccba9f
 
 # Story 2.9: The Board at five thousand Tasks
 
-Status: review
+Status: done
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-9-the-board-at-five-thousand-tasks`
@@ -221,6 +221,31 @@ AC1–AC8 are reproduced **verbatim** from `epics.md:1303-1336` (`status: final`
   - [x] `dotnet build Yello.slnx` 0/0; `dotnet build-server shutdown`; full run with `--max-parallel-test-modules 1` (never two `dotnet test` at once); Nightly/Weekly tests run once locally by their filter and their numbers recorded.
   - [x] Ledger: for every entry in the header, write CLOSED (with the test/evidence) or RE-OWNED (owner, reason) **in `deferred-work.md` itself**. Recommended dispositions are in "Ledger dispositions" below. Add new entries for anything deferred here, with owners.
   - [x] `sprint-status.yaml`: `2-9-the-board-at-five-thousand-tasks: review`.
+
+### Review Findings
+
+Code review 2026-10-28 (`bmad-code-review`, full mode, `ff8b728..HEAD`): 44 raw findings from three layers (Blind 20, Edge 11, Auditor 13), 30 after de-duplication - 14 patch, 5 defer, 11 dismissed; one more patch was found while verifying the patches (15 in all).
+
+- [x] [Review][Patch] **The Project's Tasks lock is not named for the Space** (high): `Yello/ProjectTasks/{projectId}` is global, and the Tasks-per-Project bound takes it from the route before the Project is checked, so `POST /spaces/{B}/projects/{A's project}/tasks` queues behind Space A's held writers (a cross-tenant wait and a timing signal that the id exists - AC17, AD-3) [Yello.Infrastructure/Persistence/ApplicationLocks.cs:43]
+- [x] [Review][Patch] **Idempotency-Key lookup no longer waits on an uncommitted record under RCSI** (medium): a retry overlapping the first request's commit now runs the effect again and answers `409 idempotency-key-in-flight` instead of replaying; `READCOMMITTEDLOCK` restores the pre-RCSI behaviour (a Q18-class read) [Yello.Infrastructure/Persistence/IdempotencyStore.cs:51]
+- [x] [Review][Patch] **A refused column page (`404`) is silent and the control stays** (medium): the Board's cold load raises the page's one refusal surface on a `404`; the page fetch swallows it [Yello.Client/Components/BoardView.Paging.cs:89]
+- [x] [Review][Patch] **The card index survives a Space purge** (low): `_cardIndex` keeps the previous Space's `ColumnState`s and Tasks after `Purge` [Yello.Client/Components/BoardView.razor:300]
+- [x] [Review][Patch] **RCSI migration: `Down` would turn off Azure SQL's own default, and its remarks are stale** (low): guard `Down` off Azure SQL Database (`EngineEdition` 5); the remark that the hinted range locks "still lock exactly as before" contradicts Q17; state that `ROLLBACK IMMEDIATE` ends open transactions on a non-Azure target [Yello.Infrastructure/Persistence/Migrations/20261028120526_ReadCommittedSnapshot.cs:44]
+- [x] [Review][Patch] **The scheduled workflows' checkout keeps the token in `.git/config`** (low): `persist-credentials: false` [.github/workflows/nightly.yml, .github/workflows/weekly.yml]
+- [x] [Review][Patch] **The browser p95 is taken over 21 samples; the convention is at least 100** (low) [tests/Yello.Tests.Client/BoardRenderCostTests.cs:36]
+- [x] [Review][Patch] **A doc comment split from its method in the fake** (low): `TryColumnPage` was inserted between `TryUnderProject`'s summary and its method [tests/Yello.Tests.Client/FakeYelloApi.cs]
+- [x] [Review][Patch] **Stale range-lock and pre-RCSI wording** (medium): `TESTING-CONVENTIONS.md` race sections (2.2-2.6) still teach `UPDLOCK, HOLDLOCK` range shapes, "range before row" and "a read-committed read already waits"; `TaskStore`'s class remarks, `ApplyAsync`'s Q18 comment (it does not stop a title edit racing a deletion), `DeleteWire`, `MoveWire`, `EditRace`, `LabelsRace`, `TaskEndpointTests.Bound` and the two ATDD-era gate remarks say the same [tests/TESTING-CONVENTIONS.md:102-161, Yello.Infrastructure/Persistence/TaskStore.cs:22-70]
+- [x] [Review][Patch] **Q10's snapshot decision is not recorded in `ListProjectsHandler`** (low): Task 8's last subtask [Yello.Application/Projects/ListProjects/ListProjectsHandler.cs]
+- [x] [Review][Patch] **The key-length report gives max and average, not the p99 Task 10 asks for** (low) [tests/Yello.Tests.Slices/Boards/EnvelopeLoadTests.cs]
+- [x] [Review][Patch] **The cold-path figure is called "a fresh Host process"; it is a fresh in-process Host** (low) [docs/operations.md]
+- [x] [Review][Patch] **AC10's cursor advance (a move placed directly after the last loaded card) has no test** (medium) [tests/Yello.Tests.Client/BoardPagingTests.cs]
+- [x] [Review][Patch] **The story's record overstates what was done** (low): `BoardColumn` has no `ShouldRender` (Task 7); the deleted-Task focus plant and the baseline run (Task 1) were not done; three of the four new isolation rows are not plant-proven (Task 3); AC14's drag frame records rect reads, not input-to-update time; AC15's "PR stage under 15 minutes" has no CI timing behind it [this file, Dev Agent Record]
+- [x] [Review][Patch] **PG-14..PG-17 and PG-19 counted any lock wait in the database as "the request waited on the held side"** (medium; found while verifying the patches): under the full suite's load PG-16 failed 2 runs in 3 on a transient wait that was gone a moment later, while it passed alone and in its namespace. The cases now count only waits that lead to the holder's session (`WaitUntilBlockedByTheHolderOrAnsweredAsync`); the RCSI-off and lock-name plants are still caught [tests/Yello.Tests.Slices/Boards/BoardPagingTests.cs]
+- [x] [Review][Defer] **Label deletion's `TaskLabel` range lock, and the point `UPDLOCK, HOLDLOCK` reads on ids another Space owns, can still lock another Space's keys** [Yello.Infrastructure/Persistence/LabelStore.cs:103, TaskStore.cs:235, ProjectStore.cs:100] — deferred, pre-existing (not in this diff); owner story 3.4
+- [x] [Review][Defer] **A title or due-date edit racing a Task deletion still reaches a 0-row UPDATE (`500`)** [Yello.Infrastructure/Persistence/TaskStore.cs:192] — deferred, pre-existing (the deletion's `UPDLOCK` never blocked the edit's shared read, before or after RCSI); owner story 7.4
+- [x] [Review][Defer] **After a re-read, a kept Task that another Session deleted or moved makes `RestoreDepthAsync` page its whole column** [Yello.Client/Components/BoardView.Paging.cs:261] — deferred; owner story 7.3
+- [x] [Review][Defer] **Three of the four new isolation rows have no plant of their own** [tests/Yello.Tests.Isolation/IsolationCases.cs] — deferred; owner story 3.4
+- [x] [Review][Defer] **The `:219` locality closure measured the seeded `NEWID()` rows, not product-created ones** [_bmad-output/implementation-artifacts/deferred-work.md:219] — deferred, closure reopened; owner story 7.3
 
 ## Dev Notes
 
@@ -473,9 +498,18 @@ Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, run unattended by the story-c
 - Q14 - (a) `sp_getapplock` `Yello/ProjectsPerSpace/{spaceId}` before the count (no range hints); Project deletion takes it too.
 - Q15 - (a) escalation observed, `LOCK_ESCALATION = DISABLE` on `Task` and `TaskLabel`; deletion stays one statement.
 - Q16 - (a) a .NET harness over `RunningHost`, no new dependency; one request at a time across 50 Sessions (ledgered: parallel load needs an approved tool).
-- Q17 (new, cut-able) - the Project's Task range lock (`UPDLOCK, HOLDLOCK WHERE ProjectId`) became an application lock `Yello/ProjectTasks/{projectId}` taken by every key placer (creation's bound count, Status edit, move, Task deletion, Project deletion), with plain reads after it under RCSI. Reason: the range's next key reached the adjacent Space, so AC17 failed even with escalation disabled. Cost: race tests hold the lock, not the range.
+- Q17 (new, cut-able) - the Project's Task range lock (`UPDLOCK, HOLDLOCK WHERE ProjectId`) became an application lock `Yello/ProjectTasks/{projectId}` taken by every key placer (creation's bound count, Status edit, move, Task deletion, Project deletion), with plain reads after it under RCSI. Reason: the range's next key reached the adjacent Space, so AC17 failed even with escalation disabled. Cost: race tests hold the lock, not the range. **Amended at code review:** the name carries the Space too (`Yello/ProjectTasks/{spaceId}/{projectId}`) - a creation naming another Space's Project took the bound count's lock on that Project and queued on its writers (PG-19).
 - Q18 (new, cut-able) - `READCOMMITTEDLOCK` on the two write-path reads that relied on waiting (`TaskStore.ApplyAsync`, `ReplaceAsync`). Reason: RCSI turned a held Task deletion into a `400`/`500` for a racing edit.
 - Q19 (new, cut-able) - every tiered test is `Explicit` (see Q13); `TESTING-CONVENTIONS.md` documents running a tier.
+- **Corrections to this record (code review, 2026-10-28)** - what the checked tasks above did not do, stated rather than re-checked:
+  - Task 7: `BoardColumn` has no `ShouldRender`; only `TaskCard` does. AC14's budget held without it (56.6 ms). The page-append cost it would address is ledgered (owner Lee).
+  - Task 1: the baseline run was the orchestrator's figure (1340 / 1293 / 47 skipped), not a run by the dev phase.
+  - Task 3: of the four new isolation rows, only `ISO-BOARD-COLUMN-FOREIGN-ID-IN-OWN-SPACE` is plant-proven (Plants 3). The other three are live on both surfaces but have no plant of their own (ledgered, owner story 3.4).
+  - Tasks 6 and 13: plant 7 was run against the panel-close case only. `Deleting_a_Task_whose_card_is_not_loaded_focuses_its_column` has no plant of its own.
+  - AC14: the drag half records per-frame rect reads (zero on a still pointer), not input-to-update time for a drag frame.
+  - AC15: "the PR stage still finishes under 15 minutes" has no CI timing behind it. The PR job's test filter only gained the `Tier` exclusion; no GitHub Actions run was triggered (the story may not trigger one).
+  - Q18 has a third site, added at review: `IdempotencyStore.FindAsync` reads with `READCOMMITTEDLOCK` (a retry overlapping a first use's commit replays again instead of answering `409 in flight`).
+  - The key-length report gives the p99 as well since review. P-11's "fresh Host" is in-process, and `docs/operations.md` says so.
 
 ### File List
 
@@ -551,3 +585,4 @@ Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, run unattended by the story-c
 
 - 2026-10-28 - Story created (create-story): ACs 1-8 verbatim from `epics.md:1303-1336`, ACs 9-19 derived; 16 open questions with recommendations; 26 ledger entries folded or with recommended re-owners.
 - 2026-10-28 - Implemented (dev-story): keyset paging server and client, page contract and refusals, RCSI and lock-escalation migrations, application locks for Projects-per-Space and Project Tasks, full-gap refusal, Nightly/Weekly stages, AR-40b decided, ledger settled. Status -> review.
+- 2026-10-28 - Code review (bmad-code-review, full, `ff8b728..HEAD`): 44 raw findings, 30 after de-duplication; 15 patches applied (the Project's Tasks lock named for the Space - PG-19; the Idempotency-Key lookup under `READCOMMITTEDLOCK`; a refused column page raises the refusal surface; the card index purged; the RCSI migration's `Down` leaves Azure SQL alone; `persist-credentials: false`; the browser p95 over 100 steps; stale range-lock and pre-RCSI wording in `TESTING-CONVENTIONS.md`, `TaskStore`, `ProjectStore`, `BoundCounter`, `PositionKey` and the race helpers; Q10 recorded in `ListProjectsHandler`; the key-length p99; P-11's in-process cold path stated; AC10's cursor-advance case; the record corrected; the "does not wait" cases count only waits on the held side). 5 deferred with owners (3.4, 7.4, 7.3). Files touched beyond the File List: `Yello.Application/Projects/ListProjects/ListProjectsHandler.cs`, `Yello.Infrastructure/Persistence/IdempotencyStore.cs`, `tests/Yello.Tests.Slices/Tasks/MoveWire.cs`, `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.LabelsRace.cs`. Build 0/0; 1364 total, 1356 passed, 0 failed, 8 skipped (run one project at a time after the host stopped the full run for low memory). Status -> done.
