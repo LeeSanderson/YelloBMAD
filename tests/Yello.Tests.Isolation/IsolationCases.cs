@@ -279,6 +279,85 @@ internal static class IsolationCases
             },
             Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable))),
 
+        // Story 2.9 - the column-page route (Q1 (a), AC9, Task 3; 1.9-GATE-002 on both surfaces), pending until the dev phase
+        // maps it (GATE-003: every one live before 2.9 reaches review). The rows name ColumnRoute, the scaffold constant for
+        // the template story Task 2 adds to BoardRoutes; switch it (and ColumnOf) when that exists. The route is a read every
+        // Role holds (ReadProjectsAndTasks), so both surfaces get the same expectation. Seeded through the product.
+        new(
+            "ISO-DIRECT-BOARD-COLUMN", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, ColumnRoute,
+            async world =>
+            {
+                var (foreign, _) = await SeedProjectWithTaskAsync(world.B);
+                var theirStatus = (await StatusIdsAsync(world.B))[0];
+
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Get,
+                    [new(ColumnOf(world.B.SpaceId, foreign, theirStatus), ColumnOf(Guid.NewGuid(), foreign, theirStatus))],
+                    world.B.SpaceId);
+            },
+            Both(new BoundaryNotFound()),
+            PendingUntil: "2.9",
+            PendingReason: "GET …/projects/{projectId}/board/columns/{statusId} is mapped by story 2.9 Task 2"),
+
+        new(
+            "ISO-BOARD-COLUMN-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Get, ColumnRoute,
+            async world =>
+            {
+                var (own, _) = await SeedProjectWithTaskAsync(world.A);
+                var (foreign, _) = await SeedProjectWithTaskAsync(world.B);
+                var ownStatus = (await StatusIdsAsync(world.A))[0];
+                var theirStatus = (await StatusIdsAsync(world.B))[0];
+
+                // B's Project (with B's Status) and B's Status (in A's own Project) each in A's own Space: only the Task's,
+                // Project's and Status's query filters and FILTER predicates stand between A and them - the dev phase plants
+                // the drop of the Task's two layers (the Session row fails), then each alone (green) - story Task 3.
+                return new CaseRequest(
+                    world.A,
+                    HttpMethod.Get,
+                    [
+                        new(ColumnOf(world.A.SpaceId, foreign, theirStatus), ColumnOf(world.A.SpaceId, Guid.NewGuid(), theirStatus)),
+                        new(ColumnOf(world.A.SpaceId, own, theirStatus), ColumnOf(world.A.SpaceId, own, Guid.NewGuid())),
+                        new(ColumnOf(world.A.SpaceId, foreign, ownStatus), ColumnOf(world.A.SpaceId, Guid.NewGuid(), ownStatus)),
+                    ],
+                    TargetSpaceId: null);
+            },
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable)),
+            PendingUntil: "2.9",
+            PendingReason: "GET …/projects/{projectId}/board/columns/{statusId} is mapped by story 2.9 Task 2; the two-layer plant is Task 3's"),
+
+        new(
+            "ISO-BOARD-COLUMN-AGGREGATE", "I-3 (includes Board column counts), FR-28", IsolationVector.Aggregate, HttpMethod.Get, ColumnRoute,
+            async world =>
+            {
+                var (own, _) = await SeedProjectWithTaskAsync(world.A);
+                _ = await SeedProjectWithTaskAsync(world.B);
+
+                return await OwnAsync(world, ColumnOf(world.A.SpaceId, own, (await StatusIdsAsync(world.A))[0]));
+            },
+            Both(new Served(HttpStatusCode.OK, ColumnPageHoldsExactlyTheCallersTasksAsync, "200, the page's total and Tasks are A's only, none of B's ids or titles")),
+            PendingUntil: "2.9",
+            PendingReason: "GET …/projects/{projectId}/board/columns/{statusId} is mapped by story 2.9 Task 2"),
+
+        // Story 2.9 - the Board read itself, once it pages (AC9): ISO-BOARD-AGGREGATE's checker asserts every Task is returned
+        // (a column's tasks == its total), which stops being true above 50. This row is its paged successor - 51 Tasks in
+        // one column, so the first page is full and a cursor follows - and walking the pages must yield exactly A's Tasks.
+        // On activation, fold ISO-BOARD-AGGREGATE's `tasks == total` line into this rule rather than keeping both.
+        new(
+            "ISO-BOARD-AGGREGATE-PAGED", "I-3 (includes Board column counts), FR-28, AC9 (2.9)", IsolationVector.Aggregate, HttpMethod.Get, BoardRoutes.Board,
+            async world =>
+            {
+                var (own, _) = await SeedProjectWithTaskAsync(world.A);
+
+                await SeedTasksThroughTheProductAsync(world.A, own, PageSize);
+                _ = await SeedProjectWithTaskAsync(world.B);
+
+                return await OwnAsync(world, BoardRoutes.BoardOf(world.A.SpaceId, own));
+            },
+            Both(new Served(HttpStatusCode.OK, BoardPagesHoldExactlyTheCallersTasksAsync, "200, each column at most 50 with a cursor iff more follow; walking the pages yields exactly A's Tasks")),
+            PendingUntil: "2.9",
+            PendingReason: "the Board read pages its columns and the column-page route is mapped by story 2.9 Task 2"),
+
         new(
             "ISO-WRITE-TASK-FOREIGN-PROJECT-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Post, TaskRoutes.Create,
             async world =>
@@ -1211,6 +1290,130 @@ internal static class IsolationCases
         Assert.All(columns, column => Assert.Equal(column.GetProperty("tasks").GetArrayLength(), column.GetProperty("total").GetInt32()));
         Assert.Equal(own.Select(task => task.Id).Order(), listed.Order());
         Assert.Empty(listed.Intersect(theirs.Select(task => task.Id)));
+        Assert.All(theirs, task => Assert.DoesNotContain(task.Title, answer.Body, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// The column-page route's template - story 2.9 Task 2 adds it to <c>BoardRoutes</c> (Q1 (a)). A scaffold constant until
+    /// then, so the pending rows name the exact <c>(Method, Route)</c> GATE-002 will look for; replace it with the contract
+    /// constant when that exists.
+    /// </summary>
+    private const string ColumnRoute = "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/board/columns/{statusId:guid}";
+
+    /// <summary>
+    /// AR-22's page size (an assumption, spine <c>:259</c>) - story 2.9 Task 2 states it once as <c>BoardPage.Size</c>.
+    /// </summary>
+    private const int PageSize = 50;
+
+    /// <summary>
+    /// One column's page path, as the contract's builder will state it; the cursor is the last loaded Task's position key.
+    /// </summary>
+    private static string ColumnOf(Guid spaceId, Guid projectId, Guid statusId, string? after = null) =>
+        BoardRoutes.BoardOf(spaceId, projectId) + $"/columns/{statusId:D}" + (after is null ? string.Empty : "?after=" + Uri.EscapeDataString(after));
+
+    /// <summary>
+    /// <paramref name="count"/> more Tasks in <paramref name="owner"/>'s Project, created through the product one request
+    /// each, every title unique and added to the owner's secrets (I-17). Story 2.9.
+    /// </summary>
+    private static async Task SeedTasksThroughTheProductAsync(ProductActor owner, Guid projectId, int count)
+    {
+        for (var index = 0; index < count; index++)
+        {
+            var title = $"Task {Guid.NewGuid():N}";
+
+            owner.HoldsTaskTitled(title);
+
+            var created = await owner.SendAsync(
+                IsolationSurface.Session,
+                HttpMethod.Post,
+                TaskRoutes.CreateIn(owner.SpaceId, projectId),
+                JsonContent.Create(new { title }, options: JsonOptions),
+                headers: null);
+
+            Assert.True(created.StatusCode == HttpStatusCode.Created, $"Seeding a Task through the product: {created.StatusCode} {created.Body}");
+        }
+    }
+
+    /// <summary>
+    /// I-3 for one column page (story 2.9): the page's total is the number of A's Tasks of that Project in that Status, its
+    /// Tasks are exactly those (fewer than a page here, so all of them, in key order), and none of B's ids or titles appear.
+    /// Anchored both ways, since both Spaces hold Tasks.
+    /// </summary>
+    private static async Task ColumnPageHoldsExactlyTheCallersTasksAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
+    {
+        var segments = request.Paths[0].Path.Split('?')[0].Split('/');
+        var projectId = Guid.Parse(segments[^4]);
+        var statusId = Guid.Parse(segments[^1]);
+        var inProject = (await world.Database.TasksInAsync(world.A.SpaceId)).Where(task => task.ProjectId == projectId).Select(task => task.Id).ToHashSet();
+        var own = (await world.Database.TaskPlacementsInAsync(world.A.SpaceId))
+            .Where(task => inProject.Contains(task.Id) && task.StatusId == statusId)
+            .OrderBy(task => task.PositionKey, StringComparer.Ordinal)
+            .ToList();
+        var theirs = await world.Database.TasksInAsync(world.B.SpaceId);
+
+        Assert.NotEmpty(own);
+        Assert.NotEmpty(theirs);
+
+        using var document = JsonDocument.Parse(answer.Body);
+        var listed = document.RootElement.GetProperty("tasks").EnumerateArray().Select(task => task.GetProperty("id").GetGuid()).ToList();
+
+        Assert.Equal(own.Count, document.RootElement.GetProperty("total").GetInt32());
+        Assert.Equal(own.Select(task => task.Id), listed);
+        Assert.Equal(JsonValueKind.Null, document.RootElement.GetProperty("nextAfter").ValueKind);
+        Assert.Empty(listed.Intersect(theirs.Select(task => task.Id)));
+        Assert.All(theirs, task => Assert.DoesNotContain(task.Title, answer.Body, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// I-3 with Board column counts, once the Board pages (story 2.9 AC9): each column holds at most a page, carries a
+    /// cursor exactly when its total exceeds what it holds, and walking every column's pages (on A's own Session) yields
+    /// exactly A's Tasks of that Project - each column's walk exactly its total - and none of B's ids or titles.
+    /// </summary>
+    private static async Task BoardPagesHoldExactlyTheCallersTasksAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
+    {
+        var projectId = Guid.Parse(request.Paths[0].Path.Split('/')[^2]);
+        var own = (await world.Database.TasksInAsync(world.A.SpaceId)).Where(task => task.ProjectId == projectId).ToList();
+        var theirs = await world.Database.TasksInAsync(world.B.SpaceId);
+        var walked = new List<Guid>();
+
+        Assert.True(own.Count > PageSize, $"The row's Project holds {own.Count} Tasks; the case is about more than one page.");
+        Assert.NotEmpty(theirs);
+
+        using var document = JsonDocument.Parse(answer.Body);
+
+        foreach (var column in document.RootElement.GetProperty("columns").EnumerateArray())
+        {
+            var statusId = column.GetProperty("statusId").GetGuid();
+            var total = column.GetProperty("total").GetInt32();
+            var tasks = column.GetProperty("tasks").EnumerateArray().Select(task => task.GetProperty("id").GetGuid()).ToList();
+            var cursor = column.GetProperty("nextAfter");
+            var inColumn = new List<Guid>(tasks);
+
+            Assert.True(tasks.Count <= PageSize, $"A Board column served {tasks.Count} Tasks; a page is at most {PageSize}.");
+            Assert.Equal(tasks.Count < total, cursor.ValueKind != JsonValueKind.Null);
+
+            var after = cursor.ValueKind == JsonValueKind.Null ? null : cursor.GetString();
+
+            while (after is not null)
+            {
+                var page = await world.A.SendAsync(IsolationSurface.Session, HttpMethod.Get, ColumnOf(world.A.SpaceId, projectId, statusId, after));
+
+                Assert.True(page.StatusCode == HttpStatusCode.OK, $"Walking A's own column: {page.StatusCode} {page.Body}");
+                Assert.All(theirs, task => Assert.DoesNotContain(task.Title, page.Body, StringComparison.Ordinal));
+
+                using var next = JsonDocument.Parse(page.Body);
+
+                inColumn.AddRange(next.RootElement.GetProperty("tasks").EnumerateArray().Select(task => task.GetProperty("id").GetGuid()));
+                after = next.RootElement.GetProperty("nextAfter").ValueKind == JsonValueKind.Null ? null : next.RootElement.GetProperty("nextAfter").GetString();
+                Assert.True(inColumn.Count <= own.Count, "A column's walk returned more Tasks than A's Project holds.");
+            }
+
+            Assert.Equal(total, inColumn.Count);
+            walked.AddRange(inColumn);
+        }
+
+        Assert.Equal(own.Select(task => task.Id).Order(), walked.Order());
+        Assert.Empty(walked.Intersect(theirs.Select(task => task.Id)));
         Assert.All(theirs, task => Assert.DoesNotContain(task.Title, answer.Body, StringComparison.Ordinal));
     }
 

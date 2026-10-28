@@ -8,6 +8,7 @@ using Microsoft.Playwright;
 using Yello.Contracts;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.ApiTokens;
+using Yello.Contracts.Boards;
 using Yello.Contracts.Labels;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
@@ -67,6 +68,8 @@ internal sealed class FakeYelloApi
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _heldBoards = new();
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource> _arrivedBoards = new();
     private readonly ConcurrentDictionary<string, string> _createdTaskByKey = new(StringComparer.Ordinal);
+    private TaskCompletionSource? _heldColumnPage;
+    private TaskCompletionSource? _arrivedColumnPage;
     private TaskCompletionSource? _heldRename;
     private TaskEditHold? _taskEditHold;
     private TaskEditHold? _lastTaskEditHold;
@@ -300,6 +303,45 @@ internal sealed class FakeYelloApi
     public void ReleaseLabelCreate() => _heldLabelCreate?.TrySetResult();
 
     /// <summary>
+    /// Story 2.9's paging, off by default: <c>null</c> serves every Task of every column, exactly the bytes every case
+    /// written before 2.9 was served. Set (to 50, AR-22's page size), the Board answers each column's first page with
+    /// <c>nextAfter</c> - the last served Task's key, <c>null</c> when none follows - and
+    /// <c>GET …/board/columns/{statusId}?after={key}</c> answers the next page by the same rule, ordinal on the key (Q1 (a)).
+    /// The bodies are anonymous objects shaped as story Task 2's contract until <c>BoardColumnResponse.NextAfter</c> and
+    /// <c>BoardColumnPageResponse</c> exist; switch to the contract types on activation.
+    /// </summary>
+    public int? PageSize { get; set; }
+
+    /// <summary>
+    /// The column-page path, as story 2.9 Q1 (a) shapes it, for a case to assert a page request was (or was never) sent.
+    /// </summary>
+    public static string ColumnPathOf(Guid spaceId, Guid projectId, Guid statusId) =>
+        BoardRoutes.BoardOf(spaceId, projectId) + $"/columns/{statusId:D}";
+
+    /// <summary>
+    /// Every column-page request answered so far, in order.
+    /// </summary>
+    public IReadOnlyList<FakeRequest> ColumnPageRequests =>
+        [.. _requests.Where(request => request.Method == "GET" && request.Path.Contains("/board/columns/", StringComparison.Ordinal))];
+
+    /// <summary>
+    /// Holds the next column-page answer until <see cref="ReleaseColumnPage"/> (hold, assert, release, assert). Returns a
+    /// task that completes when that page request arrives. Story 2.9.
+    /// </summary>
+    public Task HoldColumnPageAsync()
+    {
+        _heldColumnPage = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _arrivedColumnPage = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        return _arrivedColumnPage.Task;
+    }
+
+    /// <summary>
+    /// Lets a held column-page answer go.
+    /// </summary>
+    public void ReleaseColumnPage() => _heldColumnPage?.TrySetResult();
+
+    /// <summary>
     /// Holds the next Board answer for <paramref name="projectId"/> until <see cref="ReleaseBoard"/>. Story 2.2.
     /// </summary>
     /// <returns>A task that completes when the held request has arrived and is waiting.</returns>
@@ -504,8 +546,9 @@ internal sealed class FakeYelloApi
     {
         var request = route.Request;
         var headers = await request.AllHeadersAsync().ConfigureAwait(false);
-        var path = new Uri(request.Url).AbsolutePath;
-        var seen = new FakeRequest(request.Method, path, headers, request.PostData);
+        var url = new Uri(request.Url);
+        var path = url.AbsolutePath;
+        var seen = new FakeRequest(request.Method, path, headers, request.PostData, url.Query);
 
         _requests.Enqueue(seen);
 
@@ -613,6 +656,10 @@ internal sealed class FakeYelloApi
             // Story 2.6 - a Task moved to a Status and a position by its neighbour, optimistically: held, refused or applied.
             case ("POST", var path) when TryTaskMove(path, out var moveSpace, out var movedTask):
                 return await MoveTaskAsync(moveSpace, movedTask, request).ConfigureAwait(false);
+
+            // Story 2.9 - one column's next page, by its cursor.
+            case ("GET", var path) when TryColumnPage(path, out var pageSpace, out var pageProject, out var pageStatus):
+                return await ColumnPageAsync(pageSpace, pageProject, pageStatus, request.Query).ConfigureAwait(false);
 
             // Story 2.2 - the Board and Task routes.
             case ("GET", var path) when TryUnderProject(path, "board", out var boardSpace, out var boardProject):
@@ -1122,9 +1169,75 @@ internal sealed class FakeYelloApi
             await held.Task.ConfigureAwait(false);
         }
 
-        return Boards.TryGetValue((spaceId, projectId), out var board)
-            ? (200, JsonSerializer.Serialize(board, JsonOptions))
-            : (404, Problem(ProblemTypes.NotAvailable));
+        if (!Boards.TryGetValue((spaceId, projectId), out var board))
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        if (PageSize is not { } size)
+        {
+            return (200, JsonSerializer.Serialize(board, JsonOptions));
+        }
+
+        var paged = new
+        {
+            project = board.Project,
+            columns = board.Columns.Select(column =>
+            {
+                var (tasks, nextAfter) = PageOf(column, after: null, size);
+
+                return new { statusId = column.StatusId, name = column.Name, total = column.Total, tasks, nextAfter };
+            }),
+        };
+
+        return (200, JsonSerializer.Serialize(paged, JsonOptions));
+    }
+
+    /// <summary>
+    /// Story 2.9: the page of <paramref name="statusId"/>'s column after the cursor in <paramref name="query"/>
+    /// (<c>after=</c>, absent for the first page), with the column's true total - or the boundary's <c>404</c> for a
+    /// Board or a Status the fake does not hold. Held when a case armed <see cref="HoldColumnPageAsync"/>.
+    /// </summary>
+    private async Task<(int Status, string Body)> ColumnPageAsync(Guid spaceId, Guid projectId, Guid statusId, string query)
+    {
+        if (_heldColumnPage is { } held)
+        {
+            _arrivedColumnPage?.TrySetResult();
+            await held.Task.ConfigureAwait(false);
+            _heldColumnPage = null;
+        }
+
+        if (!Boards.TryGetValue((spaceId, projectId), out var board)
+            || board.Columns.FirstOrDefault(candidate => candidate.StatusId == statusId) is not { } column)
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        var after = query.TrimStart('?').Split('&')
+            .Select(pair => pair.Split('=', 2))
+            .Where(pair => pair.Length == 2 && string.Equals(pair[0], "after", StringComparison.Ordinal))
+            .Select(pair => Uri.UnescapeDataString(pair[1]))
+            .FirstOrDefault();
+
+        var (tasks, nextAfter) = PageOf(column, after, PageSize ?? int.MaxValue);
+
+        return (200, JsonSerializer.Serialize(new { statusId = column.StatusId, total = column.Total, tasks, nextAfter }, JsonOptions));
+    }
+
+    /// <summary>
+    /// The Tasks of <paramref name="column"/> whose key sorts after <paramref name="after"/> (all, when <c>null</c>),
+    /// ordinal on the key as the Host's BIN2 seek is, at most <paramref name="size"/>, and the cursor: the last one's key
+    /// when another follows, otherwise <c>null</c>.
+    /// </summary>
+    private static (List<FakeTask> Tasks, string? NextAfter) PageOf(FakeColumn column, string? after, int size)
+    {
+        var following = column.Tasks
+            .Where(task => after is null || string.CompareOrdinal(task.PositionKey, after) > 0)
+            .OrderBy(task => task.PositionKey, StringComparer.Ordinal)
+            .ToList();
+        var page = following.Take(size).ToList();
+
+        return (page, following.Count > page.Count ? page[^1].PositionKey : null);
     }
 
     /// <summary>
@@ -1488,6 +1601,23 @@ internal sealed class FakeYelloApi
     /// <summary>
     /// Whether <paramref name="path"/> is <c>/api/v1/spaces/{s}/projects/{p}/{leaf}</c>.
     /// </summary>
+    /// <summary>
+    /// <c>…/projects/{projectId}/board/columns/{statusId}</c> - story 2.9's column-page route.
+    /// </summary>
+    private static bool TryColumnPage(string path, out Guid spaceId, out Guid projectId, out Guid statusId)
+    {
+        var segments = path.Split('/');
+
+        spaceId = Guid.Empty;
+        projectId = Guid.Empty;
+        statusId = Guid.Empty;
+
+        return segments.Length >= 3
+            && string.Equals(segments[^2], "columns", StringComparison.Ordinal)
+            && Guid.TryParse(segments[^1], out statusId)
+            && TryUnderProject(string.Join('/', segments[..^2]), "board", out spaceId, out projectId);
+    }
+
     private static bool TryUnderProject(string path, string leaf, out Guid spaceId, out Guid projectId)
     {
         var segments = path.Split('/');
@@ -1622,7 +1752,8 @@ internal sealed class TaskEditHold
 /// <param name="Path">The path, without the query.</param>
 /// <param name="Headers">Every header, lower-cased by the browser.</param>
 /// <param name="Body">The request body, or <c>null</c>.</param>
-internal sealed record FakeRequest(string Method, string Path, IReadOnlyDictionary<string, string> Headers, string? Body = null)
+/// <param name="Query">The query string, with its leading <c>?</c>, or empty - story 2.9's page cursor rides here.</param>
+internal sealed record FakeRequest(string Method, string Path, IReadOnlyDictionary<string, string> Headers, string? Body = null, string Query = "")
 {
     /// <summary>
     /// A header's value by name, ignoring case, or <c>null</c>.

@@ -185,6 +185,52 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// <paramref name="count"/> Tasks in one Project and one Status, written by one set-based statement under the Space's own
+    /// key - a Board at the NFR-8 scale without 5,000 requests. Added by the story 2.9 ATDD run for the real-Host browser
+    /// case; the Slices suite's <c>TaskWire.SeedTasksAsync</c> is the same statement.
+    /// </summary>
+    /// <remarks>
+    /// <b>Seed constraints checked</b> against the live schema (<c>20261025115412_TaskTable</c>, <c>20261025143020_TaskDueDate</c>,
+    /// <c>20261025175001_LabelTables</c>): every non-nullable column of <c>dbo.[Task]</c> is supplied (<c>Id</c> is
+    /// <c>ValueGeneratedNever</c>; <c>DueDate</c> is nullable); the composite FK <c>(SpaceId, ProjectId)</c> holds because
+    /// the caller passes a Project the product created in that Space; the composite FK <c>(SpaceId, StatusId)</c> because
+    /// the caller passes one of that Space's own Statuses; <c>BLOCK AFTER INSERT</c> because the statement runs under the
+    /// Space's session key; the unique <c>IX_Task_SpaceId_ProjectId_StatusId_PositionKey</c> because each key is a distinct
+    /// zero-padded number (<c>0</c> then five digits, so 99,999 at most and digit-only keys order numerically under BIN2).
+    /// Titles are <c>Seeded 1</c> to <c>Seeded {count}</c>, in key order.
+    /// </remarks>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="projectId">A Project the product created in it.</param>
+    /// <param name="statusId">One of that Space's Statuses.</param>
+    /// <param name="count">How many, at most 99,999.</param>
+    /// <returns>A task.</returns>
+    public async Task SeedTasksAsync(Guid spaceId, Guid projectId, Guid statusId, int count)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+
+        var inserted = await ExecuteAsync(
+            connection,
+            transaction: null,
+            """
+            WITH Numbers AS (
+                SELECT TOP (@count) ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS N
+                FROM sys.all_objects a CROSS JOIN sys.all_objects b)
+            INSERT dbo.[Task] (Id, SpaceId, ProjectId, StatusId, Title, PositionKey, CreatedAt)
+            SELECT NEWID(), @space, @project, @status, CONCAT(N'Seeded ', N), CONCAT('0', RIGHT(CONCAT('00000', N), 5)), SYSDATETIMEOFFSET()
+            FROM Numbers
+            """,
+            ("@count", count),
+            ("@space", spaceId),
+            ("@project", projectId),
+            ("@status", statusId)).ConfigureAwait(false);
+
+        if (inserted != count)
+        {
+            throw new InvalidOperationException($"Seeded {inserted} Tasks where {count} were asked for.");
+        }
+    }
+
+    /// <summary>
     /// Every Label in <paramref name="spaceId"/>, as (id, name), read under that Space's own key - the database's view,
     /// independent of the Host's query filter. Added by the story 2.4 ATDD run; the columns are the ones story 2.4 Task 3
     /// names (<c>dbo.[Label].Id</c>, <c>SpaceId</c>, <c>Name</c>). The table does not exist until 2.4's migration, so only

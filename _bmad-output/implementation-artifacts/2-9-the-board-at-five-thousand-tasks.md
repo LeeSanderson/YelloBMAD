@@ -360,6 +360,40 @@ Last commits: `4ccba9f` (2.8 review: Space on the Move picker's list), `3d4c511`
 - Prior stories: `2-8-operate-the-whole-board-from-the-keyboard.md` (Q1-Q14, Completion Notes `:373-386`, File List `:390-427`), `2-7-…md:13`, `:199`, `:288`, `2-6-…md:13-14`, `:313-322`, `:441`, `:480-487`
 - `_bmad-output/implementation-artifacts/deferred-work.md` — every line cited in the header.
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-2-9-the-board-at-five-thousand-tasks.md` (scaffold constants, seed constraints checked, assumed markup and copy, the gates that go red by design).
+
+| File | Cases | ACs | State |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Boards/BoardPagingTests.cs` | 18 entries (23 cases) PG-01..PG-18 | AC1, AC2 (deterministic half), AC4, AC5, AC9, AC10, AC13, AC17, AC18 | skipped `red` |
+| `tests/Yello.Tests.Slices/Boards/BoardPageWire.cs` | harness (page route, walk, Labels at scale, page-seek logical reads and plan) | - | active |
+| `tests/Yello.Tests.Slices/Boards/BoardScaleTimingTests.cs` | 1 (P-2) + `BoardScaleCollection` | AC2 | skipped `red`, `Tier=Nightly` |
+| `tests/Yello.Tests.Slices/Boards/EnvelopeLoadTests.cs` | 2 (P-1 load, P-11 cold start) | AC16, AC8 | skipped `red`, `Tier=Weekly` |
+| `tests/Yello.Tests.Slices/Boards/PercentileTests.cs` + `tests/Yello.Tests.Shared/Percentile.cs` | 4 entries (8 cases) | Task 3 | **green today** |
+| `tests/Yello.Tests.Slices/Deployment/DatabaseIdentityTests.cs` | +1 (SCH-901, RCSI on) | AC13 | skipped `red` |
+| `tests/Yello.Tests.Isolation/IsolationCases.cs` | 4 rows x 2 surfaces (`ISO-DIRECT-BOARD-COLUMN`, `ISO-BOARD-COLUMN-FOREIGN-ID-IN-OWN-SPACE`, `ISO-BOARD-COLUMN-AGGREGATE`, `ISO-BOARD-AGGREGATE-PAGED`) | AC9, AC4, AC5 | pending on 2.9 (GATE-003: live before `review`) |
+| `tests/Yello.Tests.Architecture/BoardPagingGateTests.cs` | 7 | AC3, AC9, AC18 | **2 green today** (no `Virtualize`/`ItemsProvider` + its plant); 5 skipped |
+| `tests/Yello.Tests.Architecture/DeploymentShapeTests.Tiers.cs` | 4 entries (5 cases) | AC15 | **2 green today** (every `Tier` is Nightly/Weekly + its plant); 3 skipped |
+| `tests/Yello.Tests.Client/BoardPagingTests.cs` | 13 (X-5, AC3 identity, X-6, AC6, AC10 x2, AC11 x4, AC12 x2, AC14 still-pointer rects) | AC3-AC7, AC10-AC12, AC14 | skipped `red` |
+| `tests/Yello.Tests.Client/BoardRenderCostTests.cs` | 1 (90 ms keyboard step at 5,000 loaded) | AC14 | skipped `red`, `Tier=Nightly` |
+| `tests/Yello.Tests.Client/RealHostBoardScaleTests.cs` | 1 (real-Host `↓` traversal of 5,000) | AC5, AC7, AC11 | skipped `red`, `Tier=Nightly` |
+| `FakeYelloApi.cs`, `RealHostFixture.cs`, `WireDatabase.cs` | harness: opt-in `PageSize` (null = unchanged bytes), page route and hold; `Database`; `SeedTasksAsync` | - | active |
+
+Green today (standing gates): `PercentileTests` (8), `Nothing_in_the_client_virtualises_a_list` and `The_virtualisation_scan_detects_a_plant`, `Every_Tier_trait_is_Nightly_or_Weekly` and `The_Tier_trait_scan_reads_a_planted_value`.
+
+Activation order, riskiest assumption first:
+1. `BoardRenderCostTests` - measure first (Task 7): append-only at 5,000 loaded cards within 90 ms is the one assumption whose failure stops the story (AC14 -> AD-29 amendment). Take the first figure with the fake's `PageSize` left `null` (all 5,000 at once, paging's end state) before paging exists; activate the scaffold as written once "Show more" exists.
+2. PG-11, PG-12 - keyset seek with a `varchar(128)` cursor on the BIN2 index under RLS, logical reads independent of depth (plants: `Skip()`/`OFFSET`; `nvarchar` cursor).
+3. PG-01, PG-02 (amend `BoardEndpointTests`' column pin by exactly `nextAfter`), PG-05, PG-03, PG-04, PG-06..PG-10, PG-13; the ARCH contract gates.
+4. Isolation rows one at a time (swap the scaffold `ColumnRoute`/`ColumnOf`/`PageSize` for the contract members; fold `ISO-BOARD-AGGREGATE`'s `tasks == total` into `ISO-BOARD-AGGREGATE-PAGED`).
+5. SCH-901 with the RCSI migration, then PG-14, PG-15; re-run every race class.
+6. PG-16, PG-17, PG-18.
+7. Browser: X-5, the AC3 identity case, X-6, AC6, AC10, AC11, AC12, the still-pointer rects case.
+8. ARCH-901/902 with the workflows (amend `The_revision_is_promoted_…`'s `Assert.Single` over `dotnet test Yello.slnx`, or run tiers per project); run the Nightly/Weekly cases once by their filter and record the numbers.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

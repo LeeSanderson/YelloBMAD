@@ -58,6 +58,12 @@ public sealed class RealHostFixture(SqlServerEngine engine) : IAsyncLifetime
     internal RunningHost Host => _host ?? throw NotStarted();
 
     /// <summary>
+    /// The class database's raw SQL, for what no endpoint does at scale - story 2.9's 5,000-Task seed
+    /// (<see cref="WireDatabase.SeedTasksAsync"/>). Seeding small things stays through the product.
+    /// </summary>
+    internal WireDatabase Database => _database ?? throw NotStarted();
+
+    /// <summary>
     /// Account A, seeded through the real API.
     /// </summary>
     internal ProductActor A => _a ?? throw NotStarted();

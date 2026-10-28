@@ -94,6 +94,32 @@ public sealed class DatabaseIdentityTests(MigratedDatabaseFixture fixture) : ICl
         Assert.Equal(1, await ScalarAsync(admin, "SELECT CAST(value AS int) FROM sys.database_scoped_configurations WHERE name = 'MAXDOP'", cancellationToken));
     }
 
+    /// <summary>
+    /// 2.9-SCH-901 (story 2.9 AC13, Task 8) - every database the migrations create or update reads committed data from a
+    /// row version: <c>READ_COMMITTED_SNAPSHOT</c> is on, so a Space-scoped read never waits on an uncommitted writer (a
+    /// presence insert, a large Project deletion, a creation). Azure SQL defaults it on; Testcontainers and CI do not,
+    /// until a migration turns it on.
+    /// </summary>
+    /// <remarks>
+    /// Written red by the story 2.9 ATDD run. <c>MigrationBundleEquivalenceTests</c> gains the same column in its catalogue
+    /// comparison in the same change (story Task 8), so the bundle is held to it as well. The behavioural proof is
+    /// <c>BoardPagingTests</c>' PG-14 and PG-15.
+    /// </remarks>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC13 - no migration turns READ_COMMITTED_SNAPSHOT on until story Task 8")]
+    [Trait("Requirement", "NFR-5")]
+    public async Task Every_migrated_database_reads_committed_data_from_a_snapshot()
+    {
+        Assert.SkipUnless(fixture.IsAvailable, fixture.UnavailableReason ?? string.Empty);
+
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        await using var admin = new SqlConnection(fixture.ConnectionString!);
+        await admin.OpenAsync(cancellationToken);
+
+        Assert.Equal(1, await ScalarAsync(admin, "SELECT CAST(is_read_committed_snapshot_on AS int) FROM sys.databases WHERE name = DB_NAME()", cancellationToken));
+    }
+
     private static async Task CreateDataOnlyIdentityAsync(string administrator, string login, string password, CancellationToken cancellationToken)
     {
         var master = new SqlConnectionStringBuilder(administrator) { InitialCatalog = "master" }.ConnectionString;
