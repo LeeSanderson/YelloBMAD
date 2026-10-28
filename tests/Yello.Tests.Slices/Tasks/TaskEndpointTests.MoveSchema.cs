@@ -120,7 +120,7 @@ public sealed partial class TaskEndpointTests
     /// <see cref="EmailAddressNormalisation.Normalise"/> stores.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC16 - Q12 (a)'s migration has not declared NormalizedEmailAddress BIN2; it takes the database default")]
+    [Fact]
     [Trait("Requirement", "FR-1")]
     [Trait("Requirement", "AD-15")]
     public async Task The_normalised_email_column_is_BIN2()
@@ -141,7 +141,7 @@ public sealed partial class TaskEndpointTests
     /// silent <c>204</c>). Under the default, width-insensitive collation the two compare equal and this fails.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC16 - Q12 (a): under the default collation a full-width spelling equals the registered address")]
+    [Fact]
     [Trait("Requirement", "FR-1")]
     [Trait("Requirement", "AD-23")]
     public async Task An_address_that_normalises_differently_never_equals_a_registered_one_in_the_email_index()

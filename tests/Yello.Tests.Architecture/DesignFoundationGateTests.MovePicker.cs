@@ -10,17 +10,15 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Class names are the scaffold's assumption</b> (story Task 9 names the component, not its classes):
-/// <c>.move-picker</c> for the picker (Q5 (a)), <c>.task-menu</c> for the card's context menu and
-/// <c>.task-card__actions</c> for the card's visible actions control (Q6 (a)). The browser scaffolds
-/// (<c>MoveTests</c>) locate the same parts by role and name, so a different class choice changes only the constants
-/// below; record it.
+/// <b>Class names are the built ones</b>: <c>.move-picker</c> for the picker (Q5 (a), <c>MovePicker.razor</c>),
+/// <c>.task-menu</c> for the card's context menu (<c>TaskMenu.razor</c>) and <c>.task-card__actions</c> for the card's
+/// visible actions control (Q6 (a)). The browser cases (<c>MoveTests</c>) locate the same parts by role and name.
 /// </para>
 /// <para>
 /// <b>DSN-602 runs from the ATDD run on</b>, as a standing gate over the whole corpus: no rule under <c>:hover</c> sets
 /// <c>display</c>, <c>visibility</c> or <c>opacity</c>, so no control can be revealed by hover alone ("never hover-only",
-/// UX-DR21). It was proved against a plant by the ATDD run (see the checklist). DSN-601 and DSN-603 are red until the picker
-/// and the reflow exist.
+/// UX-DR21). It was proved against a plant by the ATDD run (see the checklist). DSN-601 and DSN-603 hold the picker, the
+/// menu and the moved card's reflow that story 2.6 built.
 /// </para>
 /// </remarks>
 public sealed partial class DesignFoundationGateTests
@@ -39,7 +37,7 @@ public sealed partial class DesignFoundationGateTests
     /// carries no shadow (other than <c>none</c>).
     /// </summary>
     /// <param name="component">The component class.</param>
-    [Theory(Skip = "red: AC14 - the Move picker and the card menu are not built yet (story Task 9)")]
+    [Theory]
     [InlineData(MovePickerClass)]
     [InlineData(TaskMenuClass)]
     [Trait("Requirement", "UX-DR11")]
@@ -88,7 +86,7 @@ public sealed partial class DesignFoundationGateTests
     /// the card, the picker or the menu uses only <c>--motion-*</c> tokens (base.css's reduced-motion reset then removes it).
     /// No lift, settle or drop zone (2.7).
     /// </summary>
-    [Fact(Skip = "red: AC15 - the moved card's reflow is not built yet (story Task 9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR6")]
     public void Only_the_moved_cards_reflow_moves_and_on_the_quick_motion_token()
     {

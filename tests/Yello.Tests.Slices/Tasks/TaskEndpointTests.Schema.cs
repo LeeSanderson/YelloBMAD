@@ -17,9 +17,9 @@ namespace Yello.Tests.Slices.Tasks;
 /// <b>Read this beside <c>SpaceIsolationSchemaTests</c>.</b> Its
 /// <c>Every_Space_scoped_table_carries_a_filter_and_a_block_predicate</c> expects three predicates for
 /// <c>Project</c> and two for every other table; dev-story widens it so <c>Task</c> also expects three, and
-/// records the change. The full A-6 / R7 collation assertion and the mixed-case ordering case stay with 2.6;
-/// <see cref="The_position_key_is_BIN2_and_unique_within_a_Project_and_Status"/> is the one-query check Q2 (a)
-/// asks for now.
+/// records the change. <see cref="The_position_key_is_BIN2_and_unique_within_a_Project_and_Status"/> is the one-query
+/// check Q2 (a) asked for; the full A-6 / R7 collation assertion - BIN2 on the index key column - and the mixed-case
+/// ordering case are story 2.6's, in <c>TaskEndpointTests.MoveSchema.cs</c>.
 /// </remarks>
 public sealed partial class TaskEndpointTests
 {

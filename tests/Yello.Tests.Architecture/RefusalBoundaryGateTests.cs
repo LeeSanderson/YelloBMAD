@@ -418,44 +418,9 @@ public sealed partial class RefusalBoundaryGateTests
             + "could name any Space. The switcher reaches Space names only through its Membership join.");
     }
 
-    /// <summary>
-    /// Story 1.8 AC9 / CAP-35 / AD-24 - the endpoints marked unreachable with an API Token, by the
-    /// Session-only marker or by an AD-24 surface, are exactly Token issue, the Token list, Token
-    /// revocation and the switcher - so a new Token-management route cannot be added without one.
-    /// </summary>
-    /// <remarks>
-    /// A Token authenticates only on a Space-scoped route without <c>SessionOnlyEndpoint</c>; every
-    /// other route answers it as no credential by its shape. The two markers name the exceptions a
-    /// shape cannot decide. Read from the real route table; <b>vacuity guard:</b> the issue route is
-    /// found carrying <c>{spaceId}</c>, so the marker is doing work its shape would not.
-    /// </remarks>
-    [Fact]
-    [Trait("Requirement", "FR-36")]
-    [Trait("Requirement", "AR-29")]
-    [Trait("Requirement", "AD-24")]
-    public void The_endpoints_marked_unreachable_with_a_Token_are_exactly_Token_management_and_the_switcher()
-    {
-        var table = RouteTable();
-
-        var issue = Assert.Single(table, endpoint => endpoint.RoutePattern.RawText == Yello.Contracts.ApiTokens.ApiTokenRoutes.Issue);
-        Assert.True(CarriesSpaceId(issue), "The issue route no longer carries {spaceId}.");
-
-        var marked = table
-            .Where(endpoint => endpoint.Metadata.Any(item =>
-                item.GetType().FullName is SessionOnlyMarkerName or AccountScopedMarkerName))
-            .Select(endpoint => endpoint.RoutePattern.RawText)
-            .Order(StringComparer.Ordinal)
-            .ToList();
-
-        Assert.Equal(
-            [
-                Yello.Contracts.ApiTokens.ApiTokenRoutes.List,
-                Yello.Contracts.ApiTokens.ApiTokenRoutes.Revoke,
-                Yello.Contracts.Spaces.SpaceRoutes.Directory,
-                Yello.Contracts.ApiTokens.ApiTokenRoutes.Issue,
-            ],
-            marked);
-    }
+    // Story 1.8 AC9's Token-unreachable gate (CAP-35, AD-24) now lives in RefusalBoundaryGateTests.Move.cs as
+    // The_endpoints_unreachable_with_a_Token_are_Token_management_the_switcher_and_the_move: story 2.6 widened it by
+    // exactly the move route (FR-35) and kept its vacuity guard.
 
     /// <summary>
     /// Story 1.8 AC4 / AC10 / NFR-6 - only the Token store and the table's configuration read

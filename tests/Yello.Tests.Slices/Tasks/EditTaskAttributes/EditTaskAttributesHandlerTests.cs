@@ -253,5 +253,8 @@ public sealed class EditTaskAttributesHandlerTests
 
         public Task<TaskDeletion> DeleteAsync(Guid taskId, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The edit slice deletes nothing.");
+
+        public Task<TaskMove> MoveAsync(Guid taskId, Guid statusId, Guid? afterTaskId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The edit slice moves nothing.");
     }
 }

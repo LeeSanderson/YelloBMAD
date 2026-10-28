@@ -1,4 +1,5 @@
 using System.Data.SqlTypes;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Yello.Domain;
@@ -7,8 +8,8 @@ using Yello.Domain.Tasks;
 namespace Yello.Infrastructure.Persistence;
 
 /// <summary>
-/// Creates, reads, edits and deletes Tasks, and the Labels applied to them, inside the request's Space-scoped unit of
-/// work. Stories 2.2, 2.3, 2.4 and 2.5.
+/// Creates, reads, edits, moves and deletes Tasks, and the Labels applied to them, inside the request's Space-scoped unit
+/// of work. Stories 2.2, 2.3, 2.4, 2.5 and 2.6.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,8 +19,8 @@ namespace Yello.Infrastructure.Persistence;
 /// any insert, so the composite foreign key is never the thing that refuses it (a <c>500</c>).
 /// </para>
 /// <para>
-/// <b>The position key is the column's last plus one</b> (<see cref="PositionKey.After"/>), and <b>both
-/// writers that place a key take the same lock first</b>: the Project's Tasks under
+/// <b>A creation's and a Status edit's position key is the column's last plus one</b> (<see cref="PositionKey.After"/>),
+/// and <b>every writer that places a key takes the same lock first</b>: the Project's Tasks under
 /// <c>UPDLOCK, HOLDLOCK</c>. A creation takes it in the pipeline (the Tasks-per-Project bound,
 /// <see cref="BoundCounter"/>); a Status change takes it here, in <see cref="EditAsync"/>, with the same range
 /// over the same <c>SpaceId</c>-leading index. So an edit and a creation into one column, or two edits, queue
@@ -54,6 +55,18 @@ namespace Yello.Infrastructure.Persistence;
 /// needs while waiting for what it has. A Label deletion takes the Label and then its <c>TaskLabel</c> range and never a
 /// Task lock, so it queues behind the cascade's removed rows and never cycles. A deletion writes no position key and
 /// renumbers no sibling (AD-15). Measured by story 2.5's RACE-T1..T5, which hold each side and wait on the other.
+/// </para>
+/// <para>
+/// <b>A move is the fourth key placer and takes the same locks in the same order</b> (story 2.6, AC11): the Project's
+/// Task range in the creation count's statement shape, then the Task's own row on its clustered key (<c>INDEX(1)</c>),
+/// re-read under it - gone, or no longer in the Project whose range is held, is not found - then, only now, the
+/// neighbour and the first key after it in the destination column, the moved Task left out. Its key is placed strictly
+/// between the two (<see cref="PositionKey.Between"/>) and only its own row is written; no sibling's key ever changes
+/// (AD-15). A move to where the Task already is writes nothing but still took the locks. Measured by story 2.6's
+/// RACE-M1..M8, which hold each side and wait on the other: reading the neighbours before the range, or the range
+/// without its hints, is caught 3/3 by the read race (RACE-M2); the row's <c>INDEX(1)</c> and its
+/// <c>UPDLOCK, HOLDLOCK</c> are each masked 0/3 - the range already serialises every key placer - and kept as every
+/// Task writer's row lock.
 /// </para>
 /// <para>
 /// <b>Saves its own effect</b>, as every store does, so the idempotency record is the only thing the
@@ -259,11 +272,8 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
 
         var project = owner.ProjectId;
 
-        // The Project's Task range, in the statement shape a creation's bound count takes, so all three meet on it.
-        _ = await dbContext.Database
-            .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = {project}")
-            .SingleAsync(cancellationToken)
-            .ConfigureAwait(false);
+        // The Project's Task range, in the statement shape a creation's bound count takes, so every key placer meets on it.
+        await TakeTheProjectRangeAsync(project, cancellationToken).ConfigureAwait(false);
 
         // The Task's own row, on the clustered key every other Task locker names. Gone by now (deleted while this waited
         // on the range) is not found - never Deleted, never a 500.
@@ -285,6 +295,141 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
 
         return deleted == 0 ? TaskDeletion.NotFound : TaskDeletion.Deleted;
     }
+
+    /// <inheritdoc />
+    public async Task<TaskMove> MoveAsync(Guid taskId, Guid statusId, Guid? afterTaskId, CancellationToken cancellationToken)
+    {
+        var owner = await dbContext.Tasks
+            .AsNoTracking()
+            .Where(task => task.Id == taskId)
+            .Select(task => new { task.ProjectId })
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (owner is null)
+        {
+            return TaskMove.NotFound;
+        }
+
+        var project = owner.ProjectId;
+
+        // Range before row, as every key placer: the Project's Task range in the creation count's statement shape.
+        await TakeTheProjectRangeAsync(project, cancellationToken).ConfigureAwait(false);
+
+        // The Task's own row, on the clustered key every other Task locker names, read again under it: gone by now - or
+        // no longer in the Project whose range this holds - is not found, never Moved.
+        var task = await dbContext.Tasks
+            .FromSql($"SELECT * FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {taskId}")
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (task is null || task.ProjectId != project)
+        {
+            return TaskMove.NotFound;
+        }
+
+        // The neighbours, read only now that the range is held: nothing in this Project can be placed, moved or
+        // deleted until this commits, so the gap read here is the gap written into.
+        var (available, lower) = await NeighbourKeyAsync(project, statusId, taskId, afterTaskId, cancellationToken).ConfigureAwait(false);
+
+        if (!available)
+        {
+            return TaskMove.PositionUnavailable;
+        }
+
+        var upper = await SuccessorAsync(project, statusId, taskId, lower, cancellationToken).ConfigureAwait(false);
+
+        // Already there: nothing to write, but the locks were still taken (story 2.6, open question 18).
+        if (task.StatusId == statusId && SortsBetween(lower, task.PositionKey, upper))
+        {
+            return TaskMove.Moved(task);
+        }
+
+        if (Placed(lower, upper) is not { } key)
+        {
+            // No key fits the gap: refused, never a renumber of the siblings (AD-15, open question 10).
+            return TaskMove.PositionUnavailable;
+        }
+
+        task.StatusId = statusId;
+        task.PositionKey = key;
+
+        await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return TaskMove.Moved(task);
+    }
+
+    private static bool SortsBetween(string? lower, string key, string? upper) =>
+        (lower is null || string.CompareOrdinal(lower, key) < 0) && (upper is null || string.CompareOrdinal(key, upper) < 0);
+
+    private static string? Placed(string? lower, string? upper)
+    {
+        try
+        {
+            return PositionKey.Between(lower, upper, RandomNumberGenerator.GetInt32);
+        }
+        catch (InvalidOperationException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The key the moved Task lands after: <c>null</c> for the top of the column, or the neighbour's key when it is a Task
+    /// of the destination column of the same Project and not the moved Task itself; otherwise not available.
+    /// </summary>
+    private async Task<(bool Available, string? Key)> NeighbourKeyAsync(
+        Guid projectId,
+        Guid statusId,
+        Guid movedTaskId,
+        Guid? afterTaskId,
+        CancellationToken cancellationToken)
+    {
+        if (afterTaskId is not { } after)
+        {
+            return (true, null);
+        }
+
+        var neighbour = await dbContext.Tasks
+            .AsNoTracking()
+            .Where(candidate => candidate.Id == after && candidate.Id != movedTaskId && candidate.ProjectId == projectId && candidate.StatusId == statusId)
+            .Select(candidate => candidate.PositionKey)
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return (neighbour is not null, neighbour);
+    }
+
+    /// <summary>
+    /// The first key in one column of a Project after <paramref name="lower"/> - or the column's first key when it is
+    /// <c>null</c> - leaving out the moved Task itself. Compared in the column's own collation (BIN2).
+    /// </summary>
+    private Task<string?> SuccessorAsync(Guid projectId, Guid statusId, Guid movedTaskId, string? lower, CancellationToken cancellationToken)
+    {
+        var column = dbContext.Tasks
+            .AsNoTracking()
+            .Where(task => task.ProjectId == projectId && task.StatusId == statusId && task.Id != movedTaskId);
+
+        if (lower is not null)
+        {
+            column = column.Where(task => string.Compare(task.PositionKey, lower) > 0);
+        }
+
+        return column
+            .OrderBy(task => task.PositionKey)
+            .Select(task => task.PositionKey)
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Takes the Project's Task range under <c>UPDLOCK, HOLDLOCK</c> in the statement a creation's bound count takes
+    /// (<see cref="BoundCounter"/>): the same index and the same range, so a deletion and a move meet a creation and a
+    /// Status edit on it in one order.
+    /// </summary>
+    private Task TakeTheProjectRangeAsync(Guid projectId, CancellationToken cancellationToken) =>
+        dbContext.Database
+            .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = {projectId}")
+            .SingleAsync(cancellationToken);
 
     /// <summary>
     /// Takes the Project's Task range under <c>UPDLOCK, HOLDLOCK</c> - the range a creation's bound count

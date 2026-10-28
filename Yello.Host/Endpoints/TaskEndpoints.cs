@@ -14,7 +14,7 @@ namespace Yello.Host.Endpoints;
 
 /// <summary>
 /// Create a Task in a Project of the active Space, and read, edit and delete one Task. FR-19, FR-20, FR-23;
-/// stories 2.2, 2.3 and 2.5.
+/// stories 2.2, 2.3 and 2.5. The move is <see cref="TaskMoveEndpoints"/> (story 2.6).
 /// </summary>
 /// <remarks>
 /// <para>

@@ -200,7 +200,10 @@ public static class ProblemTypes
     /// <summary>
     /// A Task edit body that cannot be read as a JSON object, or that names none of the title, the Status, the
     /// due date and the Labels, or whose <c>labelIds</c> is not an array or holds more entries than any set could.
-    /// Answered <c>400</c>; nothing is written. Story 2.3, open question 1 (a); story 2.4, open question 6.
+    /// Answered <c>400</c>; nothing is written. Story 2.3, open question 1 (a); story 2.4, open question 6. Also a move
+    /// body (story 2.6) that cannot be read, leaves out <c>statusId</c> or <c>afterTaskId</c>, names an
+    /// <c>afterTaskId</c> that is neither an id nor <c>null</c>, or carries a <c>positionKey</c> - a move is a Task edit
+    /// by its own route.
     /// </summary>
     /// <remarks>
     /// <b>Never a statement about the Task</b>, and never a list of what the body did name. The product's own
@@ -256,6 +259,19 @@ public static class ProblemTypes
     /// another Space's real Label id answer the same bytes (I-13). It is not a <c>404</c>: the Task is present.
     /// </remarks>
     public static string InvalidTaskLabels => "urn:yello:problem:invalid-task-labels";
+
+    /// <summary>
+    /// A move whose position is not one: the Task to land after is not a Task in the destination column of the moved
+    /// Task's Project - absent, deleted, moved away, in another Project or column, another Space's, or the moved Task
+    /// itself - or no position key fits between it and its successor. Answered <c>409</c>; nothing is written. Story 2.6,
+    /// open questions 3 and 10.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never whether the neighbour exists, where it is, or that it belongs to another Space</b>: a random id and
+    /// another Space's real Task id answer the same bytes (I-13). It is not a <c>404</c> - the moved Task is present - and
+    /// never a renumber of the column's other Tasks (AD-15). The person chooses the position again.
+    /// </remarks>
+    public static string TaskPositionUnavailable => "urn:yello:problem:task-position-unavailable";
 
     /// <summary>
     /// An <c>Idempotency-Key</c> header that is empty or longer than

@@ -21,8 +21,7 @@ namespace Yello.Tests.Client;
 /// the Task after its named neighbour (or at the top for <c>null</c>) and writes the moved Task's key alone.
 /// </para>
 /// <para>
-/// <b>The locators and copy are assumptions</b>, to be corrected to the markup Task 9 builds and the correction recorded
-/// (story Q4-Q9): the panel's control is a button named "Move", after the Status control and before "Delete Task" (Q5);
+/// <b>The locators and copy are the markup Task 9 built</b> (story Q4-Q9), as the ATDD run assumed them: the panel's control is a button named "Move", after the Status control and before "Delete Task" (Q5);
 /// the card carries, for a Role that can move, a button named "Actions for {title}" opening a <c>[role=menu]</c> with
 /// <c>[role=menuitem]</c>s "Open" and "Move" (Q6 (a)), also opened by the <c>contextmenu</c> event on the card, by
 /// <c>Enter</c> on the actions control, and by the <c>ContextMenu</c> key and <c>Shift+F10</c> on the card; the picker is
@@ -90,7 +89,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// is sent by opening it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - Task detail has no Move control yet (Task 9, Q5)")]
+    [Fact]
     [Trait("Requirement", "UX-DR11")]
     [Trait("Requirement", "UX-DR12")]
     public async Task Move_in_Task_detail_opens_a_picker_of_Statuses_with_nothing_selected()
@@ -140,7 +139,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="route">How the menu is opened.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - the card has no context menu yet (Task 9, Q6)")]
+    [Theory]
     [InlineData("click")]
     [InlineData("contextmenu")]
     [InlineData("enter")]
@@ -179,7 +178,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// moved Task is not offered as its own neighbour.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the Move picker has no position step yet (Task 9, Q4)")]
+    [Fact]
     public async Task The_position_step_offers_the_top_then_each_slot_by_ordinal_and_neighbour()
     {
         var api = TwoSpaces();
@@ -220,7 +219,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// move is announced politely with the ordinal and the column's true total: "Moved to Doing, position 2 of 3.".
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - the client sends no move yet (Task 9, Q7)")]
+    [Fact]
     [Trait("Requirement", "AR-20")]
     [Trait("Requirement", "AD-11")]
     [Trait("Requirement", "UX-DR25")]
@@ -276,7 +275,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// <param name="capability">The capability a <c>403</c> names.</param>
     /// <param name="copy">What the panel says.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC15 - the client sends no move yet, so nothing reverts (Task 9, Q8)")]
+    [Theory]
     [InlineData(403, InsufficientRoleType, "manage-tasks", ManageTasksCopy)]
     [InlineData(409, FakeYelloApi.TaskPositionUnavailableType, null, PositionChangedCopy)]
     [InlineData(400, InvalidTaskStatusType, null, InvalidStatusCopy)]
@@ -320,7 +319,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// <c>Idempotency-Key</c>, and that answer lands the card.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - the client sends no move yet (Task 9, Q7, Q8)")]
+    [Fact]
     [Trait("Requirement", "NFR-5")]
     [Trait("Requirement", "AR-25")]
     public async Task An_unanswered_move_says_not_sent_reverts_and_its_resend_reuses_the_key()
@@ -365,7 +364,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// refusal surface, "Not available.", and the panel does not stay open over a Task that is not there.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - the client sends no move yet (Task 9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task A_move_answered_404_follows_the_Boards_not_found_pattern()
     {
@@ -395,7 +394,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="fromPanel">Whether the picker was opened from Task detail (otherwise from the card's menu).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC14 - there is no Move picker to dismiss yet (Task 9, Q9)")]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     [Trait("Requirement", "UX-DR12")]
@@ -444,7 +443,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="fromPanel">Whether the move was made from Task detail (otherwise from the card's menu).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC14 - the client sends no move yet (Task 9, Q9)")]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     [Trait("Requirement", "UX-DR39")]
@@ -496,7 +495,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// server), and only one move was sent.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the client cannot reorder within a column yet (Task 9)")]
+    [Fact]
     public async Task Reordering_within_a_column_is_announced_and_survives_a_reload()
     {
         var api = TwoSpaces();
@@ -530,7 +529,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="width">The viewport width.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - neither Move control exists yet (Task 9)")]
+    [Theory]
     [InlineData(320)]
     [InlineData(768)]
     [InlineData(1280)]
@@ -569,7 +568,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// Space is offered both.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the Owner's anchor needs the Move controls (Task 9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     public async Task A_Viewer_is_offered_no_move_control_and_nothing_is_disabled()
     {
@@ -640,7 +639,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// new slot, declares no transition and no animation, and neither does any card that did not move.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - the client sends no move yet (Task 9, motion)")]
+    [Fact]
     [Trait("Requirement", "UX-DR6")]
     public async Task Under_reduced_motion_a_move_animates_nothing()
     {
@@ -683,7 +682,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// updated with it).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the Status change still announces 2.3's sentence at edit time (Task 9, Q8 (b))")]
+    [Fact]
     [Trait("Requirement", "UX-DR25")]
     public async Task A_Status_change_announces_the_move_sentence_on_admission()
     {
@@ -717,7 +716,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
     /// E2E-616. AC1, Q6 (a) - the card menu's "Open" opens Task detail for that Task, exactly as its title button does.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the card has no context menu yet (Task 9, Q6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR24")]
     public async Task The_card_menus_Open_opens_Task_detail()
     {

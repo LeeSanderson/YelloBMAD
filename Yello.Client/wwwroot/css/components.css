@@ -779,6 +779,92 @@
     320px reflow width a row that scrolled inside a card is the 1.4.10 failure in the exact layout an audit uses.
     Nothing on it may refuse to wrap, and a long Label name breaks rather than widening the card.
 */
+/*
+    A MOVER'S CARD HEAD (story 2.6, open question 6 (a)): the title and the actions control side by side, the title
+    taking the room and wrapping, the control a fixed target at the end. Always rendered - never revealed on hover
+    (UX-DR21) - and absent for a Role that cannot move Tasks.
+*/
+.task-card__head {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-1);
+}
+
+.task-card__head .task-card__open {
+    flex: 1 1 auto;
+    inline-size: auto;
+    min-inline-size: 0;
+}
+
+.task-card__actions {
+    display: inline-flex;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    margin: 0;
+    padding: 0;
+    appearance: none;
+    background-color: transparent;
+    color: var(--text-muted);
+    border: 0;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+}
+
+.task-card__actions-icon {
+    inline-size: 1em;
+    fill: currentColor;
+}
+
+/*
+    THE MOVED CARD'S REFLOW (story 2.6, UX-DR6; DESIGN.md:517-521): only the card a move just placed moves, on
+    motion.quick, from a little above its new slot. No lift, settle or drop zone (2.7). base.css removes it under
+    prefers-reduced-motion.
+*/
+.task-card.task-card--moved {
+    animation: task-card-reflow var(--motion-quick) var(--motion-easing-standard);
+}
+
+@keyframes task-card-reflow {
+    from {
+        transform: translateY(calc(-1 * var(--space-1)));
+    }
+}
+
+/*
+    THE CARD'S MENU (story 2.6, open question 6 (a)): drawn inside the card, in the flow - so it never overlaps the
+    next card - with the picker treatment (DESIGN.md:256-262): the card surface, the hairline, 3px corners, no shadow.
+    Its items are full-width rows at least the target minimum.
+*/
+.task-menu {
+    display: flex;
+    flex-direction: column;
+    margin-block-start: var(--space-1);
+    padding: var(--space-1);
+    background-color: var(--surface-card);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    box-shadow: none;
+}
+
+.task-menu__item {
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    margin: 0;
+    padding-block: var(--space-1);
+    padding-inline: var(--space-3);
+    appearance: none;
+    background-color: transparent;
+    color: inherit;
+    border: 0;
+    font: inherit;
+    text-align: start;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+}
+
 .task-card__meta {
     display: flex;
     flex-wrap: wrap;
@@ -989,6 +1075,30 @@
     padding-block: var(--space-1);
     padding-inline: var(--space-3);
     cursor: pointer;
+}
+
+/* A short label after an option's name - the Move picker's "Current" and "Bottom of column" (story 2.6). */
+.picker__note {
+    color: var(--text-muted);
+}
+
+/*
+    THE MOVE PICKER (story 2.6, open question 5 (a)): the picker treatment on the card surface (DESIGN.md:256-262), in
+    place in the Task detail panel or inside a card - never a second dialog. Its rows wrap rather than clip.
+*/
+.move-picker {
+    margin-block-start: var(--space-1);
+    background-color: var(--surface-card);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    box-shadow: none;
+    overflow-wrap: anywhere;
+}
+
+/* A refused move made from a card's menu, said on the Board (story 2.6). */
+.board__notice {
+    margin-block: 0;
+    color: var(--text-primary);
 }
 
 .picker__option[aria-checked="true"] {

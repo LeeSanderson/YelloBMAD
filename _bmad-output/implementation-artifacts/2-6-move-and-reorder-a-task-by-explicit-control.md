@@ -4,7 +4,7 @@ baseline_commit: 12eba8d
 
 # Story 2.6: Move and reorder a Task by explicit control
 
-Status: ready-for-dev
+Status: review
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-6-move-and-reorder-a-task-by-explicit-control`
@@ -133,49 +133,49 @@ AC1–AC7 are reproduced **verbatim** from `epics.md:1174-1209` (`status: final`
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Confirm the gates, then decide the open questions** (AC: all)
-  - [ ] `dotnet build Yello.slnx`, then `dotnet test --project tests/Yello.Tests.Isolation/Yello.Tests.Isolation.csproj --no-build` filtered to `IsolationCaseListTests`. With 2.6 `in-progress` it is green. List every row with `PendingUntil: "2.6"` (the ATDD phase may add some) in the Debug Log; each is converted before `review`.
-  - [ ] Read the open questions (Dev Notes). Decide Q1–Q3 and Q10 before Task 2, Q11–Q13 before Task 4, Q4–Q9 before Task 9. Record each in the Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each is reversible.
-  - [ ] Re-measure the baseline (the last recorded full run is 2.5's dev phase: **1077 total, 1074 passed, 0 failed, 3 skipped**; 2.5's review added browser cases since). Record the number before any change.
+- [x] **Task 1 — Confirm the gates, then decide the open questions** (AC: all)
+  - [x] `dotnet build Yello.slnx`, then `dotnet test --project tests/Yello.Tests.Isolation/Yello.Tests.Isolation.csproj --no-build` filtered to `IsolationCaseListTests`. With 2.6 `in-progress` it is green. List every row with `PendingUntil: "2.6"` (the ATDD phase may add some) in the Debug Log; each is converted before `review`.
+  - [x] Read the open questions (Dev Notes). Decide Q1–Q3 and Q10 before Task 2, Q11–Q13 before Task 4, Q4–Q9 before Task 9. Record each in the Completion Notes as "**Qn - (x).** … Cost to later stories: …". Each is reversible.
+  - [x] Re-measure the baseline (the last recorded full run is 2.5's dev phase: **1077 total, 1074 passed, 0 failed, 3 skipped**; 2.5's review added browser cases since). Record the number before any change.
 
-- [ ] **Task 2 — `PositionKey`: the jittered midpoint** (AC: 3, 10)
-  - [ ] Add `PositionKey.Between(string? lower, string? upper, …jitter source…)` beside `After` (`Yello.Domain/Tasks/PositionKey.cs`). `lower == null` means "before the first"; `upper == null` means "after the last"; both null is an empty column (`First`). Base-62 midpoint in the existing ordinal alphabet (digits, upper, lower — `Alphabet`, `:31`), then jitter (Q10). The jitter source is injected (a `Func<int,int>`/`Random` passed in, or an interface in Domain implemented in Infrastructure) so tests are deterministic; the Domain stays free of `Random.Shared` calls a test cannot control.
-  - [ ] Guard: `lower` must sort strictly below `upper` (ordinal) or the call throws `ArgumentException` — the store must never ask for an impossible gap; a result longer than `MaxLength` follows Q10.
-  - [ ] Keep `After` for creation (2.2) and the Status `PATCH` (2.3) unless Q10 decides to route them through `Between(last, null)`; either way creation still appends.
-  - [ ] Update the remarks (`:9-24`) to say what is true now — no review archaeology (`deferred-work.md` "Review archaeology" entry).
-  - [ ] Unit tests in the Slices handler-test style (no database): strictly between for random pairs (seeded); before first / after last / empty; 1,000 placements into the same gap stay strictly ordered and report the length reached; keys differing only in case order as `StringComparer.Ordinal` says; every character is in the alphabet; `Between(x, x)` and `Between(b, a)` throw.
+- [x] **Task 2 — `PositionKey`: the jittered midpoint** (AC: 3, 10)
+  - [x] Add `PositionKey.Between(string? lower, string? upper, …jitter source…)` beside `After` (`Yello.Domain/Tasks/PositionKey.cs`). `lower == null` means "before the first"; `upper == null` means "after the last"; both null is an empty column (`First`). Base-62 midpoint in the existing ordinal alphabet (digits, upper, lower — `Alphabet`, `:31`), then jitter (Q10). The jitter source is injected (a `Func<int,int>`/`Random` passed in, or an interface in Domain implemented in Infrastructure) so tests are deterministic; the Domain stays free of `Random.Shared` calls a test cannot control.
+  - [x] Guard: `lower` must sort strictly below `upper` (ordinal) or the call throws `ArgumentException` — the store must never ask for an impossible gap; a result longer than `MaxLength` follows Q10.
+  - [x] Keep `After` for creation (2.2) and the Status `PATCH` (2.3) unless Q10 decides to route them through `Between(last, null)`; either way creation still appends.
+  - [x] Update the remarks (`:9-24`) to say what is true now — no review archaeology (`deferred-work.md` "Review archaeology" entry).
+  - [x] Unit tests in the Slices handler-test style (no database): strictly between for random pairs (seeded); before first / after last / empty; 1,000 placements into the same gap stay strictly ordered and report the length reached; keys differing only in case order as `StringComparer.Ordinal` says; every character is in the alphabet; `Between(x, x)` and `Between(b, a)` throw.
 
-- [ ] **Task 3 — Domain port, slice and store** (AC: 3, 9, 11)
-  - [ ] Domain: `ITaskStore.MoveAsync(Guid taskId, Guid statusId, Guid? afterTaskId, CancellationToken)` (or the Q2 shape) returning a typed outcome, mirroring `TaskDeletion` (`Yello.Domain/Tasks/ITaskStore.cs`): e.g. `TaskMove { Moved(TaskItem), NotFound, NeighbourUnavailable, PositionExhausted }`. No `SpaceId` parameter; no `Where(SpaceId == …)`.
-  - [ ] Slice `Yello.Application/Tasks/MoveTask/MoveTaskHandler.cs` (AR-3; slice folder is the imperative of FR-29's title, spine `:266`): validates the Status against the Task's Project's effective set exactly as `EditTaskAttributesHandler` does (`EffectiveStatusSet.Of(...)`), then calls the store. **No handler reads the Role, a capability, a bound or `Idempotency-Key`** (the pipeline-only gates catch each). Handler unit tests with hand fakes (`DeleteTaskHandlerTests` pattern).
-  - [ ] **`TaskStore.MoveAsync`** — recommended order (Task 7's races are the authority, as in 2.5):
+- [x] **Task 3 — Domain port, slice and store** (AC: 3, 9, 11)
+  - [x] Domain: `ITaskStore.MoveAsync(Guid taskId, Guid statusId, Guid? afterTaskId, CancellationToken)` (or the Q2 shape) returning a typed outcome, mirroring `TaskDeletion` (`Yello.Domain/Tasks/ITaskStore.cs`): e.g. `TaskMove { Moved(TaskItem), NotFound, NeighbourUnavailable, PositionExhausted }`. No `SpaceId` parameter; no `Where(SpaceId == …)`.
+  - [x] Slice `Yello.Application/Tasks/MoveTask/MoveTaskHandler.cs` (AR-3; slice folder is the imperative of FR-29's title, spine `:266`): validates the Status against the Task's Project's effective set exactly as `EditTaskAttributesHandler` does (`EffectiveStatusSet.Of(...)`), then calls the store. **No handler reads the Role, a capability, a bound or `Idempotency-Key`** (the pipeline-only gates catch each). Handler unit tests with hand fakes (`DeleteTaskHandlerTests` pattern).
+  - [x] **`TaskStore.MoveAsync`** — recommended order (Task 7's races are the authority, as in 2.5):
     1. Read the Task's `ProjectId` (plain read; none → `NotFound`).
     2. Take the Project's Task range **in the statement shape the creation's count, the Status edit and the deletion take**: `… FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK) WHERE ProjectId = {projectId}` (`TaskStore.cs:263-266, 295-298`; `BoundCounter.cs`). Same index, same range, same order (`deferred-work.md:494` notes). If this read can also return the destination column's keys you need, do it in the same statement.
     3. Lock the Task row `WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {taskId}` and **re-check** that it still exists and its `ProjectId` is the one whose range you hold (gone → `NotFound`, never `200`; 2.3 review fix). This is also what closes `deferred-work.md:550` for good if 6.5 ever lets `ProjectId` change.
     4. Under the range: resolve the neighbour (Q2) — it must be a Task of the same Project in the destination Status and not the moved Task — and read the key immediately after it in that column **excluding the moved Task** (or the column's first key for "top"). Anything else → the Q3 outcome.
     5. Same slot (the neighbour is already the Task's predecessor in its own column): no write, `Moved` with the unchanged Task (Q18) — the locks were still taken (2.3 review: never skip the lock for "no change").
     6. Otherwise set `StatusId` and `PositionKey = PositionKey.Between(lower, upper, jitter)`; `SaveChangesAsync`. Exactly one row updated.
-  - [ ] Record the measured order in `TaskStore`'s remarks beside 2.5's, and in `PositionKey`'s.
-  - [ ] **Bound**: a move consults no bound (2.3 P3: `ConsultsBound` on an edit refuses moves in a full Project; ARCH-004 refuses Host start). A move into a Project holding 5,000 Tasks is admitted — one case, reuse the existing 4,999-Task seed helper; no new large seed.
-  - [ ] Catch `2601`/`2627` (unique index) only if a race proves it reachable — with the range lock it should not be; if it is, that is a lock bug to fix, not an error to map.
+  - [x] Record the measured order in `TaskStore`'s remarks beside 2.5's, and in `PositionKey`'s.
+  - [x] **Bound**: a move consults no bound (2.3 P3: `ConsultsBound` on an edit refuses moves in a full Project; ARCH-004 refuses Host start). A move into a Project holding 5,000 Tasks is admitted — one case, reuse the existing 4,999-Task seed helper; no new large seed.
+  - [x] Catch `2601`/`2627` (unique index) only if a race proves it reachable — with the range lock it should not be; if it is, that is a lock bug to fix, not an error to map.
 
-- [ ] **Task 4 — Collation: A-6/R7 and the email index** (AC: 4, 16)
-  - [ ] Extend `TaskEndpointTests.Schema.cs` (`:164-182`, `The_position_key_is_BIN2_and_unique_within_a_Project_and_Status`): assert the collation of `PositionKey` **as a key column of** `IX_Task_SpaceId_ProjectId_StatusId_PositionKey` via `sys.indexes` → `sys.index_columns` → `sys.columns` (an index key takes its column's collation; assert it there so a recreated index over a re-collated column is caught). Record the AC4 tuple variance (Q11).
-  - [ ] New case **mixed-case ordering** (R7 functional half, `test-design-architecture.md:506-520`): in one column insert keys that differ only in case (`"a0"`, `"A0"`, `"b"`, `"B"` …, through the product or the seed helper with valid unique keys), read the Board, assert ordinal order and that both case variants coexist (no false duplicate on the unique index). **Plant** (one run, recorded): the column re-collated to the default in the migration (or a scratch table with the default collation in the test database, if the migration plant is impractical) → the case fails (duplicate on insert or non-ordinal order). Restore in a `finally`.
-  - [ ] Traits: `Requirement=AR-21`, `Requirement=AD-15`, `Priority=P0` (A-6 is P0, `test-design-qa.md:304`).
-  - [ ] **Email index (`deferred-work.md:198`, Q12).** First, against the running Slices engine, read the current collation of `Account.NormalizedEmailAddress` and record it in the Debug Log (the ledger entry was "reasoned rather than executed"). Then apply Q12: recommended an EF migration declaring `UseCollation("Latin1_General_100_BIN2")` on `NormalizedEmailAddress` (drop and recreate `SchemaNames.AccountEmailUniqueIndex` around the `ALTER COLUMN`), a schema assertion beside the existing Account schema tests, and a case that two addresses `EmailAddressNormalisation.Normalise` maps to different strings but a kana/width-insensitive collation would equate (e.g. full-width vs ASCII letters) both register. Update `AccountConfiguration.cs:62-65` and `EmailAddressNormalisation.cs:20-40` remarks to say what is true now. Close `:198` with what was done.
-  - [ ] Migration rules: `dotnet ef migrations add` via the local tool; the migration bundle tests stay skipped unless `YELLO_MIGRATION_BUNDLE` is set; `MigrationAtStartupGateTests` and `SchemaVarianceTests` stay green.
+- [x] **Task 4 — Collation: A-6/R7 and the email index** (AC: 4, 16)
+  - [x] Extend `TaskEndpointTests.Schema.cs` (`:164-182`, `The_position_key_is_BIN2_and_unique_within_a_Project_and_Status`): assert the collation of `PositionKey` **as a key column of** `IX_Task_SpaceId_ProjectId_StatusId_PositionKey` via `sys.indexes` → `sys.index_columns` → `sys.columns` (an index key takes its column's collation; assert it there so a recreated index over a re-collated column is caught). Record the AC4 tuple variance (Q11).
+  - [x] New case **mixed-case ordering** (R7 functional half, `test-design-architecture.md:506-520`): in one column insert keys that differ only in case (`"a0"`, `"A0"`, `"b"`, `"B"` …, through the product or the seed helper with valid unique keys), read the Board, assert ordinal order and that both case variants coexist (no false duplicate on the unique index). **Plant** (one run, recorded): the column re-collated to the default in the migration (or a scratch table with the default collation in the test database, if the migration plant is impractical) → the case fails (duplicate on insert or non-ordinal order). Restore in a `finally`.
+  - [x] Traits: `Requirement=AR-21`, `Requirement=AD-15`, `Priority=P0` (A-6 is P0, `test-design-qa.md:304`).
+  - [x] **Email index (`deferred-work.md:198`, Q12).** First, against the running Slices engine, read the current collation of `Account.NormalizedEmailAddress` and record it in the Debug Log (the ledger entry was "reasoned rather than executed"). Then apply Q12: recommended an EF migration declaring `UseCollation("Latin1_General_100_BIN2")` on `NormalizedEmailAddress` (drop and recreate `SchemaNames.AccountEmailUniqueIndex` around the `ALTER COLUMN`), a schema assertion beside the existing Account schema tests, and a case that two addresses `EmailAddressNormalisation.Normalise` maps to different strings but a kana/width-insensitive collation would equate (e.g. full-width vs ASCII letters) both register. Update `AccountConfiguration.cs:62-65` and `EmailAddressNormalisation.cs:20-40` remarks to say what is true now. Close `:198` with what was done.
+  - [x] Migration rules: `dotnet ef migrations add` via the local tool; the migration bundle tests stay skipped unless `YELLO_MIGRATION_BUNDLE` is set; `MigrationAtStartupGateTests` and `SchemaVarianceTests` stay green.
 
-- [ ] **Task 5 — Contracts** (AC: 8, 9)
-  - [ ] `TaskRoutes`: add the move route (Q1 recommended `Move = "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/move"` and `MoveOf(spaceId, taskId)`).
-  - [ ] `Yello.Contracts/Tasks/MoveTaskRequest.cs` (Q2 recommended `MoveTaskRequest(Guid StatusId, Guid? AfterTaskId)`) — **no position key member**, no Project, no Space. The answer is the existing `TaskResponse`.
-  - [ ] Problem type for Q3 (recommended `task-position-unavailable`, `409`) in `Yello.Contracts/ProblemTypes.cs`, with remarks stating what it never means (it never says whether the neighbour exists in another Space); and Q10's exhaustion outcome (recommended the same type). A `RefusalCopy` branch for each new type (unknown types fall through to "Not available.").
-  - [ ] AD-19: the contract snapshot gains the route and its request shape, deliberately.
+- [x] **Task 5 — Contracts** (AC: 8, 9)
+  - [x] `TaskRoutes`: add the move route (Q1 recommended `Move = "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/move"` and `MoveOf(spaceId, taskId)`).
+  - [x] `Yello.Contracts/Tasks/MoveTaskRequest.cs` (Q2 recommended `MoveTaskRequest(Guid StatusId, Guid? AfterTaskId)`) — **no position key member**, no Project, no Space. The answer is the existing `TaskResponse`.
+  - [x] Problem type for Q3 (recommended `task-position-unavailable`, `409`) in `Yello.Contracts/ProblemTypes.cs`, with remarks stating what it never means (it never says whether the neighbour exists in another Space); and Q10's exhaustion outcome (recommended the same type). A `RefusalCopy` branch for each new type (unknown types fall through to "Not available.").
+  - [x] AD-19: the contract snapshot gains the route and its request shape, deliberately.
 
-- [ ] **Task 6 — Endpoint and the gates that break on purpose** (AC: 8, 9, 12)
-  - [ ] `TaskEndpoints.MapMoveTask`: `MapPost(TaskRoutes.Move, MoveAsync).RequiresCapability(Capability.ManageTasks).SessionOnly()` (Q1). Body read with `JsonRequestBody.ReadAsync` in the `TaskEditBody` style (absent vs `null` distinguished; unreadable → `400 invalid-task-edit` or a move-specific type, decided and recorded; a `positionKey` member → refused, Q2). Answers: `Moved` → `Results.Ok(TaskResponse)`; `NotFound` → `BoundaryProblems.NotAvailable()` (unrecorded); Status invalid → `400 invalid-task-status`; neighbour → Q3. **No `ConsultsBound`**, no `Results.Created`/`Accepted` (ARCH-009). Register the handler and the map beside their siblings in `Program.cs`, before `MapUnmatchedApi()`.
-  - [ ] Logs carry `SpaceId` and ids only — never a title (AR-34, I-17).
-  - [ ] **Gates expected to go red by design — amend deliberately, by exactly this, never loosen** (search for each before changing; record every unpredicted widening in the Debug Log, as 2.4 did):
+- [x] **Task 6 — Endpoint and the gates that break on purpose** (AC: 8, 9, 12)
+  - [x] `TaskEndpoints.MapMoveTask`: `MapPost(TaskRoutes.Move, MoveAsync).RequiresCapability(Capability.ManageTasks).SessionOnly()` (Q1). Body read with `JsonRequestBody.ReadAsync` in the `TaskEditBody` style (absent vs `null` distinguished; unreadable → `400 invalid-task-edit` or a move-specific type, decided and recorded; a `positionKey` member → refused, Q2). Answers: `Moved` → `Results.Ok(TaskResponse)`; `NotFound` → `BoundaryProblems.NotAvailable()` (unrecorded); Status invalid → `400 invalid-task-status`; neighbour → Q3. **No `ConsultsBound`**, no `Results.Created`/`Accepted` (ARCH-009). Register the handler and the map beside their siblings in `Program.cs`, before `MapUnmatchedApi()`.
+  - [x] Logs carry `SpaceId` and ids only — never a title (AR-34, I-17).
+  - [x] **Gates expected to go red by design — amend deliberately, by exactly this, never loosen** (search for each before changing; record every unpredicted widening in the Debug Log, as 2.4 did):
     1. `RefusalBoundaryGateTests.cs:420-457` `The_endpoints_marked_unreachable_with_a_Token_are_exactly_Token_management_and_the_switcher` — widen by exactly `TaskRoutes.Move`; rename the test (it is no longer only Token management) and carry the FR-35 reason in its remarks.
     2. `RefusalBoundaryGateTests.Tasks.cs` / `.TaskEdit.cs` — any exact set of Task routes or methods widens by exactly `POST {Move}`; the move asserts `ManageTasks`, Session-only, no bound.
     3. `RefusalBoundaryGateTests.Delete.cs:62` asserts the deletes are **not** Session-only — must stay green unchanged.
@@ -183,9 +183,9 @@ AC1–AC7 are reproduced **verbatim** from `epics.md:1174-1209` (`status: final`
     5. `TaskEndpointTests.TaskProperties`, `BoardEndpointTests.TaskProperties`, `EditedTaskProperties` — unchanged (the response is unchanged).
     Also must stay green unchanged: `Every_spaceId_endpoint_declares_exactly_one_capability`, `Every_Space_scoped_state_changing_endpoint_answers_a_result_the_record_can_replay`, `No_endpoint_answers_through_Results_Created_or_Accepted`, `No_endpoint_without_spaceId_in_its_path_reaches_a_Space_scoped_entity`.
 
-- [ ] **Task 7 — Slice, idempotency, API-narrowness and race tests** (AC: 3, 5, 6, 8, 9, 11, 13)
-  - [ ] **Memory-bound machine (CLAUDE.md "Test memory budget"): add no container-backed class.** New partials of the existing class: `TaskEndpointTests.Move.cs`, `.MoveRace.cs`, `.MoveIdempotency.cs`; a `MoveWire.cs` harness beside `DeleteWire.cs`/`TaskEditWire.cs` (`POST` with a Session; a Token attempt; raw-SQL holders in the product's statement shapes). Never two `dotnet test` processes at once; iterate with `--filter`.
-  - [ ] Cases (assert the problem `type`, not only the status; every `4xx` other than `403` and boundary `404` asserts "no refusal row"):
+- [x] **Task 7 — Slice, idempotency, API-narrowness and race tests** (AC: 3, 5, 6, 8, 9, 11, 13)
+  - [x] **Memory-bound machine (CLAUDE.md "Test memory budget"): add no container-backed class.** New partials of the existing class: `TaskEndpointTests.Move.cs`, `.MoveRace.cs`, `.MoveIdempotency.cs`; a `MoveWire.cs` harness beside `DeleteWire.cs`/`TaskEditWire.cs` (`POST` with a Session; a Token attempt; raw-SQL holders in the product's statement shapes). Never two `dotnet test` processes at once; iterate with `--filter`.
+  - [x] Cases (assert the problem `type`, not only the status; every `4xx` other than `403` and boundary `404` asserts "no refusal row"):
     - Owner, Admin, Member move a Task across columns and within one (top, between two, bottom) → `200`; `GET` the Board: the Task is where asked; **every sibling key in both columns is byte-identical before and after** (AC3); reload (a second Board read, a fresh Session) gives the same order (AC6).
     - Two Sessions of two Members of one Space move two Tasks into the same gap → both admitted, distinct keys, one order both Sessions read after reload (AC5) — the deterministic version is RACE-M1.
     - Viewer → `403 manage-tasks`, one `InsufficientRole` row, nothing changed.
@@ -196,8 +196,8 @@ AC1–AC7 are reproduced **verbatim** from `epics.md:1174-1209` (`status: final`
     - **API narrowness (C-5, AC8)**: with a Token — the move route answers the no-credential `401` byte-identical to no credential, nothing changed; `PATCH` carrying only `{"positionKey": "0"}` changes no key and answers its documented `400`; `PATCH` carrying `statusId` + `positionKey` moves to the end of the column (2.3 behaviour) and ignores the key; the Board and `GET` Task over a Token show `positionKey`. Tag `Requirement=FR-35`.
     - A move in a Project holding 5,000 Tasks is admitted (no bound).
     - Exhaustion (Q10): seed a gap whose neighbours differ only at character 128 (valid alphabet keys, seed helper) → the documented refusal, nothing changed.
-  - [ ] Idempotency on the Session surface (the Token surface is `401`): same key twice → one write, byte-identical body, no second key; same key with a different body → `422 idempotency-key-reused`.
-  - [ ] **Deterministic races** with `TaskWire.WaitUntilBlockedOnALockAsync` (`TaskWire.cs:347-370`) or the "blocked or answered" wait (`LabelWire.cs:199-217`). The test holds the competing lock or change in its own transaction, sends one request (or two, for M1), waits for `LCK_M_%`, then commits or rolls back. **Never `Task.Delay`, never `Task.WhenAll` as the race.** Expected outcomes (confirm, record any that differ, with the reason):
+  - [x] Idempotency on the Session surface (the Token surface is `401`): same key twice → one write, byte-identical body, no second key; same key with a different body → `422 idempotency-key-reused`.
+  - [x] **Deterministic races** with `TaskWire.WaitUntilBlockedOnALockAsync` (`TaskWire.cs:347-370`) or the "blocked or answered" wait (`LabelWire.cs:199-217`). The test holds the competing lock or change in its own transaction, sends one request (or two, for M1), waits for `LCK_M_%`, then commits or rolls back. **Never `Task.Delay`, never `Task.WhenAll` as the race.** Expected outcomes (confirm, record any that differ, with the reason):
     - **RACE-M1** test holds the Project range; two moves into the same gap from two Sessions wait; commit → both `200`, distinct keys strictly between the gap's neighbours, neither lost.
     - **RACE-M2 (read race, the 3/3 shape of 2.3's `A_Status_edit_reads_the_last_key_of_its_new_column_only_under_the_lock`)** test holds the range, the move waits; the test inserts a Task at exactly the key the move would compute without the lock's re-read (or moves the neighbour's successor) and commits → the move still lands strictly between its *current* neighbours, no duplicate key, no `500`.
     - **RACE-M3** a Task creation holding the bound's range vs a move into that column → both succeed, distinct keys.
@@ -208,41 +208,41 @@ AC1–AC7 are reproduced **verbatim** from `epics.md:1174-1209` (`status: final`
     - **RACE-M8** a Labels `PATCH` of the same Task vs a move → both `200`; never 1205.
     - Plants (three runs each, record `n/3`): the move's range hint removed; the move's row `INDEX(1)` removed; the row's `UPDLOCK, HOLDLOCK` removed; the neighbour read moved before the range lock. Masked plants are recorded with the reason, never deleted (TESTING-CONVENTIONS `:135-147`).
 
-- [ ] **Task 8 — Isolation rows** (AC: 12)
-  - [ ] Add the rows in "Isolation rows" (Dev Notes), each sending a request on `TaskRoutes.Move` with its own body (`CaseRequest.Body`/`AnchorBody`, `Expectation.cs`), seeded through the product (`ProductActor`; `SeedProjectWithTaskAsync`; the Viewer seed pattern, `IsolationCases.cs` `ViewerEditsATaskAsync`). `Then` callbacks assert the foreign Task's Status and key are unchanged.
-  - [ ] Two-layer plant, one at a time, original held in memory and restored in a `finally`: `IgnoreQueryFilters()` on the move's Task reads **and** the `Task` FILTER predicate removed (in the migration file, rebuild, restore — 2.3 P6, 2.4 plant 3) → `ISO-MOVE-TASK-FOREIGN-ID-IN-OWN-SPACE` fails on the Session surface; each layer alone → green.
-  - [ ] No new timing row (the route is in the API group; `NotAvailableFloor` applies).
-  - [ ] GATE-003: no row pending on 2.6 at `review`.
+- [x] **Task 8 — Isolation rows** (AC: 12)
+  - [x] Add the rows in "Isolation rows" (Dev Notes), each sending a request on `TaskRoutes.Move` with its own body (`CaseRequest.Body`/`AnchorBody`, `Expectation.cs`), seeded through the product (`ProductActor`; `SeedProjectWithTaskAsync`; the Viewer seed pattern, `IsolationCases.cs` `ViewerEditsATaskAsync`). `Then` callbacks assert the foreign Task's Status and key are unchanged.
+  - [x] Two-layer plant, one at a time, original held in memory and restored in a `finally`: `IgnoreQueryFilters()` on the move's Task reads **and** the `Task` FILTER predicate removed (in the migration file, rebuild, restore — 2.3 P6, 2.4 plant 3) → `ISO-MOVE-TASK-FOREIGN-ID-IN-OWN-SPACE` fails on the Session surface; each layer alone → green.
+  - [x] No new timing row (the route is in the API group; `NotAvailableFloor` applies).
+  - [x] GATE-003: no row pending on 2.6 at `review`.
 
-- [ ] **Task 9 — Client: the Move picker** (AC: 1, 2, 7, 14, 15)
-  - [ ] One component, `Yello.Client/Components/MovePicker.razor` (Q5), used by Task detail and by the card's context menu: a Status step (the Board's columns — the effective set — current Status labelled "current", none selected) then a position step for the chosen Status (Q4), committing on the position choice; `Esc` steps back/closes innermost-first; built on 2.3's picker classes and `PickerOption` (reuse; do not fork its markup). Its options are not a second dialog.
-  - [ ] **Task detail** (`TaskDetail.razor`; header `:22` says "no Move control (2.6)" — update it): a `button-secondary` "Move" control for `CanManage` only, placed per Q5 (recommended directly after the Status control, before Labels; Delete stays last). `FocusLastAsync` unchanged if Delete stays last; re-check it. Viewer: no control.
-  - [ ] **Card context menu** (`TaskCard.razor`, Q6): for `CanManage` only, a visible actions control on the card (named "Actions for {title}" or as Q6 decides) opening a menu holding "Open" and "Move"; the card also opens the same menu on the `contextmenu` event (pointer) and on the `ContextMenu` key and `Shift+F10` (`@onkeydown` on the card, `preventDefault` only for those keys). Not hover-only: the control is always rendered (assert it is visible without hover at 320/768/1280). Viewer: no control, no handler (the browser's own context menu is left alone). The card's "exactly one control" rule changes — widen `BoardTests.A_Task_card_is_its_title_alone_and_carries_no_shadow` deliberately to "the title button and, for a Role that can move, the actions control", and record it.
-  - [ ] **Sending** (`BoardView.razor.cs`): a `MoveAsync(taskId, statusId, afterTaskId)` that renders at once (Q7: optimistic — remove from its column, insert at the chosen index, both `Total`s moved), sends `Writes.SendAsync(HttpMethod.Post, TaskRoutes.MoveOf(SpaceId, taskId), body, key, token)`, and settles on the existing replica machinery or a sibling of it: the move is a Task-level change that conflicts with an in-flight Status edit of the same Task — queue one behind the other (per-Task, the 2.3 Q8 "one write per attribute at a time" rule applied to Status+position) rather than racing them. On `200`: `Admit` with the server's `statusId` and `positionKey` and re-place by key (`InsertByKey`, 2.3 review fix); announce (Q8). On refusal: revert to the admitted slot, `RefusalText.Of(…)` where the move was made (the panel's status region, or the Board's region for a card-menu move — Q8), announce "Returned to {Status}, position {n}.". `404` → the existing `OnRefused` pattern. No answer / `5xx` → "Not sent.", revert, key kept for an identical resend. A Task deleted by this tab meanwhile (`_deleted`) → answer dropped (2.5 Q7).
-  - [ ] **Announcements** (Q8): new resx entries "Moved to {0}, position {1} of {2}." and "Returned to {0}, position {1}." in `ClientCopy.resx` with `<comment>`s; the ordinal is 1-based within the column as the client holds it after re-placing by the server's key, and the total is the column's true `Total`. Decide (Q8) whether 2.3's Status change ("Moved to {0}.") gains the position too; it lands last, so "position N of N". The live region exists empty from the first render (2.2 review).
-  - [ ] **Focus** (Q9): commit from Task detail → focus stays on the panel's Move control; commit from the card menu → the moved card's title button in its new place (the `_focusCardRequests` pattern, stale requests cleared); dismiss → the invoking control.
-  - [ ] **Motion**: only the moved card's reflow uses `motion.quick`; none under `prefers-reduced-motion: reduce` (`DESIGN.md:517-521`). No lift, settle or drop zone (2.7).
-  - [ ] Purge (UX-DR31): picker and menu state are Board state; `PurgePanel()` and the Space purge clear them.
-  - [ ] Copy (`ClientCopy.resx` only, sentence case, `<comment>` on each, never quoted in a C# comment): "Move", "Move {0}" (accessible name if needed), "Actions for {0}", "Open", "Current" (the current-Status label), the position option forms (Q4), "Top of column", "Bottom of column", the two announcements, the Q3 refusal copy (e.g. "That position has changed. Choose it again."), "Not sent." reuse. No "Are you sure", no exclamation, no "archive" (ARC-001 gate).
+- [x] **Task 9 — Client: the Move picker** (AC: 1, 2, 7, 14, 15)
+  - [x] One component, `Yello.Client/Components/MovePicker.razor` (Q5), used by Task detail and by the card's context menu: a Status step (the Board's columns — the effective set — current Status labelled "current", none selected) then a position step for the chosen Status (Q4), committing on the position choice; `Esc` steps back/closes innermost-first; built on 2.3's picker classes and `PickerOption` (reuse; do not fork its markup). Its options are not a second dialog.
+  - [x] **Task detail** (`TaskDetail.razor`; header `:22` says "no Move control (2.6)" — update it): a `button-secondary` "Move" control for `CanManage` only, placed per Q5 (recommended directly after the Status control, before Labels; Delete stays last). `FocusLastAsync` unchanged if Delete stays last; re-check it. Viewer: no control.
+  - [x] **Card context menu** (`TaskCard.razor`, Q6): for `CanManage` only, a visible actions control on the card (named "Actions for {title}" or as Q6 decides) opening a menu holding "Open" and "Move"; the card also opens the same menu on the `contextmenu` event (pointer) and on the `ContextMenu` key and `Shift+F10` (`@onkeydown` on the card, `preventDefault` only for those keys). Not hover-only: the control is always rendered (assert it is visible without hover at 320/768/1280). Viewer: no control, no handler (the browser's own context menu is left alone). The card's "exactly one control" rule changes — widen `BoardTests.A_Task_card_is_its_title_alone_and_carries_no_shadow` deliberately to "the title button and, for a Role that can move, the actions control", and record it.
+  - [x] **Sending** (`BoardView.razor.cs`): a `MoveAsync(taskId, statusId, afterTaskId)` that renders at once (Q7: optimistic — remove from its column, insert at the chosen index, both `Total`s moved), sends `Writes.SendAsync(HttpMethod.Post, TaskRoutes.MoveOf(SpaceId, taskId), body, key, token)`, and settles on the existing replica machinery or a sibling of it: the move is a Task-level change that conflicts with an in-flight Status edit of the same Task — queue one behind the other (per-Task, the 2.3 Q8 "one write per attribute at a time" rule applied to Status+position) rather than racing them. On `200`: `Admit` with the server's `statusId` and `positionKey` and re-place by key (`InsertByKey`, 2.3 review fix); announce (Q8). On refusal: revert to the admitted slot, `RefusalText.Of(…)` where the move was made (the panel's status region, or the Board's region for a card-menu move — Q8), announce "Returned to {Status}, position {n}.". `404` → the existing `OnRefused` pattern. No answer / `5xx` → "Not sent.", revert, key kept for an identical resend. A Task deleted by this tab meanwhile (`_deleted`) → answer dropped (2.5 Q7).
+  - [x] **Announcements** (Q8): new resx entries "Moved to {0}, position {1} of {2}." and "Returned to {0}, position {1}." in `ClientCopy.resx` with `<comment>`s; the ordinal is 1-based within the column as the client holds it after re-placing by the server's key, and the total is the column's true `Total`. Decide (Q8) whether 2.3's Status change ("Moved to {0}.") gains the position too; it lands last, so "position N of N". The live region exists empty from the first render (2.2 review).
+  - [x] **Focus** (Q9): commit from Task detail → focus stays on the panel's Move control; commit from the card menu → the moved card's title button in its new place (the `_focusCardRequests` pattern, stale requests cleared); dismiss → the invoking control.
+  - [x] **Motion**: only the moved card's reflow uses `motion.quick`; none under `prefers-reduced-motion: reduce` (`DESIGN.md:517-521`). No lift, settle or drop zone (2.7).
+  - [x] Purge (UX-DR31): picker and menu state are Board state; `PurgePanel()` and the Space purge clear them.
+  - [x] Copy (`ClientCopy.resx` only, sentence case, `<comment>` on each, never quoted in a C# comment): "Move", "Move {0}" (accessible name if needed), "Actions for {0}", "Open", "Current" (the current-Status label), the position option forms (Q4), "Top of column", "Bottom of column", the two announcements, the Q3 refusal copy (e.g. "That position has changed. Choose it again."), "Not sent." reuse. No "Are you sure", no exclamation, no "archive" (ARC-001 gate).
 
-- [ ] **Task 10 — Design and capability gates** (AC: 2, 14)
-  - [ ] `DesignFoundationGateTests` new partial `.MovePicker.cs`: the picker and menu use the picker tokens (`surface-card`, hairline, `--radius-md`, `min-height` ≥ target minimum), no `box-shadow`, transitions only via the motion tokens and removed under reduced motion; **no `:hover`-only rule hides or reveals the Move or actions control** (a CSS-corpus check that no rule for those selectors sets `display`/`visibility`/`opacity` only under `:hover`). Each with a plant.
-  - [ ] Capability: `TaskCapabilities.PermitsManageTasks` drives every move affordance (FR-16 matrix has no move row; moving is "Create, edit, delete Tasks", `prd.md:342`). **Add no capability.** The existing `…predicate_agrees_with_the_capability_matrix` gate holds it.
+- [x] **Task 10 — Design and capability gates** (AC: 2, 14)
+  - [x] `DesignFoundationGateTests` new partial `.MovePicker.cs`: the picker and menu use the picker tokens (`surface-card`, hairline, `--radius-md`, `min-height` ≥ target minimum), no `box-shadow`, transitions only via the motion tokens and removed under reduced motion; **no `:hover`-only rule hides or reveals the Move or actions control** (a CSS-corpus check that no rule for those selectors sets `display`/`visibility`/`opacity` only under `:hover`). Each with a plant.
+  - [x] Capability: `TaskCapabilities.PermitsManageTasks` drives every move affordance (FR-16 matrix has no move row; moving is "Create, edit, delete Tasks", `prd.md:342`). **Add no capability.** The existing `…predicate_agrees_with_the_capability_matrix` gate holds it.
 
-- [ ] **Task 11 — Browser tests** (AC: 1, 2, 7, 14, 15)
-  - [ ] `tests/Yello.Tests.Client` against `FakeYelloApi`: add `POST TaskRoutes.Move` (re-ordering the fake Board so a re-read agrees; the fake computes a key with the real `PositionKey.Between` or simply orders by the requested neighbour), with hold/release/refuse/unanswered controls (`HoldTaskEditAsync` pattern, `TaskCompletionSource`). Same `ClientSurfaceCollection`; no new fixture. Bodies are `Yello.Contracts` types.
-  - [ ] New `MoveTests.cs` (or partials of `BoardTests`/`TaskDetailTests`): picker from Task detail and from the card menu (pointer click on the actions control, right-click `contextmenu`, `Enter` on the actions control, `ContextMenu` key, `Shift+F10`); no option is selected or `aria-checked` as a destination on open (the current Status is labelled, not checked); **held** move → card already in its new slot and both totals moved; release `200` → announcement text exact ("Moved to In Progress, position 3 of 12." shape with the fake's numbers); release refused (`403`, `409`, `400`) → card back, totals back, copy shown, "Returned to …, position n." announced; unanswered → "Not sent.", back, resend reuses the key; `404` → refusal surface; dismiss → nothing sent (the fake recorded no POST), focus on the invoker.
-  - [ ] Breakpoints: at 320, 768 and 1280 px the actions control and the panel's Move control are visible without hover (`IsVisibleAsync` after moving the mouse away).
-  - [ ] Absence (**extend E2E-003**, `BoardTests.cs:140`): a Viewer has no actions control, no Move control in the panel, no `contextmenu`/`ContextMenu`-key handler effect (right-click opens nothing of ours), and `main [disabled], main [aria-disabled='true'], [role=dialog] [disabled]` count 0. Plants: a Viewer offered each control → caught.
-  - [ ] `TextSpacingTests`: the picker in the panel and the card menu under the 1.4.12 override and 200% text-only zoom.
-  - [ ] Never Playwright's URL wait; poll `location.pathname`. No `RegexOptions.CultureInvariant`. `blur()` and reset focus before keyboard tests. **Rebuild `Yello.Client` in Debug before a browser plant.**
+- [x] **Task 11 — Browser tests** (AC: 1, 2, 7, 14, 15)
+  - [x] `tests/Yello.Tests.Client` against `FakeYelloApi`: add `POST TaskRoutes.Move` (re-ordering the fake Board so a re-read agrees; the fake computes a key with the real `PositionKey.Between` or simply orders by the requested neighbour), with hold/release/refuse/unanswered controls (`HoldTaskEditAsync` pattern, `TaskCompletionSource`). Same `ClientSurfaceCollection`; no new fixture. Bodies are `Yello.Contracts` types.
+  - [x] New `MoveTests.cs` (or partials of `BoardTests`/`TaskDetailTests`): picker from Task detail and from the card menu (pointer click on the actions control, right-click `contextmenu`, `Enter` on the actions control, `ContextMenu` key, `Shift+F10`); no option is selected or `aria-checked` as a destination on open (the current Status is labelled, not checked); **held** move → card already in its new slot and both totals moved; release `200` → announcement text exact ("Moved to In Progress, position 3 of 12." shape with the fake's numbers); release refused (`403`, `409`, `400`) → card back, totals back, copy shown, "Returned to …, position n." announced; unanswered → "Not sent.", back, resend reuses the key; `404` → refusal surface; dismiss → nothing sent (the fake recorded no POST), focus on the invoker.
+  - [x] Breakpoints: at 320, 768 and 1280 px the actions control and the panel's Move control are visible without hover (`IsVisibleAsync` after moving the mouse away).
+  - [x] Absence (**extend E2E-003**, `BoardTests.cs:140`): a Viewer has no actions control, no Move control in the panel, no `contextmenu`/`ContextMenu`-key handler effect (right-click opens nothing of ours), and `main [disabled], main [aria-disabled='true'], [role=dialog] [disabled]` count 0. Plants: a Viewer offered each control → caught.
+  - [x] `TextSpacingTests`: the picker in the panel and the card menu under the 1.4.12 override and 200% text-only zoom.
+  - [x] Never Playwright's URL wait; poll `location.pathname`. No `RegexOptions.CultureInvariant`. `blur()` and reset focus before keyboard tests. **Rebuild `Yello.Client` in Debug before a browser plant.**
 
-- [ ] **Task 12 — Plants, runs, ledger, status** (AC: all)
-  - [ ] Plants one at a time in the foreground; original held in memory and restored in a `finally`; compare the tree hash after each. **Never** `git checkout --`, `git restore`, `git reset` or `git stash`. Each plant compiles. Record `| # | Plant | Gate | Caught |` in the Debug Log. Minimum set: a row left `PendingUntil: "2.6"` at `review` (GATE-003); the move route named by no row (GATE-002); `.SessionOnly()` removed (the AC8 Token case and the Token-unreachable gate); the two-layer drop and each layer alone; each lock hint (3 runs); the neighbour read before the lock; `ConsultsBound` on the move; a sibling renumber (a planted `UPDATE` of a sibling's key in the store) → the AC3 sibling-key comparison; the mixed-case plant (Task 4); a Viewer offered each control; a hover-only rule on the actions control; a default selection in the picker; an announcement without the ordinal.
-  - [ ] Runs (CLAUDE.md): `dotnet build Yello.slnx` (0 warnings, 0 errors), `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. If a Client case fails only in the full run, run `dotnet test --project tests/Yello.Tests.Client/Yello.Tests.Client.csproj --no-build` alone before calling it real (memory: the full run starves the browser suite). Rerun once on an engine start failure or a low-memory kill. Check `Get-Process Yello.Host` if `bin/Debug` is locked. Docker readiness: `docker info --format '{{.ServerVersion}}'` non-empty.
-  - [ ] `tests/TESTING-CONVENTIONS.md`: the move race pattern (who holds what; the read-race shape), the new counts.
-  - [ ] Ledger (`deferred-work.md`): CLOSE `:494` (moves and the midpoint built; the lock order measured), `:543` (decided by RACE-M5/M6 plants: caught → gate named; masked → kept and why), `:550` (a 2.6 move never changes `ProjectId`; the move re-checks `ProjectId` under its row lock; re-own any residue to **6.5**), `:198` (per Q12). UPDATE `:490` (DESIGN.md's "+" in every column: a later column's "+" would be a create-then-move — still UX's), `:517`/`:549` (the Move picker repeats the picker keyboard pattern and the identical-announcement pattern — owner 2.8). ADD with owners: any Q decided against the UX spine or the mockup (owner **UX**: Q4 position list vs the mockup's Top/Bottom, Q6 `Enter` and the actions control, Q8 announcement on a Status change); the position-key length ceiling and same-gap growth (owner **2.9**, measured under load, Q10); the picker's position list at 5,000 Tasks (owner **2.9**, paging); Board push of another participant's move (owner **Epic 7** — no 7.x story names it today, `epics.md:2654-2657`; flag to PM); Q13's digest pin decision if deferred.
-  - [ ] `sprint-status.yaml`: set `review` at the end of the dev phase. **Do not add review narration to source files.**
+- [x] **Task 12 — Plants, runs, ledger, status** (AC: all)
+  - [x] Plants one at a time in the foreground; original held in memory and restored in a `finally`; compare the tree hash after each. **Never** `git checkout --`, `git restore`, `git reset` or `git stash`. Each plant compiles. Record `| # | Plant | Gate | Caught |` in the Debug Log. Minimum set: a row left `PendingUntil: "2.6"` at `review` (GATE-003); the move route named by no row (GATE-002); `.SessionOnly()` removed (the AC8 Token case and the Token-unreachable gate); the two-layer drop and each layer alone; each lock hint (3 runs); the neighbour read before the lock; `ConsultsBound` on the move; a sibling renumber (a planted `UPDATE` of a sibling's key in the store) → the AC3 sibling-key comparison; the mixed-case plant (Task 4); a Viewer offered each control; a hover-only rule on the actions control; a default selection in the picker; an announcement without the ordinal.
+  - [x] Runs (CLAUDE.md): `dotnet build Yello.slnx` (0 warnings, 0 errors), `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. If a Client case fails only in the full run, run `dotnet test --project tests/Yello.Tests.Client/Yello.Tests.Client.csproj --no-build` alone before calling it real (memory: the full run starves the browser suite). Rerun once on an engine start failure or a low-memory kill. Check `Get-Process Yello.Host` if `bin/Debug` is locked. Docker readiness: `docker info --format '{{.ServerVersion}}'` non-empty.
+  - [x] `tests/TESTING-CONVENTIONS.md`: the move race pattern (who holds what; the read-race shape), the new counts.
+  - [x] Ledger (`deferred-work.md`): CLOSE `:494` (moves and the midpoint built; the lock order measured), `:543` (decided by RACE-M5/M6 plants: caught → gate named; masked → kept and why), `:550` (a 2.6 move never changes `ProjectId`; the move re-checks `ProjectId` under its row lock; re-own any residue to **6.5**), `:198` (per Q12). UPDATE `:490` (DESIGN.md's "+" in every column: a later column's "+" would be a create-then-move — still UX's), `:517`/`:549` (the Move picker repeats the picker keyboard pattern and the identical-announcement pattern — owner 2.8). ADD with owners: any Q decided against the UX spine or the mockup (owner **UX**: Q4 position list vs the mockup's Top/Bottom, Q6 `Enter` and the actions control, Q8 announcement on a Status change); the position-key length ceiling and same-gap growth (owner **2.9**, measured under load, Q10); the picker's position list at 5,000 Tasks (owner **2.9**, paging); Board push of another participant's move (owner **Epic 7** — no 7.x story names it today, `epics.md:2654-2657`; flag to PM); Q13's digest pin decision if deferred.
+  - [x] `sprint-status.yaml`: set `review` at the end of the dev phase. **Do not add review narration to source files.**
 
 ## Dev Notes
 
@@ -402,14 +402,139 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 5.5 (claude-opus-5-5), run by the unattended story-cycle orchestrator.
 
 ### Debug Log References
 
 **Create-story phase (2026-10-26).** No isolation row is pending on 2.6 (grepped `PendingUntil` in `tests/Yello.Tests.Isolation`). No ATDD scaffold exists for 2.6. Planning inputs read via two research passes (planning documents; stories 2.2–2.4), plus 2.5, `deferred-work.md` and the code; facts above cite paths and lines as read on 2026-10-26. After setting `2-6-move-and-reorder-a-task-by-explicit-control: ready-for-dev`: `dotnet build Yello.slnx` 0 warnings, 0 errors; `IsolationCaseListTests` 14/14 passed (GATE-001..004 green).
 
+**Dev phase (2026-10-27/28).**
+
+- **Baseline** (the orchestrator's run at the ATDD commit `8b9033c`, recorded before any change): 1148 total, 1088 passed, 0 failed, 60 skipped. Docker (Rancher) 29.5.3 throughout.
+- **Rows pending on 2.6 at the start** (ATDD phase): `ISO-MOVE-TASK-FOREIGN-SPACE`, `ISO-MOVE-TASK-FOREIGN-ID-IN-OWN-SPACE`, `ISO-MOVE-FOREIGN-NEIGHBOUR-IN-OWN-SPACE`, `ISO-MOVE-FOREIGN-STATUS-IN-OWN-SPACE`, `ISO-RECORD-KIND-TASK-MOVE-VIEWER`. All five are live now (no `PendingUntil`), named by `TaskRoutes.Move`; Isolation 119/119 green.
+- **Activation order followed the ATDD checklist**: RACE-M2 first (bound the PK seam, mapped the route, activated M2 - green; then the neighbour read planted before the range lock: M2 red 3/3, the stated reason), then the other races, PK-01..07, ARCH-601..607, MOV-01..15 and IDM-M01/02, the isolation rows, SCH-603/604 with the migration, DSN-601/603, E2E-601..616 and the two text-spacing theories.
+- **Scaffold corrections**: none to any assertion. Constants swapped for contract members as the scaffolds said (`MoveWire.MoveOf`/`TaskPositionUnavailable`, `IsolationCases.MoveRoute`/`MoveOf`/`TaskPositionUnavailable`, `FakeYelloApi.MovePathOf`); the PK seam bound to `PositionKey.Between(lower, upper, jitter.Next)`. Every browser locator and copy the ATDD run assumed matched the markup built, so none was corrected.
+- **Gates widened by design** (each by exactly the move): 1.8's `The_endpoints_marked_unreachable_with_a_Token_are_exactly_Token_management_and_the_switcher` replaced by ARCH-602 `The_endpoints_unreachable_with_a_Token_are_Token_management_the_switcher_and_the_move` (keeps the issue-route vacuity guard, adds one for the move, carries FR-35's reason); `BoardTests.A_Task_card_is_its_title_alone_and_carries_no_shadow` - two controls for a mover (title, actions control), the card's text still the title; `TaskDetailTests` Status case - "Moved to Done, position 1 of 1." on admission (Q8 (b)); E2E-003 extended (Viewer: no actions control, Owner anchor). **Unpredicted widenings**: `The_Task_creation_request_carries_a_title_and_nothing_else` and `The_Task_edit_request_carries_its_editable_attributes_and_nothing_else` each pin the exact set of Task request types, so both gained `MoveTaskRequest` (the edit request itself gains nothing); `LabelTests.A_card_shows_three_chips_in_server_order_then_plus_N` counted one control per card - now two for an Owner, plus a new assertion that the metadata row holds none (its real intent).
+- **Analyzer-driven shapes**: the move endpoint lives in its own `TaskMoveEndpoints` (S1200 dependency cap on `TaskEndpoints`); the card menu is its own `TaskMenu` component (S1200 on `BoardView`); `TaskCard` keeps one `<li>` with handlers that are absent for a Viewer (`default` callbacks), because markup inside `@code` lambdas and bare `else` lines trip `No_user_visible_*` gates.
+- **Live email-index collation** (ledger `:198` was reasoned, not executed): with the email migration planted to a no-op, `The_normalised_email_column_is_BIN2` read **`SQL_Latin1_General_CP1_CI_AS`**, and the full-width spelling of a registered address **was found equal** to it in the indexed column (count 1) - the collision was real. With the migration, both cases green.
+- **Same-gap growth (Q10)**: PK-03 placed **718** keys immediately after one neighbour before the 128-character ceiling; the next is the documented refusal. Ledger entry to 2.9.
+
+| # | Plant | Gate | Caught |
+|---|---|---|---|
+| 1 | Move's neighbour + successor read moved before the range lock | RACE-M2 | 3/3 |
+| 2 | Move's range statement without `UPDLOCK, HOLDLOCK` | RACE-M2 (M1, M3 green: masked - the moves then queue on the index at their `UPDATE` and jitter keeps the keys apart) | 3/3 |
+| 3 | Move's row lock without `INDEX(1)` | the move set (25 cases) | 0/3 - masked: the range serialises every key placer first; kept as every Task writer's row lock |
+| 4 | Move's row lock without `UPDLOCK, HOLDLOCK` | the move set | 0/3 - masked, same reason; kept |
+| 5 | 2.5's deletion Task row `INDEX(1)` removed (Q15) | the move set incl. M5 (b), M6 (b) | 0/3 - masked; kept, ledger `:543` closed |
+| 6 | 2.5's deletion Task row `UPDLOCK, HOLDLOCK` removed (Q15) | the move set | 0/3 - masked; kept |
+| 7 | 2.5's Project row hints removed (Q15) | the move set incl. M7 (b) | 0/3 - masked; kept |
+| 8 | `.SessionOnly()` removed | ARCH-601, ARCH-602; MOV-12 on the wire | caught (2 gates); caught |
+| 9 | `ConsultsBound(TasksPerProject)` on the move | ARCH-601 and `The_Tasks_per_Project_bound_is_declared_only_where_the_route_names_the_Project` | caught |
+| 10 | A sibling renumber (`ExecuteUpdate` of the column's other keys) | MOV-01 sibling comparison (3 roles) | caught 3/3 cases |
+| 11 | Position key column at the database default collation (migration) | SCH-602 mixed-case (duplicate on insert) | caught |
+| 12 | Email migration a no-op | SCH-603, SCH-604 | caught both |
+| 13 | Two-layer drop: `IgnoreQueryFilters()` on the move's Task reads and the `Task` FILTER predicate removed | `ISO-MOVE-TASK-FOREIGN-ID-IN-OWN-SPACE` (with 2.3's `ISO-TASK-FOREIGN-ID-IN-OWN-SPACE`, which shares `FindAsync`) | caught |
+| 14 | Query-filter layer alone | Isolation 94 rows | green (as required) |
+| 15 | FILTER predicate alone | Isolation 94 rows | green (as required) |
+| 16 | A row left `PendingUntil: "2.6"` with 2.6 at `review` | GATE-003 | caught |
+| 17 | The move route mapped under a path no row names | GATE-002 | caught |
+| 18 | A Viewer offered the actions control | E2E-612, E2E-003 | caught |
+| 19 | A Viewer offered the panel's Move control | E2E-612 | caught |
+| 20 | `:hover` rule revealing the actions control | DSN-602 | caught |
+| 21 | A default selection (`aria-selected="true"`) in the Move picker | E2E-601 | caught |
+| 22 | The move announcement without the ordinal | E2E-604 | caught |
+
+Every plant held its original bytes in memory and restored them in a `finally`, verified by hash, then rebuilt; never `git checkout`/`restore`/`reset`/`stash`. Two plants first failed to compile (an unused `using` once the plant removed its only reference) and were rerun with that `using` removed in the plant.
+
+- **Runs**: Architecture 298/298; Slices 563 (560 passed, 3 skipped - the bundle cases); Isolation 119/119; Client 185/185 after the `LabelTests` widening. Full run (`dotnet build Yello.slnx` 0 warnings 0 errors; `dotnet build-server shutdown`; `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`): **1182 total, 1179 passed, 0 failed, 3 skipped** (the migration bundle cases, `YELLO_MIGRATION_BUNDLE` unset), 13 m 05 s.
+
 ### Completion Notes List
 
 - Story created 2026-10-26 by create-story: ultimate context engine analysis completed — comprehensive developer guide created. Open questions Q1–Q18 carry recommended decisions; the dev phase decides each as a reversible, recorded decision.
+- **Built**: `PositionKey.Between` (jittered midpoint); `ITaskStore.MoveAsync` + `TaskMove`; `MoveTaskHandler`; `TaskStore.MoveAsync` (range, row re-read, neighbours under the range, one row written); `MoveTaskRequest`, `TaskRoutes.Move`/`MoveOf`, `ProblemTypes.TaskPositionUnavailable`; `TaskMoveEndpoints.MapMoveTask` (ManageTasks, Session-only, no bound) with `TaskMoveBody`; the email-index collation migration; client `MovePicker`, `TaskMenu`, the card's actions control, the panel's Move control, the optimistic move on the replica, announcements, focus, the moved card's reflow on `motion.quick`. FR-29, FR-35 (position clause), AR-21/AD-15, UX-DR21, UX-DR25; ledger `:494`, `:543`, `:550`, `:198` closed or re-owned.
+- Decisions (each reversible; cut any line to reverse it):
+- **Q1 - (a).** `POST /api/v1/spaces/{spaceId}/tasks/{taskId}/move`, `.SessionOnly()` as endpoint metadata (`TaskMoveEndpoints.MapMoveTask`); a Token is answered as no credential, byte for byte (MOV-12). Cost to later stories: 8.1's API docs state the exception (FR-35 already does); the Token-unreachable gate (ARCH-602) names the route.
+- **Q2 - (a).** `MoveTaskRequest(Guid StatusId, Guid? AfterTaskId)`; both members required (`afterTaskId: null` is the top - a position has no default); a `positionKey` member, a missing member or an `afterTaskId` that is neither an id nor null is `400 invalid-task-edit` (the edit's shape type, reused rather than a new type - a move is a Task edit by its own route); a `statusId` that is not an id is `400 invalid-task-status`. Cost to later stories: 2.8's keyboard move sends the same body.
+- **Q3 - (a).** `409 task-position-unavailable`, one type for every neighbour that is not one (absent, foreign, other Project or column, deleted, the moved Task itself), byte-identical for a random and a foreign id, unrecorded; client copy "That position has changed. Choose it again.". Cost to later stories: none.
+- **Q4 - (a).** Position step: Top of column, then "Position {n}, after {title}" per Task the column shows (the moved Task left out), the last also labelled Bottom of column. Cost to later stories: UX amends the mockup's Top/Bottom-only list (ledger, owner UX); 2.9 pages the list at 5,000 Tasks (ledger).
+- **Q5 - (a).** One `MovePicker` (a `.picker.move-picker` listbox on `PickerOption`, which gained `MarksCurrent` and `Note`), in place: in the panel below a "Move" button placed directly after the Status control, and inside the card after the card menu's Move. Cost to later stories: 2.8 adds arrow keys to every picker together.
+- **Q6 - (a).** A visible actions control on every card for a mover ("Actions for {title}", an icon with no text), opening `TaskMenu` (Open, Move) drawn inside the card in the flow; the card also opens it on `contextmenu`, the `ContextMenu` key and Shift+F10; Enter on the title still opens Task detail. Viewers get no control and no handler. Cost to later stories: the card's one-control gate is widened to two for a mover (recorded); 2.8's grid places the second control in its cell model; AC1's "Enter on a focused card" wording variance is UX's (ledger).
+- **Q7 - optimistic.** The move is the replica's Status-attribute change (a `MoveChoice` value), so a move and a Status edit of one Task queue rather than race; rendered at once after the neighbour, both totals moved; re-placed by the server's key on 200; reverted to the last admitted slot on refusal or no answer. Cost to later stories: none.
+- **Q8 - (a), (b) yes, (c).** Announced on admission ("Moved to {Status}, position {n} of {total}.") with the ordinal after re-placing by the server's key and the column's true total; "Returned to {Status}, position {n}." on refusal or no answer; a dismissed picker says nothing. 2.3's Status change now says the same sentence on admission (the `TaskMoved` key's value changed; `TaskDetailTests` amended deliberately). Refusal words go to the panel, or to a Board notice for a card-menu move. Cost to later stories: 2.8 owns re-announcing identical sentences (ledger :549).
+- **Q9 - as recommended.** From the panel focus returns to Move (the panel stays open); from the card menu focus follows the card's title to its new place (a card drawn afresh in another column takes it on arrival, once); a refused menu move puts focus back on the card in its old slot; dismissing returns focus to the invoker. Cost to later stories: none.
+- **Q10 - midpoint with jitter in the middle half.** `PositionKey.Between(lower, upper, Func<int,int> jitter)` (server: `RandomNumberGenerator.GetInt32`), never ending a placed key in `0` where another fits; a key over 128 characters, or a gap that holds none, is `409 task-position-unavailable`. Measured: 718 placements immediately after one neighbour reach the 128-character ceiling (PK-03). `After` stays for creation and the Status edit. Cost to later stories: 2.9 measures key length under load (ledger).
+- **Q11 - keep.** The index stays `(SpaceId, ProjectId, StatusId, PositionKey)`; SCH-601 asserts BIN2 on `PositionKey` as a key column of it. AC4's tuple omits `SpaceId` - a recorded variance; its intent holds. Cost to later stories: none; 2.9's seek uses this index.
+- **Q12 - (a).** Migration `20261027233311_EmailIndexBinaryCollation`: `NormalizedEmailAddress` to `Latin1_General_100_BIN2`, the unique index dropped and rebuilt around it; SCH-603/604 assert it. Cost to later stories: none (1.3 and 4.3 compare the same normalised form).
+- **Q13 - (a).** Keep the floating `2025-latest` tag; the A-6 assertions and the mixed-case case are the engine detector. Comments in `SqlServerContainerFixture` and `AppHost/Program.cs` updated. Cost to later stories: none.
+- **Q14 - leave it.** The Status PATCH over a Token still appends (MOV-14). Cost to later stories: none.
+- **Q15 - measured, kept.** 2.5's three deletion row hints planted under the move races (M5 (b), M6 (b), M7 (b)): each 0/3, masked by the range every writer takes first; kept as judged harmless, ledger :543 closed as decided. Cost to later stories: none.
+- **Q16 - close and re-own.** A 2.6 move never changes `ProjectId`, and the move itself re-checks `ProjectId` under its row lock; the deletion's unlocked read is correct while that holds. Residue re-owned to 6.5 (ledger :550).
+- **Q17 - ManageTasks.** No new capability; `manage-tasks` refusal copy reused.
+- **Q18 - 200, nothing written.** Locks still taken (MOV-09).
+- **Body shape refusals reuse `invalid-task-edit`** (no new problem type): a move is a Task edit by its own route, and the product's client never sends a malformed one. Reversible by adding `invalid-task-move`.
+- **The card menu is drawn inside the card, in the flow**, not as an absolutely positioned popover, so it never overlaps the next card (the text-spacing case holds that). Reversible by UX.
 
 ### File List
+
+- `_bmad-output/implementation-artifacts/2-6-move-and-reorder-a-task-by-explicit-control.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `tests/TESTING-CONVENTIONS.md`
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.MovePicker.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Move.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.TaskEdit.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Tasks.cs`
+- `tests/Yello.Tests.Client/BoardTests.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.cs`
+- `tests/Yello.Tests.Client/LabelTests.cs`
+- `tests/Yello.Tests.Client/MoveTests.cs`
+- `tests/Yello.Tests.Client/TaskDetailTests.cs`
+- `tests/Yello.Tests.Client/TextSpacingTests.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.cs`
+- `tests/Yello.Tests.Shared/SqlServerContainerFixture.cs`
+- `tests/Yello.Tests.Slices/Tasks/CreateTask/CreateTaskHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/DeleteTask/DeleteTaskHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/EditTaskAttributes/EditTaskAttributesHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/MoveTask/MoveTaskHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/MoveTask/PositionKeyBetweenTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/MoveWire.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Move.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.MoveIdempotency.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.MoveRace.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.MoveSchema.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Schema.cs`
+- `Yello.AppHost/Program.cs`
+- `Yello.Application/Tasks/MoveTask/MoveTaskHandler.cs`
+- `Yello.Client/Components/BoardColumn.razor`
+- `Yello.Client/Components/BoardView.razor`
+- `Yello.Client/Components/BoardView.razor.cs`
+- `Yello.Client/Components/MoveChoice.cs`
+- `Yello.Client/Components/MovePicker.razor`
+- `Yello.Client/Components/PickerOption.razor`
+- `Yello.Client/Components/TaskCard.razor`
+- `Yello.Client/Components/TaskDetail.razor`
+- `Yello.Client/Components/TaskMenu.razor`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Refusals/RefusalCopy.cs`
+- `Yello.Client/wwwroot/css/components.css`
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Contracts/Tasks/MoveTaskRequest.cs`
+- `Yello.Contracts/Tasks/TaskRoutes.cs`
+- `Yello.Domain/Accounts/EmailAddressNormalisation.cs`
+- `Yello.Domain/Tasks/ITaskStore.cs`
+- `Yello.Domain/Tasks/PositionKey.cs`
+- `Yello.Host/Endpoints/TaskEndpoints.cs`
+- `Yello.Host/Endpoints/TaskMoveBody.cs`
+- `Yello.Host/Endpoints/TaskMoveEndpoints.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Infrastructure/Persistence/Configurations/AccountConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261027233311_EmailIndexBinaryCollation.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261027233311_EmailIndexBinaryCollation.Designer.cs`
+- `Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs`
+- `Yello.Infrastructure/Persistence/TaskStore.cs`
+
+### Change Log
+
+- 2026-10-28: Dev phase - move and reorder a Task by explicit control (FR-29, FR-35 position clause, AR-21/AD-15, UX-DR21, UX-DR25); email unique index pinned to `Latin1_General_100_BIN2` (ledger :198); five isolation rows live; Status set to review.
+

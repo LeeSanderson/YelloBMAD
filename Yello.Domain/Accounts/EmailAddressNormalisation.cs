@@ -27,11 +27,10 @@ namespace Yello.Domain.Accounts;
 ///     "a property of the database that a restore onto a differently-collated server could change
 ///     silently". That was wrong as written. This function decides what value is <i>stored</i>;
 ///     the unique index decides which stored values are <i>equal</i>, and nothing here pins that
-///     index's collation, so it takes the database default. Two addresses this function maps to
-///     different strings can still collide in the index under a width- or kana-insensitive
-///     collation. Pinning it is story 2.6's, alongside AD-15's
-///     <c>Latin1_General_100_BIN2</c> - recorded in <c>deferred-work.md</c> rather than taken
-///     here, because it is that story's decision to make.
+///     index's collation. Story 2.6 pinned it (open question 12 (a)): the column, and so the
+///     index, compares in AD-15's <c>Latin1_General_100_BIN2</c>, so two addresses this
+///     function maps to different strings never collide in the index - under the database
+///     default, width- and kana-insensitive, they could.
 ///   </description></item>
 ///   <item><description>
 ///     It is stable under AD-15's <c>Latin1_General_100_BIN2</c>, the binary collation story 2.6

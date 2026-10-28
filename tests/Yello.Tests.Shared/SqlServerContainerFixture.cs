@@ -90,10 +90,11 @@ public sealed class SqlServerContainerFixture : IAsyncLifetime
     /// silently run different engine builds - and AD-15's collation and NFR-1's row-level
     /// security are both engine behaviour.
     /// <para>
-    /// The tag still floats by cumulative update rather than being pinned by digest. That is a
-    /// stated open question for Lee rather than an oversight, revisited when story 2.6 gives a
-    /// reason to freeze the engine; the engine-behaviour tests in the slice suite give none yet - but it now
-    /// floats in one place. Note that
+    /// The tag still floats by cumulative update rather than being pinned by digest - decided by
+    /// story 2.6 (open question 13 (a)), reversibly: the A-6 collation assertions and the
+    /// mixed-case ordering case run on every engine pull and are the detector risk R7 asks for, so
+    /// an engine update that changed collation behaviour fails the slice suite rather than
+    /// passing silently. It floats in one place. Note that
     /// <c>Yello.AppHost</c> rejects a digest reference outright rather than mis-splitting it,
     /// so pinning one is a deliberate change to both files.
     /// </para>

@@ -344,7 +344,7 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC14 - Task detail has no Move picker yet (Task 9, Q5)")]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "UX-DR21")]
@@ -381,7 +381,7 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC14 - the card has no context menu yet (Task 9, Q6)")]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "UX-DR21")]

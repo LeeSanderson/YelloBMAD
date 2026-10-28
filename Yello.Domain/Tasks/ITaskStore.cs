@@ -2,7 +2,7 @@ namespace Yello.Domain.Tasks;
 
 /// <summary>
 /// Creates, reads, edits and deletes Tasks, and the Labels applied to them, in the Space the current unit of work
-/// is scoped to. FR-19, FR-20, FR-22, FR-23; stories 2.2, 2.3, 2.4 and 2.5.
+/// is scoped to. FR-19, FR-20, FR-22, FR-23, FR-29; stories 2.2, 2.3, 2.4, 2.5 and 2.6.
 /// </summary>
 /// <remarks>
 /// <b>Never asked about another Space.</b> Every call runs inside the request's Space-scoped unit of work,
@@ -69,6 +69,68 @@ public interface ITaskStore
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>What the deletion came to.</returns>
     Task<TaskDeletion> DeleteAsync(Guid taskId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Moves one Task of the resolved Space to <paramref name="statusId"/>, immediately after
+    /// <paramref name="afterTaskId"/> - or to the top of that column when it is <c>null</c> - and saves it (story 2.6, AC3,
+    /// AC9). Only the moved Task's Status and position key are written; no sibling's key changes (AD-15). Never changes
+    /// the Task's Project.
+    /// </summary>
+    /// <param name="taskId">The Task, from the route.</param>
+    /// <param name="statusId">The destination Status, already checked against the Task's Project's effective set.</param>
+    /// <param name="afterTaskId">The Task to land after, or <c>null</c> for the top of the column.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>What the move came to.</returns>
+    Task<TaskMove> MoveAsync(Guid taskId, Guid statusId, Guid? afterTaskId, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// What a Task move came to (story 2.6). No "the neighbour is in another Space": that would tell a caller an id exists
+/// elsewhere (AD-3, I-13).
+/// </summary>
+/// <param name="Outcome">What happened.</param>
+/// <param name="Task">The Task as stored, when <see cref="Outcome"/> is <see cref="TaskMoveOutcome.Moved"/>.</param>
+public sealed record TaskMove(TaskMoveOutcome Outcome, TaskItem? Task)
+{
+    /// <summary>
+    /// No Task in the resolved Space has the id.
+    /// </summary>
+    public static TaskMove NotFound { get; } = new(TaskMoveOutcome.NotFound, null);
+
+    /// <summary>
+    /// The position asked for is not one: the neighbour is not a Task of the destination column of the same Project, or
+    /// no key fits in the gap. Nothing was written.
+    /// </summary>
+    public static TaskMove PositionUnavailable { get; } = new(TaskMoveOutcome.PositionUnavailable, null);
+
+    /// <summary>
+    /// The Task is where it was asked to go.
+    /// </summary>
+    /// <param name="task">The Task as stored.</param>
+    /// <returns>The outcome.</returns>
+    public static TaskMove Moved(TaskItem task) => new(TaskMoveOutcome.Moved, task);
+}
+
+/// <summary>
+/// What a Task move came to.
+/// </summary>
+public enum TaskMoveOutcome
+{
+    /// <summary>
+    /// The Task is in the destination Status at the position asked for - written, or already there and left alone.
+    /// </summary>
+    Moved,
+
+    /// <summary>
+    /// No Task in the resolved Space has the id, whether it never existed, was deleted, or is another Space's.
+    /// </summary>
+    NotFound,
+
+    /// <summary>
+    /// The neighbour is absent, another Space's, another Project's or column's, deleted, or the moved Task itself; or no
+    /// position key fits between it and its successor (story 2.6, open questions 3 and 10).
+    /// </summary>
+    PositionUnavailable,
 }
 
 /// <summary>

@@ -50,7 +50,7 @@ public sealed partial class TaskEndpointTests
     /// gap's neighbours, and neither is lost: the column reads neighbour, the two moved Tasks, neighbour.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the move route (Q1 (a)) is not mapped yet; RACE-M1 needs two moves to queue on the range")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "AR-21")]
     [Trait("Requirement", "AD-15")]
@@ -118,7 +118,7 @@ public sealed partial class TaskEndpointTests
     /// (2601, a <c>500</c>). No duplicate key, no <c>500</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the move route (Q1 (a)) is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "AR-21")]
     [Trait("Requirement", "AD-15")]
@@ -178,7 +178,7 @@ public sealed partial class TaskEndpointTests
     /// serves them.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the move route (Q1 (a)) is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "AR-30")]
     public async Task A_creation_and_a_move_into_one_column_both_succeed_with_distinct_keys()
@@ -236,7 +236,7 @@ public sealed partial class TaskEndpointTests
     /// <c>500</c> there).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the move route (Q1 (a)) is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-20")]
     public async Task A_move_queued_behind_a_Status_edit_of_the_same_Task_lands_after_it_commits()
@@ -280,7 +280,7 @@ public sealed partial class TaskEndpointTests
     /// finding, repeated for the move), never a <c>500</c> - and no row is written back.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the move route (Q1 (a)) is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-23")]
     public async Task A_move_queued_behind_the_deletion_of_its_Task_answers_404()
@@ -370,7 +370,7 @@ public sealed partial class TaskEndpointTests
     /// placed after a Task that is gone, never a <c>500</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the move route (Q1 (a)) and Q3's task-position-unavailable do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-29")]
     public async Task A_move_queued_behind_the_deletion_of_its_neighbour_is_refused_409_and_writes_nothing()
@@ -466,7 +466,7 @@ public sealed partial class TaskEndpointTests
     /// of one of its Tasks queues; the test commits; the move answers <c>404 not-available</c>, never a <c>500</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the move route (Q1 (a)) is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-17")]
     public async Task A_move_queued_behind_the_deletion_of_its_Project_answers_404()
@@ -556,7 +556,7 @@ public sealed partial class TaskEndpointTests
     /// row, which <c>INDEX(1)</c> on both prevents.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the move route (Q1 (a)) is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-22")]
     public async Task A_move_queued_behind_a_Labels_edit_of_the_same_Task_answers_200_and_keeps_the_application()

@@ -36,7 +36,7 @@ public sealed class PositionKeyBetweenTests
     /// PK-01 (AC10) - for 500 seeded random ordered pairs of alphabet keys, the key placed between them sorts strictly
     /// between them under <see cref="StringComparer.Ordinal"/>.
     /// </summary>
-    [Fact(Skip = "red: AC10 - PositionKey.Between does not exist yet (story Task 2)")]
+    [Fact]
     public void A_key_placed_between_two_keys_sorts_strictly_between_them()
     {
         var random = new Random(2026);
@@ -57,7 +57,7 @@ public sealed class PositionKeyBetweenTests
     /// before, the second strictly after, and the third is a key at all (story 2.2's <see cref="PositionKey.First"/> or
     /// another), each within <see cref="PositionKey.MaxLength"/>.
     /// </summary>
-    [Fact(Skip = "red: AC10 - PositionKey.Between does not exist yet (story Task 2)")]
+    [Fact]
     public void Before_the_first_after_the_last_and_into_an_empty_column_are_all_placed()
     {
         var before = Between(null, PositionKey.First, new Random(1));
@@ -76,7 +76,7 @@ public sealed class PositionKeyBetweenTests
     /// 1,000 placements or stops at Q10's documented exhaustion. The count and the length reached are written to the test
     /// output for the Debug Log and the 2.9 ledger entry (key length under load).
     /// </summary>
-    [Fact(Skip = "red: AC10 - PositionKey.Between does not exist yet (story Task 2); records the same-gap growth for Q10")]
+    [Fact]
     public void Repeated_placement_into_one_gap_stays_ordered_and_its_growth_is_measured()
     {
         const string lower = "V0000";
@@ -113,7 +113,7 @@ public sealed class PositionKeyBetweenTests
     /// says: a key placed between <c>A</c> and <c>a</c>, and between <c>Z</c> and <c>a</c>, sorts between them ordinally
     /// (upper case before lower case), which is also <c>Latin1_General_100_BIN2</c>'s order for this alphabet.
     /// </summary>
-    [Fact(Skip = "red: AC10 - PositionKey.Between does not exist yet (story Task 2)")]
+    [Fact]
     public void A_key_between_keys_differing_only_in_case_follows_ordinal_order()
     {
         foreach (var (lower, upper) in new[] { ("A", "a"), ("Z", "a"), ("B0", "b0") })
@@ -130,7 +130,7 @@ public sealed class PositionKeyBetweenTests
     /// PK-05 (AC10) - every character of every placed key is in the base-62 alphabet (digits, upper case, lower case), so
     /// .NET's ordinal order and the column's BIN2 order agree on it.
     /// </summary>
-    [Fact(Skip = "red: AC10 - PositionKey.Between does not exist yet (story Task 2)")]
+    [Fact]
     public void Every_character_of_a_placed_key_is_in_the_base_62_alphabet()
     {
         var random = new Random(62);
@@ -148,7 +148,7 @@ public sealed class PositionKeyBetweenTests
     /// PK-06 (AC10, story Task 2's guard) - an impossible gap is refused: the same key on both sides, and the two sides
     /// reversed, each throw <see cref="ArgumentException"/>. The store must never ask for one.
     /// </summary>
-    [Fact(Skip = "red: AC10 - PositionKey.Between does not exist yet (story Task 2)")]
+    [Fact]
     public void An_impossible_gap_is_refused()
     {
         Assert.ThrowsAny<ArgumentException>(() => Between("V0000", "V0000", new Random(1)));
@@ -160,7 +160,7 @@ public sealed class PositionKeyBetweenTests
     /// differently seeded jitter sources, the gap <c>V0000</c>..<c>V0001</c> receives more than one distinct key. With the
     /// server's range lock this is the second line of defence, not the convergence mechanism (spine <c>:429</c>).
     /// </summary>
-    [Fact(Skip = "red: AC10 - PositionKey.Between does not exist yet (story Task 2)")]
+    [Fact]
     public void Independent_placements_into_one_gap_carry_jitter()
     {
         var keys = Enumerable.Range(0, 100).Select(seed => Between("V0000", "V0001", new Random(seed))).ToHashSet(StringComparer.Ordinal);
@@ -172,7 +172,7 @@ public sealed class PositionKeyBetweenTests
     /// The seam story Task 2 binds to <c>PositionKey.Between</c>.
     /// </summary>
     private static string Between(string? lower, string? upper, Random jitter) =>
-        throw new NotSupportedException($"red: AC10 - bind this seam to PositionKey.Between ({lower}, {upper}, {jitter.GetType().Name}).");
+        PositionKey.Between(lower, upper, jitter.Next);
 
     /// <summary>
     /// Two distinct alphabet keys of 1-8 characters, ordered ordinally, whose upper is not the lower with only

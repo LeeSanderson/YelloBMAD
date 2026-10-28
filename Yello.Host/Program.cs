@@ -19,6 +19,7 @@ using Yello.Application.Statuses.ListStatuses;
 using Yello.Application.Tasks.CreateTask;
 using Yello.Application.Tasks.DeleteTask;
 using Yello.Application.Tasks.EditTaskAttributes;
+using Yello.Application.Tasks.MoveTask;
 using Yello.Application.Tasks.ViewTask;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Localisation;
@@ -107,6 +108,7 @@ builder.Services.AddScoped<CreateTaskHandler>();
 builder.Services.AddScoped<ViewTaskHandler>();
 builder.Services.AddScoped<EditTaskAttributesHandler>();
 builder.Services.AddScoped<DeleteTaskHandler>();
+builder.Services.AddScoped<MoveTaskHandler>();
 builder.Services.AddScoped<ViewBoardHandler>();
 builder.Services.AddScoped<ListLabelsHandler>();
 builder.Services.AddScoped<DefineLabelHandler>();
@@ -407,6 +409,10 @@ api.MapEditTask();
 // Task deletion (story 2.5). DELETE /api/v1/spaces/{spaceId}/tasks/{taskId} deletes the Task and its Label
 // applications, under ManageTasks, on both surfaces; no bound - it adds nothing.
 api.MapDeleteTask();
+
+// Task move (story 2.6). POST /api/v1/spaces/{spaceId}/tasks/{taskId}/move places the Task in a Status after a named
+// neighbour, under ManageTasks; Session only (FR-35: a position is readable, never writable, over the API); no bound.
+api.MapMoveTask();
 
 // Labels (story 2.4). GET and POST /api/v1/spaces/{spaceId}/labels list them under the read capability every
 // Role holds and define one under ManageLabels; DELETE /api/v1/spaces/{spaceId}/labels/{labelId} deletes an

@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Xunit;
+using Yello.Contracts;
 using Yello.Contracts.Tasks;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
@@ -18,14 +19,13 @@ namespace Yello.Tests.Slices.Tasks;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The route and the problem type are scaffold constants until story Task 5 adds them</b>: <see cref="MoveOf"/> is the
-/// path Q1 (a) recommends (<c>TaskRoutes.MoveOf</c>, <c>/api/v1/spaces/{spaceId}/tasks/{taskId}/move</c>) and
-/// <see cref="TaskPositionUnavailable"/> is Q3 (a)'s type (<c>ProblemTypes.TaskPositionUnavailable</c>, <c>409</c>). Replace
-/// both with the contract members when they exist; nothing else here changes.
+/// <b>The route and the problem type are the contract's</b>: <see cref="MoveOf"/> is <c>TaskRoutes.MoveOf</c> (Q1 (a),
+/// <c>/api/v1/spaces/{spaceId}/tasks/{taskId}/move</c>) and <see cref="TaskPositionUnavailable"/> is
+/// <c>ProblemTypes.TaskPositionUnavailable</c> (Q3 (a), <c>409</c>).
 /// </para>
 /// <para>
-/// <b>Bodies are anonymous objects or raw JSON</b>, never a contract type: <c>MoveTaskRequest</c> does not exist yet, and a
-/// case must be able to send what the contract forbids (a <c>positionKey</c> member, a missing <c>statusId</c>).
+/// <b>Bodies are anonymous objects or raw JSON</b>, never a contract type: a case must be able to send what the contract
+/// forbids (a <c>positionKey</c> member, a missing <c>statusId</c>).
 /// <c>JsonSerializerDefaults.Web</c> writes <c>afterTaskId: null</c> rather than dropping it - Q2 (a)'s "top of column".
 /// </para>
 /// <para>
@@ -53,12 +53,12 @@ internal static class MoveWire
     /// Q3 (a)'s problem type: a neighbour that is not (or is no longer) a Task in the destination column of the same
     /// Project, and Q10's exhausted gap. Story Task 5 adds it as <c>ProblemTypes.TaskPositionUnavailable</c>.
     /// </summary>
-    public const string TaskPositionUnavailable = "urn:yello:problem:task-position-unavailable";
+    public static string TaskPositionUnavailable => ProblemTypes.TaskPositionUnavailable;
 
     /// <summary>
     /// One Task's move path, as <c>TaskRoutes.MoveOf</c> will state it (Q1 (a)).
     /// </summary>
-    public static string MoveOf(Guid spaceId, Guid taskId) => TaskRoutes.TaskOf(spaceId, taskId) + "/move";
+    public static string MoveOf(Guid spaceId, Guid taskId) => TaskRoutes.MoveOf(spaceId, taskId);
 
     /// <summary>
     /// A move request as Q2 (a) shapes it: the destination Status and the Task to land after (<c>null</c> = the top of

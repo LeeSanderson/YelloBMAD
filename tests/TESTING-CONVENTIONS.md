@@ -145,6 +145,18 @@ range and read its Project, insert not yet sent - and wait until the deletion is
 (RACE-P1 (a)); a deletion that skipped the range commits under it and the test's insert meets 547, 3 runs in
 3. A lock hint whose plant is caught 0/3 is recorded as masked with the reason, never deleted
 (`deferred-work.md`, story 2.5).
+
+**A move is a key placer that reads its neighbours, so its decisive race is the read race - added by story
+2.6.** `MoveWire.HoldMoveAsync` plays a move in the product's shape (the Project's Task range in the count
+shape, then the Task row `INDEX(1)`, then the one `UPDATE`), and the existing writers are played by
+`DeleteWire` and `LabelWire`, so every pair meets on one key. *The test holds, the request is the move*
+(RACE-M1..M4, M5 (a)..M8 (a)); *the move is held, the request is the other writer* (M5 (b)..M8 (b)). The case
+that decides the move's lock order is RACE-M2 (`A_move_reads_its_neighbours_keys_only_under_the_lock`): the
+test holds the range, sends a move "after X", waits until it is blocked, then itself inserts a Task right after
+X and commits - a move that read X's successor before the lock lands after the new Task or collides with it,
+3 runs in 3, and the same case caught the range taken without its hints 3/3. Two moves into one gap held on the
+range (RACE-M1) pass even with the range hint removed: the moves then queue on the index at their `UPDATE`, and
+jitter keeps their keys apart - the jitter is the second line, so the read race, not M1, is the gate.
 **Randomised data where identity does not matter; fixed where an assertion depends on it.**
 
 **Never a shared email address.** FR-1 makes an Account's email unique, so a shared literal is
@@ -701,6 +713,10 @@ hold locks briefly.
 **Counts when story 2.5's dev phase closed:** 1077 cases - 1074 passed, 0 failed, 3 skipped (the bundle
 cases, `YELLO_MIGRATION_BUNDLE` unset), in about 13 minutes of wall clock. Still four engines; 2.5 added no
 engine, no fixture type and no serial collection. Its ten deletion race cases hold locks briefly.
+
+**Counts when story 2.6's dev phase closed:** 1182 cases - 1179 passed, 0 failed, 3 skipped (the bundle cases,
+`YELLO_MIGRATION_BUNDLE` unset), in about 13 minutes of wall clock with `--max-parallel-test-modules 1`. Still four
+engines; 2.6 added no engine, no fixture type and no serial collection. Its twelve move race cases hold locks briefly.
 
 **The Label palette's harness - added by story 2.4.** `tests/Yello.Tests.Architecture/CieDe2000.cs`
 implements CIEDE2000 beside `WcagContrast.cs`, and `LabelPaletteGateTests` proves it against Sharma, Wu

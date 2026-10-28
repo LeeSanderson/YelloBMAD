@@ -15,14 +15,13 @@ namespace Yello.Tests.Architecture;
 /// <remarks>
 /// <para>
 /// <b>The subjects are reached by name</b> (<c>TaskRoutes.Move</c>, <c>MoveTaskRequest</c>, <c>ITaskStore.MoveAsync</c>,
-/// <c>MoveTaskHandler</c>, <c>ProblemTypes.TaskPositionUnavailable</c>), because none exists yet; the dev phase may switch
-/// each to a typed reference once it does. The route patterns stay literals: they are what the gate asserts.
+/// <c>MoveTaskHandler</c>, <c>ProblemTypes.TaskPositionUnavailable</c>), as the ATDD run wrote them. The route patterns
+/// stay literals: they are what the gate asserts.
 /// </para>
 /// <para>
-/// <b>Gates that go red by design when story Task 6 maps the route</b> - amended in that change by exactly the move route,
-/// never loosened: <c>The_endpoints_marked_unreachable_with_a_Token_are_exactly_Token_management_and_the_switcher</c>
-/// (ARCH-602 below is its successor; rename it and carry FR-35's reason); and any exact set of Task routes or methods in
-/// <c>RefusalBoundaryGateTests.Tasks.cs</c> / <c>.TaskEdit.cs</c> (ARCH-603 holds the set under one Task). Must stay green
+/// <b>Gates the move widened, by exactly the move</b> (story 2.6 Task 6): 1.8's Token-unreachable gate is replaced by
+/// ARCH-602, which keeps its vacuity guard and adds the move with FR-35's reason; the two exact sets of Task request types
+/// (<c>RefusalBoundaryGateTests.Tasks.cs</c>, <c>.TaskEdit.cs</c>) gained <c>MoveTaskRequest</c>. Must stay green
 /// unchanged: <c>RefusalBoundaryGateTests.Delete.cs</c>'s ARCH-501 (the deletes are not Session-only),
 /// <c>The_Task_edit_request_carries_its_editable_attributes_and_nothing_else</c>, the response-shape pins
 /// (<c>TaskProperties</c>), <c>Every_spaceId_endpoint_declares_exactly_one_capability</c>, the replayable-result gate, the
@@ -39,7 +38,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Session-only - endpoint metadata, not a slice that branches on the surface - and consulting no bound: a move creates
     /// nothing, so counting would refuse moves in a full Project (2.3 P3).
     /// </summary>
-    [Fact(Skip = "red: AC9 - the move route (Q1 (a)) is not mapped yet (story Task 6)")]
+    [Fact]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "FR-29")]
     [Trait("Requirement", "AD-4")]
@@ -55,18 +54,34 @@ public sealed partial class RefusalBoundaryGateTests
     }
 
     /// <summary>
-    /// ARCH-602 - AC8, FR-35, FR-36, AD-24 - the successor of 1.8's Token-unreachable gate, widened by exactly the move
-    /// route: the endpoints a Token cannot reach are Token issue, the Token list, Token revocation, the switcher, and the
-    /// move - the one place the API is deliberately narrower than the browser (FR-35, <c>prd.md:605</c>). Replaces that gate
-    /// when story Task 6 maps the route.
+    /// ARCH-602 - AC8, FR-35, FR-36, AR-29, AD-24 - the successor of 1.8's Token-unreachable gate, widened by exactly the
+    /// move route: the endpoints marked unreachable with an API Token, by the Session-only marker or by an AD-24 surface,
+    /// are Token issue, the Token list, Token revocation, the switcher - so a new Token-management route cannot be added
+    /// without one - and the move: the one place the API is deliberately narrower than the browser (FR-35,
+    /// <c>prd.md:605</c>), because a position within a column is readable over the API and never writable.
     /// </summary>
-    [Fact(Skip = "red: AC8 - the move route is not mapped yet; replaces the 1.8 Token-unreachable gate at Task 6")]
+    /// <remarks>
+    /// A Token authenticates only on a Space-scoped route without <c>SessionOnlyEndpoint</c>; every other route answers it
+    /// as no credential by its shape. The two markers name the exceptions a shape cannot decide. Read from the real route
+    /// table; <b>vacuity guard:</b> the issue route and the move route are found carrying <c>{spaceId}</c>, so the marker
+    /// is doing work their shape would not.
+    /// </remarks>
+    [Fact]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "FR-36")]
+    [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-24")]
     public void The_endpoints_unreachable_with_a_Token_are_Token_management_the_switcher_and_the_move()
     {
-        var marked = RouteTable()
+        var table = RouteTable();
+
+        var issue = Assert.Single(table, endpoint => endpoint.RoutePattern.RawText == Yello.Contracts.ApiTokens.ApiTokenRoutes.Issue);
+        Assert.True(CarriesSpaceId(issue), "The issue route no longer carries {spaceId}.");
+
+        var move = Assert.Single(table, endpoint => endpoint.RoutePattern.RawText == TaskMovePattern);
+        Assert.True(CarriesSpaceId(move), "The move route no longer carries {spaceId}.");
+
+        var marked = table
             .Where(endpoint => endpoint.Metadata.Any(item =>
                 item.GetType().FullName is SessionOnlyMarkerName or AccountScopedMarkerName))
             .Select(endpoint => endpoint.RoutePattern.RawText)
@@ -89,7 +104,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// ARCH-603 - AC9, FR-29, FR-41's boundary - under one Task the Host maps its read, edit and deletion on the item and
     /// its move, and nothing else: no route that moves a Task to another Project (6.5) or writes a position key directly.
     /// </summary>
-    [Fact(Skip = "red: AC9 - the move route is not mapped yet (story Task 6)")]
+    [Fact]
     [Trait("Requirement", "FR-29")]
     [Trait("Requirement", "FR-35")]
     public void The_routes_under_a_Task_are_its_read_edit_deletion_and_move()
@@ -115,7 +130,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// ARCH-604 - AC9, Q1 (a), AR-35 - <c>TaskRoutes</c> names the move template once (<c>Move</c>), and <c>MoveOf</c> builds
     /// that path for a Space and a Task, so the route table, the client and the isolation rows compare one string.
     /// </summary>
-    [Fact(Skip = "red: AC9 - TaskRoutes.Move and MoveOf do not exist yet (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-35")]
     public void TaskRoutes_names_the_move_template_once()
     {
@@ -137,7 +152,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// else: <c>MoveTaskRequest</c>'s public properties are exactly <c>AfterTaskId</c> (<see cref="Nullable{T}"/> of
     /// <see cref="Guid"/>) and <c>StatusId</c> (<see cref="Guid"/>) - no position key, no Project, no Space.
     /// </summary>
-    [Fact(Skip = "red: AC9 - Yello.Contracts.Tasks.MoveTaskRequest does not exist yet (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "AR-21")]
     public void The_move_request_names_a_Status_and_a_neighbour_and_never_a_key()
@@ -160,7 +175,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// once in the contract: <c>ProblemTypes.TaskPositionUnavailable</c> is
     /// <c>urn:yello:problem:task-position-unavailable</c>.
     /// </summary>
-    [Fact(Skip = "red: AC9 - ProblemTypes.TaskPositionUnavailable does not exist yet (story Task 5)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     public void The_position_refusal_is_a_stable_problem_type()
     {
@@ -179,7 +194,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// must not read (the Role, a capability, a bound, the <c>Idempotency-Key</c>) is the existing pipeline-only gates' to
     /// hold.
     /// </summary>
-    [Fact(Skip = "red: AC9 - ITaskStore.MoveAsync and MoveTaskHandler do not exist yet (story Task 3)")]
+    [Fact]
     [Trait("Requirement", "AR-3")]
     [Trait("Requirement", "AD-2")]
     public void A_move_is_one_Domain_port_and_one_slice()

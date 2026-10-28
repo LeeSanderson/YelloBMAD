@@ -1,19 +1,25 @@
 @using Yello.Client.Spaces
 
 @*
-    ONE STATUS IN THE TASK DETAIL PANEL'S PICKER - story 2.3, UX-DR11. An option of the in-panel listbox
-    (open question 11): the Task's current Status is marked as current (aria-checked), and no option is ever
-    pre-selected as a destination (aria-selected is always false). Choosing one - click, Enter or Space -
-    commits it at once; there is nothing to confirm.
+    ONE OPTION OF A PICKER - story 2.3, UX-DR11. An option of an in-panel listbox (open question 11): in the Status
+    picker the Task's current Status is marked as current (aria-checked), and no option is ever pre-selected as a
+    destination (aria-selected is always false). Choosing one - click, Enter or Space - commits it at once; there is
+    nothing to confirm.
+
+    THE MOVE PICKER (story 2.6) uses it too, marking nothing: its current Status is labelled by a note rather than
+    checked, and so is its last position, so no option there is ever checked or selected.
 *@
 
 <li class="picker__option"
     role="option"
     tabindex="0"
     aria-selected="false"
-    aria-checked="@(Current ? "true" : "false")"
+    aria-checked="@Checked"
     @onclick="ChooseAsync"
-    @onkeydown="KeyDownAsync">@Option.Name</li>
+    @onkeydown="KeyDownAsync">@(Note is null ? Option.Name : Option.Name + " ")@if (Note is not null)
+    {
+        <span class="picker__note">@Note</span>
+    }</li>
 
 @code {
     /// <summary>The Status this option offers.</summary>
@@ -25,9 +31,25 @@
     [Parameter]
     public bool Current { get; set; }
 
+    /// <summary>
+    /// Whether the option states <see cref="Current"/> as <c>aria-checked</c> - the Status picker's way. The Move picker
+    /// labels instead (story 2.6).
+    /// </summary>
+    [Parameter]
+    public bool MarksCurrent { get; set; } = true;
+
+    /// <summary>A short label after the option's name - the Move picker's current Status, or its bottom position.</summary>
+    [Parameter]
+    public string? Note { get; set; }
+
     /// <summary>Raised with the Status's id when it is chosen.</summary>
     [Parameter]
     public EventCallback<Guid> OnChoose { get; set; }
+
+    // The Status picker states the current Status; the Move picker states nothing here and labels it instead.
+    private string? Checked => MarksCurrent ? CurrentText : null;
+
+    private string CurrentText => Current ? "true" : "false";
 
     private Task ChooseAsync() => OnChoose.InvokeAsync(Option.Id);
 

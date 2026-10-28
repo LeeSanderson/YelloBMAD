@@ -51,7 +51,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="role">The mover's Role in the Owner's Space.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - the move route (Q1 (a)) is not mapped yet; it answers the unmatched 404")]
+    [Theory]
     [InlineData("Owner")]
     [InlineData("Admin")]
     [InlineData("Member")]
@@ -129,7 +129,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="placement">Where in the column the Task is moved: <c>top</c>, <c>between</c> or <c>bottom</c>.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - the move route (Q1 (a)) is not mapped yet")]
+    [Theory]
     [InlineData("top")]
     [InlineData("between")]
     [InlineData("bottom")]
@@ -189,7 +189,7 @@ public sealed partial class TaskEndpointTests
     /// concurrent version.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the move route (Q1 (a)) is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "FR-29")]
     [Trait("Requirement", "AR-21")]
     public async Task Two_Members_moving_after_the_same_neighbour_both_land_and_read_one_order()
@@ -233,7 +233,7 @@ public sealed partial class TaskEndpointTests
     /// move answers <c>200</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the move route (Q1 (a)) is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "FR-29")]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "NFR-7")]
@@ -281,7 +281,7 @@ public sealed partial class TaskEndpointTests
     /// nothing; the other Space's Task is not moved.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the move route (Q1 (a)) is not mapped yet; today every move is the unmatched 404")]
+    [Fact]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "AR-10")]
     public async Task An_absent_deleted_or_foreign_Task_answers_the_identical_404_and_records_nothing_when_moved()
@@ -339,7 +339,7 @@ public sealed partial class TaskEndpointTests
     /// and nothing moves.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the move route (Q1 (a)) is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "AR-24")]
     public async Task A_move_to_a_Status_outside_the_effective_set_is_refused_400_identically_for_a_random_and_a_foreign_id()
@@ -381,7 +381,7 @@ public sealed partial class TaskEndpointTests
     /// and the moved Task itself. The random and the foreign id answer the same bytes.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the move route (Q1 (a)) and Q3's task-position-unavailable do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-29")]
     [Trait("Requirement", "AR-34")]
     public async Task A_neighbour_that_is_not_one_is_refused_409_and_nothing_moves()
@@ -442,7 +442,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="shape">Which malformed body is sent.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - the move route (Q1 (a)) is not mapped yet")]
+    [Theory]
     [InlineData("unreadable")]
     [InlineData("no statusId")]
     [InlineData("statusId not an id")]
@@ -488,7 +488,7 @@ public sealed partial class TaskEndpointTests
     /// <c>200</c> with the Task unchanged, and writes nothing: its key is byte-identical.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the move route (Q1 (a)) is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "FR-29")]
     public async Task A_move_to_where_the_Task_already_is_answers_200_and_writes_nothing()
     {
@@ -520,7 +520,7 @@ public sealed partial class TaskEndpointTests
     /// Seeds 4,999 by one statement (2.2's <see cref="TaskWire.SeedTasksAsync"/>); no new large seed.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the move route (Q1 (a)) is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     [Trait("Priority", "P1")]
@@ -562,7 +562,7 @@ public sealed partial class TaskEndpointTests
     /// changes.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the move route (Q1 (a)) and Q10's exhaustion outcome do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AR-21")]
     [Trait("Requirement", "AD-15")]
     [Trait("Priority", "P1")]
@@ -603,7 +603,7 @@ public sealed partial class TaskEndpointTests
     /// on the same move answers <c>200</c> (the anchor that the route exists).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - the move route (Q1 (a)) is not mapped yet; today a Token gets the unmatched 404")]
+    [Fact]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "AD-4")]
     public async Task A_Token_on_the_move_route_is_answered_as_no_credential_and_nothing_moves()

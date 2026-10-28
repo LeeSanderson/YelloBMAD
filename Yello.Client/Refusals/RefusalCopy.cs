@@ -95,6 +95,12 @@ public static class RefusalCopy
     public static string InvalidTaskLabelsKey => "InvalidTaskLabels";
 
     /// <summary>
+    /// The copy key for <c>409 task-position-unavailable</c> (story 2.6, open question 3 (a)): the position chosen is no
+    /// longer one.
+    /// </summary>
+    public static string TaskPositionUnavailableKey => "TaskPositionUnavailable";
+
+    /// <summary>
     /// The resource a refusal is rendered with.
     /// </summary>
     /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
@@ -161,6 +167,7 @@ public static class RefusalCopy
         [ProblemTypes.LabelNameTaken] = LabelNameTakenKey,
         [ProblemTypes.LabelInUse] = LabelInUseKey,
         [ProblemTypes.InvalidTaskLabels] = InvalidTaskLabelsKey,
+        [ProblemTypes.TaskPositionUnavailable] = TaskPositionUnavailableKey,
     };
 
     private static string? OwnKey(string? type) =>

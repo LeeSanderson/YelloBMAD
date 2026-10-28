@@ -20,7 +20,7 @@ public sealed partial class TaskEndpointTests
     /// written, even though the Board changed between the two (another Task was moved into the same gap meanwhile).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - the move route (Q1 (a)) is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "NFR-5")]
@@ -66,7 +66,7 @@ public sealed partial class TaskEndpointTests
     /// <c>422 idempotency-key-reused</c>, and the Task stays where the first move put it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - the move route (Q1 (a)) is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     public async Task The_same_key_with_a_different_move_is_refused_422_and_nothing_moves()
     {

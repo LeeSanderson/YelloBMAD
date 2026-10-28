@@ -592,8 +592,52 @@
     <comment>A card's due date in its metadata row; {0} is the day and month in the viewer's locale and zone (story 2.3).</comment>
   </data>
   <data name="TaskMoved" xml:space="preserve">
-    <value>Moved to {0}.</value>
-    <comment>Announced politely, once, when a Task's Status is changed; {0} is the Status name (story 2.3, open question 10 (a)).</comment>
+    <value>Moved to {0}, position {1} of {2}.</value>
+    <comment>Announced politely, once, when the server has admitted a move or a Status change (story 2.6, AC7, open question 8): {0} is the Status name, {1} the Task's 1-based position in that column as the Board shows it after placing it by the server's key, {2} the column's true total. Never on load, never before the answer.</comment>
+  </data>
+  <data name="TaskReturned" xml:space="preserve">
+    <value>Returned to {0}, position {1}.</value>
+    <comment>Announced politely when a move or a Status change was refused or got no answer and the card went back to its last admitted slot (story 2.6, AC7, AC15): {0} is the Status name, {1} the 1-based position it returned to.</comment>
+  </data>
+  <data name="TaskMove" xml:space="preserve">
+    <value>Move</value>
+    <comment>The Move control in the Task detail panel and the card menu's item that opens the Move picker (story 2.6, UX-DR21). A plain verb; never "Drag".</comment>
+  </data>
+  <data name="TaskActions" xml:space="preserve">
+    <value>Actions for {0}</value>
+    <comment>Accessible name of a card's actions control and of the menu it opens (story 2.6, open question 6 (a)); {0} is the Task's title.</comment>
+  </data>
+  <data name="TaskMenuOpen" xml:space="preserve">
+    <value>Open</value>
+    <comment>The card menu's first item: opens Task detail, as the card's title does (story 2.6, open question 6 (a)).</comment>
+  </data>
+  <data name="MoveStatusStep" xml:space="preserve">
+    <value>Move to Status</value>
+    <comment>Accessible name of the Move picker's first step, the list of Statuses (story 2.6, open question 4 (a)).</comment>
+  </data>
+  <data name="MovePositionStep" xml:space="preserve">
+    <value>Position in {0}</value>
+    <comment>Accessible name of the Move picker's second step, the positions in the chosen Status; {0} is the Status name (story 2.6).</comment>
+  </data>
+  <data name="MoveCurrent" xml:space="preserve">
+    <value>Current</value>
+    <comment>Labels the Task's own Status in the Move picker. A label, not a selection: nothing in the picker is selected when it opens (UX-DR11).</comment>
+  </data>
+  <data name="MoveTop" xml:space="preserve">
+    <value>Top of column</value>
+    <comment>The Move picker's first position: before every Task of the chosen Status (story 2.6, open question 4 (a)).</comment>
+  </data>
+  <data name="MovePosition" xml:space="preserve">
+    <value>Position {0}, after {1}</value>
+    <comment>A position in the Move picker (story 2.6, open question 4 (a)): {0} is the 1-based position the Task would take, {1} the title of the Task it would follow.</comment>
+  </data>
+  <data name="MoveBottom" xml:space="preserve">
+    <value>Bottom of column</value>
+    <comment>Labels the Move picker's last position: after every Task the column shows (story 2.6, open question 4 (a)).</comment>
+  </data>
+  <data name="TaskPositionUnavailable" xml:space="preserve">
+    <value>That position has changed. Choose it again.</value>
+    <comment>409 task-position-unavailable (story 2.6, open question 3 (a)): the Task chosen as the neighbour has moved or gone, or the gap has no room. Said where the move was made; the card goes back. Never says why or where the neighbour went.</comment>
   </data>
   <data name="TaskEditNotSent" xml:space="preserve">
     <value>Not sent.</value>

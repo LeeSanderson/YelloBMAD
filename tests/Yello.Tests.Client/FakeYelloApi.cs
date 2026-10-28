@@ -462,14 +462,12 @@ internal sealed class FakeYelloApi
         _lastTaskMoveHold?.Released.TrySetResult(new TaskEditOutcome(0, string.Empty, Capability: null, Abort: true));
 
     /// <summary>
-    /// The move path for one Task: <c>TaskRoutes.TaskOf</c> then <c>/move</c> - story 2.6 Q1 (a)'s recommended route,
-    /// stated here because <c>TaskRoutes.MoveOf</c> does not exist until the dev phase adds it. Retarget to the contract
-    /// helper on activation.
+    /// The move path for one Task - story 2.6 Q1 (a)'s route, <c>TaskRoutes.MoveOf</c>.
     /// </summary>
     /// <param name="spaceId">The Space.</param>
     /// <param name="taskId">The Task.</param>
     /// <returns>The path.</returns>
-    public static string MovePathOf(Guid spaceId, Guid taskId) => TaskRoutes.TaskOf(spaceId, taskId) + "/move";
+    public static string MovePathOf(Guid spaceId, Guid taskId) => TaskRoutes.MoveOf(spaceId, taskId);
 
     /// <summary>
     /// The Task with <paramref name="taskId"/> as the fake holds it now, with its column, in whichever Board.

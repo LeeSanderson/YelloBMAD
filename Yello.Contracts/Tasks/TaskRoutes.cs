@@ -50,4 +50,18 @@ public static class TaskRoutes
     /// <param name="taskId">The Task.</param>
     /// <returns>The path.</returns>
     public static string TaskOf(Guid spaceId, Guid taskId) => $"/api/v1/spaces/{spaceId:D}/tasks/{taskId:D}";
+
+    /// <summary>
+    /// <c>POST</c> a <see cref="MoveTaskRequest"/> here: <c>200</c> with the <see cref="TaskResponse"/> as stored, its new
+    /// Status and server-chosen position key (story 2.6). Session only (FR-35): a Token is answered as no credential.
+    /// </summary>
+    public static string Move => "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/move";
+
+    /// <summary>
+    /// One Task's move path, as a client calls it.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="taskId">The Task.</param>
+    /// <returns>The path.</returns>
+    public static string MoveOf(Guid spaceId, Guid taskId) => $"/api/v1/spaces/{spaceId:D}/tasks/{taskId:D}/move";
 }

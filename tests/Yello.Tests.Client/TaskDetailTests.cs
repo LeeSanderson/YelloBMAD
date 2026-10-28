@@ -27,7 +27,7 @@ namespace Yello.Tests.Client;
 /// a card opens from a <c>button[data-task-id]</c> inside <c>.task-card</c> (Q7 (a)); the panel is the one
 /// <c>[role=dialog]</c>; its fields are labelled "Title", "Status" and "Due date"; the Status picker is a button
 /// named "Status" opening a <c>[role=listbox]</c> of <c>[role=option]</c> rows (Q11); the clear control is "Clear
-/// due date"; the close control is "Close"; the Status announcement reads "Moved to {Status}." (Q10); a
+/// due date"; the close control is "Close"; the Status announcement reads "Moved to {Status}, position {n} of {total}." on admission (Q10, story 2.6 Q8 (b)); a
 /// no-answer reads "Not sent." (Q8). The copy that already exists ("Viewers cannot edit Tasks.", the title
 /// rule, the idempotency sentence, "Not available.") is asserted as written.
 /// </para>
@@ -332,10 +332,12 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
             Assert.Equal("1", (await columns.Nth(2).Locator(ColumnCount).TextContentAsync())?.Trim());
             Assert.Equal(["statusId"], Members(Assert.Single(Edits(api))));
 
-            await page.Locator("[role='status'][aria-live='polite']", new PageLocatorOptions { HasText = "Moved to Done." })
-                .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = Timeout });
-
+            // Changed by story 2.6 (open question 8 (b)), deliberately: a Status change is a move, announced on admission
+            // with the ordinal and the column's true total - it lands last - rather than at edit time.
             api.ReleaseTaskEdit();
+
+            await page.Locator("[role='status'][aria-live='polite']", new PageLocatorOptions { HasText = "Moved to Done, position 1 of 1." })
+                .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = Timeout });
         }
     }
 

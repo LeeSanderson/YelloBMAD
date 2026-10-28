@@ -121,7 +121,8 @@ public sealed partial class RefusalBoundaryGateTests
             .Where(type => type.Namespace == TaskContractsNamespace && type.Name.EndsWith("Request", StringComparison.Ordinal))
             .ToList();
 
-        Assert.Equal(["CreateTaskRequest", "EditTaskRequest"], requests.Select(type => type.Name).Order(StringComparer.Ordinal));
+        // Widened by story 2.6 by exactly MoveTaskRequest, whose own property set ARCH-605 pins (no key, ever).
+        Assert.Equal(["CreateTaskRequest", "EditTaskRequest", "MoveTaskRequest"], requests.Select(type => type.Name).Order(StringComparer.Ordinal));
 
         var creation = requests.Single(type => type.Name == "CreateTaskRequest");
 

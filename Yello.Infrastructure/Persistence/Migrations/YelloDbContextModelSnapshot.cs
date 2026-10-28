@@ -77,7 +77,8 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.Property<string>("NormalizedEmailAddress")
                         .IsRequired()
                         .HasMaxLength(254)
-                        .HasColumnType("nvarchar(254)");
+                        .HasColumnType("nvarchar(254)")
+                        .UseCollation("Latin1_General_100_BIN2");
 
                     b.Property<string>("PasswordHash")
                         .HasMaxLength(256)

@@ -1,5 +1,5 @@
 # generated: 2026-08-22 13:10
-# last_updated: 2026-10-26
+# last_updated: 2026-10-28
 # project: YelloBMAD
 # project_key: NOKEY
 # tracking_system: file-system
@@ -64,7 +64,7 @@
 #   - issues 8, 9: PRD §7's stale sentence; missing `status` fields
 
 generated: 2026-08-22 13:10
-last_updated: 2026-10-26
+last_updated: 2026-10-28
 project: YelloBMAD
 project_key: NOKEY
 tracking_system: file-system
@@ -92,7 +92,7 @@ development_status:
   2-3-edit-a-tasks-title-status-and-due-date: done
   2-4-define-and-apply-labels: done
   2-5-delete-a-task-and-delete-a-project: done
-  2-6-move-and-reorder-a-task-by-explicit-control: ready-for-dev
+  2-6-move-and-reorder-a-task-by-explicit-control: review
   2-7-the-accelerated-pointer-and-touch-paths: backlog
   2-8-operate-the-whole-board-from-the-keyboard: backlog
   2-9-the-board-at-five-thousand-tasks: backlog

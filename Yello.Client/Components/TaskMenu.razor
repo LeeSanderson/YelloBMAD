@@ -1,0 +1,55 @@
+@using System.Globalization
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    A CARD'S MENU - story 2.6, AC1, AC14; UX-DR21, UX-DR24, UX-DR39; open question 6 (a).
+
+    Drawn by the Board inside the card it belongs to, for a Role that can move Tasks only. Two items: "Open", which opens
+    Task detail exactly as the card's title does, and "Move", which puts the Move picker in the menu's place. Focus moves
+    to the first item when it opens; Esc closes it, and the Board returns focus to the card's actions control. Its keys
+    stay with it, so the card's own key handling does not also run. Arrow-key movement between items is story 2.8's, with
+    every picker's (deferred-work.md:517).
+*@
+
+<div class="task-menu"
+     role="menu"
+     aria-label="@string.Format(CultureInfo.CurrentCulture, Localizer["TaskActions"], Title)"
+     @onkeydown="KeyDownAsync"
+     @onkeydown:stopPropagation="true">
+    <button type="button" role="menuitem" class="task-menu__item" @onclick="OnOpen" @ref="_first">@Localizer["TaskMenuOpen"]</button>
+    <button type="button" role="menuitem" class="task-menu__item" @onclick="OnMove">@Localizer["TaskMove"]</button>
+</div>
+
+@code {
+    private ElementReference _first;
+
+    /// <summary>The Task's title, which names the menu.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string Title { get; set; } = string.Empty;
+
+    /// <summary>Raised by "Open".</summary>
+    [Parameter]
+    public EventCallback OnOpen { get; set; }
+
+    /// <summary>Raised by "Move".</summary>
+    [Parameter]
+    public EventCallback OnMove { get; set; }
+
+    /// <summary>Raised by Esc: nothing is moved.</summary>
+    [Parameter]
+    public EventCallback OnClose { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await _first.FocusAsync();
+        }
+    }
+
+    private Task KeyDownAsync(KeyboardEventArgs args) =>
+        args.Key == "Escape" ? OnClose.InvokeAsync() : Task.CompletedTask;
+}

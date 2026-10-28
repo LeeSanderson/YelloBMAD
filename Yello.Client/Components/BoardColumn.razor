@@ -12,7 +12,8 @@
     not disabled, for a Role that lacks manage-tasks (UX-DR27).
 
     THE CARDS scroll within the column, never the page. Each Task appears here only if its Status is this
-    column's (the Board answer places it; AC4).
+    column's (the Board answer places it; AC4). For a Role that can move Tasks each card carries its actions control,
+    and the Board draws an open card menu or Move picker inside its card (story 2.6).
 
     FOCUS LANDS ON THE COLUMN when a card it held is deleted (story 2.5, AC11; UX-DR39; deferred-work.md:510): the
     column is the nearest surviving container, so the section takes focus programmatically (tabindex -1, never in the
@@ -37,7 +38,19 @@
         <ul class="board-column__cards">
             @foreach (var task in Tasks)
             {
-                <TaskCard @key="task.Id" Item="@task" Labels="@Labels" OnOpen="OnOpen" FocusRequest="@(task.Id == FocusTaskId ? FocusRequest : 0)" />
+                <TaskCard @key="task.Id"
+                          Item="@task"
+                          Labels="@Labels"
+                          OnOpen="OnOpen"
+                          FocusRequest="@(task.Id == FocusTaskId ? FocusRequest : 0)"
+                          FocusOnArrival="@(task.Id == ArrivalTaskId)"
+                          CanMove="@CanMove"
+                          MenuOpen="@(task.Id == MenuTaskId)"
+                          OnMenu="OnMenu"
+                          OnMenuClose="OnMenuClose"
+                          MenuContent="@(task.Id == MenuTaskId ? MenuContent?.Invoke(task) : null)"
+                          FocusActionsRequest="@(task.Id == FocusActionsTaskId ? FocusActionsRequest : 0)"
+                          Moved="@(task.Id == MovedTaskId)" />
             }
         </ul>
     }
@@ -101,6 +114,42 @@
     /// </summary>
     [Parameter]
     public int FocusColumnRequest { get; set; }
+
+    /// <summary>Whether the Role held may move Tasks: each card carries its actions control and menu (story 2.6).</summary>
+    [Parameter]
+    public bool CanMove { get; set; }
+
+    /// <summary>The Task whose card menu - or the Move picker it led to - is open, if it is in this column.</summary>
+    [Parameter]
+    public Guid? MenuTaskId { get; set; }
+
+    /// <summary>Draws the open menu or picker inside its card (story 2.6).</summary>
+    [Parameter]
+    public Func<TaskResponse, RenderFragment?>? MenuContent { get; set; }
+
+    /// <summary>Raised with a Task's id when its card's menu is asked for.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnMenu { get; set; }
+
+    /// <summary>Raised when Esc is pressed on a card whose menu is open.</summary>
+    [Parameter]
+    public EventCallback OnMenuClose { get; set; }
+
+    /// <summary>The Task whose actions control the Board is returning focus to, if it is in this column.</summary>
+    [Parameter]
+    public Guid? FocusActionsTaskId { get; set; }
+
+    /// <summary>Bumped by the Board with each return of focus to <see cref="FocusActionsTaskId"/>'s actions control.</summary>
+    [Parameter]
+    public int FocusActionsRequest { get; set; }
+
+    /// <summary>The Task a menu move is drawing afresh in this column, whose title takes focus on arrival.</summary>
+    [Parameter]
+    public Guid? ArrivalTaskId { get; set; }
+
+    /// <summary>The Task a move just placed: only its card's reflow is animated (UX-DR6).</summary>
+    [Parameter]
+    public Guid? MovedTaskId { get; set; }
 
     /// <summary>The Space's Labels by id, so each card can name the Labels it carries (story 2.4).</summary>
     [Parameter]

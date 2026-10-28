@@ -59,5 +59,8 @@ public sealed class DeleteTaskHandlerTests
 
             return Task.FromResult(outcome);
         }
+
+        public Task<TaskMove> MoveAsync(Guid taskId, Guid statusId, Guid? afterTaskId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The deletion slice moves nothing.");
     }
 }

@@ -28,6 +28,11 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
     /// </summary>
     private const int PasswordHashMaxLength = 256;
 
+    /// <summary>
+    /// The normalised address's collation: binary, the one AD-15 already uses for position keys.
+    /// </summary>
+    private const string NormalizedEmailCollation = "Latin1_General_100_BIN2";
+
     public void Configure(EntityTypeBuilder<Account> builder)
     {
         builder.ToTable(SchemaNames.AccountTable);
@@ -45,9 +50,13 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
             .IsRequired()
             .HasMaxLength(EmailAddressMaxLength);
 
+        // Compared exactly as stored (story 2.6, open question 12 (a); deferred-work.md:198): the
+        // normalisation function decides which addresses are the same, and the unique index must not
+        // decide again under the database default, which is width- and kana-insensitive.
         builder.Property(account => account.NormalizedEmailAddress)
             .IsRequired()
-            .HasMaxLength(EmailAddressMaxLength);
+            .HasMaxLength(EmailAddressMaxLength)
+            .UseCollation(NormalizedEmailCollation);
 
         builder.Property(account => account.DisplayName)
             .IsRequired()
@@ -63,6 +72,7 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
         // EmailAddressNormalisation explains why the rule is explicit rather than collational -
         // in short, AD-15's Latin1_General_100_BIN2 offers no case-insensitive comparison at
         // all, so a design resting on a collation would have collided with a settled decision.
+        // The column, and so this index, compares in that binary collation (story 2.6).
         //
         // This index is never a soft-delete tombstone. FR-3 requires a deleted Account's address
         // to be reusable by a new Account that inherits nothing, so there is no filter here and

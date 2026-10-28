@@ -1,0 +1,148 @@
+@using System.Globalization
+@using Yello.Client.Spaces
+@using Yello.Contracts.Tasks
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    THE MOVE PICKER - story 2.6. AC1, AC14; UX-DR11, UX-DR12, UX-DR21; EXPERIENCE.md:283-295; open questions 4 (a), 5 (a).
+
+    ONE COMPONENT, TWO HOMES: rendered in place inside the Task detail panel below its Move control, and inside a card
+    on the Board after the card menu's "Move". Never a second dialog. Built on the Status picker's PickerOption.
+
+    TWO STEPS, NOTHING SELECTED (UX-DR11): first the Project's Statuses in the Board's order - the Task's own labelled as
+    current, never checked or selected - then the positions in the chosen Status: the top of the column, then one option
+    per Task the column holds (the moved Task left out), named by the ordinal the moved Task would take and the Task it
+    would follow, the last also labelled as the bottom. Choosing a position commits; nothing else does.
+
+    ESC STEPS BACK, INNERMOST FIRST (UX-DR12): from the positions to the Statuses, and from the Statuses out of the picker,
+    which returns focus to whatever opened it. The picker keeps its keys to itself, so the panel's Esc does not also run.
+*@
+
+<ul class="picker move-picker"
+    role="listbox"
+    tabindex="-1"
+    aria-label="@ListName"
+    @onkeydown="KeyDownAsync"
+    @onkeydown:stopPropagation="true"
+    @ref="_list">
+    @if (_chosen is null)
+    {
+        @foreach (var column in Columns)
+        {
+            <PickerOption @key="column.StatusId"
+                          Option="@(new TaskStatusOption(column.StatusId, column.Name))"
+                          MarksCurrent="false"
+                          Note="@(column.StatusId == Item.StatusId ? Localizer["MoveCurrent"].Value : null)"
+                          OnChoose="ChooseStatus" />
+        }
+    }
+
+    @if (_chosen is { } chosenStatus)
+    {
+        @foreach (var position in Positions(chosenStatus))
+        {
+            <PickerOption @key="position.Option.Id"
+                          Option="@position.Option"
+                          MarksCurrent="false"
+                          Note="@position.Note"
+                          OnChoose="ChoosePositionAsync" />
+        }
+    }
+</ul>
+
+@code {
+    private ElementReference _list;
+    private Guid? _chosen;
+    private bool _focusList = true;
+
+    /// <summary>The Board's columns - the Project's effective set, in order - with the Tasks each holds.</summary>
+    [Parameter]
+    [EditorRequired]
+    public IReadOnlyList<MoveColumn> Columns { get; set; } = [];
+
+    /// <summary>The Task being moved, as the Board's replica shows it now.</summary>
+    [Parameter]
+    [EditorRequired]
+    public TaskResponse Item { get; set; }
+
+    /// <summary>Raised with the destination when a position is chosen: the commit.</summary>
+    [Parameter]
+    public EventCallback<MoveChoice> OnChoose { get; set; }
+
+    /// <summary>Raised when Esc leaves the picker from its first step: nothing is moved.</summary>
+    [Parameter]
+    public EventCallback OnDismiss { get; set; }
+
+    private string ListName =>
+        _chosen is { } chosen
+            ? string.Format(CultureInfo.CurrentCulture, Localizer["MovePositionStep"], Columns.FirstOrDefault(column => column.StatusId == chosen)?.Name)
+            : Localizer["MoveStatusStep"];
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Focus starts in the picker, and stays in it when a step replaces the option that was chosen.
+        if (_focusList)
+        {
+            _focusList = false;
+            await _list.FocusAsync();
+        }
+    }
+
+    /// <summary>
+    /// The positions in one column: the top - offered as the empty id, there being no Task to land after - then one per
+    /// Task the column shows, in the Board's order, the moved Task left out (it is never its own neighbour), each named by
+    /// the ordinal the moved Task would take and the Task it would follow; the last is also the bottom.
+    /// </summary>
+    private List<(TaskStatusOption Option, string? Note)> Positions(Guid statusId)
+    {
+        var others = Columns.FirstOrDefault(column => column.StatusId == statusId)?.Tasks.Where(task => task.Id != Item.Id).ToList() ?? [];
+        var positions = new List<(TaskStatusOption Option, string? Note)> { (new TaskStatusOption(Guid.Empty, Localizer["MoveTop"]), null) };
+
+        for (var index = 0; index < others.Count; index++)
+        {
+            var text = string.Format(CultureInfo.CurrentCulture, Localizer["MovePosition"], index + 2, others[index].Title);
+            var note = index == others.Count - 1 ? Localizer["MoveBottom"].Value : null;
+
+            positions.Add((new TaskStatusOption(others[index].Id, text), note));
+        }
+
+        return positions;
+    }
+
+    private void ChooseStatus(Guid statusId)
+    {
+        _chosen = statusId;
+        _focusList = true;
+    }
+
+    private Task ChoosePositionAsync(Guid afterTaskId)
+    {
+        if (_chosen is not { } statusId)
+        {
+            return Task.CompletedTask;
+        }
+
+        Guid? after = afterTaskId == Guid.Empty ? null : afterTaskId;
+
+        return OnChoose.InvokeAsync(new MoveChoice(statusId, after));
+    }
+
+    private Task KeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key != "Escape")
+        {
+            return Task.CompletedTask;
+        }
+
+        if (_chosen is not null)
+        {
+            _chosen = null;
+            _focusList = true;
+            return Task.CompletedTask;
+        }
+
+        return OnDismiss.InvokeAsync();
+    }
+}

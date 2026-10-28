@@ -6,27 +6,58 @@
 @inject IStringLocalizer<ClientCopy> Localizer
 
 @*
-    ONE TASK ON THE BOARD - stories 2.2 and 2.3; UX-DR8; DESIGN.md:137-144, :389-453.
+    ONE TASK ON THE BOARD - stories 2.2, 2.3 and 2.6; UX-DR8, UX-DR21, UX-DR24; DESIGN.md:137-144, :389-453.
 
     THE TITLE IS THE CARD'S CONTENT. A metadata row in monospace sits beneath it: the Task's Labels (story 2.4) -
     at most three chips, in the server's order, then "+N" - and the due date when there is one (story 2.3), in the
     viewer's own locale and zone (UX-DR42); the Assignee (4.6) and Presence (Epic 7) join it later. The row wraps
     before it ever scrolls sideways (UX-DR8, UX-DR41). No placeholder, no count beyond "+N", no badge, no streak.
 
-    "+N" IS TEXT, NOT A CONTROL (story 2.4, open question 5): the card keeps its one control, and the panel it opens
-    shows every Label. Its accessible name says what it counts.
+    "+N" IS TEXT, NOT A CONTROL (story 2.4, open question 5): the panel the title opens shows every Label. Its
+    accessible name says what it counts.
 
-    ONE CONTROL: the title is a native button that opens the Task detail panel (story 2.3, open question
-    7 (a)), named by the title and carrying data-task-id so the panel can return focus to it. Every Role
-    opens it - a Viewer reads the Task there (EXPERIENCE.md:199). It is one tab stop per card until story 2.8
-    converts the Board to its keyboard grid. No drag handle or Move control for any Role (2.7, 2.6). The card
-    carries no shadow, declared explicitly in components.css so nobody adds one back.
+    THE TITLE is a native button that opens the Task detail panel (story 2.3, open question 7 (a)), named by the title
+    and carrying data-task-id so the panel can return focus to it. Every Role opens it - a Viewer reads the Task there
+    (EXPERIENCE.md:199).
+
+    THE ACTIONS CONTROL (story 2.6, open question 6 (a)) - for a Role that can move Tasks only, absent otherwise, never
+    disabled (UX-DR27). Always rendered, never revealed on hover (UX-DR21), at every breakpoint. It opens the card's
+    menu - Open and Move - which the Board draws inside the card; so do a right-click on the card (the contextmenu
+    event), the platform context-menu key and Shift+F10 on the card. Enter on the title still opens the Task. For a
+    Viewer the card carries no handler at all, and the browser's own context menu is left alone. No drag handle (2.7).
+    It is two tab stops per card until story 2.8 converts the Board to its keyboard grid. The card carries no shadow,
+    declared explicitly in components.css so nobody adds one back.
 *@
 
-<li class="task-card">
-    <button type="button" class="task-card__open" data-task-id="@Item.Id.ToString("D", CultureInfo.InvariantCulture)" @onclick="OpenAsync" @ref="_open">
-        <span class="type-task-title task-card__title">@Item.Title</span>
-    </button>
+<li class="@CardClass"
+    @oncontextmenu="ContextMenuHandler"
+    @oncontextmenu:preventDefault="@CanMove"
+    @onkeydown="KeyDownHandler">
+    @if (CanMove)
+    {
+        <div class="task-card__head">
+            <button type="button" class="task-card__open" data-task-id="@TaskId" @onclick="OpenAsync" @ref="_open">
+                <span class="type-task-title task-card__title">@Item.Title</span>
+            </button>
+            <button type="button"
+                    class="task-card__actions"
+                    aria-label="@string.Format(CultureInfo.CurrentCulture, Localizer["TaskActions"], Item.Title)"
+                    aria-haspopup="menu"
+                    aria-expanded="@(MenuOpen ? "true" : "false")"
+                    @onclick="OpenMenuAsync"
+                    @ref="_actions">
+                <svg class="task-card__actions-icon" aria-hidden="true" focusable="false" viewBox="0 0 16 16"><circle cx="3" cy="8" r="1.5" /><circle cx="8" cy="8" r="1.5" /><circle cx="13" cy="8" r="1.5" /></svg>
+            </button>
+        </div>
+    }
+
+    @if (!CanMove)
+    {
+        <button type="button" class="task-card__open" data-task-id="@TaskId" @onclick="OpenAsync" @ref="_open">
+            <span class="type-task-title task-card__title">@Item.Title</span>
+        </button>
+    }
+
     <div class="type-meta task-card__meta">
         @foreach (var label in ShownLabels)
         {
@@ -46,11 +77,15 @@
             <span class="task-card__due">@due</span>
         }
     </div>
+
+    @MenuContent
 </li>
 
 @code {
     private ElementReference _open;
+    private ElementReference _actions;
     private int _focusRequestsSeen;
+    private int _focusActionsRequestsSeen;
 
     /// <summary>The Task, as the Board's replica shows it now.</summary>
     [Parameter]
@@ -66,14 +101,51 @@
     public EventCallback<Guid> OnOpen { get; set; }
 
     /// <summary>
-    /// Bumped by the Board to return focus to this card's control - when the panel it opened closes. Zero for
-    /// every card but the one being returned to.
+    /// Bumped by the Board to return focus to this card's title - when the panel it opened closes, or when the card was
+    /// moved from its own menu. Zero for every card but the one being returned to.
     /// </summary>
     [Parameter]
     public int FocusRequest { get; set; }
 
+    /// <summary>
+    /// Whether this card's title takes focus when it is first drawn: the card just moved from its own menu into another
+    /// column, where the Board draws it afresh (story 2.6, open question 9). The Board spends it after one render.
+    /// </summary>
+    [Parameter]
+    public bool FocusOnArrival { get; set; }
+
+    /// <summary>Whether the Role held may move Tasks: the actions control and the card's menu exist (story 2.6).</summary>
+    [Parameter]
+    public bool CanMove { get; set; }
+
+    /// <summary>Whether the card's menu - or the Move picker it led to - is open on this card.</summary>
+    [Parameter]
+    public bool MenuOpen { get; set; }
+
+    /// <summary>Raised with the Task's id when the card's menu is asked for, by any of its routes.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnMenu { get; set; }
+
+    /// <summary>Raised when Esc is pressed on the card while its menu is open.</summary>
+    [Parameter]
+    public EventCallback OnMenuClose { get; set; }
+
+    /// <summary>The open menu or picker, drawn by the Board inside this card; <c>null</c> when none is.</summary>
+    [Parameter]
+    public RenderFragment? MenuContent { get; set; }
+
+    /// <summary>Bumped by the Board to return focus to this card's actions control - when its menu closes.</summary>
+    [Parameter]
+    public int FocusActionsRequest { get; set; }
+
+    /// <summary>Whether this is the card a move just placed: only its reflow is animated (UX-DR6).</summary>
+    [Parameter]
+    public bool Moved { get; set; }
+
     /// <summary>The most chips a card shows before "+N" (UX-DR8).</summary>
     private const int MostChips = 3;
+
+    private string CardClass => Moved ? "task-card task-card--moved" : "task-card";
 
     // In the server's order (by name, then id); an id this tab does not hold a Label for is not drawn.
     private List<LabelResponse> CarriedLabels => [.. Item.LabelIds.Select(id => Labels.GetValueOrDefault(id)).OfType<LabelResponse>()];
@@ -87,16 +159,43 @@
             ? string.Format(CultureInfo.CurrentCulture, Localizer["TaskDue"], TaskDates.DayAndMonth(due))
             : null;
 
+    private string TaskId => Item.Id.ToString("D", CultureInfo.InvariantCulture);
+
+    // For a Role that cannot move Tasks the card carries no handler: the browser's own context menu is left alone.
+    private EventCallback<MouseEventArgs> ContextMenuHandler =>
+        CanMove ? EventCallback.Factory.Create<MouseEventArgs>(this, OpenMenuAsync) : default;
+
+    private EventCallback<KeyboardEventArgs> KeyDownHandler =>
+        CanMove ? EventCallback.Factory.Create<KeyboardEventArgs>(this, CardKeyDownAsync) : default;
+
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        // A card created after the request was made - moved to another column by a Status change - takes the
-        // count as already seen: only a request made while it is on the Board moves focus to it, never one left
-        // over from an earlier close while a panel is open over it.
+        // A card created after the request was made - moved to another column - takes the count as already seen: only
+        // a request made while it is on the Board moves focus to it, never one left over from an earlier close while a
+        // panel is open over it. A card the Board draws afresh because it was just moved from its own menu takes the
+        // focus it arrived with instead (story 2.6), once.
         if (firstRender)
         {
             _focusRequestsSeen = FocusRequest;
+            _focusActionsRequestsSeen = FocusActionsRequest;
+
+            if (FocusOnArrival)
+            {
+                await _open.FocusAsync();
+            }
+
             return;
+        }
+
+        if (FocusActionsRequest != _focusActionsRequestsSeen)
+        {
+            _focusActionsRequestsSeen = FocusActionsRequest;
+
+            if (FocusActionsRequest > 0 && CanMove)
+            {
+                await _actions.FocusAsync();
+            }
         }
 
         if (FocusRequest == _focusRequestsSeen)
@@ -113,4 +212,17 @@
     }
 
     private Task OpenAsync() => OnOpen.InvokeAsync(Item.Id);
+
+    private Task OpenMenuAsync() => OnMenu.InvokeAsync(Item.Id);
+
+    /// <summary>
+    /// The platform's context-menu key and Shift+F10 open the card's menu (UX-DR24); Esc closes it while it is open. Every
+    /// other key is the card's controls' own.
+    /// </summary>
+    private Task CardKeyDownAsync(KeyboardEventArgs args) => args switch
+    {
+        { Key: "ContextMenu" } or { Key: "F10", ShiftKey: true } => OpenMenuAsync(),
+        { Key: "Escape" } when MenuOpen => OnMenuClose.InvokeAsync(),
+        _ => Task.CompletedTask,
+    };
 }

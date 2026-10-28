@@ -137,8 +137,9 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
     /// <summary>
     /// AC3, UX-DR27, Q11 (a) - a Viewer's Board is a Member's Board without the create affordance: the same
     /// columns and cards, no "Add a Task" anywhere, and nothing disabled. Anchor: the Owner of the other Space,
-    /// with the same Board, has the affordance. The drag handle and Move control arrive in 2.7 and 2.6, which
-    /// extend this case.
+    /// with the same Board, has the affordance. Story 2.6 extends it: the Viewer's cards carry no actions control, and
+    /// <c>MoveTests.A_Viewer_is_offered_no_move_control_and_nothing_is_disabled</c> holds the rest of the Move control's
+    /// absence. The drag handle arrives in 2.7.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -157,6 +158,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
             await page.Locator(Card, new PageLocatorOptions { HasText = "Shared card" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             Assert.True(await AddTaskControls(page).CountAsync() >= 1, "Anchor: the Owner has no create affordance.");
+            Assert.True(await page.Locator(".task-card__actions").CountAsync() >= 1, "Anchor: the Owner's cards have no actions control.");
 
             await page.EvaluateAsync("path => Blazor.navigateTo(path)", ClientBoard(Harbour, Beacon));
             await page.Locator(RoleChip, new PageLocatorOptions { HasText = "Viewer" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
@@ -164,6 +166,7 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
 
             Assert.Equal(StatusNames, await ColumnNamesAsync(page));
             Assert.Equal(0, await AddTaskControls(page).CountAsync());
+            Assert.Equal(0, await page.Locator(".task-card__actions").CountAsync());
             Assert.Equal(0, await page.Locator("main input").CountAsync());
             Assert.Equal(0, await page.Locator("main [disabled], main [aria-disabled='true']").CountAsync());
         }
@@ -230,11 +233,14 @@ public sealed class BoardTests(ClientSurfaceFixture surface)
 
             Assert.Equal("Draft the brief", (await card.TextContentAsync())?.Trim());
             Assert.Equal("none", await card.EvaluateAsync<string>("card => getComputedStyle(card).boxShadow"));
-            // Widened by story 2.3 (open question 7 (a)): the card's one control is the native button that opens
-            // the Task detail panel, named by the title. Nothing else in the card is a control.
-            Assert.Equal(1, await card.Locator("button, a, [tabindex]").CountAsync());
+            // Widened by story 2.3 (open question 7 (a)): the native button that opens the Task detail panel, named by
+            // the title. Widened again by story 2.6 (open question 6 (a)), deliberately: for a Role that can move Tasks -
+            // this Owner - the card's actions control, named for the Task, which opens its menu. Nothing else in the card
+            // is a control, and the actions control adds no text to the card.
+            Assert.Equal(2, await card.Locator("button, a, [tabindex]").CountAsync());
             Assert.Equal(1, await card.Locator("button[data-task-id]").CountAsync());
             Assert.Equal(1, await card.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Draft the brief", Exact = true }).CountAsync());
+            Assert.Equal(1, await card.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Actions for Draft the brief", Exact = true }).CountAsync());
         }
     }
 

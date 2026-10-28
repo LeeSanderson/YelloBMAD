@@ -18,8 +18,13 @@
     in a title field holding an uncommitted change reverts the field first, and Esc in the open picker
     closes the picker. On close the Board returns focus to the card that opened it.
 
-    ATTRIBUTES, THEN DELETE: title, Status, due date and - since story 2.4 - Labels, attributes above. No description
-    region, no heading for one, no placeholder (AC6; FR-31 is Epic 7). No Assignee (4.6), no Move control (2.6).
+    ATTRIBUTES, THEN DELETE: title, Status, Move, due date and - since story 2.4 - Labels, attributes above. No
+    description region, no heading for one, no placeholder (AC6; FR-31 is Epic 7). No Assignee (4.6).
+
+    MOVE (story 2.6, AC1, AC14; open questions 5 (a) and 9): a secondary button directly after the Status control, for a
+    Role that can move Tasks only. It opens the Move picker in place below it - never a second dialog - which names the
+    destination Status, then the position, with nothing selected; choosing a position commits, optimistically, and the
+    panel stays open with focus back on Move. Esc steps the picker back, then closes it, returning focus to Move.
 
     DELETE TASK (story 2.5, AC1, AC11; UX-DR12, UX-DR26, UX-DR36): the panel's last control, a secondary button - the
     danger colour is spent only inside the confirm (open question 8). It asks first, IN PLACE: the panel's content is
@@ -114,6 +119,20 @@
                             <PickerOption @key="status.Id" Option="@status" Current="@(status.Id == Item.StatusId)" OnChoose="ChooseAsync" />
                         }
                     </ul>
+                }
+            </div>
+
+            <div class="task-detail__field">
+                <button type="button"
+                        class="button-secondary task-detail__move"
+                        aria-haspopup="listbox"
+                        aria-expanded="@(_moveOpen ? "true" : "false")"
+                        @onclick="ToggleMove"
+                        @ref="_moveButton">@Localizer["TaskMove"]</button>
+
+                @if (_moveOpen)
+                {
+                    <MovePicker Columns="@MoveColumns" Item="@Item" OnChoose="MoveChosenAsync" OnDismiss="MoveDismissed" />
                 }
             </div>
 
@@ -230,6 +249,7 @@
     private ElementReference _dueDate;
     private ElementReference _clear;
     private ElementReference _labelsButton;
+    private ElementReference _moveButton;
     private ElementReference _delete;
     private ElementReference _danger;
     private ElementReference _cancel;
@@ -246,6 +266,8 @@
     private bool _confirming;
     private bool _focusCancel;
     private bool _focusDelete;
+    private bool _moveOpen;
+    private bool _focusMoveButton;
 
     /// <summary>The Task, as the Board's replica shows it now.</summary>
     [Parameter]
@@ -288,6 +310,14 @@
     /// <summary>Raised with a new due date, or <c>null</c> to clear it.</summary>
     [Parameter]
     public EventCallback<DateTimeOffset?> OnDueDate { get; set; }
+
+    /// <summary>The Board's columns, with the Tasks each holds, for the Move picker (story 2.6).</summary>
+    [Parameter]
+    public IReadOnlyList<MoveColumn> MoveColumns { get; set; } = [];
+
+    /// <summary>Raised with the destination when a position is chosen in the Move picker (story 2.6).</summary>
+    [Parameter]
+    public EventCallback<MoveChoice> OnMove { get; set; }
 
     /// <summary>Raised with the Task's whole new set of Labels, in the server's order, when one is toggled.</summary>
     [Parameter]
@@ -355,6 +385,7 @@
         {
             _pickerOpen = false;
             _labelPickerOpen = false;
+            _moveOpen = false;
             _titleMessage = null;
             _confirming = false;
         }
@@ -375,17 +406,7 @@
             await _dueDate.FocusAsync();
         }
 
-        if (_focusStatusButton)
-        {
-            _focusStatusButton = false;
-            await _statusButton.FocusAsync();
-        }
-
-        if (_focusLabelsButton)
-        {
-            _focusLabelsButton = false;
-            await _labelsButton.FocusAsync();
-        }
+        await FocusPickerControlAsync();
 
         // Each request is spent whether or not its control is drawn, so focus never goes to an element that is not there.
         if (_focusCancel)
@@ -405,6 +426,34 @@
             if (!_confirming && CanManage)
             {
                 await _delete.FocusAsync();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Returns focus to the control whose picker just closed: Status, Labels or Move.
+    /// </summary>
+    private async Task FocusPickerControlAsync()
+    {
+        if (_focusStatusButton)
+        {
+            _focusStatusButton = false;
+            await _statusButton.FocusAsync();
+        }
+
+        if (_focusLabelsButton)
+        {
+            _focusLabelsButton = false;
+            await _labelsButton.FocusAsync();
+        }
+
+        if (_focusMoveButton)
+        {
+            _focusMoveButton = false;
+
+            if (!_confirming && CanManage)
+            {
+                await _moveButton.FocusAsync();
             }
         }
     }
@@ -448,6 +497,13 @@
             return Task.CompletedTask;
         }
 
+        if (_moveOpen)
+        {
+            // Esc from outside the Move picker (it keeps its own keys): the picker closes first.
+            MoveDismissed();
+            return Task.CompletedTask;
+        }
+
         return OnClose.InvokeAsync();
     }
 
@@ -480,6 +536,7 @@
     {
         _pickerOpen = false;
         _labelPickerOpen = false;
+        _moveOpen = false;
         _confirming = true;
         _focusCancel = true;
 
@@ -556,9 +613,41 @@
         return OnTitle.InvokeAsync(_titleDraft.Trim());
     }
 
-    private void TogglePicker() => _pickerOpen = !_pickerOpen;
+    private void TogglePicker()
+    {
+        _pickerOpen = !_pickerOpen;
+        _moveOpen = false;
+    }
 
-    private void ToggleLabelPicker() => _labelPickerOpen = !_labelPickerOpen;
+    private void ToggleLabelPicker()
+    {
+        _labelPickerOpen = !_labelPickerOpen;
+        _moveOpen = false;
+    }
+
+    /// <summary>The panel's Move control: the Move picker opens in place, one picker at a time (story 2.6).</summary>
+    private void ToggleMove()
+    {
+        _moveOpen = !_moveOpen;
+        _pickerOpen = false;
+        _labelPickerOpen = false;
+    }
+
+    /// <summary>Esc out of the Move picker: nothing is moved, and focus returns to Move (open question 9).</summary>
+    private void MoveDismissed()
+    {
+        _moveOpen = false;
+        _focusMoveButton = true;
+    }
+
+    /// <summary>A position chosen: the picker closes, focus returns to Move and the Board makes the move.</summary>
+    private Task MoveChosenAsync(MoveChoice choice)
+    {
+        _moveOpen = false;
+        _focusMoveButton = true;
+
+        return OnMove.InvokeAsync(choice);
+    }
 
     /// <summary>
     /// Toggles one Label and commits the Task's whole new set (story 2.4, open question 1 (a)), in the server's order so

@@ -13,7 +13,8 @@ namespace Yello.Client.Components;
 /// <summary>
 /// The Board's Task detail panel and its replica: the product's first optimistic writes. Story 2.3; AC1,
 /// AC12, AC14; AD-11, AD-18; open questions 1 (a), 6 (a) and 8. Story 2.4 adds the Labels as a fourth attribute
-/// (AC7): the same replica, queue, key and per-attribute revert, the whole set sent as <c>labelIds</c>.
+/// (AC7): the same replica, queue, key and per-attribute revert, the whole set sent as <c>labelIds</c>. Story 2.6 adds the
+/// move (AC15): a Status and a position, sent as the Status attribute's change on the move route.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -37,6 +38,15 @@ namespace Yello.Client.Components;
 /// <b>A <c>404</c> is the Task, or the Space, being gone</b>: the change reverts, the panel closes, and the
 /// page renders its one refusal surface. Every other refusal is said inline in the panel, in the client's own
 /// words for its type (<see cref="RefusalText"/>), never as a toast and never in the server's prose.
+/// </para>
+/// <para>
+/// <b>A move is the Status attribute's change</b> (story 2.6, open question 7): the Status and the position travel
+/// together, so a move and a Status edit of one Task queue one behind the other rather than race. It renders at once -
+/// the card leaves its column for the slot after its chosen neighbour, both totals with it - and is sent as
+/// <c>POST …/move</c> naming the neighbour, never a key. On admission the card is re-placed by the server's key; a refusal
+/// or no answer puts it back in its last admitted slot. Either way the Board says so politely once the answer is in -
+/// where the Task is now, with its ordinal and the column's true total, or the slot it returned to (open question 8) - a
+/// Status edit included, which lands last. A move made from a card's menu says a refusal on the Board, where it was made.
 /// </para>
 /// </remarks>
 public sealed partial class BoardView
@@ -64,6 +74,18 @@ public sealed partial class BoardView
     private Guid? _deleting;
     private Guid? _focusColumn;
     private int _focusColumnRequests;
+
+    // Story 2.6: the card whose menu (or the Move picker it led to) is open; the focus request for the card's actions
+    // control; the card a menu move is drawing afresh, which takes focus once; the card whose reflow is animated; the Tasks
+    // whose outstanding move came from a menu; and a refusal said on the Board for one of those.
+    private Guid? _menuTaskId;
+    private bool _menuPicking;
+    private Guid? _focusActions;
+    private int _focusActionsRequests;
+    private Guid? _arrivalCard;
+    private Guid? _movedCard;
+    private readonly HashSet<Guid> _movesFromMenu = [];
+    private string? _boardNotice;
 
     /// <summary>
     /// The four attributes a Task edit can change.
@@ -97,6 +119,9 @@ public sealed partial class BoardView
     /// </summary>
     private void Open(Guid taskId)
     {
+        _menuTaskId = null;
+        _menuPicking = false;
+
         if (_openTaskId == taskId)
         {
             return;
@@ -141,6 +166,144 @@ public sealed partial class BoardView
         _deleted.Clear();
         _deleting = null;
         _focusColumn = null;
+        _menuTaskId = null;
+        _menuPicking = false;
+        _focusActions = null;
+        _arrivalCard = null;
+        _movedCard = null;
+        _movesFromMenu.Clear();
+        _boardNotice = null;
+    }
+
+    /// <summary>
+    /// The Board's columns as the Move picker offers them: each Status and the Tasks it holds now, in order.
+    /// </summary>
+    private List<MoveColumn> MoveColumns => [.. (_columns ?? []).Select(column => new MoveColumn(column.StatusId, column.Name, column.Tasks))];
+
+    /// <summary>
+    /// Opens a card's menu (story 2.6, open question 6 (a)) - replacing any other card's; it takes focus itself.
+    /// </summary>
+    private void OpenMenu(Guid taskId)
+    {
+        if (!_canManage)
+        {
+            return;
+        }
+
+        _menuTaskId = taskId;
+        _menuPicking = false;
+        _boardNotice = null;
+    }
+
+    /// <summary>
+    /// Esc on the menu, or on the picker's first step: nothing is moved, and focus returns to the card's actions control.
+    /// </summary>
+    private void CloseMenu()
+    {
+        if (_menuTaskId is { } taskId)
+        {
+            _focusActions = taskId;
+            _focusActionsRequests++;
+        }
+
+        _menuTaskId = null;
+        _menuPicking = false;
+    }
+
+    /// <summary>
+    /// The menu's "Open": Task detail, exactly as the card's title opens it.
+    /// </summary>
+    private void OpenFromMenu()
+    {
+        if (_menuTaskId is { } taskId)
+        {
+            Open(taskId);
+        }
+    }
+
+    /// <summary>
+    /// The menu's "Move": the picker takes the menu's place in the card.
+    /// </summary>
+    private void PickFromMenu() => _menuPicking = true;
+
+    /// <summary>
+    /// A position chosen in a card's picker: the menu closes and the move is made from it.
+    /// </summary>
+    private Task MoveFromMenuAsync(MoveChoice choice)
+    {
+        if (_menuTaskId is not { } taskId)
+        {
+            return Task.CompletedTask;
+        }
+
+        _menuTaskId = null;
+        _menuPicking = false;
+
+        return MoveAsync(taskId, choice, fromMenu: true);
+    }
+
+    /// <summary>
+    /// A move (story 2.6, AC15): rendered at once, then sent as the Status attribute's change. Made from a card's menu, focus
+    /// follows the card to its new place (open question 9); from the panel, it stays on the panel's Move control.
+    /// </summary>
+    private Task MoveAsync(Guid taskId, MoveChoice choice, bool fromMenu)
+    {
+        if (!_canManage)
+        {
+            return Task.CompletedTask;
+        }
+
+        _boardNotice = null;
+        _movedCard = taskId;
+
+        if (fromMenu)
+        {
+            _movesFromMenu.Add(taskId);
+            FocusCardTitle(taskId);
+        }
+        else
+        {
+            _movesFromMenu.Remove(taskId);
+        }
+
+        return EditAsync(taskId, TaskAttribute.Status, choice);
+    }
+
+    /// <summary>
+    /// Focus to a card's title: a card still in its column takes the bumped request, and a card drawn afresh in another
+    /// column takes it on arrival, once.
+    /// </summary>
+    private void FocusCardTitle(Guid taskId)
+    {
+        _focusCard = taskId;
+        _focusCardRequests++;
+        _arrivalCard = taskId;
+    }
+
+    /// <summary>
+    /// Says, once the answer to a Status attribute's change is in, where the Task is now: on admission its ordinal and the
+    /// column's true total; on a refusal or no answer the slot it returned to (open question 8). A refused menu move puts
+    /// focus back on the card in that slot.
+    /// </summary>
+    private void AnnounceMove(Guid taskId, EditOutcome outcome)
+    {
+        var fromMenu = _movesFromMenu.Remove(taskId);
+
+        if (outcome == EditOutcome.Gone || Locate(taskId) is not { } found)
+        {
+            return;
+        }
+
+        var (column, index) = found;
+
+        _announcement = outcome == EditOutcome.Admitted
+            ? string.Format(CultureInfo.CurrentCulture, Localizer["TaskMoved"], column.Name, index + 1, column.Total)
+            : string.Format(CultureInfo.CurrentCulture, Localizer["TaskReturned"], column.Name, index + 1);
+
+        if (outcome != EditOutcome.Admitted && fromMenu)
+        {
+            FocusCardTitle(taskId);
+        }
     }
 
     /// <summary>
@@ -323,12 +486,6 @@ public sealed partial class BoardView
 
         _panelRefusal = null;
 
-        if (attribute == TaskAttribute.Status && value is Guid statusId)
-        {
-            var name = _statusOptions.Find(status => status.Id == statusId)?.Name ?? string.Empty;
-            _announcement = string.Format(CultureInfo.CurrentCulture, Localizer["TaskMoved"], name);
-        }
-
         if (replica.InFlight.ContainsKey(attribute))
         {
             replica.Queued[attribute] = value;
@@ -351,10 +508,11 @@ public sealed partial class BoardView
         var generation = _generation;
         var sending = value;
         var more = true;
+        var outcome = EditOutcome.Gone;
 
         while (more)
         {
-            var outcome = await SendAsync(taskId, replica, attribute, sending, generation);
+            outcome = await SendAsync(taskId, replica, attribute, sending, generation);
 
             more = outcome == EditOutcome.Admitted
                 && replica.Queued.Remove(attribute, out sending)
@@ -369,6 +527,11 @@ public sealed partial class BoardView
         if (generation == _generation)
         {
             Place(taskId, replica);
+
+            if (attribute == TaskAttribute.Status)
+            {
+                AnnounceMove(taskId, outcome);
+            }
         }
     }
 
@@ -388,7 +551,10 @@ public sealed partial class BoardView
 
         try
         {
-            using var answer = await Writes.SendAsync(HttpMethod.Patch, TaskRoutes.TaskOf(SpaceId, taskId), body, key, token);
+            // A move goes to its own route (story 2.6); every other change is a merge patch of the Task.
+            using var answer = value is MoveChoice
+                ? await Writes.SendAsync(HttpMethod.Post, TaskRoutes.MoveOf(SpaceId, taskId), body, key, token)
+                : await Writes.SendAsync(HttpMethod.Patch, TaskRoutes.TaskOf(SpaceId, taskId), body, key, token);
 
             // A Task this tab deleted while the edit was out: its answer (a 404) is dropped - no refusal surface, no
             // revert, no words (story 2.5, open question 7).
@@ -531,13 +697,22 @@ public sealed partial class BoardView
 
     /// <summary>
     /// Says a refusal in the panel - only when the panel is open on the Task it is about, never in another
-    /// Task's panel opened since the edit was sent.
+    /// Task's panel opened since the edit was sent. A move made from a card's menu says it on the Board instead, where it
+    /// was made (story 2.6, open question 8 (c)).
     /// </summary>
     private void SayInPanel(Guid taskId, string words)
     {
         if (_openTaskId == taskId)
         {
             _panelRefusal = words;
+        }
+        else if (_movesFromMenu.Contains(taskId))
+        {
+            _boardNotice = words;
+        }
+        else
+        {
+            // Said nowhere: the panel it was about has closed, and it was not made from a menu.
         }
     }
 
@@ -575,6 +750,20 @@ public sealed partial class BoardView
         var displayed = replica.Displayed();
         var (column, index) = found;
 
+        if (replica.OutstandingMove() is { } move)
+        {
+            PlaceAfter(found, displayed, move, columns);
+            replica.Relocated = true;
+            return;
+        }
+
+        if (replica.Relocated && !replica.HasOutstanding(TaskAttribute.Status))
+        {
+            replica.Relocated = false;
+            Relocate(found, displayed, columns);
+            return;
+        }
+
         if (column.StatusId == displayed.StatusId)
         {
             if (string.Equals(column.Tasks[index].PositionKey, displayed.PositionKey, StringComparison.Ordinal))
@@ -609,6 +798,56 @@ public sealed partial class BoardView
         }
     }
 
+    /// <summary>
+    /// An outstanding move's slot (story 2.6): out of its column and in after its chosen neighbour - or at the top - with
+    /// both totals moved when the column changes. A neighbour this tab no longer shows puts it at the top.
+    /// </summary>
+    private static void PlaceAfter((ColumnState Column, int Index) found, TaskResponse displayed, MoveChoice move, List<ColumnState> columns)
+    {
+        if (columns.Find(candidate => candidate.StatusId == move.StatusId) is not { } destination)
+        {
+            return;
+        }
+
+        var (column, index) = found;
+
+        column.Tasks.RemoveAt(index);
+
+        if (!ReferenceEquals(column, destination))
+        {
+            column.Total--;
+            destination.Total++;
+        }
+
+        var at = move.AfterTaskId is { } after ? destination.Tasks.FindIndex(task => task.Id == after) + 1 : 0;
+
+        destination.Tasks.Insert(at, displayed);
+    }
+
+    /// <summary>
+    /// A card a move placed, once nothing is outstanding: by its admitted key in its admitted column - the server's slot
+    /// after an admission, its last admitted slot after a refusal - with both totals moved when the column changes.
+    /// </summary>
+    private static void Relocate((ColumnState Column, int Index) found, TaskResponse displayed, List<ColumnState> columns)
+    {
+        if (columns.Find(candidate => candidate.StatusId == displayed.StatusId) is not { } destination)
+        {
+            return;
+        }
+
+        var (column, index) = found;
+
+        column.Tasks.RemoveAt(index);
+
+        if (!ReferenceEquals(column, destination))
+        {
+            column.Total--;
+            destination.Total++;
+        }
+
+        InsertByKey(destination, displayed);
+    }
+
     private static void InsertByKey(ColumnState column, TaskResponse task)
     {
         var at = column.Tasks.FindIndex(candidate => string.CompareOrdinal(candidate.PositionKey, task.PositionKey) > 0);
@@ -639,8 +878,14 @@ public sealed partial class BoardView
             ? firstLabels.SequenceEqual(secondLabels)
             : Equals(first, second);
 
+    /// <summary>
+    /// The body a change is sent with: a merge patch naming its one member, or - for a move - <c>MoveTaskRequest</c>'s two
+    /// members, the destination Status and the neighbour, never a key (story 2.6, open question 2 (a)).
+    /// </summary>
     private static Dictionary<string, object?> BodyOf(TaskAttribute attribute, object? value) =>
-        new(StringComparer.Ordinal) { [MemberOf(attribute)] = value };
+        value is MoveChoice move
+            ? new(StringComparer.Ordinal) { ["statusId"] = move.StatusId, ["afterTaskId"] = move.AfterTaskId }
+            : new(StringComparer.Ordinal) { [MemberOf(attribute)] = value };
 
     private static string MemberOf(TaskAttribute attribute) => attribute switch
     {
@@ -662,6 +907,7 @@ public sealed partial class BoardView
     {
         TaskAttribute.Title when value is string title => task with { Title = title },
         TaskAttribute.Status when value is Guid statusId => task with { StatusId = statusId },
+        TaskAttribute.Status when value is MoveChoice move => task with { StatusId = move.StatusId },
         TaskAttribute.DueDate => task with { DueDate = value as DateTimeOffset? },
         TaskAttribute.Labels when value is IReadOnlyList<Guid> labelIds => task with { LabelIds = labelIds },
         _ => task,
@@ -692,6 +938,24 @@ public sealed partial class BoardView
         public Dictionary<TaskAttribute, object?> Queued { get; } = [];
 
         public Dictionary<TaskAttribute, (string Body, string Key)> Unanswered { get; } = [];
+
+        /// <summary>
+        /// Whether a move put the card in a slot of its own choosing, so it goes back by key once nothing is out.
+        /// </summary>
+        public bool Relocated { get; set; }
+
+        /// <summary>
+        /// The move this Task's Status attribute is waiting on or has out, if that change is a move.
+        /// </summary>
+        public MoveChoice? OutstandingMove() =>
+            Queued.TryGetValue(TaskAttribute.Status, out var queued)
+                ? queued as MoveChoice
+                : InFlight.GetValueOrDefault(TaskAttribute.Status) as MoveChoice;
+
+        /// <summary>
+        /// Whether a change of <paramref name="attribute"/> is waiting or out.
+        /// </summary>
+        public bool HasOutstanding(TaskAttribute attribute) => Queued.ContainsKey(attribute) || InFlight.ContainsKey(attribute);
 
         /// <summary>
         /// What the card and the panel show: the admitted Task with each outstanding change laid over it, the

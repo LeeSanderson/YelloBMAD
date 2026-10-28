@@ -116,7 +116,10 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
             Assert.True(
                 await meta.EvaluateAsync<bool>("m => m.textContent.includes('2 more Labels') || !!m.querySelector(\"[aria-label='2 more Labels']\")"),
                 "The +2 has no accessible name \"2 more Labels\".");
-            Assert.Equal(1, await card.Locator("button, a, input, [role='button'], [tabindex]:not([tabindex='-1'])").CountAsync());
+            // Widened by story 2.6, deliberately: an Owner's card also carries its actions control (open question 6 (a)).
+            // The "+N" and the chips are still no control - the metadata row holds none.
+            Assert.Equal(2, await card.Locator("button, a, input, [role='button'], [tabindex]:not([tabindex='-1'])").CountAsync());
+            Assert.Equal(0, await meta.Locator("button, a, input, [role='button'], [tabindex]:not([tabindex='-1'])").CountAsync());
         }
     }
 
