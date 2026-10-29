@@ -58,8 +58,8 @@ dotnet test --project tests/Yello.Tests.Slices/Yello.Tests.Slices.csproj --no-bu
 
 - **`--no-build` runs the binaries already built.** Rebuild after every change, or the run silently
   tests stale code.
-- **Client (Playwright) tests need a Debug build of `Yello.Client`.** The browser dev server serves the
-  Debug client output.
+- **Client (Playwright) tests need `Yello.Client` built in the same configuration as the tests.** The
+  browser dev server serves the client output of the configuration the test assembly was built in.
 - **Leftover `Yello.Host.exe` processes** can lock `Yello.Host/bin/Debug` and fail the build. Check
   with `Get-Process Yello.Host`.
 - **Migration bundle tests are skipped unless `YELLO_MIGRATION_BUNDLE` is set.** They need

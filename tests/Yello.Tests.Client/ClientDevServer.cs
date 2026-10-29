@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
+using System.Reflection;
 
 namespace Yello.Tests.Client;
 
@@ -30,6 +31,11 @@ namespace Yello.Tests.Client;
 /// <c>Yello.Client/Properties/launchSettings.json</c> sets <c>launchBrowser: true</c> and a fixed
 /// <c>applicationUrl</c> of port 5131. Honouring it would open a real browser window on whoever
 /// ran the suite and would collide with a developer already serving the client on that port.
+/// </para>
+/// <para>
+/// <b>The configuration this suite was built in.</b> <c>dotnet run</c> defaults to Debug, so
+/// without <c>--configuration</c> a Release build (CI's) serves a Debug output that does not
+/// exist, while the build-output check below looks at the Release one and passes.
 /// </para>
 /// <para>
 /// <b>Port 0, and the address read back from the process.</b> Asking the operating system for a
@@ -99,6 +105,8 @@ internal sealed class ClientDevServer : IAsyncDisposable
         startInfo.ArgumentList.Add("--project");
         startInfo.ArgumentList.Add(project.FullName);
         startInfo.ArgumentList.Add("--no-build");
+        startInfo.ArgumentList.Add("--configuration");
+        startInfo.ArgumentList.Add(BuildConfiguration());
         startInfo.ArgumentList.Add("--no-launch-profile");
         startInfo.ArgumentList.Add("--urls");
         startInfo.ArgumentList.Add("http://127.0.0.1:0");
@@ -230,6 +238,12 @@ internal sealed class ClientDevServer : IAsyncDisposable
                 "suite serves the real build output and launches it with --no-build, so run " +
                 "`dotnet build Yello.slnx` before it.");
     }
+
+    private static string BuildConfiguration() =>
+        typeof(ClientDevServer).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration
+        ?? throw new InvalidOperationException(
+            "The test assembly carries no AssemblyConfigurationAttribute, so the configuration " +
+            "to serve Yello.Client in is unknown.");
 
     private static DirectoryInfo RepositoryRoot()
     {
