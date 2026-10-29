@@ -4,6 +4,7 @@
 @using Yello.Contracts.Tasks
 
 @inject IStringLocalizer<ClientCopy> Localizer
+@inject IJSRuntime JS
 
 @*
     THE TASK DETAIL PANEL - story 2.3. AC1-AC3, AC5-AC7, AC12-AC14; UX-DR10, UX-DR11, UX-DR12, UX-DR26,
@@ -80,17 +81,20 @@
         {
             <div class="task-detail__field">
                 <label class="form-field__label" for="@TitleId">@Localizer["TaskDetailTitleLabel"]</label>
-                <input class="form-field__control"
-                       id="@TitleId"
-                       name="@_fieldName"
-                       type="text"
-                       autocomplete="off"
-                       value="@_titleDraft"
-                       aria-invalid="@(_titleMessage is not null ? "true" : null)"
-                       aria-describedby="@(_titleMessage is not null ? TitleMessageId : null)"
-                       @oninput="TitleInput"
-                       @onkeydown="TitleKeyDownAsync"
-                       @onchange="TitleChangedAsync" />
+                @* A textarea so a long title wraps rather than being cut off by its box (WCAG 1.4.12); still one line -
+                   js/single-line.js stops Enter's newline and turns a pasted line break into a space. *@
+                <textarea class="form-field__control task-detail__title-field"
+                          id="@TitleId"
+                          name="@_fieldName"
+                          rows="1"
+                          autocomplete="off"
+                          data-single-line
+                          value="@_titleDraft"
+                          aria-invalid="@(_titleMessage is not null ? "true" : null)"
+                          aria-describedby="@(_titleMessage is not null ? TitleMessageId : null)"
+                          @oninput="TitleInput"
+                          @onkeydown="TitleKeyDownAsync"
+                          @onchange="TitleChangedAsync"></textarea>
 
                 @if (_titleMessage is not null)
                 {
@@ -416,6 +420,7 @@
         if (firstRender)
         {
             await _close.FocusAsync();
+            await InstallSingleLineAsync();
             return;
         }
 
@@ -446,6 +451,23 @@
             {
                 await _delete.FocusAsync();
             }
+        }
+    }
+
+    /// <summary>
+    /// Keeps the Title field to one line on screen (js/single-line.js). A module that cannot load leaves Enter drawing a
+    /// line break before it commits; the title itself stays one line, because <see cref="OneLine"/> flattens it.
+    /// </summary>
+    private async Task InstallSingleLineAsync()
+    {
+        try
+        {
+            await using var module = await JS.InvokeAsync<IJSObjectReference>("import", "./js/single-line.js");
+            await module.InvokeVoidAsync("install");
+        }
+        catch (Exception exception) when (exception is JSException or ObjectDisposedException or InvalidOperationException or OperationCanceledException)
+        {
+            // The page is going, or the module could not load: see above.
         }
     }
 
@@ -585,7 +607,12 @@
     /// </summary>
     private Task DeleteAsync() => Deleting ? Task.CompletedTask : OnDelete.InvokeAsync();
 
-    private void TitleInput(ChangeEventArgs args) => _titleDraft = args.Value?.ToString() ?? string.Empty;
+    private void TitleInput(ChangeEventArgs args) => _titleDraft = OneLine(args.Value);
+
+    /// <summary>
+    /// A title is one line whatever reached the textarea: a line break becomes a space.
+    /// </summary>
+    private static string OneLine(object? value) => (value?.ToString() ?? string.Empty).ReplaceLineEndings(" ");
 
     private Task TitleKeyDownAsync(KeyboardEventArgs args)
     {
@@ -608,7 +635,7 @@
 
     private Task TitleChangedAsync(ChangeEventArgs args)
     {
-        _titleDraft = args.Value?.ToString() ?? string.Empty;
+        _titleDraft = OneLine(args.Value);
 
         return CommitTitleAsync();
     }

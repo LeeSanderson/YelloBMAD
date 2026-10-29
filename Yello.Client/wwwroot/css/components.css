@@ -1239,6 +1239,18 @@
     gap: var(--space-2);
 }
 
+/*
+    The Title field is a textarea so a long title wraps instead of being cut off by its box (WCAG 1.4.12), and
+    `field-sizing: content` grows it to fit. Without that property (it is not universal yet) the field keeps its one row
+    and scrolls, so the title is still reachable. No resize handle: the size follows the text.
+*/
+.task-detail__title-field {
+    display: block;
+    resize: none;
+    field-sizing: content;
+    overflow-wrap: anywhere;
+}
+
 .task-detail__due {
     display: flex;
     flex-wrap: wrap;

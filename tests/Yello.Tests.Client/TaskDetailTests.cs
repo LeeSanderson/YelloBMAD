@@ -187,7 +187,8 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC6 - Task detail in this epic has no description editor, no heading for one and no placeholder. Anchor:
-    /// the title field is present, so the panel rendered its attributes.
+    /// the title field is present, so the panel rendered its attributes. The title field is itself a textarea, so a long
+    /// title wraps (WCAG 1.4.12), but a single-line one (<c>data-single-line</c>), which no description editor can be.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -206,7 +207,8 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
             var dialog = page.Locator(Dialog);
 
             Assert.Equal(1, await TitleField(page).CountAsync());
-            Assert.Equal(0, await dialog.Locator("textarea, [contenteditable], [role='textbox'][aria-multiline='true']").CountAsync());
+            Assert.Equal(1, await dialog.Locator("textarea[data-single-line]").CountAsync());
+            Assert.Equal(0, await dialog.Locator("textarea:not([data-single-line]), [contenteditable], [role='textbox'][aria-multiline='true']").CountAsync());
             Assert.DoesNotContain("description", await dialog.InnerTextAsync(), StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("description", await dialog.EvaluateAsync<string>("d => d.innerHTML"), StringComparison.OrdinalIgnoreCase);
         }
@@ -828,6 +830,38 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
             await page.Locator(Dialog).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
 
             Assert.Empty(Edits(api));
+        }
+    }
+
+    /// <summary>
+    /// The title field wraps a long title but stays one line: Enter commits and draws no line break, and a pasted line
+    /// break arrives as a space - in the field and in the title the server is sent.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR40")]
+    public async Task The_title_field_stays_one_line_under_Enter_and_a_pasted_line_break()
+    {
+        var api = TwoSpaces();
+        var tasks = Seed(api, Northwind, Atlas, "Draft the brief");
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenBoardAsync(api, page, Northwind, Atlas);
+            await OpenPanelAsync(page, tasks[0].Id);
+
+            var field = TitleField(page);
+
+            await field.FillAsync(string.Empty);
+            await page.Keyboard.InsertTextAsync("Send the\nbrief");
+
+            Assert.Equal("Send the brief", await field.InputValueAsync());
+
+            await field.PressAsync("Enter");
+            await WaitUntilAsync(() => api.FindTask(tasks[0].Id)?.Task.Title == "Send the brief", "The edit was never applied.");
+
+            Assert.Equal("Send the brief", await field.InputValueAsync());
         }
     }
 
