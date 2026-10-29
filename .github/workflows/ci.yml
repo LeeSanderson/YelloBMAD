@@ -32,7 +32,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       # A CI agent fails the container-backed classes rather than skipping them when the container
       # runtime is unconfigured, and fails the bundle test rather than skipping it when the bundle is
@@ -77,8 +77,13 @@ jobs:
         run: dotnet test --project tests/Yello.Tests.Architecture/Yello.Tests.Architecture.csproj -c Release --no-build
 
       # The Nightly and Weekly tiers (story 2.9) are Explicit and excluded besides, so the PR stage stays under 15 minutes.
+      # The browser suite is left out here and runs alone below: beside the SQL-backed suites its Playwright waits ran
+      # past their 30s on the runner.
       - name: Every suite
-        run: dotnet test Yello.slnx -c Release --no-build -- --filter-not-trait "Tier=Nightly" --filter-not-trait "Tier=Weekly" --report-xunit-trx --results-directory "$GITHUB_WORKSPACE/TestResults"
+        run: dotnet test Yello.slnx -c Release --no-build -p:YelloSkipBrowserSuite=true -- --filter-not-trait "Tier=Nightly" --filter-not-trait "Tier=Weekly" --report-xunit-trx --results-directory "$GITHUB_WORKSPACE/TestResults"
+
+      - name: Browser suite (alone)
+        run: dotnet test --project tests/Yello.Tests.Client/Yello.Tests.Client.csproj -c Release --no-build -- --filter-not-trait "Tier=Nightly" --filter-not-trait "Tier=Weekly" --report-xunit-trx --results-directory "$GITHUB_WORKSPACE/TestResults"
 
       - name: Test results
         if: always()

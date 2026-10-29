@@ -737,10 +737,13 @@ steps in order:
    is exported as `YELLO_MIGRATION_BUNDLE`.
 6. The architecture suite runs **first**, on its own, because it takes seconds and should fail
    before anything slower starts.
-7. `dotnet test Yello.slnx -c Release --no-build`. This is the gate. A single failing case fails the
-   run, and the deploy jobs `need` this job, so no deploy follows a red run. `--no-build` is safe
-   here only because step 2 built the same configuration. The zero-tests trap above still applies
-   anywhere else.
+7. `dotnet test Yello.slnx -c Release --no-build -p:YelloSkipBrowserSuite=true`. This is the gate. A
+   single failing case fails the run, and the deploy jobs `need` this job, so no deploy follows a red
+   run. `--no-build` is safe here only because step 2 built the same configuration. The zero-tests
+   trap above still applies anywhere else.
+8. The browser suite (`Yello.Tests.Client`) runs alone. Run beside the SQL-backed suites on the
+   runner, its Playwright waits ran past their 30s. The property in step 7 takes the project out of
+   the solution run, rather than a trait filter, which would leave the module running zero tests.
 
 The PR-stage target is under 15 minutes. `DeploymentShapeTests` holds the order and the
 variables, and `actionlint` 1.7.12 reports no findings on the file.

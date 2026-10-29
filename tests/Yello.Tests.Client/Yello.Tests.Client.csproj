@@ -46,6 +46,18 @@
   </PropertyGroup>
 
   <!--
+    OUT OF A SOLUTION RUN ON REQUEST. ci.yml passes -p:YelloSkipBrowserSuite=true to its
+    `dotnet test Yello.slnx` and runs this suite alone in the next step: beside the SQL-backed
+    suites on a CI runner, Playwright waits ran past their 30s. Excluding by trait instead would
+    leave this module running zero tests, which exits 8. Both properties are needed; with only
+    the second, `dotnet test` stops on a test project that is not a testing-platform application.
+  -->
+  <PropertyGroup Condition="'$(YelloSkipBrowserSuite)' == 'true'">
+    <IsTestProject>false</IsTestProject>
+    <IsTestingPlatformApplication>false</IsTestingPlatformApplication>
+  </PropertyGroup>
+
+  <!--
     NO `ignore-exit-code 8` SWITCH. This suite ships with cases, so the switch would be a lie
     in the one direction that matters: with it in place a trait typo or broken discovery makes
     the suite report success having run nothing.
