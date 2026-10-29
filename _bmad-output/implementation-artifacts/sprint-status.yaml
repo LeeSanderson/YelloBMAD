@@ -1,5 +1,5 @@
 # generated: 2026-08-22 13:10
-# last_updated: 2026-10-28
+# last_updated: 2026-10-29
 # project: YelloBMAD
 # project_key: NOKEY
 # tracking_system: file-system
@@ -64,7 +64,7 @@
 #   - issues 8, 9: PRD §7's stale sentence; missing `status` fields
 
 generated: 2026-08-22 13:10
-last_updated: 2026-10-28
+last_updated: 2026-10-29
 project: YelloBMAD
 project_key: NOKEY
 tracking_system: file-system
@@ -86,7 +86,7 @@ development_status:
   epic-1-retrospective: optional
 
   # Epic 2: Track your own work on a Board
-  epic-2: in-progress
+  epic-2: done
   2-1-create-a-project-and-see-what-is-in-your-space: done
   2-2-add-tasks-and-see-them-on-a-board: done
   2-3-edit-a-tasks-title-status-and-due-date: done
