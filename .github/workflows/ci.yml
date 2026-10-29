@@ -82,8 +82,10 @@ jobs:
       - name: Every suite
         run: dotnet test Yello.slnx -c Release --no-build -p:YelloSkipBrowserSuite=true -- --filter-not-trait "Tier=Nightly" --filter-not-trait "Tier=Weekly" --report-xunit-trx --results-directory "$GITHUB_WORKSPACE/TestResults"
 
+      # --results-directory goes before `--` here: with --project, SDK 10.0.303 reads a path after `--` that names an
+      # existing directory (the step above made it) as a positional project directory, and stops.
       - name: Browser suite (alone)
-        run: dotnet test --project tests/Yello.Tests.Client/Yello.Tests.Client.csproj -c Release --no-build -- --filter-not-trait "Tier=Nightly" --filter-not-trait "Tier=Weekly" --report-xunit-trx --results-directory "$GITHUB_WORKSPACE/TestResults"
+        run: dotnet test --project tests/Yello.Tests.Client/Yello.Tests.Client.csproj -c Release --no-build --results-directory "$GITHUB_WORKSPACE/TestResults" -- --filter-not-trait "Tier=Nightly" --filter-not-trait "Tier=Weekly" --report-xunit-trx
 
       - name: Test results
         if: always()
