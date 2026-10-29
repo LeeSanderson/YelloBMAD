@@ -67,7 +67,7 @@ public sealed partial class BoardView
         total == 1 ? Localizer["ColumnCountOne"] : string.Format(CultureInfo.CurrentCulture, Localizer["ColumnCountMany"], total);
 
     /// <inheritdoc />
-    void IBoardKeysHost.Narrowed(bool narrow, bool fromPager)
+    void IBoardKeysHost.Narrowed(bool narrow, bool fromPager, Guid? focusedStatusId)
     {
         if (narrow == _narrow)
         {
@@ -78,7 +78,7 @@ public sealed partial class BoardView
 
         if (narrow)
         {
-            GoNarrow();
+            GoNarrow(focusedStatusId);
         }
         else if (fromPager)
         {
@@ -121,20 +121,23 @@ public sealed partial class BoardView
     }
 
     /// <summary>
-    /// A tab clicked or tapped (AC10): selected and said; focus is already on it.
+    /// A tab clicked or tapped (AC10): selected and said, and focus is asked onto it - a browser that does not focus a
+    /// button it clicks (WebKit) would otherwise leave focus in the column now hidden.
     /// </summary>
     private void SelectTab(Guid statusId)
     {
-        if (Column(statusId) is { } column)
+        if (Column(statusId) is { } column && Choose(column))
         {
-            _ = Choose(column);
+            _focusTabRequests++;
         }
     }
 
     /// <summary>
     /// The person's own change of tab: the column is selected, the Board's one roving stop moves into it - its first card, or
     /// the column itself when it is empty - so Tab never lands in a hidden column, and the Status and its true total are
-    /// said once (AC10). Answers whether the selection changed.
+    /// said once (AC10). A carry or a card's menu in the column being left goes with it: a carried Task returns (said, as
+    /// focus leaving a carry always is), and a menu closes, so nothing hidden is left holding the Board. Answers whether
+    /// the selection changed.
     /// </summary>
     private bool Choose(ColumnState column)
     {
@@ -143,6 +146,13 @@ public sealed partial class BoardView
             return false;
         }
 
+        if (_carried is not null)
+        {
+            Returned(EndHeld());
+        }
+
+        _menuTaskId = null;
+        _menuPicking = false;
         _selectedStatusId = column.StatusId;
         _activeTaskId = null;
         _activeColumnId = column.StatusId;
@@ -174,11 +184,28 @@ public sealed partial class BoardView
     }
 
     /// <summary>
-    /// Crossing below 768px (AC14, open question 2 (a)): the column holding a carried Task, else the active card's or the
-    /// active empty column's, is selected, so focus stays on the same Task or column. A pointer or touch lift ends as a cancel
-    /// and says where the Task is (2.7's rule); a carry goes on, its destination back in its own column.
+    /// Whether the pager shows the column <paramref name="taskId"/>'s card is in - or is counted in, when it is held out past
+    /// a cursor.
     /// </summary>
-    private void GoNarrow()
+    private bool ShowsColumnOf(Guid taskId)
+    {
+        if (SelectedColumn is not { } shown)
+        {
+            return false;
+        }
+
+        return Locate(taskId) is { } found
+            ? ReferenceEquals(found.Column, shown)
+            : _heldOut.TryGetValue(taskId, out var statusId) && statusId == shown.StatusId;
+    }
+
+    /// <summary>
+    /// Crossing below 768px (AC14, open question 2 (a)): the column holding a carried Task, else the column holding focus
+    /// (a card, the create field, the paging button), else the active card's or the active empty column's, is selected, so
+    /// focus stays on the same Task or column and never ends in a hidden one. A pointer or touch lift ends as a cancel and
+    /// says where the Task is (2.7's rule); a carry goes on, its destination back in its own column.
+    /// </summary>
+    private void GoNarrow(Guid? focusedStatusId)
     {
         if (_drag?.LiftedTaskId is { } lifted)
         {
@@ -195,18 +222,27 @@ public sealed partial class BoardView
             return;
         }
 
+        // Focus has not been in the Board when nothing names a column: the selected tab stays.
+        _selectedStatusId = ColumnToShow(focusedStatusId) ?? _selectedStatusId;
+    }
+
+    /// <summary>
+    /// The column going narrow shows when no Task is carried: the one holding focus, else the active card's, else the
+    /// active empty column; <c>null</c> when none of them is on the Board.
+    /// </summary>
+    private Guid? ColumnToShow(Guid? focusedStatusId)
+    {
+        if (focusedStatusId is { } focused && Column(focused) is not null)
+        {
+            return focused;
+        }
+
         if (_activeTaskId is { } taskId && Locate(taskId) is { } active)
         {
-            _selectedStatusId = active.Column.StatusId;
+            return active.Column.StatusId;
         }
-        else if (_activeColumnId is { } statusId && Column(statusId) is not null)
-        {
-            _selectedStatusId = statusId;
-        }
-        else
-        {
-            // Focus has not been in the Board: the selected tab stays.
-        }
+
+        return _activeColumnId is { } statusId && Column(statusId) is not null ? statusId : null;
     }
 
     /// <summary>

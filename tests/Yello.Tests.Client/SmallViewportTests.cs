@@ -521,6 +521,7 @@ public sealed class SmallViewportTests(ClientSurfaceFixture surface)
             await OpenBoardAsync(page, surface.BaseAddress, Northwind, Atlas);
             await WaitForKeysAsync(page);
             await FocusCardAsync(page, "Charlie");
+            await page.EvaluateAsync(RecordAnnouncements);
 
             var requests = api.Requests.Count;
 
@@ -530,6 +531,9 @@ public sealed class SmallViewportTests(ClientSurfaceFixture surface)
             await WaitForFocusAsync(page, "Charlie");
 
             Assert.True(await CardNamed(page, "Charlie").IsVisibleAsync());
+
+            // The Board's own change of tab says nothing (AC10).
+            Assert.Empty(await SaidAsync(page));
 
             await TabNamed(page, "Done").FocusAsync();
             await PressOnPagerAsync(page, "ArrowLeft", "Doing");
@@ -547,6 +551,185 @@ public sealed class SmallViewportTests(ClientSurfaceFixture surface)
             }
 
             Assert.Equal(requests, api.Requests.Count);
+        }
+    }
+
+    /// <summary>
+    /// AC14, AC11 - going narrow with focus in the create field of the first column, while the active card is in the third,
+    /// shows the column holding focus: focus stays in the field, and every other column is hidden and out of view.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR39")]
+    public async Task Crossing_768px_shows_the_column_holding_focus_even_off_a_stop()
+    {
+        var api = TwoSpaces(Northwind, Harbour);
+        _ = Seed(api, Northwind, Atlas, ThreeStatuses, ["Alpha"], ["Bravo"], ["Charlie"]);
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 800);
+            await api.InstallAsync(page);
+            await OpenBoardAsync(page, surface.BaseAddress, Northwind, Atlas);
+            await WaitForKeysAsync(page);
+            await FocusCardAsync(page, "Charlie");
+
+            await page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = AddTask, Exact = true }).ClickAsync(new LocatorClickOptions { Timeout = WaitMs });
+
+            var field = ColumnNamed(page, "Todo").Locator("input[type='text']");
+
+            await page.WaitForFunctionAsync("() => document.activeElement && document.activeElement.matches(\"main .board-column input[type='text']\")", null, new PageWaitForFunctionOptions { Timeout = WaitMs, PollingInterval = 50 });
+
+            await page.SetViewportSizeAsync(375, 800);
+            await WaitForPagerAsync(page);
+            await WaitForSelectedTabAsync(page, "Todo");
+
+            Assert.True(await field.IsVisibleAsync(), "The create field is not on screen after going narrow.");
+            Assert.True(await field.EvaluateAsync<bool>("f => document.activeElement === f"), "Focus left the create field.");
+            Assert.False(await ColumnNamed(page, "Done").IsVisibleAsync(), "The active card's column is still drawn.");
+            Assert.Equal(1, await page.GetByRole(AriaRole.Tabpanel).CountAsync());
+        }
+    }
+
+    /// <summary>
+    /// AC14, Q2 (a) - a keyboard carry heading for another column goes on when the viewport goes narrow, back in its own
+    /// column, on the tab the pager shows; Esc then returns the Task with nothing sent.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR39")]
+    [Trait("Requirement", "UX-DR24")]
+    public async Task Crossing_768px_during_a_carry_keeps_it_in_its_own_column()
+    {
+        var api = TwoSpaces(Northwind, Harbour);
+        _ = Seed(api, Northwind, Atlas, ThreeStatuses, ["Alpha", "Bravo"], ["Charlie"]);
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 800);
+            await api.InstallAsync(page);
+            await OpenBoardAsync(page, surface.BaseAddress, Northwind, Atlas);
+            await WaitForKeysAsync(page);
+            await page.EvaluateAsync(RecordAnnouncements);
+            await FocusCardAsync(page, "Alpha");
+
+            await page.Keyboard.PressAsync(" ");
+            await page.Locator(".task-card--carried").WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
+            await page.Keyboard.PressAsync("ArrowRight");
+            await WaitUntilSaidAsync(page, "Doing, position");
+
+            await page.SetViewportSizeAsync(375, 800);
+            await WaitForPagerAsync(page);
+            await WaitForSelectedTabAsync(page, "Todo");
+
+            Assert.True(await page.Locator(".task-card--carried").IsVisibleAsync(), "The carry did not go on in its own column.");
+            Assert.Equal(0, await ColumnNamed(page, "Doing").Locator(".drop-zone").CountAsync());
+
+            await WaitForFocusAsync(page, "Alpha");
+            await page.Keyboard.PressAsync("Escape");
+            await WaitUntilSaidAsync(page, "Returned to Todo, position 1.");
+
+            Assert.Empty(Moves(api));
+            Assert.Equal(["Alpha", "Bravo"], await TitlesInAsync(page, "Todo"));
+        }
+    }
+
+    /// <summary>
+    /// AC9, AC10 - a click on a tab selects it and says its Status and true total; <c>Tab</c> from the tablist reaches the
+    /// visible column's one roving stop, and <c>Shift+Tab</c> comes back to the selected tab. Nothing is said on load.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    public async Task A_clicked_tab_is_said_and_Tab_reaches_the_visible_column()
+    {
+        var api = TwoSpaces(Northwind, Harbour);
+        _ = Seed(api, Northwind, Atlas, ThreeStatuses, ["Alpha"], ["Bravo", "Charlie"]);
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenNarrowAsync(api, page, 375, 667);
+
+            Assert.DoesNotContain(
+                await page.EvaluateAsync<string[]>("() => [...document.querySelectorAll('[aria-live=\"polite\"]')].map(r => r.textContent.trim())"),
+                said => said.Contains("Todo,", StringComparison.Ordinal));
+
+            await page.EvaluateAsync(RecordAnnouncements);
+            await TabNamed(page, "Doing").ClickAsync(new LocatorClickOptions { Timeout = WaitMs });
+            await WaitForSelectedTabAsync(page, "Doing");
+            await WaitUntilSaidAsync(page, "Doing, 2 Tasks.");
+
+            await page.WaitForFunctionAsync("() => document.activeElement && document.activeElement.matches(\"[role='tab'][aria-selected='true']\")", null, new PageWaitForFunctionOptions { Timeout = WaitMs, PollingInterval = 50 });
+            await PressAndFocusAsync(page, "Tab", "Bravo");
+            await page.Keyboard.PressAsync("Shift+Tab");
+            await page.WaitForFunctionAsync("() => document.activeElement && document.activeElement.matches(\"[role='tab'][aria-selected='true']\")", null, new PageWaitForFunctionOptions { Timeout = WaitMs, PollingInterval = 50 });
+
+            Assert.Equal("Doing", await SelectedTabNameAsync(page));
+        }
+    }
+
+    /// <summary>
+    /// AC9, AC12 - a tab chosen while a Task is carried ends the carry: the Task is returned where it was and said so, nothing
+    /// is sent, and no carried card is left in the hidden column.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR24")]
+    public async Task A_tab_chosen_during_a_carry_returns_the_Task()
+    {
+        var api = TwoSpaces(Northwind, Harbour);
+        _ = Seed(api, Northwind, Atlas, ThreeStatuses, ["Alpha", "Bravo"], ["Charlie"]);
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenNarrowAsync(api, page, 375, 667);
+            await WaitForKeysAsync(page);
+            await page.EvaluateAsync(RecordAnnouncements);
+            await FocusCardAsync(page, "Alpha");
+
+            await page.Keyboard.PressAsync(" ");
+            await page.Locator(".task-card--carried").WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
+            await TabNamed(page, "Doing").ClickAsync(new LocatorClickOptions { Timeout = WaitMs });
+            await WaitForSelectedTabAsync(page, "Doing");
+            await WaitUntilSaidAsync(page, "Returned to Todo, position 1.");
+
+            Assert.Equal(0, await page.Locator(".task-card--carried").CountAsync());
+            Assert.Empty(Moves(api));
+        }
+    }
+
+    /// <summary>
+    /// AC15 - on an empty Board with another tab selected, the empty state's create action shows the first tab, where the
+    /// create field is drawn, and focus lands in it.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    public async Task On_an_empty_Board_the_create_action_shows_the_first_tab()
+    {
+        var api = TwoSpaces(Northwind, Harbour);
+        _ = Seed(api, Northwind, Atlas, ThreeStatuses);
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(375, 667);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/projects/{Atlas:D}").ToString());
+            await WaitForPagerAsync(page);
+
+            await TabNamed(page, "Doing").ClickAsync(new LocatorClickOptions { Timeout = WaitMs });
+            await WaitForSelectedTabAsync(page, "Doing");
+            await page.Locator(".board__empty-action").ClickAsync(new LocatorClickOptions { Timeout = WaitMs });
+            await WaitForSelectedTabAsync(page, "Todo");
+
+            var field = ColumnNamed(page, "Todo").Locator("input[type='text']");
+
+            await page.WaitForFunctionAsync("() => document.activeElement && document.activeElement.matches(\"main .board-column input[type='text']\")", null, new PageWaitForFunctionOptions { Timeout = WaitMs, PollingInterval = 50 });
+
+            Assert.True(await field.IsVisibleAsync(), "The create field is in a hidden column.");
         }
     }
 

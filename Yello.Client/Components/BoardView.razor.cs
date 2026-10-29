@@ -700,6 +700,9 @@ public sealed partial class BoardView
     /// </summary>
     private void Answered(Guid taskId, TaskReplica replica, TaskAttribute attribute, EditOutcome outcome)
     {
+        // Read before the card goes back: whether the pager still shows the column the move took it to.
+        var followed = attribute == TaskAttribute.Status && ShowsColumnOf(taskId);
+
         Place(taskId, replica);
 
         if (attribute != TaskAttribute.Status)
@@ -707,9 +710,9 @@ public sealed partial class BoardView
             return;
         }
 
-        // A move refused or unanswered puts the card back, and the pager follows it there (story 2.11, AC5); an admitted
-        // one leaves the selection the person has now.
-        if (outcome != EditOutcome.Admitted)
+        // A move refused or unanswered puts the card back, and the pager follows it there (story 2.11, AC5) - unless the
+        // person has chosen another tab since, which is theirs to keep, as it is after an admitted one.
+        if (outcome != EditOutcome.Admitted && followed)
         {
             Follow(taskId);
         }

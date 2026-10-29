@@ -35,5 +35,6 @@ public interface IBoardKeysHost
     /// </summary>
     /// <param name="narrow">Whether the viewport is below 768px.</param>
     /// <param name="fromPager">Whether focus was on one of the Status pager's tabs.</param>
-    void Narrowed(bool narrow, bool fromPager);
+    /// <param name="focusedStatusId">The Status of the column holding focus, or <c>null</c> when no column holds it.</param>
+    void Narrowed(bool narrow, bool fromPager, Guid? focusedStatusId);
 }

@@ -203,9 +203,14 @@ class BoardKeys {
 
     #onMedia = () => {
         const active = document.activeElement;
-        const fromPager = active instanceof Element && active.matches(TAB) && this.#root.contains(active);
+        const inBoard = active instanceof Element && this.#root.contains(active);
+        const fromPager = inBoard && active.matches(TAB);
 
-        this.#invoke('Narrow', this.#media.matches, fromPager);
+        // The column holding focus, whatever holds it - a card, the create field, the paging button - so going narrow selects
+        // the column the person is in, and the hidden attribute never lands on it.
+        const column = inBoard ? active.closest(COLUMN) : null;
+
+        this.#invoke('Narrow', this.#media.matches, fromPager, column ? column.getAttribute('data-status-id') : null);
     };
 
     #onKeyUp = event => {

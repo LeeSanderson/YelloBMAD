@@ -724,6 +724,15 @@
     .board-column:not([data-pager-selected]):not(:focus-within) {
         display: none;
     }
+
+    /*
+        Once .NET has drawn the pager, the hidden attribute is final: .board-column's display: flex would otherwise beat the
+        user agent's [hidden] rule, and a focused unselected column would stay drawn and in the accessibility tree (AC11).
+        Going narrow selects the column holding focus first, so this never hides the person's own column.
+    */
+    .board-column[hidden] {
+        display: none;
+    }
 }
 
 /*

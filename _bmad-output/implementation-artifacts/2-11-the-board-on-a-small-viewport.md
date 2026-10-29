@@ -4,7 +4,7 @@ baseline_commit: f37b5b9
 
 # Story 2.11: The Board on a small viewport
 
-Status: review
+Status: done
 
 Epic: 2 — Track your own work on a Board
 Story key: `2-11-the-board-on-a-small-viewport`
@@ -273,6 +273,41 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1394-1428` (`status: final
     - the 1.4.10 measurement helper;
     - that RTL is forced by `dir="rtl"`.
   - [x] (c) Run `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are 3 bundle cases plus the Explicit tiers.
+
+### Review Findings
+
+Code review of `f37b5b9..06d2a07` (2026-10-28, bmad-code-review, unattended): Blind Hunter, Edge Case Hunter and Acceptance Auditor. 38 raw findings, 25 after de-duplication: 8 patched, 3 deferred, 14 dismissed. No decision was needed.
+
+- [x] [Review][Patch] **The `hidden` attribute did nothing on a column, and a focused unselected column stayed drawn and in the accessibility tree** (high; AC11) [`Yello.Client/wwwroot/css/components.css` "THE STATUS PAGER"]
+  - `.board-column { display: flex }` beats the user agent's `[hidden]` rule, and no `[hidden]` rule existed. The only hide was `:not([data-pager-selected]):not(:focus-within)`.
+  - Any unselected column holding focus was therefore drawn, and exposed to assistive technology, beside the selected one. This happened with focus in the create field, after a tap that does not focus the tab (WebKit), or when a refused move followed back.
+  - Fixed with `.board-column[hidden] { display: none }` inside the narrow query, which makes .NET's `hidden` final once the pager is drawn. The `:focus-within` spare still covers the gap before .NET knows the width.
+- [x] [Review][Patch] **Going narrow ignored focus that was not on a roving stop** (medium; AC14) [`BoardView.Pager.cs` `GoNarrow`/`ColumnToShow`, `board-keys.js` `#onMedia`, `BoardKeys.Narrow`]
+  - Focus in column 1's create field while the active card was in column 3 selected column 3.
+  - The keys module now reports the column holding focus, and going narrow selects that column after a carried Task's column and before the active stop's.
+- [x] [Review][Patch] **A refused or unanswered move moved the pager back over a tab the person had chosen since** (medium; AC5) [`BoardView.razor.cs` `Answered`, `BoardView.Pager.cs` `ShowsColumnOf`]
+  - The pager now follows the returning card only while it still shows the column the move took the Task to.
+- [x] [Review][Patch] **A tab chosen during a keyboard carry left the carry alive in the hidden column, and Esc on a tab could not cancel it** (medium; AC9, AC12) [`BoardView.Pager.cs` `Choose`]
+  - The person's change of tab now returns the carried Task, and says so as focus leaving a carry always does.
+- [x] [Review][Patch] **A card's menu left open in a hidden column blocked `Space` pick-up in the shown one** (medium) [`BoardView.Pager.cs` `Choose`]
+  - The person's change of tab now closes it.
+- [x] [Review][Patch] **The empty Board's create action, pressed on another tab, opened the create field inside the hidden first column** (medium; AC15) [`BoardView.razor` `OpenCreate`]
+  - Opening create now selects the first tab.
+- [x] [Review][Patch] **A clicked tab assumed the browser had focused it** (low) [`BoardView.Pager.cs` `SelectTab`]
+  - WebKit does not focus a clicked button, so focus could stay in the column now hidden. A click now asks for focus on the selected tab.
+- [x] [Review][Patch] **AC clauses with no test** (medium) [`tests/Yello.Tests.Client/SmallViewportTests.cs`, `TextSpacingTests.cs`]
+  - Added `A_clicked_tab_is_said_and_Tab_reaches_the_visible_column`, which covers AC9 `Tab` and `Shift+Tab`, AC10 click, and nothing said on load.
+  - Added `Crossing_768px_during_a_carry_keeps_it_in_its_own_column` (AC14 carry).
+  - Added `Crossing_768px_shows_the_column_holding_focus_even_off_a_stop`, `A_tab_chosen_during_a_carry_returns_the_Task` and `On_an_empty_Board_the_create_action_shows_the_first_tab`.
+  - The crossing case now asserts that a crossing says nothing (AC10).
+  - The 320px context-bar text-spacing/zoom case now asserts the Role chip's unchanged name, Sign out and Account, no menu, and no sideways page scroll (AC16).
+  - Plants: removing the focused-column selection, the carry return, or the create-selects-first-tab change was each caught by its new case.
+- [x] [Review][Defer] **Going narrow during a carry moves the destination back to its own column silently** [`BoardView.Pager.cs` `GoNarrow`]. Deferred: AC14 requires the reset; whether to say the new position is UX's (owner: UX).
+- [x] [Review][Defer] **A selected Status that leaves the effective set is kept, and the pager's tab list is rebuilt on every render** [`BoardView.Pager.cs` `SelectedColumn`, `PagerTabs`]. Deferred: not reachable until Statuses are configurable (owner: story 6.1 / 6.2).
+- [x] [Review][Defer] **Defence-in-depth layers that no test can fail** [`board-drag.js` `isTarget` and the narrow sideways guard, `BoardView.Keys.cs` `Traverse`'s `narrow`, `BoardView.razor.cs` `PurgePanel`'s reset, the new `.board-column[hidden]` rule; the drag-cancel-on-crossing branch of AC14]
+  - The CSS hide or the keyed remount masks each of these.
+  - The `scrollLeft == 0` assertions in the narrow drag cases cannot fail, because the row is `overflow-x: visible` below 48em.
+  - Deferred (owner: Lee, test hardening).
 
 ## Dev Notes
 
@@ -736,3 +771,4 @@ Modified:
 
 - 2026-10-28: Story created (ready-for-dev).
 - 2026-10-28: Implemented (bmad-dev-story). The Status pager below 768px (tablist, tabpanel columns, keys, true-total announcement, follow-the-Task, breakpoint crossing), the narrow keyboard and drag limits, the context bar's drop order, shared columns at ≥1280px; 22 `SmallViewportTests` cases, 4 `TextSpacingTests` and 2 `TouchDragTests` cases, 3 `BoardTraversalTests` and 10 design gates; ledger and conventions updated. Build 0 warnings, 0 errors; full run (`--max-parallel-test-modules 1`) 1,521 total, 1,512 passed, 0 failed, 9 skipped (3 bundle cases plus the Explicit tiers, as at 2.10). Status set to review.
+- 2026-10-28: Code review (bmad-code-review): 38 raw findings, 25 after de-duplication; 8 patched (the `hidden` attribute made final below 768px, going narrow selects the column holding focus, a person's tab change ends a carry and closes a menu, a refused move no longer overrides a chosen tab, the empty Board's create selects the first tab, a clicked tab is focused; 5 new browser cases and a stronger AC16 case), 3 deferred, 14 dismissed. Status set to done.

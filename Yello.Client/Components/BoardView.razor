@@ -458,7 +458,14 @@
         }
     }
 
-    private void OpenCreate() => _creating = true;
+    private void OpenCreate()
+    {
+        _creating = true;
+
+        // The create field is drawn in the first column, so the pager shows it (story 2.11, AC15): the empty Board's create
+        // action can be pressed while another tab is selected.
+        _selectedStatusId = null;
+    }
 
     /// <summary>
     /// Says a sentence politely - the same one again included (story 2.8, AC14) - or, with <c>null</c>, clears the regions.

@@ -574,12 +574,25 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
             await api.InstallAsync(page);
             await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/projects/{Atlas:D}").ToString());
             await page.Locator("main [role='tablist']").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var chip = page.Locator("nav.context-bar .role-chip");
+            const string nameScript = "e => (e.getAttribute('aria-label') || e.textContent).trim()";
+            var name = await chip.EvaluateAsync<string>(nameScript);
+
             await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
 
             var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+            var bar = page.Locator("nav.context-bar");
 
+            // AC16 under the adaptation: the Role chip keeps its name, Sign out and Account stay reachable, nothing hides
+            // behind a menu, and the page never scrolls sideways.
             Assert.True(problems.Length == 0, string.Join("; ", problems));
-            Assert.True(await page.Locator("nav.context-bar .role-chip").IsVisibleAsync(), "The Role chip is not on screen.");
+            Assert.True(await chip.IsVisibleAsync(), "The Role chip is not on screen.");
+            Assert.Equal(name, await chip.EvaluateAsync<string>(nameScript));
+            Assert.True(await bar.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Sign out", Exact = true }).IsVisibleAsync(), "Sign out is not on screen.");
+            Assert.True(await bar.Locator(".context-bar__account").IsVisibleAsync(), "Account is not on screen.");
+            Assert.Equal(0, await bar.Locator("[aria-haspopup='menu']").CountAsync());
+            Assert.True(await page.EvaluateAsync<bool>("() => document.scrollingElement.scrollWidth <= document.scrollingElement.clientWidth + 1"), "The page scrolls sideways.");
         }
     }
 

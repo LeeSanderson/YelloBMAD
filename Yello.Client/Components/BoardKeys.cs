@@ -121,12 +121,13 @@ public sealed class BoardKeys : IAsyncDisposable
     /// </summary>
     /// <param name="belowMiddle">Whether the viewport is below 768px.</param>
     /// <param name="fromPager">Whether focus was on one of the Status pager's tabs.</param>
+    /// <param name="focusedStatusId">The Status of the column holding focus, or <c>null</c> when no column holds it.</param>
     [JSInvokable]
-    public void Narrow(bool belowMiddle, bool fromPager)
+    public void Narrow(bool belowMiddle, bool fromPager, string? focusedStatusId)
     {
         if (!_disposed)
         {
-            _host.Narrowed(belowMiddle, fromPager);
+            _host.Narrowed(belowMiddle, fromPager, IdOf(focusedStatusId));
         }
     }
 
