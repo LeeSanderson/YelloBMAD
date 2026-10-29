@@ -101,8 +101,8 @@ development_status:
   epic-2-retrospective: optional
 
   # Epic 3: Several Spaces, cleanly separated
-  epic-3: backlog
-  3-1-create-and-rename-a-space: backlog
+  epic-3: in-progress
+  3-1-create-and-rename-a-space: ready-for-dev
   3-2-switch-between-spaces-with-nothing-carrying-over: backlog
   3-3-delete-a-space-and-belong-to-none: backlog
   3-4-prove-that-owning-one-space-grants-nothing-in-another: backlog
