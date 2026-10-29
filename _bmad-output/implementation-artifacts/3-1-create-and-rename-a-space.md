@@ -406,6 +406,8 @@ Q1 resolves this, and AC7 makes the resolution an AD-24 amendment rather than a 
 
 ### Open questions (decide in Task 1; each is reversible; record as "Qn - (x)")
 
+**Decided by Lee, 2026-10-29 (not open):** Q1 - (a) one named dual-key creation unit of work; Q2 - (a) Account-scoped idempotency table; Q5 - (a) `Space` and `Account` stay policy-free as a recorded variance. Q3, Q4 and Q6-Q10 remain for the dev phase.
+
 1. **How one transaction can both count the Account's Memberships and insert the new Space's rows** (AC6, AC7, AC11).
    - (a) **Recommended.** One named Account-scoped creation unit of work sets **both** keys: `AccountId` from the Session, and `SpaceId` set to a server-generated new id. It takes the Account's app lock, counts, inserts and commits. While both keys are set, `Membership`'s filter admits the caller's own Memberships across Spaces. This unit of work reads only the count and returns only the new Space's identity, which is exactly the read the UX spine already permitted. `No_caller_sets_both_session_context_keys` is amended to admit exactly this one caller, and the AD-24 amendment names it.
    - (b) Two units of work: count under `AccountId`, then insert under `SpaceId`. Rejected, because it is not "inside the same transaction" (AD-25) and two concurrent creations at 49 can both pass.
