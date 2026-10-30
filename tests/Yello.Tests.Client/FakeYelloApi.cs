@@ -88,6 +88,63 @@ internal sealed class FakeYelloApi
     private readonly ConcurrentDictionary<string, (string Path, string Body, string Answer)> _movedByKey = new(StringComparer.Ordinal);
     private readonly TaskCompletionSource<FakeRequest> _signInSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly TaskCompletionSource<FakeRequest> _signOutSeen = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly ConcurrentDictionary<string, string> _createdSpaceByKey = new(StringComparer.Ordinal);
+    private TaskCompletionSource? _heldSpaceCreate;
+    private TaskCompletionSource? _arrivedSpaceCreate;
+    private TaskCompletionSource? _heldSpaceRename;
+    private TaskCompletionSource? _arrivedSpaceRename;
+
+    /// <summary>
+    /// Story 3.1 Task 4's stable problem type for a Space name outside the rule. Held here until
+    /// <c>ProblemTypes.InvalidSpaceName</c> exists (story 3.1 ATDD run); replace it on activation.
+    /// </summary>
+    public const string InvalidSpaceNameType = "urn:yello:problem:invalid-space-name";
+
+    /// <summary>
+    /// When set, a Space creation is refused <c>409 bound-reached</c> with <c>bound: spaces-per-account</c> and
+    /// <c>limit: 50</c>, as the Host answers the 51st (story 3.1 AC6). Story 3.1 ATDD run.
+    /// </summary>
+    public bool SpaceBoundReached { get; set; }
+
+    /// <summary>
+    /// When set, the next Space creation is applied but its answer is lost (a connection reset), so the client's
+    /// re-send must carry the same key (story 3.1 Task 6, the <c>UnansweredCreate</c> precedent). Story 3.1 ATDD run.
+    /// </summary>
+    public bool LoseNextSpaceCreateAnswer { get; set; }
+
+    /// <summary>
+    /// Holds the next Space creation (<c>POST /api/v1/spaces</c>) until <see cref="ReleaseSpaceCreate"/>. Story 3.1.
+    /// </summary>
+    /// <returns>A task that completes when the held creation has arrived and is waiting.</returns>
+    public Task HoldSpaceCreateAsync()
+    {
+        _heldSpaceCreate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _arrivedSpaceCreate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        return _arrivedSpaceCreate.Task;
+    }
+
+    /// <summary>
+    /// Lets a held Space creation answer go.
+    /// </summary>
+    public void ReleaseSpaceCreate() => _heldSpaceCreate?.TrySetResult();
+
+    /// <summary>
+    /// Holds the next Space rename (<c>PATCH /api/v1/spaces/{id}</c>) until <see cref="ReleaseSpaceRename"/>. Story 3.1.
+    /// </summary>
+    /// <returns>A task that completes when the held rename has arrived and is waiting.</returns>
+    public Task HoldSpaceRenameAsync()
+    {
+        _heldSpaceRename = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _arrivedSpaceRename = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        return _arrivedSpaceRename.Task;
+    }
+
+    /// <summary>
+    /// Lets a held Space rename answer go.
+    /// </summary>
+    public void ReleaseSpaceRename() => _heldSpaceRename?.TrySetResult();
 
     /// <summary>
     /// The anti-forgery request token this fake issues, unique per instance.
@@ -608,6 +665,13 @@ internal sealed class FakeYelloApi
             return;
         }
 
+        if (LoseNextSpaceCreateAnswer && seen.Method == "POST" && seen.Path == SpaceRoutes.Directory)
+        {
+            LoseNextSpaceCreateAnswer = false;
+            await route.AbortAsync("connectionreset").ConfigureAwait(false);
+            return;
+        }
+
         await route.FulfillAsync(new RouteFulfillOptions
         {
             Status = status,
@@ -655,6 +719,14 @@ internal sealed class FakeYelloApi
 
             case ("GET", var path) when path == SpaceRoutes.Directory:
                 return (200, JsonSerializer.Serialize(Switcher.Select(space => new SpaceIdentityResponse(space.Id, space.Name)), JsonOptions));
+
+            // Story 3.1 (ATDD run) - creating a Space and renaming the active one. No case written before 3.1 sends either,
+            // so every earlier case is served the bytes it always was (both fell to the unmatched 404 before).
+            case ("POST", var path) when path == SpaceRoutes.Directory:
+                return await CreateSpaceAsync(request).ConfigureAwait(false);
+
+            case ("PATCH", var path) when TryActiveSpace(path, out var renamedSpace):
+                return await RenameSpaceAsync(renamedSpace, request).ConfigureAwait(false);
 
             // Story 1.8 - the Account-settings Token routes, answered with the contract types.
             case ("GET", var path) when path == ApiTokenRoutes.List:
@@ -1138,6 +1210,102 @@ internal sealed class FakeYelloApi
         return path.EndsWith(leaf, StringComparison.Ordinal)
             && TryTask(path[..^leaf.Length], out spaceId, out taskId)
             && path == MovePathOf(spaceId, taskId);
+    }
+
+    /// <summary>
+    /// Story 3.1 - <c>POST /api/v1/spaces</c> as the Host answers it: a key's replay returns its first answer; the bound
+    /// (when armed) is <c>409 bound-reached</c>; a name outside the rule (trimmed, 1-200, Q6 (a) assumed) is
+    /// <c>400 invalid-space-name</c>; otherwise the caller owns a new Space, listed by the switcher at once, and the
+    /// answer is <c>{id, name}</c> (Q9).
+    /// </summary>
+    private async Task<(int Status, string Body)> CreateSpaceAsync(FakeRequest request)
+    {
+        if (_heldSpaceCreate is { } held)
+        {
+            _arrivedSpaceCreate?.TrySetResult();
+            await held.Task.ConfigureAwait(false);
+            _heldSpaceCreate = null;
+        }
+
+        var key = request.Header(Idempotency.HeaderName);
+
+        if (key is not null && _createdSpaceByKey.TryGetValue(key, out var replayed))
+        {
+            return (201, replayed);
+        }
+
+        if (SpaceBoundReached)
+        {
+            return (409, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.BoundReached, Errors: null, Bound: "spaces-per-account", Limit: 50), JsonOptions));
+        }
+
+        if (!TrySpaceName(request.Body, out var name))
+        {
+            return (400, Problem(InvalidSpaceNameType));
+        }
+
+        var id = Guid.NewGuid();
+
+        Switcher.Add((id, name));
+        Roles[id] = "owner";
+
+        var created = JsonSerializer.Serialize(new SpaceIdentityResponse(id, name), JsonOptions);
+
+        if (key is not null)
+        {
+            _createdSpaceByKey[key] = created;
+        }
+
+        return (201, created);
+    }
+
+    /// <summary>
+    /// Story 3.1 - <c>PATCH /api/v1/spaces/{id}</c> as the Host answers it: an unlisted Space is the boundary's
+    /// <c>404</c>; a Member or Viewer is <c>403 insufficient-role</c> with <c>rename-space</c>; a name outside the rule is
+    /// <c>400 invalid-space-name</c>; otherwise the switcher's row is renamed and the answer is the active Space's
+    /// <c>{id, name, role}</c>.
+    /// </summary>
+    private async Task<(int Status, string Body)> RenameSpaceAsync(Guid spaceId, FakeRequest request)
+    {
+        if (_heldSpaceRename is { } held)
+        {
+            _arrivedSpaceRename?.TrySetResult();
+            await held.Task.ConfigureAwait(false);
+            _heldSpaceRename = null;
+        }
+
+        var index = Switcher.ToList().FindIndex(space => space.Id == spaceId);
+
+        if (index < 0 || !Roles.TryGetValue(spaceId, out var role))
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        if (role is not ("owner" or "admin"))
+        {
+            return (403, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.InsufficientRole, Errors: null, Capability: "rename-space"), JsonOptions));
+        }
+
+        if (!TrySpaceName(request.Body, out var name))
+        {
+            return (400, Problem(InvalidSpaceNameType));
+        }
+
+        Switcher[index] = (spaceId, name);
+
+        return (200, JsonSerializer.Serialize(new ActiveSpaceResponse(spaceId, name, role), JsonOptions));
+    }
+
+    /// <summary>
+    /// The Host's Space name rule, as story 3.1 Q6 (a) proposes it: trimmed, 1-200 characters.
+    /// </summary>
+    private static bool TrySpaceName(string? body, out string name)
+    {
+        using var document = JsonDocument.Parse(string.IsNullOrEmpty(body) ? "{}" : body);
+
+        name = (document.RootElement.TryGetProperty("name", out var value) ? value.GetString() ?? string.Empty : string.Empty).Trim();
+
+        return name.Length is >= 1 and <= 200;
     }
 
     private (int Status, string Body) CreateProject(Guid spaceId, FakeRequest request)

@@ -558,6 +558,38 @@ The recent commits are `364d4c3` "Close epic 2", `850ebc1`/`06d2a07` (2.11 pager
 - `_bmad-output/implementation-artifacts/deferred-work.md:95-101`, `:211`, `:332`, `:334`, `:461`, `:478`, `:526`, `:528`, `:589`
 - `tests/TESTING-CONVENTIONS.md`; story files `1-7-…md`, `2-1-…md`, `2-4-…md`, `2-11-…md`
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-3-1-create-and-rename-a-space.md` (scenario map, the constraints every seed satisfies, the scaffold-held names to replace, and the open questions assumed: Q3 (a), Q4 (a), Q6 (a), Q7 (a), Q8, Q9 at their recommendations; Q1 (a), Q2 (a), Q5 (a) as Lee decided).
+
+| File | Cases | ACs |
+|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.CreateSpace.cs` | 8 (6 entries), skipped | AC1, AC2, AC5, AC9, AC10 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.CreateSpaceBound.cs` | 7, skipped | AC6, AC9 (Q2), AC11, AC12 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RenameSpace.cs` | 10 (7 entries), skipped | AC3, AC9, AC10, AC14 |
+| `tests/Yello.Tests.Isolation/IsolationCases.cs` | 3 rows x 2 surfaces, `PendingUntil: "3.1"` | AC2, AC10 (GATE-002) |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Spaces.cs` | 6, skipped | AC3, AC4, AC6, AC7, AC9, AC10 |
+| `tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.Creation.cs` | 2, skipped | AC7, AC11 |
+| `tests/Yello.Tests.Client/SpaceCreateAndRenameTests.cs` | 13 (10 entries), skipped | AC3, AC4, AC6, AC8, AC9, AC13-AC16 |
+| `tests/Yello.Tests.Client/FakeYelloApi.cs` | harness only: `POST /api/v1/spaces`, `PATCH /api/v1/spaces/{id}`, holds | - |
+
+The slice files are partials of the existing `ActiveSpaceEndpointTests` (its one database on the Slices engine), not new classes in `Spaces/CreateSpace/` and `Spaces/RenameSpace/`: no new engine, fixture or container-backed class.
+
+**Green today: none.** Every scaffold waits on a route, type, page or the AD-24 amendment, so this run adds no standing gate. Six active gates go red by design when the product lands and are Task 9's to amend (listed in `RefusalBoundaryGateTests.Spaces.cs`'s remarks).
+
+**Activation order:**
+
+1. `The_51st_Space_is_refused_409_bound_reached_and_the_Account_still_holds_50` first. It tests the riskiest assumption, Q1 (a): one connection with both `@read_only` keys, inserts admitted by the `BLOCK AFTER INSERT` predicates under the new `SpaceId`, and the count under `AccountId`, all in one transaction. Then the bare creation (`Creating_a_Space_answers_201_...`), `Exactly_one_creation_unit_of_work_sets_both_session_context_keys`, the race (`Two_concurrent_creations_at_49_...`), `Another_Accounts_creation_never_waits_...`, `A_Membership_the_Account_no_longer_holds_...` and `The_Spaces_per_Account_bound_is_consulted_by_the_creation_route_alone`.
+2. `The_AD_24_amendment_names_Space_creation_and_states_its_reason`, with Task 2.
+3. The contracts and `SpaceName` gates, then the other creation slice cases.
+4. The three idempotency cases.
+5. The rename gate and the seven rename slice cases.
+6. The three isolation rows. Delete `PendingUntil`/`PendingReason`; all three must be live before `review` (GATE-003).
+7. The client predicate gates, then the browser cases (build `Yello.Client` in Debug first).
+8. Task 9's amendments to the active gates, each proved against a plant.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

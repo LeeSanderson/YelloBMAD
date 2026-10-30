@@ -831,6 +831,35 @@ internal static class IsolationCases
             world => OwnAsync(world, SpaceRoutes.StatusesOf(world.A.SpaceId)),
             Both(new EachSeesOnlyItsOwnOnOneConnection()),
             Runner: CaseRunner.Pooled),
+
+        // Story 3.1 (ATDD run, 2026-10-29): the two routes 3.1 maps, each on both surfaces (1.9-GATE-002). Pending until
+        // the dev phase maps them; GATE-003 fails the suite if any is still pending when 3.1 reaches review. Each write
+        // row acts as a FRESH actor, because A's switcher is ISO-LIST-SPACES' subject ("exactly [SA]") and A's Space
+        // name is every row's presence anchor.
+        new(
+            "ISO-CREATE-SPACE", "I-3, I-11 (3.1 AC2, AC10)", IsolationVector.Write, HttpMethod.Post, SpaceRoutes.Directory,
+            FreshActorCreatesASpaceAsync,
+            new Dictionary<IsolationSurface, Expectation>
+            {
+                [IsolationSurface.Session] = new Served(HttpStatusCode.Created, TheCreatedSpaceIsTheCallersAloneAsync, "201, {id, name}; listed by the caller alone; A's and B's Spaces unchanged"),
+                [IsolationSurface.ApiToken] = new NoCredential { Then = TheTokenCreatedNoSpaceAsync },
+            },
+            PendingUntil: "3.1",
+            PendingReason: "red: AC10 - POST /api/v1/spaces is not mapped yet (story 3.1 Task 4); convert when it is"),
+
+        new(
+            "ISO-RENAME-SPACE-CROSS", "I-2, I-4 (3.1 AC10)", IsolationVector.Write, HttpMethod.Patch, SpaceRoutes.Active,
+            world => ForeignAsync(world, SpaceRoutes.ActiveOf, HttpMethod.Patch),
+            Both(new BoundaryNotFound { Then = TheForeignSpaceKeepsItsNameAsync }),
+            PendingUntil: "3.1",
+            PendingReason: "red: AC10 - PATCH /api/v1/spaces/{spaceId} is not mapped yet (story 3.1 Task 5); convert when it is"),
+
+        new(
+            "ISO-RENAME-SPACE-OWN", "I-12 (3.1 AC10 in-Space anchor)", IsolationVector.Api, HttpMethod.Patch, SpaceRoutes.Active,
+            FreshActorRenamesItsOwnSpaceAsync,
+            Both(new Served(HttpStatusCode.OK, RenamedOnlyTheCallersOwnSpaceAsync, "200, {id, name, role: owner}; B's Space keeps its name")),
+            PendingUntil: "3.1",
+            PendingReason: "red: AC10 - PATCH /api/v1/spaces/{spaceId} is not mapped yet (story 3.1 Task 5); convert when it is"),
     ];
 
     /// <summary>
@@ -1701,6 +1730,102 @@ internal static class IsolationCases
         Assert.DoesNotContain(world.B.DisplayName, answer.Body, StringComparison.Ordinal);
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Story 3.1 - a fresh Account sends the create on its own; the case body's name becomes one of its Space names, so
+    /// I-17 looks for it in the log (a Space name never belongs there, AR-34).
+    /// </summary>
+    private static async Task<CaseRequest> FreshActorCreatesASpaceAsync(IsolationWorld world)
+    {
+        var creator = await world.NewActorAsync("Cs");
+
+        creator.HoldsSpaceNamed(CaseBodyName);
+
+        return new CaseRequest(creator, HttpMethod.Post, [new(SpaceRoutes.Directory, SpaceRoutes.Directory)], TargetSpaceId: null);
+    }
+
+    /// <summary>
+    /// Story 3.1 AC2, AC9 - the answer is exactly <c>{id, name}</c> with the case's name; the creator's switcher lists
+    /// its Personal Space and the new one; A's switcher is still exactly [SA] and B's still exactly [SB], neither naming
+    /// the new id; the creator holds the new Space as Owner.
+    /// </summary>
+    private static async Task TheCreatedSpaceIsTheCallersAloneAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
+    {
+        Guid created;
+
+        using (var document = JsonDocument.Parse(answer.Body))
+        {
+            Assert.Equal(["id", "name"], document.RootElement.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
+            Assert.Equal(CaseBodyName, document.RootElement.GetProperty("name").GetString());
+            created = document.RootElement.GetProperty("id").GetGuid();
+        }
+
+        Assert.Equal(SpaceRoutes.ActiveOf(created), answer.Header("Location"));
+
+        var own = Ids((await request.Actor.SendAsync(IsolationSurface.Session, HttpMethod.Get, SpaceRoutes.Directory)).Body);
+
+        Assert.Equal(new[] { created, request.Actor.SpaceId }.Order(), own.Order());
+
+        foreach (var other in new[] { world.A, world.B })
+        {
+            var listed = await other.SendAsync(IsolationSurface.Session, HttpMethod.Get, SpaceRoutes.Directory);
+
+            Assert.Equal([other.SpaceId], Ids(listed.Body));
+            Assert.DoesNotContain(created.ToString("D"), listed.Body, StringComparison.OrdinalIgnoreCase);
+        }
+
+        using var arrival = JsonDocument.Parse((await request.Actor.SendAsync(IsolationSurface.Session, HttpMethod.Get, SpaceRoutes.ActiveOf(created))).Body);
+
+        Assert.Equal("owner", arrival.RootElement.GetProperty("role").GetString());
+    }
+
+    /// <summary>
+    /// Story 3.1 AC10 - a Token is no credential on creation, so the creator still holds exactly its Personal Space.
+    /// </summary>
+    private static async Task TheTokenCreatedNoSpaceAsync(IsolationWorld world, CaseRequest request) =>
+        Assert.Equal([request.Actor.SpaceId], Ids((await request.Actor.SendAsync(IsolationSurface.Session, HttpMethod.Get, SpaceRoutes.Directory)).Body));
+
+    /// <summary>
+    /// Story 3.1 AC10 - B's Space keeps its name after A's refused rename, read by B through the product.
+    /// </summary>
+    private static async Task TheForeignSpaceKeepsItsNameAsync(IsolationWorld world, CaseRequest request)
+    {
+        using var document = JsonDocument.Parse((await world.B.SendAsync(IsolationSurface.Session, HttpMethod.Get, SpaceRoutes.ActiveOf(world.B.SpaceId))).Body);
+
+        Assert.Equal(world.B.SpaceName, document.RootElement.GetProperty("name").GetString());
+    }
+
+    /// <summary>
+    /// Story 3.1 - a fresh Account renames its own Personal Space, on either surface (its Token is bound there, as
+    /// Owner). The new name joins its Space names, so I-17 looks for it.
+    /// </summary>
+    private static async Task<CaseRequest> FreshActorRenamesItsOwnSpaceAsync(IsolationWorld world)
+    {
+        var owner = await world.NewActorAsync("Rn");
+
+        owner.HoldsSpaceNamed(CaseBodyName);
+
+        return new CaseRequest(owner, HttpMethod.Patch, [new(SpaceRoutes.ActiveOf(owner.SpaceId), SpaceRoutes.ActiveOf(owner.SpaceId))], owner.SpaceId);
+    }
+
+    /// <summary>
+    /// Story 3.1 AC3, AC9 - the answer is exactly <c>{id, name, role}</c> for the caller's own Space, renamed, at
+    /// Owner; B's Space keeps its name.
+    /// </summary>
+    private static async Task RenamedOnlyTheCallersOwnSpaceAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
+    {
+        using (var document = JsonDocument.Parse(answer.Body))
+        {
+            var root = document.RootElement;
+
+            Assert.Equal(["id", "name", "role"], root.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal));
+            Assert.Equal(request.Actor.SpaceId, root.GetProperty("id").GetGuid());
+            Assert.Equal(CaseBodyName, root.GetProperty("name").GetString());
+            Assert.Equal("owner", root.GetProperty("role").GetString());
+        }
+
+        await TheForeignSpaceKeepsItsNameAsync(world, request);
     }
 
     private static Task ListsOnlyTheCallersTokensAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
