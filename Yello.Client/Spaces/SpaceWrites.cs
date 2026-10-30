@@ -16,6 +16,12 @@ namespace Yello.Client.Spaces;
 /// Board's Task creation - so the key and token rules cannot drift between them.
 /// </para>
 /// <para>
+/// <b>One Account-scoped write goes through it too</b> (story 3.1): Space creation, from the create page, which passes
+/// a token of its own (its disposal, linked to the Session) instead of the active Space's - the page is in no Space.
+/// No sibling class: the method already takes whatever token the caller owns, and the key and anti-forgery rules are
+/// the same.
+/// </para>
+/// <para>
 /// <b>The caller owns the key</b>: a fresh one per attempt, and the same one again for a resend after an
 /// attempt that got no answer, because that attempt may have been applied (2.1 review, R3).
 /// </para>

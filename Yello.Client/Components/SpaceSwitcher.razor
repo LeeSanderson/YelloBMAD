@@ -18,6 +18,10 @@
     navigation happens - the bar closes it when the location changes. A handler that closed it on
     the click removed the link from the page during the click, before the router's link
     interception had read it, and the navigation intermittently never happened.
+
+    "CREATE A SPACE" SITS AT THE PANEL'S FOOT, OUTSIDE THE LIST (story 3.1, AC13, open question 3 (a)), so the list's
+    rows still carry a name and nothing else. A link to the create page, with no click handler for the same reason the
+    rows have none; Esc on it closes the panel as on a row.
 *@
 
 <ul class="space-switcher" id="@ListId" aria-label="@Localizer["SpaceSwitcherListLabel"]">
@@ -31,6 +35,10 @@
         </li>
     }
 </ul>
+
+<p class="space-switcher__foot">
+    <a class="space-switcher__create" href="@ClientRoutes.CreateSpace" @onkeydown="KeyDownAsync">@Localizer["CreateSpaceAction"]</a>
+</p>
 
 @code {
     /// <summary>

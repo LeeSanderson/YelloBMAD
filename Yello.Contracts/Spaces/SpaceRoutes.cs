@@ -34,6 +34,13 @@ public static class SpaceRoutes
     /// <b>Account-scoped, not Space-scoped</b> (AD-24): it carries no <c>{spaceId}</c>, so Space
     /// resolution never runs on it and it is never a refusal surface. It is one of exactly two such
     /// surfaces; Account settings is the other.
+    /// <para>
+    /// <c>POST</c> here, with a <see cref="CreateSpaceRequest"/>, creates a Space (story 3.1): <c>201</c>
+    /// with a <c>Location</c> of <see cref="ActiveOf"/> and a <see cref="SpaceIdentityResponse"/> body,
+    /// <c>400 invalid-space-name</c>, <c>409 bound-reached</c> at 50 Spaces, or <c>401</c> without a
+    /// Session. It runs on the Space creation unit of work, the third Account-scoped unit of work the
+    /// AD-24 amendment of 2026-10-29 names.
+    /// </para>
     /// </remarks>
     public static string Directory => "/api/v1/spaces";
 
@@ -41,6 +48,8 @@ public static class SpaceRoutes
     /// <c>GET</c> here for the active Space's own answer - its name and the caller's Role in it, read
     /// on this request - as an <see cref="ActiveSpaceResponse"/>. <c>404</c> for a Space the caller
     /// holds no Membership in or that does not exist, exactly as every Space-scoped route answers.
+    /// <c>PATCH</c> here, with a <see cref="RenameSpaceRequest"/>, renames it (story 3.1) and answers
+    /// the same <see cref="ActiveSpaceResponse"/>; it declares <c>RenameSpace</c>.
     /// </summary>
     public static string Active => "/api/v1/spaces/{spaceId:guid}";
 

@@ -25,9 +25,12 @@ internal static partial class ActiveSpaceResolution
         /// </summary>
         /// <param name="httpContext">The request.</param>
         /// <param name="logger">The resolution's logger.</param>
-        /// <param name="spaceId">The resolved Space.</param>
+        /// <param name="spaceId">
+        /// The resolved Space, or <c>null</c> on the Space creation unit of work (story 3.1), where the bound is the
+        /// Account's own and no Space exists yet to log.
+        /// </param>
         /// <param name="cancellationToken">The request's cancellation token.</param>
-        /// <returns>The <c>409</c> when the Space or scope is already at the limit; otherwise <c>null</c>.</returns>
+        /// <returns>The <c>409</c> when the Space, scope or Account is already at the limit; otherwise <c>null</c>.</returns>
         /// <exception cref="InvalidOperationException">
         /// A scoped bound is declared on a route that does not carry its scope - which
         /// <see cref="SpaceScopedRouteCheck"/> refuses at startup, so this fails closed only if that check
@@ -36,7 +39,7 @@ internal static partial class ActiveSpaceResolution
         internal static async Task<IResult?> ConsultAsync(
             HttpContext httpContext,
             ILogger logger,
-            Guid spaceId,
+            Guid? spaceId,
             CancellationToken cancellationToken)
         {
             if (RequiredBoundExtensions.Of(httpContext.GetEndpoint()) is not { } declared)
@@ -58,7 +61,14 @@ internal static partial class ActiveSpaceResolution
 
             // Inside the creation's transaction, which the caller disposes without completing. Not an
             // AccessRefusal: AD-20 records two kinds, and this is neither.
-            SpaceLog.BoundReachedFor(logger, spaceId, bound);
+            if (spaceId is { } resolved)
+            {
+                SpaceLog.BoundReachedFor(logger, resolved, bound);
+            }
+            else
+            {
+                SpaceLog.CreationBoundReachedFor(logger, bound);
+            }
 
             return BoundaryProblems.BoundReached(bound);
         }

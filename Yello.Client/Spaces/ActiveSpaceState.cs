@@ -187,6 +187,40 @@ public sealed class ActiveSpaceState : IDisposable
     }
 
     /// <summary>
+    /// Records the server's answer to a rename of the Space the tab is in (story 3.1, AC14, open question 7 (a)): the
+    /// context bar redraws with the new name, and nothing else happens - it is not an arrival, so it does not count as a
+    /// switch and moves no focus.
+    /// </summary>
+    /// <param name="answer">The rename's answer: the Space's id, its new name and the caller's Role.</param>
+    /// <returns><c>false</c>, and nothing recorded, for an answer about a Space the tab has left.</returns>
+    public bool Renamed(ActiveSpaceResponse answer)
+    {
+        ArgumentNullException.ThrowIfNull(answer);
+
+        if (answer.Id != SpaceId || Current is null)
+        {
+            return false;
+        }
+
+        Current = answer;
+        Changed?.Invoke(this, EventArgs.Empty);
+
+        return true;
+    }
+
+    /// <summary>
+    /// The tab is about to land in a Space it has just created (story 3.1, AC13): the arrival counts as a switch, so focus
+    /// moves to the context bar and the new Space and Role are announced (UX-DR39) - although the create page it leaves
+    /// is in no Space. Call before navigating there; the location-changing hook then finds the tab already in it.
+    /// </summary>
+    /// <param name="spaceId">The created Space.</param>
+    public void ArrivingInCreated(Guid spaceId)
+    {
+        Navigating(spaceId);
+        _switching = true;
+    }
+
+    /// <summary>
     /// Records the name of the Project whose Board has just answered, for the context bar.
     /// </summary>
     /// <param name="spaceId">The Space the Board answer is about.</param>

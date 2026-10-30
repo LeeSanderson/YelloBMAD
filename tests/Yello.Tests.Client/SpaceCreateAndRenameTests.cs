@@ -12,8 +12,8 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>RED-PHASE SCAFFOLDS (story 3.1 ATDD run, 2026-10-29).</b> Every case is skipped with its AC: the create page,
-/// the switcher's foot link, the rename section and the context bar link do not exist yet (Tasks 6, 7, 8). The API is
+/// <b>Written as red-phase scaffolds by the story 3.1 ATDD run (2026-10-29), activated by story 3.1</b>, which corrected
+/// two (the no-Space action count is scoped to <c>main</c>; the lost-answer case waits for its sentence). The API is
 /// <see cref="FakeYelloApi"/> at the network edge, which this run taught <c>POST /api/v1/spaces</c> and
 /// <c>PATCH /api/v1/spaces/{id}</c> (held and released like <c>HoldRenameAsync</c>); no Host, no database, no engine.
 /// </para>
@@ -47,6 +47,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
     private const string BoundCopy = "This Account has 50 Spaces, the maximum.";
     private const string EmptySpace = "No Projects yet.";
     private const string NoSpaceHeading = "No Spaces yet";
+    private const string UnansweredCopy = "The Space may not have been created.";
 
     /// <summary>
     /// A 1.4.10 reflow probe (as <c>SmallViewportTests.Reflow</c>): the page never scrolls sideways and nothing in
@@ -87,7 +88,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
     /// announced politely; the creation carried an <c>Idempotency-Key</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - the create page and the switcher's foot link do not exist yet (story 3.1 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     [Trait("Requirement", "UX-DR31")]
     [Trait("Requirement", "AD-18")]
@@ -146,7 +147,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
     /// create a Space; nothing is created for it, and following the action sends no creation until the person submits.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - the no-Space state offers no action yet (story 3.1 Task 6; deferred-work.md:334)")]
+    [Fact]
     [Trait("Requirement", "UX-DR35")]
     [Trait("Requirement", "FR-7")]
     public async Task The_no_Space_state_offers_exactly_one_action_to_create_a_Space_and_creates_nothing()
@@ -160,7 +161,9 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
             await page.GotoAsync(surface.BaseAddress.ToString());
             await page.GetByRole(AriaRole.Heading, new PageGetByRoleOptions { Name = NoSpaceHeading }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
-            var actions = page.Locator("#app").GetByRole(AriaRole.Link).Or(page.Locator("#app").GetByRole(AriaRole.Button));
+            // Scoped to main (story 3.1 correction): the context bar's shell - skip control, switcher, Account, Sign out -
+            // sits in #app as well, and is chrome on every authenticated surface, not this state's action.
+            var actions = page.Locator("main").GetByRole(AriaRole.Link).Or(page.Locator("main").GetByRole(AriaRole.Button));
 
             Assert.Equal(1, await actions.CountAsync());
             Assert.Equal(CreateAction, (await actions.InnerTextAsync()).Trim());
@@ -178,7 +181,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
     /// Spaces, the maximum."), no navigation and nothing added to the switcher.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the create page does not exist yet (story 3.1 Task 6)")]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "AR-30")]
     public async Task The_51st_Space_renders_the_bound_in_place_and_navigates_nowhere()
@@ -208,7 +211,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
     /// marked invalid; nothing is created and the page stays.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the create page does not exist yet (story 3.1 Tasks 6, 8)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "UX-DR37")]
     public async Task An_invalid_Space_name_is_refused_beside_the_field()
@@ -240,7 +243,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
     /// with the same <c>Idempotency-Key</c>, and one Space appears.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - the create page does not exist yet (story 3.1 Task 6, Q2 (a))")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "AD-18")]
     public async Task A_creation_resent_after_a_lost_answer_reuses_its_key_and_one_Space_appears()
@@ -257,7 +260,9 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
             await SubmitNewSpaceAsync(page, "Lighthouse");
 
             // The first answer was lost; the page offers the same submission again rather than navigating.
-            await page.Locator("main [role='status'], main [role='alert']").First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = Timeout });
+            // Story 3.1 correction: waits for the unanswered sentence itself. The page's polite regions are always attached,
+            // so waiting for any status region returned at once and pressed Enter while the first attempt was in flight.
+            await page.Locator("main [role='status']", new PageLocatorOptions { HasText = UnansweredCopy }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await page.GetByLabel(SpaceNameLabel, new PageGetByLabelOptions { Exact = true }).PressAsync("Enter");
 
             await page.Locator(ContextBar, new PageLocatorOptions { HasText = "Lighthouse" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
@@ -282,7 +287,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="role">The caller's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC14 - Space settings has no rename section yet (story 3.1 Task 7)")]
+    [Theory]
     [InlineData("owner")]
     [InlineData("admin")]
     [Trait("Requirement", "UX-DR33")]
@@ -341,7 +346,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="role">The lesser Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC4 - the context bar has no Space settings link yet (story 3.1 Task 7)")]
+    [Theory]
     [InlineData("member")]
     [InlineData("viewer")]
     [Trait("Requirement", "UX-DR27")]
@@ -377,7 +382,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
     /// AC16, Task 7 - Esc closes the open rename form, sends nothing, and returns focus to "Rename".
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC16 - Space settings has no rename section yet (story 3.1 Task 7)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "NFR-9")]
     public async Task Escape_closes_the_rename_form_without_a_request_and_returns_focus_to_Rename()
@@ -411,7 +416,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
     /// inputs fails.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - neither Space name input exists yet (story 3.1 Tasks 6, 7)")]
+    [Fact]
     [Trait("Requirement", "UX-DR33")]
     public async Task Both_Space_name_inputs_are_found_and_neither_can_be_autofilled()
     {
@@ -443,7 +448,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="zoom">Whether to apply 200% text-only zoom instead of the text-spacing override.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC16 - the create page, the rename section and the context bar link do not exist yet (story 3.1 Tasks 6, 7)")]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "UX-DR41")]

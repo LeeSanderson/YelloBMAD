@@ -55,6 +55,31 @@ internal static class ApplicationLocks
     internal static string ProjectTasks(Guid spaceId, Guid projectId) => $"Yello/ProjectTasks/{spaceId:D}/{projectId:D}";
 
     /// <summary>
+    /// The lock one Account's Space creations (the Spaces-per-Account count) take. Story 3.1, AC11.
+    /// </summary>
+    /// <remarks>
+    /// Named for the Account alone, because the count is the Account's own across every Space it belongs to. Another
+    /// Account's creation takes a lock of its own and never waits here.
+    /// </remarks>
+    /// <param name="accountId">The acting Account.</param>
+    /// <returns>The resource name.</returns>
+    internal static string SpacesPerAccount(Guid accountId) => $"Yello/SpacesPerAccount/{accountId:D}";
+
+    /// <summary>
+    /// Takes the acting Account's Spaces-per-Account lock.
+    /// </summary>
+    /// <param name="dbContext">The Space creation's unit of work, scoped to the Account and inside its transaction.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>A task.</returns>
+    internal static Task TakeSpacesPerAccountAsync(YelloDbContext dbContext, CancellationToken cancellationToken)
+    {
+        var accountId = dbContext.ScopedAccountId
+            ?? throw new InvalidOperationException("The Spaces-per-Account lock is taken only inside the Space creation unit of work.");
+
+        return TakeAsync(dbContext, SpacesPerAccount(accountId), cancellationToken);
+    }
+
+    /// <summary>
     /// Takes the request's Space's Projects-per-Space lock.
     /// </summary>
     /// <param name="dbContext">The request's unit of work, scoped to a Space and inside its transaction.</param>

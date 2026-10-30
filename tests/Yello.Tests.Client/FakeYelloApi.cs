@@ -94,11 +94,6 @@ internal sealed class FakeYelloApi
     private TaskCompletionSource? _heldSpaceRename;
     private TaskCompletionSource? _arrivedSpaceRename;
 
-    /// <summary>
-    /// Story 3.1 Task 4's stable problem type for a Space name outside the rule. Held here until
-    /// <c>ProblemTypes.InvalidSpaceName</c> exists (story 3.1 ATDD run); replace it on activation.
-    /// </summary>
-    public const string InvalidSpaceNameType = "urn:yello:problem:invalid-space-name";
 
     /// <summary>
     /// When set, a Space creation is refused <c>409 bound-reached</c> with <c>bound: spaces-per-account</c> and
@@ -1241,7 +1236,7 @@ internal sealed class FakeYelloApi
 
         if (!TrySpaceName(request.Body, out var name))
         {
-            return (400, Problem(InvalidSpaceNameType));
+            return (400, Problem(ProblemTypes.InvalidSpaceName));
         }
 
         var id = Guid.NewGuid();
@@ -1288,7 +1283,7 @@ internal sealed class FakeYelloApi
 
         if (!TrySpaceName(request.Body, out var name))
         {
-            return (400, Problem(InvalidSpaceNameType));
+            return (400, Problem(ProblemTypes.InvalidSpaceName));
         }
 
         Switcher[index] = (spaceId, name);

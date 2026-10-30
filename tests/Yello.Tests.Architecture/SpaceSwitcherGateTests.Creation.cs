@@ -8,15 +8,15 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>RED-PHASE SCAFFOLDS (story 3.1 ATDD run, 2026-10-29).</b> Both are skipped with their AC. The creation step does
-/// not exist and the spine has not been amended.
+/// <b>Written as red-phase scaffolds by the story 3.1 ATDD run (2026-10-29), activated by story 3.1.</b>
 /// </para>
 /// <para>
-/// <b>Successor, not replacement.</b> <c>No_caller_sets_both_session_context_keys</c> stays active and green today;
-/// Task 9 amends it to admit exactly the one caller this file names, and must keep a plant of a second both-keys
-/// caller failing. <see cref="Exactly_one_creation_unit_of_work_sets_both_session_context_keys"/> is that amended
-/// rule written first, without guessing the step's type name: it asks for exactly one type in the intersection, and
-/// that the type is neither the Space resolver nor the switcher's directory.
+/// <b>Successor, not replacement.</b> <c>No_caller_sets_both_session_context_keys</c> was amended by story 3.1 into
+/// <c>No_caller_but_the_Space_creation_unit_of_work_sets_both_session_context_keys</c>, which admits exactly
+/// <c>SpaceCreationScope</c> by name, and a plant of a second both-keys caller still fails it.
+/// <see cref="Exactly_one_creation_unit_of_work_sets_both_session_context_keys"/> is the same rule written without
+/// the type's name: exactly one type in the intersection, and it is neither the Space resolver nor the switcher's
+/// directory.
 /// </para>
 /// </remarks>
 public sealed partial class SpaceSwitcherGateTests
@@ -45,7 +45,7 @@ public sealed partial class SpaceSwitcherGateTests
     /// Space's rows in one transaction. The resolver still sets only <c>SpaceId</c>; the <c>AccountId</c> key is set by
     /// exactly the switcher's directory and that one creation unit of work.
     /// </summary>
-    [Fact(Skip = "red: AC7 - no creation unit of work sets both keys yet (story 3.1 Task 4, Q1 (a))")]
+    [Fact]
     [Trait("Requirement", "AR-6")]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AD-25")]
@@ -76,7 +76,7 @@ public sealed partial class SpaceSwitcherGateTests
     /// decision on the <c>Space</c> and <c>Account</c> policies. The amendment is additive: AD-24's rule line stands.
     /// <c>EXPERIENCE.md</c>'s Spaces-per-Account row says it is recorded.
     /// </summary>
-    [Fact(Skip = "red: AC7 - the AD-24 amendment is not recorded yet (story 3.1 Task 2)")]
+    [Fact]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-24")]
     public void The_AD_24_amendment_names_Space_creation_and_states_its_reason()

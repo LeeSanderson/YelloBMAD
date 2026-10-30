@@ -40,8 +40,9 @@ namespace Yello.Infrastructure.Persistence;
 /// passes and the slice answers the boundary's <c>404</c> - the bound never discloses a Project.
 /// </para>
 /// <para>
-/// <b>Two bounds today.</b> Each later bound (Spaces per Account, 3.1; Memberships per Space, 4.3) adds
-/// its own count here when its creation endpoint declares it.
+/// <b>Three bounds today.</b> Spaces per Account (story 3.1) is the first counted outside a Space: on the
+/// Space creation unit of work, under the Account's own lock. Memberships per Space (4.3) adds its own
+/// count here when its creation endpoint declares it.
 /// </para>
 /// </remarks>
 /// <param name="dbContext">The request's unit of work.</param>
@@ -59,11 +60,38 @@ internal sealed class BoundCounter(YelloDbContext dbContext) : IBoundCounter
                 "Tasks per Project is counted within one Project, and none was given.",
                 nameof(scopeId)),
 
+            Bound.SpacesPerAccount => CountSpacesPerAccountAsync(cancellationToken),
+
             _ => throw new ArgumentOutOfRangeException(
                 nameof(bound),
                 bound,
-                "No creation endpoint consults this bound through the pipeline yet; add its count here when one does."),
+                "No creation endpoint consults this bound through the pipeline yet (Memberships per Space is 4.3's); "
+                + "add its count here when one does."),
         };
+
+    /// <summary>
+    /// The acting Account's Memberships, at any Role and owned or not, counted under the Account's own lock (story 3.1,
+    /// AC11, AC12): a live <c>COUNT</c>, never a stored counter, so a Membership the Account no longer holds no longer
+    /// counts.
+    /// </summary>
+    /// <remarks>
+    /// Runs only on the Space creation unit of work, under both session keys: the <c>Membership</c> policy admits the
+    /// Account's own rows across Spaces (its <c>AccountId</c> key) and the new Space's rows (its <c>SpaceId</c> key - of
+    /// which there are none yet). The explicit <c>WHERE AccountId</c> keeps the count the caller's own even so; the count
+    /// is never returned as data, only as the bound's <c>limit</c> in a refusal (AD-24 as amended, §6.1).
+    /// </remarks>
+    private async Task<int> CountSpacesPerAccountAsync(CancellationToken cancellationToken)
+    {
+        var accountId = dbContext.ScopedAccountId
+            ?? throw new InvalidOperationException("Spaces per Account is counted only inside the Space creation unit of work.");
+
+        await ApplicationLocks.TakeSpacesPerAccountAsync(dbContext, cancellationToken).ConfigureAwait(false);
+
+        return await dbContext.Database
+            .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM dbo.[Membership] WHERE AccountId = {accountId}")
+            .SingleAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
 
     /// <summary>
     /// The Space's Projects, counted under the Space's own lock (story 2.9, open question 14 (a)): the second creation in a

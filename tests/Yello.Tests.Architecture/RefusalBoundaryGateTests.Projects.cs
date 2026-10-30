@@ -87,6 +87,34 @@ public sealed partial class RefusalBoundaryGateTests
             "Yello.Infrastructure.SpaceBoundaryLimits");
 
     /// <summary>
+    /// Story 3.1, Q2 (a), A-12's idempotency clause - nothing but the pipeline, the store's adapter and its registration
+    /// depends on the Account-scoped idempotency port Space creation replays from.
+    /// </summary>
+    [Fact]
+    [Trait("Priority", "P1")]
+    [Trait("Requirement", "AR-25")]
+    [Trait("Requirement", "AD-18")]
+    public void Only_the_pipeline_depends_on_the_Account_scoped_idempotency_port() =>
+        AssertOnlyThePipelineDependsOn(
+            typeof(Yello.Application.Spaces.IAccountIdempotencyStore).FullName!,
+            "Yello.Infrastructure.Persistence.AccountIdempotencyStore",
+            "Yello.Infrastructure.SpaceBoundaryLimits");
+
+    /// <summary>
+    /// Story 3.1, Q1 (a), AR-3 - nothing but the pipeline, the unit of work's adapter and its registration depends on the
+    /// Space creation scope: no slice opens the one unit of work that carries both session keys.
+    /// </summary>
+    [Fact]
+    [Trait("Priority", "P0")]
+    [Trait("Requirement", "AR-3")]
+    [Trait("Requirement", "AD-24")]
+    public void Only_the_pipeline_opens_the_Space_creation_unit_of_work() =>
+        AssertOnlyThePipelineDependsOn(
+            typeof(Yello.Application.Spaces.ISpaceCreationScope).FullName!,
+            "Yello.Infrastructure.Persistence.SpaceCreationScope",
+            "Yello.Infrastructure.AccountScopedReads");
+
+    /// <summary>
     /// AC7 - no Project request contract carries a Space or anything but the name: the Space is the
     /// route's, fixed at creation, and a body that could name another one is the leak closed by
     /// construction rather than by rule.

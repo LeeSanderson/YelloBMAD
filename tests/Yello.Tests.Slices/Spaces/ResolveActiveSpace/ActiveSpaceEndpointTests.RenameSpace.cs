@@ -15,8 +15,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// FR-6, AR-10, AR-11, AR-34, CAP-35, I-17.
 /// </summary>
 /// <remarks>
-/// <b>RED-PHASE SCAFFOLDS (story 3.1 ATDD run, 2026-10-29).</b> All skipped: PATCH on <c>SpaceRoutes.Active</c> is not
-/// mapped, so every request below answers the unmatched fallback today. Seeded Spaces go through
+/// <b>Written as red-phase scaffolds by the story 3.1 ATDD run (2026-10-29), activated by story 3.1.</b> Seeded Spaces go through
 /// <see cref="SpaceSeeding"/> (one B2 block each: the <c>Space</c> and its one <c>Membership</c> under that Space's
 /// key, for an Account the product registered - <c>FK_Membership_Space_SpaceId</c>,
 /// <c>FK_Membership_Account_AccountId</c> and the <c>BLOCK AFTER INSERT</c> predicate hold). A Role change is the
@@ -33,7 +32,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// second Space the same Owner holds keeps its name.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - PATCH /api/v1/spaces/{spaceId} is not mapped yet (story 3.1 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-6")]
     public async Task The_Owner_renames_the_Space_and_only_that_Space_changes()
     {
@@ -73,7 +72,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// AC3, AC10 - an Admin renames: <c>200</c>, answered at the Admin's Role.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - PATCH /api/v1/spaces/{spaceId} is not mapped yet (story 3.1 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-6")]
     [Trait("Requirement", "FR-16")]
     public async Task An_Admin_renames_the_Space()
@@ -106,7 +105,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="role">The caller's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC10 - PATCH /api/v1/spaces/{spaceId} is not mapped yet (story 3.1 Task 5)")]
+    [Theory]
     [InlineData(Role.Member)]
     [InlineData(Role.Viewer)]
     [Trait("Requirement", "FR-16")]
@@ -154,7 +153,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// body names nothing.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - PATCH /api/v1/spaces/{spaceId} is not mapped yet (story 3.1 Task 5)")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AR-10")]
     public async Task A_non_members_rename_is_the_boundary_404_and_the_foreign_name_is_unchanged()
@@ -195,7 +194,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <param name="length">The submitted name's length.</param>
     /// <param name="blank">Whether it is spaces only.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - PATCH /api/v1/spaces/{spaceId} and SpaceName.TryNormalise do not exist yet (story 3.1 Tasks 3, 5)")]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(3, true)]
     [InlineData(SpaceNameMaxLength + 1, false)]
@@ -223,7 +222,7 @@ public sealed partial class ActiveSpaceEndpointTests
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, refused?.StatusCode);
-        Assert.Equal(InvalidSpaceNameType, ProblemType(refused!));
+        Assert.Equal(ProblemTypes.InvalidSpaceName, ProblemType(refused!));
         Assert.Equal(oldName, ActiveSpaceAnswer(afterRefusal!).Name);
         Assert.Equal(HttpStatusCode.OK, anchor?.StatusCode);
         Assert.Equal([limitName], await SpaceNamesOfAsync(database, spaceId));
@@ -235,7 +234,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// the very next request and the name stays.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - PATCH /api/v1/spaces/{spaceId} is not mapped yet (story 3.1 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AD-6")]
     public async Task A_Token_renames_its_own_Space_at_its_current_Role()
@@ -283,7 +282,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// request having been served or refused as expected.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - POST and PATCH on /api/v1/spaces are not mapped yet (story 3.1 Tasks 4, 5)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "NFR-6")]
     public async Task No_Space_name_reaches_the_log_on_creation_or_rename()

@@ -47,6 +47,10 @@
     list. Purged with the Space, cleared on leaving the Board, and dropped by CSS at 768-1279px
     (EXPERIENCE.md:413-419), where the Role chip is not.
 
+    SPACE SETTINGS (story 3.1, AC4, open question 4 (a)) is linked from here, after the Role chip, for a Role
+    SpaceCapabilities.PermitsSpaceSettings admits - Owner and Admin - and absent for the others (UX-DR27). It is its own
+    link and never the Role chip, which stays display-only (UX-DR28). Space home no longer links there.
+
     SIGN OUT asks the server to end the Session (which refuses every copy of the cookie from then
     on), then runs the same purge an expired Session does and lands on sign-in with no reason.
 *@
@@ -75,6 +79,11 @@
         @if (ActiveSpace.Current is { } held)
         {
             <RoleChip Role="@held.Role" />
+        }
+
+        @if (ActiveSpace.Current is { } settable && SpaceCapabilities.PermitsSpaceSettings(settable.Role))
+        {
+            <a class="context-bar__settings" href="@ClientRoutes.SpaceSettings(settable.Id)">@Localizer["SpaceSettingsLink"]</a>
         }
     </div>
 

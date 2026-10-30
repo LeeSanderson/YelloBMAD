@@ -444,7 +444,7 @@
   </data>
   <data name="NoSpaceBody" xml:space="preserve">
     <value>You do not belong to any Space yet.</value>
-    <comment>The sentence under NoSpaceHeading. Creating a Space arrives with story 3.1; until then there is nothing to offer here.</comment>
+    <comment>The sentence under NoSpaceHeading. Story 3.1 (AC15): the state offers one action, CreateSpaceAction, and creates nothing itself (UX-DR35).</comment>
   </data>
   <!--
     Below: one entry per capability code a 403 can carry. The code IS the key, as for failure codes.
@@ -701,7 +701,7 @@
   </data>
   <data name="SpaceSettingsLink" xml:space="preserve">
     <value>Space settings</value>
-    <comment>The link from Space home to Space settings, for Owners and Admins only, and from an empty Label picker (story 2.4, open question 7).</comment>
+    <comment>The link to Space settings in the context bar (story 3.1, AC4, open question 4 (a)), for Owners and Admins only and absent for the others - never on the Role chip; and from an empty Label picker (story 2.4, open question 7).</comment>
   </data>
   <data name="SpaceSettingsHeading" xml:space="preserve">
     <value>Space settings</value>
@@ -970,5 +970,65 @@
   <data name="ListCursorInvalid" xml:space="preserve">
     <value>The next Tasks could not be loaded.</value>
     <comment>The refusal for 400 invalid-list-cursor (story 2.10, Task 4 (c)): a cursor the server did not issue for the sort.</comment>
+  </data>
+  <data name="CreateSpaceAction" xml:space="preserve">
+    <value>Create a Space</value>
+    <comment>Story 3.1 (AC13, AC15, open question 3 (a)): the link at the foot of the Space switcher, outside its list, and the no-Space state&apos;s one action. Both open the create page.</comment>
+  </data>
+  <data name="CreateSpaceHeading" xml:space="preserve">
+    <value>Create a Space</value>
+    <comment>Story 3.1: the create page&apos;s heading. Account-scoped: it names no Space.</comment>
+  </data>
+  <data name="SpaceNameLabel" xml:space="preserve">
+    <value>Space name</value>
+    <comment>Story 3.1 (AC8, AC16): the label of every Space name input - the create page&apos;s and the rename section&apos;s. A real label, never a placeholder.</comment>
+  </data>
+  <data name="SpaceNameInvalid" xml:space="preserve">
+    <value>A Space name is 1 to 200 characters.</value>
+    <comment>Story 3.1 (AC9, open question 6 (a)): the invalid-space-name refusal, beside the name field. States the rule; never &quot;that name is taken&quot; - Space names are not unique across Yello (FR-6).</comment>
+  </data>
+  <data name="CreateSpaceSubmit" xml:space="preserve">
+    <value>Create</value>
+    <comment>Story 3.1: the create page&apos;s primary action.</comment>
+  </data>
+  <data name="CreateSpaceCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Story 3.1: leaves the create page without sending anything, back to where the person came from.</comment>
+  </data>
+  <data name="SpaceCreating" xml:space="preserve">
+    <value>Creating the Space.</value>
+    <comment>Story 3.1: shown in place of the create actions while a creation is on its way, so it cannot be sent twice.</comment>
+  </data>
+  <data name="SpaceCreated" xml:space="preserve">
+    <value>Space created.</value>
+    <comment>Story 3.1 (AC13, open question 8): announced politely once the Space exists. Names no Space - the arrival&apos;s own announcement in the context bar names the new Space and the Role.</comment>
+  </data>
+  <data name="SpaceCreateUnanswered" xml:space="preserve">
+    <value>The Space may not have been created. Create it again to check; it will not be created twice.</value>
+    <comment>Story 3.1 (AC13, open question 2 (a)): the creation got no answer. Sending it again reuses its Idempotency-Key, so the server answers the first attempt rather than creating a second Space.</comment>
+  </data>
+  <data name="SpaceNameHeading" xml:space="preserve">
+    <value>Space name</value>
+    <comment>Story 3.1 (AC3): the heading of Space settings&apos; name section, shown to Owners and Admins only.</comment>
+  </data>
+  <data name="RenameSpaceAction" xml:space="preserve">
+    <value>Rename</value>
+    <comment>Story 3.1 (AC3): opens the inline rename form in Space settings. Owners and Admins only; absent, never disabled, for the others (UX-DR27).</comment>
+  </data>
+  <data name="RenameSpaceSubmit" xml:space="preserve">
+    <value>Save</value>
+    <comment>Story 3.1: the rename form&apos;s primary action.</comment>
+  </data>
+  <data name="RenameSpaceCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Story 3.1: closes the rename form without sending anything. Esc does the same, and focus returns to Rename.</comment>
+  </data>
+  <data name="SpaceRenaming" xml:space="preserve">
+    <value>Renaming the Space.</value>
+    <comment>Story 3.1: shown in place of the rename actions while a rename is on its way.</comment>
+  </data>
+  <data name="SpaceRenamed" xml:space="preserve">
+    <value>Space renamed.</value>
+    <comment>Story 3.1 (AC14, open question 8): announced politely once the server has renamed the Space. Names no Space; the context bar shows the new name.</comment>
   </data>
 </root>

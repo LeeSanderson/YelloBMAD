@@ -29,6 +29,9 @@ internal static class SpaceBoundaryLimits
         // other ports, on the request's own unit of work, so scoped with it.
         services.AddScoped<IBoundCounter, BoundCounter>();
         services.AddScoped<IIdempotencyStore, IdempotencyStore>();
+
+        // Story 3.1, open question 2 (a): the Account-scoped Idempotency-Key record Space creation replays from.
+        services.AddScoped<IAccountIdempotencyStore, AccountIdempotencyStore>();
         services.AddSingleton<RefusalPurgeSchedule>();
         services.AddSingleton<IRefusalRetention, AccessRefusalPurge>();
 

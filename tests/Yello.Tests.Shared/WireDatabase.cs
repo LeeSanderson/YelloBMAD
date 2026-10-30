@@ -286,8 +286,15 @@ public sealed class WireDatabase(string connectionString)
 
     /// <summary>
     /// A second Space owned by <paramref name="accountId"/>: the <c>Space</c> row, then its Owner
-    /// <c>Membership</c>, under that Space's key (no endpoint creates a Space yet).
+    /// <c>Membership</c>, under that Space's key.
     /// </summary>
+    /// <remarks>
+    /// <b>Not a created Space in one respect, deliberately</b> (story 3.1, open question 10 (b)): it carries no
+    /// default Statuses, which <c>POST /api/v1/spaces</c> provisions through <c>NewSpace</c>. This project
+    /// references only <c>Yello.Contracts</c>, so it cannot read <c>DefaultStatusSet</c>, and its callers - the
+    /// browser suite's real-Host fixture and the isolation world's second Space - read no Status in it. A case
+    /// that needs a Space exactly as creation makes one creates it over the wire.
+    /// </remarks>
     /// <param name="accountId">The owner.</param>
     /// <param name="name">The Space's name.</param>
     /// <returns>The new Space's id.</returns>

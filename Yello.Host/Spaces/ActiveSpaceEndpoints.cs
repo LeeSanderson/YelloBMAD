@@ -1,7 +1,10 @@
 using Yello.Application.Spaces;
+using Yello.Application.Spaces.RenameSpace;
 using Yello.Contracts.Spaces;
 using Yello.Domain;
 using Yello.Domain.Memberships;
+using Yello.Domain.Spaces;
+using Yello.Host.Endpoints;
 
 namespace Yello.Host.Spaces;
 
@@ -62,5 +65,47 @@ public static class ActiveSpaceEndpoints
         var name = await names.ReadAsync(cancellationToken).ConfigureAwait(false);
 
         return Results.Ok(new ActiveSpaceResponse(context.SpaceId, name, StableCode.Of(context.Role)));
+    }
+
+    /// <summary>
+    /// Registers <c>PATCH /api/v1/spaces/{spaceId}</c> - renaming the active Space (story 3.1, FR-6). Space-scoped on
+    /// both surfaces, declaring <c>RenameSpace</c>, which the matrix grants Owner and Admin.
+    /// </summary>
+    /// <remarks>
+    /// <b>Here, beside the read it answers like</b>: a rename answers the same <see cref="ActiveSpaceResponse"/> the
+    /// context bar reads, so the Role it states is the pipeline's resolution reported, as <see cref="GetAsync"/>
+    /// reports it - decided by nothing here.
+    /// </remarks>
+    /// <param name="endpoints">The route builder.</param>
+    /// <returns>The registered route, for further configuration.</returns>
+    public static RouteHandlerBuilder MapRenameSpace(this IEndpointRouteBuilder endpoints) =>
+        endpoints.MapPatch(SpaceRoutes.Active, RenameAsync)
+            .RequiresCapability(Capability.RenameSpace);
+
+    /// <summary>
+    /// Renames the active Space.
+    /// </summary>
+    /// <param name="handler">The slice.</param>
+    /// <param name="httpContext">The request: its services hold the resolved context, and its body is read here.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns><c>200</c> with the Space's id, new name and the caller's Role, or <c>400 invalid-space-name</c>.</returns>
+    public static async Task<IResult> RenameAsync(
+        RenameSpaceHandler handler,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var request = await JsonRequestBody.ReadAsync(httpContext.Request, typeof(RenameSpaceRequest), cancellationToken)
+            .ConfigureAwait(false) as RenameSpaceRequest;
+
+        if (!SpaceName.TryNormalise(request?.Name, out var name))
+        {
+            return SpaceNameProblems.Invalid();
+        }
+
+        var context = httpContext.RequestServices.GetRequiredService<ActiveSpaceContext>();
+
+        var renamed = await handler.HandleAsync(context, name, cancellationToken).ConfigureAwait(false);
+
+        return Results.Ok(new ActiveSpaceResponse(renamed.Id, renamed.Name, StableCode.Of(context.Role)));
     }
 }

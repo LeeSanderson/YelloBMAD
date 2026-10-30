@@ -1,8 +1,6 @@
 using Yello.Domain;
 using Yello.Domain.Accounts;
-using Yello.Domain.Memberships;
 using Yello.Domain.Spaces;
-using Yello.Domain.Statuses;
 
 namespace Yello.Application.Accounts.RegisterAccount;
 
@@ -32,8 +30,9 @@ namespace Yello.Application.Accounts.RegisterAccount;
 /// resolution, no refusal recording, no idempotency and no bound check. Those belong to the
 /// request pipeline. Registration is unauthenticated and its route carries no <c>{spaceId}</c>, so
 /// Space resolution never runs for it, and
-/// there is nothing for authorisation to decide; and no NFR-8 bound applies - <c>BoundRegistry</c>
-/// assigns Spaces-per-Account to story 3.1, which creates a Space beyond the first.
+/// there is nothing for authorisation to decide; and no NFR-8 bound applies - Spaces-per-Account is
+/// consulted by story 3.1's creation route, which creates a Space beyond the first. Registration's
+/// Space counts toward that bound once it exists.
 /// </para>
 /// </remarks>
 /// <param name="passwordHasher">Turns the password into the only form Yello stores.</param>
@@ -90,42 +89,23 @@ public sealed class RegisterAccountHandler(
             CreatedAt = createdAt,
         };
 
-        // An ordinary Space. Nothing marks it as provisioned rather than created, because AC4
-        // requires that no attribute distinguishes it from a Space made by any other route.
-        var space = new Space
-        {
-            Id = spaceId,
-            Name = personalSpaceNaming.NameFor(displayName),
-            CreatedAt = createdAt,
-        };
+        // An ordinary Space, provisioned exactly as story 3.1's creation provisions one: the Space,
+        // its Owner Membership (never an OwnerId column - addendum.md:33, which is what makes FR-3's
+        // erasure work) and FR-24's three identity-bearing defaults (AR-23), all from NewSpace.
+        // Nothing marks it as provisioned rather than created, because AC4 requires that no
+        // attribute distinguishes it from a Space made by any other route.
+        var provisioned = NewSpace.Provision(
+            spaceId,
+            accountId,
+            personalSpaceNaming.NameFor(displayName),
+            createdAt,
+            identifiers);
 
-        // Ownership is a Membership at Role Owner, never an OwnerId column on Space
-        // (addendum.md:33). That is what makes FR-3's erasure work: ownership cannot be forced
-        // onto an Account, so deleting one removes rows rather than orphaning a Space.
-        var ownerMembership = new Membership
-        {
-            Id = identifiers.Next(),
-            SpaceId = spaceId,
-            AccountId = accountId,
-            Role = Role.Owner,
-            CreatedAt = createdAt,
-        };
-
-        // FR-24's three defaults, identity-bearing so a later rename moves no Task (AR-23).
-        // Position comes from the index, so DefaultStatusSet.Names is the one place the order is
-        // stated. No per-Project effective Status set is materialised - no table stores one.
-        var statuses = DefaultStatusSet.Names
-            .Select((name, index) => new StatusDefinition
-            {
-                Id = identifiers.Next(),
-                SpaceId = spaceId,
-                Name = name,
-                Position = index,
-                CreatedAt = createdAt,
-            })
-            .ToList();
-
-        var registration = new AccountRegistration(account, space, ownerMembership, statuses);
+        var registration = new AccountRegistration(
+            account,
+            provisioned.Space,
+            provisioned.OwnerMembership,
+            provisioned.Statuses);
 
         // The outcome is discarded, deliberately and permanently. See the class remarks: the
         // caller must not be able to tell a new address from a known one, and the surest way to

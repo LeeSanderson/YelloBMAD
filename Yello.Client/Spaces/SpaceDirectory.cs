@@ -89,6 +89,23 @@ public sealed class SpaceDirectory(HttpClient http)
     public bool Lists(Guid spaceId) => Current?.Any(space => space.Id == spaceId) == true;
 
     /// <summary>
+    /// Renames one row of the held answer in place, after the server has renamed that Space (story 3.1, AC14, open
+    /// question 7 (a)) - so the switcher shows the new name even before its next refresh lands. A Space the answer does
+    /// not list is left unlisted.
+    /// </summary>
+    /// <param name="spaceId">The renamed Space.</param>
+    /// <param name="name">Its new name, from the server's answer.</param>
+    public void Renamed(Guid spaceId, string name)
+    {
+        if (Current is not { } current || !current.Any(space => space.Id == spaceId))
+        {
+            return;
+        }
+
+        Current = [.. current.Select(space => space.Id == spaceId ? space with { Name = name } : space)];
+    }
+
+    /// <summary>
     /// Drops the answer - on sign-out and when the Session ends.
     /// </summary>
     public void Forget()

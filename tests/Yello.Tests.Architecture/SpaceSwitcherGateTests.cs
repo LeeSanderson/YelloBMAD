@@ -66,15 +66,18 @@ public sealed partial class SpaceSwitcherGateTests
     }
 
     /// <summary>
-    /// AC3 / AD-24 - there are exactly two Account-scoped surfaces, the switcher and Account
-    /// settings. A third is an amendment to AD-24, not a code change.
+    /// AC3 / AD-24 - the Account-scoped surfaces are exactly the AD-24 names as amended on
+    /// 2026-10-29: its two read surfaces, the switcher and Account settings, and the one
+    /// Account-scoped unit of work that writes, Space creation (story 3.1). Another is a further
+    /// amendment to AD-24, not a code change.
     /// </summary>
     [Fact]
     [Trait("Requirement", "AR-3")]
-    public void The_Account_scoped_surfaces_are_exactly_the_two_AD_24_names()
+    [Trait("Requirement", "AD-24")]
+    public void The_Account_scoped_surfaces_are_exactly_the_AD_24_names_as_amended()
     {
         Assert.Equal(
-            ["AccountSettings", "SpaceSwitcher"],
+            ["AccountSettings", "SpaceCreation", "SpaceSwitcher"],
             Enum.GetNames<AccountScopedSurface>().Order(StringComparer.Ordinal));
     }
 
@@ -323,8 +326,10 @@ public sealed partial class SpaceSwitcherGateTests
     }
 
     /// <summary>
-    /// AC3 / AD-24 - only the Space switcher's directory sets the <c>AccountId</c> session key, and no
-    /// type that sets <c>SpaceId</c> also sets <c>AccountId</c>: a unit of work sets exactly one key.
+    /// AC3 / AD-24 - only the Space switcher's directory and the one Space creation unit of work set
+    /// the <c>AccountId</c> session key, and no type but that creation unit of work sets both keys: every
+    /// other unit of work sets exactly one. The exception is the AD-24 amendment of 2026-10-29
+    /// (story 3.1, open question 1 (a)), and it is admitted by name, never by a looser rule.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -337,12 +342,14 @@ public sealed partial class SpaceSwitcherGateTests
     /// <b>Vacuity guard:</b> each entry point is found called, by the resolver and the directory
     /// respectively.
     /// The wire half is <c>SpaceIsolationLayerTests.A_Space_scoped_unit_of_work_sees_only_its_own_Membership_of_an_Account_in_several_Spaces</c>.
+    /// Planted by story 3.1 with a second both-keys caller, and caught.
     /// </para>
     /// </remarks>
     [Fact]
     [Trait("Requirement", "AR-6")]
     [Trait("Requirement", "AD-2")]
-    public void No_caller_sets_both_session_context_keys()
+    [Trait("Requirement", "AD-24")]
+    public void No_caller_but_the_Space_creation_unit_of_work_sets_both_session_context_keys()
     {
         var spaceKeySetters = CallersOf(SessionContextTypeName, "SetAsync");
         var accountKeySetters = CallersOf(SessionContextTypeName, "SetAccountAsync");
@@ -350,9 +357,23 @@ public sealed partial class SpaceSwitcherGateTests
         Assert.Contains("Yello.Infrastructure.Persistence.MembershipActiveSpaceResolver", spaceKeySetters);
         Assert.Contains(AccountDirectoryTypeName, accountKeySetters);
 
-        Assert.Equal([AccountDirectoryTypeName], accountKeySetters);
-        Assert.Empty(spaceKeySetters.Intersect(accountKeySetters, StringComparer.Ordinal));
+        Assert.True(
+            accountKeySetters.SequenceEqual([AccountDirectoryTypeName, SpaceCreationUnitOfWorkTypeName], StringComparer.Ordinal),
+            "The AccountId key is set by exactly the switcher's directory and the Space creation unit of work, which "
+            + "the AD-24 amendment of 2026-10-29 names. Found: " + string.Join(", ", accountKeySetters));
+
+        var both = spaceKeySetters.Intersect(accountKeySetters, StringComparer.Ordinal).ToList();
+
+        Assert.True(
+            both.SequenceEqual([SpaceCreationUnitOfWorkTypeName], StringComparer.Ordinal),
+            "Only the Space creation unit of work may set both session keys - the AD-24 amendment of 2026-10-29 "
+            + "names it and nothing else. Found: " + string.Join(", ", both));
     }
+
+    /// <summary>
+    /// The one both-keys caller the AD-24 amendment of 2026-10-29 names (story 3.1, open question 1 (a)).
+    /// </summary>
+    private const string SpaceCreationUnitOfWorkTypeName = "Yello.Infrastructure.Persistence.SpaceCreationScope";
 
     private const string SessionContextTypeName = "Yello.Infrastructure.Persistence.SpaceSessionContext";
 

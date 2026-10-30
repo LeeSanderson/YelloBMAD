@@ -22,7 +22,9 @@ namespace Yello.Host;
 /// state-changing request, so a forged change is refused before any Space is read. Then the
 /// not-found floor (story 2.2, Q7), which times everything after it and holds a Space-scoped <c>404</c>
 /// to a fixed minimum, so a boundary refusal and an in-Space not-found take the same time. Then Space
-/// resolution, the capability check, the bound and the refusal record. The group also stamps every
+/// resolution, the capability check, the bound and the refusal record. Last, the Space creation step
+/// (story 3.1), which only the creation endpoint opts into: its own unit of work under both session
+/// keys, its idempotency replay and the Spaces-per-Account bound. The group also stamps every
 /// endpoint it maps, which is how the Host knows at startup that no <c>{spaceId}</c> route was
 /// mapped around it.
 /// </para>
@@ -41,5 +43,6 @@ internal static class ApiRouteGroup
             .AddEndpointFilter(AccountScopedResolution.EstablishAsync)
             .AddEndpointFilter(AntiforgeryRequirement.ValidateStateChangingAsync)
             .AddEndpointFilter(NotAvailableFloor.HoldAsync)
-            .AddEndpointFilter(ActiveSpaceResolution.ResolveAsync);
+            .AddEndpointFilter(ActiveSpaceResolution.ResolveAsync)
+            .AddEndpointFilter(ActiveSpaceResolution.CreateSpaceAsync);
 }

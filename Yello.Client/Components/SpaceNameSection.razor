@@ -1,0 +1,224 @@
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Spaces
+@using Yello.Contracts
+@using Yello.Contracts.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceDirectory Directory
+@inject SpaceWrites Writes
+
+@*
+    THE SPACE NAME SECTION OF SPACE SETTINGS - story 3.1: AC3, AC8, AC14, AC16; FR-6; UX-DR12, UX-DR27, UX-DR33, UX-DR38.
+
+    OWNER AND ADMIN ONLY. Space settings renders this only when SpaceCapabilities.PermitsRenameSpace; for a Member or a
+    Viewer it is absent, never disabled (UX-DR27).
+
+    THE RENAME IS INLINE, AS A PROJECT'S IS (ProjectRow, ProjectList.RenameAsync): "Rename" opens a form with the name
+    field - a real label, autocomplete="off" and a field name fresh per page (AC8, UX-DR33) - and Save and Cancel. Esc or
+    Cancel closes it without sending anything and returns focus to "Rename".
+
+    NOT OPTIMISTIC. The form stays open, holding the new name, until the server answers; the context bar keeps the old
+    name meanwhile. On 200 the form closes, focus returns to "Rename", "Space renamed." is announced politely - naming no
+    Space (open question 8) - and the active Space's answer is replaced in place (ActiveSpaceState.Renamed, open
+    question 7 (a)): the context bar's visible and accessible names redraw, and nothing moves focus there, because a
+    rename is not a switch. The switcher's held row is renamed too. A 404 is the Space refusal surface; an invalid name is
+    said beside the field; anything else on the section, in RefusalCopy's words.
+*@
+
+<div class="space-name-section">
+    <h2 class="type-space-name">@Localizer["SpaceNameHeading"]</h2>
+
+    <LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
+
+    @if (_renaming)
+    {
+        <form class="space-name-section__form" @onsubmit="RenameAsync" @onkeydown="KeyDown" novalidate>
+            <FormField FieldId="space-rename-name"
+                       FieldName="@_fieldName"
+                       Label="@Localizer["SpaceNameLabel"]"
+                       Value="@_name"
+                       ValueChanged="value => _name = value"
+                       Message="@_message"
+                       Invalid="@(_message is not null)"
+                       FocusOnFirstRender="true" />
+
+            <div class="space-name-section__actions">
+                @if (!_inFlight)
+                {
+                    <PrimaryButton>@Localizer["RenameSpaceSubmit"]</PrimaryButton>
+                    <button type="button" class="button-secondary" @onclick="Close">@Localizer["RenameSpaceCancel"]</button>
+                }
+
+                @if (_inFlight)
+                {
+                    <p class="space-name-section__progress" role="status">@Localizer["SpaceRenaming"]</p>
+                }
+            </div>
+        </form>
+    }
+
+    @if (!_renaming)
+    {
+        <button type="button" class="button-secondary" @onclick="Open" @ref="_opener">@Localizer["RenameSpaceAction"]</button>
+    }
+
+    @if (_refusal is { } refusal)
+    {
+        <p class="space-name-section__refusal" role="status">@refusal</p>
+    }
+</div>
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    // A field name no browser's autofill would match to a saved value (UX-DR33): random per page.
+    private readonly string _fieldName = Guid.NewGuid().ToString("N");
+
+    private ElementReference _opener;
+
+    private bool _renaming;
+    private bool _inFlight;
+    private bool _focusOpener;
+    private string _name = string.Empty;
+    private string? _message;
+    private string? _refusal;
+    private string? _renamedTo;
+    private string? _announcement;
+    private int _announcements;
+
+    /// <summary>The Space this section renames - the route's, which the pipeline resolves.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>The Space's name, from the active Space's answer on this load.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string CurrentName { get; set; } = string.Empty;
+
+    /// <summary>Raised when the server refuses the Space itself, so the page renders the one refusal surface.</summary>
+    [Parameter]
+    public EventCallback<ProblemResponse?> OnSpaceRefused { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusOpener && !_renaming)
+        {
+            _focusOpener = false;
+            await _opener.FocusAsync();
+        }
+    }
+
+    private void Open()
+    {
+        _renaming = true;
+        _name = _renamedTo ?? CurrentName;
+        _message = null;
+        _refusal = null;
+    }
+
+    private void Close()
+    {
+        _renaming = false;
+        _message = null;
+        _focusOpener = true;
+    }
+
+    private void KeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape" && !_inFlight)
+        {
+            Close();
+        }
+    }
+
+    private async Task RenameAsync()
+    {
+        if (_inFlight)
+        {
+            return;
+        }
+
+        if (!SpaceNameRule.IsSpaceName(_name))
+        {
+            _message = Localizer[RefusalCopy.InvalidSpaceNameKey];
+            return;
+        }
+
+        _inFlight = true;
+        _message = null;
+        _refusal = null;
+
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var answer = await Writes.SendAsync(
+                HttpMethod.Patch,
+                SpaceRoutes.ActiveOf(SpaceId),
+                new RenameSpaceRequest(_name.Trim()),
+                Guid.NewGuid().ToString("D"),
+                token);
+
+            if (!token.IsCancellationRequested && answer.StatusCode != HttpStatusCode.Unauthorized)
+            {
+                await UseAnswerAsync(answer, token);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            _refusal = Localizer[RefusalCopy.NotAvailableKey];
+        }
+        finally
+        {
+            _inFlight = false;
+        }
+    }
+
+    /// <summary>
+    /// The server's answer: the renamed Space in place; an invalid name beside the field; the Space refused, the one
+    /// refusal surface; anything else on the section.
+    /// </summary>
+    private async Task UseAnswerAsync(SpaceWriteAnswer answer, CancellationToken token)
+    {
+        if (answer.StatusCode == HttpStatusCode.OK
+            && await answer.Response.Content.ReadFromJsonAsync<ActiveSpaceResponse>(JsonOptions, token) is { } renamed)
+        {
+            ActiveSpace.Renamed(renamed);
+            Directory.Renamed(renamed.Id, renamed.Name);
+
+            // The page above renders from the arrival's answer and is not redrawn by this; the next Rename starts from
+            // the server's new name all the same.
+            _renamedTo = renamed.Name;
+
+            _renaming = false;
+            _focusOpener = true;
+            _announcement = Localizer["SpaceRenamed"];
+            _announcements++;
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.NotFound)
+        {
+            await OnSpaceRefused.InvokeAsync(answer.Problem);
+            return;
+        }
+
+        if (answer.Problem?.Type == ProblemTypes.InvalidSpaceName)
+        {
+            _message = Localizer[RefusalCopy.InvalidSpaceNameKey];
+            return;
+        }
+
+        _renaming = false;
+        _refusal = RefusalText.Of(Localizer, answer.Problem);
+    }
+}

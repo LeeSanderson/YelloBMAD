@@ -60,6 +60,14 @@ public sealed partial class RefusalBoundaryGateTests
     /// </summary>
     private const string CreatesItsOwnSpace = "/api/v1/accounts";
 
+    /// <summary>
+    /// The second, named by story 3.1 and the AD-24 amendment of 2026-10-29: Space creation writes the new Space's
+    /// Owner Membership and default Statuses under an id the server has just minted, on the Space creation unit of
+    /// work. Like registration it resolves nothing by id, so no boundary refusal exists here to be told apart from an
+    /// ordinary not-found. Matched with its method: <c>GET</c> on the same path is the switcher, which must not reach.
+    /// </summary>
+    private const string CreatesASpace = "POST /api/v1/spaces";
+
     private static readonly string MatrixTypeName = typeof(RoleCapabilityMatrix).FullName!;
     private static readonly string RecorderPortName = typeof(IAccessRefusalRecorder).FullName!;
     private static readonly string PresencePortName = typeof(ISpacePresenceRegister).FullName!;
@@ -244,10 +252,13 @@ public sealed partial class RefusalBoundaryGateTests
         // also the proof that the walk crosses a port.
         Assert.Contains(reaching, endpoint => endpoint.RoutePattern.RawText == CreatesItsOwnSpace);
 
+        // Story 3.1's exemption must be found reaching too, through the same port crossing.
+        Assert.Contains(reaching, endpoint => MethodAndPattern(endpoint) == CreatesASpace);
+
         var offenders = reaching
             .Where(endpoint => !CarriesSpaceId(endpoint))
-            .Select(endpoint => endpoint.RoutePattern.RawText)
-            .Where(pattern => pattern != CreatesItsOwnSpace)
+            .Where(endpoint => endpoint.RoutePattern.RawText != CreatesItsOwnSpace && MethodAndPattern(endpoint) != CreatesASpace)
+            .Select(MethodAndPattern)
             .ToList();
 
         Assert.True(
@@ -322,7 +333,8 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// Story 1.7 / AD-24 - every endpoint the pipeline establishes an Account-scoped context for names
-    /// one of AD-24's two surfaces, and the set of such endpoints is exactly the one this story maps.
+    /// one of AD-24's surfaces as amended on 2026-10-29 (the two read surfaces, and story 3.1's Space
+    /// creation), and the set of such endpoints is exactly the one those stories map.
     /// </summary>
     /// <remarks>
     /// <para>
@@ -352,13 +364,17 @@ public sealed partial class RefusalBoundaryGateTests
                 Surface: pair.Marker!.GetType().GetProperty("Surface")?.GetValue(pair.Marker)?.ToString()))
             .ToList();
 
+        // Story 3.1 / the AD-24 amendment of 2026-10-29 adds exactly one: Space creation, on the switcher's path.
         Assert.Equal(
             [
                 (Yello.Contracts.ApiTokens.ApiTokenRoutes.List, "AccountSettings"),
                 (Yello.Contracts.ApiTokens.ApiTokenRoutes.Revoke, "AccountSettings"),
+                (Yello.Contracts.Spaces.SpaceRoutes.Directory, "SpaceCreation"),
                 (Yello.Contracts.Spaces.SpaceRoutes.Directory, "SpaceSwitcher"),
             ],
-            marked.OrderBy(entry => entry.Route, StringComparer.Ordinal));
+            marked
+                .OrderBy(entry => entry.Route, StringComparer.Ordinal)
+                .ThenBy(entry => entry.Surface, StringComparer.Ordinal));
 
         Assert.All(marked, entry => Assert.Contains(entry.Surface, Enum.GetNames<Yello.Host.Spaces.AccountScopedSurface>()));
     }
@@ -367,7 +383,8 @@ public sealed partial class RefusalBoundaryGateTests
     /// Story 1.7 / AD-24 - <c>Space</c>, which carries no row-level security policy, is read only by
     /// the types named here: the switcher's directory (through a join from the policy-protected
     /// <c>Membership</c> read), the active Space's name reader (for the Space resolved on that request),
-    /// and registration (which creates one).
+    /// registration (which creates one), and story 3.1's provisioning and Space store (which create one
+    /// and rename the resolved one).
     /// </summary>
     /// <remarks>
     /// <para>
@@ -404,6 +421,13 @@ public sealed partial class RefusalBoundaryGateTests
 
             // Story 2.4: the Label's foreign key to its Space, declared in the model and reading nothing.
             "Yello.Infrastructure.Persistence.Configurations.LabelConfiguration",
+
+            // Story 3.1: the provisioning both registration and creation build a new Space through, its rows, and the
+            // store that writes them and renames the resolved Space - which reads nothing, and whose one update is held
+            // to the resolved Space's id by The_only_update_of_a_Space_is_the_rename_of_the_resolved_Space.
+            "Yello.Domain.Spaces.NewSpace",
+            "Yello.Domain.Spaces.ProvisionedSpace",
+            "Yello.Infrastructure.Persistence.SpaceStore",
         ];
 
         var dependents = DependentsOf(space);
@@ -753,6 +777,12 @@ public sealed partial class RefusalBoundaryGateTests
 
     private static bool CarriesSpaceId(RouteEndpoint endpoint) =>
         endpoint.RoutePattern.GetParameter(Yello.Contracts.Spaces.SpaceRoutes.SpaceIdParameter) is not null;
+
+    /// <summary>
+    /// An endpoint as "METHOD /pattern", so two endpoints on one path - the switcher and Space creation - are told apart.
+    /// </summary>
+    private static string MethodAndPattern(RouteEndpoint endpoint) =>
+        $"{string.Join(',', endpoint.Metadata.GetMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()?.HttpMethods ?? [])} {endpoint.RoutePattern.RawText}";
 
     /// <summary>
     /// Every endpoint the Host maps, built through the framework's own data source.

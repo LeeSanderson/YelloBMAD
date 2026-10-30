@@ -17,9 +17,9 @@
 
     THE HEADING DOES NOT NAME THE SPACE - the context bar does, and the name lives in one place.
 
-    SPACE SETTINGS (story 2.4, open question 7) is linked from here for a Role that may manage Labels - Owner and
-    Admin - and absent for the others (UX-DR27). A Role re-read lower on that page is narrated, then routed here, and
-    this page says the sentence on arrival (UX-DR29).
+    SPACE SETTINGS is linked from the context bar since story 3.1 (AC4, open question 4 (a)), not from here - so an
+    empty Space offers exactly one action (deferred-work.md:528). A Role re-read lower on that page is narrated, then
+    routed here, and this page says the sentence on arrival (UX-DR29).
 
     THE PROJECTS (story 2.1) are ProjectList's, rendered only once the Space has answered, keyed on the
     Space so a switch starts a new list rather than reusing the departed one's. A 404 the list or a
@@ -33,11 +33,6 @@
         @if (_narration is not null)
         {
             <p class="space-home__narration" role="status">@_narration</p>
-        }
-
-        @if (LabelCapabilities.PermitsManageLabels(arrival.Current.Role))
-        {
-            <a class="space-home__settings" href="@ClientRoutes.SpaceSettings(SpaceId)">@Localizer["SpaceSettingsLink"]</a>
         }
 
         <ProjectList @key="SpaceId" SpaceId="@SpaceId" RoleCode="@arrival.Current.Role" OnSpaceRefused="arrival.Refuse" />

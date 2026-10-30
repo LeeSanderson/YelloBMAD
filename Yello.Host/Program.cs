@@ -16,7 +16,9 @@ using Yello.Application.Labels.DefineLabel;
 using Yello.Application.Labels.DeleteLabel;
 using Yello.Application.Labels.ListLabels;
 using Yello.Application.Lists.ViewList;
+using Yello.Application.Spaces.CreateSpace;
 using Yello.Application.Spaces.ListSpaces;
+using Yello.Application.Spaces.RenameSpace;
 using Yello.Application.Statuses.ListStatuses;
 using Yello.Application.Tasks.CreateTask;
 using Yello.Application.Tasks.DeleteTask;
@@ -117,6 +119,8 @@ builder.Services.AddScoped<ViewListHandler>();
 builder.Services.AddScoped<ListLabelsHandler>();
 builder.Services.AddScoped<DefineLabelHandler>();
 builder.Services.AddScoped<DeleteLabelHandler>();
+builder.Services.AddScoped<CreateSpaceHandler>();
+builder.Services.AddScoped<RenameSpaceHandler>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
 builder.Services.AddAccountScopedResolution();
@@ -374,6 +378,13 @@ api.MapActiveSpace();
 // Spaces as identity only (an empty list included), or 401 without a Session. Never a refusal
 // surface, and never reachable with an API Token (CAP-35; story 1.8).
 api.MapListSpaces();
+
+// Space creation and rename (story 3.1). POST /api/v1/spaces creates a Space owned by the caller, on the Space
+// creation unit of work the AD-24 amendment of 2026-10-29 names - Session only, no capability, the Spaces-per-Account
+// bound and an Account-scoped Idempotency-Key. PATCH /api/v1/spaces/{spaceId} renames the active Space under
+// RenameSpace, on both surfaces.
+api.MapCreateSpace();
+api.MapRenameSpace();
 
 // API Tokens (story 1.8). POST /api/v1/spaces/{spaceId}/api-tokens issues one bound to that Space:
 // Space-scoped, so the pipeline resolves the Membership and records a boundary refusal, and

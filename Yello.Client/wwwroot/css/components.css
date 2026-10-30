@@ -327,7 +327,17 @@
     margin: 0;
 }
 
-.space-switcher__link {
+/*
+    Story 3.1 (AC13): "Create a Space" at the panel's foot - a full-width row of the bar under the list, outside it,
+    with the rows' 24px floor.
+*/
+.space-switcher__foot {
+    flex-basis: 100%;
+    margin: 0;
+}
+
+.space-switcher__link,
+.space-switcher__create {
     display: flex;
     align-items: center;
     min-height: var(--target-min);
@@ -451,7 +461,9 @@
     gap: var(--space-3);
 }
 
-.context-bar__account {
+/* Story 3.1 (AC4): the Space settings link, drawn as the Account link is - a quiet control, the 24px floor. */
+.context-bar__account,
+.context-bar__settings {
     display: inline-flex;
     align-items: center;
     min-height: var(--target-min);
@@ -611,6 +623,17 @@
 @media (max-width: 79.9375em) {
     .context-bar__project {
         display: none;
+    }
+}
+
+/*
+    On a viewport shorter than 30em the bar stops sticking (story 3.1, AC16). At 320x256 with 200% text-only zoom and a
+    100-character Space name it wraps taller than the viewport, and a sticky bar that tall would cover the page beneath
+    it for good (1.4.10, 2.4.11). It still never collapses or hides: it scrolls with the page instead.
+*/
+@media (max-height: 29.9375em) {
+    .context-bar {
+        position: static;
     }
 }
 
@@ -1390,11 +1413,6 @@
     margin-block: var(--space-3) 0;
 }
 
-.space-home__settings {
-    display: inline-block;
-    margin-block: var(--space-3) 0;
-}
-
 .label-section {
     display: flex;
     flex-direction: column;
@@ -1667,4 +1685,56 @@
         margin-inline-end: var(--space-2);
         color: var(--text-muted);
     }
+}
+
+/*
+    STORY 3.1: the create page and Space settings' name section (AC16). One column, the page's own padding, every row
+    wrapping - so a 100-character name, 1.4.12 text spacing and 200% text-only zoom never force a sideways scroll at
+    320px. The forms copy a Project's create and rename shape.
+*/
+.space-create {
+    padding-block: var(--space-5);
+    padding-inline: var(--space-4);
+}
+
+.space-create__form,
+.space-name-section,
+.space-name-section__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-inline-size: 0;
+}
+
+.space-name-section {
+    align-items: flex-start;
+    margin-block-start: var(--space-4);
+}
+
+.space-name-section__form {
+    align-self: stretch;
+}
+
+.space-create__actions,
+.space-name-section__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.space-create__status,
+.space-create__progress,
+.space-name-section__progress,
+.space-name-section__refusal {
+    margin-block: 0;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+/* Story 3.1 (AC15): the no-Space state's one action, a link drawn as the primary button it stands in for. */
+.auth-panel__action {
+    display: block;
+    text-align: center;
+    text-decoration: none;
 }

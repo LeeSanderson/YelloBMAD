@@ -4,7 +4,7 @@ baseline_commit: 364d4c3
 
 # Story 3.1: Create and rename a Space
 
-Status: ready-for-dev
+Status: review
 
 Epic: 3 — Several Spaces, cleanly separated
 Story key: `3-1-create-and-rename-a-space`
@@ -189,29 +189,29 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1444-1477` (`status: final
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: decide the open questions** (all ACs)
-  - [ ] Read Dev Notes → Open questions. Decide each as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default.
-- [ ] **Task 2: record the AD-24 amendment** (AC7; Q1, Q5)
-  - [ ] Edit `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md` AD-24 (`:218-222`). Append a dated **Amendment (2026-10-29, story 3.1)** bullet that does five things:
+- [x] **Task 1: decide the open questions** (all ACs)
+  - [x] Read Dev Notes → Open questions. Decide each as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default.
+- [x] **Task 2: record the AD-24 amendment** (AC7; Q1, Q5)
+  - [x] Edit `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md` AD-24 (`:218-222`). Append a dated **Amendment (2026-10-29, story 3.1)** bullet that does five things:
     - Names the third Account-scoped unit of work: **Space creation**, which reads the acting Account's own Membership count for AD-25's Spaces-per-Account bound, and writes the new Space under its own server-generated `SpaceId`.
     - Names the second permitted read now as well: delete-Account-refused listing every owned Space (FR-3, story 5.4). Its implementation stays 5.4's.
     - States the reason in AC7's words.
     - States the mechanism Q1 chose. Write this as a rule, so a later reader cannot generalise it.
     - States Q5's decision on `Space` and `Account` policies.
-  - [ ] Do not rewrite AD-24's rule text or AD-26's "AD-24 stands unamended" (correct for its own subject). The amendment is additive.
-  - [ ] Add the same note, in one line, to `EXPERIENCE.md:190`'s table row ("Recorded in AD-24, 2026-10-29").
-  - [ ] Note it in `_bmad-output/specs/spec-yello/SPEC.md` only if that file restates AD-24's two surfaces. Grep for it first, and record what you found.
-- [ ] **Task 3: the domain** (AC1, AC5, AC9; Q6)
-  - [ ] Add `Yello.Domain/Spaces/SpaceName.cs`. Copy the shape of `Projects/ProjectName.cs`: `TryNormalise(string? submitted, out string name)`, which trims, `MaxLength`, and no uniqueness.
+  - [x] Do not rewrite AD-24's rule text or AD-26's "AD-24 stands unamended" (correct for its own subject). The amendment is additive.
+  - [x] Add the same note, in one line, to `EXPERIENCE.md:190`'s table row ("Recorded in AD-24, 2026-10-29").
+  - [x] Note it in `_bmad-output/specs/spec-yello/SPEC.md` only if that file restates AD-24's two surfaces. Grep for it first, and record what you found.
+- [x] **Task 3: the domain** (AC1, AC5, AC9; Q6)
+  - [x] Add `Yello.Domain/Spaces/SpaceName.cs`. Copy the shape of `Projects/ProjectName.cs`: `TryNormalise(string? submitted, out string name)`, which trims, `MaxLength`, and no uniqueness.
     - Use **200** as the maximum (Q6), because a provisioned name can already be up to 128 + `"'s Space"` characters.
     - `SpaceConfiguration.NameMaxLength` should reference `SpaceName.MaxLength` (or assert it is equal), so there is one source of truth.
-  - [ ] Extract the Space-seeding block from `RegisterAccountHandler` (Space, Owner Membership, `DefaultStatusSet` rows, one clock read) into one Domain or Application helper, for example `NewSpace.Provision(spaceId, accountId, name, createdAt, identifiers)`. Use it from both registration and creation. **Registration's behaviour and its tests must not change** (AD-22: still exactly one slice creates an Account).
-- [ ] **Task 4: Space creation through the pipeline** (AC1, AC2, AC6, AC7, AC10-AC12; Q1, Q2)
-  - [ ] Contracts:
+  - [x] Extract the Space-seeding block from `RegisterAccountHandler` (Space, Owner Membership, `DefaultStatusSet` rows, one clock read) into one Domain or Application helper, for example `NewSpace.Provision(spaceId, accountId, name, createdAt, identifiers)`. Use it from both registration and creation. **Registration's behaviour and its tests must not change** (AD-22: still exactly one slice creates an Account).
+- [x] **Task 4: Space creation through the pipeline** (AC1, AC2, AC6, AC7, AC10-AC12; Q1, Q2)
+  - [x] Contracts:
     - `Yello.Contracts/Spaces/SpaceRoutes.cs`: create shares the `Directory` path with POST; rename shares `Active` with PATCH. Keep route strings as constants.
     - Add `CreateSpaceRequest(string? Name)` and `RenameSpaceRequest(string? Name)`.
     - Add `ProblemTypes.InvalidSpaceName`.
-  - [ ] Pipeline (Q1 (a)): give Account-scoped creation its own named step beside `AccountScopedResolution`. Do not put it in the slice. The step:
+  - [x] Pipeline (Q1 (a)): give Account-scoped creation its own named step beside `AccountScopedResolution`. Do not put it in the slice. The step:
     1. opens the unit of work's transaction;
     2. sets **both** keys through `SpaceSessionContext`: `AccountId` from the Session, and `SpaceId` set to a **server-generated** new id (`IIdentifierGenerator`, never the body);
     3. narrows `AccountScope` and `SpaceScope`;
@@ -219,67 +219,67 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1444-1477` (`status: final
     5. runs the endpoint;
     6. commits on success, and rolls back on any `>= 400`.
     - Mirror `ActiveSpaceResolution`'s commit and rollback discipline. Log the refusal with `SpaceLog.BoundReachedFor`, keyed by Account and never by name. It writes **no** `AccessRefusal`: a bound refusal is neither kind (`ActiveSpaceResolution.Bound.cs:59-60`).
-  - [ ] `BoundCounter`: add `Bound.SpacesPerAccount`.
+  - [x] `BoundCounter`: add `Bound.SpacesPerAccount`.
     - First take `ApplicationLocks` `"Yello/SpacesPerAccount/{accountId}"` (Exclusive, Transaction owner; add `TakeSpacesPerAccountAsync` beside the existing two).
     - Then run `SELECT COUNT(*) FROM dbo.[Membership] WHERE AccountId = @accountId`. Under the two-key unit of work, RLS admits the Account's own rows plus the new Space's rows, of which there are none. The explicit `WHERE` keeps the count the caller's own even so.
     - Replace the "No creation endpoint consults this bound" message accordingly.
-  - [ ] Add the slice `Yello.Application/Spaces/CreateSpace/CreateSpaceHandler.cs`. It receives the established context (Account id, new Space id) and the normalised name, provisions through Task 3's helper, and saves on the pipeline's unit of work through a store port, for example `ISpaceCreationStore` in Domain or Application, implemented in Infrastructure. It returns `SpaceIdentity`.
-  - [ ] Add the endpoint `MapCreateSpace` in `Yello.Host/Endpoints/SpaceDirectoryEndpoints.cs`, or a new `SpaceEndpoints.cs`. It reads the body with `JsonRequestBody.ReadAsync`, validates with `SpaceName.TryNormalise` (`400 InvalidSpaceName`), and answers `201` with a `Location`. Register the handler and store in `Program.cs` and `InfrastructureServices.cs` / `AccountScopedReads.cs` as their neighbours are.
-  - [ ] Idempotency (Q2 (a)): add an Account-scoped idempotency record, with a migration and an RLS policy on `SESSION_CONTEXT('AccountId')`. Replay it inside the same step, before the bound, so a replay of a created Space at 50 returns the original `201` and not a `409`. Mirror `ActiveSpaceResolution.Idempotency.cs`. If Q2 picks (b), write the stated-out reason in Completion Notes and make sure the client never re-sends a create without its original key.
-- [ ] **Task 5: rename** (AC3, AC9, AC10, AC14; Q7)
-  - [ ] Map `MapRenameSpace` as a PATCH on `SpaceRoutes.Active` with `.RequiresCapability(Capability.RenameSpace)`. That capability already exists in `RoleCapabilityMatrix`: Owner and Admin yes, Member and Viewer no. Read the body, validate it with `SpaceName.TryNormalise`, and call the slice.
-  - [ ] Add `Yello.Application/Spaces/RenameSpace/RenameSpaceHandler.cs`. It takes `ActiveSpaceContext` and the name. The store runs `ExecuteUpdateAsync` on `Space` **`WHERE Id = activeSpace.SpaceId`**, the resolved Space and never an id from the body.
+  - [x] Add the slice `Yello.Application/Spaces/CreateSpace/CreateSpaceHandler.cs`. It receives the established context (Account id, new Space id) and the normalised name, provisions through Task 3's helper, and saves on the pipeline's unit of work through a store port, for example `ISpaceCreationStore` in Domain or Application, implemented in Infrastructure. It returns `SpaceIdentity`.
+  - [x] Add the endpoint `MapCreateSpace` in `Yello.Host/Endpoints/SpaceDirectoryEndpoints.cs`, or a new `SpaceEndpoints.cs`. It reads the body with `JsonRequestBody.ReadAsync`, validates with `SpaceName.TryNormalise` (`400 InvalidSpaceName`), and answers `201` with a `Location`. Register the handler and store in `Program.cs` and `InfrastructureServices.cs` / `AccountScopedReads.cs` as their neighbours are.
+  - [x] Idempotency (Q2 (a)): add an Account-scoped idempotency record, with a migration and an RLS policy on `SESSION_CONTEXT('AccountId')`. Replay it inside the same step, before the bound, so a replay of a created Space at 50 returns the original `201` and not a `409`. Mirror `ActiveSpaceResolution.Idempotency.cs`. If Q2 picks (b), write the stated-out reason in Completion Notes and make sure the client never re-sends a create without its original key.
+- [x] **Task 5: rename** (AC3, AC9, AC10, AC14; Q7)
+  - [x] Map `MapRenameSpace` as a PATCH on `SpaceRoutes.Active` with `.RequiresCapability(Capability.RenameSpace)`. That capability already exists in `RoleCapabilityMatrix`: Owner and Admin yes, Member and Viewer no. Read the body, validate it with `SpaceName.TryNormalise`, and call the slice.
+  - [x] Add `Yello.Application/Spaces/RenameSpace/RenameSpaceHandler.cs`. It takes `ActiveSpaceContext` and the name. The store runs `ExecuteUpdateAsync` on `Space` **`WHERE Id = activeSpace.SpaceId`**, the resolved Space and never an id from the body.
     - `Space` has no RLS policy (Q5), so this `WHERE` is the only thing that scopes the write. A gate must hold it (Task 9).
     - Answer with `ActiveSpaceResponse` carrying the caller's Role.
-- [ ] **Task 6: the client - create** (AC8, AC13, AC15, AC16; Q3)
-  - [ ] Add a page `Yello.Client/Pages/CreateSpace.razor` at `ClientRoutes.CreateSpace` (for example `/spaces/new`).
+- [x] **Task 6: the client - create** (AC8, AC13, AC15, AC16; Q3)
+  - [x] Add a page `Yello.Client/Pages/CreateSpace.razor` at `ClientRoutes.CreateSpace` (for example `/spaces/new`).
     - The route must never be matched by `/spaces/{id:guid}`, and `ClientRoutes.SpaceIn` must return `null` for it, so arriving there purges the departed Space as any non-Space route does.
     - It is Account-scoped: no `SpaceArrival` and no Space token.
     - It holds `<PageHeading>`, a `<FormField>` with `FieldName` set to a fresh `Guid.NewGuid().ToString("N")` (AutoComplete defaults to `"off"`) and `FocusOnFirstRender`, a `PrimaryButton`, and Cancel as `button-secondary`.
     - Refusals render beside the field (`InvalidSpaceName`) or in the form's status region (`bound-reached` through `RefusalText.Of`, which already resolves `spaces-per-account`).
     - Not optimistic. Reuse the key after an unanswered attempt (the `UnansweredCreate` precedent in `ProjectList.razor`).
     - On `201`: `await Directory.RefreshAsync(...)`, then `Navigation.NavigateTo(ClientRoutes.SpaceHome(id))`.
-  - [ ] Entry points (Q3 (a)): a "Create a Space" link at the foot of the switcher panel, **outside** its `<ul>`, so the switcher's rows still carry a name and nothing else. And the same action on `Home.razor`'s no-Space state.
-  - [ ] Writes: `SpaceWrites` is documented as about the active Space. Add a small sibling for Account-scoped writes, or a method that takes no Space token. Record which. Either way it uses the same `HttpClient`, anti-forgery and `ProblemOfAsync` path.
-- [ ] **Task 7: the client - rename and Space settings** (AC3, AC4, AC8, AC14, AC16; Q4, Q7)
-  - [ ] Add `SpaceCapabilities.PermitsRenameSpace(role)` (`owner|admin`) in `Yello.Client/Spaces/`.
+  - [x] Entry points (Q3 (a)): a "Create a Space" link at the foot of the switcher panel, **outside** its `<ul>`, so the switcher's rows still carry a name and nothing else. And the same action on `Home.razor`'s no-Space state.
+  - [x] Writes: `SpaceWrites` is documented as about the active Space. Add a small sibling for Account-scoped writes, or a method that takes no Space token. Record which. Either way it uses the same `HttpClient`, anti-forgery and `ProblemOfAsync` path.
+- [x] **Task 7: the client - rename and Space settings** (AC3, AC4, AC8, AC14, AC16; Q4, Q7)
+  - [x] Add `SpaceCapabilities.PermitsRenameSpace(role)` (`owner|admin`) in `Yello.Client/Spaces/`.
     - Add the gate `The_clients_rename_predicate_agrees_with_the_capability_matrix`, beside the Label one in `RefusalBoundaryGateTests`.
     - Add a `PermitsSpaceSettings(role)` that is the union of the sections' predicates, so the link's audience is defined in one place.
-  - [ ] Add a "Space name" section to `Pages/SpaceSettings.razor`, rendered only when `PermitsRenameSpace`.
+  - [x] Add a "Space name" section to `Pages/SpaceSettings.razor`, rendered only when `PermitsRenameSpace`.
     - Follow `ProjectRow.razor:36-64` and `ProjectList.RenameAsync:474-550`: a "Rename" `button-secondary` opens an inline form with `FormField` (non-reusable `FieldName`, `autocomplete="off"`), submit and Cancel.
     - Keep the form open until the server answers, then close it, announce the rename (`LiveAnnouncement`), and update `ActiveSpace` with the answer (Q7: an `Arrive`-shaped update that does not count as a switch, or a new `Renamed(ActiveSpaceResponse)` method). This makes the context bar re-render.
     - Esc closes the form and returns focus to "Rename".
-  - [ ] Add a "Space settings" link to `Components/ContextBar.razor` (Q4), present only when `PermitsSpaceSettings(role)` and absent otherwise.
+  - [x] Add a "Space settings" link to `Components/ContextBar.razor` (Q4), present only when `PermitsSpaceSettings(role)` and absent otherwise.
     - Never put it on the Role chip.
     - Copy comes from `SpaceSettingsLink`; update its `<comment>`.
     - Remove the Space home link, or keep it, per Q4. Then update `SpaceHomeProjectsTests.An_empty_Space_states_no_Projects_yet_and_offers_one_action_to_create_one`'s set-aside and `LabelTests.A_Member_has_no_Label_definition_affordance` accordingly.
     - The 320px context bar must still keep the Role chip, with no sideways scroll (2.11 AC16). Add CSS only in `components.css`, using logical properties and rem/em, with no px literal.
-- [ ] **Task 8: copy** (AC6, AC13-AC15; UX-DR37)
-  - [ ] Add these keys to `ClientCopy.resx`, each with a `<comment>` naming 3.1 and its AC:
+- [x] **Task 8: copy** (AC6, AC13-AC15; UX-DR37)
+  - [x] Add these keys to `ClientCopy.resx`, each with a `<comment>` naming 3.1 and its AC:
     - `CreateSpaceAction` ("Create a Space");
     - the create page heading;
     - `SpaceNameLabel` ("Space name");
     - an invalid-name message stating the rule ("A Space name is 1 to 200 characters." or the like);
     - `SpaceCreated` / `SpaceRenamed` announcements, which must carry **no Space name** (Q8);
     - `RenameSpaceAction` ("Rename").
-  - [ ] Change `NoSpaceBody`'s comment, which currently says "arrives with story 3.1". `spaces-per-account` and `rename-space` exist already; reuse them.
-  - [ ] Add `InvalidSpaceName` to `RefusalCopy.OwnKeys`, which keeps `RefusalCopyTests` green.
-- [ ] **Task 9: gates** (each proved against a plant; save the original content and restore it in a `finally`, **never `git checkout`/`restore`/`reset`**)
-  - [ ] `SpaceSwitcherGateTests.The_Account_scoped_surfaces_are_exactly_the_two_AD_24_names`, `Every_Account_scoped_endpoint_names_an_AD_24_surface`, `No_caller_sets_both_session_context_keys` and the `.Isolation.cs` allow-lists:
+  - [x] Change `NoSpaceBody`'s comment, which currently says "arrives with story 3.1". `spaces-per-account` and `rename-space` exist already; reuse them.
+  - [x] Add `InvalidSpaceName` to `RefusalCopy.OwnKeys`, which keeps `RefusalCopyTests` green.
+- [x] **Task 9: gates** (each proved against a plant; save the original content and restore it in a `finally`, **never `git checkout`/`restore`/`reset`**)
+  - [x] `SpaceSwitcherGateTests.The_Account_scoped_surfaces_are_exactly_the_two_AD_24_names`, `Every_Account_scoped_endpoint_names_an_AD_24_surface`, `No_caller_sets_both_session_context_keys` and the `.Isolation.cs` allow-lists:
     - amend each to admit **exactly** the one named creation step or surface Q1 chose;
     - make every assertion cite the AD-24 amendment;
     - make sure a second both-keys caller still fails.
-  - [ ] `SpaceResolutionSeamTests.Exactly_one_production_line_sets_a_session_context_key` must stay green. Both keys still go through `SpaceSessionContext.SetKeyAsync`.
-  - [ ] `RefusalBoundaryGateTests.No_endpoint_without_spaceId_in_its_path_reaches_a_Space_scoped_entity`: add the creation route as the second named exemption beside `/api/v1/accounts`, with its reason.
-  - [ ] `Space_is_read_only_where_named`: name the creation and rename stores. Add a gate that every `Space` **write** filters on the resolved context's `SpaceId`, or name the one rename store as the only `ExecuteUpdate` on `Space`.
-  - [ ] The bound registry: a gate that `Bound.SpacesPerAccount` is consulted by exactly one endpoint, the creation route. Follow the existing per-bound gates.
-  - [ ] Space name inputs (AC8, `deferred-work.md:332`): extend the client's name-input gate (`SpaceHomeProjectsTests.AssertNameInputsAreNotAutofilledAsync` / `ReusableFieldNames`), or add a static gate over `*.razor`. It must **first find** the create input and the rename input, then assert `autocomplete="off"` and a non-reusable `name` on each. A gate over zero inputs fails.
-  - [ ] Logs: if `SpaceLog` gains a creation or rename event, it carries `SpaceId` and never the name. Extend the existing log-content gate.
-- [ ] **Task 10: tests** (see Dev Notes → Testing requirements)
-- [ ] **Task 11: ledger, conventions, verification**
-  - [ ] `deferred-work.md`: apply Dev Notes → Ledger dispositions.
-  - [ ] `tests/TESTING-CONVENTIONS.md`: add a short "Account-scoped creation - added by story 3.1" note. It covers how to seed N Memberships for the bound (`WireDatabase.AddOwnedSpaceAsync`, which should now seed default Statuses too, or say why not), and how to make two creations overlap on the Account's application lock.
-  - [ ] Run `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the Explicit tiers. **Build `Yello.Client` in Debug before browser plants.**
+  - [x] `SpaceResolutionSeamTests.Exactly_one_production_line_sets_a_session_context_key` must stay green. Both keys still go through `SpaceSessionContext.SetKeyAsync`.
+  - [x] `RefusalBoundaryGateTests.No_endpoint_without_spaceId_in_its_path_reaches_a_Space_scoped_entity`: add the creation route as the second named exemption beside `/api/v1/accounts`, with its reason.
+  - [x] `Space_is_read_only_where_named`: name the creation and rename stores. Add a gate that every `Space` **write** filters on the resolved context's `SpaceId`, or name the one rename store as the only `ExecuteUpdate` on `Space`.
+  - [x] The bound registry: a gate that `Bound.SpacesPerAccount` is consulted by exactly one endpoint, the creation route. Follow the existing per-bound gates.
+  - [x] Space name inputs (AC8, `deferred-work.md:332`): extend the client's name-input gate (`SpaceHomeProjectsTests.AssertNameInputsAreNotAutofilledAsync` / `ReusableFieldNames`), or add a static gate over `*.razor`. It must **first find** the create input and the rename input, then assert `autocomplete="off"` and a non-reusable `name` on each. A gate over zero inputs fails.
+  - [x] Logs: if `SpaceLog` gains a creation or rename event, it carries `SpaceId` and never the name. Extend the existing log-content gate.
+- [x] **Task 10: tests** (see Dev Notes → Testing requirements)
+- [x] **Task 11: ledger, conventions, verification**
+  - [x] `deferred-work.md`: apply Dev Notes → Ledger dispositions.
+  - [x] `tests/TESTING-CONVENTIONS.md`: add a short "Account-scoped creation - added by story 3.1" note. It covers how to seed N Memberships for the bound (`WireDatabase.AddOwnedSpaceAsync`, which should now seed default Statuses too, or say why not), and how to make two creations overlap on the Account's application lock.
+  - [x] Run `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the Explicit tiers. **Build `Yello.Client` in Debug before browser plants.**
 
 ## Dev Notes
 
@@ -594,10 +594,128 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), dev-story run by the story-cycle orchestrator, 2026-10-30.
+
 ### Debug Log References
+
+- **Red evidence, honestly stated.** The ATDD run's red table (checklist, Step 5) stands for SLC-001, SLC-006, BND-001, ARCH-003 to ARCH-007. In this run the server half (Tasks 3-5) was written before the slice scaffolds were un-skipped, so their red was not re-observed here; on activation all 25 slice cases passed on the first run (`ActiveSpaceEndpointTests`, 61/61). Re-observed red in this run, before the change that greens it: ARCH-008 (AD-24 amendment absent, before Task 2), ARCH-001/ARCH-002 ("No static bool (string roleCode) method named for RenameSpace / SpaceSettings", before Task 7), and the six active gates the scaffold remarks predicted (`No_endpoint_without_spaceId...`, `Every_Account_scoped_endpoint_names_an_AD_24_surface`, `The_Account_scoped_surfaces_are_exactly_the_two_AD_24_names`, `No_caller_sets_both_session_context_keys`, `Space_is_read_only_where_named`) plus one it did not: `The_endpoints_unreachable_with_a_Token_are_Token_management_the_switcher_and_the_move` (creation carries the Account-scoped marker on the switcher's path). Each was amended for exactly the one named exception.
+- **Own defect caught by an existing gate:** `Only_the_pipeline_depends_on_the_idempotency_port` failed because `AccountIdempotencyStore` read `IIdempotencyStore.Retention`; the Account port now states its own 24 hours.
+- **Scaffold corrections (client):** (1) `The_no_Space_state_offers_exactly_one_action...` counted links and buttons in `#app`, which includes the context bar's shell (skip control, switcher, Account, Sign out) on every authenticated surface - scoped to `main`. (2) `A_creation_resent_after_a_lost_answer...` waited for any `main [role=status]`, which is always attached (the page's polite regions), so it pressed Enter while the first attempt was in flight - it now waits for the unanswered sentence ("The Space may not have been created."). (3) `FakeYelloApi.InvalidSpaceNameType` replaced by `ProblemTypes.InvalidSpaceName` and removed.
+- **Scaffold correction found by the first full run:** `Creating_a_Space_leaves_every_other_Space_unchanged_and_unseen` compared an unordered expected pair `[newId, personal]` with the ordered actual ids, so it passed or failed by which sequential GUID sorted first (passed in the class run, failed in the full run). The expected pair is now ordered too.
+- **Scaffold corrections (server/arch):** the held `InvalidSpaceNameType` in the slice partials replaced by `ProblemTypes.InvalidSpaceName`; ARCH-003/ARCH-004 lookups by name replaced by `typeof(...)`; red-phase remarks rewritten. No scaffold assertion changed.
+- **Product fixes found by the browser scaffolds:** the rename section was a `<section aria-labelledby>` whose heading "Space name" made `GetByLabel("Space name")` resolve to the region and the input - now a plain `div` with its `h2`. At 320x256 with 200% text-only zoom and a 100-character name the sticky context bar grew taller than the viewport and intercepted every click below it - the bar now stops sticking below 30em of viewport height.
+- **Plants (each restored from memory in a `finally`; no git restore):** a second both-keys caller in `MembershipActiveSpaceResolver` -> `No_caller_but_the_Space_creation_unit_of_work_sets_both_session_context_keys` and `Exactly_one_creation_unit_of_work_sets_both_session_context_keys` fail; an `ExecuteUpdateAsync` on `Space` in `ActiveSpaceNameReader` -> `The_only_update_of_a_Space_is_the_rename_of_the_resolved_Space` fails; the Account's lock removed from `BoundCounter` -> `Two_concurrent_creations_at_49...` and `Another_Accounts_creation_never_waits...` fail; `name="name"` on the create page -> `Both_Space_name_inputs_are_found...` fails; the context bar link for every Role -> `Space_settings_is_linked_from_the_context_bar...` (member, viewer) fail; a `spaceName` argument on `SpaceLog.SpaceCreated` -> `No_log_message_takes_a_name` fails. A first client plant did not compile (unused field) and so proved nothing; it was redone so it compiled, with `Yello.Client` rebuilt in Debug.
+- Migration scaffolded with `dotnet ef migrations add SpaceCreation` (after `dotnet tool restore`), then hand-edited.
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
+**Decisions (Task 1).** Q1 (a), Q2 (a), Q5 (a) were decided by Lee and implemented as decided. The rest are this run's reversible decisions, each at the story's recommendation unless stated:
+
+- Q3 - (a): a page at `/spaces/new`, linked from the switcher panel's foot (outside its `<ul>`) and from the no-Space state. Cost: one route under `/spaces` that is not a Space; `ClientRoutes.SpaceIn` reads it as none.
+- Q4 - (a): a "Space settings" link in the context bar after the Role chip, Owner and Admin only, never on the chip; Space home's link removed. Cost: `deferred-work.md:528` resolved by UX's first option and left for UX to confirm.
+- Q6 - (a): `SpaceName` 1-200 trimmed, not unique; the column length is `SpaceName.MaxLength`. Cost: none beyond Projects' 100 differing.
+- Q7 - (a): `ActiveSpaceState.Renamed(ActiveSpaceResponse)` replaces `Current` for the same Space only, raises `Changed`, is not an arrival and moves no focus; `SpaceDirectory.Renamed` updates the held row.
+- Q8: "Space created." / "Space renamed.", no name.
+- Q9: `201` + `Location: ActiveOf(id)` + `{id, name}`.
+- Q10 - (b), not the recommendation: `WireDatabase.AddOwnedSpaceAsync` still seeds no Statuses, documented in its remarks. Reason: `Yello.Tests.Shared` references only `Yello.Contracts` and cannot read `DefaultStatusSet` without a new project reference, and its two callers read no Status. Cut this line to switch to (a) by adding the reference.
+
+**Other reversible decisions (each a line to cut):**
+
+- The creation surface is a third `AccountScopedSurface` member, `SpaceCreation`, as the story's variance note allowed; the gates say "the AD-24 names as amended".
+- The creation step is a nested partial of `ActiveSpaceResolution` (`ActiveSpaceResolution.Creation.cs`, filter `CreateSpaceAsync`, last in `ApiRouteGroup`), so every A-12 gate's "the pipeline" still names one type. Its unit of work is `SpaceCreationScope` behind the Application port `ISpaceCreationScope`.
+- Rename is mapped in `ActiveSpaceEndpoints` (beside the GET it answers like), because it states the caller's Role in `ActiveSpaceResponse` and that type is the one the Role-reader gate already names; no gate was widened for it.
+- The Account-scoped idempotency table has its own `AccountIsolationPolicy` rather than a predicate in `SpaceIsolationPolicy`, so the Space policy still covers exactly the tables with a `SpaceId`.
+- The creation's bound refusal is logged by a new `SpaceLog.CreationBoundReached` naming the bound and limit only - not the Account (SpaceLog's rule forbids Account identity) and not a Space that was never created. The story's "keyed by Account" was read as "not by name".
+- Writes: no sibling class; the create page calls `SpaceWrites.SendAsync` with its own token (its disposal linked to the Session).
+- The context bar stops being sticky below 30em of viewport height (found by AC16's 200% zoom case).
+- `SPEC.md` does not restate AD-24's two surfaces (grepped: no match); its companion `surfaces-and-journeys.md:128` does, and got a one-sentence note.
+
+**What was built.** Domain `SpaceName`, `NewSpace.Provision` (registration refactored onto it; its tests unchanged and green). `POST /api/v1/spaces` on the Space creation unit of work: server-generated id, both keys and both scopes, Account-scoped `Idempotency-Key` replay before the bound, `Bound.SpacesPerAccount` counted live under `Yello/SpacesPerAccount/{accountId}`, `201` + `Location`, `400 invalid-space-name`, `409 bound-reached`, `401` without a Session (a Token is no credential). `PATCH /api/v1/spaces/{spaceId}` under `RenameSpace`, writing `WHERE Id =` the resolved Space. Migration `20261030201142_SpaceCreation`. AD-24 amendment recorded (spine, `EXPERIENCE.md:190`). Client: create page, switcher foot link, no-Space action, Space settings name section, context bar link, `SpaceCapabilities`, `SpaceNameRule`, copy.
+
+**AC -> tests.** AC1: `Creating_a_Space_answers_201_and_makes_the_caller_its_one_Owner...`. AC2: `Creating_a_Space_leaves_every_other_Space_unchanged_and_unseen`, ISO-CREATE-SPACE. AC3: `The_Owner_renames...`, `An_Admin_renames...`, `A_Member_or_a_Viewer_is_refused_403...`, `Renaming_updates_the_context_bar_in_place...` (owner, admin), `Space_settings_is_linked_from_the_context_bar...`, `The_clients_rename_predicate_agrees_with_the_capability_matrix`. AC4: `Space_settings_is_linked_from_the_context_bar...`, `The_clients_Space_settings_predicate_is_the_union_of_its_sections`, `An_empty_Space_states_no_Projects_yet...` (set-aside removed). AC5: `Two_Accounts_may_each_create_a_Space_with_the_same_name...`. AC6: `The_51st_Space_is_refused_409_bound_reached...`, `The_51st_Space_renders_the_bound_in_place...`, `The_Spaces_per_Account_bound_is_consulted_by_the_creation_route_alone`. AC7: `The_AD_24_amendment_names_Space_creation_and_states_its_reason`, `Exactly_one_creation_unit_of_work_sets_both_session_context_keys`, `No_caller_but_the_Space_creation_unit_of_work_sets_both_session_context_keys`, `Only_the_pipeline_opens_the_Space_creation_unit_of_work`. AC8: `Both_Space_name_inputs_are_found_and_neither_can_be_autofilled`. AC9: `An_invalid_Space_name_is_refused_400...`, `An_invalid_rename_is_refused_400...`, `The_new_Space_id_is_generated_by_the_server...`, `The_Space_request_contracts_carry_a_name_and_nothing_else`, `The_Space_name_rule_admits_1_to_200...`, `The_clients_Space_name_predicate_agrees_with_the_Domain_rule`, the three idempotency cases, `The_Account_scoped_policy_covers_exactly_the_Account_scoped_tables_on_the_AccountId_key`. AC10: `Creation_without_a_Session_is_refused_401...`, `A_non_members_rename_is_the_boundary_404...`, `A_Token_renames_its_own_Space_at_its_current_Role`, `Rename_declares_RenameSpace_and_creation_declares_no_capability`, ISO-RENAME-SPACE-CROSS, ISO-RENAME-SPACE-OWN. AC11: `Two_concurrent_creations_at_49...`, `Another_Accounts_creation_never_waits...`, and BND-001's "nothing written" (no injected mid-creation failure: the rows and the record are one `SaveChanges` sequence on one transaction, and no seam exists over the wire). AC12: `A_Membership_the_Account_no_longer_holds_does_not_count...`, BND-001 (seeded at every Role). AC13: `Creating_a_Space_from_the_switcher_lands_in_it_as_a_switch...`, `A_creation_resent_after_a_lost_answer...`. AC14: `Renaming_updates_the_context_bar_in_place_and_announces_no_name`, `No_Space_name_reaches_the_log_on_creation_or_rename`, `No_log_message_takes_a_name`. AC15: `The_no_Space_state_offers_exactly_one_action...`, `The_51st_Space_renders_the_bound_in_place...`. AC16: `The_new_surfaces_reflow_at_320px_with_a_100_character_name` (text spacing, 200% zoom), `Escape_closes_the_rename_form...`.
+
+**Verification:** `dotnet build Yello.slnx` 0 warnings, 0 errors; `dotnet build-server shutdown`; `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`: total 1,585, passed 1,576, failed 0, skipped 9 (baseline 1,565 / 1,518 / 0 / 47: the 38 scaffold entries are live, 6 gates and 1 schema case added). The 9 skips are the 3 migration-bundle cases and the explicit tiers; no story 3.1 case is skipped.
+
+**Ledger:** `:95-101` closed by the amendment (Q5); `:211` noted (3.1 is the precedent, not a licence); `:332`, `:334`, `:461` closed; `:478` noted (same race shape on the creation key, owner 8.3 unchanged); `:526` corrected (rename is 3.1's, done); `:528` resolved by option one, for UX to confirm. No new deferral.
 
 ### File List
+
+- `Yello.Domain/Spaces/SpaceName.cs` (new)
+- `Yello.Domain/Spaces/NewSpace.cs` (new)
+- `Yello.Application/Accounts/RegisterAccount/RegisterAccountHandler.cs`
+- `Yello.Application/Spaces/ISpaceCreationScope.cs` (new)
+- `Yello.Application/Spaces/IAccountIdempotencyStore.cs` (new)
+- `Yello.Application/Spaces/ISpaceStore.cs` (new)
+- `Yello.Application/Spaces/CreateSpace/CreateSpaceHandler.cs` (new)
+- `Yello.Application/Spaces/RenameSpace/RenameSpaceHandler.cs` (new)
+- `Yello.Infrastructure/AccountScopedReads.cs`
+- `Yello.Infrastructure/SpaceBoundaryLimits.cs`
+- `Yello.Infrastructure/Persistence/AccountIdempotencyRecord.cs` (new)
+- `Yello.Infrastructure/Persistence/AccountIdempotencyStore.cs` (new)
+- `Yello.Infrastructure/Persistence/ApplicationLocks.cs`
+- `Yello.Infrastructure/Persistence/BoundCounter.cs`
+- `Yello.Infrastructure/Persistence/Configurations/AccountIdempotencyRecordConfiguration.cs` (new)
+- `Yello.Infrastructure/Persistence/Configurations/SpaceConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261030201142_SpaceCreation.cs` (new)
+- `Yello.Infrastructure/Persistence/Migrations/20261030201142_SpaceCreation.Designer.cs` (new)
+- `Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs`
+- `Yello.Infrastructure/Persistence/SchemaNames.cs`
+- `Yello.Infrastructure/Persistence/SpaceCreationScope.cs` (new)
+- `Yello.Infrastructure/Persistence/SpaceStore.cs` (new)
+- `Yello.Infrastructure/Persistence/YelloDbContext.cs`
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Contracts/Spaces/SpaceRoutes.cs`
+- `Yello.Contracts/Spaces/CreateSpaceRequest.cs` (new)
+- `Yello.Contracts/Spaces/RenameSpaceRequest.cs` (new)
+- `Yello.Host/ApiRouteGroup.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Host/SpaceLog.cs`
+- `Yello.Host/Endpoints/SpaceDirectoryEndpoints.cs`
+- `Yello.Host/Spaces/AccountScopedResolution.cs`
+- `Yello.Host/Spaces/AccountScopedSurface.cs`
+- `Yello.Host/Spaces/ActiveSpaceEndpoints.cs`
+- `Yello.Host/Spaces/ActiveSpaceResolution.Bound.cs`
+- `Yello.Host/Spaces/ActiveSpaceResolution.Creation.cs` (new)
+- `Yello.Client/Components/ContextBar.razor`
+- `Yello.Client/Components/SpaceNameSection.razor` (new)
+- `Yello.Client/Components/SpaceSwitcher.razor`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Pages/ClientRoutes.cs`
+- `Yello.Client/Pages/CreateSpace.razor` (new)
+- `Yello.Client/Pages/Home.razor`
+- `Yello.Client/Pages/SpaceHome.razor`
+- `Yello.Client/Pages/SpaceSettings.razor`
+- `Yello.Client/Refusals/RefusalCopy.cs`
+- `Yello.Client/Spaces/ActiveSpaceState.cs`
+- `Yello.Client/Spaces/SpaceCapabilities.cs` (new)
+- `Yello.Client/Spaces/SpaceDirectory.cs`
+- `Yello.Client/Spaces/SpaceNameRule.cs` (new)
+- `Yello.Client/Spaces/SpaceWrites.cs`
+- `Yello.Client/wwwroot/css/components.css`
+- `tests/TESTING-CONVENTIONS.md`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Move.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Projects.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Spaces.cs`
+- `tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.cs`
+- `tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.Creation.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.cs`
+- `tests/Yello.Tests.Client/LabelTests.cs`
+- `tests/Yello.Tests.Client/SpaceCreateAndRenameTests.cs`
+- `tests/Yello.Tests.Client/SpaceHomeProjectsTests.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.cs`
+- `tests/Yello.Tests.Shared/WireDatabase.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/SpaceIsolationSchemaTests.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.CreateSpace.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.CreateSpaceBound.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RenameSpace.cs`
+- `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md`
+- `_bmad-output/planning-artifacts/ux-designs/ux-YelloBMAD-2026-08-18/EXPERIENCE.md`
+- `_bmad-output/specs/spec-yello/surfaces-and-journeys.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/3-1-create-and-rename-a-space.md`
+
+## Change Log
+
+- 2026-10-30 - Story 3.1 implemented (dev-story): Space creation on one named both-keys unit of work with the Spaces-per-Account bound and an Account-scoped Idempotency-Key; rename under RenameSpace; AD-24 amendment recorded; client create page, switcher and no-Space entry points, Space settings name section and context bar link; 38 ATDD scaffold entries activated (20 slice, 8 architecture, 10 browser), 3 isolation rows made live, 7 active gates amended for one named exception each, 6 gates added.

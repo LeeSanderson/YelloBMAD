@@ -186,8 +186,8 @@ Three specified reads are richer than *"identity only"*. In each the data is the
 
 | Read | Decision |
 |---|---|
-| `Delete Account refused` naming **every Space still owned** (FR-3) | **Permitted.** Own Membership, own Roles. Flag for an AD-24 amendment naming it — the AD already anticipates needing one. |
-| The **Spaces-per-Account** bound at NFR-8's 50 (AD-25) | **Permitted**, same basis: own count, never another Account's. Also needs naming in AD-24, since Space creation is not one of its two enumerated surfaces. |
+| `Delete Account refused` naming **every Space still owned** (FR-3) | **Permitted.** Own Membership, own Roles. Flag for an AD-24 amendment naming it — the AD already anticipates needing one. Named in AD-24's amendment of 2026-10-29; built by story 5.4. |
+| The **Spaces-per-Account** bound at NFR-8's 50 (AD-25) | **Permitted**, same basis: own count, never another Account's. Also needs naming in AD-24, since Space creation is not one of its two enumerated surfaces. Recorded in AD-24, 2026-10-29 (story 3.1). |
 | The API Token list showing a **per-Space Role** | **Dropped.** This is genuinely a Membership read across a boundary on an Account-scoped surface, and it is decoration rather than function. UJ-7's point — that a Token's capability tracks the current Role — survives without displaying it. |
 
 ## Component Patterns

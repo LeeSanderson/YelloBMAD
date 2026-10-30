@@ -462,9 +462,10 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// AC1, AC14, UX-DR27, UX-DR32, Q7 - a Member's Space home has no "Space settings" link (absent, not disabled), and the
-    /// settings address reached by hand shows the within-Space capability copy and no define form. Anchor: the Owner's
-    /// Space home has the link.
+    /// AC1, AC14, UX-DR27, UX-DR32, Q7 - a Member has no "Space settings" link (absent, not disabled), and the
+    /// settings address reached by hand shows the within-Space capability copy and no define form. Anchor: the Owner has
+    /// the link. Story 3.1 (AC4, open question 4 (a)) moved the link from Space home to the context bar, so it is looked
+    /// for in both places.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -482,14 +483,16 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
 
         await using (context)
         {
+            var settingsLink = page.Locator("nav.context-bar, main").GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = SpaceSettingsLink });
+
             await OpenSpaceHomeAsync(api, page, Northwind);
-            await page.Locator("main").GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = SpaceSettingsLink }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await settingsLink.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             await page.EvaluateAsync("path => Blazor.navigateTo(path)", ClientSpaceHome(Harbour));
             await page.Locator(RoleChip, new PageLocatorOptions { HasText = "Member" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await page.Locator("main").GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = "Beacon" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
-            Assert.Equal(0, await page.Locator("main").GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = SpaceSettingsLink }).CountAsync());
+            Assert.Equal(0, await settingsLink.CountAsync());
 
             await page.EvaluateAsync("path => Blazor.navigateTo(path)", ClientSettings(Harbour));
             await page.Locator("main").GetByText(ManageLabelsCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });

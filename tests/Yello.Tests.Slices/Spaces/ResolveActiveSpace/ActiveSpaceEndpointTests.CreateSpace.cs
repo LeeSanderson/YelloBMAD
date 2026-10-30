@@ -19,12 +19,10 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>RED-PHASE SCAFFOLDS (story 3.1 ATDD run, 2026-10-29).</b> Every case is skipped with the AC it waits
-/// for; no route, request type or problem type of story 3.1 exists yet. Routes are the existing
-/// <c>SpaceRoutes.Directory</c> (POST shares the switcher's path, Task 4) and <c>SpaceRoutes.ActiveOf</c>; the
-/// one missing contract constant is held here as <see cref="InvalidSpaceNameType"/> and is replaced by
-/// <c>ProblemTypes.InvalidSpaceName</c> on activation. Bodies are anonymous objects and answers are raw JSON,
-/// so the scaffolds compile today and an added property cannot hide behind a DTO.
+/// <b>Written as red-phase scaffolds by the story 3.1 ATDD run (2026-10-29), activated by story 3.1.</b> Routes
+/// are <c>SpaceRoutes.Directory</c> (POST shares the switcher's path) and <c>SpaceRoutes.ActiveOf</c>; the held
+/// problem type is now <c>ProblemTypes.InvalidSpaceName</c>. Bodies are anonymous objects and answers are raw
+/// JSON, so an added property cannot hide behind a DTO.
 /// </para>
 /// <para>
 /// <b>Why a partial of <see cref="ActiveSpaceEndpointTests"/></b> and not a class of its own: the class already
@@ -48,11 +46,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </remarks>
 public sealed partial class ActiveSpaceEndpointTests
 {
-    /// <summary>
-    /// Story 3.1 Task 4's new stable problem type. Scaffold: replace with <c>ProblemTypes.InvalidSpaceName</c>.
-    /// </summary>
-    private const string InvalidSpaceNameType = "urn:yello:problem:invalid-space-name";
-
     /// <summary>
     /// <c>StableCode.Of(Bound.SpacesPerAccount)</c>, the resource key the client already holds.
     /// </summary>
@@ -80,7 +73,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Membership (the caller, Owner), the default Status set in its order, and no Projects.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - POST /api/v1/spaces is not mapped yet (story 3.1 Task 4)")]
+    [Fact]
     [Trait("Requirement", "FR-5")]
     [Trait("Requirement", "AR-34")]
     public async Task Creating_a_Space_answers_201_and_makes_the_caller_its_one_Owner_with_the_default_Statuses_and_no_Projects()
@@ -123,7 +116,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// switcher does not list the new Space. Anchor: the creator's own switcher lists both of its Spaces.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - POST /api/v1/spaces is not mapped yet (story 3.1 Task 4)")]
+    [Fact]
     [Trait("Requirement", "FR-5")]
     [Trait("Requirement", "NFR-1")]
     public async Task Creating_a_Space_leaves_every_other_Space_unchanged_and_unseen()
@@ -156,7 +149,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         var newId = CreatedSpace(created).Id;
 
-        Assert.Equal([newId, personal], IdentityRows(creatorsSwitcher!).Select(row => row.Id).Order());
+        Assert.Equal(new[] { newId, personal }.Order(), IdentityRows(creatorsSwitcher!).Select(row => row.Id).Order());
         Assert.DoesNotContain(newId, IdentityRows(othersSwitcher!).Select(row => row.Id));
         Assert.DoesNotContain(newId.ToString("D"), othersSwitcher!.Body, StringComparison.OrdinalIgnoreCase);
 
@@ -168,7 +161,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// both are <c>201</c>, the two ids differ, and each Account's switcher lists its own and never the other's.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - POST /api/v1/spaces is not mapped yet (story 3.1 Task 4)")]
+    [Fact]
     [Trait("Requirement", "FR-6")]
     public async Task Two_Accounts_may_each_create_a_Space_with_the_same_name_and_neither_sees_the_other()
     {
@@ -210,7 +203,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <param name="length">The submitted name's length.</param>
     /// <param name="blank">Whether it is spaces only.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - POST /api/v1/spaces and SpaceName.TryNormalise do not exist yet (story 3.1 Tasks 3, 4)")]
+    [Theory]
     [InlineData(0, false)]
     [InlineData(3, true)]
     [InlineData(SpaceNameMaxLength + 1, false)]
@@ -238,7 +231,7 @@ public sealed partial class ActiveSpaceEndpointTests
         });
 
         Assert.Equal(HttpStatusCode.BadRequest, refused?.StatusCode);
-        Assert.Equal(InvalidSpaceNameType, ProblemType(refused!));
+        Assert.Equal(ProblemTypes.InvalidSpaceName, ProblemType(refused!));
         Assert.Equal(HttpStatusCode.Created, anchor?.StatusCode);
 
         // Exactly the Personal Space and the anchor: the refused name wrote nothing, not even a truncated Space.
@@ -257,7 +250,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// another, and no Space has the body's id.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - POST /api/v1/spaces is not mapped yet (story 3.1 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     public async Task The_new_Space_id_is_generated_by_the_server_and_never_taken_from_the_body()
     {
@@ -289,7 +282,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>ISO-LIST-SPACES</c>). Anchor: the same Account's Session creates.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - POST /api/v1/spaces is not mapped yet (story 3.1 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AR-10")]
     [Trait("Requirement", "FR-36")]
     public async Task Creation_without_a_Session_is_refused_401_and_a_Token_is_no_credential_on_it()

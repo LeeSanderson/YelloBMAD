@@ -9,7 +9,8 @@ namespace Yello.Host;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>EventIds 1016-1020, 1031-1032 (story 2.1's idempotency) and 1033-1034 (story 2.2's not-found floor).</b> 1000-1007 belong to
+/// <b>EventIds 1016-1020, 1031-1032 (story 2.1's idempotency), 1033-1034 (story 2.2's not-found floor) and
+/// 1035-1038 (story 3.1's Space creation).</b> 1000-1007 belong to
 /// <see cref="StartupLog"/>, 1008-1009 to <see cref="RegistrationLog"/> and 1010-1015 to
 /// <see cref="SessionLog"/>; 1021 onwards to <see cref="RateLimitLog"/> and the others.
 /// </para>
@@ -97,4 +98,43 @@ internal static partial class SpaceLog
         Level = LogLevel.Information,
         Message = "A Space-scoped not-found answer takes at least {Floor} (zero is off).")]
     internal static partial void NotAvailableFloorResolved(ILogger logger, TimeSpan floor);
+
+    /// <summary>
+    /// A Space creation refused at an Account's bound (story 3.1). Neither the Account nor the Space it would have
+    /// created is named: the line says which bound, and nothing that ties an Account to anything.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    /// <param name="bound">The bound's stable code.</param>
+    /// <param name="limit">Its value.</param>
+    [LoggerMessage(
+        EventId = 1035,
+        Level = LogLevel.Warning,
+        Message = "A Space creation was refused at the {Bound} bound of {Limit}.")]
+    internal static partial void CreationBoundReached(ILogger logger, string bound, int limit);
+
+    /// <summary>
+    /// A Space creation's bound refusal, by the bound's stable code and its value.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    /// <param name="bound">The bound reached.</param>
+    internal static void CreationBoundReachedFor(ILogger logger, BoundEntry bound) =>
+        CreationBoundReached(logger, StableCode.Of(bound.Bound), bound.Limit);
+
+    [LoggerMessage(
+        EventId = 1036,
+        Level = LogLevel.Information,
+        Message = "A Space creation repeated an Idempotency-Key; the recorded response was replayed and nothing was created.")]
+    internal static partial void CreationReplayed(ILogger logger);
+
+    [LoggerMessage(
+        EventId = 1037,
+        Level = LogLevel.Information,
+        Message = "A Space creation carried an Idempotency-Key it could not use ({Problem}); the request was refused.")]
+    internal static partial void CreationIdempotencyKeyRefused(ILogger logger, string problem);
+
+    [LoggerMessage(
+        EventId = 1038,
+        Level = LogLevel.Information,
+        Message = "Space {SpaceId} was created.")]
+    internal static partial void SpaceCreated(ILogger logger, Guid spaceId);
 }

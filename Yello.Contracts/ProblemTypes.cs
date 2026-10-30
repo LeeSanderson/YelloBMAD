@@ -166,6 +166,16 @@ public static class ProblemTypes
     public static string InvalidProjectName => "urn:yello:problem:invalid-project-name";
 
     /// <summary>
+    /// A Space name that is not 1-200 characters once trimmed. Answered <c>400</c> by creation and rename alike;
+    /// nothing is written and nothing is truncated. Story 3.1, open question 6 (a).
+    /// </summary>
+    /// <remarks>
+    /// <b>Never "that name is taken".</b> Space names are not unique across Yello (FR-6); this reports only what
+    /// was sent, and its body never carries the name.
+    /// </remarks>
+    public static string InvalidSpaceName => "urn:yello:problem:invalid-space-name";
+
+    /// <summary>
     /// A Task title that is not 1-200 characters once trimmed. Answered <c>400</c>; nothing is written.
     /// Story 2.2, open question 3 (a).
     /// </summary>

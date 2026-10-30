@@ -7,7 +7,8 @@ namespace Yello.Infrastructure;
 
 /// <summary>
 /// Registers story 1.7's reads: the Account-scoped context and the Space switcher's directory
-/// (AD-24), and the active Space's name for the context bar.
+/// (AD-24), and the active Space's name for the context bar; and story 3.1's Space creation unit of
+/// work and Space store.
 /// </summary>
 internal static class AccountScopedReads
 {
@@ -28,6 +29,11 @@ internal static class AccountScopedReads
         services.AddScoped<IAccountSpaceDirectory>(provider => provider.GetRequiredService<AccountSpaceDirectory>());
         services.AddScoped<IAccountApiTokenDirectory>(provider => provider.GetRequiredService<AccountSpaceDirectory>());
         services.AddScoped<IActiveSpaceNameReader, ActiveSpaceNameReader>();
+
+        // Story 3.1: the Space creation unit of work (the AD-24 amendment's one both-keys caller), and the store that
+        // writes a new Space's rows on it and renames the active Space.
+        services.AddScoped<ISpaceCreationScope, SpaceCreationScope>();
+        services.AddScoped<ISpaceStore, SpaceStore>();
 
         return services;
     }

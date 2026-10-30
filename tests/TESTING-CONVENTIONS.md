@@ -724,6 +724,26 @@ Host's address - the only fake there. Chromium keeps the Host's `SameSite=None; 
 needs the running client's session-end path navigates in-app (`Blazor.navigateTo`), because a reload
 boots a client that never held the Session.
 
+**Account-scoped creation - added by story 3.1.** `POST /api/v1/spaces` runs on one unit of work holding
+both session keys (`SpaceCreationScope`), so its cases live in `Yello.Tests.Slices` as partials of the
+existing `ActiveSpaceEndpointTests` (no new engine, fixture or container-backed class).
+
+- **Seeding N Memberships for the bound.** Register through the product, then add Memberships with
+  `SpaceSeeding` - one block per Space, the `Space` row and its one `Membership` in the same unit of work
+  under that Space's key (the `BLOCK AFTER INSERT` predicate), cycling the Roles, because every Membership
+  counts (`SeedMembershipsAsync` in `ActiveSpaceEndpointTests.CreateSpace.cs`). The Personal Space counts,
+  so "at 49" is the Personal Space plus 48 seeded. Count under the `AccountId` key with an explicit
+  `WHERE AccountId` (`MembershipCountOfAsync`). `WireDatabase.AddOwnedSpaceAsync` seeds no Statuses (story
+  3.1 open question 10 (b): `Yello.Tests.Shared` cannot read `DefaultStatusSet`); a case that needs a Space
+  exactly as creation makes one creates it over the wire.
+- **Making two creations overlap.** Take the product's own lock, `Yello/SpacesPerAccount/{accountId:D}`, on
+  a connection of the test's own inside a transaction (`sp_getapplock`, Exclusive, Transaction owner; an
+  application lock is not a row, so it needs no session context), send both creations, wait until both are
+  blocked (`TaskWire.WaitUntilBlockedOnALockAsync`, which reads `LCK_M_%` waits), then commit. Planted by
+  removing the product's lock: the race case and the other-Account case both fail.
+- **Another Account never waits:** with A's lock held, B's creation must answer without anything being
+  released (`LabelWire.WaitUntilBlockedOrAnsweredAsync`), anchored on A's own creation then waiting on it.
+
 ## CI: the PR stage - built by story 1.10
 
 `.github/workflows/ci.yml` runs on every push and pull request to `main`. Its `test` job runs these

@@ -253,6 +253,46 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
         Assert.Contains(accountClause, membershipFunction, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Story 3.1, open question 2 (a) - the Account-scoped policy covers exactly <c>SchemaNames.AccountScopedTables</c>,
+    /// each with a FILTER and a BLOCK predicate on <c>fn_AccountIsolationPredicate(AccountId)</c>, and that function reads
+    /// the <c>AccountId</c> session key and never the <c>SpaceId</c> one. Read from the catalogue, as the Space policy's
+    /// cases are.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "AD-18")]
+    [Trait("Requirement", "AD-24")]
+    public async Task The_Account_scoped_policy_covers_exactly_the_Account_scoped_tables_on_the_AccountId_key()
+    {
+        var database = Available();
+
+        await using var connection = await database.OpenWithoutSpaceContextAsync(TestContext.Current.CancellationToken);
+
+        var predicates = await ReadNamesAsync(
+            connection,
+            """
+            SELECT CONCAT(OBJECT_NAME(sp.target_object_id) COLLATE DATABASE_DEFAULT, N'|', sp.predicate_type_desc COLLATE DATABASE_DEFAULT, N'|', sp.predicate_definition COLLATE DATABASE_DEFAULT)
+            FROM sys.security_predicates sp
+            JOIN sys.security_policies p ON p.object_id = sp.object_id
+            WHERE p.name = @name AND p.is_enabled = 1
+            """,
+            SchemaNames.AccountIsolationPolicy,
+            TestContext.Current.CancellationToken);
+
+        var definition = $"([dbo].[{SchemaNames.AccountPredicateFunction}]([{SchemaNames.AccountIdColumn}]))";
+
+        Assert.Equal(
+            SchemaNames.AccountScopedTables
+                .SelectMany(table => new[] { $"{table}|BLOCK|{definition}", $"{table}|FILTER|{definition}" })
+                .Order(StringComparer.Ordinal),
+            predicates.Order(StringComparer.Ordinal));
+
+        var body = Assert.Single(await FunctionBodyAsync(connection, SchemaNames.AccountPredicateFunction));
+
+        Assert.Contains($"CAST(SESSION_CONTEXT(N'{SchemaNames.AccountIdSessionKey}') AS uniqueidentifier)", body, StringComparison.Ordinal);
+        Assert.DoesNotContain($"SESSION_CONTEXT(N'{SchemaNames.SpaceIdSessionKey}')", body, StringComparison.Ordinal);
+    }
+
     private static Task<List<string>> FunctionBodyAsync(SqlConnection connection, string function) =>
         ReadNamesAsync(
             connection,

@@ -117,6 +117,12 @@ public static class RefusalCopy
     public static string InvalidListCursorKey => "ListCursorInvalid";
 
     /// <summary>
+    /// The copy key for <c>400 invalid-space-name</c> (story 3.1, open question 6 (a)): a Space name outside 1-200
+    /// characters, met by a Space creation and a Space rename.
+    /// </summary>
+    public static string InvalidSpaceNameKey => "SpaceNameInvalid";
+
+    /// <summary>
     /// The resource a refusal is rendered with.
     /// </summary>
     /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
@@ -187,6 +193,7 @@ public static class RefusalCopy
         [ProblemTypes.TaskPositionFull] = TaskPositionFullKey,
         [ProblemTypes.InvalidListQuery] = InvalidListQueryKey,
         [ProblemTypes.InvalidListCursor] = InvalidListCursorKey,
+        [ProblemTypes.InvalidSpaceName] = InvalidSpaceNameKey,
     };
 
     private static string? OwnKey(string? type) =>

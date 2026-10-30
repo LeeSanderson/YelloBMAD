@@ -16,9 +16,10 @@
     order served - never on a remembered last Space, because nothing remembers one (UX-DR32).
 
     BELONGING TO NO SPACE IS A VALID STATE (UX-DR35, FR-7). An Account holding no Membership is told
-    so here and nothing is created for it: creating a Space is story 3.1's, and its offer arrives
-    with it. Epic 1 cannot reach this state - registration always provisions a Space - but the entry
-    point has to answer an empty list honestly.
+    so here, and nothing is ever created for it. Story 3.1 (AC15) gives the state its one action - a
+    link to the create page - so the person is offered the chance to create a Space and decides.
+    Registration always provisions a Space, so this state is reached by leaving or losing every one
+    (stories 3.3, 4.5); the entry point has to answer an empty list honestly either way.
 *@
 
 @if (_noSpace)
@@ -27,6 +28,7 @@
         <div class="auth-panel">
             <h1 class="type-dialog-title auth-panel__heading" tabindex="-1" @ref="_noSpaceHeading">@Localizer["NoSpaceHeading"]</h1>
             <p class="auth-panel__intro">@Localizer["NoSpaceBody"]</p>
+            <a class="button-primary auth-panel__action" href="@ClientRoutes.CreateSpace">@Localizer["CreateSpaceAction"]</a>
         </div>
     </div>
 }

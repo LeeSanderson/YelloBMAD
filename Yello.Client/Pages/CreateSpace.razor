@@ -1,0 +1,261 @@
+@page "/spaces/new"
+
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Sessions
+@using Yello.Client.Spaces
+@using Yello.Contracts
+@using Yello.Contracts.Spaces
+
+@implements IDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject SessionState Session
+@inject SpaceDirectory Directory
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceWrites Writes
+@inject NavigationManager Navigation
+
+@*
+    CREATING A SPACE - story 3.1: AC6, AC8, AC13, AC15, AC16; FR-5; UX-DR31, UX-DR33, UX-DR35, UX-DR37, UX-DR39.
+
+    ACCOUNT-SCOPED. This page is in no Space: no SpaceArrival, no Space token. Its requests are cancelled by its own
+    disposal and by the Session's end, never by a Space's purge (2.4's lesson: a timeout is not "the tab left").
+
+    THE NAME INPUT IS NEVER AUTOFILLED (AC8, UX-DR33): autocomplete="off" and a field name fresh on every render,
+    because autofill is origin-scoped and Account-agnostic and would otherwise offer one Account's Space name to the
+    next Account using that browser profile.
+
+    NOT OPTIMISTIC. The form stays until the server answers. An invalid name is said beside the field; the bound
+    (409 spaces-per-account) and anything else in the form's status region, in RefusalCopy's words - in place, with no
+    navigation. An attempt that got no answer may have been applied, so sending the same name again reuses its
+    Idempotency-Key (open question 2 (a)) and the server answers the first attempt instead of creating a second Space.
+
+    ON 201 THE DIRECTORY IS REFRESHED FIRST (UX-DR31), so the new id is one the switcher's current answer lists before
+    anything is asked about it; then the tab lands in the new Space's home, and that arrival is a switch (UX-DR39):
+    focus moves to the context bar, which announces the new Space and the Role.
+*@
+
+<div class="space-create">
+    <PageHeading>@Localizer["CreateSpaceHeading"]</PageHeading>
+
+    <LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
+
+    <form class="space-create__form" @onsubmit="CreateAsync" @onkeydown="KeyDown" novalidate>
+        <FormField FieldId="space-create-name"
+                   FieldName="@_fieldName"
+                   Label="@Localizer["SpaceNameLabel"]"
+                   Value="@_name"
+                   ValueChanged="value => _name = value"
+                   Message="@_nameMessage"
+                   Invalid="@(_nameMessage is not null)"
+                   FocusOnFirstRender="true" />
+
+        <p class="space-create__status" role="status">@_refusal</p>
+
+        <div class="space-create__actions">
+            @if (!_submitting)
+            {
+                <PrimaryButton>@Localizer["CreateSpaceSubmit"]</PrimaryButton>
+                <button type="button" class="button-secondary" @onclick="Cancel">@Localizer["CreateSpaceCancel"]</button>
+            }
+
+            @if (_submitting)
+            {
+                <p class="space-create__progress" role="status">@Localizer["SpaceCreating"]</p>
+            }
+        </div>
+    </form>
+</div>
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    // A field name no browser's autofill would match to a saved value (UX-DR33): fresh per render of this page.
+    private readonly string _fieldName = Guid.NewGuid().ToString("N");
+
+    private readonly CancellationTokenSource _disposal = new();
+
+    private IDisposable? _purgeRegistration;
+    private int _generation;
+
+    private string _name = string.Empty;
+    private string? _nameMessage;
+    private string? _refusal;
+    private bool _submitting;
+    private string? _announcement;
+    private int _announcements;
+    private UnansweredCreate? _unanswered;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        if (!Session.IsSignedIn)
+        {
+            Navigation.NavigateTo(ClientRoutes.SignIn, replace: true);
+            return;
+        }
+
+        _purgeRegistration = Session.RegisterPurge(PurgeAsync);
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _generation++;
+        _purgeRegistration?.Dispose();
+        _disposal.Cancel();
+        _disposal.Dispose();
+    }
+
+    private Task PurgeAsync()
+    {
+        _generation++;
+        _name = string.Empty;
+        _unanswered = null;
+
+        return Task.CompletedTask;
+    }
+
+    private void KeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape" && !_submitting)
+        {
+            Cancel();
+        }
+    }
+
+    /// <summary>
+    /// Leaves without sending anything, to the entry point - which lands on a Space the switcher lists, or says there is
+    /// none. Never back to a remembered Space (UX-DR32).
+    /// </summary>
+    private void Cancel() => Navigation.NavigateTo(ClientRoutes.Home);
+
+    private async Task CreateAsync()
+    {
+        if (_submitting)
+        {
+            return;
+        }
+
+        _nameMessage = null;
+        _refusal = null;
+
+        if (!SpaceNameRule.IsSpaceName(_name))
+        {
+            _nameMessage = Localizer[RefusalCopy.InvalidSpaceNameKey];
+            return;
+        }
+
+        _submitting = true;
+
+        var generation = _generation;
+        var name = _name;
+        var key = KeyFor(name);
+
+        try
+        {
+            using var linked = Session.LinkToSession(_disposal.Token);
+            using var answer = await Writes.SendAsync(HttpMethod.Post, SpaceRoutes.Directory, new CreateSpaceRequest(name), key, linked.Token);
+
+            // In flight means the first use of this key has not finished: a resend must still reuse it.
+            if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
+            {
+                _unanswered = null;
+            }
+
+            if (generation == _generation && answer.StatusCode != HttpStatusCode.Unauthorized)
+            {
+                await UseAnswerAsync(answer, generation, linked.Token);
+            }
+        }
+        catch (OperationCanceledException) when (_disposal.IsCancellationRequested)
+        {
+            // The page was left, or the Session ended, while the answer was on its way.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // No answer: the Space may or may not exist. Said in place; the same name sent again reuses the key.
+            if (generation == _generation)
+            {
+                _refusal = Localizer["SpaceCreateUnanswered"];
+            }
+        }
+        finally
+        {
+            _submitting = false;
+        }
+    }
+
+    /// <summary>
+    /// The key for this attempt. One that never got an answer may still have been applied: sending the same name again
+    /// is a retry of it and reuses its key, so the server replays it rather than creating a second Space. Any answer
+    /// ends it.
+    /// </summary>
+    private string KeyFor(string name)
+    {
+        var key = _unanswered is { } unanswered && string.Equals(unanswered.Name, name, StringComparison.Ordinal)
+            ? unanswered.Key
+            : Guid.NewGuid().ToString("D");
+
+        _unanswered = new UnansweredCreate(name, key);
+
+        return key;
+    }
+
+    private async Task UseAnswerAsync(SpaceWriteAnswer answer, int generation, CancellationToken token)
+    {
+        if (answer.StatusCode == HttpStatusCode.Created
+            && await answer.Response.Content.ReadFromJsonAsync<SpaceIdentityResponse>(JsonOptions, token) is { } created)
+        {
+            await LandAsync(created, generation, token);
+            return;
+        }
+
+        Refuse(answer.Problem);
+    }
+
+    /// <summary>
+    /// The Space exists. The switcher is asked again first, so the new id is listed before anything is asked about it
+    /// (UX-DR31); then the tab lands in it, as a switch.
+    /// </summary>
+    private async Task LandAsync(SpaceIdentityResponse created, int generation, CancellationToken token)
+    {
+        _name = string.Empty;
+        Say(Localizer["SpaceCreated"]);
+
+        await Directory.RefreshAsync(token);
+
+        if (generation != _generation)
+        {
+            return;
+        }
+
+        ActiveSpace.ArrivingInCreated(created.Id);
+        Navigation.NavigateTo(ClientRoutes.SpaceHome(created.Id));
+    }
+
+    /// <summary>
+    /// A refused creation, in place: an invalid name beside the field; the bound and anything else in the form's status
+    /// region. A 401 is YelloApiHandler's.
+    /// </summary>
+    private void Refuse(ProblemResponse? problem)
+    {
+        if (problem?.Type == ProblemTypes.InvalidSpaceName)
+        {
+            _nameMessage = Localizer[RefusalCopy.InvalidSpaceNameKey];
+            return;
+        }
+
+        _refusal = RefusalText.Of(Localizer, problem);
+    }
+
+    private void Say(string text)
+    {
+        _announcement = text;
+        _announcements++;
+    }
+
+    private sealed record UnansweredCreate(string Name, string Key);
+}

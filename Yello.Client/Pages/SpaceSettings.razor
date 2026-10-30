@@ -8,14 +8,16 @@
 @inject SpaceNarration Narration
 
 @*
-    A SPACE'S SETTINGS - story 2.4, open question 7: its Labels section today; later stories add their own sections
+    A SPACE'S SETTINGS - story 2.4, open question 7: its Space name section (story 3.1, AC3) and its Labels section;
+    later stories add their own sections
     (deferred-work.md). FR-22; UX-DR27, UX-DR29, UX-DR31, UX-DR32, UX-DR33.
 
     ARRIVES LIKE EVERY SPACE-SCOPED PAGE, through SpaceArrival: an unlisted Space is refused with no request, the
     Role is the server's answer on this load, and a 404 renders the one refusal surface. The address holds ids only,
     and the document's title stays the product's name.
 
-    OWNER AND ADMIN ONLY (manage-labels). Space home links here only for them. A Member or Viewer who arrives by the
+    OWNER AND ADMIN ONLY (SpaceCapabilities.PermitsSpaceSettings, the union of its sections' predicates). The context
+    bar links here only for them (story 3.1, AC4); each section renders only for a Role its own predicate admits. A Member or Viewer who arrives by the
     address meets the within-Space capability surface in place - "Only Owners and Admins can manage Labels.", never a
     toast - and no define form (UX-DR32, UX-DR27).
 
@@ -27,7 +29,12 @@
     <div class="space-settings">
         <PageHeading>@Localizer["SpaceSettingsHeading"]</PageHeading>
 
-        @if (Permitted(arrival.Current.Role))
+        @if (Permitted(arrival.Current.Role) && SpaceCapabilities.PermitsRenameSpace(arrival.Current.Role))
+        {
+            <SpaceNameSection @key="SpaceId" SpaceId="@SpaceId" CurrentName="@arrival.Current.Name" OnSpaceRefused="arrival.Refuse" />
+        }
+
+        @if (LabelCapabilities.PermitsManageLabels(arrival.Current.Role))
         {
             <LabelSection @key="SpaceId" SpaceId="@SpaceId" OnSpaceRefused="arrival.Refuse" />
         }
@@ -71,7 +78,7 @@
     /// </summary>
     private bool Permitted(string roleCode)
     {
-        var permitted = LabelCapabilities.PermitsManageLabels(roleCode);
+        var permitted = SpaceCapabilities.PermitsSpaceSettings(roleCode);
 
         if (permitted)
         {

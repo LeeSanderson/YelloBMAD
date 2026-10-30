@@ -13,7 +13,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>RED-PHASE SCAFFOLDS (story 3.1 ATDD run, 2026-10-29).</b> All skipped; see
+/// <b>Written as red-phase scaffolds by the story 3.1 ATDD run (2026-10-29), activated by story 3.1.</b> See
 /// <c>ActiveSpaceEndpointTests.CreateSpace.cs</c> for the seeding constraints.
 /// </para>
 /// <para>
@@ -40,7 +40,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// and a bound refusal records no <c>AccessRefusal</c> (it is neither kind).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - POST /api/v1/spaces and the SpacesPerAccount count do not exist yet (story 3.1 Task 4)")]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
@@ -84,7 +84,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Account's Memberships is gone, the next creation is admitted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - POST /api/v1/spaces and the SpacesPerAccount count do not exist yet (story 3.1 Task 4)")]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "AD-25")]
     public async Task A_Membership_the_Account_no_longer_holds_does_not_count_toward_the_bound()
@@ -118,7 +118,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// application lock, end with exactly one <c>201</c> and one <c>409 bound-reached</c>, and the Account holds 50.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the SpacesPerAccount count and its application lock do not exist yet (story 3.1 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     public async Task Two_concurrent_creations_at_49_yield_exactly_one_201_and_one_409()
@@ -171,7 +171,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// so the held lock is the product's, and B's not waiting is not a misnamed hold.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the SpacesPerAccount count and its application lock do not exist yet (story 3.1 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AD-25")]
     [Trait("Requirement", "NFR-1")]
     public async Task Another_Accounts_creation_never_waits_on_this_Accounts_lock()
@@ -222,7 +222,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// status, body and <c>Location</c>, and one Space exists.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the Account-scoped idempotency record does not exist yet (story 3.1 Task 4, Q2 (a))")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "AD-18")]
     public async Task A_creation_replayed_with_its_key_returns_the_original_answer_and_creates_one_Space()
@@ -255,7 +255,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// is full, returns that creation's <c>201</c>, not a <c>409</c>; a fresh key is refused (the anchor).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the Account-scoped idempotency record does not exist yet (story 3.1 Task 4, Q2 (a))")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "AD-25")]
@@ -294,7 +294,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// is applied; another Account's same key is a first use of its own (keyed <c>(AccountId, Key)</c>).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the Account-scoped idempotency record does not exist yet (story 3.1 Task 4, Q2 (a))")]
+    [Fact]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "AD-18")]
     public async Task A_key_reused_with_another_body_is_refused_422_and_another_Accounts_same_key_is_a_first_use()

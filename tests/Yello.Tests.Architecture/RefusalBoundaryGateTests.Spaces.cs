@@ -17,34 +17,27 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>RED-PHASE SCAFFOLDS.</b> Every case is skipped with its AC. None of the subjects exist yet, so they are reached
-/// by name (<c>Yello.Contracts.Spaces.CreateSpaceRequest</c>, <c>Yello.Domain.Spaces.SpaceName</c>, a client predicate
-/// named for <c>RenameSpace</c> or <c>SpaceSettings</c>) - the story's indicative names (Tasks 3, 4, 7). On activation,
-/// replace each lookup by the typed reference it stands for, so a rename is a compile error.
+/// <b>Written as red-phase scaffolds by the story 3.1 ATDD run, activated by story 3.1.</b> The contracts and the name
+/// rule are typed references now, so a rename is a compile error; the client predicates are still found by name,
+/// because the client assembly's static classes are what the gate scans, and the internal column configuration by name.
 /// </para>
 /// <para>
-/// <b>Active gates that go red by design when 3.1 lands</b> and are amended in that change (Task 9), not here:
+/// <b>Active gates amended by story 3.1 (Task 9)</b>, each for exactly one named exception:
 /// <c>No_endpoint_without_spaceId_in_its_path_reaches_a_Space_scoped_entity</c> (creation is the second named
 /// exemption beside registration), <c>Every_Account_scoped_endpoint_names_an_AD_24_surface</c> and
-/// <c>SpaceSwitcherGateTests.The_Account_scoped_surfaces_are_exactly_the_two_AD_24_names</c> (if Q1's step carries a
-/// surface member), <c>SpaceSwitcherGateTests.No_caller_sets_both_session_context_keys</c> (its successor is
-/// <c>Exactly_one_creation_unit_of_work_sets_both_session_context_keys</c>), <c>Space_is_read_only_where_named</c>
-/// (the creation and rename stores), and <c>SpaceSwitcherGateTests.Only_the_Account_scoped_handlers_depend_on_the_Account_scoped_reads</c>
-/// if the creation handler takes an Account-scoped read.
+/// <c>SpaceSwitcherGateTests.The_Account_scoped_surfaces_are_exactly_the_AD_24_names_as_amended</c> (the
+/// <c>SpaceCreation</c> surface), <c>SpaceSwitcherGateTests.No_caller_but_the_Space_creation_unit_of_work_sets_both_session_context_keys</c>,
+/// <c>Space_is_read_only_where_named</c> (the provisioning and the Space store), and
+/// <c>The_endpoints_unreachable_with_a_Token_are_Token_management_the_switcher_and_the_move</c> (creation, on the
+/// switcher's path).
 /// </para>
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
 {
-    private const string CreateSpaceRequestName = "Yello.Contracts.Spaces.CreateSpaceRequest, Yello.Contracts";
-
-    private const string RenameSpaceRequestName = "Yello.Contracts.Spaces.RenameSpaceRequest, Yello.Contracts";
-
-    private const string SpaceNameTypeName = "Yello.Domain.Spaces.SpaceName";
-
     private const string SpaceConfigurationTypeName = "Yello.Infrastructure.Persistence.Configurations.SpaceConfiguration";
 
     /// <summary>
-    /// Story 3.1 Q6 (a), assumed (open for the dev phase): the longest provisioned name is 128 + "'s Space", so 200.
+    /// Story 3.1 Q6 (a): the longest provisioned name is 128 + "'s Space", so 200.
     /// </summary>
     private const int SpaceNameLimit = 200;
 
@@ -53,7 +46,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// every Role: it offers it exactly where <c>RenameSpace</c> is not denied (Owner, Admin). Sibling of
     /// <c>The_clients_Label_definition_predicate_agrees_with_the_capability_matrix</c>.
     /// </summary>
-    [Fact(Skip = "red: AC3 - SpaceCapabilities.PermitsRenameSpace does not exist yet (story 3.1 Task 7)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "FR-6")]
     public void The_clients_rename_predicate_agrees_with_the_capability_matrix()
@@ -75,7 +68,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// its sections is (the Label section's <c>ManageLabels</c>, the name section's <c>RenameSpace</c>), so the
     /// link's audience is defined in one place and is never wider or narrower than the page.
     /// </summary>
-    [Fact(Skip = "red: AC4 - SpaceCapabilities.PermitsSpaceSettings does not exist yet (story 3.1 Task 7)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "UX-DR9")]
     public void The_clients_Space_settings_predicate_is_the_union_of_its_sections()
@@ -97,16 +90,13 @@ public sealed partial class RefusalBoundaryGateTests
     /// AC9, AD-2, Task 4 - <c>CreateSpaceRequest</c> and <c>RenameSpaceRequest</c> carry <c>Name</c> and nothing else:
     /// the new Space's id is server-generated, and a rename writes the resolved Space, never an id from the body.
     /// </summary>
-    [Fact(Skip = "red: AC9 - CreateSpaceRequest and RenameSpaceRequest do not exist yet (story 3.1 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AR-34")]
     public void The_Space_request_contracts_carry_a_name_and_nothing_else()
     {
-        foreach (var name in new[] { CreateSpaceRequestName, RenameSpaceRequestName })
+        foreach (var contract in new[] { typeof(Yello.Contracts.Spaces.CreateSpaceRequest), typeof(Yello.Contracts.Spaces.RenameSpaceRequest) })
         {
-            var contract = Type.GetType(name);
-
-            Assert.True(contract is not null, $"{name} is not declared.");
             Assert.Equal(["Name"], PropertyNames(contract));
             Assert.Equal(typeof(string), contract.GetProperty("Name")?.PropertyType);
         }
@@ -116,14 +106,12 @@ public sealed partial class RefusalBoundaryGateTests
     /// AC9, Q6 (a) assumed, Task 3 - <c>SpaceName.TryNormalise</c> trims and admits 1-200 characters, and nothing else
     /// (no uniqueness: AC5); its <c>MaxLength</c> is the column's, so there is one source of truth.
     /// </summary>
-    [Fact(Skip = "red: AC9 - SpaceName does not exist yet (story 3.1 Task 3)")]
+    [Fact]
     [Trait("Requirement", "FR-6")]
     [Trait("Assumption", "FR-6-Q6")]
     public void The_Space_name_rule_admits_1_to_200_characters_and_the_column_agrees()
     {
-        var spaceName = ProductionAssemblies.Domain.GetType(SpaceNameTypeName);
-
-        Assert.True(spaceName is not null, $"{SpaceNameTypeName} is not declared.");
+        var spaceName = typeof(Yello.Domain.Spaces.SpaceName);
 
         var maxLength = ConstantOf(spaceName, "MaxLength");
         var column = ConstantOf(ProductionAssemblies.Infrastructure.GetType(SpaceConfigurationTypeName), "NameMaxLength");
@@ -164,7 +152,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// AC6, AC7, AD-25, AR-3 - the Spaces-per-Account bound is declared by exactly one endpoint, the creation route
     /// (<c>POST /api/v1/spaces</c>), so the pipeline - not a slice - consults it there and nowhere else.
     /// </summary>
-    [Fact(Skip = "red: AC6 - no endpoint consults Bound.SpacesPerAccount yet (story 3.1 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     public void The_Spaces_per_Account_bound_is_consulted_by_the_creation_route_alone()
@@ -182,7 +170,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>RenameSpace</c>; creation (<c>POST</c> on the directory) declares no capability, because it is Account-scoped
     /// and no Role is held in a Space that does not exist yet (there is no <c>CreateSpace</c> capability).
     /// </summary>
-    [Fact(Skip = "red: AC10 - POST and PATCH on /api/v1/spaces are not mapped yet (story 3.1 Tasks 4, 5)")]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "AR-11")]
     public void Rename_declares_RenameSpace_and_creation_declares_no_capability()
@@ -198,6 +186,150 @@ public sealed partial class RefusalBoundaryGateTests
         Assert.Empty(create.Metadata.OfType<RequiredCapability>());
         Assert.DoesNotContain("CreateSpace", Enum.GetNames<Capability>());
     }
+
+    /// <summary>
+    /// AC3, AC10, Q5 (a), Task 9 - <c>Space</c> carries no row-level security policy, so the only thing that scopes a write
+    /// to it is the statement's own filter. Exactly one production method updates or deletes a <c>Space</c> in bulk -
+    /// <c>SpaceStore.RenameAsync</c>, which filters on the resolved context's <c>SpaceId</c> - and nothing calls
+    /// <c>Update</c> or <c>Remove</c> on a <c>Space</c> entity. Read from the compiled IL: a generic
+    /// <c>ExecuteUpdate</c>/<c>ExecuteDelete</c> whose source type is <c>Space</c>.
+    /// </summary>
+    /// <remarks>
+    /// <b>Vacuity guard:</b> the scan finds <c>ExecuteUpdateAsync</c> calls on other entities (a Project rename), so it
+    /// reads what it claims to. Planted by story 3.1 with a second <c>ExecuteUpdateAsync</c> on <c>Space</c>, and caught.
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "NFR-1")]
+    public void The_only_update_of_a_Space_is_the_rename_of_the_resolved_Space()
+    {
+        const string space = "Yello.Domain.Spaces.Space";
+
+        var calls = BulkWriteCalls();
+
+        Assert.Contains(calls, call => call.Caller == "Yello.Infrastructure.Persistence.ProjectStore");
+
+        var bulkWriters = calls
+            .Where(call => call.SourceTypes.Contains(space, StringComparer.Ordinal))
+            .Select(call => call.Caller)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(
+            bulkWriters.SequenceEqual(["Yello.Infrastructure.Persistence.SpaceStore"], StringComparer.Ordinal),
+            "Space carries no policy (Q5 (a), the AD-24 amendment), so its one bulk write is the rename of the resolved "
+            + "Space. Found: " + string.Join(", ", bulkWriters));
+    }
+
+    /// <summary>
+    /// Q6 (a), Tasks 6, 7 - the client's courtesy check of a Space name (<c>SpaceNameRule.IsSpaceName</c>) agrees with the
+    /// Domain's <c>SpaceName</c> at every edge: empty, blank, one character, trimmed, 200 and 201 characters. The sibling of
+    /// <c>The_clients_Label_name_predicate_agrees_with_the_Domain_rule</c>.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "FR-6")]
+    [Trait("Assumption", "FR-6-Q6")]
+    public void The_clients_Space_name_predicate_agrees_with_the_Domain_rule()
+    {
+        var predicate = ProductionAssemblies.Client.GetTypes()
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
+            .SingleOrDefault(method => method.Name == "IsSpaceName"
+                && method.ReturnType == typeof(bool)
+                && method.GetParameters() is [{ ParameterType: var only }]
+                && only == typeof(string));
+
+        Assert.True(predicate is not null, "No static bool IsSpaceName(string) in Yello.Client.");
+
+        var longest = Yello.Domain.Spaces.SpaceName.MaxLength;
+
+        string[] inputs =
+        [
+            string.Empty,
+            "   ",
+            "a",
+            "  a  ",
+            new string('n', longest),
+            new string('n', longest + 1),
+            "  " + new string('n', longest) + "  ",
+        ];
+
+        foreach (var input in inputs)
+        {
+            var expected = Yello.Domain.Spaces.SpaceName.TryNormalise(input, out _);
+
+            Assert.True(
+                predicate.Invoke(null, [input]) is bool shown && shown == expected,
+                $"The client's Space name check disagrees with the Domain for a {input.Length}-character input.");
+        }
+    }
+
+    /// <summary>
+    /// AC14, AR-34, I-17, Task 9 - no source-generated log message in the product takes a name as an argument: a Space's
+    /// id may be logged (story 3.1's creation event carries it), its name never - nor any other name a person typed.
+    /// Static half of <c>ActiveSpaceEndpointTests.No_Space_name_reaches_the_log_on_creation_or_rename</c>.
+    /// </summary>
+    /// <remarks>
+    /// <b>Vacuity guard:</b> the scan finds story 3.1's <c>SpaceCreated</c> message and its <c>spaceId</c>. Planted by
+    /// story 3.1 with a <c>spaceName</c> argument on that message, and caught.
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "AR-34")]
+    [Trait("Requirement", "NFR-6")]
+    public void No_log_message_takes_a_name()
+    {
+        // Names the deployment gives, not a person: the Data Protection application name and the database resource name.
+        string[] systemNames = ["applicationName", "resourceName"];
+
+        var messages = ProductionAssemblies.All
+            .Where(assembly => assembly != ProductionAssemblies.AppHost)
+            .SelectMany(assembly => assembly.GetTypes())
+            .SelectMany(type => type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.Instance | BindingFlags.DeclaredOnly))
+            .Where(method => method.GetCustomAttributes().Any(attribute => attribute.GetType().Name == "LoggerMessageAttribute"))
+            .ToList();
+
+        var created = Assert.Single(messages, method => method.Name == "SpaceCreated");
+        Assert.Contains(created.GetParameters(), parameter => parameter.Name == "spaceId");
+
+        var offenders = messages
+            .SelectMany(method => method.GetParameters()
+                .Where(parameter => parameter.Name?.Contains("name", StringComparison.OrdinalIgnoreCase) == true
+                    && !systemNames.Contains(parameter.Name, StringComparer.Ordinal))
+                .Select(parameter => $"{method.DeclaringType?.Name}.{method.Name}({parameter.Name})"))
+            .ToList();
+
+        Assert.True(offenders.Count == 0, "A log message takes a name, which a person typed (AR-34): " + string.Join(", ", offenders));
+    }
+
+    /// <summary>
+    /// Every production call to EF Core's bulk <c>ExecuteUpdate</c>/<c>ExecuteDelete</c>, as the outermost calling type and
+    /// the call's generic arguments.
+    /// </summary>
+    private static List<(string Caller, string[] SourceTypes)> BulkWriteCalls()
+    {
+        string[] bulk = ["ExecuteUpdate", "ExecuteUpdateAsync", "ExecuteDelete", "ExecuteDeleteAsync"];
+
+        var calls = new List<(string, string[])>();
+
+        foreach (var assembly in ProductionAssemblies.All.Where(assembly => assembly != ProductionAssemblies.AppHost))
+        {
+            using var module = Mono.Cecil.ModuleDefinition.ReadModule(assembly.Location);
+
+            calls.AddRange(module.GetTypes()
+                .SelectMany(type => type.Methods
+                    .Where(method => method.HasBody)
+                    .SelectMany(method => method.Body.Instructions)
+                    .Select(instruction => instruction.Operand)
+                    .OfType<Mono.Cecil.GenericInstanceMethod>()
+                    .Where(called => bulk.Contains(called.Name, StringComparer.Ordinal))
+                    .Select(called => (OutermostName(type), called.GenericArguments.Select(argument => argument.FullName).ToArray()))));
+        }
+
+        return calls;
+    }
+
+    private static string OutermostName(Mono.Cecil.TypeDefinition type) =>
+        type.DeclaringType is null ? type.FullName : OutermostName(type.DeclaringType);
 
     /// <summary>
     /// The one public static <c>bool (string roleCode)</c> method in <c>Yello.Client</c> whose name contains

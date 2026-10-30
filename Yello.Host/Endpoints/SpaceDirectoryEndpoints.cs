@@ -1,12 +1,17 @@
+using Yello.Application.Spaces.CreateSpace;
 using Yello.Application.Spaces.ListSpaces;
+using Yello.Contracts;
 using Yello.Contracts.Spaces;
+using Yello.Domain.Bounds;
+using Yello.Domain.Spaces;
 using Yello.Host.Spaces;
 
 namespace Yello.Host.Endpoints;
 
 /// <summary>
 /// <c>GET /api/v1/spaces</c> - the Space switcher, the first of AD-24's two Account-scoped surfaces.
-/// FR-9; AD-24 / AR-29; I-11.
+/// FR-9; AD-24 / AR-29; I-11. And <c>POST /api/v1/spaces</c> on the same path - Space creation, the
+/// Account-scoped unit of work AD-24's amendment of 2026-10-29 names (story 3.1, FR-5).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -52,4 +57,73 @@ public static class SpaceDirectoryEndpoints
             .Select(space => new SpaceIdentityResponse(space.Id, space.Name))
             .ToList());
     }
+
+    /// <summary>
+    /// Registers <c>POST /api/v1/spaces</c> - Space creation (story 3.1, FR-5), the Account-scoped unit of work the
+    /// AD-24 amendment of 2026-10-29 names. Session only; it declares no capability (no Role is held in a Space that
+    /// does not exist yet) and the Spaces-per-Account bound, which the pipeline's creation step consults.
+    /// </summary>
+    /// <param name="endpoints">The route builder.</param>
+    /// <returns>The registered route, for further configuration.</returns>
+    public static RouteHandlerBuilder MapCreateSpace(this IEndpointRouteBuilder endpoints) =>
+        endpoints.MapPost(SpaceRoutes.Directory, CreateAsync)
+            .AccountScoped(AccountScopedSurface.SpaceCreation)
+            .ConsultsBound(Bound.SpacesPerAccount);
+
+    /// <summary>
+    /// Creates a Space, owned by the caller.
+    /// </summary>
+    /// <param name="handler">The slice.</param>
+    /// <param name="httpContext">
+    /// The request: its services hold the creation context the pipeline established, and its body is read here -
+    /// never bound as a parameter, so a body the framework could not bind is still answered by the pipeline.
+    /// </param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>
+    /// <c>201</c> with the new Space's identity and a <c>Location</c> of its active route, or
+    /// <c>400 invalid-space-name</c>.
+    /// </returns>
+    public static async Task<IResult> CreateAsync(
+        CreateSpaceHandler handler,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var request = await JsonRequestBody.ReadAsync(httpContext.Request, typeof(CreateSpaceRequest), cancellationToken)
+            .ConfigureAwait(false) as CreateSpaceRequest;
+
+        if (!SpaceName.TryNormalise(request?.Name, out var name))
+        {
+            return SpaceNameProblems.Invalid();
+        }
+
+        var context = httpContext.RequestServices.GetRequiredService<SpaceCreationRequest>().Context;
+
+        var created = await handler.HandleAsync(context, name, cancellationToken).ConfigureAwait(false);
+
+        SpaceLog.SpaceCreated(
+            httpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(SpaceDirectoryEndpoints)),
+            created.Id);
+
+        // Set on the response rather than through Results.Created, so the pipeline's idempotency record reads it
+        // from one place whatever the endpoint.
+        httpContext.Response.Headers.Location = SpaceRoutes.ActiveOf(created.Id);
+
+        return Results.Json(new SpaceIdentityResponse(created.Id, created.Name), statusCode: StatusCodes.Status201Created);
+    }
+}
+
+/// <summary>
+/// The one refusal a Space name earns, shared by creation and rename. Story 3.1, open question 6 (a).
+/// </summary>
+internal static class SpaceNameProblems
+{
+    /// <summary>
+    /// <c>400 invalid-space-name</c>, stating the rule and never the name sent (AR-34).
+    /// </summary>
+    /// <returns>The problem.</returns>
+    internal static IResult Invalid() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            type: ProblemTypes.InvalidSpaceName,
+            title: "A Space's name is 1 to 200 characters.");
 }

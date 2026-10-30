@@ -56,7 +56,8 @@ public sealed partial class RefusalBoundaryGateTests
     /// <summary>
     /// ARCH-602 - AC8, FR-35, FR-36, AR-29, AD-24 - the successor of 1.8's Token-unreachable gate, widened by exactly the
     /// move route: the endpoints marked unreachable with an API Token, by the Session-only marker or by an AD-24 surface,
-    /// are Token issue, the Token list, Token revocation, the switcher - so a new Token-management route cannot be added
+    /// are Token issue, the Token list, Token revocation, the switcher, Space creation (story 3.1, on the switcher's
+    /// path) - so a new Token-management route cannot be added
     /// without one - and the move: the one place the API is deliberately narrower than the browser (FR-35,
     /// <c>prd.md:605</c>), because a position within a column is readable over the API and never writable.
     /// </summary>
@@ -93,6 +94,10 @@ public sealed partial class RefusalBoundaryGateTests
             {
                 Yello.Contracts.ApiTokens.ApiTokenRoutes.List,
                 Yello.Contracts.ApiTokens.ApiTokenRoutes.Revoke,
+                Yello.Contracts.Spaces.SpaceRoutes.Directory,
+
+                // Story 3.1: Space creation shares the switcher's path, as AD-24's amended Space creation surface. A
+                // Token is no credential on it (CAP-35: a Token acts in its own Space, and creating one is not that).
                 Yello.Contracts.Spaces.SpaceRoutes.Directory,
                 Yello.Contracts.ApiTokens.ApiTokenRoutes.Issue,
                 TaskMovePattern,

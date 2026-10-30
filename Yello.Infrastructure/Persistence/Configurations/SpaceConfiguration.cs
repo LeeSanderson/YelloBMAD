@@ -20,9 +20,10 @@ internal sealed class SpaceConfiguration : IEntityTypeConfiguration<Space>
     /// <summary>
     /// A Space name is a heading, not prose. Long enough for a composed
     /// "&lt;display name&gt;'s Space" in any language - German and Finnish run 30-40% longer
-    /// than English - and for a name a person types themselves from Epic 3.
+    /// than English - and for a name a person types themselves (story 3.1). The rule's own limit, so
+    /// the column and <see cref="SpaceName.TryNormalise"/> cannot disagree.
     /// </summary>
-    private const int NameMaxLength = 200;
+    private static int NameMaxLength => SpaceName.MaxLength;
 
     public void Configure(EntityTypeBuilder<Space> builder)
     {

@@ -10,8 +10,9 @@ namespace Yello.Host.Spaces;
 /// <remarks>
 /// <para>
 /// <b>Opted into by metadata, and the set of endpoints that opt in is closed.</b> An Account-scoped
-/// endpoint carries <see cref="AccountScopedEndpoint"/> naming one of AD-24's two
-/// <see cref="AccountScopedSurface"/> members, and a gate enumerates them. Unlike Space resolution,
+/// endpoint carries <see cref="AccountScopedEndpoint"/> naming one of AD-24's
+/// <see cref="AccountScopedSurface"/> members (two read surfaces, and Space creation since the
+/// amendment of 2026-10-29), and a gate enumerates them. Unlike Space resolution,
 /// which is decided by the shape of the route, this cannot be decided by shape: an Account-scoped
 /// route has no parameter to recognise it by, and the risk runs the other way - a surface reading
 /// across Spaces that AD-24 never sanctioned - so it has to be named.
@@ -49,7 +50,7 @@ internal static class AccountScopedResolution
     /// <param name="services">The container.</param>
     /// <returns>The same collection, for chaining.</returns>
     internal static IServiceCollection AddAccountScopedResolution(this IServiceCollection services) =>
-        services.AddScoped<AccountScopedRequest>();
+        services.AddScoped<AccountScopedRequest>().AddScoped<SpaceCreationRequest>();
 
     /// <summary>
     /// Refuses an unauthenticated request to an Account-scoped endpoint with <c>401</c>, establishes

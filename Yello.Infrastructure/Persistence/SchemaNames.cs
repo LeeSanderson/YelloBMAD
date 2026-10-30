@@ -89,6 +89,30 @@ public static class SchemaNames
     public static string IdempotencyRecordTable => "IdempotencyRecord";
 
     /// <summary>
+    /// The Account-scoped idempotency record (story 3.1, open question 2 (a); AD-18): the answer to a Space creation's
+    /// <c>Idempotency-Key</c>. Under <see cref="AccountIsolationPolicy"/>, not the Space policy - it has no
+    /// <c>SpaceId</c> column.
+    /// </summary>
+    public static string AccountIdempotencyRecordTable => "AccountIdempotencyRecord";
+
+    /// <summary>
+    /// The predicate function the Account-scoped tables' policy is built from: the row's <c>AccountId</c> is
+    /// <c>SESSION_CONTEXT('AccountId')</c> (story 3.1).
+    /// </summary>
+    public static string AccountPredicateFunction => "fn_AccountIsolationPredicate";
+
+    /// <summary>
+    /// The security policy that applies <see cref="AccountPredicateFunction"/> to every Account-scoped table. A
+    /// policy of its own, so the Space policy still covers exactly the tables with a <c>SpaceId</c> (story 3.1).
+    /// </summary>
+    public static string AccountIsolationPolicy => "AccountIsolationPolicy";
+
+    /// <summary>
+    /// The tables <see cref="AccountIsolationPolicy"/> covers, each with a FILTER and a BLOCK AFTER INSERT predicate.
+    /// </summary>
+    public static IReadOnlyList<string> AccountScopedTables { get; } = [AccountIdempotencyRecordTable];
+
+    /// <summary>
     /// The AccessRefusal table. <b>Not</b> Space-scoped: its target column is <c>TargetSpaceId</c>,
     /// and it carries no predicate - see <c>AccessRefusalConfiguration</c>.
     /// </summary>

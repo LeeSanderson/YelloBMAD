@@ -127,7 +127,8 @@ public sealed class YelloDbContext(
     /// <summary>
     /// The Account <c>Membership</c>'s filter admits alongside <see cref="ScopedSpaceId"/>, read from
     /// this context's <see cref="AccountScope"/> each time a query runs. <c>null</c> - matching
-    /// nothing - except inside the Account-scoped adapter's unit of work.
+    /// nothing - except inside an Account-scoped unit of work: the switcher's directory, or the Space
+    /// creation unit of work (story 3.1), whose Account-scoped idempotency record filters on it too.
     /// </summary>
     internal Guid? ScopedAccountId => _accountScope.AccountId;
 
@@ -162,6 +163,7 @@ public sealed class YelloDbContext(
         modelBuilder.ApplyConfiguration(new LabelConfiguration(this));
         modelBuilder.ApplyConfiguration(new TaskLabelConfiguration(this));
         modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration(this));
+        modelBuilder.ApplyConfiguration(new AccountIdempotencyRecordConfiguration(this));
         modelBuilder.ApplyConfiguration(new AccessRefusalConfiguration());
         modelBuilder.ApplyConfiguration(new ApiTokenConfiguration());
         modelBuilder.ApplyConfiguration(new DataProtectionKeyConfiguration());

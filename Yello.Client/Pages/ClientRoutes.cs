@@ -64,6 +64,14 @@ public static class ClientRoutes
     public static string AccountSettings => "/account";
 
     /// <summary>
+    /// The create page (story 3.1, open question 3 (a)), reached from the switcher's foot and the no-Space state. Under
+    /// <c>/spaces</c> but never a Space: <c>new</c> is not a Space id, so the <c>{SpaceId:guid}</c> routes never match it
+    /// and <see cref="SpaceIn"/> reads it as outside every Space - arriving here purges the departed Space like any other
+    /// Account-scoped route.
+    /// </summary>
+    public static string CreateSpace => "/spaces/new";
+
+    /// <summary>
     /// The query-string key the sign-in surface reads its reason from.
     /// </summary>
     /// <remarks>

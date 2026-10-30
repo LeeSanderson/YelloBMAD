@@ -832,8 +832,8 @@ internal static class IsolationCases
             Both(new EachSeesOnlyItsOwnOnOneConnection()),
             Runner: CaseRunner.Pooled),
 
-        // Story 3.1 (ATDD run, 2026-10-29): the two routes 3.1 maps, each on both surfaces (1.9-GATE-002). Pending until
-        // the dev phase maps them; GATE-003 fails the suite if any is still pending when 3.1 reaches review. Each write
+        // Story 3.1 (written by its ATDD run, 2026-10-29; live since its dev phase): the two routes 3.1 maps, each on
+        // both surfaces (1.9-GATE-002). Each write
         // row acts as a FRESH actor, because A's switcher is ISO-LIST-SPACES' subject ("exactly [SA]") and A's Space
         // name is every row's presence anchor.
         new(
@@ -843,23 +843,17 @@ internal static class IsolationCases
             {
                 [IsolationSurface.Session] = new Served(HttpStatusCode.Created, TheCreatedSpaceIsTheCallersAloneAsync, "201, {id, name}; listed by the caller alone; A's and B's Spaces unchanged"),
                 [IsolationSurface.ApiToken] = new NoCredential { Then = TheTokenCreatedNoSpaceAsync },
-            },
-            PendingUntil: "3.1",
-            PendingReason: "red: AC10 - POST /api/v1/spaces is not mapped yet (story 3.1 Task 4); convert when it is"),
+            }),
 
         new(
             "ISO-RENAME-SPACE-CROSS", "I-2, I-4 (3.1 AC10)", IsolationVector.Write, HttpMethod.Patch, SpaceRoutes.Active,
             world => ForeignAsync(world, SpaceRoutes.ActiveOf, HttpMethod.Patch),
-            Both(new BoundaryNotFound { Then = TheForeignSpaceKeepsItsNameAsync }),
-            PendingUntil: "3.1",
-            PendingReason: "red: AC10 - PATCH /api/v1/spaces/{spaceId} is not mapped yet (story 3.1 Task 5); convert when it is"),
+            Both(new BoundaryNotFound { Then = TheForeignSpaceKeepsItsNameAsync })),
 
         new(
             "ISO-RENAME-SPACE-OWN", "I-12 (3.1 AC10 in-Space anchor)", IsolationVector.Api, HttpMethod.Patch, SpaceRoutes.Active,
             FreshActorRenamesItsOwnSpaceAsync,
-            Both(new Served(HttpStatusCode.OK, RenamedOnlyTheCallersOwnSpaceAsync, "200, {id, name, role: owner}; B's Space keeps its name")),
-            PendingUntil: "3.1",
-            PendingReason: "red: AC10 - PATCH /api/v1/spaces/{spaceId} is not mapped yet (story 3.1 Task 5); convert when it is"),
+            Both(new Served(HttpStatusCode.OK, RenamedOnlyTheCallersOwnSpaceAsync, "200, {id, name, role: owner}; B's Space keeps its name"))),
     ];
 
     /// <summary>
