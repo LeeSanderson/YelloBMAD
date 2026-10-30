@@ -4,7 +4,7 @@ baseline_commit: 364d4c3
 
 # Story 3.1: Create and rename a Space
 
-Status: review
+Status: done
 
 Epic: 3 — Several Spaces, cleanly separated
 Story key: `3-1-create-and-rename-a-space`
@@ -280,6 +280,22 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1444-1477` (`status: final
   - [x] `deferred-work.md`: apply Dev Notes → Ledger dispositions.
   - [x] `tests/TESTING-CONVENTIONS.md`: add a short "Account-scoped creation - added by story 3.1" note. It covers how to seed N Memberships for the bound (`WireDatabase.AddOwnedSpaceAsync`, which should now seed default Statuses too, or say why not), and how to make two creations overlap on the Account's application lock.
   - [x] Run `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the Explicit tiers. **Build `Yello.Client` in Debug before browser plants.**
+
+### Review Findings
+
+Code review 2026-10-30 (bmad-code-review, full mode, range `f3da467..HEAD`). All 6 patches applied; D1 decided by Lee. 39 raw findings from three layers (Blind Hunter 17, Edge Case Hunter 10, Acceptance Auditor 12), 26 after dedupe. 1 decision-needed, 6 patch, 4 defer, 15 dismissed.
+
+- [x] [Review][Decision] **Decided by Lee 2026-10-30: (a)**, keep it non-sticky below 30em of viewport height (WCAG 1.4.10 reflow wins at that height), with a `deferred-work.md` entry owned by UX to confirm the UX-DR9 exception. The context bar stops being sticky below 30em of viewport height — `components.css` adds `@media (max-height: 29.9375em) { .context-bar { position: static; } }` so AC16's 320x256 / 200% text-only zoom case can click below the bar. UX-DR9 (`epics.md:247`, `DESIGN.md:427`) says the bar "never scrolls away", and the story lists UX-DR9 as binding. Recorded only as a reversible decision in Completion Notes, with no ledger entry for UX. Options: (a) keep it, with a ledger entry for UX to confirm; (b) keep it sticky and bound the bar's height on short viewports instead; (c) keep it sticky and narrow AC16's short-viewport case.
+- [x] [Review][Patch] A 201 whose body cannot be read clears the retry key, and the "will not be created twice" retry then makes a second Space [Yello.Client/Pages/CreateSpace.razor:163]
+- [x] [Review][Patch] The retry key is reused only for an ordinally identical untrimmed name, so a whitespace-only edit draws a new key for the same normalised name [Yello.Client/Pages/CreateSpace.razor:198]
+- [x] [Review][Patch] `SpaceCreated` (EventId 1038) is logged by the endpoint before the commit, so a creation rolled back (key in flight, failed commit) is logged as created [Yello.Host/Endpoints/SpaceDirectoryEndpoints.cs:103]
+- [x] [Review][Patch] Two amended gates do not cite the AD-24 amendment in their assertions (Task 9) [tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.cs]
+- [x] [Review][Patch] `The_only_update_of_a_Space_is_the_rename_of_the_resolved_Space`'s summary claims it checks `Update`/`Remove` on a `Space` entity; it scans only `ExecuteUpdate`/`ExecuteDelete` [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Spaces.cs]
+- [x] [Review][Patch] `CreateSpaceCancel`'s comment says Cancel goes "back to where the person came from"; it goes to `ClientRoutes.Home` [Yello.Client/Localisation/ClientCopy.resx:996]
+- [x] [Review][Defer] Rename answers 200 when `ExecuteUpdateAsync` touches no row (the Space deleted after resolution) [Yello.Infrastructure/Persistence/SpaceStore.cs:39] — deferred to story 3.3, which introduces Space deletion and so the only way to reach it
+- [x] [Review][Defer] "The both-keys unit of work reads nothing but the count" is stated (story regression guard, AD-24 amendment) but not gated; nothing limits what the creation handler or endpoint may read while both keys are set [Yello.Application/Spaces/CreateSpace/CreateSpaceHandler.cs] — deferred to story 4.3, the next both-keys unit of work (`deferred-work.md:211`)
+- [x] [Review][Defer] No test drives the path where the Space rows are saved and then rolled back (the key's first use lost on the unique index → 409 in flight) (AC11) [Yello.Host/Spaces/ActiveSpaceResolution.Creation.cs:116] — deferred to story 8.3, which owns concurrent same-key creation (`deferred-work.md:482-485`)
+- [x] [Review][Defer] AC16's Tab-order and focus-visible clauses have no browser assertion on the create page or the rename section [tests/Yello.Tests.Client/SpaceCreateAndRenameTests.cs] — deferred to story 3.2, which next changes switcher and context-bar focus
 
 ## Dev Notes
 

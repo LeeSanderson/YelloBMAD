@@ -79,8 +79,10 @@ internal static partial class ActiveSpaceResolution
 
                 var idempotent = await BeginAsync(httpContext, logger, accountId, cancellationToken).ConfigureAwait(false);
 
-                var result = idempotent.Answer
-                    ?? await CreationBound.ConsultAsync(httpContext, logger, spaceId: null, cancellationToken).ConfigureAwait(false)
+                var replayedOrRefused = idempotent.Answer
+                    ?? await CreationBound.ConsultAsync(httpContext, logger, spaceId: null, cancellationToken).ConfigureAwait(false);
+
+                var result = replayedOrRefused
                     ?? await RunAsync(context, next, logger, accountId, idempotent).ConfigureAwait(false);
 
                 if (UnitOfWorkResults.IsFailure(result))
@@ -89,6 +91,13 @@ internal static partial class ActiveSpaceResolution
                 }
 
                 await unitOfWork.CompleteAsync(CancellationToken.None).ConfigureAwait(false);
+
+                // Only once committed, and only when this request created it: a replay creates nothing, and a creation
+                // rolled back (its key in flight, or a failed commit) never existed.
+                if (replayedOrRefused is null)
+                {
+                    SpaceLog.SpaceCreated(logger, spaceId);
+                }
 
                 return result;
             }

@@ -159,6 +159,9 @@
             using var linked = Session.LinkToSession(_disposal.Token);
             using var answer = await Writes.SendAsync(HttpMethod.Post, SpaceRoutes.Directory, new CreateSpaceRequest(name), key, linked.Token);
 
+            // A 201 is an answer only once its body is read: before then the key is still held.
+            var created = await ReadCreatedAsync(answer, linked.Token);
+
             // In flight means the first use of this key has not finished: a resend must still reuse it.
             if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
             {
@@ -167,7 +170,7 @@
 
             if (generation == _generation && answer.StatusCode != HttpStatusCode.Unauthorized)
             {
-                await UseAnswerAsync(answer, generation, linked.Token);
+                await UseAnswerAsync(answer.Problem, created, generation, linked.Token);
             }
         }
         catch (OperationCanceledException) when (_disposal.IsCancellationRequested)
@@ -190,30 +193,43 @@
 
     /// <summary>
     /// The key for this attempt. One that never got an answer may still have been applied: sending the same name again
-    /// is a retry of it and reuses its key, so the server replays it rather than creating a second Space. Any answer
-    /// ends it.
+    /// is a retry of it and reuses its key, so the server replays it rather than creating a second Space. "The same
+    /// name" is the name the server would store - trimmed, as <c>SpaceName</c> trims - so an edit to surrounding
+    /// spaces alone is still a retry. Any answer ends it.
     /// </summary>
     private string KeyFor(string name)
     {
-        var key = _unanswered is { } unanswered && string.Equals(unanswered.Name, name, StringComparison.Ordinal)
+        var normalised = name.Trim();
+
+        var key = _unanswered is { } unanswered && string.Equals(unanswered.Name, normalised, StringComparison.Ordinal)
             ? unanswered.Key
             : Guid.NewGuid().ToString("D");
 
-        _unanswered = new UnansweredCreate(name, key);
+        _unanswered = new UnansweredCreate(normalised, key);
 
         return key;
     }
 
-    private async Task UseAnswerAsync(SpaceWriteAnswer answer, int generation, CancellationToken token)
+    /// <summary>
+    /// The created Space a 201 carries, or null for any other answer. A 201 whose body cannot be read, or reads as
+    /// nothing, throws - into the unanswered path, with the key still held - so the same name sent again is replayed by
+    /// the server rather than creating a second Space.
+    /// </summary>
+    private static async Task<SpaceIdentityResponse?> ReadCreatedAsync(SpaceWriteAnswer answer, CancellationToken token) =>
+        answer.StatusCode != HttpStatusCode.Created
+            ? null
+            : await answer.Response.Content.ReadFromJsonAsync<SpaceIdentityResponse>(JsonOptions, token)
+                ?? throw new JsonException();
+
+    private async Task UseAnswerAsync(ProblemResponse? problem, SpaceIdentityResponse? created, int generation, CancellationToken token)
     {
-        if (answer.StatusCode == HttpStatusCode.Created
-            && await answer.Response.Content.ReadFromJsonAsync<SpaceIdentityResponse>(JsonOptions, token) is { } created)
+        if (created is not null)
         {
             await LandAsync(created, generation, token);
             return;
         }
 
-        Refuse(answer.Problem);
+        Refuse(problem);
     }
 
     /// <summary>

@@ -100,9 +100,7 @@ public static class SpaceDirectoryEndpoints
 
         var created = await handler.HandleAsync(context, name, cancellationToken).ConfigureAwait(false);
 
-        SpaceLog.SpaceCreated(
-            httpContext.RequestServices.GetRequiredService<ILoggerFactory>().CreateLogger(typeof(SpaceDirectoryEndpoints)),
-            created.Id);
+        // SpaceCreated is logged by the pipeline's creation step once the unit of work has committed, not here.
 
         // Set on the response rather than through Results.Created, so the pipeline's idempotency record reads it
         // from one place whatever the endpoint.

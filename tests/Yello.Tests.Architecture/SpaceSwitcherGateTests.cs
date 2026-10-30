@@ -76,9 +76,15 @@ public sealed partial class SpaceSwitcherGateTests
     [Trait("Requirement", "AD-24")]
     public void The_Account_scoped_surfaces_are_exactly_the_AD_24_names_as_amended()
     {
-        Assert.Equal(
-            ["AccountSettings", "SpaceCreation", "SpaceSwitcher"],
-            Enum.GetNames<AccountScopedSurface>().Order(StringComparer.Ordinal));
+        string[] expected = ["AccountSettings", "SpaceCreation", "SpaceSwitcher"];
+        var actual = Enum.GetNames<AccountScopedSurface>().Order(StringComparer.Ordinal).ToList();
+
+        Assert.True(
+            expected.SequenceEqual(actual, StringComparer.Ordinal),
+            $"The Account-scoped surfaces are [{string.Join(", ", actual)}], not [{string.Join(", ", expected)}]. "
+            + "AD-24 as amended on 2026-10-29 (story 3.1) names exactly the switcher, Account settings and Space "
+            + "creation; another surface is a further amendment to AD-24, recorded in ARCHITECTURE-SPINE.md, not a "
+            + "code change.");
     }
 
     /// <summary>

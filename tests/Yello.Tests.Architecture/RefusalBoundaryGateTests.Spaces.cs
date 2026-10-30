@@ -189,14 +189,21 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// AC3, AC10, Q5 (a), Task 9 - <c>Space</c> carries no row-level security policy, so the only thing that scopes a write
-    /// to it is the statement's own filter. Exactly one production method updates or deletes a <c>Space</c> in bulk -
-    /// <c>SpaceStore.RenameAsync</c>, which filters on the resolved context's <c>SpaceId</c> - and nothing calls
-    /// <c>Update</c> or <c>Remove</c> on a <c>Space</c> entity. Read from the compiled IL: a generic
-    /// <c>ExecuteUpdate</c>/<c>ExecuteDelete</c> whose source type is <c>Space</c>.
+    /// to it is the statement's own filter. Exactly one production method updates or deletes a <c>Space</c> in bulk:
+    /// <c>SpaceStore.RenameAsync</c>. Read from the compiled IL: a generic <c>ExecuteUpdate</c>/<c>ExecuteDelete</c>
+    /// whose source type is <c>Space</c>.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// <b>What it does not hold.</b> It names the one bulk writer; it does not read that writer's filter, which is held
+    /// by review and by the rename slice cases (<c>WHERE Id =</c> the resolved context's <c>SpaceId</c>). It scans no
+    /// tracked write: an <c>Update</c> or <c>Remove</c> of a tracked <c>Space</c> entity is held by
+    /// <c>Space_is_read_only_where_named</c>, which names every type that reaches <c>Space</c> at all.
+    /// </para>
+    /// <para>
     /// <b>Vacuity guard:</b> the scan finds <c>ExecuteUpdateAsync</c> calls on other entities (a Project rename), so it
     /// reads what it claims to. Planted by story 3.1 with a second <c>ExecuteUpdateAsync</c> on <c>Space</c>, and caught.
+    /// </para>
     /// </remarks>
     [Fact]
     [Trait("Requirement", "AR-29")]

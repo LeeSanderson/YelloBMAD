@@ -993,7 +993,7 @@
   </data>
   <data name="CreateSpaceCancel" xml:space="preserve">
     <value>Cancel</value>
-    <comment>Story 3.1: leaves the create page without sending anything, back to where the person came from.</comment>
+    <comment>Story 3.1: leaves the create page without sending anything, to the entry point (/), which lands on a Space the switcher lists or states there is none - never back to a remembered Space (UX-DR32). Esc does the same.</comment>
   </data>
   <data name="SpaceCreating" xml:space="preserve">
     <value>Creating the Space.</value>

@@ -365,16 +365,25 @@ public sealed partial class RefusalBoundaryGateTests
             .ToList();
 
         // Story 3.1 / the AD-24 amendment of 2026-10-29 adds exactly one: Space creation, on the switcher's path.
-        Assert.Equal(
-            [
-                (Yello.Contracts.ApiTokens.ApiTokenRoutes.List, "AccountSettings"),
-                (Yello.Contracts.ApiTokens.ApiTokenRoutes.Revoke, "AccountSettings"),
-                (Yello.Contracts.Spaces.SpaceRoutes.Directory, "SpaceCreation"),
-                (Yello.Contracts.Spaces.SpaceRoutes.Directory, "SpaceSwitcher"),
-            ],
-            marked
-                .OrderBy(entry => entry.Route, StringComparer.Ordinal)
-                .ThenBy(entry => entry.Surface, StringComparer.Ordinal));
+        (string? Route, string? Surface)[] expected =
+        [
+            (Yello.Contracts.ApiTokens.ApiTokenRoutes.List, "AccountSettings"),
+            (Yello.Contracts.ApiTokens.ApiTokenRoutes.Revoke, "AccountSettings"),
+            (Yello.Contracts.Spaces.SpaceRoutes.Directory, "SpaceCreation"),
+            (Yello.Contracts.Spaces.SpaceRoutes.Directory, "SpaceSwitcher"),
+        ];
+
+        var actual = marked
+            .OrderBy(entry => entry.Route, StringComparer.Ordinal)
+            .ThenBy(entry => entry.Surface, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(
+            expected.SequenceEqual(actual),
+            $"The Account-scoped endpoints are [{string.Join(", ", actual)}], not [{string.Join(", ", expected)}]. "
+            + "AD-24 as amended on 2026-10-29 (story 3.1) admits the switcher, Account settings' Token list and "
+            + "revocation, and Space creation; another Account-scoped endpoint is a further amendment to AD-24, "
+            + "recorded in ARCHITECTURE-SPINE.md, not a code change.");
 
         Assert.All(marked, entry => Assert.Contains(entry.Surface, Enum.GetNames<Yello.Host.Spaces.AccountScopedSurface>()));
     }
