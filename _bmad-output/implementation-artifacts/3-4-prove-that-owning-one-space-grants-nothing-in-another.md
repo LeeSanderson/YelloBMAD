@@ -585,6 +585,38 @@ The pattern is story, then ATDD scaffolds (`[Fact(Skip = "red: ACn - ...")]` plu
 - Story files: `1-9-…md` (Q3, Q8, plant 13), `2-9-…md`, `3-2-…md` (plants `:391-402`, `:523-540`), `3-3-…md`
 - `tests/TESTING-CONVENTIONS.md`: `:9`, `:44-73`, `:97-102`, `:151`, `:167-180`, `:192`, `:677-737`
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+**Checklist:** `_bmad-output/test-artifacts/atdd-checklist-3-4-prove-that-owning-one-space-grants-nothing-in-another.md`. It assumes Q1-Q10 at their recommended options. Q5 is (a), never the [LEE] option. C1 is applied as Lee decided it.
+
+**Scaffold files** (71 entries, 121 cases):
+
+| File | Cases | ACs | Green today (standing gates) | Skipped `red:` |
+|---|---|---|---|---|
+| `tests/Yello.Tests.Isolation/IsolationCases.SeveralSpaces.cs` (50 rows: `ISO-OWN-OTHER-SPACE-*`, `ISO-OWNER-ELSEWHERE-*`, `ISO-OWNER-ROLE-NOT-CARRIED`, `ISO-TOKEN-OWN-OTHER-SPACE-*`, `ISO-TWO-SPACES-*`, `ISO-POOLED-ONE-ACCOUNT-TWO-SPACES`) | 100 | AC1-AC4, AC6, AC7, AC9 | all 100 (no row is pending) | 0 |
+| `tests/Yello.Tests.Isolation/IsolationCaseListTests.cs` (Q3 gate; AC14 trait) | 2 | AC3, AC14 | Q3 gate | AC14 |
+| `tests/Yello.Tests.Revocation/RevocationCaseTests.cs` (AC14 trait) | 1 | AC14 | - | 1 |
+| `tests/Yello.Tests.Slices/Boards/BoardPagingTests.CrossSpaceLocks.cs` | 4 | AC10 | - | 4 |
+| `tests/Yello.Tests.Architecture/ClientStaticStateGateTests.cs` | 4 | AC12 | writable statics, singletons, detector plant | mutable collections |
+| `tests/Yello.Tests.Architecture/SpaceNavigationGateTests.cs` | 2 | AC13 | allow-list freshness | the helper gate |
+| `tests/Yello.Tests.Client/SpaceSwitchMemoryTests.cs` | 7 | AC5, AC6, AC13 | Board, Project list and Labels switches; sign-out exit; deletion exit | heap spike (AC5), Session-end exit (AC13) |
+| `tests/Yello.Tests.Client/RealHostRefusalNoiseTests.cs` | 1 | AC6, AC7 | yes | - |
+
+The harness was added as active test code: `IsolationWorld.OwnerOfTwoAsync` and `OwnerElsewhereAsync`, `SeededSpace`, `ProductActor.InSpace`, `WireDatabase.AddMembershipAsync` (AC8), the expectations `SameAsAnchorAndStranger`, `EachOwnSpaceOnOneConnection` and `RoleNotCarriedAcrossSpaces`, `CaseRequest.Other`/`StrangerPaths`, and `IsolationVector.TokenOwnOtherSpace`.
+
+**Activated by the ATDD run.** Every AC10 case fails for the ledger's reason: the anchor queues first, then the other Space's request waits on the held key (`LCK_M_U` on Project and Label, `LCK_M_RS_U` on Label via `OPENJSON` and on `TaskLabel`). AC12 reports `RefusalCopy.OwnKeys` and the three `PathEnds` fields. AC13's gate reports six files that navigate directly. AC14 finds no `Assumption` property. The Session-end case found no 401 trigger in the fake. The AC13 deletion exit passed, so it was left active. That does not answer the hook question.
+
+**Activation order:**
+
+1. AC10 first. It is the riskiest assumption and the only product change. Start with `A_Label_deletion_does_not_wait_on_another_Spaces_held_Label_application`, which covers the `TaskLabel` range read and the new `LabelApplications` applock, and keep 2.4's in-use rule and `LabelWire`'s races green. Then do the Label application, the Label deletion and the Project deletion cases.
+2. AC12: the mutable-collection gate.
+3. AC13: first the hook observation (Q9), then the navigation gate, then the Session-end case.
+4. AC14: both trait facts.
+5. AC11 and the plants against the standing gates.
+6. AC5's heap spike (time-boxed).
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

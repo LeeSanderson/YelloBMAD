@@ -275,6 +275,62 @@ public sealed class IsolationCaseListTests
     }
 
     /// <summary>
+    /// Story 3.4 AC3, Q3 (a) (written by its ATDD run) - every route the Host maps under <c>/api/v1/spaces/{spaceId}</c>
+    /// is named by an active row whose request uses a Token bound to another Space of the <b>same</b> Account
+    /// (<see cref="IsolationVector.TokenOwnOtherSpace"/>), or is Session-only - some row on it gives the ApiToken surface
+    /// the no-credential <c>401</c> - and so exempt by that row. A Space-scoped route added without such a row fails here.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-36")]
+    public async Task Every_Space_scoped_route_a_Token_reaches_has_a_row_with_a_Token_of_the_same_Account_bound_elsewhere()
+    {
+        var spaceScoped = (await HostRouteTable.ReadAsync())
+            .Where(route => route.Pattern.StartsWith(SpaceRoutes.Active, StringComparison.Ordinal))
+            .ToList();
+        var active = IsolationCases.All.Where(@case => @case.PendingUntil is null).ToList();
+        var covered = active
+            .Where(@case => @case.Vector == IsolationVector.TokenOwnOtherSpace)
+            .Select(@case => (@case.Method.Method, @case.Route))
+            .ToHashSet();
+        var sessionOnly = active
+            .Where(@case => @case.Expectations.TryGetValue(IsolationSurface.ApiToken, out var expectation) && expectation is NoCredential)
+            .Select(@case => (@case.Method.Method, @case.Route))
+            .ToHashSet();
+
+        // Vacuity guards: the set holds a route known to exist, and the vector is used at all.
+        Assert.Contains(spaceScoped, route => route.Pattern == SpaceRoutes.Statuses);
+        Assert.NotEmpty(covered);
+
+        Assert.Equal([], spaceScoped.Where(route => !covered.Contains(route) && !sessionOnly.Contains(route)).Select(route => $"{route.Method} {route.Pattern}"));
+    }
+
+    /// <summary>
+    /// Story 3.4 AC14, Q8 (a) (written by its ATDD run) - <c>ISO-DELETE-SPACE-OWN</c> carries the assumption it rests on
+    /// (PRD §12 #2) as a row, and the generated theory row on each surface carries it as an <c>Assumption</c> trait, so
+    /// <c>--filter "Assumption~PRD-12"</c> selects it. Read by reflection: the row column does not exist yet.
+    /// </summary>
+    [Fact(Skip = "red: AC14 - IsolationCase has no Assumption column and the generated rows carry no trait yet (story 3.4 Task 7)")]
+    [Trait("Requirement", "AD-4")]
+    public void The_deletion_row_carries_its_assumption_as_a_trait_on_both_surfaces()
+    {
+        var column = typeof(IsolationCase).GetProperty("Assumption");
+
+        Assert.NotNull(column);
+        Assert.Equal("PRD-12-2", column.GetValue(IsolationCases.Named("ISO-DELETE-SPACE-OWN")));
+
+        var rows = IsolationCases.BoundaryRows.Where(row => (row.TestDisplayName ?? string.Empty).StartsWith("ISO-DELETE-SPACE-OWN /", StringComparison.Ordinal)).ToList();
+
+        Assert.Equal(Enum.GetValues<IsolationSurface>().Length, rows.Count);
+        Assert.All(rows, row => Assert.Contains("PRD-12-2", row.Traits?.GetValueOrDefault("Assumption") ?? []));
+
+        // Anchor: a row with no assumption carries none, so the trait is per row and not per class.
+        Assert.All(
+            IsolationCases.BoundaryRows.Where(row => (row.TestDisplayName ?? string.Empty).StartsWith("ISO-DIRECT-SPACE /", StringComparison.Ordinal)),
+            row => Assert.False(row.Traits?.ContainsKey("Assumption") ?? false));
+    }
+
+    /// <summary>
     /// "Case id / surface" for every surface a case declares no expectation for - the generic gate
     /// both suites share.
     /// </summary>

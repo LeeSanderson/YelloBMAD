@@ -404,6 +404,50 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// Adds a non-Owner Membership for an Account the product registered to a Space the product created, under that
+    /// Space's own key - no endpoint adds a member until Invitations (Epic 4), which <c>TESTING-CONVENTIONS.md</c>
+    /// allows. Story 3.4 AC8, written by its ATDD run. Satisfies <c>FK_Membership_Space_SpaceId</c> and
+    /// <c>FK_Membership_Account_AccountId</c> (both rows exist), <c>AK_Membership_SpaceId_AccountId</c> (once per
+    /// Space - the call throws on a second), <c>UX_Membership_SpaceId_Owner</c> (an Owner is refused here), and the
+    /// <c>BLOCK AFTER INSERT</c> predicate (the connection carries the Space's key).
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="accountId">The new member.</param>
+    /// <param name="roleStableCode">The Role's stable code: <c>admin</c>, <c>member</c> or <c>viewer</c>.</param>
+    /// <returns>A task.</returns>
+    public Task AddMembershipAsync(Guid spaceId, Guid accountId, string roleStableCode)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(roleStableCode);
+
+        if (string.Equals(roleStableCode, "owner", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException("A Space has one Owner; this adds Admins, Members and Viewers only.", nameof(roleStableCode));
+        }
+
+        // Stored by name, as ChangeRoleAsync stores it.
+        return AddMembershipCoreAsync(spaceId, accountId, char.ToUpperInvariant(roleStableCode[0]) + roleStableCode[1..]);
+    }
+
+    private async Task AddMembershipCoreAsync(Guid spaceId, Guid accountId, string stored)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+
+        var added = await ExecuteAsync(
+            connection,
+            null,
+            "INSERT dbo.[Membership] (Id, SpaceId, AccountId, Role, CreatedAt) VALUES (@id, @space, @account, @role, SYSDATETIMEOFFSET())",
+            ("@id", Guid.NewGuid()),
+            ("@space", spaceId),
+            ("@account", accountId),
+            ("@role", stored)).ConfigureAwait(false);
+
+        if (added != 1)
+        {
+            throw new InvalidOperationException($"Expected to add one Membership; added {added}.");
+        }
+    }
+
+    /// <summary>
     /// Changes one Membership's Role under its Space's key.
     /// </summary>
     /// <param name="spaceId">The Space.</param>

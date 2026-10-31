@@ -47,7 +47,7 @@ namespace Yello.Tests.Slices.Boards;
 [Trait("Requirement", "FR-28")]
 [Trait("Requirement", "AR-22")]
 [Trait("Requirement", "AD-29")]
-public sealed class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFixture<MigratedDatabaseFixture>
+public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : IClassFixture<MigratedDatabaseFixture>
 {
     private const int Scale = 5_000;
 

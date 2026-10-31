@@ -46,11 +46,42 @@ public sealed class ProductActor
 
     private readonly List<string> _labelNames = [];
 
+    private readonly List<string> _otherSecrets = [];
+
     private ProductActor(WireSession session, WireSession script)
     {
         Session = session;
         _script = script;
+        Origin = this;
     }
+
+    // Story 3.4 (ATDD run): a view of the same Account in another of its Spaces. It shares the Session, the Token
+    // client and every secret list with its origin, so a name a case adds through either is looked for in the log.
+    private ProductActor(ProductActor origin, Guid spaceId, string spaceName, Guid tokenId, string tokenPlaintext)
+    {
+        Session = origin.Session;
+        _script = origin._script;
+        _otherSpaceNames = origin._otherSpaceNames;
+        _projectNames = origin._projectNames;
+        _taskTitles = origin._taskTitles;
+        _labelNames = origin._labelNames;
+        _otherSecrets = origin._otherSecrets;
+        Origin = origin;
+        AccountId = origin.AccountId;
+        DisplayName = origin.DisplayName;
+        EmailAddress = origin.EmailAddress;
+        Password = origin.Password;
+        SessionCookieValue = origin.SessionCookieValue;
+        SpaceId = spaceId;
+        SpaceName = spaceName;
+        TokenId = tokenId;
+        TokenPlaintext = tokenPlaintext;
+    }
+
+    /// <summary>
+    /// The actor as registered: itself, or the actor this view was made from (<see cref="InSpace"/>). Story 3.4.
+    /// </summary>
+    public ProductActor Origin { get; }
 
     /// <summary>
     /// The name and title every case's write body carries: a Project or Task written by a refused request
@@ -117,6 +148,7 @@ public sealed class ProductActor
         Password,
         TokenPlaintext,
         SessionCookieValue,
+        .. _otherSecrets,
         .. new[] { SpaceName }.Concat(_otherSpaceNames).Concat(_projectNames).Concat(_taskTitles).Concat(_labelNames)
             .SelectMany(name => new[] { name, JsonEncodedText.Encode(name, JavaScriptEncoder.Default).ToString() }),
     ];
@@ -169,6 +201,37 @@ public sealed class ProductActor
         ArgumentException.ThrowIfNullOrEmpty(labelName);
 
         _labelNames.Add(labelName);
+    }
+
+    /// <summary>
+    /// The same Account seen from another of its Spaces (story 3.4, AC8): the same Session and secrets, with
+    /// <see cref="SpaceId"/>, <see cref="SpaceName"/> and the Token those of <paramref name="spaceId"/>. The Space's
+    /// name joins the origin's secrets. The Account must already hold a Membership there and the Token must be bound
+    /// there; this only reads them.
+    /// </summary>
+    /// <param name="spaceId">The other Space.</param>
+    /// <param name="spaceName">Its name, as the product returned it.</param>
+    /// <param name="token">A Token of this Account bound to that Space.</param>
+    /// <returns>The view.</returns>
+    public ProductActor InSpace(Guid spaceId, string spaceName, (Guid Id, string Plaintext) token)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(spaceName);
+
+        Origin.HoldsSpaceNamed(spaceName);
+        Origin.HoldsSecret(token.Plaintext);
+
+        return new ProductActor(Origin, spaceId, spaceName, token.Id, token.Plaintext);
+    }
+
+    /// <summary>
+    /// Adds a further secret (a second Token's plaintext) to <see cref="Secrets"/>. Story 3.4.
+    /// </summary>
+    /// <param name="secret">The secret.</param>
+    public void HoldsSecret(string secret)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(secret);
+
+        _otherSecrets.Add(secret);
     }
 
     /// <summary>

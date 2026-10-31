@@ -40,7 +40,7 @@ namespace Yello.Tests.Isolation;
 /// row's run applies both - see <see cref="CaseRun"/>.
 /// </para>
 /// </remarks>
-internal static class IsolationCases
+internal static partial class IsolationCases
 {
     /// <summary>
     /// The kind <c>AccessRefusal</c> stores for a cross-Space attempt.
@@ -883,6 +883,9 @@ internal static class IsolationCases
             "ISO-RECORD-KIND-DELETION-SUMMARY-ADMIN", "V-1, C-6 (3.3 AC9, Q2 (a))", IsolationVector.RecordKind, HttpMethod.Get, DeletionSummaryRoute,
             AdminReadsTheDeletionSummaryAsync,
             Both(new RoleRefused("delete-space"))),
+
+        // Story 3.4 - one Account, several Spaces (IsolationCases.SeveralSpaces.cs).
+        .. SeveralSpacesCases(),
     ];
 
     /// <summary>
@@ -1997,6 +2000,12 @@ internal enum IsolationVector
     Timing,
     PooledConnection,
     RecordKind,
+
+    /// <summary>
+    /// Story 3.4 Q3 (a): a Token bound to one of an Account's Spaces, used on another Space the same Account owns
+    /// (FR-36, AD-6, I-12). The route-coverage gate reads this vector.
+    /// </summary>
+    TokenOwnOtherSpace,
 }
 
 /// <summary>
@@ -2027,13 +2036,23 @@ internal enum CaseRunner
 /// The anchor's own body when it differs from <paramref name="Body"/> - the in-Space comparison for a foreign id carried
 /// in the body (<c>labelIds: [random]</c> against <c>labelIds: [LB]</c>) rather than in the path. Story 2.4.
 /// </param>
+/// <param name="Other">
+/// Story 3.4 (ATDD run): the same Account seen from its other Space, for a case about one Account holding several - the
+/// Space a Then check proves unchanged, or the one an expectation alternates with.
+/// </param>
+/// <param name="StrangerPaths">
+/// Story 3.4 Q1 (a): for each of <paramref name="Paths"/>, the path an Account with no Membership near the foreign id
+/// (B) sends under its own Space, whose answer the case's must equal byte for byte.
+/// </param>
 internal sealed record CaseRequest(
     ProductActor Actor,
     HttpMethod Method,
     IReadOnlyList<CasePath> Paths,
     Guid? TargetSpaceId,
     Func<HttpContent>? Body = null,
-    Func<HttpContent>? AnchorBody = null)
+    Func<HttpContent>? AnchorBody = null,
+    ProductActor? Other = null,
+    IReadOnlyList<string>? StrangerPaths = null)
 {
     /// <summary>
     /// Sends <paramref name="path"/> as the case's actor on <paramref name="surface"/>, with the case's body if it has one.

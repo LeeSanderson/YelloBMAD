@@ -138,6 +138,115 @@ internal sealed class IsolationWorld : IAsyncDisposable
     }
 
     /// <summary>
+    /// Story 3.4 AC8 (written by its ATDD run): a fresh Account that owns two Spaces - its Personal Space and a second
+    /// created through <c>POST /api/v1/spaces</c>, so it carries its default Statuses - with a Token bound to each, and
+    /// both populated through the product with distinct randomised names: one Project, a Label, and
+    /// <see cref="SeededSpace.FirstSpaceTasks"/> or <see cref="SeededSpace.OtherSpaceTasks"/> Tasks (so their counts
+    /// differ), the Label applied to the first Task. Never <see cref="WireDatabase.AddOwnedSpaceAsync"/>, which writes no
+    /// Statuses.
+    /// </summary>
+    /// <param name="label">A label for the display name.</param>
+    /// <returns>The two Spaces, each as a view of the one Account.</returns>
+    public async Task<(SeededSpace First, SeededSpace Second)> OwnerOfTwoAsync(string label)
+    {
+        var owner = await NewActorAsync(label);
+        var first = await SeedAsync(owner, SeededSpace.FirstSpaceTasks);
+        var second = await SeedAsync(await SecondSpaceOfAsync(owner), SeededSpace.OtherSpaceTasks);
+
+        return (first, second);
+    }
+
+    /// <summary>
+    /// Story 3.4 AC2: a fresh Account (the Owner of its Personal Space, populated) and a second fresh Account's
+    /// Personal Space (populated by its own Owner) in which the first holds <paramref name="roleStableCode"/>, with a
+    /// Token the first Account issued there. Both views are of the first Account.
+    /// </summary>
+    /// <param name="roleStableCode">The Role it holds in the other Account's Space.</param>
+    /// <returns>Its own Space, and its view of the other.</returns>
+    public async Task<(SeededSpace Own, SeededSpace Elsewhere)> OwnerElsewhereAsync(string roleStableCode)
+    {
+        var owner = await NewActorAsync("Ow");
+        var host = await NewActorAsync("Oh");
+        var own = await SeedAsync(owner, SeededSpace.FirstSpaceTasks);
+        var hosted = await SeedAsync(host, SeededSpace.OtherSpaceTasks);
+
+        await Database.AddMembershipAsync(host.SpaceId, owner.AccountId, roleStableCode);
+
+        var token = await owner.IssueTokenAsync(host.SpaceId, "elsewhere");
+        var view = owner.InSpace(host.SpaceId, host.SpaceName, token);
+
+        return (own, hosted with { Actor = view });
+    }
+
+    private static async Task<ProductActor> SecondSpaceOfAsync(ProductActor owner)
+    {
+        var name = $"Second {Guid.NewGuid():N}";
+
+        var created = await owner.SendAsync(
+            IsolationSurface.Session,
+            HttpMethod.Post,
+            Yello.Contracts.Spaces.SpaceRoutes.Directory,
+            System.Net.Http.Json.JsonContent.Create(new { name }),
+            headers: null);
+
+        Assert.True(created.StatusCode == System.Net.HttpStatusCode.Created, $"Creating a second Space through the product: {created.StatusCode} {created.Body}");
+
+        using var document = System.Text.Json.JsonDocument.Parse(created.Body);
+        var spaceId = document.RootElement.GetProperty("id").GetGuid();
+
+        return owner.InSpace(spaceId, name, await owner.IssueTokenAsync(spaceId, "second"));
+    }
+
+    private static async Task<SeededSpace> SeedAsync(ProductActor owner, int tasks)
+    {
+        var projectName = $"Project {Guid.NewGuid():N}";
+
+        owner.HoldsProjectNamed(projectName);
+
+        var projectId = await CreatedIdAsync(owner, Yello.Contracts.Projects.ProjectRoutes.ListIn(owner.SpaceId), new { name = projectName });
+        var taskIds = new List<Guid>();
+
+        for (var index = 0; index < tasks; index++)
+        {
+            var title = $"Task {Guid.NewGuid():N}";
+
+            owner.HoldsTaskTitled(title);
+            taskIds.Add(await CreatedIdAsync(owner, Yello.Contracts.Tasks.TaskRoutes.CreateIn(owner.SpaceId, projectId), new { title }));
+        }
+
+        var labelName = $"Label {Guid.NewGuid():N}"[..30];
+
+        owner.HoldsLabelNamed(labelName);
+
+        var labelId = await CreatedIdAsync(
+            owner,
+            Yello.Contracts.Labels.LabelRoutes.LabelsOf(owner.SpaceId),
+            new { name = labelName, colour = Yello.Contracts.Labels.LabelColours.Keys[0] });
+
+        var applied = await owner.SendAsync(
+            IsolationSurface.Session,
+            HttpMethod.Patch,
+            Yello.Contracts.Tasks.TaskRoutes.TaskOf(owner.SpaceId, taskIds[0]),
+            System.Net.Http.Json.JsonContent.Create(new { labelIds = new[] { labelId } }),
+            headers: null);
+
+        Assert.True(applied.StatusCode == System.Net.HttpStatusCode.OK, $"Applying a Label through the product: {applied.StatusCode} {applied.Body}");
+
+        return new SeededSpace(owner, projectId, taskIds, labelId);
+    }
+
+    private static async Task<Guid> CreatedIdAsync(ProductActor owner, string path, object body)
+    {
+        var created = await owner.SendAsync(IsolationSurface.Session, HttpMethod.Post, path, System.Net.Http.Json.JsonContent.Create(body), headers: null);
+
+        Assert.True(created.StatusCode == System.Net.HttpStatusCode.Created, $"Seeding through the product ({path}): {created.StatusCode} {created.Body}");
+
+        using var document = System.Text.Json.JsonDocument.Parse(created.Body);
+
+        return document.RootElement.GetProperty("id").GetGuid();
+    }
+
+    /// <summary>
     /// The same request with no credential at all - the anchor <c>401</c>.
     /// </summary>
     /// <param name="method">The method.</param>
@@ -263,4 +372,30 @@ public sealed class PinnedPoolWorldFixture(SqlServerEngine engine) : IAsyncLifet
             await _world.DisposeAsync();
         }
     }
+}
+
+/// <summary>
+/// One Space seeded through the product by story 3.4's world helpers (AC8): the Account's view of it, its one Project,
+/// its Tasks in creation order (all in the Space's first Status), and its one Label, applied to the first Task.
+/// </summary>
+/// <param name="Actor">The Account, seen from this Space (its Session, and a Token bound here).</param>
+/// <param name="ProjectId">The Project.</param>
+/// <param name="TaskIds">The Tasks.</param>
+/// <param name="LabelId">The Label.</param>
+internal sealed record SeededSpace(ProductActor Actor, Guid ProjectId, IReadOnlyList<Guid> TaskIds, Guid LabelId)
+{
+    /// <summary>
+    /// The Tasks seeded in an Account's first (Personal) Space.
+    /// </summary>
+    public const int FirstSpaceTasks = 2;
+
+    /// <summary>
+    /// The Tasks seeded in the other Space - a different number, so a count that crossed shows.
+    /// </summary>
+    public const int OtherSpaceTasks = 3;
+
+    /// <summary>
+    /// The Space.
+    /// </summary>
+    public Guid SpaceId => Actor.SpaceId;
 }

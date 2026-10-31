@@ -51,6 +51,26 @@ public sealed class RevocationCaseTests(RevocationWorldFixture fixture) : IClass
     }
 
     /// <summary>
+    /// Story 3.4 AC14, Q8 (a) (written by its ATDD run) - <c>REV-SPACE-DELETED-BY-OWNER</c> carries the assumption it
+    /// rests on (PRD §12 #2) as a row, emitted as an <c>Assumption</c> trait on the generated row for each surface, so
+    /// <c>--filter "Assumption~PRD-12"</c> selects it. Read by reflection: the row column does not exist yet.
+    /// </summary>
+    [Fact(Skip = "red: AC14 - RevocationCase has no Assumption column and the generated rows carry no trait yet (story 3.4 Task 7)")]
+    [Trait("Requirement", "AD-4")]
+    public void The_deletion_row_carries_its_assumption_as_a_trait_on_both_surfaces()
+    {
+        var column = typeof(RevocationCase).GetProperty("Assumption");
+
+        Assert.NotNull(column);
+        Assert.Equal("PRD-12-2", column.GetValue(RevocationCases.Named("REV-SPACE-DELETED-BY-OWNER")));
+
+        var rows = RevocationCases.CrossProduct.Where(row => (row.TestDisplayName ?? string.Empty).StartsWith("REV-SPACE-DELETED-BY-OWNER /", StringComparison.Ordinal)).ToList();
+
+        Assert.Equal(Enum.GetValues<IsolationSurface>().Length, rows.Count);
+        Assert.All(rows, row => Assert.Contains("PRD-12-2", row.Traits?.GetValueOrDefault("Assumption") ?? []));
+    }
+
+    /// <summary>
     /// 1.9-REV-001 to REV-008, as rows: after the row's event, the very next request on the surface
     /// answers as the row says.
     /// </summary>
