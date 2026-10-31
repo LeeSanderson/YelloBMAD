@@ -172,6 +172,13 @@ internal sealed partial class FakeYelloApi
             return (404, Problem(ProblemTypes.NotAvailable));
         }
 
+        // The server's guard is DeleteSpace, the Owner's alone: a client that sent the deletion for any other Role must
+        // meet the 403 here as it would there, not a fake 204 (added at code review).
+        if (Roles.TryGetValue(spaceId, out var role) && role != "owner")
+        {
+            return (403, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.InsufficientRole, Errors: null, Capability: "delete-space"), JsonOptions));
+        }
+
         Switcher.RemoveAt(index);
         _ = Roles.Remove(spaceId);
         _ = Projects.Remove(spaceId);

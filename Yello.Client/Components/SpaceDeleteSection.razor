@@ -38,8 +38,9 @@
     server's guard is DeleteSpace.
 
     NOT OPTIMISTIC (AC12, EXPERIENCE.md:335). While the deletion is out the confirm stays as it is, aria-busy, nothing
-    disabled. One Idempotency-Key per deletion, kept after an attempt that got no answer, so pressing again cannot apply
-    twice (open question 1 (a)). On 204 the Space leaves the switcher's held list (SpaceDirectory.Removed), "Space deleted."
+    disabled. One Idempotency-Key per deletion, kept after an attempt that got no answer (open question 1 (a)); the server
+    records none on this route, and pressing again cannot apply twice because a committed first attempt took the
+    Membership, so the resend is the boundary's 404. On 204 the Space leaves the switcher's held list (SpaceDirectory.Removed), "Space deleted."
     is held for the page the tab lands on (DepartureNarration, open question 6 (a)), and the tab goes to the entry point with
     replace - which purges the Space and lands on the first remaining listed Space, or on the no-Space state. A 404 means the
     Space is already gone for this Account: routed the same way, said by no one. No answer, or a 5xx: "Not sent.", the
@@ -124,6 +125,15 @@
     /// <summary>Raised when the server refuses the Space itself on the counts read, so the page renders the one refusal surface.</summary>
     [Parameter]
     public EventCallback<ProblemResponse?> OnSpaceRefused { get; set; }
+
+    /// <summary>
+    /// A section mounted fresh holds no counts, so it has no confirm to show: a page still holding the confirm open (the
+    /// section was unmounted by a Role re-read lower, then mounted again) is told it is closed, rather than hiding every
+    /// other section behind a confirm that does not render.
+    /// </summary>
+    /// <returns>A task.</returns>
+    protected override Task OnInitializedAsync() =>
+        Confirming ? ConfirmingChanged.InvokeAsync(false) : Task.CompletedTask;
 
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -219,8 +229,18 @@
 
     private async Task OpenAsync(SpaceDeletionSummaryResponse summary)
     {
+        // The typed name is the guard against accident (AC3): with no name held to type, an empty field would match an
+        // empty name and the irreversible deletion would go with nothing typed. The confirm does not open.
+        var name = ActiveSpace.Current?.Name;
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            _refusal = Localizer[RefusalCopy.NotAvailableKey];
+            return;
+        }
+
         _summary = summary;
-        _name = ActiveSpace.Current?.Name ?? string.Empty;
+        _name = name;
 
         // A field name no browser's autofill would match to a saved value, fresh per opening (AC3, UX-DR33).
         _fieldName = Guid.NewGuid().ToString("N");
@@ -270,7 +290,9 @@
         _status = null;
         _deleting = true;
 
-        // A deletion sent again after an attempt that got no answer reuses its key: it may have been applied.
+        // A deletion sent again after an attempt that got no answer reuses its key. The server records no key on this route
+        // (AD-18's variance), so what keeps a second press from applying twice is that the first one, if it committed, took
+        // the Membership: the resend is the boundary's 404, routed as gone.
         _key ??= Guid.NewGuid().ToString("D");
 
         var token = ActiveSpace.Token;
@@ -278,6 +300,12 @@
         try
         {
             using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Delete, SpaceRoutes.ActiveOf(SpaceId), _key, token);
+
+            // The Space is gone whatever this tab has done since: out of the held list even when the tab has left it.
+            if (answer.StatusCode is HttpStatusCode.NoContent or HttpStatusCode.NotFound)
+            {
+                Directory.Removed(SpaceId);
+            }
 
             if (!token.IsCancellationRequested)
             {

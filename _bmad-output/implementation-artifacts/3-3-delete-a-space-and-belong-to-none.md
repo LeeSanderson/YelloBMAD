@@ -4,7 +4,7 @@ baseline_commit: 5e04528
 
 # Story 3.3: Delete a Space, and belong to none
 
-Status: review
+Status: done
 
 Epic: 3 — Several Spaces, cleanly separated
 Story key: `3-3-delete-a-space-and-belong-to-none`
@@ -276,6 +276,30 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1539-1573` (`status: final
   - [x] `deferred-work.md`: apply Ledger dispositions.
   - [x] Rewrite any comment that predicts 3.3 so it describes what exists (`grep -rn "3\.3" Yello.* tests`). Example: `Home.razor:23-24`.
   - [x] Run `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers.
+
+### Review Findings
+
+Code review 2026-10-31 (Blind Hunter, Edge Case Hunter, Acceptance Auditor; commit range `a8fe2c6..4f74ea7`). 50 raw findings; 38 after dedup: 0 decision-needed, 14 patch, 5 defer, 19 dismissed. The isolation constraints hold. The deletion is one `ExecuteDeleteAsync` on the resolved `SpaceId` under the `SpaceId` key alone. The post-547 re-resolution goes through the one resolver line that sets `SpaceId` alone, records its refusal on its own context and writes no second record. No caller sets both keys, and no policy or gate is relaxed.
+
+- [x] [Review][Patch] The typed-name guard passed on an empty field when the active Space's name was not held (`_name` fell back to `""`), so the irreversible DELETE could go with nothing typed, under the heading "Delete ?" [Yello.Client/Components/SpaceDeleteSection.razor:220]
+- [x] [Review][Patch] A `204`/`404` that arrived after the tab's Space token was cancelled left the deleted Space in the switcher's held list [Yello.Client/Components/SpaceDeleteSection.razor:282]
+- [x] [Review][Patch] A delete section remounted while Space settings still held `_confirmingDelete` (the Role was re-read lower, then Owner again) hid every section and showed no confirm [Yello.Client/Components/SpaceDeleteSection.razor, Yello.Client/Pages/SpaceSettings.razor:102]
+- [x] [Review][Patch] The switcher said "could not be listed" for a refresh that returned nothing because the Session had ended (a 401 on its way to sign-in) [Yello.Client/Components/ContextBar.razor:227]
+- [x] [Review][Patch] "Space {id} was deleted." (1039) was logged inside the endpoint, before the pipeline committed; now logged when the 204 starts, after the commit [Yello.Host/Spaces/ActiveSpaceEndpoints.cs:421]
+- [x] [Review][Patch] `deferred-work.md:679`: the CLOSED note held a TAB and a FORM FEED (PowerShell escapes ate `` `true `` / `` `false ``), its inline code was lost, and the file and `components.css` lost their final newline [_bmad-output/implementation-artifacts/deferred-work.md:679]
+- [x] [Review][Patch] AC10's "forced failure after the delete statement and before commit" had no standing case on the product path (only the raw-SQL rollback and a one-off plant). Added a case: an AFTER DELETE trigger on this one Space throws inside the endpoint's own unit of work, the answer is `500`, every row is still there and the Token still works [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteSpace.cs]
+- [x] [Review][Patch] The Project-create and Task-create races (RACE-S3, S4) did not assert Q4's `CrossSpace` record, and RACE-S2 asserted `Contains` where exactly one record is the contract [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteSpaceRace.cs]
+- [x] [Review][Patch] `Assumption=PRD-12-2` was missing from three cases that assert the deleted Space stays gone [ActiveSpaceEndpointTests.DeleteSpace.cs `Another_Account_loses_only_the_deleted_Space`, `A_replayed_deletion_...`; SpaceDeleteTests.cs `Deleting_with_Spaces_remaining_...`]
+- [x] [Review][Patch] The delete section's comments said the kept Idempotency-Key stops a second press from applying twice. The server records no key on this route (AD-18 variance). What stops it is that the Membership is gone [Yello.Client/Components/SpaceDeleteSection.razor:41,273]
+- [x] [Review][Patch] `ReferenceConflict` said 547 meant only FOREIGN KEY or REFERENCE conflicts. SQL Server also raises 547 for CHECK conflicts, which the re-resolution guard covers. The doc now says so [Yello.Infrastructure/Persistence/ReferenceConflict.cs]
+- [x] [Review][Patch] EventId 1040's message dropped the word "Space" ("{SpaceId} was deleted under a request ...") [Yello.Host/SpaceLog.cs:345]
+- [x] [Review][Patch] `WaitForPathAsync` busy-polled the browser with no interval, on a suite known to starve under memory pressure [tests/Yello.Tests.Client/SpaceDeleteTests.cs:909]
+- [x] [Review][Patch] The fake API deleted a Space for any Role, so a client regression that sent DELETE as an Admin would get a fake 204 [tests/Yello.Tests.Client/FakeYelloApi.SpaceDeletion.cs]
+- [x] [Review][Defer] A Task title, due-date or Status edit racing a Space deletion reaches a 0-row UPDATE and `DbUpdateConcurrencyException` (`500`), not Q4's `404` [Yello.Infrastructure/Persistence/TaskStore.cs:195]. Deferred, pre-existing: this is the same half as `deferred-work.md:607`, which a Space cascade now reaches too. Owner: story 7.4.
+- [x] [Review][Defer] A deadlock (1205) between the cascading delete and a concurrent Space-scoped write answers the victim an unclassified `500` [Yello.Host/Spaces/ActiveSpaceResolution.Deletion.cs]. Deferred: deadlock retry is general concurrency work. Owner: story 7.4.
+- [x] [Review][Defer] One cascading DELETE of a very large Space can escalate locks on shared tables (`Task`) or exceed the command timeout. No case seeds past a few rows [Yello.Infrastructure/Persistence/SpaceStore.cs:88]. Deferred: Account deletion runs the same cascade at a larger scale. Owner: story 5.4.
+- [x] [Review][Defer] Q4's re-resolution asks "is the caller still a Member?", not "does the Space exist?". This is the recorded change of mechanism. When a Membership removal (or a CHECK-547 that coincides with one) loses its Membership under a request, the answer is still the correct `404`. The log line 1040 says the Space was deleted, though, and a `CrossSpace` record is written [Yello.Host/Spaces/ActiveSpaceResolution.Deletion.cs:536]. Deferred: no Membership removal exists yet. Owner: story 4.5.
+- [x] [Review][Defer] The row-driven `ISO-DELETE-SPACE-OWN` and `REV-SPACE-DELETED-BY-OWNER` cannot carry the `Assumption=PRD-12-2` trait, so `--filter "Assumption~PRD-12"` misses them [tests/Yello.Tests.Isolation/IsolationCases.cs, tests/Yello.Tests.Revocation/RevocationCases.cs]. Deferred: the case-row types are shared by every isolation row. Owner: story 3.4.
 
 ## Dev Notes
 
@@ -784,3 +808,4 @@ Modified:
 ## Change Log
 
 - 2026-10-31 - dev-story: Space deletion (`DELETE /api/v1/spaces/{spaceId}`, Owner-only, one statement under the Space key, cascades) and its counts read; the pipeline answers a Space deleted under a request with the boundary `404`; rename and the name read answer `404` for a vanished Space; the client's delete section, in-place confirm, route home and "Space deleted."; the switcher's empty and failed sentences; the refusal page at `/` points to the switcher. AD-24 amendment and AD-18 variance recorded in the spine. 42 ATDD scaffolds and 5 isolation rows activated; 6 ledger entries closed or noted, 5 added. Full run 1,679 / 1,670 passed / 0 failed / 9 skipped. Status: review.
+- 2026-10-31 - code-review: 50 raw findings, 38 after dedup; 14 patches applied, 5 deferred (owners 7.4, 7.4, 5.4, 4.5, 3.4), 19 dismissed, 0 decisions. The isolation constraints hold. Patched: the typed-name guard bypass on an empty held name, the deletion log moved after the commit, a product-path forced-failure case for AC10 (S-1), exactly one `CrossSpace` record asserted on RACE-S2..S4, the remount and switcher state fixes, and the ledger's corrupted line. Full run 1,680 / 1,671 passed / 0 failed / 9 skipped. Status: done.

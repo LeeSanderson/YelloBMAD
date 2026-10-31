@@ -266,6 +266,53 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
+    /// AC10, S-1, AD-6, FR-36 - a failure forced after the delete statement and before the commit, on the product path:
+    /// an <c>AFTER DELETE</c> trigger on this one Space throws once the statement and its cascades have run, inside the
+    /// deletion's own unit of work. The answer is <c>500</c>; every row is still there (the Space, its Memberships,
+    /// Projects, Tasks, Labels, Statuses, presence and idempotency rows, its Tokens), and the Token bound to it still
+    /// works. Anchored on the same deletion answering <c>204</c> once the trigger is dropped. Added at code review.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-7")]
+    [Trait("Requirement", "FR-36")]
+    [Trait("Requirement", "AD-6")]
+    public async Task A_failure_forced_after_the_delete_statement_rolls_the_whole_deletion_back()
+    {
+        var database = Available();
+        PopulatedSpace? seeded = null;
+        SpaceRowCounts? before = null;
+        SpaceRowCounts? afterFailure = null;
+        var answers = new Dictionary<string, HttpStatusCode>(StringComparer.Ordinal);
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            seeded = await PopulateSpaceAsync(client, database, "Forced failure " + Suffix());
+            before = await SpaceRowCountsAsync(database, seeded.SpaceId);
+
+            var trigger = await PlantFailingDeletionTriggerAsync(database, seeded.SpaceId);
+
+            try
+            {
+                answers["forced"] = (await DeleteSpaceOverWireAsync(seeded.Owner.Session, seeded.SpaceId, Guid.NewGuid().ToString("D"))).StatusCode;
+            }
+            finally
+            {
+                await DropTriggerAsync(database, trigger);
+            }
+
+            afterFailure = await SpaceRowCountsAsync(database, seeded.SpaceId);
+            answers["owner token"] = (await seeded.Owner.Session.GetWithTokenAsync(SpaceRoutes.ActiveOf(seeded.SpaceId), seeded.OwnerToken)).StatusCode;
+            answers["anchor"] = (await DeleteSpaceOverWireAsync(seeded.Owner.Session, seeded.SpaceId, Guid.NewGuid().ToString("D"))).StatusCode;
+        });
+
+        Assert.Equal(HttpStatusCode.InternalServerError, answers["forced"]);
+        Assert.Equal(before!.Flattened, afterFailure!.Flattened);
+        Assert.Equal(HttpStatusCode.OK, answers["owner token"]);
+        Assert.Equal(HttpStatusCode.NoContent, answers["anchor"]);
+    }
+
+    /// <summary>
     /// AC5, FR-7, I-11 - another Account holding Membership in the deleted Space loses it and nothing else: its switcher no
     /// longer lists it, its Session is the boundary <c>404</c> there, and it keeps its own Personal Space, its Membership of
     /// a third Space, and its Account. Anchored on the switcher listing all three before.
@@ -274,6 +321,7 @@ public sealed partial class ActiveSpaceEndpointTests
     [Fact]
     [Trait("Requirement", "FR-7")]
     [Trait("Requirement", "FR-9")]
+    [Trait("Assumption", "PRD-12-2")]
     public async Task Another_Account_loses_only_the_deleted_Space()
     {
         var database = Available();
@@ -401,6 +449,7 @@ public sealed partial class ActiveSpaceEndpointTests
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "NFR-5")]
+    [Trait("Assumption", "PRD-12-2")]
     public async Task A_replayed_deletion_with_the_same_key_is_the_boundary_404_and_never_500()
     {
         var database = Available();
@@ -693,6 +742,42 @@ public sealed partial class ActiveSpaceEndpointTests
         {
             await transaction.RollbackAsync(TestContext.Current.CancellationToken);
         }
+    }
+
+    /// <summary>
+    /// Plants an <c>AFTER DELETE</c> trigger on <c>Space</c> that throws when this one Space is deleted - after the
+    /// statement and its cascades, before any commit. A test-only object in this class's own database, always dropped by
+    /// the caller in a <c>finally</c>; it fires for no other Space.
+    /// </summary>
+    /// <returns>The trigger's name, for <see cref="DropTriggerAsync"/>.</returns>
+    private static async Task<string> PlantFailingDeletionTriggerAsync(RegistrationDatabase database, Guid spaceId)
+    {
+        var name = "TR_Space_ForcedFailure_" + Guid.NewGuid().ToString("N");
+
+        await using var connection = await database.OpenWithoutSpaceContextAsync(TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+
+#pragma warning disable CA2100 // Review SQL queries - DDL takes no parameters; both values are GUIDs formatted here.
+        command.CommandText =
+            $"CREATE TRIGGER dbo.[{name}] ON dbo.[Space] AFTER DELETE AS " +
+            $"IF EXISTS (SELECT 1 FROM deleted WHERE Id = '{spaceId:D}') THROW 50000, 'Forced failure after the delete statement.', 1;";
+#pragma warning restore CA2100
+
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+
+        return name;
+    }
+
+    private static async Task DropTriggerAsync(RegistrationDatabase database, string name)
+    {
+        await using var connection = await database.OpenWithoutSpaceContextAsync(TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+
+#pragma warning disable CA2100 // Review SQL queries - the name is one PlantFailingDeletionTriggerAsync built from a GUID.
+        command.CommandText = $"DROP TRIGGER IF EXISTS dbo.[{name}];";
+#pragma warning restore CA2100
+
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 
     /// <summary>

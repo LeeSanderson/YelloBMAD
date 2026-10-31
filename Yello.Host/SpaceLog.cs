@@ -158,6 +158,6 @@ internal static partial class SpaceLog
     [LoggerMessage(
         EventId = 1040,
         Level = LogLevel.Information,
-        Message = "{SpaceId} was deleted under a request resolved in it; the request was refused.")]
+        Message = "Space {SpaceId} was deleted under a request resolved in it; the request was refused.")]
     internal static partial void SpaceDeletedUnderRequest(ILogger logger, Guid spaceId);
 }

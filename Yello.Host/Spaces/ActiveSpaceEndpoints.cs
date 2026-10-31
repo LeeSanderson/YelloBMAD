@@ -156,7 +156,21 @@ public static class ActiveSpaceEndpoints
             return BoundaryProblems.NotAvailable();
         }
 
-        SpaceLog.SpaceDeleted(loggerFactory.CreateLogger(typeof(ActiveSpaceEndpoints).FullName!), context.SpaceId);
+        // Logged when the 204 starts, which is after the pipeline has committed: a commit that fails answers 500 and logs
+        // no deletion that did not happen.
+        var logger = loggerFactory.CreateLogger(typeof(ActiveSpaceEndpoints).FullName!);
+        var spaceId = context.SpaceId;
+        var response = httpContext.Response;
+
+        response.OnStarting(() =>
+        {
+            if (response.StatusCode == StatusCodes.Status204NoContent)
+            {
+                SpaceLog.SpaceDeleted(logger, spaceId);
+            }
+
+            return Task.CompletedTask;
+        });
 
         return Results.NoContent();
     }

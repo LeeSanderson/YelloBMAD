@@ -224,7 +224,8 @@
         else
         {
             // A failed refresh keeps a held list as it was; with nothing held, the panel says so.
-            _listFailed = _spaces is null;
+            // A 401 has already ended the Session and is on its way to sign-in: nothing to say about the list.
+            _listFailed = _spaces is null && Session.IsSignedIn;
         }
     }
 

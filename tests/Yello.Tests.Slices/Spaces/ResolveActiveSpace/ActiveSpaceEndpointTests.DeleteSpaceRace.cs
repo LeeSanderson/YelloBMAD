@@ -148,7 +148,8 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.True(answer?.StatusCode == HttpStatusCode.NotFound, $"A request racing the deletion answered {answer?.StatusCode}: {answer?.Body}");
         Assert.Equal(ProblemTypes.NotAvailable, ProblemType(answer!));
-        Assert.Contains("CrossSpace", await TaskWire.RefusalKindsAsync(database, memberId, spaceId));
+        // Exactly one: the re-resolution itself records nothing, and the pipeline records the refusal once.
+        Assert.Equal(["CrossSpace"], await TaskWire.RefusalKindsAsync(database, memberId, spaceId));
     }
 
     /// <summary>
@@ -164,13 +165,13 @@ public sealed partial class ActiveSpaceEndpointTests
     {
         var database = Available();
         var cancellationToken = TestContext.Current.CancellationToken;
-        var spaceId = Guid.Empty;
+        var (spaceId, ownerId) = (Guid.Empty, Guid.Empty);
         WireResponse? answer = null;
 
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await TaskWire.RegisterAsync(client, database);
-            spaceId = owner.SpaceId;
+            (spaceId, ownerId) = (owner.SpaceId, owner.AccountId);
 
             Assert.Equal(HttpStatusCode.OK, (await owner.Session.GetAsync(ProjectRoutes.ListIn(spaceId))).StatusCode);
 
@@ -195,6 +196,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.True(answer?.StatusCode == HttpStatusCode.NotFound, $"A Project creation racing the deletion answered {answer?.StatusCode}: {answer?.Body}");
         Assert.Equal(ProblemTypes.NotAvailable, ProblemType(answer!));
         Assert.Equal(0, (await SpaceRowCountsAsync(database, spaceId)).Tables["Project"]);
+        Assert.Equal(["CrossSpace"], await TaskWire.RefusalKindsAsync(database, ownerId, spaceId));
     }
 
     /// <summary>
@@ -210,13 +212,13 @@ public sealed partial class ActiveSpaceEndpointTests
     {
         var database = Available();
         var cancellationToken = TestContext.Current.CancellationToken;
-        var spaceId = Guid.Empty;
+        var (spaceId, ownerId) = (Guid.Empty, Guid.Empty);
         WireResponse? answer = null;
 
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await TaskWire.RegisterAsync(client, database);
-            spaceId = owner.SpaceId;
+            (spaceId, ownerId) = (owner.SpaceId, owner.AccountId);
 
             var projectId = await TaskWire.CreateProjectAsync(owner, "Emptied " + Suffix());
 
@@ -239,6 +241,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.True(answer?.StatusCode == HttpStatusCode.NotFound, $"A Task creation racing the deletion answered {answer?.StatusCode}: {answer?.Body}");
         Assert.Equal(ProblemTypes.NotAvailable, ProblemType(answer!));
         Assert.Equal(0, (await SpaceRowCountsAsync(database, spaceId)).Tables["Task"]);
+        Assert.Equal(["CrossSpace"], await TaskWire.RefusalKindsAsync(database, ownerId, spaceId));
     }
 
     /// <summary>

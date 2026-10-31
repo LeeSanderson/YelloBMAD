@@ -14,7 +14,9 @@ namespace Yello.Infrastructure.Persistence;
 public static class ReferenceConflict
 {
     /// <summary>
-    /// SQL Server's "statement conflicted with a FOREIGN KEY / REFERENCE constraint".
+    /// SQL Server's "statement conflicted with a FOREIGN KEY / REFERENCE constraint" - and also its CHECK constraint
+    /// conflict, which shares the number. That is safe here only because the pipeline re-resolves before it answers: a
+    /// CHECK conflict under a Membership that still exists is rethrown.
     /// </summary>
     private const int ReferenceConflictErrorNumber = 547;
 

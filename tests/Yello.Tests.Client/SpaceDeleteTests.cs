@@ -430,6 +430,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     [Fact]
     [Trait("Requirement", "UX-DR32")]
     [Trait("Requirement", "UX-DR38")]
+    [Trait("Assumption", "PRD-12-2")]
     public async Task Deleting_with_Spaces_remaining_lands_on_the_next_listed_Space_and_says_so_without_a_name()
     {
         var api = TwoSpaces();
@@ -913,6 +914,9 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
         while (await page.EvaluateAsync<string>("() => location.pathname") != path)
         {
             Assert.True(DateTimeOffset.UtcNow < deadline, $"The page never reached {path}; it is on {new Uri(page.Url).AbsolutePath}.");
+
+            // Polled at an interval, not back to back: the browser suite already runs short of memory on a full run.
+            await Task.Delay(50, TestContext.Current.CancellationToken);
         }
     }
 
