@@ -444,7 +444,8 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC8 / AC2 (UX-DR33, Q4) - after scrolling A's Board, a switch to B's Board and Back to A's each land with the
-    /// window and every Board column at scroll offset zero.
+    /// window and every Board column at scroll offset zero; and after scrolling A's List, a switch to B's List lands at
+    /// zero too.
     /// </summary>
     /// <remarks>
     /// Q4 (a) assumed: measure first. Blazor's own scroll behaviour on internal navigation is unverified (story Task 4).
@@ -474,11 +475,28 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
             Assert.Equal(0, await ScrolledAsync(page));
 
             await ScrollEverythingAsync(page);
+
+            // Anchor: B's Board did scroll before Back (story 3.2 code review).
+            Assert.True(await ScrolledAsync(page) > 0, "Nothing on B's Board scrolled, so the Back case proves nothing.");
+
             await page.GoBackAsync();
             await page.Locator(Card, new PageLocatorOptions { HasText = NorthwindTitles[0] }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             Assert.Equal(0, await ScrolledAsync(page));
             Assert.Equal("manual", await page.EvaluateAsync<string>("() => history.scrollRestoration"));
+
+            // The List view (story Task 4), measured the same way: A's List scrolled, then a switch to B's List.
+            await NavigateInAppAsync(page, $"/spaces/{Northwind:D}/projects/{Atlas:D}/list");
+            await page.Locator(ListRows).First.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            await ScrollEverythingAsync(page);
+            Assert.True(await ScrolledAsync(page) > 0, "Nothing on A's List scrolled, so the List case proves nothing.");
+
+            await NavigateInAppAsync(page, $"/spaces/{Harbour:D}/projects/{Beacon:D}/list");
+            await page.Locator(ContextBar, new PageLocatorOptions { HasText = HarbourName }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.Locator(ListRows).First.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal(0, await ScrolledAsync(page));
         }
     }
 
@@ -546,6 +564,9 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
             await OpenPanelAsync(other, second, HarbourTitles[0]);
 
             var focusedBefore = await other.EvaluateAsync<bool>("() => !!document.activeElement && !!document.activeElement.closest('[role=dialog]')");
+
+            // Anchor: focus is in tab 2's panel, so "focus where it was" below compares something (story 3.2 code review).
+            Assert.True(focusedBefore, "Focus is not in tab 2's panel before tab 1 acts.");
 
             await OpenListAsync(first, page, Northwind, Atlas);
             await page.GetByRole(AriaRole.Checkbox, new PageGetByRoleOptions { Name = "Doing", Exact = true }).CheckAsync(new LocatorCheckOptions { Timeout = Timeout });
@@ -738,8 +759,10 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
     /// unmounts its child while the destination is held, so a fresh section mounts on arrival. Skipping the seam's
     /// <c>Purge()</c> in <c>Navigating</c> turns this red on the bar's Space name (ATDD run). With all four layers off -
     /// the seam's purge, the arrival gate's reset, the <c>@key</c> and the section's purge - the reused section keeps the
-    /// departed Space's Labels and this goes red before Back, at B's own Labels. The section's purge and key are defence in
-    /// depth behind the arrival gate, which the browser cannot see one at a time.
+    /// departed Space's Labels and this goes red before Back, at the anchor (B's own Labels never replace A's). No plant
+    /// has turned the held-absence assertion itself red: with any one layer intact the destination's held answer shows
+    /// nothing, and with all of them off the case fails earlier (story 3.2 code review). The section's purge and key are
+    /// defence in depth behind the arrival gate, which the browser cannot see one at a time.
     /// </remarks>
     [Fact]
     public async Task Back_from_one_Spaces_settings_to_anothers_leaves_no_Label_of_the_departed_Space_while_held()
@@ -809,12 +832,61 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// AC15 (NFR-9, UX-DR40), Lee's decision D2 in the story 3.2 code review - ArrowDown on the open trigger moves focus
+    /// straight to the first row, past the bar's other controls; Tab order is unchanged. Choosing a row from there by
+    /// keyboard still lands focus on the bar and announces the destination.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "UX-DR39")]
+    [Trait("Requirement", "UX-DR40")]
+    public async Task ArrowDown_on_the_open_trigger_moves_focus_to_the_first_row()
+    {
+        var api = SeededSpaces();
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSpaceAsync(api, page, Northwind);
+            await page.EvaluateAsync(RecordBarAnnouncements);
+            await KeyboardHarness.ResetFocusAsync(page);
+
+            await TabUntilAsync(page, "switcher");
+            await page.Keyboard.PressAsync("Enter");
+            await page.Locator("#space-switcher-list a").First.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            // Anchor: the list is open and focus is still on the trigger.
+            Assert.Equal("switcher", await page.EvaluateAsync<string>(DescribeFocus));
+
+            await page.Keyboard.PressAsync("ArrowDown");
+            await page.WaitForFunctionAsync(
+                "() => document.activeElement && document.activeElement.closest('#space-switcher-list') !== null",
+                null,
+                new PageWaitForFunctionOptions { Timeout = Timeout });
+
+            Assert.Equal("row:" + NorthwindName, await page.EvaluateAsync<string>(DescribeFocus));
+
+            await page.Keyboard.PressAsync("Tab");
+            Assert.Equal("row:" + HarbourName, await page.EvaluateAsync<string>(DescribeFocus));
+
+            await page.Keyboard.PressAsync("Enter");
+            await page.Locator(ContextBar, new PageLocatorOptions { HasText = HarbourName }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.WaitForFunctionAsync(
+                $"() => document.activeElement && document.activeElement.matches('{ContextBar}')",
+                null,
+                new PageWaitForFunctionOptions { Timeout = Timeout });
+
+            await WaitUntilBarSaidAsync(page, HarbourName);
+        }
+    }
+
+    /// <summary>
     /// AC15 (NFR-9, UX-DR40, UX-DR41) - the context bar's Tab order follows reading order (skip control, switcher, Space
     /// settings for an Owner, Account, Sign out), every stop shows a visible focus ring that is not inset, and at 320px the
     /// Role chip is kept.
     /// </summary>
     [Theory]
     [InlineData("owner", 1280, 800)]
+    [InlineData("admin", 1280, 800)]
     [InlineData("viewer", 1280, 800)]
     [InlineData("owner", 320, 256)]
     [InlineData("viewer", 320, 256)]
@@ -831,7 +903,7 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
             await OpenSpaceAsync(api, page, Northwind);
             await KeyboardHarness.ResetFocusAsync(page);
 
-            string[] expected = role == "owner"
+            string[] expected = role is "owner" or "admin"
                 ? ["skip", "switcher", "settings", "account", "sign-out"]
                 : ["skip", "switcher", "account", "sign-out"];
 
@@ -853,17 +925,21 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC15 (<c>deferred-work.md:669</c>) - on <c>/spaces/new</c> the Tab order is the name, Create, Cancel, each with a
-    /// visible focus ring.
+    /// visible focus ring, at 1280x800 and at 320x256.
     /// </summary>
-    [Fact]
+    [Theory]
+    [InlineData(1280, 800)]
+    [InlineData(320, 256)]
     [Trait("Requirement", "UX-DR40")]
-    public async Task The_create_pages_Tab_order_is_name_Create_Cancel_with_a_visible_ring()
+    [Trait("Requirement", "UX-DR41")]
+    public async Task The_create_pages_Tab_order_is_name_Create_Cancel_with_a_visible_ring(int width, int height)
     {
         var api = SeededSpaces();
         var (context, page) = await surface.OpenAsync(EnglishLocale);
 
         await using (context)
         {
+            await page.SetViewportSizeAsync(width, height);
             await OpenSpaceAsync(api, page, Northwind);
             await NavigateInAppAsync(page, "/spaces/new");
             await page.GetByLabel("Space name", new PageGetByLabelOptions { Exact = true }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
@@ -885,17 +961,21 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC15 (<c>deferred-work.md:669</c>) - Space settings' rename section: Rename, then (opened) the field, Save, Cancel,
-    /// each with a visible focus ring.
+    /// each with a visible focus ring, at 1280x800 and at 320x256.
     /// </summary>
-    [Fact]
+    [Theory]
+    [InlineData(1280, 800)]
+    [InlineData(320, 256)]
     [Trait("Requirement", "UX-DR40")]
-    public async Task The_rename_sections_Tab_order_is_Rename_field_Save_Cancel_with_a_visible_ring()
+    [Trait("Requirement", "UX-DR41")]
+    public async Task The_rename_sections_Tab_order_is_Rename_field_Save_Cancel_with_a_visible_ring(int width, int height)
     {
         var api = SeededSpaces();
         var (context, page) = await surface.OpenAsync(EnglishLocale);
 
         await using (context)
         {
+            await page.SetViewportSizeAsync(width, height);
             await api.InstallAsync(page);
             await page.GotoAsync(Address($"spaces/{Northwind:D}/settings"));
             await page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Rename", Exact = true })

@@ -86,11 +86,18 @@ public sealed partial class SpaceSwitcherGateTests
     /// sentence held for Space A's home ("narrated, then routed", UX-DR29) is gone before Space B renders.
     /// </summary>
     /// <remarks>
+    /// <para>
     /// Assumes the story's recommended wiring (Task 2): <c>activeSpace.RegisterPurge(spaceNarration.Forget)</c> in
     /// <c>Program</c>. A method group compiles to <c>ldftn</c>, whose operand is the method reference this reads.
-    /// Plant: remove the registration - this goes red, and so does
-    /// <c>ActiveSpaceStateTests.A_pending_narration_is_forgotten_on_a_Space_change_and_kept_within_one_Space</c> only if
-    /// the plant removes <c>Forget</c> itself.
+    /// Plant: remove the registration - this goes red. <c>ActiveSpaceStateTests.A_pending_narration_is_forgotten_on_a_Space_change_and_kept_within_one_Space</c>
+    /// stays green under that plant, because it wires its own registration; it goes red only if <c>Forget</c> itself
+    /// stops forgetting.
+    /// </para>
+    /// <para>
+    /// The IL reads which methods <c>Program</c> calls, not which purge <c>Forget</c> is handed to, so the source is also
+    /// read (line comments stripped) for the registration on the Space seam itself: a
+    /// <c>sessionState.RegisterPurge(spaceNarration.Forget)</c> would satisfy the IL and fail here (story 3.2 code review).
+    /// </para>
     /// </remarks>
     [Fact]
     [Trait("Requirement", "UX-DR31")]
@@ -102,6 +109,10 @@ public sealed partial class SpaceSwitcherGateTests
 
         Assert.Contains("Program", CallersOf(typeof(ActiveSpaceState).FullName!, nameof(ActiveSpaceState.RegisterPurge)));
         Assert.Contains("Program", CallersOf(typeof(SpaceNarration).FullName!, nameof(SpaceNarration.Forget)));
+
+        var program = LineComment.Replace(File.ReadAllText(Path.Combine(ClientRoot.FullName, "Program.cs")), string.Empty);
+
+        Assert.Matches(NarrationOnTheSpacePurge, program);
     }
 
     /// <summary>
@@ -134,11 +145,40 @@ public sealed partial class SpaceSwitcherGateTests
         Assert.True(refusedMembers.Count > 0, "SpaceDirectory holds no set of the Spaces that refused this tab (Q1 (a)).");
         Assert.All(refusedMembers, name => Assert.DoesNotMatch(RemembersASpace, name));
 
-        var home = RazorComment.Replace(File.ReadAllText(Path.Combine(ClientRoot.FullName, "Pages", "Home.razor")), string.Empty);
+        // Razor and C# line comments stripped, so a remark naming the set satisfies nothing (story 3.2 code review).
+        var home = LineComment.Replace(
+            RazorComment.Replace(File.ReadAllText(Path.Combine(ClientRoot.FullName, "Pages", "Home.razor")), string.Empty),
+            string.Empty);
 
-        Assert.Contains("Refused", home, StringComparison.Ordinal);
-        Assert.DoesNotContain("spaces[0]", home, StringComparison.Ordinal);
+        Assert.Contains("Directory.RefusedInThisLoad(", home, StringComparison.Ordinal);
+        Assert.DoesNotMatch(FirstListedSpace, home);
     }
+
+    /// <summary>
+    /// The AC12 scan for an unconditional first listed Space sees the shapes it would take, and not the route back's own
+    /// filtered choice. A standing check on the scan.
+    /// </summary>
+    [Fact]
+    public void The_first_listed_Space_scan_detects_each_shape()
+    {
+        Assert.Matches(FirstListedSpace, "ClientRoutes.SpaceHome(spaces[0].Id)");
+        Assert.Matches(FirstListedSpace, "ClientRoutes.SpaceHome(spaces[ 0 ].Id)");
+        Assert.Matches(FirstListedSpace, "var first = spaces.First();");
+        Assert.Matches(FirstListedSpace, "var first = spaces.ElementAt(0);");
+        Assert.DoesNotMatch(FirstListedSpace, "spaces.FirstOrDefault(space => !Directory.RefusedInThisLoad(space.Id))");
+    }
+
+    // A C# line comment, to the end of the line.
+    [GeneratedRegex(@"//[^\r\n]*", RegexOptions.None, 1000)]
+    private static partial Regex LineComment { get; }
+
+    // The Space seam's registration of the pending narration (AC11).
+    [GeneratedRegex(@"activeSpace\s*\.\s*RegisterPurge\s*\(\s*spaceNarration\s*\.\s*Forget\s*\)", RegexOptions.None, 1000)]
+    private static partial Regex NarrationOnTheSpacePurge { get; }
+
+    // The first listed Space taken unconditionally: spaces[0], spaces.First() or spaces.ElementAt(0) (AC12).
+    [GeneratedRegex(@"\bspaces\s*(?:\[\s*0\s*\]|\.\s*First\s*\(\s*\)|\.\s*ElementAt\s*\(\s*0\s*\))", RegexOptions.None, 1000)]
+    private static partial Regex FirstListedSpace { get; }
 
     // A Razor loop whose source is the switcher's answer: the directory's Current, or a variable or parameter named for
     // the Spaces (Spaces, _spaces, spaces).

@@ -35,7 +35,8 @@
     </div>
 }
 
-@* Otherwise on its way to sign-in or to a Space, with nothing to render meanwhile. *@
+@* The refusal page when the switcher could not be asked, or when every listed Space has refused this tab in this
+   load (story 3.2, AC12). Otherwise on its way to sign-in or to a Space, with nothing to render meanwhile. *@
 @if (_unavailable)
 {
     <RefusalSurface />

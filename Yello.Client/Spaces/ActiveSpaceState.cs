@@ -40,10 +40,14 @@ namespace Yello.Client.Spaces;
 /// <item>Keyed and arrival-gated: <c>BoardView</c> and <c>TaskListView</c> (<c>@key</c> on the Space and Project), and
 /// <c>ProjectList</c>, <c>SpaceNameSection</c> and <c>LabelSection</c> (<c>@key</c> on the Space); their children
 /// (<c>TaskDetail</c>, <c>TaskCreate</c>, <c>MovePicker</c>, cards and rows) go with them.</item>
+/// <item>Cleared through <see cref="Changed"/>, which <see cref="Purge"/> raises: <c>ContextBar</c>'s displayed Space name,
+/// Role chip, Project name and pending switch announcement (<c>_announcement</c>).</item>
 /// <item>Page-level fields of a page reused across Spaces reset on a change of <c>SpaceId</c>: <c>SpaceArrival</c>'s
 /// arrival state, <c>SpaceSettings</c>' permission state (story 2.4) and <c>SpaceHome</c>'s narration (story 3.2).</item>
 /// <item>Not Space-scoped, kept across a switch by design: <c>SpaceDirectory</c> and <c>ContextBar</c>'s copy of it
 /// (Account-scoped, dropped on Session end), and <c>PageHeadingFocus</c> (an element reference, no content).</item>
+/// <item>Session-scoped, purged on sign-out and Session end through <c>SessionState.RegisterPurge</c>: this seam and
+/// <c>SpaceDirectory</c> (registered by <c>Program</c>), <c>AccountSettings</c>' Tokens and <c>CreateSpace</c>'s form.</item>
 /// </list>
 /// <para>
 /// <b>Epic 7 registers the rest of UX-DR31 with this seam</b> (stories 7.3 and 7.7): the replica, its projections, the

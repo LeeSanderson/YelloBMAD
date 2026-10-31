@@ -24,12 +24,15 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 public sealed partial class ActiveSpaceEndpointTests
 {
     /// <summary>
-    /// AC18 / Q2 (a) - the switcher's <c>200</c>, a Space-scoped <c>200</c> (the active Space and its Statuses) and the
-    /// boundary's <c>404</c> each carry <c>Cache-Control: no-store</c>.
+    /// AC18 / Q2 (a) - the switcher's <c>200</c>, a Space-scoped <c>200</c> (the active Space and its Statuses), the
+    /// boundary's <c>404</c>, an anonymous <c>401</c> and an unmatched <c>/api</c> path's <c>404</c> each carry
+    /// <c>Cache-Control: no-store</c>.
     /// </summary>
     /// <remarks>
     /// Anchored on the statuses first, so a route that fell through to the unmatched endpoint is not read as an answer.
-    /// Plant: remove the pipeline's <c>no-store</c> - this goes red on all four.
+    /// Plant: remove the pipeline's <c>no-store</c> - this goes red on the first four (the dev phase's plant). The
+    /// anonymous <c>401</c> and the unmatched path were added by the story 3.2 code review, so the remarks of
+    /// <c>ApiNoStore</c> claim nothing this case does not hold.
     /// </remarks>
     [Fact]
     [Trait("Priority", "P0")]
@@ -46,6 +49,8 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? active = null;
         WireResponse? statuses = null;
         WireResponse? boundary = null;
+        WireResponse? anonymous = null;
+        WireResponse? unmatched = null;
 
         await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
@@ -56,20 +61,26 @@ public sealed partial class ActiveSpaceEndpointTests
             active = await session.GetAsync(SpaceRoutes.ActiveOf(personal));
             statuses = await session.GetAsync(SpaceRoutes.StatusesOf(personal));
             boundary = await session.GetAsync(SpaceRoutes.ActiveOf(absent));
+            anonymous = await session.GetAnonymouslyAsync(SpaceRoutes.ActiveOf(personal));
+            unmatched = await session.GetAsync("/api/v1/no-such-route-" + absent.ToString("N"));
         });
 
         Assert.NotNull(directory);
         Assert.NotNull(active);
         Assert.NotNull(statuses);
         Assert.NotNull(boundary);
+        Assert.NotNull(anonymous);
+        Assert.NotNull(unmatched);
 
         // Anchors: each route answered as itself.
         Assert.Equal(HttpStatusCode.OK, directory.StatusCode);
         Assert.Equal(HttpStatusCode.OK, active.StatusCode);
         Assert.Equal(HttpStatusCode.OK, statuses.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, boundary.StatusCode);
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymous.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unmatched.StatusCode);
 
-        foreach (var (what, response) in new[] { ("switcher", directory), ("active Space", active), ("Statuses", statuses), ("boundary 404", boundary) })
+        foreach (var (what, response) in new[] { ("switcher", directory), ("active Space", active), ("Statuses", statuses), ("boundary 404", boundary), ("anonymous 401", anonymous), ("unmatched path", unmatched) })
         {
             var cacheControl = response.Header("Cache-Control") ?? string.Empty;
 

@@ -94,7 +94,8 @@
 
     @if (_open && _spaces is { } spaces)
     {
-        <SpaceSwitcher ListId="@ListId"
+        <SpaceSwitcher @ref="_switcher"
+                       ListId="@ListId"
                        Spaces="@spaces"
                        ActiveSpaceId="@ActiveSpace.SpaceId"
                        OnDismissed="Dismiss" />
@@ -108,10 +109,12 @@
 
     private ElementReference _bar;
     private ElementReference _trigger;
+    private SpaceSwitcher? _switcher;
 
     private bool _open;
     private bool _focusBar;
     private bool _focusTrigger;
+    private bool _focusFirstRow;
     private int _arrivalsSeen;
     private string _announcement = string.Empty;
     private IReadOnlyList<SpaceIdentityResponse>? _spaces;
@@ -147,6 +150,15 @@
         {
             _focusTrigger = false;
             await _trigger.FocusAsync();
+        }
+        else if (_focusFirstRow)
+        {
+            _focusFirstRow = false;
+
+            if (_open && _switcher is not null)
+            {
+                await _switcher.FocusFirstRowAsync();
+            }
         }
         else
         {
@@ -224,6 +236,15 @@
         if (_open && string.Equals(key.Key, "Escape", StringComparison.Ordinal))
         {
             Dismiss();
+        }
+        else if (_open && string.Equals(key.Key, "ArrowDown", StringComparison.Ordinal))
+        {
+            // The arrow path into the rows (story 3.2, AC15, Lee's decision D2); Tab order is unchanged.
+            _focusFirstRow = true;
+        }
+        else
+        {
+            // Any other key on the trigger is the button's own (Enter and Space toggle it, Tab moves on).
         }
     }
 

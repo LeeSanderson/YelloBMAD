@@ -4,7 +4,7 @@ baseline_commit: f3139a1
 
 # Story 3.2: Switch between Spaces with nothing carrying over
 
-Status: review
+Status: done
 
 Epic: 3 — Several Spaces, cleanly separated
 Story key: `3-2-switch-between-spaces-with-nothing-carrying-over`
@@ -66,6 +66,8 @@ AC1 to AC10 are reproduced **verbatim** from `epics.md:1487-1529` (`status: fina
 **Then** it lists exactly those Spaces by name and nothing else, and it remains the only list of Spaces anywhere in the product
 
 > Read "the only list of Spaces" as **the only list of the Spaces an Account belongs to**. The AD-24 amendment (`ARCHITECTURE-SPINE.md:225`) already permits story 5.4's delete-Account refusal to name the Spaces the Account owns. Record that exception in the gate's message rather than writing a gate 5.4 must break silently.
+>
+> **Second named exception (Lee, code review decision D1, 2026-10-31):** Account settings' Token-binding `<select>` (story 1.8) lists the Account's Spaces to choose a Token's binding, not to reach a Space. It stays, named in the gate's allow-list and message beside the 5.4 exception. Any third list is a defect.
 
 **AC2 — the Role is the destination's** (FR-9, NFR-2)
 **Given** a Space is selected
@@ -188,6 +190,29 @@ AC1 to AC10 are reproduced **verbatim** from `epics.md:1487-1529` (`status: fina
   - [x] `tests/TESTING-CONVENTIONS.md`: add a short note, "Two tabs and an Account switch, added by story 3.2". It covers how a case opens a second page in one `IBrowserContext` (`context.NewPageAsync`, the same `FakeYelloApi` installed on each page or one per page, as decided), and how a case changes the signed-in identity of `FakeYelloApi` between a sign-out and a sign-in.
   - [x] Rewrite any comment that predicts 3.2 so it describes what exists (`grep -rn "3\.2" Yello.Client Yello.Host tests`).
   - [x] Run `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers.
+
+### Review Findings
+
+Code review 2026-10-31 (`4837bfe..HEAD`, full mode: Blind Hunter, Edge Case Hunter, Acceptance Auditor). 35 raw findings, 24 after dedup: 2 decision-needed, 14 patch, 2 defer, 6 dismissed.
+
+- [x] [Review][Decision] **Lee decided (a): keep the exception, amend AC1's note (done above).** AC1's "only list of Spaces" was loosened for Account settings' Token-binding `<select>` — AC1 is verbatim from the final epics, and its note names only the 5.4/AD-24 exception. The dev phase allow-listed `Pages/AccountSettings.razor` in `Only_the_switcher_renders_the_Accounts_Spaces_as_a_list` and recorded "AC1 - Token select" as a reversible decision. That select (story 1.8) renders the Account's Space names as options to bind a Token. Not an open question the story delegated.
+- [x] [Review][Decision] **Lee decided (b): ArrowDown on the open trigger focuses the first row; Tab order unchanged; a test asserts the arrow path (`ArrowDown_on_the_open_trigger_moves_focus_to_the_first_row`). Applied as a patch.** AC15's keyboard switch passes Space settings, Account and Sign out before the first row — `ContextBar.razor` renders `SpaceSwitcher` after `context-bar__account-controls`, so after Enter on the trigger, Tab reaches settings (Owner/Admin), Account and Sign out before any row. AC15 says "Tab to the trigger, Enter, Tab or arrow into the rows". The test uses `TabUntilAsync`, which tolerates the extra stops. The ATDD checklist flagged it for dev-story; no decision was recorded.
+- [x] [Review][Patch] A late refusal can be recorded against the Space the tab has moved to: `Directory.Refused(SpaceId)` and `Refuse` run after `await ProblemOfAsync` with no token check [Yello.Client/Components/SpaceArrival.razor:185]
+- [x] [Review][Patch] A transport failure or a 5xx is recorded as the Space refusing, so one network blip excludes a healthy Space for the load and a single-Space Account's route back dead-ends (before 3.2 it retried). AC12 names `403`, `404` and `409` only; record those alone (also removes the duplicated "unless left" guard in the unlisted branch) [Yello.Client/Components/SpaceArrival.razor:183,218]
+- [x] [Review][Patch] `ApiNoStore`'s remarks claim a `401`, a `503` and the unmatched path, but the wire case proves four `GET`s; add the anonymous `401` and the unmatched `/api` path, and state what is proved [Yello.Host/ApiNoStore.cs:15; tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.CacheControl.cs]
+- [x] [Review][Patch] The composition-root gate checks `RegisterPurge` and `SpaceNarration.Forget` separately, so `sessionState.RegisterPurge(spaceNarration.Forget)` would pass [tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.CarryOver.cs:~100]
+- [x] [Review][Patch] The AC12 `Home` gate passes on "Refused" in a C# comment and misses `spaces.First()` / `spaces.ElementAt(0)` [tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.CarryOver.cs:139]
+- [x] [Review][Patch] The AC14 record overstates: the all-layers-off plant went red at the anchor (B's own Labels before Back), not at the held-absence assertion; correct the `:542` closure, the test remark and the Debug Log [deferred-work.md:542; tests/Yello.Tests.Client/SpaceSwitchCarryOverTests.cs:~735]
+- [x] [Review][Patch] The 4.4 ledger entry still says 4.4 "decides whether the held sentence should also be cleared on a Space purge"; 3.2 decided it [deferred-work.md:541]
+- [x] [Review][Patch] The holder list in `ActiveSpaceState`'s remarks omits `ContextBar`'s announcement and displayed Space/Role (cleared through `Changed`) and the Session-scoped purges in `AccountSettings` and `CreateSpace` [Yello.Client/Spaces/ActiveSpaceState.cs:32]
+- [x] [Review][Patch] The two-tab case compares `focusedBefore` with itself without anchoring it to `true` [tests/Yello.Tests.Client/SpaceSwitchCarryOverTests.cs:548]
+- [x] [Review][Patch] A gate remark says the plant both does and does not turn `ActiveSpaceStateTests` red [tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.CarryOver.cs:~93]
+- [x] [Review][Patch] Stale comment above the new all-refused path: "with nothing to render meanwhile" [Yello.Client/Pages/Home.razor:38]
+- [x] [Review][Patch] AC15 coverage: no Admin row in the bar's Tab-order theory, and the create and rename cases run at 1280 only, not 320×256 [tests/Yello.Tests.Client/SpaceSwitchCarryOverTests.cs:816-925]
+- [x] [Review][Patch] Q4's measurement: B's scroll before Back is unanchored, and the List view (Task 4) is not measured, though Q4 - (b) claims "every `main` element" [tests/Yello.Tests.Client/SpaceSwitchCarryOverTests.cs:456]
+- [x] [Review][Patch] AC17's "no Task edit control" maps to no case in the AC map; the Owner→Viewer panel case exists (`DeleteTests.A_Viewer_is_offered_no_delete_control_and_nothing_is_disabled`, `LabelTests` Viewer panel) and should be cited [this file, AC to test map]
+- [x] [Review][Defer] On the all-refused page at `/`, "Back to Yello" links to the page it is on and the copy is the generic "Not available." [Yello.Client/Pages/Home.razor:93] — deferred, pre-existing (the `spaces is null` path already renders the same surface on `/`); owner story 3.3
+- [x] [Review][Defer] Several new absence assertions were never seen red under a plant (E2E-001 Role text, -003, -005, -007, -008, -010, -014, -020) [tests/Yello.Tests.Client/SpaceSwitchCarryOverTests.cs] — deferred; owner story 3.4 (one Account, two Spaces, "nothing in client memory")
 
 ## Dev Notes
 
@@ -506,7 +531,7 @@ Claude Opus 5.5 (`claude-opus-5-5`), dev-story run unattended by the story-cycle
 | `no-store` neutered in `ApiNoStore` | SLC-001 | **red** at `ActiveSpaceEndpointTests.CacheControl.cs:76` |
 | `LabelSection.Purge` skipped alone | E2E-015 | green: defence in depth |
 | `LabelSection` `@key` removed + `Purge` skipped | E2E-015 | green: `SpaceArrival` unmounts its child while the destination is held |
-| Seam `Purge()` skipped in `Navigating` + `SpaceArrival`'s `_arrived` reset removed + `@key` removed + `LabelSection.Purge` skipped | E2E-015 | **red** at line 752: the reused section kept Northwind's Labels under Harbour's settings |
+| Seam `Purge()` skipped in `Navigating` + `SpaceArrival`'s `_arrived` reset removed + `@key` removed + `LabelSection.Purge` skipped | E2E-015 | **red**, but at the anchor before Back (the reused section kept Northwind's Labels under Harbour's settings), not at the held-absence assertion. Corrected by the code review: no plant has seen that assertion red |
 | Seam `Purge()` skipped in `Navigating` alone (ATDD run) | E2E-002, -006, -015 | **red** on the bar's Space name |
 | `outline: none` on `.context-bar a/button:focus-visible` | E2E-017 x4 | all four **red** |
 | `TaskListFilters.Clear()` removed + `TaskListView` `@key` removed (same build as the ring plant; disjoint cases) | E2E-004 | green: the arrival gate, as for Labels |
@@ -520,10 +545,10 @@ Claude Opus 5.5 (`claude-opus-5-5`), dev-story run unattended by the story-cycle
 
 **Decisions** (each reversible; cut any line to reopen it):
 
-- **Q1 - (a).** An in-memory, per-load exclusion set on `SpaceDirectory` (`Refused`, `ArrivedIn`, `RefusedInThisLoad`, cleared by `Forget`). `Home` lands on the first listed Space not in it, and shows the refusal page with the bar's shell when all have refused. Cost: one `HashSet<Guid>` in an Account-scoped service. Recorded: a listed Space's own refusal (`403`/`404`/`409`, or a transport failure on arrival). Not recorded: an unlisted id (the route back never offers one) and a page's own `404` (a missing Project is not the Space refusing).
+- **Q1 - (a).** An in-memory, per-load exclusion set on `SpaceDirectory` (`Refused`, `ArrivedIn`, `RefusedInThisLoad`, cleared by `Forget`). `Home` lands on the first listed Space not in it, and shows the refusal page with the bar's shell when all have refused. Cost: one `HashSet<Guid>` in an Account-scoped service. Recorded: a listed Space's own refusal (`403`/`404`/`409`) only. The code review removed the transport failure and the `5xx`, which say nothing about the Space, so "Back to Yello" asks that Space again. Not recorded: an unlisted id (the route back never offers one) and a page's own `404` (a missing Project is not the Space refusing).
 - **Q2 - (a).** `Cache-Control: no-store` on every `/api` response, set once by the `ApiNoStore` middleware in `Yello.Host/Program.cs` through `Response.OnStarting`, so `DatabaseAvailability`'s `Response.Clear()` cannot drop it. A value already holding `no-store` (the cookie handler's `no-cache,no-store` on a dead-cookie `401`) is left alone. **The per-endpoint lines stay** (`IdempotentResponses.cs:182`, `ApiTokenEndpoints.cs:99`): they state their reason where the secret is written and agree with the pipeline. Cost: one header per answer.
 - **Q3 - (a).** Each layer was planted separately; the record is in the Debug Log and in `deferred-work.md` (`:542` closure). The component purges and `@key`s stay as defence in depth behind the arrival gate.
-- **Q4 - (b).** Measured: window and every `main` element at offset 0 after a switch and after Back (`Scroll_is_at_the_origin_after_a_switch_and_after_Back`, green in this run and in the ATDD run). No reset added. The case stays, to catch a framework change.
+- **Q4 - (b).** Measured: window and every `main` element at offset 0 after a switch and after Back between Boards, and after a switch between Lists (the List leg and the anchor on B's scroll were added by the code review) (`Scroll_is_at_the_origin_after_a_switch_and_after_Back`, green in this run and in the ATDD run). No reset added. The case stays, to catch a framework change.
 - **Q5 - (a).** No isolation row. 3.2 maps no `/api` route; Q2 adds only a header.
 - **Q6 - (a).** One `IBrowserContext`, two pages, one `FakeYelloApi` per page seeded identically (`Two_tabs_on_two_Spaces_share_no_state`).
 - **AC1 - Token select.** Account settings' Token-binding `<select>` (story 1.8) stays an allowed exception to "the only list of Spaces". It chooses a binding, not a way to reach a Space. ARCH-001's allow-list and message name it beside 5.4's AD-24 exception. Cost: a second rendering of the Space names exists, on Account settings only.
@@ -534,7 +559,7 @@ Claude Opus 5.5 (`claude-opus-5-5`), dev-story run unattended by the story-cycle
 | AC | Cases |
 |---|---|
 | AC1 | `The_switcher_lists_three_Spaces_at_mixed_Roles_by_name_and_nothing_else`; gate `Only_the_switcher_renders_the_Accounts_Spaces_as_a_list` (+ `The_Space_list_scan_detects_a_planted_list`) |
-| AC2 / AC17 | `Switching_from_Owner_to_Viewer_drops_every_Owner_affordance_while_held_and_after`, `A_Viewer_destination_Board_has_no_Task_create_control_after_an_Owners_Board`, `A_List_filter_and_sort_do_not_survive_a_switch`, `An_open_Task_and_the_bars_Project_name_do_not_survive_a_switch`; NFR-2 on the wire stays `Each_Space_reports_the_Role_held_there_with_no_carry_over_across_switches` |
+| AC2 / AC17 | `Switching_from_Owner_to_Viewer_drops_every_Owner_affordance_while_held_and_after`, `A_Viewer_destination_Board_has_no_Task_create_control_after_an_Owners_Board`, the Task edit controls on an Owner-to-Viewer switch held by `DeleteTests.A_Viewer_is_offered_no_delete_control_and_nothing_is_disabled` and the Viewer panel cases in `LabelTests` (code review), `A_List_filter_and_sort_do_not_survive_a_switch`, `An_open_Task_and_the_bars_Project_name_do_not_survive_a_switch`; NFR-2 on the wire stays `Each_Space_reports_the_Role_held_there_with_no_carry_over_across_switches` |
 | AC3 / AC4 | `Back_and_Forward_between_two_Boards_leave_nothing_of_the_departed_Space_while_held`, `An_Account_switch_in_one_tab_leaves_nothing_of_the_first_Account`, the 1.7 sign-out cases, `ActiveSpaceStateTests.*` |
 | AC5 | `A_session_through_two_Spaces_Boards_Lists_and_settings_leaves_nothing_in_browser_storage`, `ClientStorageBanTests` |
 | AC6 / AC7 | `A_Project_id_followed_under_another_Space_renders_nothing_of_the_first_and_refuses_as_unlisted`, `SpaceScopedFirstLoadTests` |
@@ -545,7 +570,7 @@ Claude Opus 5.5 (`claude-opus-5-5`), dev-story run unattended by the story-cycle
 | AC12 | `The_route_back_skips_a_listed_Space_that_refused_with_409`, `When_every_listed_Space_refuses_the_route_back_stops_on_the_refusal_page`, `The_route_back_exclusion_lives_in_the_directory_and_is_not_a_remembered_Space`, `No_client_code_remembers_a_last_Space` |
 | AC13 | `An_in_app_navigation_to_a_Space_removed_after_a_visit_is_refused_with_no_request` |
 | AC14 | `Back_from_one_Spaces_settings_to_anothers_leaves_no_Label_of_the_departed_Space_while_held` + the Q3 plant record |
-| AC15 | `A_keyboard_only_switch_lands_focus_on_the_bar_and_announces_the_destination`, `The_bars_Tab_order_follows_reading_order_with_a_visible_ring_at_every_stop` (x4), `The_create_pages_Tab_order_is_name_Create_Cancel_with_a_visible_ring`, `The_rename_sections_Tab_order_is_Rename_field_Save_Cancel_with_a_visible_ring` |
+| AC15 | `A_keyboard_only_switch_lands_focus_on_the_bar_and_announces_the_destination`, `ArrowDown_on_the_open_trigger_moves_focus_to_the_first_row` (decision D2), `The_bars_Tab_order_follows_reading_order_with_a_visible_ring_at_every_stop` (x5, Admin added), `The_create_pages_Tab_order_is_name_Create_Cancel_with_a_visible_ring` (x2 widths), `The_rename_sections_Tab_order_is_Rename_field_Save_Cancel_with_a_visible_ring` (x2 widths) |
 | AC16 | `An_Account_switch_in_one_tab_leaves_nothing_of_the_first_Account` |
 | AC18 | `Every_api_answer_is_no_store_on_the_switcher_a_Space_and_the_boundary` |
 
@@ -575,7 +600,9 @@ Claude Opus 5.5 (`claude-opus-5-5`), dev-story run unattended by the story-cycle
 - `_bmad-output/implementation-artifacts/deferred-work.md` (modified)
 - `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified)
 - `_bmad-output/implementation-artifacts/3-2-switch-between-spaces-with-nothing-carrying-over.md` (this file)
+- Code review: `Yello.Client/Components/ContextBar.razor` and `SpaceSwitcher.razor` (ArrowDown into the rows, decision D2), `SpaceArrival.razor` (records only a 403/404/409, behind a token check), `SpaceDirectory.cs`, `Home.razor`, `ActiveSpaceState.cs` (remarks), `Yello.Host/ApiNoStore.cs` (remarks), `tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.CarryOver.cs`, `tests/Yello.Tests.Client/SpaceSwitchCarryOverTests.cs`, `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.CacheControl.cs`
 
 ### Change Log
 
 - 2026-10-31 - dev-story: AC11 (`SpaceNarration` purged on a Space change; `SpaceHome` drops a taken sentence on a change of Space), AC12 (route-back exclusion set), AC18 (`no-store` on every `/api` answer). Six scaffolds activated, one browser case added, plants recorded, four ledger entries closed, two added. Verification: `dotnet build Yello.slnx` 0 warnings, 0 errors; `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`: 1,615 total, 1,605 passed, 1 failed, 9 skipped. The one failure was `ISO-TIMING-IN-SPACE / Session` (boundary vs in-Space not-found medians 62.1 vs 46.6 ms, 24.9 % against 20 %), a timing measurement under full-run load. The `/api` header applies to both paths alike. Rerun alone per CLAUDE.md, `Yello.Tests.Isolation` passed 141/141. Net: 1,606 passed, 0 failed, 9 skipped, against a baseline of 1,614 / 1,599 / 15 skipped (+1 new case; 6 red-phase skips activated). Status set to review.
+- 2026-10-31 - code review: 35 raw findings, 24 after dedup (2 decisions by Lee, 14 patches applied, 2 deferred to 3.3 and 3.4, 6 dismissed). The main fix: AC12 recorded a transport failure or a 5xx as the Space refusing, and recorded a refusal after an await with no token check. Both fixed; only a 403/404/409 is recorded now. D1: the Token-binding select stays as a named AC1 exception. D2: ArrowDown on the open trigger focuses the first row. New source-level gates were planted red (narration registered on the Space seam). Verification: `dotnet build Yello.slnx` 0 warnings, 0 errors. The full run gave 1,620 total, 1,610 passed, 1 failed, 9 skipped. The failure was the new List leg of `Scroll_is_at_the_origin_after_a_switch_and_after_Back`, which waited on one title being among the first rows. After the fix (wait on the bar and the first row), the class passed 3 of 3 times and `Yello.Tests.Client` passed alone with 374 total, 372 passed, 0 failed, 2 skipped. Net: 1,620 total, 1,611 passed, 0 failed, 9 skipped. Status set to done.

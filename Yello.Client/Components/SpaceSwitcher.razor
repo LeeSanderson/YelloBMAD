@@ -11,7 +11,9 @@
     aria-current="page" alone; there is no visual "current" badge (open question 8).
 
     A NON-MODAL DISCLOSURE (open question 8, option a). The context bar's trigger opens it; Esc
-    closes it and returns focus to the trigger; choosing a row navigates. Rows are links, so a
+    closes it and returns focus to the trigger; choosing a row navigates. ArrowDown on the open trigger
+    moves focus to the first row, and Tab still reaches the rows after the bar's other controls (story 3.2,
+    AC15, Lee's decision D2). Rows are links, so a
     middle-click opens a Space in a new tab, which holds its own context (EXPERIENCE.md:93).
 
     CHOOSING A ROW HAS NO CLICK HANDLER OF ITS OWN, deliberately. The list closes because the
@@ -30,6 +32,7 @@
         <li class="space-switcher__row">
             <a class="space-switcher__link type-space-name"
                href="@ClientRoutes.SpaceHome(space.Id)"
+               @ref="_rows[space.Id]"
                aria-current="@(space.Id == ActiveSpaceId ? "page" : null)"
                @onkeydown="KeyDownAsync">@space.Name</a>
         </li>
@@ -66,6 +69,22 @@
     /// </summary>
     [Parameter]
     public EventCallback OnDismissed { get; set; }
+
+    // Each row's element, so ArrowDown on the open trigger can move focus to the first one (story 3.2, AC15).
+    private readonly Dictionary<Guid, ElementReference> _rows = [];
+
+    /// <summary>
+    /// Moves focus to the first row - ArrowDown on the open trigger (story 3.2, AC15, Lee's decision D2). Tab order is
+    /// unchanged; this is the arrow path into the rows.
+    /// </summary>
+    /// <returns>A task that completes when focus has moved, or at once when the list is empty.</returns>
+    public async Task FocusFirstRowAsync()
+    {
+        if (Spaces.Count > 0 && _rows.TryGetValue(Spaces[0].Id, out var first))
+        {
+            await first.FocusAsync();
+        }
+    }
 
     private Task KeyDownAsync(KeyboardEventArgs key) =>
         string.Equals(key.Key, "Escape", StringComparison.Ordinal) ? OnDismissed.InvokeAsync() : Task.CompletedTask;

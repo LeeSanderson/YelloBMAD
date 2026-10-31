@@ -29,9 +29,11 @@
     render the same RefusalSurface; a 403 or 409 renders through the same surface with RefusalCopy's own
     words; and a page's own 404 (a Project that matches nothing) comes back through Refuse to the same
     surface. A 401 is YelloApiHandler's: the Session has ended, and the purge and the sign-in page follow.
-    A listed Space whose OWN answer refused (or never came) is recorded with the directory, so the route
-    back offers a different listed Space (story 3.2, AC12); a page's own 404 is not the Space refusing,
-    and an unlisted id is never one the route back would offer, so neither is recorded.
+    A listed Space whose OWN answer refused - a 403, 404 or 409 - is recorded with the directory, so the
+    route back offers a different listed Space (story 3.2, AC12). A failure that says nothing about the
+    Space (a timeout, a transport failure, a 5xx) is not recorded, so "Back to Yello" asks that Space
+    again; a page's own 404 is not the Space refusing, and an unlisted id is never one the route back
+    would offer, so neither is recorded either.
 
     A FIRST ARRIVAL FOCUSES THE PAGE'S HEADING, as FocusOnNavigate would have had the heading existed when
     it ran (PageHeadingFocus). After a switch the context bar takes focus instead.
@@ -144,11 +146,7 @@
             if (!Directory.Lists(SpaceId))
             {
                 // Not recorded as a refusal: the route back only ever looks at listed Spaces.
-                if (!token.IsCancellationRequested)
-                {
-                    Refuse(problem: null);
-                }
-
+                RefuseUnlessLeft(token, firstArrival: true);
                 return;
             }
         }
@@ -184,7 +182,19 @@
             {
                 var problem = await SpaceWrites.ProblemOfAsync(response, token);
 
-                Directory.Refused(SpaceId);
+                // The tab may have left while the problem was read; this component is reused across Spaces, so
+                // SpaceId may already be the destination's.
+                if (token.IsCancellationRequested)
+                {
+                    return;
+                }
+
+                // Only the Space's own refusal is recorded for the route back (AC12); a 5xx says nothing about it.
+                if (response.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.NotFound or HttpStatusCode.Conflict)
+                {
+                    Directory.Refused(SpaceId);
+                }
+
                 Refuse(problem);
             }
         }
@@ -213,14 +223,14 @@
     /// Spaces, so a late failure about the departed Space would otherwise refuse the destination.
     /// </summary>
     /// <remarks>
-    /// A Space whose arrival failed is recorded with the directory, so the route back offers another (story 3.2, AC12).
+    /// Not recorded with the directory: a timeout or a transport failure says nothing about the Space, so the route
+    /// back asks it again (story 3.2, AC12).
     /// </remarks>
     private void RefuseUnlessLeft(CancellationToken token, bool firstArrival)
     {
         // A failed re-arrival keeps the page and the Role it already has (AC14).
         if (!token.IsCancellationRequested && firstArrival)
         {
-            Directory.Refused(SpaceId);
             Refuse(problem: null);
         }
     }

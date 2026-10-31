@@ -118,8 +118,9 @@ public sealed class SpaceDirectory(HttpClient http)
     }
 
     /// <summary>
-    /// Records that a listed Space refused this tab's arrival (a <c>403</c>, <c>404</c> or <c>409</c>, or no answer at
-    /// all), so the entry point's route back offers a different one (story 3.2, AC12, open question 1 (a)).
+    /// Records that a listed Space refused this tab's arrival with its own answer (a <c>403</c>, <c>404</c> or
+    /// <c>409</c>), so the entry point's route back offers a different one (story 3.2, AC12, open question 1 (a)). A
+    /// timeout, a transport failure or a <c>5xx</c> is not a refusal and is not recorded.
     /// </summary>
     /// <param name="spaceId">The Space that refused.</param>
     public void Refused(Guid spaceId) => _refusedInThisLoad.Add(spaceId);
