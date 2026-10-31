@@ -105,7 +105,7 @@ development_status:
   3-1-create-and-rename-a-space: done
   3-2-switch-between-spaces-with-nothing-carrying-over: done
   3-3-delete-a-space-and-belong-to-none: done
-  3-4-prove-that-owning-one-space-grants-nothing-in-another: backlog
+  3-4-prove-that-owning-one-space-grants-nothing-in-another: ready-for-dev
   epic-3-retrospective: optional
 
   # Epic 4: Bring people into one piece of your work
