@@ -169,6 +169,8 @@ AC1 to AC7 are reproduced **verbatim** from `epics.md:1583-1611` (`status: final
 **Then** it is classified `CrossSpace` rather than `InsufficientRole`
 **And** the client has manufactured none of them during ordinary use, because a client that does buries real probing in its own noise and defeats the record's purpose
 
+> **Decided by Lee, 2026-10-31:** C1 is resolved as written below. AD-3 stands, and AC7's `CrossSpace` classification covers only the cross-Space cases.
+>
 > **Contradiction C1 (record, keep AD-3).** AC2's lesser-Role case is a Member refused by the matrix, so AD-3 and AR-10 require `403` and `InsufficientRole`, and forbid converting one into the other. AC7 applies to the **cross-Space** cases: AC1's direct form, AC2's no-Membership arm and AC3. AC1's foreign-id-under-SA1 form is answered as an in-Space not-found, which writes **no** record (the 2.5 precedent, `SameAsAnchor`). Q5 decides whether that stays.
 >
 > **"The client manufactured none".** A real-Host browser case (`RealHostCollection`) has one Account owning two populated Spaces. It:
