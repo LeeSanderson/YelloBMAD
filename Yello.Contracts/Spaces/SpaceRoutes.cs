@@ -49,9 +49,25 @@ public static class SpaceRoutes
     /// on this request - as an <see cref="ActiveSpaceResponse"/>. <c>404</c> for a Space the caller
     /// holds no Membership in or that does not exist, exactly as every Space-scoped route answers.
     /// <c>PATCH</c> here, with a <see cref="RenameSpaceRequest"/>, renames it (story 3.1) and answers
-    /// the same <see cref="ActiveSpaceResponse"/>; it declares <c>RenameSpace</c>.
+    /// the same <see cref="ActiveSpaceResponse"/>; it declares <c>RenameSpace</c>. <c>DELETE</c> here, with no body,
+    /// deletes it (story 3.3) and answers <c>204</c>; it declares <c>DeleteSpace</c>, which the Owner alone holds. A
+    /// replayed deletion finds no Membership and is the boundary's <c>404</c> (AD-18's recorded variance).
     /// </summary>
     public static string Active => "/api/v1/spaces/{spaceId:guid}";
+
+    /// <summary>
+    /// <c>GET</c> here for what deleting the active Space would take, as a <see cref="SpaceDeletionSummaryResponse"/>:
+    /// its Project and Task counts and how many other Accounts would lose access, counted live (story 3.3, open question
+    /// 2 (a)). Declares <c>DeleteSpace</c>, so it answers the Owner alone.
+    /// </summary>
+    public static string DeletionSummary => "/api/v1/spaces/{spaceId:guid}/deletion";
+
+    /// <summary>
+    /// The deletion summary's path for one Space, as a client calls it.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The path.</returns>
+    public static string DeletionSummaryOf(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}/deletion";
 
     /// <summary>
     /// The active Space's path for one Space, as a client calls it.

@@ -20,7 +20,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// Story 3.3 AC13 over the wire: the races a Space deletion makes reachable. A request resolved against a Space that is
 /// deleted before its unit of work commits answers the uniform boundary <c>404</c> - never a <c>200</c> for a write that
 /// touched nothing (<c>deferred-work.md:666</c>), never a <c>500</c> from a foreign key (547) or from a name read that found
-/// no row (<c>:360</c>). Q4 (a); AD-1, AD-3, AD-20, AR-34. Written as red-phase scaffolds by the story 3.3 ATDD run.
+/// no row (<c>:360</c>). Q4 (a); AD-1, AD-3, AD-20, AR-34. Written as red-phase scaffolds by the story 3.3 ATDD run and activated by its dev phase.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -62,7 +62,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Sent with no <c>Idempotency-Key</c>, so the answer is the rename's own and not the record insert's.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - a rename whose UPDATE touches no row answers 200; ISpaceStore.RenameAsync discards the row count (story 3.3 Task 3, deferred-work.md:666)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "AD-3")]
     public async Task A_rename_that_loses_its_Space_to_a_deletion_answers_the_boundary_404_not_200()
@@ -111,7 +111,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// boundary <c>404</c> with a <c>CrossSpace</c> record - the next request's answer - never a <c>500</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - a Space-scoped unit of work that meets 547 because its Space was deleted answers 500 (story 3.3 Task 4, Q4 (a))")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-20")]
     public async Task A_first_request_queued_behind_a_Space_deletion_answers_the_boundary_404_never_500()
@@ -157,7 +157,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>FK_Project_Space_SpaceId</c>, and no Project exists.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - a Project creation that loses its Space to a deletion answers 500 (547) (story 3.3 Task 4, Q4 (a))")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "FR-17")]
     public async Task A_Project_creation_queued_behind_a_Space_deletion_answers_404_never_500()
@@ -203,7 +203,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>404</c>, never a <c>500</c> from <c>FK_Task_Project_SpaceId_ProjectId</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - a Task creation that loses its Space to a deletion answers 500 (547) (story 3.3 Task 4, Q4 (a))")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "FR-19")]
     public async Task A_Task_creation_queued_behind_a_Space_deletion_answers_404_never_500()
@@ -249,7 +249,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// story Task 3; this case is what makes it a decision: if it is not taken, record the reason and keep this case red.)
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10, AC13 - DELETE /api/v1/spaces/{spaceId} is not mapped yet, and SpaceStore.DeleteAsync takes no Projects-per-Space lock (story 3.3 Tasks 3, 4; Q4 (a))")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-7")]
     public async Task A_deletion_waits_for_a_Project_creation_that_holds_the_Projects_lock_and_takes_the_new_Project_with_it()
@@ -316,7 +316,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// reads the Space's name before the deletion. Driven directly - see the class remarks for why there is no wire race.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - ActiveSpaceNameReader uses SingleAsync and throws for a Space deleted after resolution (story 3.3 Task 3, deferred-work.md:360)")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-2")]
     public async Task The_name_reader_answers_no_name_for_a_Space_deleted_after_it_was_resolved()

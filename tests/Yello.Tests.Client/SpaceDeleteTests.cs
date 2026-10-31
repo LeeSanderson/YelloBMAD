@@ -12,11 +12,11 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 3.3 ATDD run (2026-10-31).</b> The API is <see cref="FakeYelloApi"/> at
-/// the network edge, taught by this run the deletion (held and released like 2.5's), Q2 (a)'s counts read and a failing
-/// switcher (<c>FakeYelloApi.SpaceDeletion.cs</c>); no Host, no database, no engine. One case is green today and stays
-/// active as a standing gate: <see cref="An_Admin_has_no_delete_affordance_at_all"/> (an Admin has never had one); its
-/// plant - the section rendered for an Admin - is the dev phase's.
+/// <b>Written as red-phase scaffolds by the story 3.3 ATDD run (2026-10-31), activated by its dev phase.</b> The API is
+/// <see cref="FakeYelloApi"/> at the network edge, taught by that run the deletion (held and released like 2.5's), Q2
+/// (a)'s counts read and a failing switcher (<c>FakeYelloApi.SpaceDeletion.cs</c>); no Host, no database, no engine.
+/// <see cref="An_Admin_has_no_delete_affordance_at_all"/> was green before the section existed and is a standing gate;
+/// its plant (the section rendered for an Admin) turned it red.
 /// </para>
 /// <para>
 /// <b>Locators are by role, label and the copy the story recommends</b>, so they are assumptions to correct to the markup
@@ -143,7 +143,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// <c>main</c>, after the name and Label sections, and nothing in <c>main</c> is disabled.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - Space settings has no delete section yet (story 3.3 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     public async Task The_Owner_is_offered_Delete_this_Space_in_Space_settings()
     {
@@ -166,9 +166,8 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC1, UX-DR27 - an Admin has no delete affordance at all: no "Delete this Space" control or text in the DOM - absent,
-    /// not hidden, not disabled. Anchored: the same Admin is offered "Rename" on the same page. <b>Green today, and a
-    /// standing gate</b>: no Role has had the affordance yet. Its plant (render the section for an Admin) is the dev phase's,
-    /// once the section exists.
+    /// not hidden, not disabled. Anchored: the same Admin is offered "Rename" on the same page. <b>A standing gate</b>:
+    /// planted by story 3.3 (the section rendered for an Admin), and red.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -198,7 +197,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// scrim). Cancel restores both sections and returns focus to "Delete this Space"; nothing was sent.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the delete confirm does not exist yet (story 3.3 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR12")]
     public async Task The_confirm_replaces_the_settings_content_in_place_and_Cancel_restores_it()
     {
@@ -234,7 +233,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// returns focus to "Delete this Space", sending nothing.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC16 - the delete confirm does not exist yet (story 3.3 Task 6; Q5 focus)")]
+    [Fact]
     [Trait("Requirement", "NFR-9")]
     [Trait("Requirement", "UX-DR12")]
     public async Task Escape_closes_the_confirm_and_returns_focus_to_Delete_this_Space()
@@ -272,7 +271,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// <param name="counts">The counts sentence.</param>
     /// <param name="othersSentence">The other-Accounts sentence.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2, AC8 - the delete confirm and its counts read do not exist yet (story 3.3 Tasks 4, 6; Q2 (a), Q5)")]
+    [Theory]
     [InlineData(2, 5, 2, "It holds 2 Projects and 5 Tasks.", "2 other people will lose access to it.")]
     [InlineData(1, 1, 0, "It holds 1 Project and 1 Task.", NoOneElse)]
     [Trait("Requirement", "UX-DR36")]
@@ -325,7 +324,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// would match to a saved value, and that name is fresh per opening.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the delete confirm's typed-name field does not exist yet (story 3.3 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR33")]
     public async Task The_typed_name_field_is_labelled_not_autofillable_and_named_afresh_per_opening()
     {
@@ -354,7 +353,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// name, with spaces either side, is sent.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the delete confirm does not exist yet (story 3.3 Task 6; Q5 match rule)")]
+    [Fact]
     [Trait("Requirement", "UX-DR37")]
     public async Task A_name_that_does_not_match_sends_nothing_and_Delete_is_never_disabled()
     {
@@ -392,7 +391,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// Space.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the delete confirm does not exist yet (story 3.3 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR26")]
     public async Task While_the_deletion_is_out_the_confirm_stays_busy_and_nothing_is_removed()
     {
@@ -428,7 +427,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// in the DOM, the switcher no longer lists it, and no web storage holds anything.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the deletion's outcome on the client does not exist yet (story 3.3 Task 6; Q6 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     [Trait("Requirement", "UX-DR38")]
     public async Task Deleting_with_Spaces_remaining_lands_on_the_next_listed_Space_and_says_so_without_a_name()
@@ -473,7 +472,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// focus on it, its one "Create a Space" action, and nothing created.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6, AC12 - the deletion's outcome on the client does not exist yet (story 3.3 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR35")]
     [Trait("Assumption", "PRD-12-2")]
     public async Task Deleting_the_last_Space_lands_on_the_no_Space_state_with_focus_on_its_heading()
@@ -512,7 +511,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// but says nothing, since this tab deleted nothing.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the deletion's outcome on the client does not exist yet (story 3.3 Task 6; Q1 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task A_404_on_the_deletion_goes_home_as_a_204_does_and_says_nothing()
     {
@@ -550,7 +549,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="unanswered">Whether the connection is reset rather than answered <c>503</c>.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC12 - the deletion's outcome on the client does not exist yet (story 3.3 Task 6; Q1 key reuse)")]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     [Trait("Requirement", "NFR-5")]
@@ -603,7 +602,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// removed.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC9 - the deletion's outcome on the client does not exist yet (story 3.3 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR26")]
     public async Task A_403_on_the_deletion_says_only_the_Owner_can_delete_the_Space()
     {
@@ -632,7 +631,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// belong to any Space yet." outside the list, keeps its "Create a Space" foot link, and the list holds no row.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - the open switcher with an empty answer is an empty, unexplained panel (story 3.3 Task 6, Q7 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR35")]
     [Trait("Requirement", "UX-DR9")]
     public async Task The_switcher_with_no_Space_says_so_outside_the_list_and_keeps_Create_a_Space()
@@ -663,7 +662,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// no row.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - the open switcher whose refresh failed is an empty, unexplained panel (story 3.3 Task 6, Q7 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR9")]
     public async Task The_switcher_that_could_not_be_asked_says_so_and_never_claims_no_Space()
     {
@@ -693,7 +692,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// switcher instead.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - the refusal page at / links Back to Yello to itself (story 3.3 Task 6, Q8 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task The_refusal_page_at_home_when_the_switcher_failed_points_to_the_switcher_not_to_itself()
     {
@@ -717,7 +716,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// <c>/</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - the refusal page at / links Back to Yello to itself (story 3.3 Task 6, Q8 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task The_refusal_page_at_home_when_every_Space_refused_points_to_the_switcher_not_to_itself()
     {
@@ -754,7 +753,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
     /// <param name="width">The viewport width.</param>
     /// <param name="height">The viewport height.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC16 - the delete confirm does not exist yet (story 3.3 Task 6)")]
+    [Theory]
     [InlineData(1280, 800)]
     [InlineData(320, 256)]
     [Trait("Requirement", "NFR-9")]

@@ -21,6 +21,10 @@
     address meets the within-Space capability surface in place - "Only Owners and Admins can manage Labels.", never a
     toast - and no define form (UX-DR32, UX-DR27).
 
+    THE DELETE SECTION (story 3.3) IS THE OWNER'S ALONE (SpaceCapabilities.PermitsDeleteSpace), and absent for every
+    other Role. Its confirm REPLACES this panel's content in place while it is open (AC7, EXPERIENCE.md:67): the name
+    and Label sections are not rendered, and nothing is stacked on them. Esc or Cancel brings them back.
+
     A ROLE RE-READ LOWER WHILE HERE (UX-DR29): the change is narrated, then the page routes to Space home, which says
     the sentence on arrival; focus then follows Space home's own arrival (UX-DR39).
 *@
@@ -29,25 +33,45 @@
     <div class="space-settings">
         <PageHeading>@Localizer["SpaceSettingsHeading"]</PageHeading>
 
-        @if (Permitted(arrival.Current.Role) && SpaceCapabilities.PermitsRenameSpace(arrival.Current.Role))
+        @{ var permitted = Permitted(arrival.Current.Role); }
+
+        @if (ShowsSections(arrival.Current.Role))
         {
-            <SpaceNameSection @key="SpaceId" SpaceId="@SpaceId" CurrentName="@arrival.Current.Name" OnSpaceRefused="arrival.Refuse" />
+            @if (permitted && SpaceCapabilities.PermitsRenameSpace(arrival.Current.Role))
+            {
+                <SpaceNameSection @key="(SectionKey.Name, SpaceId)" SpaceId="@SpaceId" CurrentName="@arrival.Current.Name" OnSpaceRefused="arrival.Refuse" />
+            }
+
+            @if (LabelCapabilities.PermitsManageLabels(arrival.Current.Role))
+            {
+                <LabelSection @key="(SectionKey.Labels, SpaceId)" SpaceId="@SpaceId" OnSpaceRefused="arrival.Refuse" />
+            }
+
+            @if (!LabelCapabilities.PermitsManageLabels(arrival.Current.Role))
+            {
+                <p class="space-settings__refusal" role="status">@Localizer["manage-labels"]</p>
+            }
         }
 
-        @if (LabelCapabilities.PermitsManageLabels(arrival.Current.Role))
+        @if (permitted && SpaceCapabilities.PermitsDeleteSpace(arrival.Current.Role))
         {
-            <LabelSection @key="SpaceId" SpaceId="@SpaceId" OnSpaceRefused="arrival.Refuse" />
-        }
-
-        @if (!LabelCapabilities.PermitsManageLabels(arrival.Current.Role))
-        {
-            <p class="space-settings__refusal" role="status">@Localizer["manage-labels"]</p>
+            <SpaceDeleteSection @key="(SectionKey.Delete, SpaceId)" SpaceId="@SpaceId" @bind-Confirming="_confirmingDelete" OnSpaceRefused="arrival.Refuse" />
         }
     </div>
 </SpaceArrival>
 
 @code {
+    // Each section is keyed on the Space, so a change of Space starts it again, and on its own kind, because sibling keys
+    // must be unique: the delete confirm removes the other sections in place (story 3.3, AC7), which the renderer diffs.
+    private enum SectionKey
+    {
+        Name,
+        Labels,
+        Delete,
+    }
+
     private bool _wasPermitted;
+    private bool _confirmingDelete;
     private bool _leaving;
     private Guid _spaceSeen;
 
@@ -68,8 +92,14 @@
             _spaceSeen = SpaceId;
             _wasPermitted = false;
             _leaving = false;
+            _confirmingDelete = false;
         }
     }
+
+    /// <summary>
+    /// Whether the panel's sections render: not while the Owner's delete confirm replaces them in place (story 3.3, AC7).
+    /// </summary>
+    private bool ShowsSections(string roleCode) => !(_confirmingDelete && SpaceCapabilities.PermitsDeleteSpace(roleCode));
 
     /// <summary>
     /// The Role decides what renders, read on every arrival. A Role that permitted this page on an earlier answer and

@@ -179,15 +179,16 @@ internal static partial class ActiveSpaceResolution
             return BoundaryProblems.NotAvailable();
         }
 
-        await using (unitOfWork.ConfigureAwait(false))
+        // The Role off the Membership row on this request (AD-1), against the matrix. A Qualified
+        // cell passes the Role gate; its target constraint is the owning slice's.
+        if (RoleCapabilityMatrix.Decide(unitOfWork.Context.Role, capability) != CapabilityDecision.Denied)
         {
-            // The Role off the Membership row on this request (AD-1), against the matrix. A
-            // Qualified cell passes the Role gate; its target constraint is the owning slice's.
-            if (RoleCapabilityMatrix.Decide(unitOfWork.Context.Role, capability) != CapabilityDecision.Denied)
-            {
-                return await ServeAsync(context, next, unitOfWork, request).ConfigureAwait(false);
-            }
+            // Served inside the unit of work, which a Space deleted under the request may end
+            // early (story 3.3) - see LostSpace.
+            return await LostSpace.ServeOrRefuseAsync(context, next, unitOfWork, request).ConfigureAwait(false);
         }
+
+        await unitOfWork.DisposeAsync().ConfigureAwait(false);
 
         // Denied, and the unit of work disposed without completing - rolled back - before the
         // refusal is recorded on a unit of its own.
@@ -264,7 +265,9 @@ internal static partial class ActiveSpaceResolution
 
         UnitOfWorkResults.EnsureMaterialised(result);
 
-        return UnitOfWorkResults.IsFailure(result) || idempotent.Key is null
+        // A route whose effect destroys its own Space records no key: the record's foreign key to the Space would refuse
+        // the insert, and the cascade would take it anyway (story 3.3, open question 1 (a); AD-18's recorded variance).
+        return UnitOfWorkResults.IsFailure(result) || idempotent.Key is null || LostSpace.DestroysItsOwnScope(context.HttpContext)
             ? result
             : await RecordIdempotentAsync(context.HttpContext, request, idempotent, result).ConfigureAwait(false);
     }

@@ -4,7 +4,7 @@ baseline_commit: 5e04528
 
 # Story 3.3: Delete a Space, and belong to none
 
-Status: ready-for-dev
+Status: review
 
 Epic: 3 — Several Spaces, cleanly separated
 Story key: `3-3-delete-a-space-and-belong-to-none`
@@ -214,35 +214,35 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1539-1573` (`status: final
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: decide the open questions** (all ACs)
-  - [ ] Read Dev Notes, then Open questions. Decide each one as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default, and no human is in the loop, so do not stop to ask. **Exception:** a question marked **[LEE]** relaxes an isolation or security rule under its non-recommended option. Take the recommended option, which relaxes nothing. Never take the [LEE] option without a recorded decision from Lee.
-- [ ] **Task 2: record the AD-24 / AD-18 notes** (AC9, AC10; Q1)
-  - [ ] In `ARCHITECTURE-SPINE.md`, add one dated bullet under AD-24's amendment: "**Amendment (2026-10-31, story 3.3):** `SpaceStore` gains the one deletion of `Space`, the resolved Space only, under the `SpaceId` key alone. `The_only_update_of_a_Space_is_the_rename_of_the_resolved_Space` becomes '... the rename or the deletion of the resolved Space'." It is additive; do not rewrite the rule.
-  - [ ] Under AD-18, add the Q1 variance line: what a replayed Space deletion answers, and why.
-- [ ] **Task 3: Application and Infrastructure** (AC1, AC4, AC10, AC13)
-  - [ ] `Yello.Application/Spaces/DeleteSpace/DeleteSpaceHandler.cs` (new slice folder, matching `RenameSpace/`) calls `ISpaceStore.DeleteAsync(ActiveSpaceContext, ct)` and returns `SpaceDeletion { Deleted, NotFound }`, the same shape as `ProjectDeletion`. Register it as the other Space handlers are registered.
-  - [ ] `ISpaceStore.DeleteAsync`. `SpaceStore.DeleteAsync`:
+- [x] **Task 1: decide the open questions** (all ACs)
+  - [x] Read Dev Notes, then Open questions. Decide each one as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default, and no human is in the loop, so do not stop to ask. **Exception:** a question marked **[LEE]** relaxes an isolation or security rule under its non-recommended option. Take the recommended option, which relaxes nothing. Never take the [LEE] option without a recorded decision from Lee.
+- [x] **Task 2: record the AD-24 / AD-18 notes** (AC9, AC10; Q1)
+  - [x] In `ARCHITECTURE-SPINE.md`, add one dated bullet under AD-24's amendment: "**Amendment (2026-10-31, story 3.3):** `SpaceStore` gains the one deletion of `Space`, the resolved Space only, under the `SpaceId` key alone. `The_only_update_of_a_Space_is_the_rename_of_the_resolved_Space` becomes '... the rename or the deletion of the resolved Space'." It is additive; do not rewrite the rule.
+  - [x] Under AD-18, add the Q1 variance line: what a replayed Space deletion answers, and why.
+- [x] **Task 3: Application and Infrastructure** (AC1, AC4, AC10, AC13)
+  - [x] `Yello.Application/Spaces/DeleteSpace/DeleteSpaceHandler.cs` (new slice folder, matching `RenameSpace/`) calls `ISpaceStore.DeleteAsync(ActiveSpaceContext, ct)` and returns `SpaceDeletion { Deleted, NotFound }`, the same shape as `ProjectDeletion`. Register it as the other Space handlers are registered.
+  - [x] `ISpaceStore.DeleteAsync`. `SpaceStore.DeleteAsync`:
     - Optionally take `ApplicationLocks.TakeProjectsPerSpaceAsync` first (Q4).
     - Then `dbContext.Spaces.Where(s => s.Id == context.SpaceId).ExecuteDeleteAsync(ct)`.
     - `0` rows gives `NotFound`.
     - It is one statement. Never delete child tables by hand: the cascades are the contract.
-  - [ ] `ISpaceStore.RenameAsync` returns the row count, or a result type. `RenameSpaceHandler` and `ActiveSpaceEndpoints.RenameAsync` map `0` to `BoundaryProblems.NotAvailable()` (`:666`).
-  - [ ] `ActiveSpaceNameReader`: `SingleAsync` becomes `SingleOrDefaultAsync`, and its caller maps `null` to the boundary 404 (`:360`).
-  - [ ] Widen `RefusalBoundaryGateTests.Space_is_read_only_where_named` only if a new type touches `Space`. Keeping the delete inside `SpaceStore` needs no widening. Amend `The_only_update_of_a_Space_is_the_rename_of_the_resolved_Space` to admit the deletion, citing the 2026-10-31 amendment in its message.
-- [ ] **Task 4: Host** (AC9, AC12, AC13; Q1, Q2, Q4)
-  - [ ] `ActiveSpaceEndpoints.MapDeleteSpace` maps `MapDelete(SpaceRoutes.Active, DeleteAsync).RequiresCapability(Capability.DeleteSpace)`. It answers `Results.NoContent()`, or `BoundaryProblems.NotAvailable()` on `NotFound`. Map it in `Program.cs` beside `MapRenameSpace`.
-  - [ ] Implement Q1 in `ActiveSpaceResolution.Idempotency.cs`, with a route marker in the style of `CarriesSecretInResponse`. **Note:** today the pipeline records the idempotency record **after** the endpoint (`ActiveSpaceResolution.cs:263-269`). For a deleted Space, that insert fails on `FK_IdempotencyRecord_Space` (error 547) and gives a `500`. This must not ship.
-  - [ ] Implement Q2's counts read.
-  - [ ] Implement Q4: a Space-scoped unit of work that fails because its Space was deleted under it answers the boundary `404`.
-  - [ ] `SpaceLog.SpaceDeleted(logger, spaceId)` logs the id only, never the name (I-17).
-- [ ] **Task 5: Contracts** (AC9; Q2)
-  - [ ] Add `SpaceRoutes.DeletionSummary`, or whatever Q2 names, and its response record in `Yello.Contracts/Spaces/`. No request body for `DELETE` (Q3).
-- [ ] **Task 6: Client** (AC2, AC3, AC7, AC8, AC12, AC14, AC15, AC16)
-  - [ ] **The section.** `Components/SpaceDeleteSection.razor` (new) is rendered by `SpaceSettings.razor` for an Owner only. It is `@key`'d on the Space, inside `SpaceArrival`, like `SpaceNameSection`.
+  - [x] `ISpaceStore.RenameAsync` returns the row count, or a result type. `RenameSpaceHandler` and `ActiveSpaceEndpoints.RenameAsync` map `0` to `BoundaryProblems.NotAvailable()` (`:666`).
+  - [x] `ActiveSpaceNameReader`: `SingleAsync` becomes `SingleOrDefaultAsync`, and its caller maps `null` to the boundary 404 (`:360`).
+  - [x] Widen `RefusalBoundaryGateTests.Space_is_read_only_where_named` only if a new type touches `Space`. Keeping the delete inside `SpaceStore` needs no widening. Amend `The_only_update_of_a_Space_is_the_rename_of_the_resolved_Space` to admit the deletion, citing the 2026-10-31 amendment in its message.
+- [x] **Task 4: Host** (AC9, AC12, AC13; Q1, Q2, Q4)
+  - [x] `ActiveSpaceEndpoints.MapDeleteSpace` maps `MapDelete(SpaceRoutes.Active, DeleteAsync).RequiresCapability(Capability.DeleteSpace)`. It answers `Results.NoContent()`, or `BoundaryProblems.NotAvailable()` on `NotFound`. Map it in `Program.cs` beside `MapRenameSpace`.
+  - [x] Implement Q1 in `ActiveSpaceResolution.Idempotency.cs`, with a route marker in the style of `CarriesSecretInResponse`. **Note:** today the pipeline records the idempotency record **after** the endpoint (`ActiveSpaceResolution.cs:263-269`). For a deleted Space, that insert fails on `FK_IdempotencyRecord_Space` (error 547) and gives a `500`. This must not ship.
+  - [x] Implement Q2's counts read.
+  - [x] Implement Q4: a Space-scoped unit of work that fails because its Space was deleted under it answers the boundary `404`.
+  - [x] `SpaceLog.SpaceDeleted(logger, spaceId)` logs the id only, never the name (I-17).
+- [x] **Task 5: Contracts** (AC9; Q2)
+  - [x] Add `SpaceRoutes.DeletionSummary`, or whatever Q2 names, and its response record in `Yello.Contracts/Spaces/`. No request body for `DELETE` (Q3).
+- [x] **Task 6: Client** (AC2, AC3, AC7, AC8, AC12, AC14, AC15, AC16)
+  - [x] **The section.** `Components/SpaceDeleteSection.razor` (new) is rendered by `SpaceSettings.razor` for an Owner only. It is `@key`'d on the Space, inside `SpaceArrival`, like `SpaceNameSection`.
     - Add `SpaceCapabilities.PermitsDeleteSpace` (Owner only, mirroring the matrix), and add it to the `PermitsSpaceSettings` union. `The_clients_Space_settings_predicate_is_the_union_of_its_sections` must stay green, and `Every_permit_phrase_agrees_with_the_capability_matrix` must agree.
     - For an Admin, the section is **absent** from the DOM, not hidden and not disabled.
-  - [ ] **The confirm replaces the panel's content in place** (AC7). While it is open, `SpaceSettings` renders the confirm **instead of** the name and Label sections, with no scrim, no `<dialog>` and no second layer. On Esc or Cancel, the sections return and focus goes to "Delete this Space". It is the inline `div.destructive-confirm` from 2.5 (`ProjectRow.razor`), scaled to the page. Reuse its CSS class; add only what is missing to `components.css` (logical properties, rem/em, tokens, no animation).
-  - [ ] **Its content (AC2, AC8; Q5 copy), in order:**
+  - [x] **The confirm replaces the panel's content in place** (AC7). While it is open, `SpaceSettings` renders the confirm **instead of** the name and Label sections, with no scrim, no `<dialog>` and no second layer. On Esc or Cancel, the sections return and focus goes to "Delete this Space". It is the inline `div.destructive-confirm` from 2.5 (`ProjectRow.razor`), scaled to the page. Reuse its CSS class; add only what is missing to `components.css` (logical properties, rem/em, tokens, no animation).
+  - [x] **Its content (AC2, AC8; Q5 copy), in order:**
     - `DeleteQuestion` ("Delete {0}?") as the heading, with the Space's current name;
     - `DeleteCannotBeUndone` ("This cannot be undone.") directly after, with nothing reassuring before it;
     - the counts sentence or list;
@@ -251,31 +251,31 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1539-1573` (`status: final
     - "Delete this Space" (`button-danger`);
     - `DeleteCancel` (`button-secondary`).
     - Read the counts **when the confirm opens** (Q2). Never show cached counts.
-  - [ ] **The typed name** (AC3; Q5).
+  - [x] **The typed name** (AC3; Q5).
     - A real `<label>`, `autocomplete="off"`, and a field `name` fresh per render, using the helper `SpaceNameSection` and `CreateSpace` already use (find it; do not write a second one).
     - Pressing Delete when the typed text does not match sends nothing and shows Q5's inline message.
     - The button is never disabled.
-  - [ ] **The send.** `SpaceWrites.SendWithoutBodyAsync(HttpMethod.Delete, SpaceRoutes.ActiveOf(id), key, ActiveSpace.Token)`. Keep one key for the life of the confirm, reused after an unanswered attempt (the 2.5 `_deleteKeys` pattern).
-  - [ ] **The outcomes** (AC12):
+  - [x] **The send.** `SpaceWrites.SendWithoutBodyAsync(HttpMethod.Delete, SpaceRoutes.ActiveOf(id), key, ActiveSpace.Token)`. Keep one key for the life of the confirm, reused after an unanswered attempt (the 2.5 `_deleteKeys` pattern).
+  - [x] **The outcomes** (AC12):
     - `204` or `404`: call `SpaceDirectory.Removed(id)` (new; it drops the row from `Current` and from the refused set), then `NavigateTo(ClientRoutes.Home, replace: true)`. The navigation purges through `Navigating`.
     - `403`: the `delete-space` refusal copy, in the section.
     - `5xx` or no answer: `TaskEditNotSent` (or 2.5's equivalent), with the confirm left open.
     - Announce per Q6 so that the sentence survives the navigation. Use `SpaceNarration` only if Q6 says so, keeping in mind that 3.2 registered it with the Space purge, so a sentence held for the deleted Space is purged on leaving it.
-  - [ ] **The switcher** (AC14; Q7): `ContextBar.ToggleAsync` and `SpaceSwitcher.razor` tell "empty" apart from "failed". Copy goes in `ClientCopy.resx`.
-  - [ ] **Home and RefusalSurface** (AC15; Q8).
-  - [ ] Copy goes only in `ClientCopy.resx`. Each entry carries a `<comment>` naming 3.3 and the AC. Announcements carry no Space name (UX-DR38). The confirm's heading names it, because that is visible text the Owner is acting on.
-- [ ] **Task 7: isolation and revocation rows** (AC9, AC11; GATE-002, GATE-003)
-  - [ ] `tests/Yello.Tests.Isolation/IsolationCases.cs`, each row on **both** surfaces:
+  - [x] **The switcher** (AC14; Q7): `ContextBar.ToggleAsync` and `SpaceSwitcher.razor` tell "empty" apart from "failed". Copy goes in `ClientCopy.resx`.
+  - [x] **Home and RefusalSurface** (AC15; Q8).
+  - [x] Copy goes only in `ClientCopy.resx`. Each entry carries a `<comment>` naming 3.3 and the AC. Announcements carry no Space name (UX-DR38). The confirm's heading names it, because that is visible text the Owner is acting on.
+- [x] **Task 7: isolation and revocation rows** (AC9, AC11; GATE-002, GATE-003)
+  - [x] `tests/Yello.Tests.Isolation/IsolationCases.cs`, each row on **both** surfaces:
     - `ISO-DELETE-SPACE-CROSS`: delete a foreign Space gives `404`, the Space survives, and a `CrossSpace` record is written;
     - `ISO-DELETE-SPACE-ADMIN` (or the Viewer/Member variant matching `ISO-RECORD-KIND-PROJECT-DELETE-VIEWER`): `403`, the Space survives, and an `InsufficientRole` record is written;
     - a row for Q2's counts read: foreign gives `404`, and a non-Owner gives `403`.
     - Copy the shape of `ISO-DELETE-PROJECT-FOREIGN-SPACE` (`:656`) and `ISO-RENAME-SPACE-CROSS` (`:849`). Leave no row pending: this story reaches review with them.
-  - [ ] `tests/Yello.Tests.Revocation/RevocationCases.cs`: the endpoint-driven Space-deletion row (AC11). Keep `REV-SPACE-DELETED` (raw SQL) as the schema proof, or retarget it and say which.
-- [ ] **Task 8: tests** (see Testing requirements). Build `Yello.Client` in **Debug** before any browser run or plant.
-- [ ] **Task 9: ledger, docs, verification**
-  - [ ] `deferred-work.md`: apply Ledger dispositions.
-  - [ ] Rewrite any comment that predicts 3.3 so it describes what exists (`grep -rn "3\.3" Yello.* tests`). Example: `Home.razor:23-24`.
-  - [ ] Run `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers.
+  - [x] `tests/Yello.Tests.Revocation/RevocationCases.cs`: the endpoint-driven Space-deletion row (AC11). Keep `REV-SPACE-DELETED` (raw SQL) as the schema proof, or retarget it and say which.
+- [x] **Task 8: tests** (see Testing requirements). Build `Yello.Client` in **Debug** before any browser run or plant.
+- [x] **Task 9: ledger, docs, verification**
+  - [x] `deferred-work.md`: apply Ledger dispositions.
+  - [x] Rewrite any comment that predicts 3.3 so it describes what exists (`grep -rn "3\.3" Yello.* tests`). Example: `Home.razor:23-24`.
+  - [x] Run `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers.
 
 ## Dev Notes
 
@@ -642,10 +642,145 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), dev-story, run unattended by the story-cycle orchestrator, 2026-10-31.
+
 ### Debug Log References
+
+**Order of work.** The server slice was written first, then each scaffold was activated in the checklist's order and run against it; the red step for each was then shown by the plant table below (every plant restored from memory in a `finally` by a scratch script, and the tree rebuilt from the restored files).
+
+**Scaffolds corrected, and why** (none deleted):
+
+- Slices, Isolation, Architecture and the fake: every `/deletion` literal retargeted to `SpaceRoutes.DeletionSummary` / `DeletionSummaryOf` (the path the scaffolds assumed is the one shipped).
+- Revocation: `REV-SPACE-DELETED-BY-OWNER` moved into `RevocationCases.All`; the held-apart theory deleted, as the checklist said. `REV-SPACE-DELETED` (raw SQL) kept as the schema proof.
+- Isolation: the five rows' `PendingUntil: "3.3"` cleared; none pending (GATE-003).
+- Architecture: `The_clients_Space_settings_predicate_is_the_union_of_its_sections` widened to name `DeleteSpace` (finding 4), and `The_only_update_of_a_Space_is_the_rename_of_the_resolved_Space`'s message now cites the 2026-10-31 amendment.
+- Scaffold remarks describing a red state rewritten to describe the activated one. No assertion was loosened.
+
+**Build-gate corrections on the way:** S1200 (the pipeline type passed 30 dependencies - the deletion handling moved into a nested `ActiveSpaceResolution.LostSpace`, which the gates attribute to the pipeline); S3218, S4261, S125; the copy gates (`No_user_visible_*`) rejected a quoted copy string in an XML doc comment, a Razor `else` and `@if (!(...))` - rewritten as two `@if`s and helper predicates.
+
+**Two real defects found by the activated cases:**
+
+1. `Space_is_read_only_where_named` failed on a first design that read `Space` (`SpaceExistence`) to tell "the Space was deleted under the request" from a defect. Rather than widen that gate, the pipeline now asks the existing resolver once more on a fresh unit of work (no Membership = gone). No gate was widened; the both-keys gates are untouched.
+2. Blazor threw "More than one sibling ... has the same key value" when the confirm removed the settings sections: `SpaceNameSection` and `LabelSection` shared `@key="SpaceId"` (latent since 3.1). Keys are now `(SectionKey.X, SpaceId)`.
+
+**Focus after a deletion (AC12 vs 3.2's switch focus).** E2E-009 first went red with focus on the context bar. A temporary console trace (removed) showed the location-changing hook never ran `ActiveSpaceState.Navigating(null)` for the deletion's `NavigateTo("/")`, so the tab was still "in" the deleted Space when the entry point sent it on, and the arrival counted as a switch. `SpaceDeleteSection.Leave` now calls `ActiveSpace.Navigating(target: null)` itself (the `ArrivingInCreated` precedent); the arrival is then a first arrival and focus goes to the `h1`. Ledgered to 3.4 to find out whether the hook runs for every programmatic navigation.
+
+**Races, 3/3.** RACE-S1..S6 with SLC-001/008: run 1 green; run 2 failed all 8 in 0 ms (fixture/engine start, no assertion reached - the CLAUDE.md rerun rule); runs 3 and 4 green.
+
+**Plant table** (each restored in a `finally`; Debug client rebuilt before each browser plant):
+
+| Plant | Expected red | Seen |
+|---|---|---|
+| Pipeline records the key on the deletion route (`DestroysItsOwnScope` forced false) | SLC-001, SLC-008 | both `500` |
+| `RenameAsync` row count ignored | RACE-S1 | `200` with the never-written name |
+| `SingleAsync` restored in `ActiveSpaceNameReader` | RACE-S6 | "Sequence contains no elements" |
+| 547 mapping removed (filter never matches) | RACE-S2, S3, S4 | each `500` |
+| Projects lock dropped from `SpaceStore.DeleteAsync` | RACE-S5 | red, but as a `500` on the deletion rather than the case's "did not wait" message: without the lock the deletion failed after the test's insert |
+| `ExecuteDeleteAsync` on `Spaces` planted in `SpaceContentsReader` | ARCH-004 and the 3.1 gate | both red (and `Space_is_read_only_where_named`) |
+| `.DestroysItsSpace()` removed from the route | ARCH-003 | `[]` |
+| `PermitsDeleteSpace` admits Admin | ARCH-001; E2E-002 | both red (E2E-002: "Delete this Space" count 1) |
+| `Removed` a no-op | UNIT-001 | red. **The browser case E2E-009 stayed green under this plant**: Home refreshes the switcher, which the fake has already emptied of the Space. `Removed` is the defence for a failed refresh; UNIT-001 is its gate |
+| Typed-name check skipped | E2E-007 | red (deleted without the message) |
+| `Home` passes `OfferRouteBack="true"` | E2E-016, E2E-017 | both red |
+| Failed-switcher flag never set | E2E-015 | red |
+| `DepartureNarration.Say` skipped | E2E-009 | red ("Space deleted." not said); E2E-010 stayed green (it does not assert the sentence) |
+| Explicit `Navigating(null)` absent (the first implementation) | E2E-009 focus | red, focus on the context bar (seen before the fix, above) |
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created (create-story, 2026-10-31).
+- **What was built.** `DELETE /api/v1/spaces/{spaceId}` (Owner-only, `DeleteSpace`, `DestroysItsSpace` marker) deleting the resolved Space in one `ExecuteDeleteAsync` under the `SpaceId` key alone, with the database's cascades taking Memberships, Tokens, Projects, Tasks, TaskLabels, Labels, Statuses, presence and idempotency records; `GET /api/v1/spaces/{spaceId}/deletion` (Owner-only counts); the pipeline's handling of a Space deleted under a request; the client's delete section and in-place confirm; the route home with "Space deleted."; the switcher's empty and failed sentences; the refusal page at `/` pointing to the switcher. No migration (the populated-Space case proves one statement succeeds over the `NO ACTION` FKs), no new package or project, no RLS policy or block predicate added or changed.
+- **Decisions (each reversible; cut any line to revisit it):**
+  - Q1 - (a). The deletion route validates and looks up the key and records nothing; a replay is the boundary `404`. Recorded as AD-18's variance in the spine. Cost: one marker, one branch. (b) was not taken: no second both-keys caller exists.
+  - Q2 - (a). `GET /api/v1/spaces/{spaceId}/deletion` answers `{projects, tasks, otherMembers}`, live counts, Owner-only, with isolation rows on both surfaces.
+  - Q3 - (a). `DELETE` has no body; the server does not check the typed name.
+  - Q4 - (a), with one change of mechanism: a unit of work ending in a foreign-key conflict (547) is answered the boundary `404` + `CrossSpace` record when **re-resolving the Account in the Space on a fresh unit of work finds no Membership**, and rethrown otherwise. The story suggested reading `Space`; that would have needed `Space_is_read_only_where_named` widened, so the existing resolver answers instead (sets the `SpaceId` key alone, through the one production line that sets a key). `SpaceStore.DeleteAsync` takes the Projects-per-Space lock first (RACE-S5 proves it).
+  - Q5 - recommendation: heading "Delete {name}?", then "This cannot be undone.", then "It holds {p} and {t}." (no/one/many forms), then the other-people sentence (no/one/many), field "Type the Space name to confirm", mismatch "Type the Space name exactly as shown." (trimmed, ordinal), button "Delete this Space", focus on the field. Ledgered to UX.
+  - Q6 - (a). "Space deleted." is held in a new `DepartureNarration` (not on the Space purge, dropped with the Session), taken by Home and handed to the destination's `SpaceNarration` after Home has entered that Space, or said by Home itself in the no-Space state.
+  - Q7 - (a). Empty answer: `NoSpaceBody` outside the list; failed refresh with nothing held: "Your Spaces could not be listed."; a held list stays on failure; nothing is said while the first answer is out.
+  - Q8 - (a). `RefusalSurface.OfferRouteBack` (default `true`); Home passes `false` on both refusal paths and the surface says "Choose a Space from the switcher above."
+  - Q9 - the Personal Space that is an Account's only Space is deletable (SLC-006, ISO-DELETE-SPACE-OWN).
+  - RLS: no delete block predicate added (2.5 Q6's deferral closed as "none needed"): the deletion filters on the resolved id, under that Space's key, in `SpaceStore` alone, and two gates hold it.
+  - Focus after a deletion (the ATDD phase's AC12 vs 3.2 switch-focus conflict): resolved in AC12's favour. The route passes through `/`, outside any Space, so the landing is a first arrival and focus goes to the page's `h1`, not the context bar; `SpaceDeleteSection` leaves the Space explicitly before navigating so this does not depend on the location-changing hook.
+  - `SpaceDeleteSection` reads the counts before it opens the confirm (2.5's order); while reading, the opener is `aria-busy`, never disabled.
+  - Token issuance (the name reader's other caller) answers the boundary `404` when the Space was deleted after resolution, rather than a `NullReferenceException`.
+- **AC to test map:**
+  - AC1: SLC-001 `The_Owner_deletes_a_populated_Space_and_every_row_hanging_from_it_goes_with_it`; SLC-002 `An_Admin_a_Member_or_a_Viewer_is_refused_403_delete_space_and_the_Space_is_intact` (x3); E2E-001 `The_Owner_is_offered_Delete_this_Space_in_Space_settings`; E2E-002 `An_Admin_has_no_delete_affordance_at_all`; ARCH-001; `ISO-RECORD-KIND-SPACE-DELETE-ADMIN`.
+  - AC2: SLC-010 `The_counts_read_states_Projects_Tasks_and_other_Members_and_names_nothing`; E2E-005 (x2).
+  - AC3: E2E-006 `The_typed_name_field_is_labelled_not_autofillable_and_named_afresh_per_opening`; E2E-007 `A_name_that_does_not_match_sends_nothing_and_Delete_is_never_disabled`.
+  - AC4: SLC-001; SLC-004 `Deleting_the_Space_ends_its_Tokens_on_the_next_request_and_leaves_the_Owners_other_Space_working`; `ISO-DELETE-SPACE-OWN`.
+  - AC5: SLC-005 `Another_Account_loses_only_the_deleted_Space`.
+  - AC6: SLC-006 `An_Account_may_delete_its_last_Space_belongs_to_none_and_can_create_one`; SLC-007 `An_Account_at_fifty_Spaces_deletes_one_and_can_create_one`; E2E-010.
+  - AC7: E2E-003 `The_confirm_replaces_the_settings_content_in_place_and_Cancel_restores_it`.
+  - AC8: E2E-005; ARCH-005 `The_Space_deletion_copy_is_externalised_once_each_with_a_comment_naming_the_story`; 2.5's `DeletionCopyGateTests`.
+  - AC9: SLC-002, SLC-003 `A_non_members_deletion_is_the_boundary_404_and_the_foreign_Space_is_intact`, SLC-008 `A_replayed_deletion_with_the_same_key_is_the_boundary_404_and_never_500`, SLC-009 `A_malformed_key_on_the_deletion_is_refused_400_and_deletes_nothing`, SLC-011 `The_counts_read_is_the_Owners_alone`, SLC-012 `No_Space_name_reaches_the_log_on_deletion_or_its_refusals`; ARCH-002, ARCH-003; the five isolation rows.
+  - AC10: SLC-001, SLC-004 (S-1's rolled-back anchor); ARCH-004 `The_only_bulk_writes_of_a_Space_are_the_rename_and_the_deletion_in_SpaceStore` and the amended 3.1 gate; RACE-S5. The "forced failure after the delete statement" is the Q1 plant (the key recorded after the deletion: `500`, rolled back).
+  - AC11: SLC-004, SLC-005; `REV-SPACE-DELETED-BY-OWNER` (both surfaces).
+  - AC12: E2E-008 `While_the_deletion_is_out_the_confirm_stays_busy_and_nothing_is_removed`, E2E-009 `Deleting_with_Spaces_remaining_lands_on_the_next_listed_Space_and_says_so_without_a_name`, E2E-010 `Deleting_the_last_Space_lands_on_the_no_Space_state_with_focus_on_its_heading`, E2E-011 `A_404_on_the_deletion_goes_home_as_a_204_does_and_says_nothing`, E2E-012 (x2) `A_deletion_with_no_answer_or_a_5xx_keeps_the_confirm_and_its_retry_reuses_the_key`, E2E-013 `A_403_on_the_deletion_says_only_the_Owner_can_delete_the_Space`; UNIT-001 `Removed_drops_the_Space_from_the_held_list_and_from_the_refused_set`.
+  - AC13: RACE-S1..S4 (wire races on `LCK_M_%`), RACE-S6 (reader driven directly - under RCSI the name read takes no lock, so there is no wire race to hold; ATDD finding 2).
+  - AC14: E2E-014, E2E-015.
+  - AC15: E2E-016, E2E-017; every other `RefusalSurface` keeps "Back to Yello." (the 3.2 cases and fingerprints unchanged, green).
+  - AC16: E2E-004 `Escape_closes_the_confirm_and_returns_focus_to_Delete_this_Space`; E2E-018 (x2) `The_deletion_works_by_keyboard_alone_with_a_visible_ring_and_no_sideways_scroll` at 1280x800 and 320x256.
+- **Ledger.** Closed: `:356`, `:360`, `:370`, `:666`, `:679`; `:382` noted. New: C1 (Invitations, 4.1), C2 (Ownership Offers, 5.1), live-session termination and `MembershipChanged` (7.7 with 7.3), the Q5 copy and focus (UX), and the location-changing hook not seen for the deletion's `NavigateTo` (3.4).
+- **Verification.** `dotnet build Yello.slnx`: 0 warnings, 0 errors. `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`: 1,679 total, 1,670 passed, 0 failed, 9 skipped (baseline 1,663 / 1,612 / 0 / 51: the 42 skipped scaffolds are active, and the isolation rows run on both surfaces). The 9 skips are the 3 migration-bundle cases and the explicit tiers. Earlier single-project runs: Architecture 390/390, Isolation 151/151, Revocation 19/19, Client 393 passed / 2 skipped, `ActiveSpaceEndpointTests` 82/82.
 
 ### File List
+New:
+- `Yello.Application/Spaces/DeleteSpace/DeleteSpaceHandler.cs`
+- `Yello.Application/Spaces/DeleteSpace/ReadDeletionSummaryHandler.cs`
+- `Yello.Application/Spaces/ISpaceContentsReader.cs`
+- `Yello.Application/Spaces/SpaceDeletion.cs`
+- `Yello.Contracts/Spaces/SpaceDeletionSummaryResponse.cs`
+- `Yello.Host/Spaces/ActiveSpaceResolution.Deletion.cs`
+- `Yello.Host/Spaces/DestroysItsSpace.cs`
+- `Yello.Infrastructure/Persistence/ReferenceConflict.cs`
+- `Yello.Infrastructure/Persistence/SpaceContentsReader.cs`
+- `Yello.Client/Components/SpaceDeleteSection.razor`
+- `Yello.Client/Spaces/DepartureNarration.cs`
+
+Modified:
+- `Yello.Application/ApiTokens/IssueApiToken/IssueApiTokenHandler.cs`
+- `Yello.Application/Spaces/IActiveSpaceNameReader.cs`
+- `Yello.Application/Spaces/ISpaceStore.cs`
+- `Yello.Application/Spaces/RenameSpace/RenameSpaceHandler.cs`
+- `Yello.Contracts/Spaces/SpaceRoutes.cs`
+- `Yello.Host/Endpoints/ApiTokenEndpoints.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Host/SpaceLog.cs`
+- `Yello.Host/Spaces/ActiveSpaceEndpoints.cs`
+- `Yello.Host/Spaces/ActiveSpaceResolution.cs`
+- `Yello.Infrastructure/AccountScopedReads.cs`
+- `Yello.Infrastructure/Persistence/ActiveSpaceNameReader.cs`
+- `Yello.Infrastructure/Persistence/Configurations/MembershipConfiguration.cs`
+- `Yello.Infrastructure/Persistence/SpaceStore.cs`
+- `Yello.Client/Components/ContextBar.razor`
+- `Yello.Client/Components/RefusalSurface.razor`
+- `Yello.Client/Components/SpaceSwitcher.razor`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Pages/Home.razor`
+- `Yello.Client/Pages/SpaceSettings.razor`
+- `Yello.Client/Program.cs`
+- `Yello.Client/Spaces/SpaceCapabilities.cs`
+- `Yello.Client/Spaces/SpaceDirectory.cs`
+- `Yello.Client/wwwroot/css/components.css`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.DeleteSpace.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Spaces.cs`
+- `tests/Yello.Tests.Architecture/SpaceDeletionClientGateTests.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.SpaceDeletion.cs`
+- `tests/Yello.Tests.Client/SpaceDeleteTests.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.cs`
+- `tests/Yello.Tests.Revocation/RevocationCaseTests.cs`
+- `tests/Yello.Tests.Revocation/RevocationCases.cs`
+- `tests/Yello.Tests.Revocation/RevocationWorld.cs`
+- `tests/Yello.Tests.Shared/WireDatabase.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteSpace.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteSpaceRace.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.Tokens.cs`
+- `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/3-3-delete-a-space-and-belong-to-none.md`
+
+## Change Log
+
+- 2026-10-31 - dev-story: Space deletion (`DELETE /api/v1/spaces/{spaceId}`, Owner-only, one statement under the Space key, cascades) and its counts read; the pipeline answers a Space deleted under a request with the boundary `404`; rename and the name read answer `404` for a vanished Space; the client's delete section, in-place confirm, route home and "Space deleted."; the switcher's empty and failed sentences; the refusal page at `/` points to the switcher. AD-24 amendment and AD-18 variance recorded in the spine. 42 ATDD scaffolds and 5 isolation rows activated; 6 ledger entries closed or noted, 5 added. Full run 1,679 / 1,670 passed / 0 failed / 9 skipped. Status: review.

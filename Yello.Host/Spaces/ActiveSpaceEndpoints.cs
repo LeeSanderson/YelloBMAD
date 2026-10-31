@@ -1,4 +1,5 @@
 using Yello.Application.Spaces;
+using Yello.Application.Spaces.DeleteSpace;
 using Yello.Application.Spaces.RenameSpace;
 using Yello.Contracts.Spaces;
 using Yello.Domain;
@@ -64,7 +65,11 @@ public static class ActiveSpaceEndpoints
 
         var name = await names.ReadAsync(cancellationToken).ConfigureAwait(false);
 
-        return Results.Ok(new ActiveSpaceResponse(context.SpaceId, name, StableCode.Of(context.Role)));
+        // No name: the Space was deleted after the pipeline resolved it (story 3.3, deferred-work.md:360). The answer the
+        // next request gets - the boundary's 404 - not a 500. Not recorded: refusal records are the pipeline's (2.5).
+        return name is null
+            ? BoundaryProblems.NotAvailable()
+            : Results.Ok(new ActiveSpaceResponse(context.SpaceId, name, StableCode.Of(context.Role)));
     }
 
     /// <summary>
@@ -106,6 +111,82 @@ public static class ActiveSpaceEndpoints
 
         var renamed = await handler.HandleAsync(context, name, cancellationToken).ConfigureAwait(false);
 
-        return Results.Ok(new ActiveSpaceResponse(renamed.Id, renamed.Name, StableCode.Of(context.Role)));
+        // No row renamed: the Space was deleted after the pipeline resolved it (story 3.3, deferred-work.md:666).
+        return renamed is null
+            ? BoundaryProblems.NotAvailable()
+            : Results.Ok(new ActiveSpaceResponse(renamed.Id, renamed.Name, StableCode.Of(context.Role)));
+    }
+
+    /// <summary>
+    /// Registers <c>DELETE /api/v1/spaces/{spaceId}</c> - deleting the active Space (story 3.3, FR-7). Space-scoped on
+    /// both surfaces, declaring <c>DeleteSpace</c>, which the matrix grants the Owner alone, and marked
+    /// <see cref="DestroysItsSpace"/>, so the pipeline records no idempotency record against the Space it destroys (open
+    /// question 1 (a)).
+    /// </summary>
+    /// <param name="endpoints">The route builder.</param>
+    /// <returns>The registered route, for further configuration.</returns>
+    public static RouteHandlerBuilder MapDeleteSpace(this IEndpointRouteBuilder endpoints) =>
+        endpoints.MapDelete(SpaceRoutes.Active, DeleteAsync)
+            .RequiresCapability(Capability.DeleteSpace)
+            .DestroysItsSpace();
+
+    /// <summary>
+    /// Deletes the active Space.
+    /// </summary>
+    /// <param name="handler">The slice.</param>
+    /// <param name="httpContext">The request, whose services hold the resolved context.</param>
+    /// <param name="loggerFactory">Builds the logger the deletion is recorded on.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>
+    /// <c>204</c> once the deletion is in the unit of work the pipeline commits, or the boundary's <c>404</c> when the
+    /// Space was already gone - not recorded, as story 2.5's Project deletion is not.
+    /// </returns>
+    public static async Task<IResult> DeleteAsync(
+        DeleteSpaceHandler handler,
+        HttpContext httpContext,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        var context = httpContext.RequestServices.GetRequiredService<ActiveSpaceContext>();
+
+        var deleted = await handler.HandleAsync(context, cancellationToken).ConfigureAwait(false);
+
+        if (deleted == SpaceDeletion.NotFound)
+        {
+            return BoundaryProblems.NotAvailable();
+        }
+
+        SpaceLog.SpaceDeleted(loggerFactory.CreateLogger(typeof(ActiveSpaceEndpoints).FullName!), context.SpaceId);
+
+        return Results.NoContent();
+    }
+
+    /// <summary>
+    /// Registers <c>GET /api/v1/spaces/{spaceId}/deletion</c> - what deleting the active Space would take, for the
+    /// confirm (story 3.3, AC2, open question 2 (a)). Declares <c>DeleteSpace</c>, so only the Owner reads it.
+    /// </summary>
+    /// <param name="endpoints">The route builder.</param>
+    /// <returns>The registered route, for further configuration.</returns>
+    public static RouteHandlerBuilder MapSpaceDeletionSummary(this IEndpointRouteBuilder endpoints) =>
+        endpoints.MapGet(SpaceRoutes.DeletionSummary, DeletionSummaryAsync)
+            .RequiresCapability(Capability.DeleteSpace);
+
+    /// <summary>
+    /// Counts the active Space's Projects, Tasks and other Members.
+    /// </summary>
+    /// <param name="handler">The slice.</param>
+    /// <param name="httpContext">The request, whose services hold the resolved context.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns><c>200</c> with the counts and nothing else.</returns>
+    public static async Task<IResult> DeletionSummaryAsync(
+        ReadDeletionSummaryHandler handler,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
+    {
+        var context = httpContext.RequestServices.GetRequiredService<ActiveSpaceContext>();
+
+        var contents = await handler.HandleAsync(context, cancellationToken).ConfigureAwait(false);
+
+        return Results.Ok(new SpaceDeletionSummaryResponse(contents.Projects, contents.Tasks, contents.OtherMembers));
     }
 }

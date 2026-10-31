@@ -24,6 +24,11 @@
     "CREATE A SPACE" SITS AT THE PANEL'S FOOT, OUTSIDE THE LIST (story 3.1, AC13, open question 3 (a)), so the list's
     rows still carry a name and nothing else. A link to the create page, with no click handler for the same reason the
     rows have none; Esc on it closes the panel as on a row.
+
+    NOTHING TO LIST IS SAID, NEVER AN EMPTY, UNEXPLAINED PANEL (story 3.3, AC14, open question 7 (a);
+    deferred-work.md:356). An answer that lists no Space says the Account belongs to none; a switcher that could not be
+    asked, with nothing held, says the list could not be had - never the first sentence, which would be false. Either
+    sentence sits outside the list, which holds names and nothing else, and the foot link stays.
 *@
 
 <ul class="space-switcher" id="@ListId" aria-label="@Localizer["SpaceSwitcherListLabel"]">
@@ -38,6 +43,16 @@
         </li>
     }
 </ul>
+
+@if (Listed && Spaces.Count == 0)
+{
+    <p class="space-switcher__empty">@Localizer["NoSpaceBody"]</p>
+}
+
+@if (Failed)
+{
+    <p class="space-switcher__empty">@Localizer["SpaceSwitcherFailed"]</p>
+}
 
 <p class="space-switcher__foot">
     <a class="space-switcher__create" href="@ClientRoutes.CreateSpace" @onkeydown="KeyDownAsync">@Localizer["CreateSpaceAction"]</a>
@@ -57,6 +72,19 @@
     [Parameter]
     [EditorRequired]
     public IReadOnlyList<SpaceIdentityResponse> Spaces { get; set; } = [];
+
+    /// <summary>
+    /// Whether <see cref="Spaces"/> is an answer the server gave (held or fresh), so an empty one means the Account
+    /// belongs to no Space - rather than nothing had yet (story 3.3, AC14).
+    /// </summary>
+    [Parameter]
+    public bool Listed { get; set; }
+
+    /// <summary>
+    /// Whether the switcher could not be asked and nothing was held (story 3.3, AC14, open question 7 (a)).
+    /// </summary>
+    [Parameter]
+    public bool Failed { get; set; }
 
     /// <summary>
     /// The Space the tab is in, whose row carries <c>aria-current</c>.

@@ -10,7 +10,7 @@ namespace Yello.Host;
 /// <remarks>
 /// <para>
 /// <b>EventIds 1016-1020, 1031-1032 (story 2.1's idempotency), 1033-1034 (story 2.2's not-found floor) and
-/// 1035-1038 (story 3.1's Space creation).</b> 1000-1007 belong to
+/// 1035-1038 (story 3.1's Space creation) and 1039-1040 (story 3.3's Space deletion).</b> 1000-1007 belong to
 /// <see cref="StartupLog"/>, 1008-1009 to <see cref="RegistrationLog"/> and 1010-1015 to
 /// <see cref="SessionLog"/>; 1021 onwards to <see cref="RateLimitLog"/> and the others.
 /// </para>
@@ -137,4 +137,27 @@ internal static partial class SpaceLog
         Level = LogLevel.Information,
         Message = "Space {SpaceId} was created.")]
     internal static partial void SpaceCreated(ILogger logger, Guid spaceId);
+
+    /// <summary>
+    /// A Space deleted by its Owner (story 3.3). Its id only, never its name (I-17).
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    /// <param name="spaceId">The Space.</param>
+    [LoggerMessage(
+        EventId = 1039,
+        Level = LogLevel.Information,
+        Message = "Space {SpaceId} was deleted.")]
+    internal static partial void SpaceDeleted(ILogger logger, Guid spaceId);
+
+    /// <summary>
+    /// A Space-scoped request whose Space was deleted between its resolution and its write (story 3.3, open question
+    /// 4 (a)); it was answered as the boundary refuses.
+    /// </summary>
+    /// <param name="logger">The logger.</param>
+    /// <param name="spaceId">The Space.</param>
+    [LoggerMessage(
+        EventId = 1040,
+        Level = LogLevel.Information,
+        Message = "{SpaceId} was deleted under a request resolved in it; the request was refused.")]
+    internal static partial void SpaceDeletedUnderRequest(ILogger logger, Guid spaceId);
 }

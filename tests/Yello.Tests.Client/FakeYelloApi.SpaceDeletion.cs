@@ -20,10 +20,9 @@ namespace Yello.Tests.Client;
 /// Projects, Boards and Labels.
 /// </para>
 /// <para>
-/// <b>The counts read's path and body are assumed</b> (Q2 (a)): <c>/deletion</c> under the active Space, answering
-/// <c>{projects, tasks, otherMembers}</c> - the camel-cased <c>SpaceDeletionSummaryResponse(int Projects, int Tasks, int
-/// OtherMembers)</c> the story names. Retarget <see cref="DeletionSummaryPathOf"/> and the body to the contract once the
-/// dev phase adds it. A Role other than Owner is <c>403 insufficient-role</c> with <c>delete-space</c>.
+/// <b>The counts read</b> (Q2 (a)): <c>SpaceRoutes.DeletionSummary</c>, answering <c>{projects, tasks, otherMembers}</c> -
+/// the camel-cased <c>SpaceDeletionSummaryResponse(int Projects, int Tasks, int OtherMembers)</c>. A Role other than Owner
+/// is <c>403 insufficient-role</c> with <c>delete-space</c>.
 /// </para>
 /// </remarks>
 internal sealed partial class FakeYelloApi
@@ -50,11 +49,11 @@ internal sealed partial class FakeYelloApi
     public bool SwitcherFails { get; set; }
 
     /// <summary>
-    /// Q2 (a)'s counts read for one Space - an assumed path; see the class remarks.
+    /// Q2 (a)'s counts read for one Space, as the contract names it.
     /// </summary>
     /// <param name="spaceId">The Space.</param>
     /// <returns>The path.</returns>
-    public static string DeletionSummaryPathOf(Guid spaceId) => SpaceRoutes.ActiveOf(spaceId) + "/deletion";
+    public static string DeletionSummaryPathOf(Guid spaceId) => SpaceRoutes.DeletionSummaryOf(spaceId);
 
     /// <summary>
     /// Every deletion of <paramref name="spaceId"/> the page sent, in order.

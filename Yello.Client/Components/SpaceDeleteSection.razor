@@ -1,0 +1,350 @@
+@using System.Globalization
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Spaces
+@using Yello.Contracts
+@using Yello.Contracts.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceDirectory Directory
+@inject SpaceWrites Writes
+@inject DepartureNarration Departure
+@inject NavigationManager Navigation
+
+@*
+    THE DELETE SECTION OF SPACE SETTINGS - story 3.3: AC1-AC3, AC7, AC8, AC12, AC16; FR-7, PRD §6.2; UX-DR12, UX-DR27,
+    UX-DR33, UX-DR36-UX-DR38.
+
+    THE OWNER ONLY. Space settings renders this only when SpaceCapabilities.PermitsDeleteSpace; for an Admin, a Member or a
+    Viewer it is absent from the DOM, never hidden and never disabled (UX-DR27). The server refuses anyone else 403 all the
+    same.
+
+    "DELETE THIS SPACE" ASKS FIRST, IN PLACE, ONE LEVEL DEEP (AC7, EXPERIENCE.md:67). The counts are read from the server
+    when it is pressed - never cached (open question 2 (a)); the control is aria-busy meanwhile, never disabled. Then Space
+    settings renders the confirm INSTEAD OF its other sections: no dialog, no scrim, no second layer. Esc or Cancel restores
+    the sections and returns focus to "Delete this Space".
+
+    THE CONFIRM, IN ORDER (AC2, AC8; open question 5): "Delete {name}?" as its heading; "This cannot be undone." directly
+    after it, with nothing reassuring before it; the Projects and Tasks it holds; who else loses access; the typed-name
+    field; "Delete this Space" (button-danger); Cancel. Focus goes to the field, because typing is the first required act.
+    The copy is the signal - no icon, and nothing on this path animates (DESIGN.md:476, :519).
+
+    THE TYPED NAME (AC3, UX-DR33; open questions 3 (a), 5). A real label, autocomplete="off" and a field name fresh per
+    opening. Pressing Delete with text that, trimmed, is not the Space's name exactly (case counts) sends nothing and says
+    so beside the field. The button is never disabled. The name is never sent: it guards against accident here, and the
+    server's guard is DeleteSpace.
+
+    NOT OPTIMISTIC (AC12, EXPERIENCE.md:335). While the deletion is out the confirm stays as it is, aria-busy, nothing
+    disabled. One Idempotency-Key per deletion, kept after an attempt that got no answer, so pressing again cannot apply
+    twice (open question 1 (a)). On 204 the Space leaves the switcher's held list (SpaceDirectory.Removed), "Space deleted."
+    is held for the page the tab lands on (DepartureNarration, open question 6 (a)), and the tab goes to the entry point with
+    replace - which purges the Space and lands on the first remaining listed Space, or on the no-Space state. A 404 means the
+    Space is already gone for this Account: routed the same way, said by no one. No answer, or a 5xx: "Not sent.", the
+    confirm stays. A 403: the capability's words, in the section.
+*@
+
+<div class="space-delete-section">
+    @if (Confirming && _summary is { } summary)
+    {
+        <div class="destructive-confirm space-delete-section__confirm" aria-busy="@(_deleting ? "true" : null)" @onkeydown="ConfirmKeyDownAsync">
+            <h2 class="type-space-name space-delete-section__question" id="@QuestionId">@string.Format(CultureInfo.CurrentCulture, Localizer["DeleteQuestion"], _name)</h2>
+            <p class="space-delete-section__fact">@Localizer["DeleteCannotBeUndone"]</p>
+            <p class="space-delete-section__fact">@HoldsSentence(summary)</p>
+            <p class="space-delete-section__fact">@OthersSentence(summary)</p>
+
+            <FormField FieldId="space-delete-typed-name"
+                       FieldName="@_fieldName"
+                       Label="@Localizer["DeleteSpaceTypedNameLabel"]"
+                       Value="@_typed"
+                       ValueChanged="value => _typed = value"
+                       Message="@_mismatch"
+                       Invalid="@(_mismatch is not null)"
+                       FocusOnFirstRender="true" />
+
+            <div class="space-delete-section__actions">
+                <button type="button" class="button-danger" aria-describedby="@QuestionId" @onclick="DeleteAsync">@Localizer["DeleteSpaceAction"]</button>
+                <button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["DeleteCancel"]</button>
+            </div>
+
+            @if (_status is { } status)
+            {
+                <p class="space-delete-section__refusal" role="status">@status</p>
+            }
+        </div>
+    }
+
+    @if (!ShowsConfirm)
+    {
+        <button type="button" class="button-secondary" aria-busy="@(_counting ? "true" : null)" @onclick="AskAsync" @ref="_opener">@Localizer["DeleteSpaceAction"]</button>
+    }
+
+    @if (_refusal is { } refusal)
+    {
+        <p class="space-delete-section__refusal" role="status">@refusal</p>
+    }
+</div>
+
+@code {
+    private const string QuestionId = "space-delete-question";
+
+    private bool ShowsConfirm => Confirming && _summary is not null;
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private ElementReference _opener;
+
+    private SpaceDeletionSummaryResponse? _summary;
+    private string _name = string.Empty;
+    private string _fieldName = string.Empty;
+    private string _typed = string.Empty;
+    private string? _mismatch;
+    private string? _status;
+    private string? _refusal;
+    private string? _key;
+    private bool _counting;
+    private bool _deleting;
+    private bool _focusOpener;
+
+    /// <summary>The Space this section deletes - the route's, which the pipeline resolves.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>Whether the confirm is open, so Space settings renders it in place of its other sections (AC7).</summary>
+    [Parameter]
+    public bool Confirming { get; set; }
+
+    /// <summary>Raised when the confirm opens or closes; Space settings owns <see cref="Confirming"/>.</summary>
+    [Parameter]
+    public EventCallback<bool> ConfirmingChanged { get; set; }
+
+    /// <summary>Raised when the server refuses the Space itself on the counts read, so the page renders the one refusal surface.</summary>
+    [Parameter]
+    public EventCallback<ProblemResponse?> OnSpaceRefused { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusOpener && !Confirming)
+        {
+            _focusOpener = false;
+            await _opener.FocusAsync();
+        }
+    }
+
+    private string HoldsSentence(SpaceDeletionSummaryResponse summary)
+    {
+        var projects = summary.Projects switch
+        {
+            0 => Localizer["DeleteSpaceProjectsNone"].Value,
+            1 => Localizer["DeleteSpaceProjectsOne"].Value,
+            var many => string.Format(CultureInfo.CurrentCulture, Localizer["DeleteSpaceProjectsMany"], many),
+        };
+
+        var tasks = summary.Tasks switch
+        {
+            0 => Localizer["DeleteSpaceTasksNone"].Value,
+            1 => Localizer["DeleteSpaceTasksOne"].Value,
+            var many => string.Format(CultureInfo.CurrentCulture, Localizer["DeleteSpaceTasksMany"], many),
+        };
+
+        return string.Format(CultureInfo.CurrentCulture, Localizer["DeleteSpaceHolds"], projects, tasks);
+    }
+
+    private string OthersSentence(SpaceDeletionSummaryResponse summary) => summary.OtherMembers switch
+    {
+        0 => Localizer["DeleteSpaceOthersNone"],
+        1 => Localizer["DeleteSpaceOthersOne"],
+        var many => string.Format(CultureInfo.CurrentCulture, Localizer["DeleteSpaceOthersMany"], many),
+    };
+
+    /// <summary>
+    /// The section's delete control: reads the counts, then opens the confirm. Never cached - a Project added since the last look
+    /// is counted (§6.2).
+    /// </summary>
+    private async Task AskAsync()
+    {
+        if (_counting)
+        {
+            return;
+        }
+
+        _counting = true;
+        _refusal = null;
+
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(SpaceRoutes.DeletionSummaryOf(SpaceId), UriKind.Relative), token);
+
+            if (token.IsCancellationRequested || response.StatusCode == HttpStatusCode.Unauthorized)
+            {
+                return;
+            }
+
+            if (response.IsSuccessStatusCode
+                && await response.Content.ReadFromJsonAsync<SpaceDeletionSummaryResponse>(JsonOptions, token) is { } summary)
+            {
+                await OpenAsync(summary);
+                return;
+            }
+
+            var problem = await SpaceWrites.ProblemOfAsync(response, token);
+
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                await OnSpaceRefused.InvokeAsync(problem);
+                return;
+            }
+
+            _refusal = RefusalText.Of(Localizer, problem);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            _refusal = Localizer[RefusalCopy.NotAvailableKey];
+        }
+        finally
+        {
+            _counting = false;
+        }
+    }
+
+    private async Task OpenAsync(SpaceDeletionSummaryResponse summary)
+    {
+        _summary = summary;
+        _name = ActiveSpace.Current?.Name ?? string.Empty;
+
+        // A field name no browser's autofill would match to a saved value, fresh per opening (AC3, UX-DR33).
+        _fieldName = Guid.NewGuid().ToString("N");
+        _typed = string.Empty;
+        _mismatch = null;
+        _status = null;
+
+        await ConfirmingChanged.InvokeAsync(true);
+    }
+
+    private async Task CancelAsync()
+    {
+        if (_deleting)
+        {
+            return;
+        }
+
+        _summary = null;
+        _mismatch = null;
+        _status = null;
+        _focusOpener = true;
+
+        await ConfirmingChanged.InvokeAsync(false);
+    }
+
+    private Task ConfirmKeyDownAsync(KeyboardEventArgs args) =>
+        args.Key == "Escape" ? CancelAsync() : Task.CompletedTask;
+
+    /// <summary>
+    /// The confirm's danger action. The typed name first; then one Idempotency-Key for this deletion, kept until an answer
+    /// decides it.
+    /// </summary>
+    private async Task DeleteAsync()
+    {
+        if (_deleting)
+        {
+            return;
+        }
+
+        if (!string.Equals(_typed.Trim(), _name.Trim(), StringComparison.Ordinal))
+        {
+            _mismatch = Localizer["DeleteSpaceTypedNameMismatch"];
+            return;
+        }
+
+        _mismatch = null;
+        _status = null;
+        _deleting = true;
+
+        // A deletion sent again after an attempt that got no answer reuses its key: it may have been applied.
+        _key ??= Guid.NewGuid().ToString("D");
+
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Delete, SpaceRoutes.ActiveOf(SpaceId), _key, token);
+
+            if (!token.IsCancellationRequested)
+            {
+                UseAnswer(answer);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // No answer: nothing is removed, the key is kept for the resend, and the confirm says so.
+            _status = Localizer["TaskEditNotSent"];
+        }
+        finally
+        {
+            _deleting = false;
+        }
+    }
+
+    private void UseAnswer(SpaceWriteAnswer answer)
+    {
+        switch (answer.StatusCode)
+        {
+            case HttpStatusCode.NoContent:
+                Leave(Localizer["SpaceDeleted"]);
+                return;
+
+            case HttpStatusCode.NotFound:
+                // Already gone for this Account - an earlier attempt of this tab's, or someone else's. Routed as a 204 is, and
+                // said by no one, because this press deleted nothing that can be told apart.
+                Leave(sentence: null);
+                return;
+
+            case HttpStatusCode.Unauthorized:
+                return;
+
+            case >= HttpStatusCode.InternalServerError:
+                // The outcome is not known: treated as no answer, so the key is kept.
+                _status = Localizer["TaskEditNotSent"];
+                return;
+
+            default:
+                _key = null;
+                _status = RefusalText.Of(Localizer, answer.Problem);
+                return;
+        }
+    }
+
+    /// <summary>
+    /// The Space is gone: out of the switcher's held list, then to the entry point with replace, which purges it and lands
+    /// on the first remaining listed Space or on the no-Space state (AC12).
+    /// </summary>
+    private void Leave(string? sentence)
+    {
+        _key = null;
+        Directory.Removed(SpaceId);
+
+        if (sentence is not null)
+        {
+            Departure.Say(sentence);
+        }
+
+        // The tab leaves the deleted Space before it navigates, as the location-changing hook would have it leave, so the
+        // purge runs now and the entry point starts outside any Space - where it lands is then a first arrival (AC12)
+        ActiveSpace.Navigating(target: null);
+        Navigation.NavigateTo(ClientRoutes.Home, replace: true);
+    }
+}

@@ -412,7 +412,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
     /// <summary>
     /// AC5 / AC8 / V-3 - deleting the Space cascades Space -&gt; Membership -&gt; ApiToken in one
-    /// statement, and the next Token request is <c>401</c>. Story 3.3 owns the event; this proves the
+    /// statement, and the next Token request is <c>401</c>. Story 3.3's endpoint drives the event (the DeleteSpace partial); this proves the
     /// schema carries it.
     /// </summary>
     [Fact]

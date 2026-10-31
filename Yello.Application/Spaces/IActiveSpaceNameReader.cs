@@ -23,6 +23,9 @@ public interface IActiveSpaceNameReader
     /// Reads the resolved Space's name.
     /// </summary>
     /// <param name="cancellationToken">The request's cancellation token.</param>
-    /// <returns>The name.</returns>
-    Task<string> ReadAsync(CancellationToken cancellationToken);
+    /// <returns>
+    /// The name, or <c>null</c> when the Space was deleted after the pipeline resolved it (story 3.3,
+    /// <c>deferred-work.md:360</c>) - which the caller answers as the boundary's <c>404</c>.
+    /// </returns>
+    Task<string?> ReadAsync(CancellationToken cancellationToken);
 }

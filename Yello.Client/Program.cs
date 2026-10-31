@@ -118,6 +118,10 @@ builder.Services.AddScoped<ActiveSpaceState>();
 // rules exist once), and the routed page's heading, which the skip control and a first arrival focus.
 builder.Services.AddScoped<SpaceWrites>();
 builder.Services.AddScoped<SpaceNarration>();
+
+// Story 3.3 (AC12, open question 6 (a)): the sentence said after a deletion, held across the purge of the Space it is
+// about and taken by the entry point. Dropped with the Session, below.
+builder.Services.AddScoped<DepartureNarration>();
 builder.Services.AddScoped<PageHeadingFocus>();
 
 var host = builder.Build();
@@ -154,11 +158,13 @@ sessionState.AnnounceSignOutWith(() =>
 // state (and through it everything epic 2 will register there), and the switcher's list.
 var activeSpace = host.Services.GetRequiredService<ActiveSpaceState>();
 var spaceDirectory = host.Services.GetRequiredService<SpaceDirectory>();
+var departureNarration = host.Services.GetRequiredService<DepartureNarration>();
 
 sessionState.RegisterPurge(() =>
 {
     activeSpace.Purge();
     spaceDirectory.Forget();
+    departureNarration.Forget();
 
     return Task.CompletedTask;
 });

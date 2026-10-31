@@ -855,45 +855,34 @@ internal static class IsolationCases
             FreshActorRenamesItsOwnSpaceAsync,
             Both(new Served(HttpStatusCode.OK, RenamedOnlyTheCallersOwnSpaceAsync, "200, {id, name, role: owner}; B's Space keeps its name"))),
 
-        // Story 3.3 (ATDD run, 2026-10-31): the deletion route and Q2 (a)'s counts read, each on both surfaces
-        // (1.9-GATE-002). Pending until the dev phase maps them; GATE-003 fails the suite if any is still pending when 3.3
-        // reaches review. The counts read's pattern is a literal until SpaceRoutes names it (story 3.3 Task 5) - retarget
-        // DeletionSummaryRoute and DeletionSummaryOf to the contract on conversion. Write rows act as FRESH actors where the
-        // request could destroy the actor's Space, so A's and B's Spaces - every other row's subject - survive any failure.
+        // Story 3.3: the deletion route and Q2 (a)'s counts read (SpaceRoutes.DeletionSummary), each on both surfaces
+        // (1.9-GATE-002). Written pending by the ATDD run and converted by the dev phase. Write rows act as FRESH actors
+        // where the request could destroy the actor's Space, so A's and B's Spaces - every other row's subject - survive
+        // any failure.
         new(
             "ISO-DELETE-SPACE-CROSS", "I-2, I-4 (3.3 AC9)", IsolationVector.Write, HttpMethod.Delete, SpaceRoutes.Active,
             world => ForeignAsync(world, SpaceRoutes.ActiveOf, HttpMethod.Delete),
-            Both(new BoundaryNotFound { Then = TheForeignSpaceKeepsItsNameAsync }),
-            PendingUntil: "3.3",
-            PendingReason: "red: AC9 - DELETE /api/v1/spaces/{spaceId} is not mapped yet (story 3.3 Task 4); convert when it is"),
+            Both(new BoundaryNotFound { Then = TheForeignSpaceKeepsItsNameAsync })),
 
         new(
             "ISO-RECORD-KIND-SPACE-DELETE-ADMIN", "V-1, C-6, NFR-7 (3.3 AC1, AC9)", IsolationVector.RecordKind, HttpMethod.Delete, SpaceRoutes.Active,
             AdminDeletesTheSpaceAsync,
-            Both(new RoleRefused("delete-space") { Then = TheActorsSpaceStillStandsAsync }),
-            PendingUntil: "3.3",
-            PendingReason: "red: AC1, AC9 - DELETE /api/v1/spaces/{spaceId} is not mapped yet (story 3.3 Task 4); convert when it is"),
+            Both(new RoleRefused("delete-space") { Then = TheActorsSpaceStillStandsAsync })),
 
         new(
             "ISO-DELETE-SPACE-OWN", "I-12 (3.3 AC4, AC6, AC11 in-Space anchor)", IsolationVector.Api, HttpMethod.Delete, SpaceRoutes.Active,
             FreshActorDeletesItsOwnSpaceAsync,
-            Both(new Served(HttpStatusCode.NoContent, DeletedOnlyTheCallersOwnSpaceAsync, "204, no body; the caller belongs to no Space; B's Space keeps its name")),
-            PendingUntil: "3.3",
-            PendingReason: "red: AC4, AC6 - DELETE /api/v1/spaces/{spaceId} is not mapped yet (story 3.3 Task 4); convert when it is"),
+            Both(new Served(HttpStatusCode.NoContent, DeletedOnlyTheCallersOwnSpaceAsync, "204, no body; the caller belongs to no Space; B's Space keeps its name"))),
 
         new(
             "ISO-DELETION-SUMMARY-CROSS", "I-1, I-2 (3.3 AC9, Q2 (a))", IsolationVector.DirectIdentifier, HttpMethod.Get, DeletionSummaryRoute,
             world => ForeignAsync(world, DeletionSummaryOf),
-            Both(new BoundaryNotFound()),
-            PendingUntil: "3.3",
-            PendingReason: "red: AC9 - Q2 (a)'s counts read is not mapped yet (story 3.3 Tasks 4, 5); convert when it is"),
+            Both(new BoundaryNotFound())),
 
         new(
             "ISO-RECORD-KIND-DELETION-SUMMARY-ADMIN", "V-1, C-6 (3.3 AC9, Q2 (a))", IsolationVector.RecordKind, HttpMethod.Get, DeletionSummaryRoute,
             AdminReadsTheDeletionSummaryAsync,
-            Both(new RoleRefused("delete-space")),
-            PendingUntil: "3.3",
-            PendingReason: "red: AC9 - Q2 (a)'s counts read is not mapped yet (story 3.3 Tasks 4, 5); convert when it is"),
+            Both(new RoleRefused("delete-space"))),
     ];
 
     /// <summary>
@@ -1863,15 +1852,14 @@ internal static class IsolationCases
     }
 
     /// <summary>
-    /// Story 3.3, Q2 (a) - the counts read's route pattern. <b>Assumed</b>: retarget to the <c>SpaceRoutes</c> constant the dev
-    /// phase adds (story 3.3 Task 5).
+    /// Story 3.3, Q2 (a) - the counts read's route pattern, as the contract names it.
     /// </summary>
-    private static string DeletionSummaryRoute => SpaceRoutes.Active + "/deletion";
+    private static string DeletionSummaryRoute => SpaceRoutes.DeletionSummary;
 
     /// <summary>
     /// Story 3.3, Q2 (a) - the counts read's path for one Space.
     /// </summary>
-    private static string DeletionSummaryOf(Guid spaceId) => SpaceRoutes.ActiveOf(spaceId) + "/deletion";
+    private static string DeletionSummaryOf(Guid spaceId) => SpaceRoutes.DeletionSummaryOf(spaceId);
 
     /// <summary>
     /// Story 3.3 AC1 - a fresh Account demoted to Admin in its own Personal Space asks to delete it. The Admin's Token is

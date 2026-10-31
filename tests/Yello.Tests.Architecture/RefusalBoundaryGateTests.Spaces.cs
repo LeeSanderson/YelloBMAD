@@ -78,7 +78,8 @@ public sealed partial class RefusalBoundaryGateTests
         foreach (var role in Enum.GetValues<Role>())
         {
             var expected = RoleCapabilityMatrix.Decide(role, Capability.RenameSpace) != CapabilityDecision.Denied
-                || RoleCapabilityMatrix.Decide(role, Capability.ManageLabels) != CapabilityDecision.Denied;
+                || RoleCapabilityMatrix.Decide(role, Capability.ManageLabels) != CapabilityDecision.Denied
+                || RoleCapabilityMatrix.Decide(role, Capability.DeleteSpace) != CapabilityDecision.Denied;
 
             Assert.True(
                 predicate.Invoke(null, [StableCode.Of(role)]) is bool shown && shown == expected,
@@ -189,8 +190,8 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// AC3, AC10, Q5 (a), Task 9 - <c>Space</c> carries no row-level security policy, so the only thing that scopes a write
-    /// to it is the statement's own filter. Exactly one production method updates or deletes a <c>Space</c> in bulk:
-    /// <c>SpaceStore.RenameAsync</c>. Read from the compiled IL: a generic <c>ExecuteUpdate</c>/<c>ExecuteDelete</c>
+    /// to it is the statement's own filter. Exactly one production type updates or deletes a <c>Space</c> in bulk:
+    /// <c>SpaceStore</c> - its rename and, since the AD-24 amendment of 2026-10-31 (story 3.3), its deletion. Read from the compiled IL: a generic <c>ExecuteUpdate</c>/<c>ExecuteDelete</c>
     /// whose source type is <c>Space</c>.
     /// </summary>
     /// <remarks>
@@ -225,8 +226,9 @@ public sealed partial class RefusalBoundaryGateTests
 
         Assert.True(
             bulkWriters.SequenceEqual(["Yello.Infrastructure.Persistence.SpaceStore"], StringComparer.Ordinal),
-            "Space carries no policy (Q5 (a), the AD-24 amendment), so its one bulk write is the rename of the resolved "
-            + "Space. Found: " + string.Join(", ", bulkWriters));
+            "Space carries no policy (Q5 (a), the AD-24 amendment), so its only bulk writes are the rename or the deletion "
+            + "of the resolved Space, in SpaceStore (the AD-24 amendment of 2026-10-31, story 3.3). Found: "
+            + string.Join(", ", bulkWriters));
     }
 
     /// <summary>

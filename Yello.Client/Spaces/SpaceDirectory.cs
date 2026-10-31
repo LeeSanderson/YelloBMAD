@@ -118,6 +118,22 @@ public sealed class SpaceDirectory(HttpClient http)
     }
 
     /// <summary>
+    /// Drops one Space from the held answer and from the Spaces that refused this tab, after the server has deleted it,
+    /// or answered that it is already gone (story 3.3, AC12). It edits the directory - the rest of the answer stays, in
+    /// the order served - and never forgets it: the directory is Account-scoped and outlives the Space.
+    /// </summary>
+    /// <param name="spaceId">The deleted Space.</param>
+    public void Removed(Guid spaceId)
+    {
+        _refusedInThisLoad.Remove(spaceId);
+
+        if (Current is { } current)
+        {
+            Current = [.. current.Where(space => space.Id != spaceId)];
+        }
+    }
+
+    /// <summary>
     /// Records that a listed Space refused this tab's arrival with its own answer (a <c>403</c>, <c>404</c> or
     /// <c>409</c>), so the entry point's route back offers a different one (story 3.2, AC12, open question 1 (a)). A
     /// timeout, a transport failure or a <c>5xx</c> is not a refusal and is not recorded.

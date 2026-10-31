@@ -16,8 +16,8 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds, skipped with <c>red: AC&lt;n&gt;</c>.</b> <c>Removed</c> does not exist yet, so it is found by
-/// reflection (a public instance <c>void Removed(Guid)</c>); a typed call would not compile. The copy is matched by value,
+/// <b>Red-phase scaffolds, activated by the story 3.3 dev phase.</b> <c>Removed</c> is found by reflection (a public
+/// instance <c>void Removed(Guid)</c>), as the scaffold was written before it existed. The copy is matched by value,
 /// so a key may be named as the dev phase likes; a changed sentence is a recorded correction to Q5-Q8, not a quiet edit.
 /// </para>
 /// <para>
@@ -57,7 +57,7 @@ public sealed class SpaceDeletionClientGateTests
     /// is not <c>null</c> afterwards. Anchored: the directory held both rows and had the id refused before.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - SpaceDirectory has no Removed(Guid) yet (story 3.3 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task Removed_drops_the_Space_from_the_held_list_and_from_the_refused_set()
     {
@@ -93,7 +93,7 @@ public sealed class SpaceDeletionClientGateTests
     /// naming 3.3 and the AC"). "Delete {0}?" and "This cannot be undone." are 2.5's and are reused, never copied - held by
     /// <c>DeletionCopyGateTests</c>.
     /// </summary>
-    [Fact(Skip = "red: AC8, AC12, AC14, AC15 - the Q5-Q8 copy is not in ClientCopy.resx yet (story 3.3 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR36")]
     [Trait("Requirement", "UX-DR42")]
     public void The_Space_deletion_copy_is_externalised_once_each_with_a_comment_naming_the_story()

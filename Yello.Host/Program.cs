@@ -17,6 +17,7 @@ using Yello.Application.Labels.DeleteLabel;
 using Yello.Application.Labels.ListLabels;
 using Yello.Application.Lists.ViewList;
 using Yello.Application.Spaces.CreateSpace;
+using Yello.Application.Spaces.DeleteSpace;
 using Yello.Application.Spaces.ListSpaces;
 using Yello.Application.Spaces.RenameSpace;
 using Yello.Application.Statuses.ListStatuses;
@@ -121,6 +122,8 @@ builder.Services.AddScoped<DefineLabelHandler>();
 builder.Services.AddScoped<DeleteLabelHandler>();
 builder.Services.AddScoped<CreateSpaceHandler>();
 builder.Services.AddScoped<RenameSpaceHandler>();
+builder.Services.AddScoped<DeleteSpaceHandler>();
+builder.Services.AddScoped<ReadDeletionSummaryHandler>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
 builder.Services.AddAccountScopedResolution();
@@ -388,6 +391,13 @@ api.MapListSpaces();
 // RenameSpace, on both surfaces.
 api.MapCreateSpace();
 api.MapRenameSpace();
+
+// Space deletion (story 3.3). DELETE /api/v1/spaces/{spaceId} deletes the active Space - every Membership, Token,
+// Project, Task, Label and Status with it, in one statement under the Space key alone - under DeleteSpace, the Owner's
+// alone, on both surfaces; it records no idempotency record against the Space it destroys (DestroysItsSpace, AD-18's
+// recorded variance). GET /api/v1/spaces/{spaceId}/deletion counts what that would take, for the confirm.
+api.MapDeleteSpace();
+api.MapSpaceDeletionSummary();
 
 // API Tokens (story 1.8). POST /api/v1/spaces/{spaceId}/api-tokens issues one bound to that Space:
 // Space-scoped, so the pipeline resolves the Membership and records a boundary refusal, and

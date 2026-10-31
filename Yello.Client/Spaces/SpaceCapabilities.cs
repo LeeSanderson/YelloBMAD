@@ -29,10 +29,19 @@ public static class SpaceCapabilities
         roleCode is "owner" or "admin";
 
     /// <summary>
+    /// Whether a Role may delete the Space (FR-7's <c>delete-space</c>; story 3.3, AC1). The Owner alone: an Admin, a
+    /// Member and a Viewer have no delete affordance at all (UX-DR27).
+    /// </summary>
+    /// <param name="roleCode">The Role's stable code, from the active Space's answer.</param>
+    /// <returns><c>true</c> for the Owner; <c>false</c> for every other Role and anything unknown.</returns>
+    public static bool PermitsDeleteSpace(string roleCode) =>
+        roleCode is "owner";
+
+    /// <summary>
     /// Whether a Role may reach Space settings: whether any of its sections would render for it.
     /// </summary>
     /// <param name="roleCode">The Role's stable code, from the active Space's answer.</param>
-    /// <returns><c>true</c> when the name section or the Label section is offered to the Role.</returns>
+    /// <returns><c>true</c> when the name section, the Label section or the delete section is offered to the Role.</returns>
     public static bool PermitsSpaceSettings(string roleCode) =>
-        PermitsRenameSpace(roleCode) || LabelCapabilities.PermitsManageLabels(roleCode);
+        PermitsRenameSpace(roleCode) || LabelCapabilities.PermitsManageLabels(roleCode) || PermitsDeleteSpace(roleCode);
 }

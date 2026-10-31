@@ -62,21 +62,6 @@ public sealed class RevocationCaseTests(RevocationWorldFixture fixture) : IClass
     public Task The_very_next_request_on_each_surface_reflects_the_event(string caseId, IsolationSurface surface) =>
         RunAsync(RevocationCases.Named(caseId), surface);
 
-    /// <summary>
-    /// Story 3.3 AC11, V-3, NFR-2 - <c>REV-SPACE-DELETED-BY-OWNER</c>, the endpoint-driven Space deletion, on both surfaces:
-    /// after the Owner deletes the Space in the browser, the very next Session request is the boundary <c>404</c> (the
-    /// Session itself still valid) and the very next Token request is the no-credential <c>401</c>. Written red by the story
-    /// 3.3 ATDD run; on activation move the row into <see cref="RevocationCases.All"/> and delete this theory.
-    /// </summary>
-    /// <param name="surface">The surface.</param>
-    /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11 - DELETE /api/v1/spaces/{spaceId} is not mapped yet (story 3.3 Tasks 4, 7); move REV-SPACE-DELETED-BY-OWNER into RevocationCases.All when it is")]
-    [InlineData(IsolationSurface.Session)]
-    [InlineData(IsolationSurface.ApiToken)]
-    [Trait("Requirement", "FR-7")]
-    public Task The_Owners_deletion_of_the_Space_governs_the_very_next_request(IsolationSurface surface) =>
-        RunAsync(RevocationCases.SpaceDeletedByOwner, surface);
-
     private async Task RunAsync(RevocationCase @case, IsolationSurface surface)
     {
         var world = fixture.World;

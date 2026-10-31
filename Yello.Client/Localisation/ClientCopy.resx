@@ -1031,4 +1031,68 @@
     <value>Space renamed.</value>
     <comment>Story 3.1 (AC14, open question 8): announced politely once the server has renamed the Space. Names no Space; the context bar shows the new name.</comment>
   </data>
+  <data name="DeleteSpaceAction" xml:space="preserve">
+    <value>Delete this Space</value>
+    <comment>Story 3.3 (AC1, AC16; Q5): the Owner's delete control in Space settings, which asks first, and the confirmation's danger action. Absent, never disabled, for every other Role (UX-DR27).</comment>
+  </data>
+  <data name="DeleteSpaceHolds" xml:space="preserve">
+    <value>It holds {0} and {1}.</value>
+    <comment>Story 3.3 (AC2; Q5): in the Space's delete confirmation, what it destroys. {0} is DeleteSpaceProjects*, {1} DeleteSpaceTasks*, both counted live when the confirmation opened (PRD §6.2).</comment>
+  </data>
+  <data name="DeleteSpaceProjectsNone" xml:space="preserve">
+    <value>no Projects</value>
+    <comment>Story 3.3 (AC2): {0} of DeleteSpaceHolds when the Space holds no Projects.</comment>
+  </data>
+  <data name="DeleteSpaceProjectsOne" xml:space="preserve">
+    <value>1 Project</value>
+    <comment>Story 3.3 (AC2): {0} of DeleteSpaceHolds when the Space holds exactly one Project.</comment>
+  </data>
+  <data name="DeleteSpaceProjectsMany" xml:space="preserve">
+    <value>{0} Projects</value>
+    <comment>Story 3.3 (AC2): {0} of DeleteSpaceHolds when the Space holds more than one Project. {0} is the true total.</comment>
+  </data>
+  <data name="DeleteSpaceTasksNone" xml:space="preserve">
+    <value>no Tasks</value>
+    <comment>Story 3.3 (AC2): {1} of DeleteSpaceHolds when the Space holds no Tasks.</comment>
+  </data>
+  <data name="DeleteSpaceTasksOne" xml:space="preserve">
+    <value>1 Task</value>
+    <comment>Story 3.3 (AC2): {1} of DeleteSpaceHolds when the Space holds exactly one Task.</comment>
+  </data>
+  <data name="DeleteSpaceTasksMany" xml:space="preserve">
+    <value>{0} Tasks</value>
+    <comment>Story 3.3 (AC2): {1} of DeleteSpaceHolds when the Space holds more than one Task. {0} is the true total, in every Project.</comment>
+  </data>
+  <data name="DeleteSpaceOthersNone" xml:space="preserve">
+    <value>No one else has access to it.</value>
+    <comment>Story 3.3 (AC2; Q5): in the Space's delete confirmation, when no other Account holds a Membership in it. Names no one.</comment>
+  </data>
+  <data name="DeleteSpaceOthersOne" xml:space="preserve">
+    <value>1 other person will lose access to it.</value>
+    <comment>Story 3.3 (AC2, FR-7; Q5): when exactly one other Account holds a Membership - it loses this Space and nothing else. Names no one.</comment>
+  </data>
+  <data name="DeleteSpaceOthersMany" xml:space="preserve">
+    <value>{0} other people will lose access to it.</value>
+    <comment>Story 3.3 (AC2, FR-7; Q5): when more than one other Account holds a Membership. {0} is the live count. Names no one.</comment>
+  </data>
+  <data name="DeleteSpaceTypedNameLabel" xml:space="preserve">
+    <value>Type the Space name to confirm</value>
+    <comment>Story 3.3 (AC3, UX-DR33, UX-DR37; Q5): the label of the field the Owner types the Space's name into before the deletion is sent. A guard against accident; the name is never sent (Q3 (a)).</comment>
+  </data>
+  <data name="DeleteSpaceTypedNameMismatch" xml:space="preserve">
+    <value>Type the Space name exactly as shown.</value>
+    <comment>Story 3.3 (AC3; Q5): said beside the field when Delete is pressed and the typed text, trimmed, is not the Space's name exactly (case counts). Nothing is sent.</comment>
+  </data>
+  <data name="SpaceDeleted" xml:space="preserve">
+    <value>Space deleted.</value>
+    <comment>Story 3.3 (AC12, UX-DR38; Q6 (a)): announced politely once, by the page the tab lands on after the Owner's deletion. Names no Space.</comment>
+  </data>
+  <data name="SpaceSwitcherFailed" xml:space="preserve">
+    <value>Your Spaces could not be listed.</value>
+    <comment>Story 3.3 (AC14; Q7 (a)): in the open switcher, outside its list, when the switcher could not be asked and nothing was held. Never NoSpaceBody, which would be untrue.</comment>
+  </data>
+  <data name="RefusalChooseFromSwitcher" xml:space="preserve">
+    <value>Choose a Space from the switcher above.</value>
+    <comment>Story 3.3 (AC15; Q8 (a)): on the refusal page at the entry point, in place of RefusalRouteBack, which would link to the page it is on. Points to the context bar's switcher.</comment>
+  </data>
 </root>

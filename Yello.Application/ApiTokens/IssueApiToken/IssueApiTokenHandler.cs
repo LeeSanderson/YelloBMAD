@@ -29,8 +29,11 @@ public sealed class IssueApiTokenHandler(IApiTokenStore store, IActiveSpaceNameR
     /// <param name="context">The active Space, as the pipeline resolved it on this request.</param>
     /// <param name="name">The Token's name, already normalised.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
-    /// <returns>The Token with its plaintext, and the Space it is bound to.</returns>
-    public Task<IssuedApiTokenInSpace> HandleAsync(
+    /// <returns>
+    /// The Token with its plaintext, and the Space it is bound to; or <c>null</c> when the Space was deleted after the
+    /// pipeline resolved it (story 3.3) - answered as the boundary's <c>404</c>, and the Token rolled back with it.
+    /// </returns>
+    public Task<IssuedApiTokenInSpace?> HandleAsync(
         ActiveSpaceContext context,
         string name,
         CancellationToken cancellationToken)
@@ -41,7 +44,7 @@ public sealed class IssueApiTokenHandler(IApiTokenStore store, IActiveSpaceNameR
         return HandleCoreAsync(context.AccountId, context.SpaceId, name, cancellationToken);
     }
 
-    private async Task<IssuedApiTokenInSpace> HandleCoreAsync(
+    private async Task<IssuedApiTokenInSpace?> HandleCoreAsync(
         Guid accountId,
         Guid spaceId,
         string name,
@@ -50,7 +53,7 @@ public sealed class IssueApiTokenHandler(IApiTokenStore store, IActiveSpaceNameR
         var issued = await store.IssueAsync(accountId, spaceId, name, cancellationToken).ConfigureAwait(false);
         var spaceName = await names.ReadAsync(cancellationToken).ConfigureAwait(false);
 
-        return new IssuedApiTokenInSpace(issued, new SpaceIdentity(spaceId, spaceName));
+        return spaceName is null ? null : new IssuedApiTokenInSpace(issued, new SpaceIdentity(spaceId, spaceName));
     }
 }
 

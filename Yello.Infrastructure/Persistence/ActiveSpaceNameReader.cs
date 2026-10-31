@@ -17,17 +17,19 @@ namespace Yello.Infrastructure.Persistence;
 internal sealed class ActiveSpaceNameReader(YelloDbContext dbContext, SpaceScope spaceScope) : IActiveSpaceNameReader
 {
     /// <inheritdoc />
-    public async Task<string> ReadAsync(CancellationToken cancellationToken)
+    public async Task<string?> ReadAsync(CancellationToken cancellationToken)
     {
         var resolved = spaceScope.Resolved
             ?? throw new InvalidOperationException(
                 "No active Space has been resolved on this request, so there is no Space whose name may be read.");
 
+        // SingleOrDefault, not Single (story 3.3, deferred-work.md:360): under read-committed snapshot the Space can be
+        // deleted between the resolution and this read, and that is the boundary's 404, not a 500.
         return await dbContext.Spaces
             .AsNoTracking()
             .Where(space => space.Id == resolved.SpaceId)
             .Select(space => space.Name)
-            .SingleAsync(cancellationToken)
+            .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
     }
 }

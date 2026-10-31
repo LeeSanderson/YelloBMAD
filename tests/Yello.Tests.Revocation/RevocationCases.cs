@@ -59,6 +59,16 @@ internal static class RevocationCases
                 [IsolationSurface.ApiToken] = new(context => context.World.Database.DeleteSpaceAsync(context.Actor.SpaceId), new NoCredential()),
             }),
 
+        // Story 3.3's row (AC11, deferred-work.md:382): the Owner deletes the Space through the product - the
+        // endpoint-driven twin of REV-SPACE-DELETED, which stays as the raw-SQL schema proof.
+        new(
+            "REV-SPACE-DELETED-BY-OWNER", "V-3, NFR-2 (3.3 AC11)",
+            new Dictionary<IsolationSurface, RevocationStep>
+            {
+                [IsolationSurface.Session] = new(OwnerDeletesTheSpaceAsync, new BoundaryNotFound()),
+                [IsolationSurface.ApiToken] = new(OwnerDeletesTheSpaceAsync, new NoCredential()),
+            }),
+
         new(
             "REV-ACCOUNT-DELETED", "V-3",
             new Dictionary<IsolationSurface, RevocationStep>
@@ -91,22 +101,6 @@ internal static class RevocationCases
                 [IsolationSurface.ApiToken] = new(_ => Task.CompletedTask, new SignOutIsNoCredential()),
             }),
     ];
-
-    /// <summary>
-    /// Story 3.3's row (AC11, <c>deferred-work.md:382</c>): the Owner deletes the Space through the product - the
-    /// endpoint-driven twin of <c>REV-SPACE-DELETED</c>, which stays as the raw-SQL schema proof. <b>Held apart from
-    /// <see cref="All"/> while red</b>, because this list has no pending mechanism and a row in <see cref="All"/> runs: the
-    /// skipped theory <c>RevocationCaseTests.The_Owners_deletion_of_the_Space_governs_the_very_next_request</c> runs it.
-    /// On activation, move it into <see cref="All"/> and delete that theory (story 3.3 Task 7). Written by the story 3.3
-    /// ATDD run.
-    /// </summary>
-    public static RevocationCase SpaceDeletedByOwner { get; } = new(
-        "REV-SPACE-DELETED-BY-OWNER", "V-3, NFR-2 (3.3 AC11)",
-        new Dictionary<IsolationSurface, RevocationStep>
-        {
-            [IsolationSurface.Session] = new(OwnerDeletesTheSpaceAsync, new BoundaryNotFound()),
-            [IsolationSurface.ApiToken] = new(OwnerDeletesTheSpaceAsync, new NoCredential()),
-        });
 
     /// <summary>
     /// The generated theory data: every case on every surface, named "case id / surface".

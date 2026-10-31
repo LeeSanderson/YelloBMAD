@@ -19,12 +19,25 @@
     THE ROUTE BACK IS HOME, never a remembered last Space - which may itself be the one refused.
     Home is the entry point, which lands on the first Space the switcher currently lists (UX-DR32).
     Rendered in place by a Space's home for both 404 causes, so the two are one page in a browser.
+
+    EXCEPT ON HOME ITSELF (story 3.3, AC15, open question 8 (a); deferred-work.md:679). The entry point
+    renders this when the switcher could not be asked or every listed Space refused, and a link to home
+    there would go to the page it is on. It passes OfferRouteBack="false", and the surface points to
+    the context bar's switcher instead. The heading is unchanged, so no 404 cause is told apart.
 *@
 
 <div class="auth-surface">
     <div class="auth-panel">
         <h1 class="type-dialog-title auth-panel__heading" tabindex="-1" @ref="_heading">@Heading</h1>
-        <p class="auth-panel__aside"><a href="@ClientRoutes.Home">@Localizer[RefusalCopy.RouteBackKey]</a></p>
+        @if (OfferRouteBack)
+        {
+            <p class="auth-panel__aside"><a href="@ClientRoutes.Home">@Localizer[RefusalCopy.RouteBackKey]</a></p>
+        }
+
+        @if (!OfferRouteBack)
+        {
+            <p class="auth-panel__aside">@Localizer["RefusalChooseFromSwitcher"]</p>
+        }
     </div>
 </div>
 
@@ -36,6 +49,13 @@
     /// </summary>
     [Parameter]
     public ProblemResponse? Problem { get; set; }
+
+    /// <summary>
+    /// Whether to offer the route back to the entry point - <c>false</c> on the entry point itself, which points to the switcher instead
+    /// (story 3.3, AC15).
+    /// </summary>
+    [Parameter]
+    public bool OfferRouteBack { get; set; } = true;
 
     private string Heading
     {

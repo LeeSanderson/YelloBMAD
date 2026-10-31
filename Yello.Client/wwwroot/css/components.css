@@ -1738,3 +1738,52 @@
     text-align: center;
     text-decoration: none;
 }
+
+/*
+    THE DELETE SECTION OF SPACE SETTINGS (story 3.3): "Delete this Space", and the confirm that replaces the panel's
+    content in place (AC7) - 2.5's destructive-confirm, its sentences, field and actions stacked as the Task detail
+    panel's are. No icon, no shadow, no transition (DESIGN.md:476, :519). Story 3.3 (AC14): the switcher's sentence when
+    it has nothing to list sits under the list, outside it, as the foot does.
+*/
+.space-delete-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    margin-block-start: var(--space-4);
+    min-inline-size: 0;
+}
+
+.space-delete-section__confirm {
+    flex-direction: column;
+    align-items: stretch;
+    align-self: stretch;
+    min-inline-size: 0;
+}
+
+.space-delete-section__question,
+.space-delete-section__fact {
+    margin-block: 0;
+    overflow-wrap: anywhere;
+}
+
+.space-delete-section__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.space-delete-section__refusal {
+    margin-block: 0;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.space-switcher__empty {
+    flex-basis: 100%;
+    margin: 0;
+    padding-block: var(--space-1);
+    padding-inline: var(--space-2);
+    color: var(--text-muted);
+}

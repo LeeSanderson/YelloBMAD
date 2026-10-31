@@ -15,11 +15,10 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds, skipped with <c>red: AC&lt;n&gt;</c>.</b> Nothing they name exists yet, so every
-/// product type is found by name or by metadata, never by a typed reference: <c>PermitsDeleteSpace</c> through
-/// <see cref="ClientRolePredicate"/>, the counts read by its assumed path (<c>/deletion</c> under the active Space -
-/// retarget to the <c>SpaceRoutes</c> constant on activation), and Q1's marker as any endpoint metadata whose type name
-/// contains <c>Destroys</c> (the story's example is <c>DestroysItsSpace()</c>; record the real name when it lands).
+/// <b>Written as red-phase scaffolds and activated by the story 3.3 dev phase.</b> Product types are found by name or by
+/// metadata: <c>PermitsDeleteSpace</c> through <see cref="ClientRolePredicate"/>, the counts read by
+/// <c>SpaceRoutes.DeletionSummary</c>, and Q1's marker as any endpoint metadata whose type name contains <c>Destroys</c>
+/// (it is <c>DestroysItsSpace</c>).
 /// </para>
 /// <para>
 /// <b>Gates left green and unchanged by this run</b>, which the dev phase keeps green: <c>The_clients_Space_settings_predicate_is_the_union_of_its_sections</c>
@@ -32,13 +31,13 @@ namespace Yello.Tests.Architecture;
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
 {
-    private static string DeletionSummaryPattern => Yello.Contracts.Spaces.SpaceRoutes.Active + "/deletion";
+    private static string DeletionSummaryPattern => Yello.Contracts.Spaces.SpaceRoutes.DeletionSummary;
 
     /// <summary>
     /// AC1, UX-DR27, Task 6 - the client's predicate for offering deletion agrees with the capability matrix for every
     /// Role: Owner only (<c>DeleteSpace</c> is <c>[Yes, No, No, No]</c>). An Admin has no affordance at all.
     /// </summary>
-    [Fact(Skip = "red: AC1 - SpaceCapabilities.PermitsDeleteSpace does not exist yet (story 3.3 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "FR-7")]
     public void The_clients_delete_Space_predicate_agrees_with_the_capability_matrix()
@@ -61,7 +60,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// AC9, FR-7, Q2 (a), Task 4 - <c>DELETE</c> on the active Space's route declares exactly <c>DeleteSpace</c>, and so
     /// does the counts read (<c>GET</c>), so the pipeline - not the endpoint - refuses an Admin, a Member and a Viewer.
     /// </summary>
-    [Fact(Skip = "red: AC9 - neither DELETE /api/v1/spaces/{spaceId} nor the counts read is mapped yet (story 3.3 Task 4; Q2 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "AR-11")]
     public void The_deletion_and_its_counts_read_declare_DeleteSpace()
@@ -83,7 +82,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// route would silently drop that route's replay protection. Plant: remove the marker, and this turns red; put it on
     /// the rename, and this turns red.
     /// </summary>
-    [Fact(Skip = "red: AC9 - Q1 (a)'s route marker does not exist yet (story 3.3 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "AR-25")]
     public void Only_the_deletion_route_carries_the_marker_that_it_destroys_its_own_Space()
@@ -103,7 +102,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <see cref="The_only_update_of_a_Space_is_the_rename_of_the_resolved_Space"/> is, but by method as well as caller.
     /// Plant: an <c>ExecuteDeleteAsync</c> on <c>Spaces</c> in another type turns this and the 3.1 gate red.
     /// </summary>
-    [Fact(Skip = "red: AC10 - SpaceStore has no deletion of Space yet (story 3.3 Task 3)")]
+    [Fact]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "NFR-1")]
     public void The_only_bulk_writes_of_a_Space_are_the_rename_and_the_deletion_in_SpaceStore()

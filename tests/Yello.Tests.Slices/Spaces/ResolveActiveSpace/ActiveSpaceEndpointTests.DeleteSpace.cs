@@ -25,16 +25,14 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 3.3 ATDD run (2026-10-31).</b> Every case is skipped with
-/// <c>red: AC&lt;n&gt;</c> until the dev phase maps the route; activate one at a time. Partials of the existing
-/// <see cref="ActiveSpaceEndpointTests"/>: no new container class, no new engine.
+/// <b>Written as red-phase scaffolds by the story 3.3 ATDD run (2026-10-31), activated by its dev phase.</b> Partials of
+/// the existing <see cref="ActiveSpaceEndpointTests"/>: no new container class, no new engine.
 /// </para>
 /// <para>
-/// <b>Assumed open questions</b>, each the story's recommendation: Q1 (a) - the deletion route validates and looks up an
-/// <c>Idempotency-Key</c> but records nothing, so a replay after a committed deletion is the boundary <c>404</c>; Q2 (a) -
-/// <c>GET /api/v1/spaces/{spaceId}/deletion</c> answers <c>{projects, tasks, otherMembers}</c> and declares
-/// <c>DeleteSpace</c> (its path is written here as <see cref="DeletionSummaryOf"/> until <c>SpaceRoutes</c> names it -
-/// retarget on activation); Q3 (a) - <c>DELETE</c> carries no body and the server does not check the typed name; Q9 - a
+/// <b>The open questions as decided</b>, each at the story's recommendation: Q1 (a) - the deletion route validates and
+/// looks up an <c>Idempotency-Key</c> but records nothing, so a replay after a committed deletion is the boundary
+/// <c>404</c>; Q2 (a) - <c>SpaceRoutes.DeletionSummary</c> answers <c>{projects, tasks, otherMembers}</c> and declares
+/// <c>DeleteSpace</c>; Q3 (a) - <c>DELETE</c> carries no body and the server does not check the typed name; Q9 - a
 /// Personal Space that is the Account's only Space is deletable.
 /// </para>
 /// <para>
@@ -70,7 +68,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// assumption. The key exercises Q1: a pipeline that records it after the deletion meets 547 and answers <c>500</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC4, AC10 - DELETE /api/v1/spaces/{spaceId} is not mapped yet, and the pipeline would record its key against a deleted Space (story 3.3 Tasks 3, 4; Q1)")]
+    [Fact]
     [Trait("Requirement", "FR-7")]
     [Trait("Requirement", "AD-6")]
     [Trait("Requirement", "AD-24")]
@@ -124,7 +122,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="role">The caller's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1, AC9 - DELETE /api/v1/spaces/{spaceId} is not mapped yet, so it answers 405 rather than 403 delete-space (story 3.3 Task 4)")]
+    [Theory]
     [InlineData(Role.Admin)]
     [InlineData(Role.Member)]
     [InlineData(Role.Viewer)]
@@ -173,7 +171,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// foreign Space keeps its name; the body names nothing.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - DELETE /api/v1/spaces/{spaceId} is not mapped yet, so it answers 405 rather than the boundary 404 (story 3.3 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AR-10")]
     public async Task A_non_members_deletion_is_the_boundary_404_and_the_foreign_Space_is_intact()
@@ -217,7 +215,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Owner's Session is the boundary <c>404</c> on the deleted Space and <c>200</c> on its other one.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4, AC11 - DELETE /api/v1/spaces/{spaceId} is not mapped yet (story 3.3 Task 4)")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AD-6")]
     [Trait("Requirement", "NFR-2")]
@@ -273,7 +271,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// a third Space, and its Account. Anchored on the switcher listing all three before.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - DELETE /api/v1/spaces/{spaceId} is not mapped yet (story 3.3 Task 4)")]
+    [Fact]
     [Trait("Requirement", "FR-7")]
     [Trait("Requirement", "FR-9")]
     public async Task Another_Account_loses_only_the_deleted_Space()
@@ -322,7 +320,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Personal Space before.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - DELETE /api/v1/spaces/{spaceId} is not mapped yet (story 3.3 Task 4; Q9)")]
+    [Fact]
     [Trait("Requirement", "FR-7")]
     [Trait("Requirement", "UX-DR35")]
     [Trait("Assumption", "PRD-12-2")]
@@ -362,7 +360,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// then create one: the deletion frees a slot with no counter to maintain.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - DELETE /api/v1/spaces/{spaceId} is not mapped yet (story 3.3 Task 4)")]
+    [Fact]
     [Trait("Priority", "P2")]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
@@ -399,7 +397,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// byte for byte the answer for a Space that does not exist. No idempotency row survives for the Space.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - DELETE /api/v1/spaces/{spaceId} is not mapped yet, and Q1's route marker does not exist (story 3.3 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "NFR-5")]
@@ -434,7 +432,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// being admitted afterwards.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - DELETE /api/v1/spaces/{spaceId} is not mapped yet (story 3.3 Task 4)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "AD-18")]
     public async Task A_malformed_key_on_the_deletion_is_refused_400_and_deletes_nothing()
@@ -466,7 +464,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Label name is in the body.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2, AC9 - the counts read (Q2 (a), GET /api/v1/spaces/{spaceId}/deletion) is not mapped yet (story 3.3 Tasks 4, 5)")]
+    [Fact]
     [Trait("Requirement", "FR-7")]
     [Trait("Requirement", "UX-DR37")]
     public async Task The_counts_read_states_Projects_Tasks_and_other_Members_and_names_nothing()
@@ -506,7 +504,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// an absent Space's. Anchored on the Owner's own <c>200</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the counts read (Q2 (a)) is not mapped yet (story 3.3 Task 4)")]
+    [Fact]
     [Trait("Requirement", "AR-11")]
     [Trait("Requirement", "AD-3")]
     public async Task The_counts_read_is_the_Owners_alone()
@@ -547,7 +545,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// or a stranger's. Anchored on the log having been captured and on each answer being the one expected.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - DELETE /api/v1/spaces/{spaceId} and the counts read are not mapped yet (story 3.3 Task 4; SpaceLog.SpaceDeleted)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "NFR-6")]
     public async Task No_Space_name_reaches_the_log_on_deletion_or_its_refusals()
@@ -580,10 +578,9 @@ public sealed partial class ActiveSpaceEndpointTests
         session.SendWithHeadersAsync(HttpMethod.Delete, SpaceRoutes.ActiveOf(spaceId), content: null, KeyHeaders(key));
 
     /// <summary>
-    /// Q2 (a)'s counts read for one Space. <b>Assumed path</b> - retarget to the <c>SpaceRoutes</c> constant the dev phase
-    /// adds (story 3.3 Task 5), and record the retarget if the path differs.
+    /// Q2 (a)'s counts read for one Space, as the contract names it.
     /// </summary>
-    private static string DeletionSummaryOf(Guid spaceId) => SpaceRoutes.ActiveOf(spaceId) + "/deletion";
+    private static string DeletionSummaryOf(Guid spaceId) => SpaceRoutes.DeletionSummaryOf(spaceId);
 
     /// <summary>
     /// A Space the Owner creates through the product, populated as AC10 asks: two Projects (the second created with an

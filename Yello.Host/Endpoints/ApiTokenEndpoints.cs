@@ -95,6 +95,13 @@ public static class ApiTokenEndpoints
 
         var issued = await handler.HandleAsync(context, name, cancellationToken).ConfigureAwait(false);
 
+        if (issued is null)
+        {
+            // The Space was deleted after the pipeline resolved it (story 3.3): the boundary's 404, and the unit of work
+            // rolls the Token back.
+            return BoundaryProblems.NotAvailable();
+        }
+
         // The only copy: nothing between here and the caller may keep it.
         httpContext.Response.Headers.CacheControl = "no-store";
 

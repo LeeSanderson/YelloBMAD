@@ -35,6 +35,9 @@ internal static class AccountScopedReads
         services.AddScoped<ISpaceCreationScope, SpaceCreationScope>();
         services.AddScoped<ISpaceStore, SpaceStore>();
 
+        // Story 3.3: the counts the delete confirm states (open question 2 (a)).
+        services.AddScoped<ISpaceContentsReader, SpaceContentsReader>();
+
         return services;
     }
 }

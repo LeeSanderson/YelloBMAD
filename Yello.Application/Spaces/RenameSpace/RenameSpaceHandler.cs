@@ -17,8 +17,11 @@ public sealed class RenameSpaceHandler(ISpaceStore spaces)
     /// <param name="context">The context the pipeline resolved.</param>
     /// <param name="name">The new name, already normalised.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
-    /// <returns>The Space's identity under its new name.</returns>
-    public Task<SpaceIdentity> HandleAsync(ActiveSpaceContext context, string name, CancellationToken cancellationToken)
+    /// <returns>
+    /// The Space's identity under its new name, or <c>null</c> when no row was renamed because the Space was deleted
+    /// after it was resolved (story 3.3, <c>deferred-work.md:666</c>) - answered as the boundary's <c>404</c>.
+    /// </returns>
+    public Task<SpaceIdentity?> HandleAsync(ActiveSpaceContext context, string name, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(context);
 
@@ -26,10 +29,10 @@ public sealed class RenameSpaceHandler(ISpaceStore spaces)
         return RenameAsync(context, name, cancellationToken);
     }
 
-    private async Task<SpaceIdentity> RenameAsync(ActiveSpaceContext context, string name, CancellationToken cancellationToken)
+    private async Task<SpaceIdentity?> RenameAsync(ActiveSpaceContext context, string name, CancellationToken cancellationToken)
     {
-        await spaces.RenameAsync(context, name, cancellationToken).ConfigureAwait(false);
+        var renamed = await spaces.RenameAsync(context, name, cancellationToken).ConfigureAwait(false);
 
-        return new SpaceIdentity(context.SpaceId, name);
+        return renamed ? new SpaceIdentity(context.SpaceId, name) : null;
     }
 }

@@ -7,6 +7,9 @@
 @inject SessionState Session
 @inject SpaceDirectory Directory
 @inject NavigationManager Navigation
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceNarration Narration
+@inject DepartureNarration Departure
 
 @*
     THE ENTRY POINT. AC9, AC11; UX-DR32, UX-DR35; open question 6.
@@ -20,8 +23,18 @@
     BELONGING TO NO SPACE IS A VALID STATE (UX-DR35, FR-7). An Account holding no Membership is told
     so here, and nothing is ever created for it. Story 3.1 (AC15) gives the state its one action - a
     link to the create page - so the person is offered the chance to create a Space and decides.
-    Registration always provisions a Space, so this state is reached by leaving or losing every one
-    (stories 3.3, 4.5); the entry point has to answer an empty list honestly either way.
+    Registration always provisions a Space, so this state is reached by deleting, leaving or losing
+    every one (story 3.3 deletes; 4.5 leaves); the entry point answers an empty list honestly either way.
+
+    AFTER A DELETION (story 3.3, AC12, open question 6 (a)). The deleting page routes here with
+    replace, and the sentence it held ("Space deleted.", no name) is taken: handed to the destination
+    Space's home once the tab is already in that Space, so the Space purge on arriving does not drop
+    it, or said here when the Account now belongs to no Space. Focus goes to the destination's heading:
+    the tab passed through here, outside any Space, so the arrival is a first arrival, not a switch.
+
+    THE REFUSAL PAGE HERE OFFERS NO LINK TO ITSELF (story 3.3, AC15, open question 8 (a);
+    deferred-work.md:679). It points to the context bar's switcher instead; the heading stays the
+    uniform one.
 *@
 
 @if (_noSpace)
@@ -30,6 +43,7 @@
         <div class="auth-panel">
             <h1 class="type-dialog-title auth-panel__heading" tabindex="-1" @ref="_noSpaceHeading">@Localizer["NoSpaceHeading"]</h1>
             <p class="auth-panel__intro">@Localizer["NoSpaceBody"]</p>
+            <LiveAnnouncement Text="@_departure" Sequence="@_departures" />
             <a class="button-primary auth-panel__action" href="@ClientRoutes.CreateSpace">@Localizer["CreateSpaceAction"]</a>
         </div>
     </div>
@@ -39,13 +53,16 @@
    load (story 3.2, AC12). Otherwise on its way to sign-in or to a Space, with nothing to render meanwhile. *@
 @if (_unavailable)
 {
-    <RefusalSurface />
+    <RefusalSurface OfferRouteBack="false" />
+    <LiveAnnouncement Text="@_departure" Sequence="@_departures" />
 }
 
 @code {
     private bool _noSpace;
     private bool _unavailable;
     private bool _focusNoSpace;
+    private string? _departure;
+    private int _departures;
     private ElementReference _noSpaceHeading;
 
     /// <inheritdoc />
@@ -59,6 +76,9 @@
             Navigation.NavigateTo(ClientRoutes.SignIn, replace: true);
             return;
         }
+
+        // Taken before the answer is asked for, so a sentence held for this arrival is said by it or by no one.
+        var departure = Departure.Take();
 
         var spaces = await Directory.RefreshAsync(CancellationToken.None);
 
@@ -74,6 +94,7 @@
             // The switcher could not be asked. A 401 has already ended the Session and is on its way
             // to sign-in; anything else is reported as the one refusal page rather than guessed at.
             _unavailable = Session.IsSignedIn;
+            SayHere(departure);
             return;
         }
 
@@ -83,6 +104,7 @@
             // focused here instead.
             _noSpace = true;
             _focusNoSpace = true;
+            SayHere(departure);
             return;
         }
 
@@ -96,10 +118,31 @@
             // Every listed Space has refused in this load: the refusal page stands, with the bar's shell, whose
             // switcher still lists every one of them.
             _unavailable = true;
+            SayHere(departure);
             return;
         }
 
+        if (departure is not null)
+        {
+            // The tab enters the destination first, so the Space purge that arriving runs has already run, and the
+            // sentence is held for that Space's home alone (story 3.3, open question 6 (a)).
+            ActiveSpace.Navigating(destination.Id);
+            Narration.Say(departure);
+        }
+
         Navigation.NavigateTo(ClientRoutes.SpaceHome(destination.Id), replace: true);
+    }
+
+    /// <summary>
+    /// Says a sentence held for this arrival on this page, which is where the tab stays.
+    /// </summary>
+    private void SayHere(string? departure)
+    {
+        if (departure is not null)
+        {
+            _departure = departure;
+            _departures++;
+        }
     }
 
     /// <inheritdoc />

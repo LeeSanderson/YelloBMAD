@@ -19,7 +19,8 @@ namespace Yello.Tests.Revocation;
 /// <para>
 /// <b>Raw SQL only where no endpoint exists yet</b> - Membership removal, Space and Account deletion, a
 /// Role change - through <see cref="WireDatabase"/>, under the session keys the schema requires. Their
-/// endpoints arrive in 3.3, 4.5 and 5.4, and each owner adds the endpoint-driven row to this list.
+/// endpoints arrive in 3.3 (Space deletion, whose <c>REV-SPACE-DELETED-BY-OWNER</c> is added), 4.5 and 5.4, and each
+/// owner adds the endpoint-driven row to this list.
 /// </para>
 /// </remarks>
 internal sealed class RevocationWorld : IAsyncDisposable

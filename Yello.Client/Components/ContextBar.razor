@@ -92,11 +92,13 @@
         <button type="button" class="context-bar__sign-out" @onclick="SignOutAsync">@Localizer["SignOutLabel"]</button>
     </div>
 
-    @if (_open && _spaces is { } spaces)
+    @if (_open)
     {
         <SpaceSwitcher @ref="_switcher"
                        ListId="@ListId"
-                       Spaces="@spaces"
+                       Spaces="@(_spaces ?? [])"
+                       Listed="@(_spaces is not null)"
+                       Failed="@_listFailed"
                        ActiveSpaceId="@ActiveSpace.SpaceId"
                        OnDismissed="Dismiss" />
     }
@@ -118,6 +120,10 @@
     private int _arrivalsSeen;
     private string _announcement = string.Empty;
     private IReadOnlyList<SpaceIdentityResponse>? _spaces;
+
+    // Story 3.3, AC14 (open question 7 (a)): the switcher could not be asked and nothing was held, so the panel says the
+    // list could not be had - never that the Account belongs to no Space, which would be a false statement about it.
+    private bool _listFailed;
 
     private string AccessibleName => ActiveSpace.Current is { } current
         ? RoleCopy.Compose(Copy, RoleCopy.AccessibleNameKey, current.Name, current.Role)
@@ -203,8 +209,10 @@
         }
 
         // Open at once on what is held, then asked again: a Membership may have changed since the
-        // last look, and the list redraws with the fresh answer when it arrives.
-        _spaces = Directory.Current ?? [];
+        // last look, and the list redraws with the fresh answer when it arrives. Nothing held is not
+        // an empty list (story 3.3, AC14): until an answer is had, the panel says nothing about it.
+        _spaces = Directory.Current;
+        _listFailed = false;
         _open = true;
 
         StateHasChanged();
@@ -212,6 +220,11 @@
         if (await Directory.RefreshAsync(CancellationToken.None) is { } fresh)
         {
             _spaces = fresh;
+        }
+        else
+        {
+            // A failed refresh keeps a held list as it was; with nothing held, the panel says so.
+            _listFailed = _spaces is null;
         }
     }
 

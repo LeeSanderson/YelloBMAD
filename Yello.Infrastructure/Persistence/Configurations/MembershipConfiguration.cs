@@ -92,7 +92,7 @@ internal sealed class MembershipConfiguration(YelloDbContext context) : IEntityT
 
         // Deleting a Space takes its Memberships with it: a Membership in no Space cannot exist
         // (see the non-nullable column above), so cascade is the only behaviour that leaves the
-        // table consistent. Story 3.3 owns Space deletion.
+        // table consistent. Story 3.3's SpaceStore.DeleteAsync deletes the Space row and relies on it.
         builder.HasOne<Space>()
             .WithMany()
             .HasForeignKey(membership => membership.SpaceId)
