@@ -109,8 +109,8 @@ development_status:
   epic-3-retrospective: optional
 
   # Epic 4: Bring people into one piece of your work
-  epic-4: backlog
-  4-1-invite-an-email-address-to-a-space-at-a-role: backlog
+  epic-4: in-progress
+  4-1-invite-an-email-address-to-a-space-at-a-role: ready-for-dev
   4-2-see-and-revoke-pending-invitations: backlog
   4-3-accept-an-invitation: backlog
   4-4-manage-memberships-and-roles: backlog
