@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Reflection;
 using System.Resources;
 using Mono.Cecil;
 using Xunit;
@@ -255,6 +256,42 @@ public sealed class ActiveSpaceStateTests
         Assert.Contains("Program", CallersOf("Microsoft.AspNetCore.Components.NavigationManager", "RegisterLocationChangingHandler"));
         Assert.Contains("Program", CallersOf(typeof(ActiveSpaceState).FullName!, nameof(ActiveSpaceState.Navigating)));
         Assert.Contains("Program", CallersOf(typeof(SessionState).FullName!, nameof(SessionState.AnnounceSignOutWith)));
+    }
+
+    /// <summary>
+    /// Story 3.2 AC11 (UX-DR31, UX-DR38) - a sentence held in <see cref="SpaceNarration"/> is a pending announcement
+    /// bound to the Space it was said in: it survives a navigation within that Space and is gone after a change of Space.
+    /// </summary>
+    /// <remarks>
+    /// <b>Written by the story 3.2 ATDD run.</b> Wired here the way Task 2 recommends <c>Program</c> wires it
+    /// (<c>RegisterPurge(narration.Forget)</c>); <c>Forget</c> is found by reflection so the scaffold compiles before it
+    /// exists. Retarget to a direct call on activation. The wiring itself is held by
+    /// <c>SpaceSwitcherGateTests.The_composition_root_registers_the_pending_narration_with_the_Space_purge</c>.
+    /// </remarks>
+    [Fact(Skip = "red: AC11 - SpaceNarration has no Forget() for the Space purge to run (story 3.2 Task 2)")]
+    [Trait("Requirement", "UX-DR38")]
+    public void A_pending_narration_is_forgotten_on_a_Space_change_and_kept_within_one_Space()
+    {
+        var forget = typeof(SpaceNarration).GetMethod("Forget", BindingFlags.Public | BindingFlags.Instance, Type.EmptyTypes);
+
+        Assert.NotNull(forget);
+
+        using var state = InSpace(Northwind);
+
+        var narration = new SpaceNarration();
+
+        using var registration = state.RegisterPurge(() => forget.Invoke(narration, parameters: null));
+
+        // Anchor: a navigation within one Space purges nothing, so the sentence is still there to take.
+        narration.Say("You're now a Member. Space settings is no longer available.");
+        state.Navigating(Northwind);
+
+        Assert.Equal("You're now a Member. Space settings is no longer available.", narration.Take());
+
+        narration.Say("You're now a Member. Space settings is no longer available.");
+        state.Navigating(Harbour);
+
+        Assert.Null(narration.Take());
     }
 
     private static TypeDefinition Outermost(TypeDefinition type) =>

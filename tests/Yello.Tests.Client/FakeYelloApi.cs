@@ -96,6 +96,20 @@ internal sealed class FakeYelloApi
 
 
     /// <summary>
+    /// The bound a listed Space's arrival is refused for when the concurrent-Sessions bound is reached (story 1.6,
+    /// <c>Bound.ConcurrentActiveSessionsPerSpace</c> in its stable code). Story 3.2 ATDD run.
+    /// </summary>
+    public const string ConcurrentSessionsBound = "concurrent-active-sessions-per-space";
+
+    /// <summary>
+    /// A listed Space whose arrival (<c>GET /api/v1/spaces/{id}</c>) is refused with the status given - <c>409</c> as the
+    /// concurrent-Sessions bound, <c>403</c> as <c>insufficient-role</c>, anything else as <c>404 not-available</c> - while
+    /// the switcher still lists it (story 3.2 AC12, <c>deferred-work.md:358</c>). Empty unless a case fills it, so every
+    /// case written before 3.2 is served the bytes it always was. Story 3.2 ATDD run.
+    /// </summary>
+    public IDictionary<Guid, int> ArrivalRefusals { get; } = new Dictionary<Guid, int>();
+
+    /// <summary>
     /// When set, a Space creation is refused <c>409 bound-reached</c> with <c>bound: spaces-per-account</c> and
     /// <c>limit: 50</c>, as the Host answers the 51st (story 3.1 AC6). Story 3.1 ATDD run.
     /// </summary>
@@ -797,25 +811,44 @@ internal sealed class FakeYelloApi
                 return RenameProject(renameSpace, renamed, request.Body);
 
             case ("GET", var path) when TryActiveSpace(path, out var spaceId):
-                if (_held.TryGetValue(spaceId, out var held))
-                {
-                    if (_arrived.TryRemove(spaceId, out var arrived))
-                    {
-                        arrived.TrySetResult();
-                    }
-
-                    await held.Task.ConfigureAwait(false);
-                }
-
-                var listed = Switcher.FirstOrDefault(space => space.Id == spaceId);
-
-                return Roles.TryGetValue(spaceId, out var role) && listed.Id == spaceId
-                    ? (200, JsonSerializer.Serialize(new ActiveSpaceResponse(spaceId, listed.Name, role), JsonOptions))
-                    : (404, Problem(ProblemTypes.NotAvailable));
+                return await ActiveSpaceAsync(spaceId).ConfigureAwait(false);
 
             default:
                 return (404, Problem(ProblemTypes.NotAvailable));
         }
+    }
+
+    /// <summary>
+    /// The active Space's own answer (<c>GET /api/v1/spaces/{id}</c>): held when a case holds it, refused when a case
+    /// refuses it (story 3.2), otherwise the listed Space with the Role the fake holds, or <c>404</c>.
+    /// </summary>
+    private async Task<(int Status, string Body)> ActiveSpaceAsync(Guid spaceId)
+    {
+        if (_held.TryGetValue(spaceId, out var held))
+        {
+            if (_arrived.TryRemove(spaceId, out var arrived))
+            {
+                arrived.TrySetResult();
+            }
+
+            await held.Task.ConfigureAwait(false);
+        }
+
+        if (ArrivalRefusals.TryGetValue(spaceId, out var refusal))
+        {
+            return refusal switch
+            {
+                409 => (409, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.BoundReached, Errors: null, Bound: ConcurrentSessionsBound, Limit: 50), JsonOptions)),
+                403 => (403, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.InsufficientRole, Errors: null), JsonOptions)),
+                _ => (404, Problem(ProblemTypes.NotAvailable)),
+            };
+        }
+
+        var listed = Switcher.FirstOrDefault(space => space.Id == spaceId);
+
+        return Roles.TryGetValue(spaceId, out var role) && listed.Id == spaceId
+            ? (200, JsonSerializer.Serialize(new ActiveSpaceResponse(spaceId, listed.Name, role), JsonOptions))
+            : (404, Problem(ProblemTypes.NotAvailable));
     }
 
     private (int Status, string Body) Issue(Guid spaceId, string? body)

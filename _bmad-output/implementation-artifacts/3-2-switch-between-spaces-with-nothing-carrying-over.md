@@ -434,6 +434,39 @@ Recent commits: `f3139a1` (3.1 review fixes), `1908f44` (3.1 implementation), `3
 - `_bmad-output/implementation-artifacts/deferred-work.md:358`, `:364`, `:542`, `:589`, `:669`; story files `1-7-…md`, `3-1-…md`
 - `tests/TESTING-CONVENTIONS.md`
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+**Checklist:** `_bmad-output/test-artifacts/atdd-checklist-3-2-switch-between-spaces-with-nothing-carrying-over.md`. It records the scenario map, the assumed Q1-Q6 answers, the plant record and the "AC1 - Token select" finding.
+
+**Scaffold files:**
+
+- **`tests/Yello.Tests.Client/SpaceSwitchCarryOverTests.cs`** (new, `ClientSurfaceCollection`, no engine). 20 entries, 23 cases, covering AC1-AC10 and AC12-AC17.
+  - 21 cases are **green today** and stay active as standing gates.
+  - 2 are skipped, `red: AC12`:
+    - `The_route_back_skips_a_listed_Space_that_refused_with_409`
+    - `When_every_listed_Space_refuses_the_route_back_stops_on_the_refusal_page`
+- **`tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.CarryOver.cs`** (new partial). 4 cases.
+  - **Green today:** `Only_the_switcher_renders_the_Accounts_Spaces_as_a_list` (AC1, proved by a plant in `Home.razor`) and `The_Space_list_scan_detects_a_planted_list`.
+  - **Skipped:** `The_composition_root_registers_the_pending_narration_with_the_Space_purge` (`red: AC11`) and `The_route_back_exclusion_lives_in_the_directory_and_is_not_a_remembered_Space` (`red: AC12`).
+- **`tests/Yello.Tests.Architecture/ActiveSpaceStateTests.cs`** gains 1 case, skipped `red: AC11`: `A_pending_narration_is_forgotten_on_a_Space_change_and_kept_within_one_Space`.
+- **`tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.CacheControl.cs`** (new partial of an existing class, no new engine). 1 case, skipped `red: AC18`: `Every_api_answer_is_no_store_on_the_switcher_a_Space_and_the_boundary`.
+- **`tests/Yello.Tests.Client/FakeYelloApi.cs`** is harness, not a scaffold. It adds `ArrivalRefusals` (a listed Space refusing with `409`, `403` or `404` on arrival) and moves the active-Space answer into `ActiveSpaceAsync`. Every earlier case is served the same bytes.
+
+**Activation order:**
+
+1. **`The_route_back_skips_a_listed_Space_that_refused_with_409` comes first. It tests the riskiest assumption:** Q1 (a) can end the route-back loop with a set that only excludes and never chooses. Then activate `The_route_back_exclusion_lives_in_the_directory_and_is_not_a_remembered_Space`, with the `RemembersASpace` regex unchanged, and then `When_every_listed_Space_refuses_the_route_back_stops_on_the_refusal_page`.
+2. **AC11:** first `A_pending_narration_is_forgotten_on_a_Space_change_and_kept_within_one_Space`, then `The_composition_root_registers_the_pending_narration_with_the_Space_purge`.
+3. **AC18:** `Every_api_answer_is_no_store_on_the_switcher_a_Space_and_the_boundary`, with Q2 (a).
+4. **The standing gates:** keep all 23 green throughout. Run the story's plant table against them, including Q3's combined plant (remove `@key` and skip `LabelSection.Purge`) against `Back_from_one_Spaces_settings_to_anothers_leaves_no_Label_of_the_departed_Space_while_held`. Rebuild `Yello.Client` in Debug before each browser plant.
+
+**What this run measured:**
+
+- Scroll is at offset 0 after a switch and after Back today, so Q4 defaults to (b).
+- A plant that skips `Purge()` in `Navigating` leaves only the departed Space's name in the bar. The keyed children hold the data. This is the Q3 record for `:542`.
+- The AC11 browser case is not scaffolded. The gap between `Say` and `Take` is one `InvokeAsync` turn, which a browser cannot interleave deterministically.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used
