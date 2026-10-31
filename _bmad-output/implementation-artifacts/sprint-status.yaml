@@ -104,7 +104,7 @@ development_status:
   epic-3: in-progress
   3-1-create-and-rename-a-space: done
   3-2-switch-between-spaces-with-nothing-carrying-over: done
-  3-3-delete-a-space-and-belong-to-none: backlog
+  3-3-delete-a-space-and-belong-to-none: ready-for-dev
   3-4-prove-that-owning-one-space-grants-nothing-in-another: backlog
   epic-3-retrospective: optional
 
