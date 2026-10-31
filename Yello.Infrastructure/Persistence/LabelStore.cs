@@ -24,7 +24,7 @@ namespace Yello.Infrastructure.Persistence;
 /// <b>Deletion is serialised against application (AC3, AC10).</b> It reads the Label with a plain statement first, so
 /// an id that is missing or another Space's is not found before any lock is taken (story 3.4, AC10: a locking point read
 /// on a missing key locks the next key, which can be another Space's). It then locks the Label row under
-/// <c>UPDLOCK, HOLDLOCK</c>, takes the Label's applications lock (<see cref="ApplicationLocks.LabelApplications"/>, named
+/// <c>UPDLOCK</c> (no <c>HOLDLOCK</c>, so a key deleted meanwhile is not range-locked), takes the Label's applications lock (<see cref="ApplicationLocks.LabelApplications"/>, named
 /// for the request's Space), probes the Label's applications under <c>READCOMMITTEDLOCK</c> (which waits on an
 /// uncommitted change to them but locks no range), and deletes only when there are none. An
 /// application takes the same Label lock and then the same applications lock (<see cref="TaskStore"/>), so both writers
@@ -104,9 +104,11 @@ internal sealed class LabelStore(YelloDbContext dbContext, IIdentifierGenerator 
             return LabelDeletion.NotFound;
         }
 
-        // The Label's own row, on the key an application locks too. Gone by now is not found.
+        // The Label's own row, on the key an application locks too. Gone by now is not found. UPDLOCK without HOLDLOCK
+        // (story 3.4 review): a found row's U lock is held to commit either way, and a row deleted between the plain read
+        // and this one leaves a missing key, which HOLDLOCK would range-lock up to the next key - another Space's.
         var locked = await dbContext.Labels
-            .FromSql($"SELECT * FROM dbo.[Label] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {labelId}")
+            .FromSql($"SELECT * FROM dbo.[Label] WITH (UPDLOCK, INDEX(1)) WHERE Id = {labelId}")
             .AsNoTracking()
             .AnyAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -122,8 +124,14 @@ internal sealed class LabelStore(YelloDbContext dbContext, IIdentifierGenerator 
         // READCOMMITTEDLOCK, not a snapshot and not HOLDLOCK: it waits on this Space's uncommitted removal of an application
         // (a Task deletion's cascade, story 2.5 RACE-T4) and follows its outcome, but takes no range lock, so it reaches no
         // key past this Space's own (story 3.4, AC10). The query filter and the security policy both narrow it to the Space.
+        // A locking read takes a shared lock on every row it reads, so the plan is pinned (story 3.4 review): a seek on
+        // (SpaceId, LabelId) over the in-use probe's index reads this Space's rows only. Left to the optimiser, a scan
+        // would read - and wait on - another Space's uncommitted application before the filters dropped it.
+        var spaceId = dbContext.ScopedSpaceId
+            ?? throw new InvalidOperationException("A Label is deleted only inside a Space-scoped unit of work.");
+
         var applied = await dbContext.Set<TaskLabel>()
-            .FromSql($"SELECT * FROM dbo.[TaskLabel] WITH (READCOMMITTEDLOCK) WHERE LabelId = {labelId}")
+            .FromSql($"SELECT * FROM dbo.[TaskLabel] WITH (READCOMMITTEDLOCK, FORCESEEK (IX_TaskLabel_SpaceId_LabelId_TaskId (SpaceId, LabelId))) WHERE SpaceId = {spaceId} AND LabelId = {labelId}")
             .AsNoTracking()
             .AnyAsync(cancellationToken)
             .ConfigureAwait(false);

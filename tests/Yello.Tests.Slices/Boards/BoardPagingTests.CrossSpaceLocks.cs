@@ -280,9 +280,13 @@ public sealed partial class BoardPagingTests
         await using DbCommand take = connection.CreateCommand();
 
         take.Transaction = transaction;
-        take.CommandText = "EXEC sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction'";
-        take.Parameters.Add(new SqlParameter("@resource", $"Yello/LabelApplications/{spaceId:D}/{labelId:D}"));
+        // sp_getapplock reports a refusal through its return code, not an exception (story 3.4 review), so the code is read
+        // and a hold that was not granted fails here rather than leaving the anchor to pass on the row lock alone.
+        take.CommandText = "DECLARE @granted int; EXEC @granted = sp_getapplock @Resource = @resource, @LockMode = 'Exclusive', @LockOwner = 'Transaction'; SELECT @granted;";
+        take.Parameters.Add(new SqlParameter("@resource", Yello.Infrastructure.Persistence.ApplicationLocks.LabelApplications(spaceId, labelId)));
 
-        await take.ExecuteNonQueryAsync(cancellationToken);
+        var granted = Convert.ToInt32(await take.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture);
+
+        Assert.True(granted >= 0, $"sp_getapplock answered {granted}: the test's hold of the Label's applications lock was not granted.");
     }
 }

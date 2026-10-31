@@ -89,6 +89,7 @@ public sealed class ClientStaticStateGateTests
         Assert.Single(WritableStatics([typeof(PlantedWritableField)]));
         Assert.Single(WritableStatics([typeof(PlantedStaticSetter)]));
         Assert.Single(MutableCollectionStatics([typeof(PlantedMutableCollection)]));
+        Assert.Single(MutableCollectionStatics([typeof(PlantedMutableAutoProperty)]));
         Assert.Empty(WritableStatics([typeof(PlantedImmutable)]));
         Assert.Empty(MutableCollectionStatics([typeof(PlantedImmutable)]));
         var planted = new Microsoft.Extensions.DependencyInjection.ServiceCollection();
@@ -133,8 +134,17 @@ public sealed class ClientStaticStateGateTests
     private static List<string> MutableCollectionStatics(IEnumerable<Type> types) =>
         [.. types.SelectMany(type =>
             type.GetFields(DeclaredStatics)
-                .Where(field => field.IsInitOnly && !field.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false) && IsMutableCollection(field.FieldType))
+                .Where(field => field.IsInitOnly
+                    && (IsAutoPropertyBackingField(field) || !field.IsDefined(typeof(CompilerGeneratedAttribute), inherit: false))
+                    && IsMutableCollection(field.FieldType))
                 .Select(field => $"{type.FullName}.{field.Name}: static readonly {field.FieldType.Name}, a mutable collection"))];
+
+    /// <summary>
+    /// A getter-only static auto-property (<c>static List&lt;string&gt; Seen { get; } = [];</c>) is a person's state behind a
+    /// compiler-generated readonly field, so it is judged as the field it is (story 3.4 review).
+    /// </summary>
+    private static bool IsAutoPropertyBackingField(FieldInfo field) =>
+        field.Name.EndsWith(">k__BackingField", StringComparison.Ordinal);
 
     private static bool IsMutableCollection(Type type)
     {
@@ -204,6 +214,11 @@ public sealed class ClientStaticStateGateTests
     internal static class PlantedMutableCollection
     {
         internal static readonly List<string> Seen = [];
+    }
+
+    internal static class PlantedMutableAutoProperty
+    {
+        internal static List<string> Seen { get; } = [];
     }
 
     internal static class PlantedImmutable

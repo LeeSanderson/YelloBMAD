@@ -167,9 +167,9 @@ internal sealed partial class FakeYelloApi
     public bool SignedIn { get; set; }
 
     /// <summary>
-    /// Story 3.4 (AC13): the Session has ended on the server. Every request but the Session's own routes answers
-    /// <c>401</c>, as the Host answers one whose cookie it no longer honours, and the current Session reads as not
-    /// signed in.
+    /// Story 3.4 (AC13): the Session has ended on the server. Every request but a preflight, the anti-forgery token read
+    /// and sign-in answers <c>401</c>, as the Host answers one whose cookie it no longer honours - sign-out and the current
+    /// Session read included - so the current Session reads as not signed in.
     /// </summary>
     public bool SessionEnded { get; set; }
 

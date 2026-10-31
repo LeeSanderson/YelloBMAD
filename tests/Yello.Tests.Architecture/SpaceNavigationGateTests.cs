@@ -30,19 +30,19 @@ public sealed partial class SpaceNavigationGateTests
     /// <summary>
     /// The one file that may call <c>NavigateTo</c> for a navigation leaving the current Space (Q9 (a)).
     /// </summary>
-    private const string HelperFile = "SpaceNavigation.cs";
+    private const string HelperFile = "Yello.Client/Spaces/SpaceNavigation.cs";
 
     /// <summary>
-    /// Call sites that do not leave a Space through this gate's door, each with its reason. Session end and sign-out
-    /// purge through the Session purge (<c>Program.cs</c>), which runs before they navigate; Space settings returns to its
-    /// own Space's home.
+    /// Call sites that do not leave a Space through this gate's door, each pinned by its file's path and its number of
+    /// calls (story 3.4 review: a file name alone let any later call in the same file, or any file of the same name, pass),
+    /// with its reason. Session end and sign-out purge through the Session purge (<c>Program.cs</c>), which runs before
+    /// they navigate.
     /// </summary>
-    private static readonly Dictionary<string, string> Allowed = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, (int Calls, string Reason)> Allowed = new(StringComparer.Ordinal)
     {
-        ["Program.cs"] = "Session end and sign-out: the Session purge empties every Space-scoped holder before the navigation",
-        ["SpaceSettings.razor"] = "returns to the same Space's home; no Space is left",
-        ["AccountSettings.razor"] = "leaves Account settings, which is in no Space, for sign-in when no Session is held",
-        ["SignIn.razor"] = "leaves sign-in, which is in no Space, for the entry point once signed in",
+        ["Yello.Client/Program.cs"] = (2, "Session end and sign-out: the Session purge empties every Space-scoped holder before the navigation"),
+        ["Yello.Client/Pages/AccountSettings.razor"] = (1, "leaves Account settings, which is in no Space, for sign-in when no Session is held"),
+        ["Yello.Client/Pages/SignIn.razor"] = (1, "leaves sign-in, which is in no Space, for the entry point once signed in"),
     };
 
     /// <summary>
@@ -58,20 +58,25 @@ public sealed partial class SpaceNavigationGateTests
         var calls = NavigateToCalls();
 
         // Vacuity guard: the scan reads the client and finds the calls known to exist.
-        Assert.Contains(calls, call => call.StartsWith("Program.cs", StringComparison.Ordinal));
+        Assert.Contains(calls, call => call.StartsWith("Yello.Client/Program.cs:", StringComparison.Ordinal));
 
-        Assert.Equal([], calls.Where(call => !call.StartsWith(HelperFile, StringComparison.Ordinal) && !Allowed.Keys.Any(file => call.StartsWith(file + ":", StringComparison.Ordinal))));
+        Assert.Equal([], calls.Where(call => !call.StartsWith(HelperFile + ":", StringComparison.Ordinal) && !Allowed.Keys.Any(file => call.StartsWith(file + ":", StringComparison.Ordinal))));
     }
 
     /// <summary>
-    /// The allow-list names only files that still call <c>NavigateTo</c>, so a stale entry cannot hide a new call.
+    /// Each allowed file makes exactly the calls the allow-list counts, so a stale entry cannot hide a new call and a new
+    /// call in an allowed file is judged rather than waved through.
     /// </summary>
     [Fact]
-    public void Every_allowed_file_still_navigates()
+    public void Every_allowed_file_makes_exactly_its_counted_calls()
     {
         var calls = NavigateToCalls();
 
-        Assert.Equal([], Allowed.Keys.Where(file => !calls.Exists(call => call.StartsWith(file + ":", StringComparison.Ordinal))));
+        Assert.Equal(
+            [],
+            Allowed
+                .Where(entry => calls.Count(call => call.StartsWith(entry.Key + ":", StringComparison.Ordinal)) != entry.Value.Calls)
+                .Select(entry => $"{entry.Key}: allowed {entry.Value.Calls} ({entry.Value.Reason})"));
     }
 
     private static List<string> NavigateToCalls()
@@ -85,7 +90,7 @@ public sealed partial class SpaceNavigationGateTests
             .SelectMany(file => File.ReadAllLines(file.FullName)
                 .Select((line, index) => (line, index))
                 .Where(entry => NavigateToCall.IsMatch(entry.line) && !entry.line.TrimStart().StartsWith("//", StringComparison.Ordinal))
-                .Select(entry => $"{file.Name}:{entry.index + 1}: {entry.line.Trim()}"))];
+                .Select(entry => $"{RepositoryLayout.RelativePath(file)}:{entry.index + 1}: {entry.line.Trim()}"))];
     }
 
     [GeneratedRegex(@"\.NavigateTo\s*\(", RegexOptions.None, matchTimeoutMilliseconds: 5000)]

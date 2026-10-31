@@ -4,7 +4,7 @@ baseline_commit: e4cdd951aa4f19fb9fe1ce3f06798496750a2583
 
 # Story 3.4: Prove that owning one Space grants nothing in another
 
-Status: review
+Status: done
 
 Epic: 3 — Several Spaces, cleanly separated (the last story of the epic)
 Story key: `3-4-prove-that-owning-one-space-grants-nothing-in-another`
@@ -294,6 +294,27 @@ Plant: a `static List<string>` in a client service. The gate must go red.
   - [x] Rewrite any comment that predicts 3.4 so it describes what exists (`grep -rn "3\.4" Yello.* tests`).
   - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev. Leave `epic-3` alone; the retrospective and the orchestrator own it.
   - [x] Run `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers.
+
+### Review Findings
+
+Code review 2026-10-31 (bmad-code-review, full mode, `9077806..HEAD`). Three layers: Blind Hunter, Edge Case Hunter and Acceptance Auditor. There were 44 raw findings, 30 after deduplication, and 16 kept: 0 decision-needed, 12 patches (all applied), 4 deferred and 14 dismissed.
+
+- [x] [Review][Patch] A point read under `UPDLOCK, HOLDLOCK` still range-locked another Space's key when its row was deleted between the plain read and the locking read, for example by a double submit. `HOLDLOCK` was dropped from all six point reads. A found row's U lock is held to commit without it. [Yello.Infrastructure/Persistence/LabelStore.cs:111, ProjectStore.cs:116, TaskStore.cs:230, :250, :370, :411]
+- [x] [Review][Patch] The `READCOMMITTEDLOCK` in-use check had no pinned plan. A scan would take S locks on, and wait for, another Space's uncommitted `TaskLabel` row. It is now `FORCESEEK (IX_TaskLabel_SpaceId_LabelId_TaskId (SpaceId, LabelId))`, with `SpaceId` named from `ScopedSpaceId`. [Yello.Infrastructure/Persistence/LabelStore.cs:128]
+- [x] [Review][Patch] The AC12 mutable-collection gate missed a getter-only static auto-property, whose backing field is compiler-generated. That field is now judged, and the detector plant has an auto-property kind. [tests/Yello.Tests.Architecture/ClientStaticStateGateTests.cs:133]
+- [x] [Review][Patch] The AC13 navigation gate allowed whole files by bare file name. It now pins each allowed file by repository path and call count. The count rule was planted: an extra call in `SignIn.razor` went red, and the file was restored and verified. [tests/Yello.Tests.Architecture/SpaceNavigationGateTests.cs:40]
+- [x] [Review][Patch] The deferred `NavigateTo` in `SpaceSettings.razor` bypassed the door. It now goes through `SpaceNavigation.GoTo`, and the file is off the allow-list. [Yello.Client/Pages/SpaceSettings.razor:123]
+- [x] [Review][Patch] `GoTo` documented "absolute" locations, which `ToBaseRelativePath` throws on. The doc now says client routes only. [Yello.Client/Spaces/SpaceNavigation.cs:20]
+- [x] [Review][Patch] The AC13 observation was recorded as "the hook does not purge". The case is also red with the hook unregistered, so it cannot tell "does not run" from "runs too late". The comments now say what was seen. The `Program.cs` comment no longer claims the gate allows no other call. [Yello.Client/Program.cs:182, Yello.Client/Spaces/SpaceNavigation.cs:12]
+- [x] [Review][Patch] The `SpaceSwitchMemoryTests` remarks claimed four proving layers and live registration plants. Plants 9a to 9c were masked, and the remarks now say so. [tests/Yello.Tests.Client/SpaceSwitchMemoryTests.cs:24]
+- [x] [Review][Patch] The AC10 test's `sp_getapplock` hold ignored its return code and copied the lock name. It now asserts the lock was granted and uses `ApplicationLocks.LabelApplications`. [tests/Yello.Tests.Slices/Boards/BoardPagingTests.CrossSpaceLocks.cs:278]
+- [x] [Review][Patch] The fake's `SessionEnded` doc named the wrong exempt routes. [tests/Yello.Tests.Client/FakeYelloApi.cs:170]
+- [x] [Review][Patch] `ISO-TWO-SPACES-STATUSES` checked only that the two Spaces' Statuses are disjoint, so a third Space's Statuses would have passed. It now compares each answer with that Space's rows in the database (`WireDatabase.StatusIdsInAsync`). [tests/Yello.Tests.Isolation/IsolationCases.SeveralSpaces.cs:382]
+- [x] [Review][Patch] The ledger closures for `:407`, `:606` and `:688` claimed more than the plants showed. They now name what was not seen red, the review's lock changes and the observation's limit. [_bmad-output/implementation-artifacts/deferred-work.md]
+- [x] [Review][Defer] AC11's own-absence plants were not run beyond `ISO-OWN-OTHER-SPACE-TASK-READ`. Still not seen red: the other AC1 rows, any `ISO-TWO-SPACES-*` row, and the pooled row's per-answer disclosure check (plant 5 failed at seeding). [tests/Yello.Tests.Isolation/IsolationCases.SeveralSpaces.cs] — deferred, owner: Epic 3 retrospective (Lee)
+- [x] [Review][Defer] The AC10 proof has no deterministic key-edge hold and no missing-id hold. There is also no case for a foreign Task id in a Labels edit. [tests/Yello.Tests.Slices/Boards/BoardPagingTests.CrossSpaceLocks.cs] — deferred, owner: Epic 3 retrospective (Lee)
+- [x] [Review][Defer] `SpaceArrival.razor`'s exit to sign-in has no AC13 browser case. The Session-purge exits' plant (12b) was masked. [tests/Yello.Tests.Client/SpaceSwitchMemoryTests.cs] — deferred, owner: Epic 3 retrospective (Lee)
+- [x] [Review][Defer] The AC12 gate judges a field's declared type only. An `IReadOnlyList` field holding a `List` passes. So does a mutable non-collection object, and so does a singleton registered through a `ServiceDescriptor`. [tests/Yello.Tests.Architecture/ClientStaticStateGateTests.cs] — deferred, owner: story 7.3 (the client replica, the next client-held state)
 
 ## Dev Notes
 
@@ -741,3 +762,4 @@ Tracking:
 ## Change Log
 
 - 2026-10-31: Implemented (dev-story). AC10's lock fix: a Space-named `LabelApplications` application lock, plain reads before every locking point read, and a `READCOMMITTEDLOCK` in-use check. AC12: no mutable static collection in the client. AC13: the hook was observed not to purge for `NavigateTo`, so every Space exit goes through `SpaceNavigation.GoTo`, behind a gate. AC14: a row `Assumption` trait. 39 plant runs recorded; masked cases recorded with their reasons; seven ledger entries closed and one added for Lee. Verified: dotnet build Yello.slnx 0 warnings, 0 errors; dotnet test Yello.slnx --no-build --max-parallel-test-modules 1: 1,801 total, 1,791 passed, 0 failed, 10 skipped (20 m 00 s). Status -> review.
+- 2026-10-31: Code review (bmad-code-review, full). The review raised 44 raw findings, kept 16 and dismissed 14. All 12 patches were applied and 4 entries were deferred with owners. The main change drops `HOLDLOCK` from every store point read, so a key deleted after the plain read no longer range-locks another Space's key. The in-use check is pinned to a seek. The AC12 and AC13 gates are tightened, and comments and ledger text that claimed too much are corrected. Verified: dotnet build Yello.slnx 0 warnings, 0 errors; dotnet test Yello.slnx --no-build --max-parallel-test-modules 1: 1,801 total, 1,791 passed, 0 failed, 10 skipped (20 m 02 s). Status -> done.

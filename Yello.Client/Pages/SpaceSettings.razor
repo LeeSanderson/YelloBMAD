@@ -5,6 +5,7 @@
 
 @inject IStringLocalizer<ClientCopy> Localizer
 @inject NavigationManager Navigation
+@inject ActiveSpaceState ActiveSpace
 @inject SpaceNarration Narration
 
 @*
@@ -118,8 +119,9 @@
         {
             _leaving = true;
             Narration.Say(string.Format(CultureInfo.CurrentCulture, Localizer["SpaceSettingsNoLongerAvailable"], Localizer[RoleCopy.NameKey(roleCode)]));
-            // After this render, never during it.
-            _ = InvokeAsync(() => Navigation.NavigateTo(ClientRoutes.SpaceHome(SpaceId)));
+            // After this render, never during it. Through the one door (story 3.4 review): a no-op purge while the tab is
+            // still in this Space, and a purge if it has left by the time the callback runs.
+            _ = InvokeAsync(() => Navigation.GoTo(ActiveSpace, ClientRoutes.SpaceHome(SpaceId)));
         }
         else
         {

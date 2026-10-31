@@ -388,6 +388,11 @@ internal static partial class IsolationCases
         Assert.Equal(3, own.Count);
         Assert.Equal(3, theirs.Count);
         Assert.Empty(own.Intersect(theirs));
+
+        // Exactly each Space's own rows, as the database holds them (story 3.4 review): disjoint alone would pass a third
+        // Space's Statuses.
+        Assert.Equal((await world.Database.StatusIdsInAsync(request.Actor.SpaceId)).Order(), own.Order());
+        Assert.Equal((await world.Database.StatusIdsInAsync(other.SpaceId)).Order(), theirs.Order());
     }
 
     private static async Task ProjectsAndTaskCountsAreEachSpacesOwnAsync(IsolationWorld world, CaseRequest request, WireResponse answer)

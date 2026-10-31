@@ -130,6 +130,33 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// The ids of every Status in <paramref name="spaceId"/>, read under that Space's own key - the database's view,
+    /// independent of the Host's query filter. Added by story 3.4's review, so a Statuses read is compared with its own
+    /// Space's rows and not only with the other Space's.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>Its Status ids.</returns>
+    public async Task<IReadOnlyList<Guid>> StatusIdsInAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT Id FROM dbo.[StatusDefinition] WHERE SpaceId = @space";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+
+        var statuses = new List<Guid>();
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            statuses.Add(reader.GetGuid(0));
+        }
+
+        return statuses;
+    }
+
+    /// <summary>
     /// Every Task in <paramref name="spaceId"/>, as (id, Project, title), read under that Space's own key -
     /// the database's view, independent of the Host's query filter. Added by the story 2.2 ATDD run; the
     /// columns are the ones story 2.2 Task 2 names (<c>dbo.[Task].Id</c>, <c>SpaceId</c>, <c>ProjectId</c>,

@@ -21,10 +21,12 @@ namespace Yello.Tests.Client;
 /// the destination's total 1 each and 3. A count chip or a text node holding any departed number is a survivor.
 /// </para>
 /// <para>
-/// <b>"Client memory", Q2 (a).</b> Reachable managed state is proved by four layers together: the purge registrations
-/// and their gates (<c>ActiveSpaceStateTests</c>), AC12's static gate (<c>ClientStaticStateGateTests</c>), the DOM
-/// absences here with the departed page held mounted until the switch (planted by skipping each registration in turn -
-/// <c>BoardView</c>, <c>ProjectList</c>, <c>LabelSection</c>), and the time-boxed heap-scan spike, held skipped below.
+/// <b>"Client memory", Q2 (a), as measured.</b> Q2 planned four layers; two hold. Reachable managed state is proved by
+/// the purge registrations and their gates (<c>ActiveSpaceStateTests</c>) and AC12's static gate
+/// (<c>ClientStaticStateGateTests</c>). The DOM absences here do <b>not</b> observe the registrations: skipping each in
+/// turn (<c>BoardView</c>, <c>ProjectList</c>, <c>LabelSection</c>) was masked, because <c>SpaceArrival</c> unmounts the
+/// departed page before the destination renders - they stand as regression cases for what reaches the screen. The
+/// heap-scan spike, held skipped below, is unreliable and ledgered to Lee.
 /// </para>
 /// <para>
 /// <b>The API is <see cref="FakeYelloApi"/></b> at the network edge, in <see cref="ClientSurfaceCollection"/>: no Host,
@@ -98,7 +100,7 @@ public sealed class SpaceSwitchMemoryTests(ClientSurfaceFixture surface)
     /// AC5 - with the departed Board mounted until the switch, nothing of it - titles, Labels, Status names, the
     /// Project's name, or a column count - is in the DOM while the destination is held or once it has rendered.
     /// Anchored on every one of them being on screen before the switch. Plant: skip <c>BoardView</c>'s purge
-    /// registration (Q2 (a)).
+    /// registration (Q2 (a)) - masked, green (story 3.4 plants 9a, 9a').
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -133,7 +135,8 @@ public sealed class SpaceSwitchMemoryTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC5 - from the departed Space's home, its Project's deletion confirm open and stating its 49 Tasks, nothing of it
-    /// survives a switch: not the Project's name, and not its count. Plant: skip <c>ProjectList</c>'s purge registration.
+    /// survives a switch: not the Project's name, and not its count. Plant: skip <c>ProjectList</c>'s purge registration -
+    /// masked, green (story 3.4 plant 9b).
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -171,7 +174,7 @@ public sealed class SpaceSwitchMemoryTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC5 - from the departed Space's settings (its Labels listed), nothing of it survives a switch. Plant: skip
-    /// <c>LabelSection</c>'s purge registration.
+    /// <c>LabelSection</c>'s purge registration - masked, green (story 3.4 plant 9c).
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -268,9 +271,9 @@ public sealed class SpaceSwitchMemoryTests(ClientSurfaceFixture surface)
     /// AC13 - the deletion's exit (<c>SpaceDeleteSection</c>'s <c>NavigateTo("/")</c>): no frame rendered after the
     /// navigation leaves the deleted Space's routes holds its name or its Labels. Anchored on the Labels on screen in the
     /// deleted Space's settings, and on frames being recorded at the destination. Plant: remove
-    /// <c>Navigating(null)</c> from <c>SpaceDeleteSection.Leave</c>. Green when the ATDD run activated it (3.3's explicit
-    /// call holds), so it stands as a regression gate; it does not by itself say whether the location-changing hook runs
-    /// for <c>NavigateTo</c> - that observation is still AC13's first step.
+    /// <c>Navigating(null)</c> from <c>SpaceDeleteSection.Leave</c> - red (story 3.4 plant 12a). It was also AC13's
+    /// observation: with that call removed it went red with <c>replace: true</c>, without it, and with the hook
+    /// unregistered, so the hook is not relied on for a <c>NavigateTo</c> (<c>SpaceNavigation.GoTo</c> purges first).
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]

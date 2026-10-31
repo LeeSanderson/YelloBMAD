@@ -179,8 +179,10 @@ _ = activeSpace.RegisterPurge(spaceNarration.Forget);
 // the router renders the new location - for a link and for browser Back or Forward - so the departed
 // Space is gone before anything of the destination is drawn. A navigation within one Space purges
 // nothing. Registered for the life of the application; the handle is not disposed. A programmatic
-// NavigateTo is NOT purged by it in time (observed by story 3.4, AC13): every component navigates
-// through SpaceNavigation.GoTo, which purges first, and SpaceNavigationGateTests allows no other.
+// NavigateTo was NOT seen purged by it before the destination's first frame (story 3.4, AC13; the browser
+// case cannot tell a hook that does not run from one that runs too late): a component leaving a Space navigates through
+// SpaceNavigation.GoTo, which purges first. SpaceNavigationGateTests allows only the calls it counts by
+// file, each with its reason - this file's two above among them.
 _ = navigation.RegisterLocationChangingHandler(context =>
 {
     activeSpace.Navigating(ClientRoutes.SpaceIn(navigation.ToBaseRelativePath(context.TargetLocation)));

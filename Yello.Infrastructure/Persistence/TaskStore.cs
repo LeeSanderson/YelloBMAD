@@ -35,7 +35,7 @@ namespace Yello.Infrastructure.Persistence;
 /// </para>
 /// <para>
 /// <b>Applying Labels locks them first</b> (story 2.4, AC10): the submitted Labels are read under
-/// <c>UPDLOCK, HOLDLOCK</c> on the clustered key that a deletion locks too (<see cref="LabelStore"/> says why it is
+/// <c>UPDLOCK</c> on the clustered key that a deletion locks too (<see cref="LabelStore"/> says why it is
 /// named) - raw SQL composed onto the <c>Label</c> set, so the query filter and the security
 /// policy both still narrow it - and a set with any Label missing is refused before a <c>TaskLabel</c> row is
 /// written, so the composite foreign key never answers it as a <c>500</c>. A deletion that committed first is then
@@ -69,7 +69,9 @@ namespace Yello.Infrastructure.Persistence;
 /// RACE-M1..M8, which hold each side and wait on the other: reading the neighbours before the lock (in 2.6, before the
 /// range, or the range without its hints) is caught 3/3 by the read race (RACE-M2); the row's <c>INDEX(1)</c> and its
 /// <c>UPDLOCK, HOLDLOCK</c> are each masked 0/3 - the Project's lock already serialises every key placer - and kept as the
-/// row lock the Labels edit and the deletion take too. A Status edit takes no row lock: it re-reads the row under the
+/// row lock the Labels edit and the deletion take too. Story 3.4's review dropped <c>HOLDLOCK</c> from every point read:
+/// a found row's U lock is held to commit without it, and on a key deleted meanwhile it range-locked up to the next key,
+/// which can be another Space's. A Status edit takes no row lock: it re-reads the row under the
 /// Project's lock.
 /// </para>
 /// <para>
@@ -221,11 +223,13 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
             return false;
         }
 
-        // The Task's own row, under UPDLOCK, HOLDLOCK on its clustered key: two edits of one Task's Labels queue
+        // The Task's own row, under UPDLOCK on its clustered key: two edits of one Task's Labels queue
         // here, so the second reads the first's applications as current and the set stored is exactly one request's -
-        // never a merge of two, and never a second DELETE of a row the first already removed (a 500).
+        // never a merge of two, and never a second DELETE of a row the first already removed (a 500). No HOLDLOCK (story
+        // 3.4 review): a found row's U lock is held to commit either way, and on a key deleted since the plain read it
+        // would range-lock up to the next key, which can be another Space's.
         var owner = await dbContext.Tasks
-            .FromSql($"SELECT * FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {taskId}")
+            .FromSql($"SELECT * FROM dbo.[Task] WITH (UPDLOCK, INDEX(1)) WHERE Id = {taskId}")
             .AsNoTracking()
             .Select(task => new { task.SpaceId })
             .SingleOrDefaultAsync(cancellationToken)
@@ -241,11 +245,11 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
         if (labelIds.Count > 0)
         {
             // In the server's uniqueidentifier order, so two edits naming the same Labels in different orders lock
-            // them in one order and cannot deadlock on each other.
+            // them in one order and cannot deadlock on each other. UPDLOCK without HOLDLOCK, as the Task's row above.
             var submitted = JsonSerializer.Serialize(labelIds.Order(ServerGuidOrder));
 
             var visible = await dbContext.Labels
-                .FromSql($"SELECT * FROM dbo.[Label] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id IN (SELECT CAST([value] AS uniqueidentifier) FROM OPENJSON({submitted}))")
+                .FromSql($"SELECT * FROM dbo.[Label] WITH (UPDLOCK, INDEX(1)) WHERE Id IN (SELECT CAST([value] AS uniqueidentifier) FROM OPENJSON({submitted}))")
                 .AsNoTracking()
                 .CountAsync(cancellationToken)
                 .ConfigureAwait(false);
@@ -362,9 +366,10 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
         await TakeTheProjectRangeAsync(project, cancellationToken).ConfigureAwait(false);
 
         // The Task's own row, on the clustered key every other Task locker names. Gone by now (deleted while this waited
-        // on the Project's lock) is not found - never Deleted, never a 500.
+        // on the Project's lock) is not found - never Deleted, never a 500. No HOLDLOCK (story 3.4 review): on that
+        // missing key it would range-lock up to the next key, which can be another Space's.
         var locked = await dbContext.Tasks
-            .FromSql($"SELECT * FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {taskId}")
+            .FromSql($"SELECT * FROM dbo.[Task] WITH (UPDLOCK, INDEX(1)) WHERE Id = {taskId}")
             .AsNoTracking()
             .CountAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -403,9 +408,9 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
         await TakeTheProjectRangeAsync(project, cancellationToken).ConfigureAwait(false);
 
         // The Task's own row, on the clustered key every other Task locker names, read again under it: gone by now - or
-        // no longer in the Project whose lock this holds - is not found, never Moved.
+        // no longer in the Project whose lock this holds - is not found, never Moved. No HOLDLOCK, as the deletion's.
         var task = await dbContext.Tasks
-            .FromSql($"SELECT * FROM dbo.[Task] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {taskId}")
+            .FromSql($"SELECT * FROM dbo.[Task] WITH (UPDLOCK, INDEX(1)) WHERE Id = {taskId}")
             .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 

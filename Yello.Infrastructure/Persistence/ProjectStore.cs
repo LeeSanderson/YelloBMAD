@@ -109,8 +109,11 @@ internal sealed class ProjectStore(YelloDbContext dbContext, IIdentifierGenerato
         // deletion and a creation in one Space queue at one lock and no Space waits on another's.
         await ApplicationLocks.TakeProjectsPerSpaceAsync(dbContext, cancellationToken).ConfigureAwait(false);
 
+        // UPDLOCK without HOLDLOCK (story 3.4 review): a found row's U lock is held to commit either way, and a Project
+        // deleted while this waited on the Space's lock (a double submit) leaves a missing key, which HOLDLOCK would
+        // range-lock up to the next key - another Space's.
         var locked = await dbContext.Projects
-            .FromSql($"SELECT * FROM dbo.[Project] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {projectId}")
+            .FromSql($"SELECT * FROM dbo.[Project] WITH (UPDLOCK, INDEX(1)) WHERE Id = {projectId}")
             .AsNoTracking()
             .CountAsync(cancellationToken)
             .ConfigureAwait(false);
