@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Globalization;
 
 namespace Yello.Client.Pages;
@@ -32,9 +33,10 @@ public static class ClientRoutes
     private const string SpacesSegment = "spaces";
 
     /// <summary>
-    /// What ends a route's path: its query, or its fragment.
+    /// What ends a route's path: its query, or its fragment. <c>SearchValues</c>, not an array, so nothing static in the
+    /// client is a mutable collection (story 3.4, AC12).
     /// </summary>
-    private static readonly char[] PathEnds = ['?', '#'];
+    private static readonly SearchValues<char> PathEnds = SearchValues.Create("?#");
 
     /// <summary>
     /// The sign-in surface.
@@ -179,6 +181,16 @@ public static class ClientRoutes
     /// <returns><c>true</c> for <c>/</c>, with or without a query or fragment.</returns>
     public static bool IsHome(string? relativePath) => PathOf(relativePath).Length == 0;
 
-    private static string PathOf(string? relativePath) =>
-        (relativePath ?? string.Empty).Split(PathEnds)[0].Trim('/');
+    /// <summary>
+    /// A client route's path without its query, its fragment or its outer slashes.
+    /// </summary>
+    /// <param name="relativePath">The path relative to the base address.</param>
+    /// <returns>The path, for example <c>spaces/{id}/settings</c>; empty for <c>/</c>.</returns>
+    public static string PathOf(string? relativePath)
+    {
+        var path = relativePath ?? string.Empty;
+        var end = path.AsSpan().IndexOfAny(PathEnds);
+
+        return (end < 0 ? path : path[..end]).Trim('/');
+    }
 }

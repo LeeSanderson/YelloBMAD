@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using Yello.Contracts;
 
 namespace Yello.Client.Refusals;
@@ -174,9 +175,10 @@ public static class RefusalCopy
 
     /// <summary>
     /// The refusals that carry copy of their own, by type. A dictionary rather than a chain of comparisons since story
-    /// 2.4 added five, so each type is one line and the lookup is ordinal.
+    /// 2.4 added five, so each type is one line and the lookup is ordinal. Frozen, so nothing static in the client is a
+    /// mutable collection (story 3.4, AC12).
     /// </summary>
-    private static readonly Dictionary<string, string> OwnKeys = new(StringComparer.Ordinal)
+    private static readonly FrozenDictionary<string, string> OwnKeys = new Dictionary<string, string>(StringComparer.Ordinal)
     {
         [ProblemTypes.IdempotencyKeyInFlight] = IdempotencyKeyInFlightKey,
         [ProblemTypes.IdempotencyKeyReused] = IdempotencyKeyReusedKey,
@@ -194,7 +196,7 @@ public static class RefusalCopy
         [ProblemTypes.InvalidListQuery] = InvalidListQueryKey,
         [ProblemTypes.InvalidListCursor] = InvalidListCursorKey,
         [ProblemTypes.InvalidSpaceName] = InvalidSpaceNameKey,
-    };
+    }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static string? OwnKey(string? type) =>
         type is not null && OwnKeys.TryGetValue(type, out var key) ? key : null;

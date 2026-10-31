@@ -69,11 +69,11 @@ public sealed class ClientStaticStateGateTests
 
     /// <summary>
     /// AC12, Q7 (a) - no <c>static readonly</c> field in <c>Yello.Client</c> holds a mutable collection (an array, a list,
-    /// a dictionary, a set). Immutable and frozen collections, <c>SearchValues</c> and strings are allowed. Red today:
-    /// <c>RefusalCopy.OwnKeys</c> is a <c>Dictionary</c> and the <c>PathEnds</c> fields are <c>char[]</c> (Q7 (a)
-    /// converts them to <c>FrozenDictionary</c> and <c>SearchValues&lt;char&gt;</c>).
+    /// a dictionary, a set). Immutable and frozen collections, <c>SearchValues</c> and strings are allowed. Red until story
+    /// 3.4 converted <c>RefusalCopy.OwnKeys</c> to a <c>FrozenDictionary</c> and the three <c>char[] PathEnds</c> fields to
+    /// one <c>SearchValues&lt;char&gt;</c> in <c>ClientRoutes</c> (Q7 (a)).
     /// </summary>
-    [Fact(Skip = "red: AC12 - RefusalCopy.OwnKeys (Dictionary) and the char[] PathEnds fields are static readonly mutable collections today (story 3.4 Task 7, Q7 (a))")]
+    [Fact]
     public void No_client_static_readonly_field_holds_a_mutable_collection()
     {
         Assert.Equal([], MutableCollectionStatics(ClientTypes()));

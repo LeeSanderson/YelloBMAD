@@ -12,7 +12,7 @@ namespace Yello.Tests.Slices.Boards;
 
 /// <summary>
 /// Story 3.4 AC10 (<c>deferred-work.md:606</c>; Q6 (a): beside PG-16, PG-17 and PG-19) - no lock a request takes reaches
-/// another Space's keys. Written red by the story 3.4 ATDD run.
+/// another Space's keys. Written red by the story 3.4 ATDD run; green since its dev phase.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -23,18 +23,19 @@ namespace Yello.Tests.Slices.Boards;
 /// nothing is timed. The held transaction is rolled back in a <c>finally</c>.
 /// </para>
 /// <para>
-/// <b>Red today for the reason the ledger gives.</b> <c>LabelStore.DeleteAsync</c> and <c>TaskStore.ReplaceAsync</c> take
-/// <c>UPDLOCK, HOLDLOCK</c> on the named Label before any plain read, <c>LabelStore.DeleteAsync</c>'s <c>TaskLabel</c>
-/// range read names no Space, and <c>ProjectStore.DeleteAsync</c> takes its point lock with no prior existence read.
-/// The plant for each is the old read restored (story 3.4 plant 6).
+/// <b>Red before story 3.4 for the reason the ledger gave.</b> <c>LabelStore.DeleteAsync</c> and
+/// <c>TaskStore.ReplaceAsync</c> took <c>UPDLOCK, HOLDLOCK</c> on the named Label before any plain read,
+/// <c>LabelStore.DeleteAsync</c>'s <c>TaskLabel</c> range read named no Space, and <c>ProjectStore.DeleteAsync</c> took its
+/// point lock with no prior existence read. Each now reads plainly first, and the in-use check runs under the Space-named
+/// <c>LabelApplications</c> lock with no range lock. Plant 6 restored each old read in turn, and its case went red.
 /// </para>
 /// <para>
 /// <b>Seed data.</b> Accounts, Spaces, Projects, Tasks and Labels go through the product. The only SQL writes are the
 /// held side's: <see cref="LabelWire.InsertApplicationAsync"/> inserts one <c>TaskLabel</c> row under B's key for B's
 /// own Task and B's own Label (<c>FK_TaskLabel_Task_SpaceId_TaskId</c> and <c>FK_TaskLabel_Label_SpaceId_LabelId</c>
 /// hold: both are B's rows in B's Space; the key <c>(SpaceId, TaskId, LabelId)</c> is new), and the application lock
-/// <c>Yello/LabelApplications/{spaceId:D}/{labelId:D}</c> that the fixed product will take (AC10), which no product code
-/// takes today. Everything is rolled back.
+/// <c>Yello/LabelApplications/{spaceId:D}/{labelId:D}</c> that the product's Label application takes (AC10). Everything is
+/// rolled back.
 /// </para>
 /// </remarks>
 public sealed partial class BoardPagingTests
@@ -44,7 +45,7 @@ public sealed partial class BoardPagingTests
     /// that Label is held; B's own deletion queues on the hold (the anchor).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - LabelStore.DeleteAsync takes UPDLOCK, HOLDLOCK on the named Label before any plain read, so A waits on B's key (story 3.4 Task 5)")]
+    [Fact]
     [Trait("Requirement", "NFR-1")]
     public async Task A_Label_deletion_naming_another_Spaces_Label_does_not_wait_on_that_Spaces_hold()
     {
@@ -97,7 +98,7 @@ public sealed partial class BoardPagingTests
     /// the Label being applied queues on the hold (the anchor).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - LabelStore.DeleteAsync's TaskLabel range read (UPDLOCK, HOLDLOCK, WHERE LabelId only) scans past B's held application (story 3.4 Task 5)")]
+    [Fact]
     [Trait("Requirement", "NFR-1")]
     public async Task A_Label_deletion_does_not_wait_on_another_Spaces_held_Label_application()
     {
@@ -152,7 +153,7 @@ public sealed partial class BoardPagingTests
     /// own application of that Label is held; B's own edit queues on the hold (the anchor).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - TaskStore.ReplaceAsync locks the submitted Labels (UPDLOCK, HOLDLOCK, INDEX(1)) before any plain read, so A waits on B's key (story 3.4 Task 5)")]
+    [Fact]
     [Trait("Requirement", "NFR-1")]
     public async Task A_Label_application_naming_another_Spaces_Label_does_not_wait_on_that_Spaces_hold()
     {
@@ -206,7 +207,7 @@ public sealed partial class BoardPagingTests
     /// deletion of that Project is held; B's own deletion queues on the hold (the anchor).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - ProjectStore.DeleteAsync takes UPDLOCK, HOLDLOCK on the named Project with no prior existence read, so A waits on B's key (story 3.4 Task 5)")]
+    [Fact]
     [Trait("Requirement", "NFR-1")]
     public async Task A_Project_deletion_naming_another_Spaces_Project_does_not_wait_on_that_Spaces_hold()
     {

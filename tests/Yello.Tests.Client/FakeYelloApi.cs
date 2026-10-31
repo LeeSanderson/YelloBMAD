@@ -167,6 +167,13 @@ internal sealed partial class FakeYelloApi
     public bool SignedIn { get; set; }
 
     /// <summary>
+    /// Story 3.4 (AC13): the Session has ended on the server. Every request but the Session's own routes answers
+    /// <c>401</c>, as the Host answers one whose cookie it no longer honours, and the current Session reads as not
+    /// signed in.
+    /// </summary>
+    public bool SessionEnded { get; set; }
+
+    /// <summary>
     /// Whether the first <c>DELETE /api/v1/sessions</c> is refused for its anti-forgery token, as
     /// the Host refuses a token minted to a Session that has since been ended on another device.
     /// </summary>
@@ -700,6 +707,14 @@ internal sealed partial class FakeYelloApi
     private async Task<(int Status, string Body)> DecideAsync(FakeRequest request)
     {
         const int noContent = 204;
+
+        if (SessionEnded
+            && !string.Equals(request.Method, "OPTIONS", StringComparison.Ordinal)
+            && !string.Equals(request.Path, SessionRoutes.AntiforgeryToken, StringComparison.Ordinal)
+            && !string.Equals(request.Path, SessionRoutes.Authenticate, StringComparison.Ordinal))
+        {
+            return (401, Problem(ProblemTypes.AuthenticationFailed));
+        }
 
         // Story 3.3 - the Space deletion, its counts read and a failing switcher (FakeYelloApi.SpaceDeletion.cs).
         if (await SpaceDeletionAsync(request).ConfigureAwait(false) is { } spaceDeletion)

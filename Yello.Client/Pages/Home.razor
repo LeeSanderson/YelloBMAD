@@ -73,7 +73,7 @@
 
         if (!Session.IsSignedIn)
         {
-            Navigation.NavigateTo(ClientRoutes.SignIn, replace: true);
+            Navigation.GoTo(ActiveSpace, ClientRoutes.SignIn, replace: true);
             return;
         }
 
@@ -130,7 +130,7 @@
             Narration.Say(departure);
         }
 
-        Navigation.NavigateTo(ClientRoutes.SpaceHome(destination.Id), replace: true);
+        Navigation.GoTo(ActiveSpace, ClientRoutes.SpaceHome(destination.Id), replace: true);
     }
 
     /// <summary>

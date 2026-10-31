@@ -19,8 +19,9 @@ namespace Yello.Client.Spaces;
 /// <para>
 /// <b>Synchronous, and called before the router renders.</b> The composition root hooks
 /// <c>NavigationManager.RegisterLocationChangingHandler</c>, which runs before the new location is
-/// rendered for a link, a <c>NavigateTo</c> and browser Back or Forward alike, and calls
-/// <see cref="Navigating"/> from it. Purges are <see cref="Action"/>s rather than tasks for that
+/// rendered for a link and for browser Back or Forward, and calls <see cref="Navigating"/> from it. A
+/// programmatic <c>NavigateTo</c> goes through <c>SpaceNavigation.GoTo</c>, which calls
+/// it first (story 3.4, AC13). Purges are <see cref="Action"/>s rather than tasks for that
 /// reason: nothing here may wait for anything before the departed Space is gone.
 /// </para>
 /// <para>

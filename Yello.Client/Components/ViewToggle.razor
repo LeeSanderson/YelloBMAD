@@ -21,8 +21,6 @@
 }
 
 @code {
-    private static readonly char[] PathEnds = ['?', '#'];
-
     private Guid? _spaceId;
     private Guid? _projectId;
     private bool _isList;
@@ -30,7 +28,7 @@
     /// <inheritdoc />
     protected override void OnParametersSet()
     {
-        var path = Navigation.ToBaseRelativePath(Navigation.Uri).Split(PathEnds)[0].Trim('/');
+        var path = ClientRoutes.PathOf(Navigation.ToBaseRelativePath(Navigation.Uri));
         var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
         _spaceId = null;

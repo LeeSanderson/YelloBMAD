@@ -489,7 +489,9 @@ public sealed partial class TestingConventionTests
     [GeneratedRegex(@"""([^""\\\r\n]*)""", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
     private static partial Regex StringLiteralPattern { get; }
 
-    [GeneratedRegex(@"Trait\s*\(\s*""Assumption""\s*,\s*""([^""]*)""", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
+    // A method's trait, or a row's (story 3.4, AC14): an isolation or revocation case's Assumption property, which the
+    // generated theory row carries as the same trait.
+    [GeneratedRegex(@"(?:Trait\s*\(\s*""Assumption""\s*,\s*|\bAssumption\s*=\s*)""([^""]*)""", RegexOptions.None, matchTimeoutMilliseconds: 5000)]
     private static partial Regex AssumptionTraitPattern { get; }
 
     // A source document and a location within it - PRD-12-2, AR-40a, NFR-5.

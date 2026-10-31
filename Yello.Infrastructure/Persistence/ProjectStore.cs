@@ -93,6 +93,18 @@ internal sealed class ProjectStore(YelloDbContext dbContext, IIdentifierGenerato
     /// <inheritdoc />
     public async Task<ProjectDeletion> DeleteAsync(Guid projectId, CancellationToken cancellationToken)
     {
+        // A plain read under both isolation layers first (story 3.4, AC10): an id that is missing or another Space's takes
+        // no lock, because a locking point read on a missing key locks the next key, which can be another Space's.
+        var visible = await dbContext.Projects
+            .AsNoTracking()
+            .AnyAsync(project => project.Id == projectId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!visible)
+        {
+            return ProjectDeletion.NotFound;
+        }
+
         // The Space's Projects-per-Space lock first, as a creation's count takes it (story 2.9, open question 14 (a)), so a
         // deletion and a creation in one Space queue at one lock and no Space waits on another's.
         await ApplicationLocks.TakeProjectsPerSpaceAsync(dbContext, cancellationToken).ConfigureAwait(false);

@@ -67,7 +67,11 @@ internal static class RevocationCases
             {
                 [IsolationSurface.Session] = new(OwnerDeletesTheSpaceAsync, new BoundaryNotFound()),
                 [IsolationSurface.ApiToken] = new(OwnerDeletesTheSpaceAsync, new NoCredential()),
-            }),
+            })
+        {
+            // PRD section 12 #2 (story 3.4, AC14): selected on both surfaces by --filter "Assumption~PRD-12".
+            Assumption = "PRD-12-2",
+        },
 
         new(
             "REV-ACCOUNT-DELETED", "V-3",
@@ -107,7 +111,12 @@ internal static class RevocationCases
     /// </summary>
     public static IEnumerable<TheoryDataRow<string, IsolationSurface>> CrossProduct =>
         All.SelectMany(@case => Enum.GetValues<IsolationSurface>().Select(surface =>
-            new TheoryDataRow<string, IsolationSurface>(@case.Id, surface) { TestDisplayName = $"{@case.Id} / {surface}" }));
+        {
+            var row = new TheoryDataRow<string, IsolationSurface>(@case.Id, surface) { TestDisplayName = $"{@case.Id} / {surface}" };
+
+            // A case resting on an unresolved assumption carries it as a trait on each surface's row (story 3.4, AC14).
+            return @case.Assumption is { } assumption ? row.WithTrait("Assumption", assumption) : row;
+        }));
 
     /// <summary>
     /// A case by its id.
@@ -271,7 +280,14 @@ internal static class RevocationCases
 /// <param name="Id">The case id.</param>
 /// <param name="TestDesignId">What it lands.</param>
 /// <param name="Expectations">For each surface: the event, and what the very next request gets.</param>
-internal sealed record RevocationCase(string Id, string TestDesignId, IReadOnlyDictionary<IsolationSurface, RevocationStep> Expectations);
+internal sealed record RevocationCase(string Id, string TestDesignId, IReadOnlyDictionary<IsolationSurface, RevocationStep> Expectations)
+{
+    /// <summary>
+    /// The unresolved assumption the case rests on (for example <c>PRD-12-2</c>), emitted as an <c>Assumption</c> trait on
+    /// each surface's generated row (story 3.4, AC14), or <c>null</c>.
+    /// </summary>
+    public string? Assumption { get; init; }
+}
 
 /// <summary>
 /// An event, and what the very next request on the surface gets after it.

@@ -40,9 +40,11 @@ namespace Yello.Infrastructure.Persistence;
 /// policy both still narrow it - and a set with any Label missing is refused before a <c>TaskLabel</c> row is
 /// written, so the composite foreign key never answers it as a <c>500</c>. A deletion that committed first is then
 /// simply missing; one that comes second waits on the Label lock and then finds the application
-/// (<see cref="LabelStore"/>). <b>Lock order</b>: an edit takes the Project's Tasks lock (a Status change only), then
-/// the Task's own row, then the Labels in the server's id order, then reads the Task's <c>TaskLabel</c> rows; a
-/// deletion takes the Label, then its <c>TaskLabel</c> range. Label before TaskLabel in both, and a deletion never
+/// (<see cref="LabelStore"/>). <b>Every id is read plainly first</b> (story 3.4, AC10): a Task or a Label that is missing
+/// or another Space's is refused before any lock is taken. <b>Lock order</b>: an edit takes the Project's Tasks lock (a
+/// Status change only), then the Task's own row, then the Labels in the server's id order, then each Label's applications
+/// lock (<see cref="ApplicationLocks.LabelApplications"/>) in the same order, then reads the Task's <c>TaskLabel</c> rows;
+/// a deletion takes the Label, then its applications lock. Label before the applications lock in both, and a deletion never
 /// takes a Task lock, so the two cannot wait on each other in a cycle - measured by the story's race cases, which
 /// hold each side's lock and wait on the other. The Task row lock serialises two Labels edits of one Task, so the
 /// whole-set replacement stays one request's set.
@@ -211,7 +213,15 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
 
     private async Task<bool> ReplaceAsync(Guid taskId, IReadOnlyList<Guid> labelIds, CancellationToken cancellationToken)
     {
-        // The Task's own row first, under UPDLOCK, HOLDLOCK on its clustered key: two edits of one Task's Labels queue
+        // Plain reads under both isolation layers first (story 3.4, AC10): a Task or a Label that is missing or another
+        // Space's is answered before any lock is taken, because a locking point read on a missing key locks the next key,
+        // which can be another Space's.
+        if (!await VisibleAsync(taskId, labelIds, cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        // The Task's own row, under UPDLOCK, HOLDLOCK on its clustered key: two edits of one Task's Labels queue
         // here, so the second reads the first's applications as current and the set stored is exactly one request's -
         // never a merge of two, and never a second DELETE of a row the first already removed (a 500).
         var owner = await dbContext.Tasks
@@ -244,6 +254,13 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
             {
                 return false;
             }
+
+            // Each Label's applications lock, in the same order, which a deletion of that Label takes after its row lock
+            // too: Label rows, then applications locks, in both writers.
+            foreach (var labelId in labelIds.Distinct().Order(ServerGuidOrder))
+            {
+                await ApplicationLocks.TakeLabelApplicationsAsync(dbContext, labelId, cancellationToken).ConfigureAwait(false);
+            }
         }
 
         // A locking read (story 2.9, AC13): every writer of this Task's applications holds its row lock, taken above, but a
@@ -267,6 +284,35 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
         await RecomputeFirstLabelNameAsync(taskId, cancellationToken).ConfigureAwait(false);
 
         return true;
+    }
+
+    /// <summary>
+    /// Whether the Task and every submitted Label are visible in the request's Space, read with plain statements that take
+    /// no lock (story 3.4, AC10).
+    /// </summary>
+    private async Task<bool> VisibleAsync(Guid taskId, IReadOnlyList<Guid> labelIds, CancellationToken cancellationToken)
+    {
+        var task = await dbContext.Tasks
+            .AsNoTracking()
+            .AnyAsync(candidate => candidate.Id == taskId, cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!task)
+        {
+            return false;
+        }
+
+        if (labelIds.Count == 0)
+        {
+            return true;
+        }
+
+        var labels = await dbContext.Labels
+            .AsNoTracking()
+            .CountAsync(label => labelIds.Contains(label.Id), cancellationToken)
+            .ConfigureAwait(false);
+
+        return labels == labelIds.Count;
     }
 
     /// <summary>

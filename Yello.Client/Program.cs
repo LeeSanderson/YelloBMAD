@@ -176,9 +176,11 @@ var spaceNarration = host.Services.GetRequiredService<SpaceNarration>();
 _ = activeSpace.RegisterPurge(spaceNarration.Forget);
 
 // THE SYNCHRONOUS PURGE ON LEAVING A SPACE (story 1.7, AC7). A location-changing handler runs BEFORE
-// the router renders the new location - for a link, a NavigateTo, and browser Back or Forward alike
-// - so the departed Space is gone before anything of the destination is drawn. A navigation within
-// one Space purges nothing. Registered for the life of the application; the handle is not disposed.
+// the router renders the new location - for a link and for browser Back or Forward - so the departed
+// Space is gone before anything of the destination is drawn. A navigation within one Space purges
+// nothing. Registered for the life of the application; the handle is not disposed. A programmatic
+// NavigateTo is NOT purged by it in time (observed by story 3.4, AC13): every component navigates
+// through SpaceNavigation.GoTo, which purges first, and SpaceNavigationGateTests allows no other.
 _ = navigation.RegisterLocationChangingHandler(context =>
 {
     activeSpace.Navigating(ClientRoutes.SpaceIn(navigation.ToBaseRelativePath(context.TargetLocation)));

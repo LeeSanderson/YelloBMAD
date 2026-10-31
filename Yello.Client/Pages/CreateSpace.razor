@@ -93,7 +93,7 @@
     {
         if (!Session.IsSignedIn)
         {
-            Navigation.NavigateTo(ClientRoutes.SignIn, replace: true);
+            Navigation.GoTo(ActiveSpace, ClientRoutes.SignIn, replace: true);
             return;
         }
 
@@ -130,7 +130,7 @@
     /// Leaves without sending anything, to the entry point - which lands on a Space the switcher lists, or says there is
     /// none. Never back to a remembered Space (UX-DR32).
     /// </summary>
-    private void Cancel() => Navigation.NavigateTo(ClientRoutes.Home);
+    private void Cancel() => Navigation.GoTo(ActiveSpace, ClientRoutes.Home);
 
     private async Task CreateAsync()
     {
@@ -249,7 +249,7 @@
         }
 
         ActiveSpace.ArrivingInCreated(created.Id);
-        Navigation.NavigateTo(ClientRoutes.SpaceHome(created.Id));
+        Navigation.GoTo(ActiveSpace, ClientRoutes.SpaceHome(created.Id));
     }
 
     /// <summary>

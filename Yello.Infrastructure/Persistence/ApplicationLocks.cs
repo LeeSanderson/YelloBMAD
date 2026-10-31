@@ -55,6 +55,20 @@ internal static class ApplicationLocks
     internal static string ProjectTasks(Guid spaceId, Guid projectId) => $"Yello/ProjectTasks/{spaceId:D}/{projectId:D}";
 
     /// <summary>
+    /// The lock that one Label's applications and its deletion both take (story 3.4, AC10; <c>deferred-work.md:606</c>).
+    /// </summary>
+    /// <remarks>
+    /// It replaces the deletion's serialisable <c>TaskLabel</c> range read, which named no Space and so locked the first
+    /// key after the Label's range - another Space's application at the edge of its keys. The name carries the request's
+    /// Space, and it is taken only for a Label already seen by a plain read under both isolation layers, so no Space
+    /// ever waits on a name another Space takes.
+    /// </remarks>
+    /// <param name="spaceId">The request's Space.</param>
+    /// <param name="labelId">The Label, visible in that Space.</param>
+    /// <returns>The resource name.</returns>
+    internal static string LabelApplications(Guid spaceId, Guid labelId) => $"Yello/LabelApplications/{spaceId:D}/{labelId:D}";
+
+    /// <summary>
     /// The lock one Account's Space creations (the Spaces-per-Account count) take. Story 3.1, AC11.
     /// </summary>
     /// <remarks>
@@ -106,6 +120,21 @@ internal static class ApplicationLocks
             ?? throw new InvalidOperationException("A Project's Tasks lock is taken only inside a Space-scoped unit of work.");
 
         return TakeAsync(dbContext, ProjectTasks(spaceId, projectId), cancellationToken);
+    }
+
+    /// <summary>
+    /// Takes one Label's applications lock, named for the request's Space and the Label.
+    /// </summary>
+    /// <param name="dbContext">The request's unit of work, scoped to a Space and inside its transaction.</param>
+    /// <param name="labelId">The Label, already seen by a plain read in that Space.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>A task.</returns>
+    internal static Task TakeLabelApplicationsAsync(YelloDbContext dbContext, Guid labelId, CancellationToken cancellationToken)
+    {
+        var spaceId = dbContext.ScopedSpaceId
+            ?? throw new InvalidOperationException("A Label's applications lock is taken only inside a Space-scoped unit of work.");
+
+        return TakeAsync(dbContext, LabelApplications(spaceId, labelId), cancellationToken);
     }
 
     /// <summary>

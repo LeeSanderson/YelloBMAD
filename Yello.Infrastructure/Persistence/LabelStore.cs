@@ -21,11 +21,16 @@ namespace Yello.Infrastructure.Persistence;
 /// <c>500</c>.
 /// </para>
 /// <para>
-/// <b>Deletion is serialised against application (AC3, AC10).</b> It locks the Label row under
-/// <c>UPDLOCK, HOLDLOCK</c>, then probes the Label's applications under the same hints over the
-/// <c>(SpaceId, LabelId, TaskId)</c> index, and deletes only when there are none. An application takes the same
-/// Label lock first (<see cref="TaskStore"/>), so both writers take Label, then TaskLabel - one order, so neither can
-/// hold what the other waits on. <b>Both Label reads take the clustered index (<c>INDEX(1)</c>)</b>, so they lock the
+/// <b>Deletion is serialised against application (AC3, AC10).</b> It reads the Label with a plain statement first, so
+/// an id that is missing or another Space's is not found before any lock is taken (story 3.4, AC10: a locking point read
+/// on a missing key locks the next key, which can be another Space's). It then locks the Label row under
+/// <c>UPDLOCK, HOLDLOCK</c>, takes the Label's applications lock (<see cref="ApplicationLocks.LabelApplications"/>, named
+/// for the request's Space), probes the Label's applications under <c>READCOMMITTEDLOCK</c> (which waits on an
+/// uncommitted change to them but locks no range), and deletes only when there are none. An
+/// application takes the same Label lock and then the same applications lock (<see cref="TaskStore"/>), so both writers
+/// take Label, then the applications lock - one order, so neither can hold what the other waits on. Until story 3.4 the
+/// probe was a serialisable range read over <c>TaskLabel</c> that named no Space, and locked another Space's first key
+/// at the edge of its range. <b>Both Label reads take the clustered index (<c>INDEX(1)</c>)</b>, so they lock the
 /// same key: left to the optimiser, the application's count is covered by <c>AK_Label_SpaceId_Id</c> and the
 /// deletion's read by the clustered key, the two U locks never meet, and the deletion's <c>DELETE</c> then deadlocks
 /// with the application's insert - measured by the story's race case, which found it. The <c>NoAction</c> reference is the backstop: if it ever refuses (547), the answer
@@ -88,10 +93,10 @@ internal sealed class LabelStore(YelloDbContext dbContext, IIdentifierGenerator 
     /// <inheritdoc />
     public async Task<LabelDeletion> DeleteAsync(Guid labelId, CancellationToken cancellationToken)
     {
+        // A plain read under both isolation layers first: an id that is missing or another Space's takes no lock at all.
         var visible = await dbContext.Labels
-            .FromSql($"SELECT * FROM dbo.[Label] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {labelId}")
             .AsNoTracking()
-            .AnyAsync(cancellationToken)
+            .AnyAsync(label => label.Id == labelId, cancellationToken)
             .ConfigureAwait(false);
 
         if (!visible)
@@ -99,8 +104,26 @@ internal sealed class LabelStore(YelloDbContext dbContext, IIdentifierGenerator 
             return LabelDeletion.NotFound;
         }
 
+        // The Label's own row, on the key an application locks too. Gone by now is not found.
+        var locked = await dbContext.Labels
+            .FromSql($"SELECT * FROM dbo.[Label] WITH (UPDLOCK, HOLDLOCK, INDEX(1)) WHERE Id = {labelId}")
+            .AsNoTracking()
+            .AnyAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (!locked)
+        {
+            return LabelDeletion.NotFound;
+        }
+
+        // Every application of this Label takes the same lock, so the read below sees every one committed before it.
+        await ApplicationLocks.TakeLabelApplicationsAsync(dbContext, labelId, cancellationToken).ConfigureAwait(false);
+
+        // READCOMMITTEDLOCK, not a snapshot and not HOLDLOCK: it waits on this Space's uncommitted removal of an application
+        // (a Task deletion's cascade, story 2.5 RACE-T4) and follows its outcome, but takes no range lock, so it reaches no
+        // key past this Space's own (story 3.4, AC10). The query filter and the security policy both narrow it to the Space.
         var applied = await dbContext.Set<TaskLabel>()
-            .FromSql($"SELECT * FROM dbo.[TaskLabel] WITH (UPDLOCK, HOLDLOCK) WHERE LabelId = {labelId}")
+            .FromSql($"SELECT * FROM dbo.[TaskLabel] WITH (READCOMMITTEDLOCK) WHERE LabelId = {labelId}")
             .AsNoTracking()
             .AnyAsync(cancellationToken)
             .ConfigureAwait(false);

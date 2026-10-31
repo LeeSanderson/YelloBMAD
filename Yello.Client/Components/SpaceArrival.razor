@@ -58,8 +58,6 @@
 @code {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    private static readonly char[] PathEnds = ['?', '#'];
-
     private bool _refused;
     private bool _arrived;
     private Guid? _arrivedIn;
@@ -106,14 +104,14 @@
     }
 
     private string PathOf(string location) =>
-        Navigation.ToBaseRelativePath(location).Split(PathEnds)[0].Trim('/');
+        ClientRoutes.PathOf(Navigation.ToBaseRelativePath(location));
 
     /// <inheritdoc />
     protected override async Task OnParametersSetAsync()
     {
         if (!Session.IsSignedIn)
         {
-            Navigation.NavigateTo(ClientRoutes.SignIn, replace: true);
+            Navigation.GoTo(ActiveSpace, ClientRoutes.SignIn, replace: true);
             return;
         }
 

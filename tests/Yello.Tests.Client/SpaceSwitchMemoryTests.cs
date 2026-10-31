@@ -206,9 +206,17 @@ public sealed class SpaceSwitchMemoryTests(ClientSurfaceFixture surface)
     /// signal (then it becomes a Nightly case) or is recorded as unreliable and ledgered to Lee with the measurement. A Nightly
     /// case moves to a file of its own with <c>Tier=Nightly</c> and <c>Explicit = true</c>: a file carrying the trait must
     /// mark every test in it Explicit (<c>DeploymentShapeTests.Every_tiered_test_is_Explicit</c>).
+    /// <para>
+    /// <b>Measured by story 3.4 (2026-10-31), once, un-skipped for the run and restored after it.</b> The accessor works
+    /// in Blazor 10.0.11: <c>getDotnetRuntime(0).Module.HEAPU8</c> is reachable, and the anchor held (the title was found
+    /// while the Board was on screen). After the switch the title was still found. That is no evidence of a leak: the page
+    /// cannot force a .NET collection without a test hook in the client (ruled out by story 1.9 Q4), and memory a collection
+    /// frees is not zeroed, so a hit cannot tell garbage from reachable state. The case stays skipped and is not a Nightly
+    /// case; the ledger hands the question to Lee.
+    /// </para>
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - Q2 (a)'s heap-scan spike: the runtime's memory accessor in Blazor 10.0.11 is unverified and the signal's reliability is unmeasured (story 3.4 Task 6)")]
+    [Fact(Skip = "AC5, Q2 (a) spike measured by story 3.4: unreliable. The heap is readable and the anchor holds, but the departed title is still found after the switch, because no managed collection can be forced from the page without a test hook and freed memory is not zeroed. Ledgered to Lee (deferred-work.md)")]
     public async Task The_departed_Spaces_Task_titles_are_not_in_the_WebAssembly_heap_after_a_switch()
     {
         var api = SeededSpaces();
@@ -294,10 +302,12 @@ public sealed class SpaceSwitchMemoryTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC13 - Session end (<c>Program.cs</c>'s Session-end exit): a <c>401</c> to a client that believed it held a Session
-    /// purges and routes to sign-in; no frame at the sign-in route holds anything of the Space left.
+    /// purges and routes to sign-in; no frame at the sign-in route holds anything of the Space left. Corrected by story 3.4:
+    /// clearing <c>SignedIn</c> alone ended nothing, because the fake still answered the Space's reads; the fake's
+    /// <c>SessionEnded</c> answers them <c>401</c>, as the Host does.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - activated by the ATDD run, clearing SignedIn did not end the Session: no sign-in page in 30 s; the fake needs a 401 for Space-scoped reads (story 3.4 Task 6, Q9)")]
+    [Fact]
     public async Task A_Session_ending_purges_the_departed_Space_before_the_sign_in_page_renders()
     {
         var api = SeededSpaces();
@@ -311,6 +321,7 @@ public sealed class SpaceSwitchMemoryTests(ClientSurfaceFixture surface)
             await page.EvaluateAsync(RecordFrames);
 
             api.SignedIn = false;
+            api.SessionEnded = true;
             await page.EvaluateAsync("path => Blazor.navigateTo(path)", $"/spaces/{Departed:D}/settings");
             await page.Locator("#password").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 

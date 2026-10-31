@@ -8,13 +8,14 @@ namespace Yello.Tests.Architecture;
 /// navigates. A programmatic <c>NavigateTo</c> was not seen to run Blazor's location-changing hook (3.3), so a
 /// Space-leaving navigation goes through one helper that calls <c>ActiveSpace.Navigating(target)</c> first, and this gate
 /// allows no other <c>NavigateTo</c> in the client except those named here with the reason they are safe. Written red by
-/// the story 3.4 ATDD run.
+/// the story 3.4 ATDD run; green since its dev phase.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Assumed (Q9 (a)):</b> the helper lives in a file named <c>SpaceNavigation.cs</c>. If the browser observation the
-/// story asks for first shows the hook does run for <c>NavigateTo</c>, Q9 (b) applies instead: record that, and this
-/// gate's allow-list grows to every call site with "the hook purges" as its reason - the gate itself stays.
+/// <b>Q9 (a), decided by the observation.</b> With <c>SpaceDeleteSection</c>'s explicit <c>Navigating(null)</c> removed,
+/// <c>SpaceSwitchMemoryTests.Deleting_a_Space_purges_it_before_the_destination_renders</c> went red with and without
+/// <c>replace: true</c> (a frame at <c>/</c> rendered the deleted Space's name), so the hook is not relied on and the
+/// helper is <c>Yello.Client/Spaces/SpaceNavigation.cs</c>.
 /// </para>
 /// <para>
 /// <b>Source text, not IL</b>, because the reason a call is safe is about its target, which only the source shows; and
@@ -40,14 +41,18 @@ public sealed partial class SpaceNavigationGateTests
     {
         ["Program.cs"] = "Session end and sign-out: the Session purge empties every Space-scoped holder before the navigation",
         ["SpaceSettings.razor"] = "returns to the same Space's home; no Space is left",
+        ["AccountSettings.razor"] = "leaves Account settings, which is in no Space, for sign-in when no Session is held",
+        ["SignIn.razor"] = "leaves sign-in, which is in no Space, for the entry point once signed in",
     };
 
     /// <summary>
-    /// AC13 - every <c>NavigateTo</c> in <c>Yello.Client</c> is in the helper or in an allowed file. Red today:
-    /// <c>SpaceArrival.razor</c>, <c>SpaceDeleteSection.razor</c>, <c>Home.razor</c>, <c>CreateSpace.razor</c>,
-    /// <c>AccountSettings.razor</c> and <c>SignIn.razor</c> navigate directly.
+    /// AC13 - every <c>NavigateTo</c> in <c>Yello.Client</c> is in the helper or in an allowed file. Activated by story
+    /// 3.4 once the observation came back (the hook does not purge for a programmatic <c>NavigateTo</c>):
+    /// <c>SpaceArrival.razor</c>, <c>SpaceDeleteSection.razor</c>, <c>Home.razor</c> and <c>CreateSpace.razor</c> go
+    /// through <c>SpaceNavigation.GoTo</c>; <c>AccountSettings.razor</c> and <c>SignIn.razor</c> leave pages that are in no
+    /// Space and are allowed by name.
     /// </summary>
-    [Fact(Skip = "red: AC13 - six client files call NavigateTo directly and no SpaceNavigation helper exists yet (story 3.4 Task 7, Q9 (a))")]
+    [Fact]
     public void Every_navigation_that_leaves_a_Space_goes_through_the_one_helper()
     {
         var calls = NavigateToCalls();

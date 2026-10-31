@@ -282,6 +282,8 @@ internal static partial class IsolationCases
 
         // Story 2.9 - the column-page route (Q1 (a), AC9, Task 3; 1.9-GATE-002 on both surfaces). The route is a read every
         // Role holds (ReadProjectsAndTasks), so both surfaces get the same expectation. Seeded through the product.
+        // Plant (story 3.4, AC11): none of its own. The row stands behind the Space boundary, which runs before any handler
+        // and which story 1.9's plants and story 3.4's plants 1 and 2 (the Token binding skipped, the Role cached) prove.
         new(
             "ISO-DIRECT-BOARD-COLUMN", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, BoardRoutes.Column,
             async world =>
@@ -322,6 +324,9 @@ internal static partial class IsolationCases
             },
             Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable))),
 
+        // Plant (story 3.4, AC11): the Task query filter and the Task FILTER predicate dropped together - green, masked 0/1.
+        // The page's count and seek are keyed by A's own Project and Status ids, which no Task of B's carries, so the Task's
+        // layers are not what keeps B's Tasks out of this answer. The same plant turned ISO-OWN-OTHER-SPACE-TASK-READ red.
         new(
             "ISO-BOARD-COLUMN-AGGREGATE", "I-3 (includes Board column counts), FR-28", IsolationVector.Aggregate, HttpMethod.Get, BoardRoutes.Column,
             async world =>
@@ -333,6 +338,8 @@ internal static partial class IsolationCases
             },
             Both(new Served(HttpStatusCode.OK, ColumnPageHoldsExactlyTheCallersTasksAsync, "200, the page's total and Tasks are A's only, none of B's ids or titles"))),
 
+        // Plant (story 3.4, AC11): as ISO-BOARD-COLUMN-AGGREGATE - the Task's two layers dropped, green, masked 0/1, for the
+        // same reason: every column read is keyed by A's own Project and Status ids.
         // Story 2.9 - the Board read itself, once it pages (AC9): ISO-BOARD-AGGREGATE's `tasks == total` rule stopped being
         // true above 50 and is folded into the paged rule both rows now share. This row is about more than one page - 51
         // Tasks in one column, so the first page is full and a cursor follows - and walking the pages must yield exactly A's.
@@ -872,7 +879,12 @@ internal static partial class IsolationCases
         new(
             "ISO-DELETE-SPACE-OWN", "I-12 (3.3 AC4, AC6, AC11 in-Space anchor)", IsolationVector.Api, HttpMethod.Delete, SpaceRoutes.Active,
             FreshActorDeletesItsOwnSpaceAsync,
-            Both(new Served(HttpStatusCode.NoContent, DeletedOnlyTheCallersOwnSpaceAsync, "204, no body; the caller belongs to no Space; B's Space keeps its name"))),
+            Both(new Served(HttpStatusCode.NoContent, DeletedOnlyTheCallersOwnSpaceAsync, "204, no body; the caller belongs to no Space; B's Space keeps its name")))
+        {
+            // PRD section 12 #2: what a deletion leaves of the Space (story 3.3). The trait selects this row on both
+            // surfaces when that question is decided (story 3.4, AC14).
+            Assumption = "PRD-12-2",
+        },
 
         new(
             "ISO-DELETION-SUMMARY-CROSS", "I-1, I-2 (3.3 AC9, Q2 (a))", IsolationVector.DirectIdentifier, HttpMethod.Get, DeletionSummaryRoute,
@@ -937,9 +949,17 @@ internal static partial class IsolationCases
     /// <returns>The case.</returns>
     public static IsolationCase Named(string id) => All.Single(@case => string.Equals(@case.Id, id, StringComparison.Ordinal));
 
+    /// <summary>
+    /// One case's rows, one per surface. A row whose case rests on an unresolved assumption carries it as an
+    /// <c>Assumption</c> trait (story 3.4, AC14), so <c>--filter "Assumption~PRD-12"</c> selects it on every surface.
+    /// </summary>
     private static IEnumerable<TheoryDataRow<string, IsolationSurface>> Rows(IsolationCase @case) =>
         Enum.GetValues<IsolationSurface>().Select(surface =>
-            new TheoryDataRow<string, IsolationSurface>(@case.Id, surface) { TestDisplayName = $"{@case.Id} / {surface}" });
+        {
+            var row = new TheoryDataRow<string, IsolationSurface>(@case.Id, surface) { TestDisplayName = $"{@case.Id} / {surface}" };
+
+            return @case.Assumption is { } assumption ? row.WithTrait("Assumption", assumption) : row;
+        });
 
     private static Dictionary<IsolationSurface, Expectation> Both(Expectation expectation) =>
         Enum.GetValues<IsolationSurface>().ToDictionary(surface => surface, _ => expectation);
@@ -1984,7 +2004,14 @@ internal sealed record IsolationCase(
     IReadOnlyDictionary<IsolationSurface, Expectation> Expectations,
     CaseRunner Runner = CaseRunner.Boundary,
     string? PendingUntil = null,
-    string? PendingReason = null);
+    string? PendingReason = null)
+{
+    /// <summary>
+    /// The unresolved assumption the case rests on (for example <c>PRD-12-2</c>), emitted as an <c>Assumption</c> trait on
+    /// each surface's generated row (story 3.4, AC14), or <c>null</c>.
+    /// </summary>
+    public string? Assumption { get; init; }
+}
 
 /// <summary>
 /// How an attempt reaches for another Space (the story's vector column).

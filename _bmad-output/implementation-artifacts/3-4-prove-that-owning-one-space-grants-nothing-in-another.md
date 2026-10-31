@@ -1,6 +1,10 @@
+---
+baseline_commit: e4cdd951aa4f19fb9fe1ce3f06798496750a2583
+---
+
 # Story 3.4: Prove that owning one Space grants nothing in another
 
-Status: ready-for-dev
+Status: review
 
 Epic: 3 — Several Spaces, cleanly separated (the last story of the epic)
 Story key: `3-4-prove-that-owning-one-space-grants-nothing-in-another`
@@ -247,49 +251,49 @@ Plant: a `static List<string>` in a client service. The gate must go red.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: decide the open questions** (all ACs)
-  - [ ] Read the Dev Notes, then the Open questions. Decide each one as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default, and no human is in the loop, so do not stop to ask. **Exception:** a question marked **[LEE]** relaxes an isolation or security rule under its non-recommended option. Take the recommended option, which relaxes nothing. Never take the [LEE] option without a recorded decision from Lee.
-- [ ] **Task 2: the world** (AC8)
-  - [ ] Add `IsolationWorld.OwnerOfTwoAsync` (or an equivalent name), plus seeding helpers that take a Space id (today `SeedProjectAsync` and its siblings seed only `owner.SpaceId`).
-  - [ ] Add `WireDatabase.AddMembershipAsync(spaceId, accountId, roleStableCode)`.
-  - [ ] Use randomised names only, never a shared literal.
-- [ ] **Task 3: isolation rows** (AC1, AC2, AC3, AC6, AC7, AC9; `:407`)
-  - [ ] Add rows to `IsolationCases.All` under a comment heading "Story 3.4 - one Account, several Spaces". Every row states both surfaces.
-  - [ ] Suggested ids:
+- [x] **Task 1: decide the open questions** (all ACs)
+  - [x] Read the Dev Notes, then the Open questions. Decide each one as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default, and no human is in the loop, so do not stop to ask. **Exception:** a question marked **[LEE]** relaxes an isolation or security rule under its non-recommended option. Take the recommended option, which relaxes nothing. Never take the [LEE] option without a recorded decision from Lee.
+- [x] **Task 2: the world** (AC8)
+  - [x] Add `IsolationWorld.OwnerOfTwoAsync` (or an equivalent name), plus seeding helpers that take a Space id (today `SeedProjectAsync` and its siblings seed only `owner.SpaceId`).
+  - [x] Add `WireDatabase.AddMembershipAsync(spaceId, accountId, roleStableCode)`.
+  - [x] Use randomised names only, never a shared literal.
+- [x] **Task 3: isolation rows** (AC1, AC2, AC3, AC6, AC7, AC9; `:407`)
+  - [x] Add rows to `IsolationCases.All` under a comment heading "Story 3.4 - one Account, several Spaces". Every row states both surfaces.
+  - [x] Suggested ids:
     - `ISO-OWN-OTHER-SPACE-<OBJECT>-<VERB>` (AC1);
     - `ISO-OWNER-ELSEWHERE-VIEWER-<VERB>` and `-ADMIN-DELETE-SPACE` (AC2, `RoleRefused`);
     - `ISO-OWNER-ELSEWHERE-NONE-<VERB>` (AC2, `BoundaryNotFound`);
     - `ISO-OWNER-ROLE-NOT-CARRIED` (AC2, I-10);
     - `ISO-TOKEN-OWN-OTHER-SPACE-<ROUTE>` (AC3);
     - `ISO-TWO-SPACES-<AGGREGATE>` (AC9).
-  - [ ] Record test design ids (I-1, I-4, I-9, I-10, I-12, I-3, I-11) in the `TestDesignId` column.
-  - [ ] If the ATDD phase lands these rows with `PendingUntil: "3.4"`, clear every one before review (GATE-003).
-  - [ ] If an expectation kind needs a two-Space variant (for example `SameAsNonMember` comparing against a fresh stranger's answer for an SA2 id), add it to `Expectation.cs`. Never branch a case on the surface.
-- [ ] **Task 4: the pooled row** (AC4)
-  - [ ] Add a `Pooled` runner row for one Account and two Spaces, on both surfaces, in `PooledConnectionCollection`.
-  - [ ] Extend `EachSeesOnlyItsOwnOnOneConnection` or add a sibling expectation.
-  - [ ] Plant: remove `Max Pool Size=1` (expect the anchor to fail, as 1.9 plant 13 did). Separately, plant `@read_only = 0` and drop the per-unit-of-work reset (expect disclosure or red).
-- [ ] **Task 5: the lock fix** (AC10; `:606`)
-  - [ ] `ApplicationLocks.LabelApplications(spaceId, labelId)`.
-  - [ ] `LabelStore.DeleteAsync`, `TaskStore.ReplaceAsync` and `ProjectStore.DeleteAsync` as AC10 states.
-  - [ ] Keep the 2.4 rule that a Label in use cannot be deleted, and keep its race tests green (`LabelWire`).
-  - [ ] Add the cross-Space no-wait cases with their anchors and plants.
-- [ ] **Task 6: browser cases** (AC5, AC7, AC11, AC13). Build `Yello.Client` in **Debug** before every browser run or plant.
-  - [ ] AC5 in `ClientSurfaceCollection` (the fake API; extend `SeededSpaces()` with the distinct counts). Add it to `SpaceSwitchCarryOverTests.cs` or a new `SpaceSwitchMemoryTests.cs` in the same collection.
-  - [ ] AC7 in `RealHostCollection` (`RealHostBrowserTests.cs` or a sibling). `RealHostFixture.AddSecondSpaceAsync` writes the Space with SQL, so make sure the second Space has Statuses: create it through the product instead.
-  - [ ] AC13: one case per exit. Each holds a departed-Space marker and asserts it is gone at the destination.
-  - [ ] AC11: plant 3.2's eight cases one at a time.
-- [ ] **Task 7: gates** (AC12, AC13, AC14)
-  - [ ] The client static gate, with an allow-list that states its reasons.
-  - [ ] The `NavigateTo` gate, if AC13 needs one.
-  - [ ] The `Assumption` row column, the trait emission and the `TestingConventionTests` check.
-  - [ ] Each gate is proved by a plant.
-- [ ] **Task 8: plants.** Save each original in memory and restore it in a `finally`. **Never** use `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log. The minimum set is in Testing requirements.
-- [ ] **Task 9: ledger, docs, verification**
-  - [ ] `deferred-work.md`: apply the Ledger dispositions. Keep each CLOSED note on one line, and check that no TAB or FORM FEED is introduced (3.3 review finding 6). Keep the file's final newline.
-  - [ ] Rewrite any comment that predicts 3.4 so it describes what exists (`grep -rn "3\.4" Yello.* tests`).
-  - [ ] `sprint-status.yaml`: this story goes to `review` at the end of dev. Leave `epic-3` alone; the retrospective and the orchestrator own it.
-  - [ ] Run `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers.
+  - [x] Record test design ids (I-1, I-4, I-9, I-10, I-12, I-3, I-11) in the `TestDesignId` column.
+  - [x] If the ATDD phase lands these rows with `PendingUntil: "3.4"`, clear every one before review (GATE-003).
+  - [x] If an expectation kind needs a two-Space variant (for example `SameAsNonMember` comparing against a fresh stranger's answer for an SA2 id), add it to `Expectation.cs`. Never branch a case on the surface.
+- [x] **Task 4: the pooled row** (AC4)
+  - [x] Add a `Pooled` runner row for one Account and two Spaces, on both surfaces, in `PooledConnectionCollection`.
+  - [x] Extend `EachSeesOnlyItsOwnOnOneConnection` or add a sibling expectation.
+  - [x] Plant: remove `Max Pool Size=1` (expect the anchor to fail, as 1.9 plant 13 did). Separately, plant `@read_only = 0` and drop the per-unit-of-work reset (expect disclosure or red).
+- [x] **Task 5: the lock fix** (AC10; `:606`)
+  - [x] `ApplicationLocks.LabelApplications(spaceId, labelId)`.
+  - [x] `LabelStore.DeleteAsync`, `TaskStore.ReplaceAsync` and `ProjectStore.DeleteAsync` as AC10 states.
+  - [x] Keep the 2.4 rule that a Label in use cannot be deleted, and keep its race tests green (`LabelWire`).
+  - [x] Add the cross-Space no-wait cases with their anchors and plants.
+- [x] **Task 6: browser cases** (AC5, AC7, AC11, AC13). Build `Yello.Client` in **Debug** before every browser run or plant.
+  - [x] AC5 in `ClientSurfaceCollection` (the fake API; extend `SeededSpaces()` with the distinct counts). Add it to `SpaceSwitchCarryOverTests.cs` or a new `SpaceSwitchMemoryTests.cs` in the same collection.
+  - [x] AC7 in `RealHostCollection` (`RealHostBrowserTests.cs` or a sibling). `RealHostFixture.AddSecondSpaceAsync` writes the Space with SQL, so make sure the second Space has Statuses: create it through the product instead.
+  - [x] AC13: one case per exit. Each holds a departed-Space marker and asserts it is gone at the destination.
+  - [x] AC11: plant 3.2's eight cases one at a time.
+- [x] **Task 7: gates** (AC12, AC13, AC14)
+  - [x] The client static gate, with an allow-list that states its reasons.
+  - [x] The `NavigateTo` gate, if AC13 needs one.
+  - [x] The `Assumption` row column, the trait emission and the `TestingConventionTests` check.
+  - [x] Each gate is proved by a plant.
+- [x] **Task 8: plants.** Save each original in memory and restore it in a `finally`. **Never** use `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log. The minimum set is in Testing requirements.
+- [x] **Task 9: ledger, docs, verification**
+  - [x] `deferred-work.md`: apply the Ledger dispositions. Keep each CLOSED note on one line, and check that no TAB or FORM FEED is introduced (3.3 review finding 6). Keep the file's final newline.
+  - [x] Rewrite any comment that predicts 3.4 so it describes what exists (`grep -rn "3\.4" Yello.* tests`).
+  - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev. Leave `epic-3` alone; the retrospective and the orchestrator own it.
+  - [x] Run `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers.
 
 ## Dev Notes
 
@@ -621,10 +625,119 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, run unattended by the story-cycle orchestrator.
+
 ### Debug Log References
+
+**Scaffold activation (red, then green).**
+
+- AC10's four cases: the ATDD run had already activated them against the product and seen each fail for the ledger's reason. They were un-skipped first. After the fix all four pass, and plant 6 (below) turned each one red again by restoring its old read.
+- AC12 mutable-collection gate, AC13 navigation gate, AC14 Isolation and Revocation facts: un-skipped once the product change existed. Each was then proved by a plant (11, 12g, 13).
+- **Scaffold corrected: `A_Session_ending_purges_the_departed_Space_before_the_sign_in_page_renders`.** Clearing `SignedIn` alone ended nothing, because the fake still answered the Space's reads. The fake gained `SessionEnded`, which answers every request but the Session's own routes with `401`, as the Host does. The case now passes.
+- **Scaffold kept skipped, reason rewritten: the heap spike** (`The_departed_Spaces_Task_titles_are_not_in_the_WebAssembly_heap_after_a_switch`). The measurement is in Completion Notes (Q2).
+- **Product correction found by a regression run.** The first AC10 fix made the in-use check a plain snapshot read. Story 2.5's RACE-T4 (`A_Label_deletion_queued_behind_the_deletion_of_its_last_Task_follows_that_deletions_outcome`, both arms) failed: the Label deletion no longer waited on the held Task deletion's uncommitted cascade. The in-use check is now `READCOMMITTEDLOCK`, which waits on this Space's uncommitted change but takes no range lock. All 257 Board, Task and Project slice cases then passed, including the four AC10 cases.
+- **Product correction found by a browser run.** `SpaceNavigation.GoTo` first called `NavigateTo(location, replace)`, which binds `replace` to `forceLoad`, so every exit reloaded the page. It now names both arguments.
+
+**Plants.** Each was applied by a script that held the original bytes in memory, built, ran a filtered test and restored the files in a `finally`, then checked each restored file's SHA-256. No `git checkout`, `git restore` or `git reset`. Production plants were built with `-p:TreatWarningsAsErrors=false -p:RunAnalyzers=false`, and the solution was rebuilt strictly after the last plant.
+
+| # | Plant | Expected red | Seen |
+|---|---|---|---|
+| 1 | Token binding check skipped (`ActiveSpaceResolution`) | AC3 rows, ApiToken | **Red**: 19 of 38 (every ApiToken arm; the Session arms are `Served` by design) |
+| 2 | Role cached per Account across Spaces (`MembershipActiveSpaceResolver`) | AC2 Viewer/Admin rows, I-10 | **Red**: 21 of 22 (the 22nd is the Token `401` on the Session-only move) |
+| 3 | Task query filter and Task FILTER predicate dropped | AC1 rows | **Red**: `ISO-OWN-OTHER-SPACE-TASK-READ` on both surfaces |
+| 3a | Task query filter alone | green | Green (2 of 2) |
+| 3b | Task FILTER predicate alone | green | Green (2 of 2) |
+| 4 | `Max Pool Size=1` removed | AC4 anchor | **Red**: 7 and 10 Host sessions, not 1 |
+| 5 | Session key set once per Host process (the first Space's value reused) | AC4 | **Red**, but at seeding (registration answered `500`), before the case's own assertions |
+| 6a | `TaskLabel` range read under `UPDLOCK, HOLDLOCK` restored | AC10 application case | **Red**: waited `LCK_M_RS_U` on `TaskLabel` |
+| 6b | Label deletion's plain read removed | AC10 Label deletion | **Red**: waited `LCK_M_U` on `Label` |
+| 6c | Label application's plain reads removed | AC10 Label application | **Red**: waited `LCK_M_RS_U` on `Label` |
+| 6d | Project deletion's plain read removed | AC10 Project deletion | **Red**: waited `LCK_M_U` on `Project` |
+| 7 | As plant 3, against `ISO-BOARD-COLUMN-AGGREGATE` and `ISO-BOARD-AGGREGATE-PAGED` | both rows | **Masked 0/1**: both green. Their count and seek are keyed by A's own Project and Status ids |
+| 8-001 | Role text on a switcher row | E2E-001 | **Red** |
+| 8-003 | "Add a Task" offered to a Viewer | E2E-003 | **Red** (first attempt did not compile, CS8604; corrected) |
+| 8-005 | Purge's `ProjectName = null` skipped | E2E-005 | Green: masked by `ClearProject` when the Board unmounts |
+| 8-005b | Plus `ClearProject` made a no-op | E2E-005 | **Red** |
+| 8-007 | `localStorage.setItem` at start-up | E2E-007 | **Red** (storage length 1) |
+| 8-008 | The departed Board's columns kept by its purge | E2E-008 | **Masked**: green. `SpaceArrival` renders no page until the destination answers, so the Board is rebuilt |
+| 8-010 | The departed name appended to the switch announcement | E2E-010 | **Red** |
+| 8-014 | `Directory.Lists` guard bypassed | E2E-014 | **Red** (3 requests, not 2) |
+| 8-020 | `SpaceDirectory.Forget` skipped | E2E-020 | Green: masked by the entry point's refresh |
+| 8-020b | Plus the entry point using the stale list | E2E-020 | **Red** |
+| 9a | `BoardView`'s purge registration skipped | AC5 Board case | **Masked**: green |
+| 9a' | The same, against 3.2-E2E-006 (Back and Forward, held) | E2E-006 | **Masked**: green |
+| 9b | `ProjectList`'s registration skipped | AC5 Project-list case | **Masked**: green |
+| 9c | `LabelSection`'s registration skipped | AC5 Labels case | **Masked**: green |
+| 10 | `Directory.Lists` bypassed plus a deep link to another Account's Space (real Host) | AC7 | **Red**: refusal count 1, not 0 |
+| 11a | `static List<string>` in `SpaceDirectory` | AC12 mutable-collection gate | **Red** |
+| 11b | `AddSingleton<PageHeadingFocus>` in `Program.cs` | AC12 singleton gate | **Red** |
+| 11c | Writable `static int` in `SpaceDirectory` | AC12 writable-static gate | **Red** |
+| 12a | Deletion exit: `Navigating(null)` removed and the helper bypassed | AC13 deletion case | **Red** |
+| 12b | Session purge of the active Space skipped (sign-out and Session end) | AC13 sign-out and Session-end cases | **Masked**: green (sign-in renders nothing Space-scoped) |
+| 12g | A direct `NavigateTo` out of a Space (`Home.razor`) | AC13 navigation gate | **Red** |
+| 13 | `Assumption` dropped from `ISO-DELETE-SPACE-OWN` | AC14 fact | **Red** (`null`, not `PRD-12-2`). First attempt failed to compile (S3257); planted as `null` |
+| 13b | Row `Assumption = "12-2"` | `TestingConventionTests` Assumption gate | **Red** |
+| Q3 | `ISO-TOKEN-OWN-OTHER-SPACE-LABELS` removed | Q3 gate | **Red**: names `GET /api/v1/spaces/{spaceId:guid}/labels` |
+| O1/O2/O3 | AC13 observation (see Q9) | - | Red with `replace: true`, without it, and with the hook unregistered |
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created (create-story, 2026-10-31).
+- **Decided by Lee (C1), applied as written.** AD-3 stands. AC2's Viewer and Admin rows assert `403` with `InsufficientRole`. AC7's `CrossSpace` is asserted only on the cross-Space cases (AC2's no-Membership arm, AC3).
+- **Q1 - (a).** AC1 compares an SA2 id under SA1 with the in-Space not-found anchor and with a stranger's answer for the same id (`SameAsAnchorAndStranger`). Cost: two comparisons per row. Cut it by reverting to `SameAsAnchor`.
+- **Q2 - (a), with a measured limit.** "Client memory" is proved for reachable managed state by `ActiveSpaceStateTests` (the purge seam) and AC12's static gate. Two of the four layers did not hold up. (1) The DOM layer does not observe the purge registrations: plants 9a, 9a', 9b and 9c were masked, because `SpaceArrival` unmounts the departed page before the destination renders. (2) The heap spike reads the heap (`getDotnetRuntime(0).Module.HEAPU8`, anchor held), but the title survives the switch: no .NET collection can be forced from the page without a test hook, and freed memory is not zeroed. It is not a Nightly case. Ledgered to Lee. Cut by deleting the skipped spike.
+- **Q3 - (a).** A gate plus `IsolationVector.TokenOwnOtherSpace`; planted. Cost: one vector, one gate.
+- **Q4 - (a).** The browser cases name their API counterpart rows in their remarks. No cross-project gate.
+- **Q5 - (a) (not the [LEE] option).** A foreign id under the caller's own Space writes no record. Nothing reads across Spaces, and no RLS policy, session key or gate was relaxed.
+- **Q6 - (a).** AC10's cases are a partial of `BoardPagingTests`, beside PG-16, PG-17 and PG-19. They wait on `LCK_M_%` and measure no time, so they need no timing collection.
+- **Q7 - (a).** `RefusalCopy.OwnKeys` is a `FrozenDictionary`. The three `char[] PathEnds` fields are one `SearchValues<char>` behind `ClientRoutes.PathOf`, which `SpaceArrival` and `ViewToggle` now call. No allow-list entry was needed except the gate's immutable types (`JsonSerializerOptions`, `CompositeFormat`, `Regex`). Cut by reverting the three edits and allow-listing them by name (Q7 (b)).
+- **Q8 - (a).** A row `Assumption`, emitted with `TheoryDataRow.WithTrait` (xunit.v3 4.0.0). Verified: `--filter "Assumption~PRD-12"` runs exactly the two surfaces of `ISO-DELETE-SPACE-OWN` and of `REV-SPACE-DELETED-BY-OWNER`.
+- **Q9 - (a), decided by the observation.** With `SpaceDeleteSection.Leave`'s `Navigating(null)` removed, the deletion-exit case went red with `replace: true`, without it, and with the hook unregistered (a frame at `/` rendered the deleted Space's name). The location-changing hook does not purge in time for a programmatic `NavigateTo`. Every Space-leaving `NavigateTo` (`SpaceArrival`, `SpaceDeleteSection`, `Home` x2, `CreateSpace` x3) goes through `SpaceNavigation.GoTo`, which calls `ActiveSpace.Navigating(target)` first. The gate allows `Program.cs`, `SpaceSettings.razor`, `AccountSettings.razor` and `SignIn.razor`, each with its reason. 3.3's explicit call stays. The comments in `Program.cs` and `ActiveSpaceState` that said the hook runs for `NavigateTo` were corrected. Cut by reverting to direct calls and widening the allow-list (Q9 (b)).
+- **Q10 - (a).** The real-Host second Space is created through `POST /api/v1/spaces`.
+- **AC10 deviation, recorded.** The story says the in-use check "stays a plain read under that lock". A plain snapshot read broke 2.5's RACE-T4, so it is `READCOMMITTEDLOCK`: it waits on this Space's uncommitted cascade and takes no range lock. `TaskStore.ReplaceAsync` also reads the Task plainly before its Task row lock, which the ledger entry's "point reads on ids another Space owns" covers.
+- **AC11 outcome.** Of 3.2's eight absences, six went red to a single plant, two (E2E-005, E2E-020) only to a double plant, and E2E-008 is masked. Of 2.9's three rows, the two aggregate rows are masked by key and `ISO-DIRECT-BOARD-COLUMN` stands behind the boundary. Each result is recorded in the row comment and in the ledger.
+- **AC13's sign-out and Session-end exits** are purged by the Session purge before they navigate. Plant 12b (that purge's `activeSpace.Purge()` skipped) was masked, because the sign-in page renders nothing Space-scoped.
+- **No new package, project or container-backed class.** No migration.
 
 ### File List
+
+Product:
+
+- `Yello.Infrastructure/Persistence/ApplicationLocks.cs` (modified: `LabelApplications`, `TakeLabelApplicationsAsync`)
+- `Yello.Infrastructure/Persistence/LabelStore.cs` (modified)
+- `Yello.Infrastructure/Persistence/TaskStore.cs` (modified)
+- `Yello.Infrastructure/Persistence/ProjectStore.cs` (modified)
+- `Yello.Client/Spaces/SpaceNavigation.cs` (new)
+- `Yello.Client/Spaces/ActiveSpaceState.cs` (modified: remarks)
+- `Yello.Client/Program.cs` (modified: comment)
+- `Yello.Client/Pages/ClientRoutes.cs` (modified: `SearchValues`, public `PathOf`)
+- `Yello.Client/Pages/Home.razor` (modified)
+- `Yello.Client/Pages/CreateSpace.razor` (modified)
+- `Yello.Client/Components/SpaceArrival.razor` (modified)
+- `Yello.Client/Components/SpaceDeleteSection.razor` (modified)
+- `Yello.Client/Components/ViewToggle.razor` (modified)
+- `Yello.Client/Refusals/RefusalCopy.cs` (modified: `FrozenDictionary`)
+
+Tests:
+
+- `tests/Yello.Tests.Slices/Boards/BoardPagingTests.CrossSpaceLocks.cs` (modified: activated, remarks)
+- `tests/Yello.Tests.Architecture/ClientStaticStateGateTests.cs` (modified: activated, remarks)
+- `tests/Yello.Tests.Architecture/SpaceNavigationGateTests.cs` (modified: activated, allow-list, remarks)
+- `tests/Yello.Tests.Architecture/TestingConventionTests.cs` (modified: row `Assumption`)
+- `tests/Yello.Tests.Isolation/IsolationCases.cs` (modified: `Assumption` column and trait, 2.9 plant comments)
+- `tests/Yello.Tests.Isolation/IsolationCaseListTests.cs` (modified: AC14 fact activated)
+- `tests/Yello.Tests.Revocation/RevocationCases.cs` (modified: `Assumption` column and trait)
+- `tests/Yello.Tests.Revocation/RevocationCaseTests.cs` (modified: AC14 fact activated)
+- `tests/Yello.Tests.Client/FakeYelloApi.cs` (modified: `SessionEnded`)
+- `tests/Yello.Tests.Client/SpaceSwitchMemoryTests.cs` (modified: Session-end case activated, heap spike measured)
+- `tests/TESTING-CONVENTIONS.md` (modified)
+
+Tracking:
+
+- `_bmad-output/implementation-artifacts/deferred-work.md` (modified: seven entries closed, one added for Lee)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified)
+- `_bmad-output/implementation-artifacts/3-4-prove-that-owning-one-space-grants-nothing-in-another.md` (this file)
+
+## Change Log
+
+- 2026-10-31: Implemented (dev-story). AC10's lock fix: a Space-named `LabelApplications` application lock, plain reads before every locking point read, and a `READCOMMITTEDLOCK` in-use check. AC12: no mutable static collection in the client. AC13: the hook was observed not to purge for `NavigateTo`, so every Space exit goes through `SpaceNavigation.GoTo`, behind a gate. AC14: a row `Assumption` trait. 39 plant runs recorded; masked cases recorded with their reasons; seven ledger entries closed and one added for Lee. Verified: dotnet build Yello.slnx 0 warnings, 0 errors; dotnet test Yello.slnx --no-build --max-parallel-test-modules 1: 1,801 total, 1,791 passed, 0 failed, 10 skipped (20 m 00 s). Status -> review.

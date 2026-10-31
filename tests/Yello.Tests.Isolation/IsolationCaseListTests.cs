@@ -308,16 +308,14 @@ public sealed class IsolationCaseListTests
     /// <summary>
     /// Story 3.4 AC14, Q8 (a) (written by its ATDD run) - <c>ISO-DELETE-SPACE-OWN</c> carries the assumption it rests on
     /// (PRD §12 #2) as a row, and the generated theory row on each surface carries it as an <c>Assumption</c> trait, so
-    /// <c>--filter "Assumption~PRD-12"</c> selects it. Read by reflection: the row column does not exist yet.
+    /// <c>--filter "Assumption~PRD-12"</c> selects it. Activated by story 3.4: the column is
+    /// <see cref="IsolationCase.Assumption"/>, emitted with <c>WithTrait</c>.
     /// </summary>
-    [Fact(Skip = "red: AC14 - IsolationCase has no Assumption column and the generated rows carry no trait yet (story 3.4 Task 7)")]
+    [Fact]
     [Trait("Requirement", "AD-4")]
     public void The_deletion_row_carries_its_assumption_as_a_trait_on_both_surfaces()
     {
-        var column = typeof(IsolationCase).GetProperty("Assumption");
-
-        Assert.NotNull(column);
-        Assert.Equal("PRD-12-2", column.GetValue(IsolationCases.Named("ISO-DELETE-SPACE-OWN")));
+        Assert.Equal("PRD-12-2", IsolationCases.Named("ISO-DELETE-SPACE-OWN").Assumption);
 
         var rows = IsolationCases.BoundaryRows.Where(row => (row.TestDisplayName ?? string.Empty).StartsWith("ISO-DELETE-SPACE-OWN /", StringComparison.Ordinal)).ToList();
 

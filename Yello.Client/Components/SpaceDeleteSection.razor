@@ -373,6 +373,6 @@
         // The tab leaves the deleted Space before it navigates, as the location-changing hook would have it leave, so the
         // purge runs now and the entry point starts outside any Space - where it lands is then a first arrival (AC12)
         ActiveSpace.Navigating(target: null);
-        Navigation.NavigateTo(ClientRoutes.Home, replace: true);
+        Navigation.GoTo(ActiveSpace, ClientRoutes.Home, replace: true);
     }
 }

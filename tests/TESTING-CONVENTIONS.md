@@ -744,6 +744,24 @@ Host's address - the only fake there. Chromium keeps the Host's `SameSite=None; 
 needs the running client's session-end path navigates in-app (`Blazor.navigateTo`), because a reload
 boots a client that never held the Session.
 
+**One Account holding several Spaces - added by story 3.4.** `IsolationWorld.OwnerOfTwoAsync` registers
+a fresh Account, creates its second Space through `POST /api/v1/spaces` (so the Space has its default
+Statuses), issues a Token per Space, and populates both Spaces through the product with randomised
+names. `IsolationWorld.OwnerElsewhereAsync(role)` makes an Owner of one Space a Member of another
+Account's Space at a lesser Role, through `WireDatabase.AddMembershipAsync` (raw SQL, because
+Invitations do not exist until Epic 4). `ProductActor.InSpace` is the same Account seen from its other
+Space; it shares the Session and every secret, so I-17 checks both Spaces' names and Tokens. A row
+whose Token is bound to another Space of the same Account uses `IsolationVector.TokenOwnOtherSpace`,
+and a gate requires one such row for every Space-scoped route a Token reaches.
+
+**A row can carry an assumption - added by story 3.4 (AC14).** `IsolationCase` and `RevocationCase`
+have an optional `Assumption` (for example `PRD-12-2`). The generated theory row carries it as an
+`Assumption` trait on every surface (`TheoryDataRow.WithTrait`), so
+`dotnet test --project tests/Yello.Tests.Isolation/Yello.Tests.Isolation.csproj -- --filter "Assumption~PRD-12"`
+selects `ISO-DELETE-SPACE-OWN` on both surfaces, and the same filter on Revocation selects
+`REV-SPACE-DELETED-BY-OWNER`. `TestingConventionTests` checks a row's value as it checks a method's
+trait.
+
 **Account-scoped creation - added by story 3.1.** `POST /api/v1/spaces` runs on one unit of work holding
 both session keys (`SpaceCreationScope`), so its cases live in `Yello.Tests.Slices` as partials of the
 existing `ActiveSpaceEndpointTests` (no new engine, fixture or container-backed class).
