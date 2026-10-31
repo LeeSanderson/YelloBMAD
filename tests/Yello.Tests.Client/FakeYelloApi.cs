@@ -39,7 +39,7 @@ namespace Yello.Tests.Client;
 /// "without issuing any Space-scoped request for it".
 /// </para>
 /// </remarks>
-internal sealed class FakeYelloApi
+internal sealed partial class FakeYelloApi
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
@@ -700,6 +700,12 @@ internal sealed class FakeYelloApi
     private async Task<(int Status, string Body)> DecideAsync(FakeRequest request)
     {
         const int noContent = 204;
+
+        // Story 3.3 - the Space deletion, its counts read and a failing switcher (FakeYelloApi.SpaceDeletion.cs).
+        if (await SpaceDeletionAsync(request).ConfigureAwait(false) is { } spaceDeletion)
+        {
+            return spaceDeletion;
+        }
 
         switch (request.Method, request.Path)
         {

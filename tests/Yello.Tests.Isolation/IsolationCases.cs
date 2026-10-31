@@ -854,6 +854,46 @@ internal static class IsolationCases
             "ISO-RENAME-SPACE-OWN", "I-12 (3.1 AC10 in-Space anchor)", IsolationVector.Api, HttpMethod.Patch, SpaceRoutes.Active,
             FreshActorRenamesItsOwnSpaceAsync,
             Both(new Served(HttpStatusCode.OK, RenamedOnlyTheCallersOwnSpaceAsync, "200, {id, name, role: owner}; B's Space keeps its name"))),
+
+        // Story 3.3 (ATDD run, 2026-10-31): the deletion route and Q2 (a)'s counts read, each on both surfaces
+        // (1.9-GATE-002). Pending until the dev phase maps them; GATE-003 fails the suite if any is still pending when 3.3
+        // reaches review. The counts read's pattern is a literal until SpaceRoutes names it (story 3.3 Task 5) - retarget
+        // DeletionSummaryRoute and DeletionSummaryOf to the contract on conversion. Write rows act as FRESH actors where the
+        // request could destroy the actor's Space, so A's and B's Spaces - every other row's subject - survive any failure.
+        new(
+            "ISO-DELETE-SPACE-CROSS", "I-2, I-4 (3.3 AC9)", IsolationVector.Write, HttpMethod.Delete, SpaceRoutes.Active,
+            world => ForeignAsync(world, SpaceRoutes.ActiveOf, HttpMethod.Delete),
+            Both(new BoundaryNotFound { Then = TheForeignSpaceKeepsItsNameAsync }),
+            PendingUntil: "3.3",
+            PendingReason: "red: AC9 - DELETE /api/v1/spaces/{spaceId} is not mapped yet (story 3.3 Task 4); convert when it is"),
+
+        new(
+            "ISO-RECORD-KIND-SPACE-DELETE-ADMIN", "V-1, C-6, NFR-7 (3.3 AC1, AC9)", IsolationVector.RecordKind, HttpMethod.Delete, SpaceRoutes.Active,
+            AdminDeletesTheSpaceAsync,
+            Both(new RoleRefused("delete-space") { Then = TheActorsSpaceStillStandsAsync }),
+            PendingUntil: "3.3",
+            PendingReason: "red: AC1, AC9 - DELETE /api/v1/spaces/{spaceId} is not mapped yet (story 3.3 Task 4); convert when it is"),
+
+        new(
+            "ISO-DELETE-SPACE-OWN", "I-12 (3.3 AC4, AC6, AC11 in-Space anchor)", IsolationVector.Api, HttpMethod.Delete, SpaceRoutes.Active,
+            FreshActorDeletesItsOwnSpaceAsync,
+            Both(new Served(HttpStatusCode.NoContent, DeletedOnlyTheCallersOwnSpaceAsync, "204, no body; the caller belongs to no Space; B's Space keeps its name")),
+            PendingUntil: "3.3",
+            PendingReason: "red: AC4, AC6 - DELETE /api/v1/spaces/{spaceId} is not mapped yet (story 3.3 Task 4); convert when it is"),
+
+        new(
+            "ISO-DELETION-SUMMARY-CROSS", "I-1, I-2 (3.3 AC9, Q2 (a))", IsolationVector.DirectIdentifier, HttpMethod.Get, DeletionSummaryRoute,
+            world => ForeignAsync(world, DeletionSummaryOf),
+            Both(new BoundaryNotFound()),
+            PendingUntil: "3.3",
+            PendingReason: "red: AC9 - Q2 (a)'s counts read is not mapped yet (story 3.3 Tasks 4, 5); convert when it is"),
+
+        new(
+            "ISO-RECORD-KIND-DELETION-SUMMARY-ADMIN", "V-1, C-6 (3.3 AC9, Q2 (a))", IsolationVector.RecordKind, HttpMethod.Get, DeletionSummaryRoute,
+            AdminReadsTheDeletionSummaryAsync,
+            Both(new RoleRefused("delete-space")),
+            PendingUntil: "3.3",
+            PendingReason: "red: AC9 - Q2 (a)'s counts read is not mapped yet (story 3.3 Tasks 4, 5); convert when it is"),
     ];
 
     /// <summary>
@@ -1818,6 +1858,77 @@ internal static class IsolationCases
             Assert.Equal(CaseBodyName, root.GetProperty("name").GetString());
             Assert.Equal("owner", root.GetProperty("role").GetString());
         }
+
+        await TheForeignSpaceKeepsItsNameAsync(world, request);
+    }
+
+    /// <summary>
+    /// Story 3.3, Q2 (a) - the counts read's route pattern. <b>Assumed</b>: retarget to the <c>SpaceRoutes</c> constant the dev
+    /// phase adds (story 3.3 Task 5).
+    /// </summary>
+    private static string DeletionSummaryRoute => SpaceRoutes.Active + "/deletion";
+
+    /// <summary>
+    /// Story 3.3, Q2 (a) - the counts read's path for one Space.
+    /// </summary>
+    private static string DeletionSummaryOf(Guid spaceId) => SpaceRoutes.ActiveOf(spaceId) + "/deletion";
+
+    /// <summary>
+    /// Story 3.3 AC1 - a fresh Account demoted to Admin in its own Personal Space asks to delete it. The Admin's Token is
+    /// bound there, so both surfaces reach the capability check.
+    /// </summary>
+    private static async Task<CaseRequest> AdminDeletesTheSpaceAsync(IsolationWorld world)
+    {
+        var admin = await world.NewActorAsync("Ad");
+
+        await world.Database.ChangeRoleAsync(admin.SpaceId, admin.AccountId, "admin");
+
+        var path = SpaceRoutes.ActiveOf(admin.SpaceId);
+
+        return new CaseRequest(admin, HttpMethod.Delete, [new(path, path)], admin.SpaceId);
+    }
+
+    /// <summary>
+    /// Story 3.3 Q2 (a) - a fresh Account demoted to Admin in its own Personal Space asks for the deletion's counts.
+    /// </summary>
+    private static async Task<CaseRequest> AdminReadsTheDeletionSummaryAsync(IsolationWorld world)
+    {
+        var admin = await world.NewActorAsync("As");
+
+        await world.Database.ChangeRoleAsync(admin.SpaceId, admin.AccountId, "admin");
+
+        var path = DeletionSummaryOf(admin.SpaceId);
+
+        return new CaseRequest(admin, HttpMethod.Get, [new(path, path)], admin.SpaceId);
+    }
+
+    /// <summary>
+    /// Story 3.3 AC1 - the Space whose deletion was refused still stands: its Admin's switcher still lists it.
+    /// </summary>
+    private static async Task TheActorsSpaceStillStandsAsync(IsolationWorld world, CaseRequest request) =>
+        Assert.Contains(request.Actor.SpaceId, Ids((await request.Actor.SendAsync(IsolationSurface.Session, HttpMethod.Get, SpaceRoutes.Directory)).Body));
+
+    /// <summary>
+    /// Story 3.3 - a fresh Account deletes its own Personal Space, its only one, on either surface (its Token is bound there,
+    /// as Owner).
+    /// </summary>
+    private static async Task<CaseRequest> FreshActorDeletesItsOwnSpaceAsync(IsolationWorld world)
+    {
+        var owner = await world.NewActorAsync("Dl");
+        var path = SpaceRoutes.ActiveOf(owner.SpaceId);
+
+        return new CaseRequest(owner, HttpMethod.Delete, [new(path, path)], owner.SpaceId);
+    }
+
+    /// <summary>
+    /// Story 3.3 AC4, AC6, AC9 - the answer has no body; the caller's switcher is now empty (it belongs to no Space, and
+    /// nothing was created for it); A's switcher is still exactly [SA] and B's Space keeps its name.
+    /// </summary>
+    private static async Task DeletedOnlyTheCallersOwnSpaceAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
+    {
+        Assert.Equal(string.Empty, answer.Body);
+        Assert.Empty(Ids((await request.Actor.SendAsync(IsolationSurface.Session, HttpMethod.Get, SpaceRoutes.Directory)).Body));
+        Assert.Equal([world.A.SpaceId], Ids((await world.A.SendAsync(IsolationSurface.Session, HttpMethod.Get, SpaceRoutes.Directory)).Body));
 
         await TheForeignSpaceKeepsItsNameAsync(world, request);
     }

@@ -610,6 +610,34 @@ The pattern is story, then ATDD scaffolds (`[Fact(Skip = "red: ACn - ...")]` plu
 - `_bmad-output/implementation-artifacts/deferred-work.md:356`, `:360`, `:370`, `:382`, `:666`, `:679`; story files `3-1-…md`, `3-2-…md`, `2-5-…md` (Q6), `1-8-…md`
 - `tests/TESTING-CONVENTIONS.md`
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-3-3-delete-a-space-and-belong-to-none.md` (scenario map, assumed open questions, red-phase evidence, harness notes). The scaffolds assume Q1-Q9 at their recommended options; Q1 is (a), so the delete route keeps no idempotency record and no second dual-key caller exists.
+
+| File | Cases | ACs | State today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteSpace.cs` (partial, no new container class) | 12 entries (14 cases) | AC1, AC2, AC4-AC6, AC9-AC12 | all skipped `red:` |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteSpaceRace.cs` (partial) | 6 | AC10, AC13 | all skipped `red:`; S1-S4 and S6 were activated once and fail as predicted (`200`, `500` x3, `SingleAsync` throws) |
+| `tests/Yello.Tests.Isolation/IsolationCases.cs` | 5 rows (10 surface rows): `ISO-DELETE-SPACE-CROSS`, `ISO-RECORD-KIND-SPACE-DELETE-ADMIN`, `ISO-DELETE-SPACE-OWN`, `ISO-DELETION-SUMMARY-CROSS`, `ISO-RECORD-KIND-DELETION-SUMMARY-ADMIN` | AC1, AC4, AC6, AC9, AC11 | `PendingUntil: "3.3"`; convert all before review (GATE-003) |
+| `tests/Yello.Tests.Revocation/RevocationCases.cs` + `RevocationCaseTests.cs` | 1 row (`REV-SPACE-DELETED-BY-OWNER`, held in `SpaceDeletedByOwner`) run by 1 skipped theory (2 surfaces) | AC11 | skipped; on activation move the row into `All` and delete the theory |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.DeleteSpace.cs` (partial) | 4 | AC1, AC9, AC10 | all skipped `red:`; activated once, each fails for its stated reason |
+| `tests/Yello.Tests.Architecture/SpaceDeletionClientGateTests.cs` | 2 | AC8, AC12, AC14, AC15 | both skipped `red:`; activated once, each fails for its stated reason |
+| `tests/Yello.Tests.Client/SpaceDeleteTests.cs` (+ `FakeYelloApi.SpaceDeletion.cs`; `FakeYelloApi` made `partial`) | 18 entries (21 cases) | AC1-AC3, AC6-AC8, AC12, AC14-AC16 | 17 skipped `red:`; **1 green**: `An_Admin_has_no_delete_affordance_at_all` (a standing gate) |
+
+Green today: `SpaceDeleteTests.An_Admin_has_no_delete_affordance_at_all` only. Assumed paths to retarget when the contract lands: the counts read `/api/v1/spaces/{spaceId}/deletion` (Slices `DeletionSummaryOf`, Isolation `DeletionSummaryRoute`, Architecture `DeletionSummaryPattern`, the fake's `DeletionSummaryPathOf`), and Q1's marker, matched by `Destroys` in its type name.
+
+Activation order, riskiest assumption first:
+
+1. `The_Owner_deletes_a_populated_Space_and_every_row_hanging_from_it_goes_with_it`. It proves that one `DELETE` succeeds over the `NO ACTION` FKs with real data, and that Q1 keeps the pipeline from recording the key (otherwise 547 gives a `500`). Then `A_replayed_deletion_with_the_same_key_is_the_boundary_404_and_never_500` and `Only_the_deletion_route_carries_the_marker_that_it_destroys_its_own_Space`.
+2. The Q4 races: RACE-S2, S3, S4, then S1 (`:666`), S6 (`:360`), then S5 (the Projects lock). Run each 3/3.
+3. The wire contract: ARCH-004 (bulk writes), ARCH-002, SLC-002, SLC-003, SLC-009, SLC-012.
+4. Tokens and other Accounts: SLC-004 to SLC-007. Then the revocation row and the five isolation rows.
+5. The counts read: SLC-010, SLC-011. Retarget every `/deletion` literal.
+6. The client gates: ARCH-001 (and widen the Space-settings union gate to name `DeleteSpace`), `Removed`, the copy gate.
+7. The browser cases, in the order E2E-001, 003-008, 009-013, 014-017, 018. Build `Yello.Client` in Debug first. E2E-002 must stay green. AC12 puts focus on the heading, but 3.2 treats a Space change as a switch (focus to the context bar). Record that contradiction either way.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

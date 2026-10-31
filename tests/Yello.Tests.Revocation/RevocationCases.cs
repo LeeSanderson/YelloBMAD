@@ -93,6 +93,22 @@ internal static class RevocationCases
     ];
 
     /// <summary>
+    /// Story 3.3's row (AC11, <c>deferred-work.md:382</c>): the Owner deletes the Space through the product - the
+    /// endpoint-driven twin of <c>REV-SPACE-DELETED</c>, which stays as the raw-SQL schema proof. <b>Held apart from
+    /// <see cref="All"/> while red</b>, because this list has no pending mechanism and a row in <see cref="All"/> runs: the
+    /// skipped theory <c>RevocationCaseTests.The_Owners_deletion_of_the_Space_governs_the_very_next_request</c> runs it.
+    /// On activation, move it into <see cref="All"/> and delete that theory (story 3.3 Task 7). Written by the story 3.3
+    /// ATDD run.
+    /// </summary>
+    public static RevocationCase SpaceDeletedByOwner { get; } = new(
+        "REV-SPACE-DELETED-BY-OWNER", "V-3, NFR-2 (3.3 AC11)",
+        new Dictionary<IsolationSurface, RevocationStep>
+        {
+            [IsolationSurface.Session] = new(OwnerDeletesTheSpaceAsync, new BoundaryNotFound()),
+            [IsolationSurface.ApiToken] = new(OwnerDeletesTheSpaceAsync, new NoCredential()),
+        });
+
+    /// <summary>
     /// The generated theory data: every case on every surface, named "case id / surface".
     /// </summary>
     public static IEnumerable<TheoryDataRow<string, IsolationSurface>> CrossProduct =>
@@ -116,6 +132,14 @@ internal static class RevocationCases
         Assert.Equal(HttpStatusCode.NoContent, (await context.Actor.SignOutAndKeepTheOldCookieAsync()).StatusCode);
         Assert.NotNull(await context.World.Database.SessionsValidAfterAsync(context.Actor.AccountId));
     }
+
+    /// <summary>
+    /// Story 3.3 - the fresh Account, Owner of its Personal Space, deletes it through its Session, as the browser does:
+    /// <c>204</c>. Whatever the surface under test, the event is the Owner's deletion in the browser; the very next request
+    /// on that surface is what the row asserts (V-3: a script's Token dies with the Space).
+    /// </summary>
+    private static async Task OwnerDeletesTheSpaceAsync(RevocationContext context) =>
+        Assert.Equal(HttpStatusCode.NoContent, (await context.Actor.SendAsync(IsolationSurface.Session, HttpMethod.Delete, SpaceRoutes.ActiveOf(context.Actor.SpaceId))).StatusCode);
 
     private static async Task RevokeOwnTokenAsync(RevocationContext context) =>
         Assert.Equal(HttpStatusCode.NoContent, (await context.Actor.Session.DeleteAsync(ApiTokenRoutes.RevokeOf(context.Actor.TokenId))).StatusCode);
