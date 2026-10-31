@@ -225,6 +225,9 @@ ProductionShape.UseProductionShape(app, forwardedHeaders);
 
 app.UseRequestLocalization();
 
+// No /api answer is kept in the browser's HTTP cache (story 3.2, AC18): set once, here, for every answer under /api.
+app.Use(ApiNoStore.InvokeAsync);
+
 // ORDER MATTERS AND IS NOT ARBITRARY. CORS runs before authentication so that a cross-origin
 // preflight - which carries no cookie by definition - is answered rather than being asked to
 // authenticate. Authentication runs before the endpoints, because that is what populates

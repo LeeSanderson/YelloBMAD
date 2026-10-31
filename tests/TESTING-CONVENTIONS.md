@@ -365,6 +365,26 @@ the pager's 1.4.12 and touch cases.
 - **Force right to left with `dir="rtl"`** on `<html>` after the Board loads, as for the keyboard: the
   pager's arrows and the drag's direction mirror; the Status order never does.
 
+### Two tabs and an Account switch - added by story 3.2
+
+`SpaceSwitchCarryOverTests` holds both shapes.
+
+- **Two tabs are two pages in one `IBrowserContext`.** Open the second with `context.NewPageAsync()`,
+  so the pages share cookies and storage as real tabs do. Two contexts share nothing by construction
+  and prove nothing. Give each page its own `FakeYelloApi`, seeded with the same Space and Project
+  ids, and install each on its own page: the fake records requests per page, so a case can assert
+  that tab 2 never asked about the Space tab 1 left. Task ids differ per seed, so look a Task up in
+  the fake of the page that shows it.
+- **Each tab is its own WebAssembly runtime.** A `static` field is therefore per tab, and the two-tab
+  case cannot catch one. What it proves is that nothing crosses tabs through the browser.
+- **An Account switch is a sign-out and a sign-in on one page, with no reload.** Sign out through the
+  bar and wait for `/sign-in`. Then change the fake's identity: clear and refill `Switcher` and
+  `Roles` with the second Account's Spaces. Then sign in through the form. Take `api.Requests.Count`
+  at sign-out, so the requests after it can be checked for order (the switcher before any
+  Space-scoped request) and for any id of the first Account.
+- **A listed Space that refuses its arrival** is `FakeYelloApi.ArrivalRefusals[spaceId] = 409` (the
+  concurrent-Sessions bound), `403` (a capability refusal) or any other code (`404`).
+
 ### Why it exists
 
 Story 1.3 shipped the first rendered surface and closed with 136 tests passing. The client did not

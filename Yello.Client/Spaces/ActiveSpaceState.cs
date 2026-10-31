@@ -29,6 +29,28 @@ namespace Yello.Client.Spaces;
 /// about the departed Space cannot land after the purge (UX-DR30 by the other door).
 /// </para>
 /// <para>
+/// <b>Every client holder of Space-scoped state, as surveyed by story 3.2 (AC11).</b> Each one either registers with
+/// <see cref="RegisterPurge"/> or is a component keyed on the Space and rendered only inside an arrived
+/// <c>SpaceArrival</c>, so a change of Space disposes it:
+/// </para>
+/// <list type="bullet">
+/// <item>Registered here: <c>BoardView</c> (its replicas, Labels, Status options, open Task, pending deletes and moves,
+/// held-out pages), <c>TaskListView</c> (its rows and <c>TaskListFilters</c>), <c>LabelSection</c>, <c>ProjectList</c>,
+/// and <c>SpaceNarration</c> (a pending announcement, registered by <c>Program</c>).</item>
+/// <item>Keyed and arrival-gated: <c>BoardView</c> and <c>TaskListView</c> (<c>@key</c> on the Space and Project), and
+/// <c>ProjectList</c>, <c>SpaceNameSection</c> and <c>LabelSection</c> (<c>@key</c> on the Space); their children
+/// (<c>TaskDetail</c>, <c>TaskCreate</c>, <c>MovePicker</c>, cards and rows) go with them.</item>
+/// <item>Page-level fields of a page reused across Spaces reset on a change of <c>SpaceId</c>: <c>SpaceArrival</c>'s
+/// arrival state, <c>SpaceSettings</c>' permission state (story 2.4) and <c>SpaceHome</c>'s narration (story 3.2).</item>
+/// <item>Not Space-scoped, kept across a switch by design: <c>SpaceDirectory</c> and <c>ContextBar</c>'s copy of it
+/// (Account-scoped, dropped on Session end), and <c>PageHeadingFocus</c> (an element reference, no content).</item>
+/// </list>
+/// <para>
+/// <b>Epic 7 registers the rest of UX-DR31 with this seam</b> (stories 7.3 and 7.7): the replica, its projections, the
+/// queued inbound frames and lease invalidation (<c>MembershipChanged</c>) as a purge trigger. The FR-33 durable buffer
+/// lives in memory only. No second purge mechanism is added for any of them.
+/// </para>
+/// <para>
 /// <b>Never in browser storage, and shared with no other tab</b> (<c>EXPERIENCE.md:93</c>): scoped
 /// services are per tab in WebAssembly, and nothing here reaches a <c>BroadcastChannel</c> or a
 /// storage event. This class takes no framework type, so the ordering above is testable without a

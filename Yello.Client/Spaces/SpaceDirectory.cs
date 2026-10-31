@@ -12,13 +12,21 @@ namespace Yello.Client.Spaces;
 /// <para>
 /// <b>The one source a Space id may come from.</b> The Space home checks its route's id against this
 /// list before it asks anything about that Space (AC10), the entry point lands on the first Space it
-/// lists (AC11), and the refusal page's route back goes through the entry point - so no Space is ever
+/// lists that has not refused this tab (AC11; story 3.2, AC12), and the refusal page's route back goes through the entry point - so no Space is ever
 /// reached from a remembered last one (UX-DR32). Nothing records which Space was last visited.
 /// </para>
 /// <para>
 /// <b>Held in a field, never in browser storage</b> (<c>ClientStorageBanTests</c>). It is
 /// Account-scoped identity rather than Space-scoped content, so it survives a Space switch; it is
 /// dropped on sign-out and when the Session ends, through the Session's purge.
+/// </para>
+/// <para>
+/// <b>The Spaces that refused this tab, held only to be skipped</b> (story 3.2, AC12, open question 1 (a);
+/// <c>deferred-work.md:358</c>). A listed Space that answers its arrival with a <c>403</c>, <c>404</c> or <c>409</c> is
+/// recorded, and the entry point's route back lands on the first listed Space NOT recorded, so "Back to Yello" never
+/// loops on the Space that just refused. The set can only exclude, never choose a destination: the destination is
+/// always the switcher's answer in the order served, so this is not a remembered last Space (UX-DR32). A successful
+/// arrival removes a Space from it, and <see cref="Forget"/> clears it. It is per tab and per load, in memory only.
 /// </para>
 /// <para>
 /// <b>Refetched on arrival at the entry point, on a fresh load of a Space route, and every time the
@@ -29,6 +37,10 @@ namespace Yello.Client.Spaces;
 public sealed class SpaceDirectory(HttpClient http)
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    // The listed Spaces that refused this tab's arrival in this load (story 3.2, AC12). It only ever EXCLUDES: the
+    // route back skips its members and never chooses one, so it is not a remembered last Space (UX-DR32).
+    private readonly HashSet<Guid> _refusedInThisLoad = [];
 
     // Advanced by every Forget, so an answer requested before one is recognised when it lands.
     private int _generation;
@@ -106,11 +118,33 @@ public sealed class SpaceDirectory(HttpClient http)
     }
 
     /// <summary>
-    /// Drops the answer - on sign-out and when the Session ends.
+    /// Records that a listed Space refused this tab's arrival (a <c>403</c>, <c>404</c> or <c>409</c>, or no answer at
+    /// all), so the entry point's route back offers a different one (story 3.2, AC12, open question 1 (a)).
+    /// </summary>
+    /// <param name="spaceId">The Space that refused.</param>
+    public void Refused(Guid spaceId) => _refusedInThisLoad.Add(spaceId);
+
+    /// <summary>
+    /// Records that this tab arrived in a Space, so a Space that refused earlier in this load and has since recovered
+    /// (a <c>409</c> for the concurrent-Sessions bound, say) is offered by the route back again.
+    /// </summary>
+    /// <param name="spaceId">The Space arrived in.</param>
+    public void ArrivedIn(Guid spaceId) => _refusedInThisLoad.Remove(spaceId);
+
+    /// <summary>
+    /// Whether a Space refused this tab's arrival in this load and has not been arrived in since.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns><c>true</c> when the route back must not offer it.</returns>
+    public bool RefusedInThisLoad(Guid spaceId) => _refusedInThisLoad.Contains(spaceId);
+
+    /// <summary>
+    /// Drops the answer, and the Spaces that refused this tab - on sign-out and when the Session ends.
     /// </summary>
     public void Forget()
     {
         _generation++;
         Current = null;
+        _refusedInThisLoad.Clear();
     }
 }

@@ -13,7 +13,9 @@
 
     WHERE SIGN-IN LANDS, AND WHERE THE REFUSAL PAGE'S ROUTE BACK GOES. Signed out, it goes to
     sign-in. Signed in, it asks the Space switcher again and lands on the first Space listed, in the
-    order served - never on a remembered last Space, because nothing remembers one (UX-DR32).
+    order served, that has not refused this tab in this load - never on a remembered last Space, because
+    nothing remembers one (UX-DR32). Story 3.2 (AC12, open question 1 (a)): the Spaces that refused are
+    only skipped, never chosen; when every listed Space has refused, the refusal page stands.
 
     BELONGING TO NO SPACE IS A VALID STATE (UX-DR35, FR-7). An Account holding no Membership is told
     so here, and nothing is ever created for it. Story 3.1 (AC15) gives the state its one action - a
@@ -83,7 +85,20 @@
             return;
         }
 
-        Navigation.NavigateTo(ClientRoutes.SpaceHome(spaces[0].Id), replace: true);
+        // The route back skips every listed Space that refused this tab in this load, so a 403, 404 or 409 on arrival
+        // never loops (story 3.2, AC12). The set only excludes: the destination is still the switcher's answer, in the
+        // order served.
+        var destination = spaces.FirstOrDefault(space => !Directory.RefusedInThisLoad(space.Id));
+
+        if (destination is null)
+        {
+            // Every listed Space has refused in this load: the refusal page stands, with the bar's shell, whose
+            // switcher still lists every one of them.
+            _unavailable = true;
+            return;
+        }
+
+        Navigation.NavigateTo(ClientRoutes.SpaceHome(destination.Id), replace: true);
     }
 
     /// <inheritdoc />

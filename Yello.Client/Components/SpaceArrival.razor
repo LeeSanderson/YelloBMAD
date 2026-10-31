@@ -29,6 +29,9 @@
     render the same RefusalSurface; a 403 or 409 renders through the same surface with RefusalCopy's own
     words; and a page's own 404 (a Project that matches nothing) comes back through Refuse to the same
     surface. A 401 is YelloApiHandler's: the Session has ended, and the purge and the sign-in page follow.
+    A listed Space whose OWN answer refused (or never came) is recorded with the directory, so the route
+    back offers a different listed Space (story 3.2, AC12); a page's own 404 is not the Space refusing,
+    and an unlisted id is never one the route back would offer, so neither is recorded.
 
     A FIRST ARRIVAL FOCUSES THE PAGE'S HEADING, as FocusOnNavigate would have had the heading existed when
     it ran (PageHeadingFocus). After a switch the context bar takes focus instead.
@@ -140,7 +143,12 @@
 
             if (!Directory.Lists(SpaceId))
             {
-                RefuseUnlessLeft(token);
+                // Not recorded as a refusal: the route back only ever looks at listed Spaces.
+                if (!token.IsCancellationRequested)
+                {
+                    Refuse(problem: null);
+                }
+
                 return;
             }
         }
@@ -174,7 +182,10 @@
             // failure that says nothing about the Space must not throw away what a person typed (AC14).
             if (firstArrival || response.StatusCode == HttpStatusCode.NotFound)
             {
-                Refuse(await SpaceWrites.ProblemOfAsync(response, token));
+                var problem = await SpaceWrites.ProblemOfAsync(response, token);
+
+                Directory.Refused(SpaceId);
+                Refuse(problem);
             }
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
@@ -201,11 +212,15 @@
     /// Refuses this Space - unless the tab has already left it. This component is reused across
     /// Spaces, so a late failure about the departed Space would otherwise refuse the destination.
     /// </summary>
-    private void RefuseUnlessLeft(CancellationToken token, bool firstArrival = true)
+    /// <remarks>
+    /// A Space whose arrival failed is recorded with the directory, so the route back offers another (story 3.2, AC12).
+    /// </remarks>
+    private void RefuseUnlessLeft(CancellationToken token, bool firstArrival)
     {
         // A failed re-arrival keeps the page and the Role it already has (AC14).
         if (!token.IsCancellationRequested && firstArrival)
         {
+            Directory.Refused(SpaceId);
             Refuse(problem: null);
         }
     }
@@ -218,6 +233,9 @@
         {
             return;
         }
+
+        // A Space that refused earlier in this load and now answers is offered by the route back again (AC12).
+        Directory.ArrivedIn(answer.Id);
 
         _arrived = true;
         _arrivedIn = answer.Id;

@@ -31,7 +31,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Anchored on the statuses first, so a route that fell through to the unmatched endpoint is not read as an answer.
     /// Plant: remove the pipeline's <c>no-store</c> - this goes red on all four.
     /// </remarks>
-    [Fact(Skip = "red: AC18 - no Space-scoped GET, the switcher or the boundary 404 sets Cache-Control: no-store yet (story 3.2 Task 5, Q2 (a))")]
+    [Fact]
     [Trait("Priority", "P0")]
     [Trait("Requirement", "UX-DR31")]
     [Trait("Requirement", "AD-7")]

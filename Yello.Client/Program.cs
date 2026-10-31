@@ -163,6 +163,12 @@ sessionState.RegisterPurge(() =>
     return Task.CompletedTask;
 });
 
+// A PENDING ANNOUNCEMENT IS SPACE-SCOPED (story 3.2, AC11). A sentence Space settings held for its Space's home
+// ("narrated, then routed", UX-DR29) is dropped on a change of Space, so it is never said in another Space. The
+// registration lives for the application, as the narration does; the handle is not disposed.
+var spaceNarration = host.Services.GetRequiredService<SpaceNarration>();
+_ = activeSpace.RegisterPurge(spaceNarration.Forget);
+
 // THE SYNCHRONOUS PURGE ON LEAVING A SPACE (story 1.7, AC7). A location-changing handler runs BEFORE
 // the router renders the new location - for a link, a NavigateTo, and browser Back or Forward alike
 // - so the departed Space is gone before anything of the destination is drawn. A navigation within

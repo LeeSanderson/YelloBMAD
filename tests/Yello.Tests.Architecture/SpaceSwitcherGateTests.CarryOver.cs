@@ -92,7 +92,7 @@ public sealed partial class SpaceSwitcherGateTests
     /// <c>ActiveSpaceStateTests.A_pending_narration_is_forgotten_on_a_Space_change_and_kept_within_one_Space</c> only if
     /// the plant removes <c>Forget</c> itself.
     /// </remarks>
-    [Fact(Skip = "red: AC11 - SpaceNarration has no Forget() and Program registers nothing of it with the Space purge (story 3.2 Task 2)")]
+    [Fact]
     [Trait("Requirement", "UX-DR31")]
     [Trait("Requirement", "UX-DR38")]
     public void The_composition_root_registers_the_pending_narration_with_the_Space_purge()
@@ -101,7 +101,7 @@ public sealed partial class SpaceSwitcherGateTests
         Assert.Contains("Program", CallersOf(typeof(ActiveSpaceState).FullName!, nameof(ActiveSpaceState.Navigating)));
 
         Assert.Contains("Program", CallersOf(typeof(ActiveSpaceState).FullName!, nameof(ActiveSpaceState.RegisterPurge)));
-        Assert.Contains("Program", CallersOf(typeof(SpaceNarration).FullName!, "Forget"));
+        Assert.Contains("Program", CallersOf(typeof(SpaceNarration).FullName!, nameof(SpaceNarration.Forget)));
     }
 
     /// <summary>
@@ -121,7 +121,7 @@ public sealed partial class SpaceSwitcherGateTests
     /// goes red.
     /// </para>
     /// </remarks>
-    [Fact(Skip = "red: AC12 - SpaceDirectory holds no per-load set of refused Spaces and Home still lands on spaces[0] (story 3.2 Task 3, Q1 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public void The_route_back_exclusion_lives_in_the_directory_and_is_not_a_remembered_Space()
     {

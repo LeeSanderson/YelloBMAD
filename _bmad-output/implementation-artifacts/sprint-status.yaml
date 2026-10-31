@@ -1,5 +1,5 @@
 # generated: 2026-08-22 13:10
-# last_updated: 2026-10-30
+# last_updated: 2026-10-31
 # project: YelloBMAD
 # project_key: NOKEY
 # tracking_system: file-system
@@ -64,7 +64,7 @@
 #   - issues 8, 9: PRD §7's stale sentence; missing `status` fields
 
 generated: 2026-08-22 13:10
-last_updated: 2026-10-30
+last_updated: 2026-10-31
 project: YelloBMAD
 project_key: NOKEY
 tracking_system: file-system
@@ -103,7 +103,7 @@ development_status:
   # Epic 3: Several Spaces, cleanly separated
   epic-3: in-progress
   3-1-create-and-rename-a-space: done
-  3-2-switch-between-spaces-with-nothing-carrying-over: ready-for-dev
+  3-2-switch-between-spaces-with-nothing-carrying-over: review
   3-3-delete-a-space-and-belong-to-none: backlog
   3-4-prove-that-owning-one-space-grants-nothing-in-another: backlog
   epic-3-retrospective: optional

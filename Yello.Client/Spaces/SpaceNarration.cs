@@ -9,6 +9,12 @@ namespace Yello.Client.Spaces;
 /// <b>Never Space content, and never stored.</b> The sentence names a Role and a surface, both the client's own copy;
 /// it lives in this tab's memory until the destination takes it, and nothing reaches browser storage
 /// (<c>ClientStorageBanTests</c>).
+/// <para>
+/// <b>Still bound to the Space it was said in</b> (story 3.2, AC11; UX-DR31, UX-DR38). A held sentence is a pending
+/// announcement about that Space's Role, so it is registered with the Space purge in <c>Program</c>: a switch made
+/// before the destination takes it drops it, and the next Space's home says nothing about the last one. A navigation
+/// within one Space purges nothing, so "narrated, then routed" still works.
+/// </para>
 /// </remarks>
 public sealed class SpaceNarration
 {
@@ -31,4 +37,10 @@ public sealed class SpaceNarration
 
         return sentence;
     }
+
+    /// <summary>
+    /// Drops any held sentence, unsaid - registered with the Space purge (story 3.2, AC11), so a sentence held for one
+    /// Space's home is never said in another's.
+    /// </summary>
+    public void Forget() => _pending = null;
 }

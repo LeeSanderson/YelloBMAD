@@ -27,10 +27,11 @@ namespace Yello.Tests.Client;
 /// count is read after a barrier request (the switcher's refresh) the client is known to make.
 /// </para>
 /// <para>
-/// <b>Green today, standing gates</b> (built by 1.7 and registered with by Epic 2): the cases left active below. The
-/// red-phase cases are skipped with <c>red: AC&lt;n&gt;</c>, each naming what is missing. The checklist
-/// (<c>_bmad-output/test-artifacts/atdd-checklist-3-2-switch-between-spaces-with-nothing-carrying-over.md</c>) records
-/// which is which and the order to activate them.
+/// <b>Mostly standing gates</b> on rules 1.7 built and Epic 2 registered with, green when the ATDD run wrote them. The
+/// two route-back cases (AC12) were red until story 3.2 built the exclusion set, and the narration case (AC11) was
+/// written red by the dev phase. The checklist
+/// (<c>_bmad-output/test-artifacts/atdd-checklist-3-2-switch-between-spaces-with-nothing-carrying-over.md</c>) and the
+/// story's Debug Log record each case's plants.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Client")]
@@ -57,6 +58,7 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
 
     private const string NotAvailableCopy = "Not available.";
     private const string BackToYello = "Back to Yello.";
+    private const string NowAMemberCopy = "You're now a Member. Space settings is no longer available.";
     private const string SettingsLink = "Space settings";
     private const string CreateProject = "Create a Project";
     private const string AddTask = "Add a Task";
@@ -567,10 +569,50 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// AC11 (UX-DR31, UX-DR38) - a sentence Space settings narrated for its own Space's home ("narrated, then routed",
+    /// UX-DR29) is not carried into the next Space's home: Space home is one page reused across Spaces, so the sentence it
+    /// took must go with the Space it was said about.
+    /// </summary>
+    /// <remarks>
+    /// Written by the dev phase. The ATDD run's AC11 case (switch between <c>Say</c> and <c>Take</c>) is a one-turn race a
+    /// browser cannot interleave; this is the reachable path the same rule governs - the sentence after it was taken.
+    /// </remarks>
+    [Fact]
+    [Trait("Requirement", "UX-DR38")]
+    [Trait("Requirement", "UX-DR29")]
+    public async Task A_narration_said_in_one_Spaces_home_is_not_carried_into_the_next()
+    {
+        var api = SeededSpaces();
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await api.InstallAsync(page);
+            await page.GotoAsync(Address($"spaces/{Northwind:D}/settings"));
+            await page.Locator(RoleChip, new PageLocatorOptions { HasText = "Owner" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            api.Roles[Northwind] = "member";
+
+            await NavigateInAppAsync(page, $"/spaces/{Northwind:D}/settings");
+            await WaitForPathAsync(page, $"/spaces/{Northwind:D}");
+
+            // Anchor: Northwind's home says the sentence.
+            await page.Locator("main").GetByText(NowAMemberCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            await ChooseInSwitcherAsync(page, HarbourName);
+            await WaitForPathAsync(page, $"/spaces/{Harbour:D}");
+            await page.Locator(RoleChip, new PageLocatorOptions { HasText = "Viewer" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.Locator("main").GetByText(BeaconName).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal(0, await page.GetByText(NowAMemberCopy).CountAsync());
+        }
+    }
+
+    /// <summary>
     /// AC12 (UX-DR32, Q1 (a), <c>deferred-work.md:358</c>) - when a listed Space answers <c>409</c> on arrival, "Back to
     /// Yello" lands on a different listed Space, and the refusing Space is asked about once only.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the route back always lands on spaces[0], so a Space that refused is offered again (story 3.2 Task 3, Q1 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task The_route_back_skips_a_listed_Space_that_refused_with_409()
     {
@@ -601,7 +643,7 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
     /// AC12 (UX-DR32, Q1 (a)) - when every listed Space refuses in this load, the route back stops on the refusal page with
     /// the bar's shell, whose switcher still lists both; no Space is asked about again.
     /// </summary>
-    [Fact(Skip = "red: AC12 - with every listed Space refusing, the route back offers spaces[0] again (story 3.2 Task 3, Q1 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task When_every_listed_Space_refuses_the_route_back_stops_on_the_refusal_page()
     {
@@ -691,9 +733,13 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
     /// while A's answer is held, none of B's Label names is in the DOM.
     /// </summary>
     /// <remarks>
-    /// Q3 (a) assumed: plant each defence layer separately and record which the browser sees. Removing the
-    /// <c>@key</c> AND skipping <c>LabelSection.Purge</c> together must turn this red; skipping <c>Purge</c> alone may
-    /// stay green, which is the data rule holding by the key - record it, and close <c>:542</c> with that record.
+    /// Q3 (a): each defence layer planted separately, recorded by the dev phase (story 3.2 Debug Log). Skipping
+    /// <c>LabelSection.Purge</c> alone stays green, and so does removing the <c>@key</c> as well: <c>SpaceArrival</c>
+    /// unmounts its child while the destination is held, so a fresh section mounts on arrival. Skipping the seam's
+    /// <c>Purge()</c> in <c>Navigating</c> turns this red on the bar's Space name (ATDD run). With all four layers off -
+    /// the seam's purge, the arrival gate's reset, the <c>@key</c> and the section's purge - the reused section keeps the
+    /// departed Space's Labels and this goes red before Back, at B's own Labels. The section's purge and key are defence in
+    /// depth behind the arrival gate, which the browser cannot see one at a time.
     /// </remarks>
     [Fact]
     public async Task Back_from_one_Spaces_settings_to_anothers_leaves_no_Label_of_the_departed_Space_while_held()

@@ -19,7 +19,8 @@
 
     SPACE SETTINGS is linked from the context bar since story 3.1 (AC4, open question 4 (a)), not from here - so an
     empty Space offers exactly one action (deferred-work.md:528). A Role re-read lower on that page is narrated, then
-    routed here, and this page says the sentence on arrival (UX-DR29).
+    routed here, and this page says the sentence on arrival (UX-DR29). The sentence belongs to that Space: this page is
+    reused when the switcher moves to another Space's home, and drops it then (story 3.2, AC11).
 
     THE PROJECTS (story 2.1) are ProjectList's, rendered only once the Space has answered, keyed on the
     Space so a switch starts a new list rather than reusing the departed one's. A 404 the list or a
@@ -41,6 +42,7 @@
 
 @code {
     private string? _narration;
+    private Guid _narratedIn;
 
     /// <summary>
     /// The Space this route names.
@@ -49,5 +51,21 @@
     public Guid SpaceId { get; set; }
 
     /// <inheritdoc />
-    protected override void OnInitialized() => _narration = Narration.Take();
+    protected override void OnInitialized()
+    {
+        _narration = Narration.Take();
+        _narratedIn = SpaceId;
+    }
+
+    /// <summary>
+    /// This page is reused across Spaces, so the sentence it took goes with the Space it was said about (story 3.2,
+    /// AC11; UX-DR38): another Space's home says nothing about the last one.
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        if (SpaceId != _narratedIn)
+        {
+            _narration = null;
+        }
+    }
 }

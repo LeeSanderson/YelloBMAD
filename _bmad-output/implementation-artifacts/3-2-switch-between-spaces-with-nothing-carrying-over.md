@@ -4,7 +4,7 @@ baseline_commit: f3139a1
 
 # Story 3.2: Switch between Spaces with nothing carrying over
 
-Status: ready-for-dev
+Status: review
 
 Epic: 3 — Several Spaces, cleanly separated
 Story key: `3-2-switch-between-spaces-with-nothing-carrying-over`
@@ -162,32 +162,32 @@ AC1 to AC10 are reproduced **verbatim** from `epics.md:1487-1529` (`status: fina
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: decide the open questions** (all ACs)
-  - [ ] Read Dev Notes, then Open questions. Decide each one as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default. No human is in the loop, so do not stop to ask.
-- [ ] **Task 2: survey the purge holders, then fill the gaps** (AC3, AC4, AC11)
-  - [ ] Grep `Yello.Client` for every field holding Space-scoped data: `Dictionary`, `HashSet`, `List<`, `IReadOnlyList<`, and the `*Response` types. Classify each one as purge-registered, keyed-and-arrival-gated, or Account-scoped (`SpaceDirectory`, `ContextBar._spaces`) or Session-scoped. The survey below is the starting point. Verify it, do not trust it.
-  - [ ] Register `SpaceNarration` with the Space purge. The cleanest way is in the composition root (`Program.cs:158-175`, beside `activeSpace`'s wiring): `activeSpace.RegisterPurge(spaceNarration.Forget)`. `SpaceNarration` gains `Forget()`. Keep its "never Space content" remark, and add that a pending sentence is still bound to the Space it was said in.
-  - [ ] Write the holder list into `ActiveSpaceState`'s remarks, and add that Epic 7 registers its replica, projection, inbound-frame queue and lease with this seam (UX-DR31's remaining items).
-- [ ] **Task 3: the route back** (AC12, AC13; Q1)
-  - [ ] Implement Q1. Under (a), `SpaceDirectory` gains an in-memory, per-load set of Space ids that **refused this tab** (`RefusedInThisLoad` or similar; the name must not match the `RemembersASpace` regex at `SpaceSwitcherGateTests.cs:457-461`, and the regex must not be widened to make it pass). `SpaceArrival.Refuse` adds the refused id. `Home.razor:86` navigates to the first listed Space **not** in the set. If every listed Space is in the set, Home renders the refusal page with the shell, whose switcher remains usable.
-  - [ ] The set is cleared by `SpaceDirectory.Forget()`, which already runs on Session end. A successful arrival in a Space removes that id from the set, so a Space that recovers (for example after a `409` for the concurrent-Sessions bound) is offered again.
-  - [ ] The set is **never a destination**: it can only exclude Spaces. Note that in the remarks, together with the UX-DR32 reason.
-- [ ] **Task 4: scroll** (AC2, AC8; Q4)
-  - [ ] Verify in the browser what happens to `window.scrollY`, and to the Board's and List view's scroll containers, on a switch and on Back between Spaces. `history.scrollRestoration = 'manual'` already exists (`wwwroot/index.html:121`). Blazor's own scroll behaviour on internal navigation is **unverified**: measure it, do not assume it.
-  - [ ] If any scroll offset of the departed Space survives, reset it per Q4 and record what you measured.
-- [ ] **Task 5: the HTTP cache** (AC18; Q2)
-  - [ ] Implement Q2. Under (a), the `api` route group sets `Cache-Control: no-store` on every response, in one place in the pipeline (`ApiRouteGroup` or a small middleware scoped to `/api`), not per endpoint. The existing per-endpoint `no-store` lines (`IdempotentResponses.cs:182`, `ApiTokenEndpoints.cs:99`) stay, or are folded in. Record which.
-  - [ ] Add a wire case to `ActiveSpaceEndpointTests` (an existing container class) asserting `no-store` on a Space-scoped `200`, on the boundary `404`, and on the switcher `200`.
-- [ ] **Task 6: gates** (AC1, AC4, AC5, AC11; each proved against a plant. Save the original content and restore it in a `finally`. **Never `git checkout`, `restore` or `reset`.**)
-  - [ ] **The switcher is the only list of the Account's Spaces** (AC1): a static gate in `SpaceSwitcherGateTests` asserting that only `SpaceSwitcher.razor` renders rows from `SpaceIdentityResponse` (a `@foreach` over `SpaceDirectory.Current` or over the `Spaces` parameter). `Home.razor` may read the list to choose a destination and must render none of it. Its message names the 5.4 exception (AC1 note). Plant a `@foreach` over `Directory.Current` in `Home.razor`.
-  - [ ] **Every Space-scoped holder is purged** (AC11): extend `ActiveSpaceStateTests` with a unit case asserting that a sentence held in `SpaceNarration` is gone after `Purge()` and survives a same-Space navigation, and an IL or source gate asserting that `Program` registers `SpaceNarration` with the Space purge. Plant: remove the registration.
-  - [ ] Keep green: `ClientStorageBanTests`, `No_client_code_remembers_a_last_Space` (and its plant tests), `The_host_page_disables_scroll_restoration_before_the_runtime_loads`, `No_client_code_sets_the_document_title`, `The_Role_chip_is_never_interactive`, `ActiveSpaceStateTests.*`.
-- [ ] **Task 7: browser tests** (see Dev Notes, then Testing requirements). Build `Yello.Client` in **Debug** before any browser run or plant.
-- [ ] **Task 8: ledger, conventions, verification**
-  - [ ] `deferred-work.md`: apply Dev Notes → Ledger dispositions.
-  - [ ] `tests/TESTING-CONVENTIONS.md`: add a short note, "Two tabs and an Account switch, added by story 3.2". It covers how a case opens a second page in one `IBrowserContext` (`context.NewPageAsync`, the same `FakeYelloApi` installed on each page or one per page, as decided), and how a case changes the signed-in identity of `FakeYelloApi` between a sign-out and a sign-in.
-  - [ ] Rewrite any comment that predicts 3.2 so it describes what exists (`grep -rn "3\.2" Yello.Client Yello.Host tests`).
-  - [ ] Run `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers.
+- [x] **Task 1: decide the open questions** (all ACs)
+  - [x] Read Dev Notes, then Open questions. Decide each one as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default. No human is in the loop, so do not stop to ask.
+- [x] **Task 2: survey the purge holders, then fill the gaps** (AC3, AC4, AC11)
+  - [x] Grep `Yello.Client` for every field holding Space-scoped data: `Dictionary`, `HashSet`, `List<`, `IReadOnlyList<`, and the `*Response` types. Classify each one as purge-registered, keyed-and-arrival-gated, or Account-scoped (`SpaceDirectory`, `ContextBar._spaces`) or Session-scoped. The survey below is the starting point. Verify it, do not trust it.
+  - [x] Register `SpaceNarration` with the Space purge. The cleanest way is in the composition root (`Program.cs:158-175`, beside `activeSpace`'s wiring): `activeSpace.RegisterPurge(spaceNarration.Forget)`. `SpaceNarration` gains `Forget()`. Keep its "never Space content" remark, and add that a pending sentence is still bound to the Space it was said in.
+  - [x] Write the holder list into `ActiveSpaceState`'s remarks, and add that Epic 7 registers its replica, projection, inbound-frame queue and lease with this seam (UX-DR31's remaining items).
+- [x] **Task 3: the route back** (AC12, AC13; Q1)
+  - [x] Implement Q1. Under (a), `SpaceDirectory` gains an in-memory, per-load set of Space ids that **refused this tab** (`RefusedInThisLoad` or similar; the name must not match the `RemembersASpace` regex at `SpaceSwitcherGateTests.cs:457-461`, and the regex must not be widened to make it pass). `SpaceArrival.Refuse` adds the refused id. `Home.razor:86` navigates to the first listed Space **not** in the set. If every listed Space is in the set, Home renders the refusal page with the shell, whose switcher remains usable.
+  - [x] The set is cleared by `SpaceDirectory.Forget()`, which already runs on Session end. A successful arrival in a Space removes that id from the set, so a Space that recovers (for example after a `409` for the concurrent-Sessions bound) is offered again.
+  - [x] The set is **never a destination**: it can only exclude Spaces. Note that in the remarks, together with the UX-DR32 reason.
+- [x] **Task 4: scroll** (AC2, AC8; Q4)
+  - [x] Verify in the browser what happens to `window.scrollY`, and to the Board's and List view's scroll containers, on a switch and on Back between Spaces. `history.scrollRestoration = 'manual'` already exists (`wwwroot/index.html:121`). Blazor's own scroll behaviour on internal navigation is **unverified**: measure it, do not assume it.
+  - [x] If any scroll offset of the departed Space survives, reset it per Q4 and record what you measured.
+- [x] **Task 5: the HTTP cache** (AC18; Q2)
+  - [x] Implement Q2. Under (a), the `api` route group sets `Cache-Control: no-store` on every response, in one place in the pipeline (`ApiRouteGroup` or a small middleware scoped to `/api`), not per endpoint. The existing per-endpoint `no-store` lines (`IdempotentResponses.cs:182`, `ApiTokenEndpoints.cs:99`) stay, or are folded in. Record which.
+  - [x] Add a wire case to `ActiveSpaceEndpointTests` (an existing container class) asserting `no-store` on a Space-scoped `200`, on the boundary `404`, and on the switcher `200`.
+- [x] **Task 6: gates** (AC1, AC4, AC5, AC11; each proved against a plant. Save the original content and restore it in a `finally`. **Never `git checkout`, `restore` or `reset`.**)
+  - [x] **The switcher is the only list of the Account's Spaces** (AC1): a static gate in `SpaceSwitcherGateTests` asserting that only `SpaceSwitcher.razor` renders rows from `SpaceIdentityResponse` (a `@foreach` over `SpaceDirectory.Current` or over the `Spaces` parameter). `Home.razor` may read the list to choose a destination and must render none of it. Its message names the 5.4 exception (AC1 note). Plant a `@foreach` over `Directory.Current` in `Home.razor`.
+  - [x] **Every Space-scoped holder is purged** (AC11): extend `ActiveSpaceStateTests` with a unit case asserting that a sentence held in `SpaceNarration` is gone after `Purge()` and survives a same-Space navigation, and an IL or source gate asserting that `Program` registers `SpaceNarration` with the Space purge. Plant: remove the registration.
+  - [x] Keep green: `ClientStorageBanTests`, `No_client_code_remembers_a_last_Space` (and its plant tests), `The_host_page_disables_scroll_restoration_before_the_runtime_loads`, `No_client_code_sets_the_document_title`, `The_Role_chip_is_never_interactive`, `ActiveSpaceStateTests.*`.
+- [x] **Task 7: browser tests** (see Dev Notes, then Testing requirements). Build `Yello.Client` in **Debug** before any browser run or plant.
+- [x] **Task 8: ledger, conventions, verification**
+  - [x] `deferred-work.md`: apply Dev Notes → Ledger dispositions.
+  - [x] `tests/TESTING-CONVENTIONS.md`: add a short note, "Two tabs and an Account switch, added by story 3.2". It covers how a case opens a second page in one `IBrowserContext` (`context.NewPageAsync`, the same `FakeYelloApi` installed on each page or one per page, as decided), and how a case changes the signed-in identity of `FakeYelloApi` between a sign-out and a sign-in.
+  - [x] Rewrite any comment that predicts 3.2 so it describes what exists (`grep -rn "3\.2" Yello.Client Yello.Host tests`).
+  - [x] Run `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers.
 
 ## Dev Notes
 
@@ -471,10 +471,111 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (`claude-opus-5-5`), dev-story run unattended by the story-cycle orchestrator, 2026-10-31.
+
 ### Debug Log References
+
+**Activation (red, then green).** All six red-phase scaffolds were un-skipped and run before any product change:
+
+| Scaffold | Red, for the stated reason | Green after |
+|---|---|---|
+| `The_route_back_skips_a_listed_Space_that_refused_with_409` | timeout at `WaitForPathAsync(/spaces/{Harbour})` - the route back returned to Northwind | Q1 (a) in `SpaceDirectory`, `SpaceArrival`, `Home` |
+| `When_every_listed_Space_refuses_the_route_back_stops_on_the_refusal_page` | the same loop | same |
+| `The_route_back_exclusion_lives_in_the_directory_and_is_not_a_remembered_Space` | "SpaceDirectory holds no set of the Spaces that refused this tab" | same; regex not widened |
+| `A_pending_narration_is_forgotten_on_a_Space_change_and_kept_within_one_Space` | `Assert.NotNull` - no `Forget()` | `SpaceNarration.Forget` |
+| `The_composition_root_registers_the_pending_narration_with_the_Space_purge` | `Program` not among `RegisterPurge`'s callers | `activeSpace.RegisterPurge(spaceNarration.Forget)` in `Program` |
+| `Every_api_answer_is_no_store_on_the_switcher_a_Space_and_the_boundary` | confirmed by plant (below): the assertion at line 76 fails with the middleware neutered | `ApiNoStore` middleware |
+
+**Scaffolds corrected:**
+
+- `ActiveSpaceStateTests.A_pending_narration_...`: found `Forget` by reflection so it compiled before the method existed. Retargeted to a direct `narration.Forget` method group, as its own remark asked, and the now-unused `using System.Reflection` removed.
+- `SpaceSwitcherGateTests.The_composition_root_registers_...`: the string `"Forget"` became `nameof(SpaceNarration.Forget)`.
+- `SpaceSwitchCarryOverTests.Back_from_one_Spaces_settings_...` (E2E-015): its remark said removing the `@key` and skipping `LabelSection.Purge` together "must turn this red". Measured, it stays green, so the remark now records the measured layers (Q3 below). The assertions are unchanged.
+- `SpaceSwitchCarryOverTests` class remark: updated from "red-phase cases are skipped" to what now exists.
+
+**A real gap the survey found, written red first.** `SpaceHome` is one page reused across Spaces and took the narration in `OnInitialized` only. A sentence said in A's home ("You're now a Member...") stayed on screen in B's home after a switch through the switcher. New case `A_narration_said_in_one_Spaces_home_is_not_carried_into_the_next` failed at its final `Assert.Equal(0, ...)` with `SpaceNarration` already registered, then passed once `SpaceHome` dropped the sentence on a change of `SpaceId`. This is the reachable browser path for AC11. The ATDD run's switch between `Say` and `Take` is a one-turn race, and is held by the unit case and the IL gate instead.
+
+**Plants** (each applied by `plant.py` in the scratchpad, which held every original in memory and restored it in a `finally`, with SHA-256 verified. The Debug client or test project was rebuilt before each run.):
+
+| Plant | Target | Result |
+|---|---|---|
+| `Home` back to `spaces[0]` | E2E-012, ARCH-004 | both **red** (timeout at line 634; "Not found: Refused") |
+| Exclusion set made a destination (`var lastSpace = spaces.LastOrDefault(refused)`) | E2E-012, `No_client_code_remembers_a_last_Space` | both **red** |
+| `SpaceNarration` registration removed from `Program` | ARCH-003, UNIT-001 | ARCH-003 **red**; UNIT-001 green (it wires its own registration, by design) |
+| `SpaceHome`'s narration reset absent (the state before the fix) | new AC11 browser case | **red** (above) |
+| `no-store` neutered in `ApiNoStore` | SLC-001 | **red** at `ActiveSpaceEndpointTests.CacheControl.cs:76` |
+| `LabelSection.Purge` skipped alone | E2E-015 | green: defence in depth |
+| `LabelSection` `@key` removed + `Purge` skipped | E2E-015 | green: `SpaceArrival` unmounts its child while the destination is held |
+| Seam `Purge()` skipped in `Navigating` + `SpaceArrival`'s `_arrived` reset removed + `@key` removed + `LabelSection.Purge` skipped | E2E-015 | **red** at line 752: the reused section kept Northwind's Labels under Harbour's settings |
+| Seam `Purge()` skipped in `Navigating` alone (ATDD run) | E2E-002, -006, -015 | **red** on the bar's Space name |
+| `outline: none` on `.context-bar a/button:focus-visible` | E2E-017 x4 | all four **red** |
+| `TaskListFilters.Clear()` removed + `TaskListView` `@key` removed (same build as the ring plant; disjoint cases) | E2E-004 | green: the arrival gate, as for Labels |
+| `@foreach` over `Directory.Current` in `Home.razor` (ATDD run) | ARCH-001 | **red** |
+| A shared `static` in a client service | E2E-011 | not run: unprovable from the browser, because each tab is its own WebAssembly runtime. Ledgered to 3.4 |
+| Q4 scroll reset removed | E2E-009 | not applicable: Q4 landed as (b), and no reset exists |
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created (create-story, 2026-10-30).
 
+**Decisions** (each reversible; cut any line to reopen it):
+
+- **Q1 - (a).** An in-memory, per-load exclusion set on `SpaceDirectory` (`Refused`, `ArrivedIn`, `RefusedInThisLoad`, cleared by `Forget`). `Home` lands on the first listed Space not in it, and shows the refusal page with the bar's shell when all have refused. Cost: one `HashSet<Guid>` in an Account-scoped service. Recorded: a listed Space's own refusal (`403`/`404`/`409`, or a transport failure on arrival). Not recorded: an unlisted id (the route back never offers one) and a page's own `404` (a missing Project is not the Space refusing).
+- **Q2 - (a).** `Cache-Control: no-store` on every `/api` response, set once by the `ApiNoStore` middleware in `Yello.Host/Program.cs` through `Response.OnStarting`, so `DatabaseAvailability`'s `Response.Clear()` cannot drop it. A value already holding `no-store` (the cookie handler's `no-cache,no-store` on a dead-cookie `401`) is left alone. **The per-endpoint lines stay** (`IdempotentResponses.cs:182`, `ApiTokenEndpoints.cs:99`): they state their reason where the secret is written and agree with the pipeline. Cost: one header per answer.
+- **Q3 - (a).** Each layer was planted separately; the record is in the Debug Log and in `deferred-work.md` (`:542` closure). The component purges and `@key`s stay as defence in depth behind the arrival gate.
+- **Q4 - (b).** Measured: window and every `main` element at offset 0 after a switch and after Back (`Scroll_is_at_the_origin_after_a_switch_and_after_Back`, green in this run and in the ATDD run). No reset added. The case stays, to catch a framework change.
+- **Q5 - (a).** No isolation row. 3.2 maps no `/api` route; Q2 adds only a header.
+- **Q6 - (a).** One `IBrowserContext`, two pages, one `FakeYelloApi` per page seeded identically (`Two_tabs_on_two_Spaces_share_no_state`).
+- **AC1 - Token select.** Account settings' Token-binding `<select>` (story 1.8) stays an allowed exception to "the only list of Spaces". It chooses a binding, not a way to reach a Space. ARCH-001's allow-list and message name it beside 5.4's AD-24 exception. Cost: a second rendering of the Space names exists, on Account settings only.
+- **SpaceHome narration.** It is dropped when the reused page's `SpaceId` changes. This is a fix beyond the story's survey, under AC11 / UX-DR38.
+
+**AC to test map:**
+
+| AC | Cases |
+|---|---|
+| AC1 | `The_switcher_lists_three_Spaces_at_mixed_Roles_by_name_and_nothing_else`; gate `Only_the_switcher_renders_the_Accounts_Spaces_as_a_list` (+ `The_Space_list_scan_detects_a_planted_list`) |
+| AC2 / AC17 | `Switching_from_Owner_to_Viewer_drops_every_Owner_affordance_while_held_and_after`, `A_Viewer_destination_Board_has_no_Task_create_control_after_an_Owners_Board`, `A_List_filter_and_sort_do_not_survive_a_switch`, `An_open_Task_and_the_bars_Project_name_do_not_survive_a_switch`; NFR-2 on the wire stays `Each_Space_reports_the_Role_held_there_with_no_carry_over_across_switches` |
+| AC3 / AC4 | `Back_and_Forward_between_two_Boards_leave_nothing_of_the_departed_Space_while_held`, `An_Account_switch_in_one_tab_leaves_nothing_of_the_first_Account`, the 1.7 sign-out cases, `ActiveSpaceStateTests.*` |
+| AC5 | `A_session_through_two_Spaces_Boards_Lists_and_settings_leaves_nothing_in_browser_storage`, `ClientStorageBanTests` |
+| AC6 / AC7 | `A_Project_id_followed_under_another_Space_renders_nothing_of_the_first_and_refuses_as_unlisted`, `SpaceScopedFirstLoadTests` |
+| AC8 | `Scroll_is_at_the_origin_after_a_switch_and_after_Back`, `A_Space_route_keeps_the_fixed_title_and_manual_scroll_restoration` |
+| AC9 | `Back_between_Spaces_focuses_the_bar_and_announces_the_destination_once` |
+| AC10 | `Two_tabs_on_two_Spaces_share_no_state` |
+| AC11 | `A_pending_narration_is_forgotten_on_a_Space_change_and_kept_within_one_Space`, `The_composition_root_registers_the_pending_narration_with_the_Space_purge`, `A_narration_said_in_one_Spaces_home_is_not_carried_into_the_next`; holder list in `ActiveSpaceState` remarks |
+| AC12 | `The_route_back_skips_a_listed_Space_that_refused_with_409`, `When_every_listed_Space_refuses_the_route_back_stops_on_the_refusal_page`, `The_route_back_exclusion_lives_in_the_directory_and_is_not_a_remembered_Space`, `No_client_code_remembers_a_last_Space` |
+| AC13 | `An_in_app_navigation_to_a_Space_removed_after_a_visit_is_refused_with_no_request` |
+| AC14 | `Back_from_one_Spaces_settings_to_anothers_leaves_no_Label_of_the_departed_Space_while_held` + the Q3 plant record |
+| AC15 | `A_keyboard_only_switch_lands_focus_on_the_bar_and_announces_the_destination`, `The_bars_Tab_order_follows_reading_order_with_a_visible_ring_at_every_stop` (x4), `The_create_pages_Tab_order_is_name_Create_Cancel_with_a_visible_ring`, `The_rename_sections_Tab_order_is_Rename_field_Save_Cancel_with_a_visible_ring` |
+| AC16 | `An_Account_switch_in_one_tab_leaves_nothing_of_the_first_Account` |
+| AC18 | `Every_api_answer_is_no_store_on_the_switcher_a_Space_and_the_boundary` |
+
+**Ledger.** Closed `:358`, `:364`, `:542` and `:669`. Added two entries:
+
+- UX-DR31's remaining purge holders (replica, projections, inbound frames, lease invalidation), owned by 7.3/7.7. No existing entry said so.
+- The two-tab case cannot see a shared static, owned by 3.4.
+
+**Verification.** See the Change Log entry for the build and full-run totals.
+
 ### File List
+
+- `Yello.Client/Spaces/SpaceDirectory.cs` (modified: the per-load refusal exclusion set)
+- `Yello.Client/Spaces/SpaceNarration.cs` (modified: `Forget`)
+- `Yello.Client/Spaces/ActiveSpaceState.cs` (modified: remarks - the holder list, Epic 7's registrations)
+- `Yello.Client/Components/SpaceArrival.razor` (modified: records refusals and arrivals with the directory)
+- `Yello.Client/Pages/Home.razor` (modified: the route back skips refused Spaces)
+- `Yello.Client/Pages/SpaceHome.razor` (modified: drops the narration on a change of Space)
+- `Yello.Client/Program.cs` (modified: registers `SpaceNarration.Forget` with the Space purge)
+- `Yello.Host/ApiNoStore.cs` (new)
+- `Yello.Host/Program.cs` (modified: `app.Use(ApiNoStore.InvokeAsync)`)
+- `tests/Yello.Tests.Client/SpaceSwitchCarryOverTests.cs` (modified: two cases activated, one case added, remarks)
+- `tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.CarryOver.cs` (modified: two cases activated)
+- `tests/Yello.Tests.Architecture/ActiveSpaceStateTests.cs` (modified: one case activated and retargeted)
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.CacheControl.cs` (modified: activated)
+- `tests/TESTING-CONVENTIONS.md` (modified: "Two tabs and an Account switch - added by story 3.2")
+- `_bmad-output/implementation-artifacts/deferred-work.md` (modified)
+- `_bmad-output/implementation-artifacts/sprint-status.yaml` (modified)
+- `_bmad-output/implementation-artifacts/3-2-switch-between-spaces-with-nothing-carrying-over.md` (this file)
+
+### Change Log
+
+- 2026-10-31 - dev-story: AC11 (`SpaceNarration` purged on a Space change; `SpaceHome` drops a taken sentence on a change of Space), AC12 (route-back exclusion set), AC18 (`no-store` on every `/api` answer). Six scaffolds activated, one browser case added, plants recorded, four ledger entries closed, two added. Verification: `dotnet build Yello.slnx` 0 warnings, 0 errors; `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`: 1,615 total, 1,605 passed, 1 failed, 9 skipped. The one failure was `ISO-TIMING-IN-SPACE / Session` (boundary vs in-Space not-found medians 62.1 vs 46.6 ms, 24.9 % against 20 %), a timing measurement under full-run load. The `/api` header applies to both paths alike. Rerun alone per CLAUDE.md, `Yello.Tests.Isolation` passed 141/141. Net: 1,606 passed, 0 failed, 9 skipped, against a baseline of 1,614 / 1,599 / 15 skipped (+1 new case; 6 red-phase skips activated). Status set to review.
