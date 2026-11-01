@@ -416,6 +416,73 @@ internal sealed record RoleRefused(string Capability) : Expectation("403 insuffi
 }
 
 /// <summary>
+/// Story 4.1 AC5 / I-7 (bytes): an Invitation issued to an address with no Account and one issued to an address registered
+/// as an Account with no Membership in the Space answer byte-identically - both <c>204</c>, the same (empty) body, content
+/// type and header names. The registered address is a fresh actor's, so it joins the world's log secrets (I-17); the
+/// other is added to the case actor's. Written by the story 4.1 ATDD run.
+/// </summary>
+internal sealed record SameAnswerWhetherOrNotTheAddressHasAnAccount() : Expectation("204 either way, byte-identical, whether or not the address has an Account")
+{
+    /// <inheritdoc />
+    protected override async Task VerifyCoreAsync(IsolationWorld world, CaseRequest request, IsolationSurface surface)
+    {
+        foreach (var (path, _) in request.Paths)
+        {
+            var registered = await world.NewActorAsync("Ia");
+            var nobody = InvitationScaffold.FreshAddress("i7");
+
+            request.Actor.HoldsSecret(nobody);
+
+            var toNobody = await request.Actor.SendAsync(surface, request.Method, path, InvitationScaffold.Body(nobody, "member"), headers: null);
+            var toAccount = await request.Actor.SendAsync(surface, request.Method, path, InvitationScaffold.Body(registered.EmailAddress, "member"), headers: null);
+
+            Assert.True(toNobody.StatusCode == HttpStatusCode.NoContent, $"{path}: {toNobody.StatusCode} {toNobody.Body}");
+            AssertSameBytes(toNobody, toAccount, path);
+        }
+    }
+}
+
+/// <summary>
+/// Story 4.1 AC5 / I-7 (duration), AD-23: the same two arms take the same server time - 21 interleaved samples per arm,
+/// median, 20% (the one method, <see cref="DurationIndistinguishability.CompareMeasuredAsync"/>), each a fresh address so
+/// every sample takes the issue path. The registered addresses are made before measuring, so registration's own work is
+/// outside the window. Written by the story 4.1 ATDD run.
+/// </summary>
+internal sealed record IssueIndistinguishableWhetherOrNotTheAddressHasAnAccount() : Expectation("indistinguishable in duration whether or not the address has an Account")
+{
+    /// <inheritdoc />
+    protected override async Task VerifyCoreAsync(IsolationWorld world, CaseRequest request, IsolationSurface surface)
+    {
+        foreach (var (path, _) in request.Paths)
+        {
+            var registered = new Queue<string>();
+
+            // One per sample and one for the warm-up.
+            for (var sample = 0; sample <= DurationIndistinguishability.MinimumSamples; sample++)
+            {
+                registered.Enqueue((await world.NewActorAsync("It")).EmailAddress);
+            }
+
+            var verdict = await DurationIndistinguishability.CompareMeasuredAsync(
+                () => world.Host.ServerDurationOfAsync(() => IssueAsync(request, surface, path, InvitationScaffold.FreshAddress("i7t"))),
+                () => world.Host.ServerDurationOfAsync(() => IssueAsync(request, surface, path, registered.Dequeue())));
+
+            TimingRecord.Add($"issue to no Account vs to an Account / {surface}: {verdict.Describe()}");
+            Assert.True(verdict.AreIndistinguishable, $"{surface}: {verdict.Describe()}");
+        }
+    }
+
+    private static async Task IssueAsync(CaseRequest request, IsolationSurface surface, string path, string address)
+    {
+        request.Actor.HoldsSecret(address);
+
+        var answer = await request.Actor.SendAsync(surface, request.Method, path, InvitationScaffold.Body(address, "member"), headers: null);
+
+        Assert.True(answer.StatusCode == HttpStatusCode.NoContent, $"{path}: {answer.StatusCode} {answer.Body}");
+    }
+}
+
+/// <summary>
 /// A row owned by a later story. It is never executed; it states what the surface will get.
 /// </summary>
 /// <param name="WillBe">What the surface will get once the owning story builds the route.</param>

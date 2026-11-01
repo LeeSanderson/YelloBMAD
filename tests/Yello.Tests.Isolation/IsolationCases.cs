@@ -898,6 +898,9 @@ internal static partial class IsolationCases
 
         // Story 3.4 - one Account, several Spaces (IsolationCases.SeveralSpaces.cs).
         .. SeveralSpacesCases(),
+
+        // Story 4.1 - issue an Invitation (IsolationCases.Invitations.cs), pending until its dev phase maps the route.
+        .. InvitationCases(),
     ];
 
     /// <summary>

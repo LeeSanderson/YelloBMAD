@@ -77,6 +77,39 @@ public sealed class IsolationTimingTests(IsolationWorldFixture fixture) : IClass
         TimingRecord.Add($"oracle (boundary vs unmatched) / {surface}: {verdict.Describe()}");
         Assert.False(verdict.AreIndistinguishable, $"{surface}: the oracle was not caught - {verdict.Describe()}");
     }
+
+    /// <summary>
+    /// Story 4.1 AC5 (written by its ATDD run) - the permanent planted oracle for <c>ISO-TIMING-ISSUE-INVITATION-NO-ACCOUNT-ORACLE</c>:
+    /// the method must tell an issue that does the token and outbox work (a fresh address, <c>204</c>) from one that skips
+    /// it (an address already a Member here, <c>409 already-a-member</c>, refused after the lock and the Membership read).
+    /// That is the planted handler's shape - "skips the outbox and token work when an Account exists" - reached through
+    /// the product, since a Host started as a process cannot be given a planted handler. If this cannot be caught, the
+    /// 20% method cannot see the outbox and token work at all, and the indistinguishability row proves nothing: record
+    /// it as masked in the Debug Log, never delete it.
+    /// </summary>
+    /// <param name="surface">The surface.</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = "red: AC5 - POST /spaces/{spaceId}/invitations is mapped by story 4.1 Task 5")]
+    [InlineData(IsolationSurface.Session)]
+    [InlineData(IsolationSurface.ApiToken)]
+    [Trait("Requirement", "AR-28")]
+    [Trait("Requirement", "AD-23")]
+    public async Task The_duration_method_tells_an_issue_from_one_that_skips_the_outbox_and_token_work(IsolationSurface surface)
+    {
+        var world = fixture.World;
+        var issuer = await world.NewActorAsync("Oi");
+        var member = await world.NewActorAsync("Om");
+        var path = InvitationScaffold.InvitationsOf(issuer.SpaceId);
+
+        await world.Database.AddMembershipAsync(issuer.SpaceId, member.AccountId, "member");
+
+        var verdict = await DurationIndistinguishability.CompareMeasuredAsync(
+            () => world.Host.ServerDurationOfAsync(() => issuer.SendAsync(surface, HttpMethod.Post, path, InvitationScaffold.Body(InvitationScaffold.FreshAddress("oracle"), "member"), headers: null)),
+            () => world.Host.ServerDurationOfAsync(() => issuer.SendAsync(surface, HttpMethod.Post, path, InvitationScaffold.Body(member.EmailAddress, "member"), headers: null)));
+
+        TimingRecord.Add($"oracle (issue vs already-a-member) / {surface}: {verdict.Describe()}");
+        Assert.False(verdict.AreIndistinguishable, $"{surface}: the oracle was not caught - {verdict.Describe()}");
+    }
 }
 
 /// <summary>

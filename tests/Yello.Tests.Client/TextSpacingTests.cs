@@ -596,6 +596,49 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
         }
     }
 
+    /// <summary>
+    /// Story 4.1, AC10, <c>deferred-work.md:20</c>'s convention that every new surface adds its own case: the invite form in
+    /// Space settings, holding a long address and showing its "Choose a Role." message, under 1.4.12 text spacing and 200%
+    /// text-only zoom - no text clipped (the legend, the three Role labels, the message, "Send invitation"), no sideways
+    /// page scroll. Anchored: the message is on screen before the check runs. Written red by the story 4.1 ATDD run; the
+    /// locators are <c>InvitationTests</c>' assumptions (<c>main .invitation-section</c>, "Email address", a "Role"
+    /// fieldset, "Send invitation", Q9 (a)'s copy).
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = "red: AC10 - the invite form (InvitationSection) does not exist in Space settings yet")]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR40")]
+    [Trait("Requirement", "UX-DR37")]
+    public async Task Text_spacing_and_text_only_zoom_clip_nothing_in_the_invite_form(bool zoom)
+    {
+        var api = Seeded();
+        const string section = "main .invitation-section";
+
+        var address = $"a.rather.long.local.part.for.an.invitee.{Guid.NewGuid():N}@a-long-subdomain.of.an.example.test";
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/settings").ToString());
+
+            var form = page.Locator(section);
+
+            await form.GetByLabel("Email address", new LocatorGetByLabelOptions { Exact = true }).FillAsync(address, new LocatorFillOptions { Timeout = Timeout });
+            await form.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Send invitation", Exact = true }).ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await form.GetByText("Choose a Role.").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+            Assert.Equal(3, await form.GetByRole(AriaRole.Group, new LocatorGetByRoleOptions { Name = "Role", Exact = true }).GetByRole(AriaRole.Radio).CountAsync());
+        }
+    }
+
     private static FakeYelloApi Seeded()
     {
         var api = new FakeYelloApi { SignedIn = true };

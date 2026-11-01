@@ -722,6 +722,13 @@ internal sealed partial class FakeYelloApi
             return spaceDeletion;
         }
 
+        // Story 4.1 - issuing an Invitation (FakeYelloApi.Invitations.cs). Only that POST is answered; it fell to the
+        // unmatched 404 before, and every other route is unchanged.
+        if (await InvitationAsync(request).ConfigureAwait(false) is { } invitation)
+        {
+            return invitation;
+        }
+
         switch (request.Method, request.Path)
         {
             case ("OPTIONS", _):

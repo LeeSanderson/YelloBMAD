@@ -748,6 +748,68 @@ The pattern is story, then ATDD scaffolds (`[Fact(Skip = "red: ACn - ...")]` plu
 - `implementation-readiness-report-2026-08-22.md`: `:399-400`, `:489`, `:518`, `:649`, `:998`, `:1048`, `:1240-1247`, `:1372-1376`.
 - `deferred-work.md`: `:20`, `:213`, `:277`, `:425`, `:532`, `:569`, `:670`, `:689`, `:691`.
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+**Checklist:** `_bmad-output/test-artifacts/atdd-checklist-4-1-invite-an-email-address-to-a-space-at-a-role.md`. It
+lists the assumptions, the scenario map and the plants.
+
+**Scaffolds.** Each is skipped with `red: AC<n> - ...` unless marked otherwise.
+
+| File | Cases | ACs |
+|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.IssueInvitation.cs` | 19 | AC1, AC2, AC3, AC4, AC5, AC8, AC12, AC13 |
+| `.../ActiveSpaceEndpointTests.IssueInvitationOutbox.cs` | 7 | AC6, AC7 |
+| `.../ActiveSpaceEndpointTests.IssueInvitationRace.cs` | 1 | AC13 |
+| `.../ActiveSpaceEndpointTests.IssueInvitationSchema.cs` | 6 | AC1, AC3, AC6, AC8, AC12, AC13 |
+| `tests/Yello.Tests.Isolation/IsolationCases.Invitations.cs` | 6 rows, `PendingUntil: "4.1"`, both surfaces | AC1, AC5, AC9 |
+| `tests/Yello.Tests.Isolation/IsolationTimingTests.cs` (the duration oracle theory) | 2 | AC5 |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Invitations.cs` | 12 | AC1, AC2, AC3, AC5, AC6, AC7, AC8, AC10 |
+| `tests/Yello.Tests.Architecture/SecretHygieneTests.Email.cs` | 1 | AC11 |
+| `tests/Yello.Tests.Client/InvitationTests.cs` | 24 | AC1, AC2, AC3, AC10 |
+| `tests/Yello.Tests.Client/TextSpacingTests.cs` (the invite-form theory) | 2 | AC10 |
+
+- The six isolation rows are `FOREIGN-SPACE`, `RECORD-KIND-...-MEMBER`, `RECORD-KIND-...-VIEWER`,
+  `TOKEN-OWN-OTHER-SPACE-ISSUE-INVITATION`, `NO-ACCOUNT-ORACLE` and the timing row. Clear every one of them before
+  review (GATE-003).
+- The harness, which is not product code:
+  - `tests/Yello.Tests.Shared/InvitationScaffold.cs` holds the route and the problem types. It is temporary.
+  - `tests/Yello.Tests.Shared/MailDrop.cs` is the recording sender.
+  - `WireDatabase` gains the Invitation and outbox helpers.
+  - `FakeYelloApi.Invitations.cs` adds the fake's Invitation route.
+
+**Green today:** `No_log_message_takes_an_address_a_token_or_an_email_body` (Architecture). It is a standing regression
+gate and is left active. A planted `[LoggerMessage]` with a `recipient` parameter turned it red, and the plant was
+restored.
+
+**Assumptions to read before activating** (Q13 is the new one; all are in the checklist):
+
+- **Q13 (a).** A Host started as a separate Production process cannot take an in-process fake sender. Therefore:
+  - the file-drop sender is selected whenever `Email:DropFolder` is configured, in any environment;
+  - `HostProcess.CreateStartInfo` must gain a default `Email__DropFolder`, or every Host-starting test fails once
+    startup "fails loudly";
+  - the drop writes one whole JSON file per message, in the ACS REST body shape.
+- An unknown or missing Role answers `400 role-not-offerable`.
+- An implausible address answers `400 invalid-email-address`.
+- The piggyback throttle is not consumed by the start-up kick.
+
+**Activation order, riskiest first:**
+
+0. The Q13 harness change.
+1. The duration oracle: `IsolationTimingTests.The_duration_method_tells_an_issue_from_one_that_skips_the_outbox_and_token_work`.
+   It tests whether the 20% method can see the token and outbox work at all. If it cannot, AC5's duration proof is
+   masked: record that, and do not widen the tolerance. Then `ISO-TIMING-ISSUE-INVITATION-NO-ACCOUNT-ORACLE`.
+2. `A_failure_after_the_enqueue_rolls_back_the_Invitation_and_the_outbox_row_and_sends_nothing`.
+3. The lock race.
+4. The expired/live predicate case, the `ExpiresAt` default, and AC8 gates (i) and (ii).
+5. The issue and refusal cases, the schema cases and the isolation rows.
+6. The outbox sweeps.
+7. Email content (I-14), the link and token case, and the token, template and outbox gates.
+8. The client gates, then the browser cases.
+9. The ACS Bicep gate.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected
+and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used
