@@ -66,17 +66,25 @@ public sealed partial class SecretHygieneTests
 
         Assert.Contains("DropFolder", File.ReadAllText(development.FullName), StringComparison.Ordinal);
 
+        // Widened at code review (2026-11-01): every appsettings file but Development's - the base appsettings.json loads
+        // in every environment, and a Staging file would deploy - and the CI workflows, whose deploy job runs
+        // `az containerapp update`. What no scan can see (a setting added by hand on a revision) is refused at runtime:
+        // a Host in Azure Container Apps will not start with a drop folder (Lee's D1 (a), EmailServices).
         var deployed = root.EnumerateFiles("*.bicep", SearchOption.AllDirectories)
             .Concat(root.EnumerateFiles("*.bicepparam", SearchOption.AllDirectories))
-            .Concat(root.EnumerateFiles("appsettings.Production*.json", SearchOption.AllDirectories))
+            .Concat(root.EnumerateFiles("appsettings*.json", SearchOption.AllDirectories)
+                .Where(file => !file.Name.Equals("appsettings.Development.json", StringComparison.OrdinalIgnoreCase)))
             .Concat(new DirectoryInfo(Path.Combine(root.FullName, "Yello.AppHost")).EnumerateFiles("*", SearchOption.AllDirectories))
             .Concat(new DirectoryInfo(Path.Combine(root.FullName, "infra")).EnumerateFiles("*", SearchOption.AllDirectories))
+            .Concat(new DirectoryInfo(Path.Combine(root.FullName, ".github", "workflows")).EnumerateFiles("*", SearchOption.AllDirectories))
             .Where(file => !IsBuildOutput(file))
             .DistinctBy(file => file.FullName, StringComparer.OrdinalIgnoreCase)
             .ToList();
 
         Assert.Contains(deployed, file => RepositoryLayout.RelativePath(file).Equals("infra/main.bicep", StringComparison.Ordinal));
         Assert.Contains(deployed, file => RepositoryLayout.RelativePath(file).Equals("Yello.AppHost/Program.cs", StringComparison.Ordinal));
+        Assert.Contains(deployed, file => RepositoryLayout.RelativePath(file).Equals("Yello.Host/appsettings.json", StringComparison.Ordinal));
+        Assert.Contains(deployed, file => RepositoryLayout.RelativePath(file).Equals(".github/workflows/ci.yml", StringComparison.Ordinal));
 
         var offenders = deployed
             .Where(file => File.ReadAllText(file.FullName).Contains("DropFolder", StringComparison.OrdinalIgnoreCase))

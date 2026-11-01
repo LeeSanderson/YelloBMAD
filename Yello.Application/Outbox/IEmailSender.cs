@@ -49,4 +49,10 @@ public sealed class EmailNotSentException : Exception
         : base(message, innerException)
     {
     }
+
+    /// <summary>
+    /// Whether the provider refused the email for good, so trying again cannot succeed: the outbox then deletes it unsent
+    /// (Lee's decision D2 (a), story 4.1 code review). <c>false</c> for anything that may pass on a later attempt.
+    /// </summary>
+    public bool IsPermanent { get; init; }
 }

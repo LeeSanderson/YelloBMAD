@@ -667,6 +667,45 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
+    /// AC12, recorded rather than prevented (story 4.1 code review): the outbox carries no Space reference (Lee's Q6), so
+    /// an email still unsent when its Space is deleted stays in the outbox and may yet be delivered; its link then answers
+    /// 4.3's uniform "no longer valid". The row is seeded as claimed a minute ago, so no sweep sends it during the case.
+    /// Anchor: the same deletion removes the Space's Invitation.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-7")]
+    [Trait("Requirement", "AD-10")]
+    public async Task An_unsent_outbox_row_survives_its_Spaces_deletion()
+    {
+        var database = Available();
+        var wire = Wire();
+        var address = RandomAddress();
+        var invitee = InvitationWire.FreshAddress("cascade-mail");
+        var spaceId = Guid.NewGuid();
+        var outboxId = Guid.Empty;
+        WireResponse? deleted = null;
+
+        using var mail = new MailDrop();
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, mail.With(Configured), async client =>
+        {
+            var session = await SignedInAsync(client, address);
+            await SeedNamedSpaceAsync(database, spaceId, "Doomed " + Suffix(), await AccountIdOfAsync(database, address), Role.Owner);
+
+            await session.FetchAntiforgeryTokenAsync();
+            Assert.Equal(HttpStatusCode.NoContent, (await IssueAsync(session, spaceId, invitee, "member")).StatusCode);
+
+            outboxId = await wire.AddOutboxRowAsync(invitee, "Unsent " + Suffix(), "Still waiting", claimedMinutesAgo: 1);
+            deleted = await DeleteSpaceOverWireAsync(session, spaceId, key: null);
+        });
+
+        Assert.True(deleted?.StatusCode == HttpStatusCode.NoContent, $"{deleted?.StatusCode} {deleted?.Body}");
+        Assert.Empty(await wire.InvitationsInAsync(spaceId));
+        Assert.Single(await wire.OutboxRowsAsync(), row => row.Id == outboxId);
+    }
+
+    /// <summary>
     /// AC5, NFR-6, I-17 - neither the invited address (as submitted or normalised), nor the token, nor the Space's or the
     /// issuer's name reaches the Host's log, across an issue, a refused re-issue and a refused Owner offer. Anchor: the
     /// log is the Host's (its listening line is in it), and the token is read from the email.

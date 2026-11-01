@@ -67,6 +67,16 @@ internal sealed class AcsEmailSender : IEmailSender, IDisposable
     /// <inheritdoc />
     public void Dispose() => _client.Dispose();
 
+    /// <summary>
+    /// A 4xx answer other than 408 (timeout) and 429 (throttled) will be the same on every attempt: the request itself is
+    /// refused. Lee's decision D2 (a), story 4.1 code review.
+    /// </summary>
+    /// <param name="status">The provider's answer.</param>
+    /// <returns><c>true</c> when trying again cannot succeed.</returns>
+    internal static bool IsPermanentRefusal(HttpStatusCode status) =>
+        status is >= HttpStatusCode.BadRequest and < HttpStatusCode.InternalServerError
+            and not HttpStatusCode.RequestTimeout and not HttpStatusCode.TooManyRequests;
+
     private async Task PostAsync(OutboxEmail email, CancellationToken cancellationToken)
     {
         var uri = new UriBuilder(_connection.Endpoint) { Path = "emails:send", Query = "api-version=" + ApiVersion }.Uri;
@@ -88,7 +98,10 @@ internal sealed class AcsEmailSender : IEmailSender, IDisposable
 
             if (response.StatusCode != HttpStatusCode.Accepted)
             {
-                throw new EmailNotSentException($"Azure Communication Services answered {response.StatusCode:D}.");
+                throw new EmailNotSentException($"Azure Communication Services answered {response.StatusCode:D}.")
+                {
+                    IsPermanent = IsPermanentRefusal(response.StatusCode),
+                };
             }
         }
         catch (Exception exception) when (exception is HttpRequestException or TaskCanceledException)

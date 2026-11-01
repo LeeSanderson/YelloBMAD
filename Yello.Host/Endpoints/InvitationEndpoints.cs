@@ -102,7 +102,10 @@ public static class InvitationEndpoints
                 title: "This address already has a pending Invitation to this Space."),
 
             // The Space was deleted after the pipeline resolved it (story 3.3). The failure rolls the unit of work back.
-            _ => BoundaryProblems.NotAvailable(),
+            null => BoundaryProblems.NotAvailable(),
+
+            // A new outcome must be answered here, never fall into the boundary's 404 (story 4.1 code review).
+            _ => throw new InvalidOperationException($"Unanswered Invitation issue outcome {result.Outcome}."),
         };
     }
 }

@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Yello.Contracts;
+using Yello.Contracts.Invitations;
 
 namespace Yello.Tests.Client;
 
@@ -29,15 +30,6 @@ namespace Yello.Tests.Client;
 /// </remarks>
 internal sealed partial class FakeYelloApi
 {
-    /// <summary>
-    /// The route's template. It becomes <c>InvitationRoutes.Issue</c> (and <c>InvitationRoutes.InvitationsOf(spaceId)</c>)
-    /// in <c>Yello.Contracts/Invitations</c> when story 4.1's dev phase adds it; replace this constant with the contract
-    /// route then, so a contract change breaks the fake as well as the Host.
-    /// </summary>
-    private const string InvitationsRoute = "/api/v1/spaces/{spaceId:guid}/invitations";
-
-    private const string RoleNotOfferableType = "urn:yello:problem:role-not-offerable";
-
     private readonly ConcurrentDictionary<string, string> _invitedByKey = new(StringComparer.Ordinal);
 
     private DeleteHold? _invitationHold;
@@ -50,12 +42,12 @@ internal sealed partial class FakeYelloApi
     public (int Status, string ProblemType, string? Capability)? NextInvitationRefusal { get; set; }
 
     /// <summary>
-    /// The issue route for one Space, as <c>InvitationRoutes.InvitationsOf</c> will name it.
+    /// The issue route for one Space, as the contract names it, so a contract change breaks the fake as well as the Host.
     /// </summary>
     /// <param name="spaceId">The Space.</param>
     /// <returns>The path.</returns>
     public static string InvitationsPathOf(Guid spaceId) =>
-        InvitationsRoute.Replace("{spaceId:guid}", spaceId.ToString("D"), StringComparison.Ordinal);
+        InvitationRoutes.InvitationsOf(spaceId);
 
     /// <summary>
     /// Every Invitation issue in <paramref name="spaceId"/> the page sent, in order, each with its body text and headers.
@@ -152,7 +144,7 @@ internal sealed partial class FakeYelloApi
 
         if (RoleCodeOf(body) is not ("admin" or "member" or "viewer"))
         {
-            return (400, Problem(RoleNotOfferableType));
+            return (400, Problem(ProblemTypes.RoleNotOfferable));
         }
 
         if (key is not null)

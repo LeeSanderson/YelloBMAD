@@ -679,7 +679,20 @@ public sealed class WireDatabase(string connectionString)
     /// <param name="body">The rendered body.</param>
     /// <param name="claimedMinutesAgo">When it was claimed, or <c>null</c> for never.</param>
     /// <returns>The row's id.</returns>
-    public async Task<Guid> AddOutboxRowAsync(string recipient, string subject, string body, int? claimedMinutesAgo)
+    public Task<Guid> AddOutboxRowAsync(string recipient, string subject, string body, int? claimedMinutesAgo) =>
+        AddOutboxRowAsync(recipient, subject, body, claimedMinutesAgo, attempts: claimedMinutesAgo is null ? 0 : 1);
+
+    /// <summary>
+    /// As <see cref="AddOutboxRowAsync(string, string, string, int?)"/>, with the number of claims it has already had (story
+    /// 4.1 code review: the attempt cap).
+    /// </summary>
+    /// <param name="recipient">The recipient address.</param>
+    /// <param name="subject">The rendered subject.</param>
+    /// <param name="body">The rendered body.</param>
+    /// <param name="claimedMinutesAgo">When it was claimed, or <c>null</c> for never.</param>
+    /// <param name="attempts">How many claims it has had.</param>
+    /// <returns>The row's id.</returns>
+    public async Task<Guid> AddOutboxRowAsync(string recipient, string subject, string body, int? claimedMinutesAgo, int attempts)
     {
         var id = Guid.NewGuid();
 
@@ -692,13 +705,14 @@ public sealed class WireDatabase(string connectionString)
             INSERT dbo.[OutboxMessage] (Id, Kind, Recipient, Subject, Body, EnqueuedAt, ClaimedAt, Attempts)
             VALUES (@id, N'invitation-issued', @recipient, @subject, @body, SYSDATETIMEOFFSET(),
                     CASE WHEN @claimed < 0 THEN NULL ELSE DATEADD(minute, -@claimed, SYSDATETIMEOFFSET()) END,
-                    CASE WHEN @claimed < 0 THEN 0 ELSE 1 END)
+                    @attempts)
             """,
             ("@id", id),
             ("@recipient", recipient),
             ("@subject", subject),
             ("@body", body),
-            ("@claimed", claimedMinutesAgo ?? -1)).ConfigureAwait(false);
+            ("@claimed", claimedMinutesAgo ?? -1),
+            ("@attempts", attempts)).ConfigureAwait(false);
 
         if (added != 1)
         {

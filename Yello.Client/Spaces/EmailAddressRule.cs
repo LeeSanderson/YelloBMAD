@@ -1,4 +1,6 @@
+using System.Buffers;
 using System.Globalization;
+using System.Text;
 
 namespace Yello.Client.Spaces;
 
@@ -34,14 +36,33 @@ public static class EmailAddressRule
 
         return trimmed.Length is >= 1 and <= Longest
             && OneInnerAt(trimmed, at)
-            && !trimmed.Any(IsNeverPartOfAnAddress);
+            && HasOnlyVisibleScalars(trimmed)
+            && trimmed.Normalize(NormalizationForm.FormC).Length <= Longest;
     }
 
     private static bool OneInnerAt(string candidate, int at) =>
         at > 0 && at == candidate.LastIndexOf('@') && at < candidate.Length - 1;
 
-    private static bool IsNeverPartOfAnAddress(char character) =>
-        char.IsWhiteSpace(character)
-        || char.IsControl(character)
-        || char.GetUnicodeCategory(character) is UnicodeCategory.Format;
+    private static bool HasOnlyVisibleScalars(ReadOnlySpan<char> candidate)
+    {
+        var remaining = candidate;
+
+        while (!remaining.IsEmpty)
+        {
+            if (Rune.DecodeFromUtf16(remaining, out var rune, out var consumed) != OperationStatus.Done
+                || IsNeverPartOfAnAddress(rune))
+            {
+                return false;
+            }
+
+            remaining = remaining[consumed..];
+        }
+
+        return true;
+    }
+
+    private static bool IsNeverPartOfAnAddress(Rune rune) =>
+        Rune.IsWhiteSpace(rune)
+        || Rune.IsControl(rune)
+        || Rune.GetUnicodeCategory(rune) is UnicodeCategory.Format;
 }

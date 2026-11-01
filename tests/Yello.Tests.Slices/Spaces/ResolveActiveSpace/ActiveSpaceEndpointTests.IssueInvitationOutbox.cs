@@ -2,6 +2,8 @@ using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 using Yello.Contracts.Spaces;
 using Yello.Domain.Memberships;
@@ -278,13 +280,24 @@ public sealed partial class ActiveSpaceEndpointTests
             var firstProject = (await new WireDatabase(fixture.ConnectionString!).ProjectsInAsync(populated.SpaceId))[0].Id;
             _ = Tasks.TaskWire.IdOf(await Tasks.TaskWire.CreateTaskAsync(owner, populated.SpaceId, firstProject, taskTitle));
 
+            // The issuer's other Space is populated too (story 4.1 code review): a Project, a Task, a Label and a Member of
+            // its own, each named at random.
             var otherSpace = CreatedSpace(await CreateSpaceAsync(populated.Owner.Session, otherSpaceName)).Id;
-            _ = await Tasks.TaskWire.CreateProjectAsync(populated.Owner with { SpaceId = otherSpace }, otherProject, otherSpace);
+            var inOtherSpace = populated.Owner with { SpaceId = otherSpace };
+            var (otherTask, otherLabel) = ("Other task " + Suffix(), "Other label " + Suffix());
+            var otherProjectId = await Tasks.TaskWire.CreateProjectAsync(inOtherSpace, otherProject, otherSpace);
+            _ = Tasks.TaskWire.IdOf(await Tasks.TaskWire.CreateTaskAsync(inOtherSpace, otherSpace, otherProjectId, otherTask));
+            _ = await Tasks.LabelWire.SeedAsync(inOtherSpace, otherSpace, otherLabel);
+
+            var otherMember = await Tasks.TaskWire.RegisterAsync(client, database);
+            await Tasks.TaskWire.AddMemberAsync(database, otherSpace, otherMember.AccountId, "Member");
+            var otherMemberIdentity = await IdentityOfAsync(database, otherMember.AccountId);
 
             issuerName = ownerIdentity.DisplayName;
             withheld.AddRange(populated.Names);
-            withheld.AddRange([taskTitle, otherSpaceName, otherProject, ownerIdentity.EmailAddress]);
+            withheld.AddRange([taskTitle, otherSpaceName, otherProject, otherTask, otherLabel, ownerIdentity.EmailAddress]);
             withheld.AddRange([memberIdentity.DisplayName, memberIdentity.EmailAddress, adminIdentity.DisplayName, adminIdentity.EmailAddress]);
+            withheld.AddRange([otherMemberIdentity.DisplayName, otherMemberIdentity.EmailAddress]);
 
             Assert.Equal(HttpStatusCode.NoContent, (await IssueAsync(populated.Owner.Session, populated.SpaceId, invitee, "member")).StatusCode);
 
@@ -350,6 +363,91 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
+    /// Lee's decision D2 (a), story 4.1 code review - a message the provider refuses for good, and one that has reached
+    /// its tenth attempt, is deleted unsent, so neither its address nor its token outlives the decision to stop trying;
+    /// a message refused for now is left claimed, its attempt counted, for a later sweep. The dispatcher runs in process
+    /// against the case's database with a sender that refuses the three recipients as each case needs; the transient row
+    /// is the anchor that a failure alone deletes nothing.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AR-33")]
+    [Trait("Requirement", "NFR-6")]
+    public async Task A_permanently_refused_or_tenth_attempt_message_is_deleted_and_a_transient_one_is_kept()
+    {
+        _ = Available();
+        var wire = Wire();
+        var (permanent, exhausted, transient) =
+            (InvitationWire.FreshAddress("permanent"), InvitationWire.FreshAddress("exhausted"), InvitationWire.FreshAddress("transient"));
+
+        var permanentId = await wire.AddOutboxRowAsync(permanent, "Permanent " + Suffix(), "Refused for good", claimedMinutesAgo: null);
+        var exhaustedId = await wire.AddOutboxRowAsync(exhausted, "Exhausted " + Suffix(), "Ninth claim went stale", claimedMinutesAgo: 6, attempts: 9);
+        var transientId = await wire.AddOutboxRowAsync(transient, "Transient " + Suffix(), "Refused for now", claimedMinutesAgo: null);
+
+        var sender = new RefusingSender(permanent, [exhausted, transient]);
+        var services = new ServiceCollection()
+            .AddSingleton<Yello.Application.Outbox.IEmailSender>(sender)
+            .AddSingleton(new DbContextOptionsBuilder<Yello.Infrastructure.Persistence.YelloDbContext>()
+                .UseSqlServer(fixture.ConnectionString!)
+                .Options);
+
+        await using var provider = services.BuildServiceProvider();
+
+        var dispatcher = new Yello.Infrastructure.Outbox.OutboxDispatcher(
+            provider.GetRequiredService<IServiceScopeFactory>(),
+            new Yello.Infrastructure.Outbox.OutboxSweepSchedule(),
+            TimeProvider.System,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<Yello.Infrastructure.Outbox.OutboxDispatcher>.Instance);
+
+        IReadOnlyList<OutboxRow> left;
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+
+        do
+        {
+            dispatcher.SweepNow();
+            await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
+            left = await wire.OutboxRowsAsync();
+        }
+        while (DateTimeOffset.UtcNow < deadline
+            && (sender.Tried.Count < 3 || left.Any(row => row.Id == permanentId || row.Id == exhaustedId)));
+
+        Assert.Equal(3, sender.Tried.Count);
+        Assert.DoesNotContain(left, row => row.Id == permanentId);
+        Assert.DoesNotContain(left, row => row.Id == exhaustedId);
+        Assert.Equal(1, Assert.Single(left, row => row.Id == transientId).Attempts);
+    }
+
+    /// <summary>
+    /// A sender that refuses one recipient for good and others for now, accepts everything else, and records whom it was
+    /// asked to send to among the refused.
+    /// </summary>
+    private sealed class RefusingSender(string permanent, string[] transient) : Yello.Application.Outbox.IEmailSender
+    {
+        public System.Collections.Concurrent.ConcurrentDictionary<string, int> Tried { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public Task SendAsync(Yello.Application.Outbox.OutboxEmail email, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(email);
+
+            if (string.Equals(email.Recipient, permanent, StringComparison.OrdinalIgnoreCase))
+            {
+                Tried[email.Recipient] = 1;
+
+                throw new Yello.Application.Outbox.EmailNotSentException("Refused for good.") { IsPermanent = true };
+            }
+
+            if (transient.Contains(email.Recipient, StringComparer.OrdinalIgnoreCase))
+            {
+                Tried[email.Recipient] = 1;
+
+                throw new Yello.Application.Outbox.EmailNotSentException("Refused for now.");
+            }
+
+            return Task.CompletedTask;
+        }
+    }
+
+    /// <summary>
     /// An <c>AFTER INSERT</c> trigger on <c>IdempotencyRecord</c> that throws for one key: the forced failure after the
     /// enqueue. Dropped by the caller in a <c>finally</c>; it fires for no other key.
     /// </summary>
@@ -389,6 +487,10 @@ public sealed partial class ActiveSpaceEndpointTests
             {
                 return true;
             }
+
+            // Not back to back (story 4.1 code review): one engine serves the whole project under the 8GB budget, and the
+            // Host under test needs it more than this poll does.
+            await Task.Delay(TimeSpan.FromMilliseconds(100), TestContext.Current.CancellationToken);
         }
 
         return false;

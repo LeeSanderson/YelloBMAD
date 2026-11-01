@@ -1,4 +1,6 @@
+using System.Buffers;
 using System.Globalization;
+using System.Text;
 
 namespace Yello.Domain.Accounts;
 
@@ -47,9 +49,38 @@ public static class EmailAddressRule
 
         var trimmed = candidate.Trim();
 
+        // The scalar scan comes before the length of the normalised form: Normalize throws on a lone surrogate.
         return trimmed.Length <= MaxLength
             && HasOneInnerAt(trimmed, trimmed.IndexOf('@', StringComparison.Ordinal))
-            && !trimmed.Any(IsNeverPartOfAnAddress);
+            && HasOnlyVisibleScalars(trimmed)
+            && EmailAddressNormalisation.Normalise(trimmed).Length <= MaxLength;
+    }
+
+    /// <summary>
+    /// Every Unicode scalar is well formed and none is whitespace, control or format. Scanned by <see cref="Rune"/>, not
+    /// by <see langword="char"/>: a per-<see langword="char"/> scan sees a supplementary-plane format character (the tag
+    /// characters U+E0001 and U+E0020-U+E007F) only as two surrogate halves and lets it through (story 4.1 code review).
+    /// </summary>
+    /// <remarks>
+    /// The normalised length is checked too because composition exclusions (U+0958 and its kind) decompose under NFC, so
+    /// a 254-character address could otherwise overflow the 254-character normalised column (story 4.1 code review).
+    /// </remarks>
+    private static bool HasOnlyVisibleScalars(ReadOnlySpan<char> candidate)
+    {
+        var remaining = candidate;
+
+        while (!remaining.IsEmpty)
+        {
+            if (Rune.DecodeFromUtf16(remaining, out var rune, out var consumed) != OperationStatus.Done
+                || IsNeverPartOfAnAddress(rune))
+            {
+                return false;
+            }
+
+            remaining = remaining[consumed..];
+        }
+
+        return true;
     }
 
     /// <summary>
@@ -62,8 +93,8 @@ public static class EmailAddressRule
     /// Characters no email address can contain: whitespace, the control category, and the format category that carries
     /// the zero-width and bidirectional marks.
     /// </summary>
-    private static bool IsNeverPartOfAnAddress(char character) =>
-        char.IsWhiteSpace(character)
-        || char.IsControl(character)
-        || char.GetUnicodeCategory(character) is UnicodeCategory.Format;
+    private static bool IsNeverPartOfAnAddress(Rune rune) =>
+        Rune.IsWhiteSpace(rune)
+        || Rune.IsControl(rune)
+        || Rune.GetUnicodeCategory(rune) is UnicodeCategory.Format;
 }

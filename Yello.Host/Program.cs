@@ -178,11 +178,16 @@ builder.Services.AddSingleton(new InvitationLinks(
 // THE EMAIL SENDER, CHOSEN BY CONFIGURATION, OR NO HOST AT ALL (story 4.1, AC11; Q13 (a)). Azure Communication
 // Services with ConnectionStrings:acs; otherwise the file drop with Email:DropFolder (Development's points at a folder
 // git ignores; the wire suites point it at their own); otherwise startup fails loudly here rather than a Host silently
-// discarding every invitation. A deployed environment never sets Email:DropFolder - an Architecture gate holds that.
+// discarding every invitation. A deployed environment never sets Email:DropFolder - an Architecture gate holds that, and
+// a Host in Azure Container Apps (CONTAINER_APP_NAME) refuses to start with it (Lee's D1 (a)). A relative drop folder is
+// resolved against the content root, never the working directory, so Development's lands in the ignored artifacts/.
 var emailSender = builder.Services.AddYelloEmailSender(
     builder.Configuration.GetConnectionString(EmailServices.AcsConnectionStringName),
-    builder.Configuration[EmailServices.DropFolderConfigurationKey],
-    builder.Configuration[EmailServices.SenderConfigurationKey]);
+    builder.Configuration[EmailServices.DropFolderConfigurationKey] is { Length: > 0 } dropFolder
+        ? Path.GetFullPath(dropFolder, builder.Environment.ContentRootPath)
+        : null,
+    builder.Configuration[EmailServices.SenderConfigurationKey],
+    builder.Configuration[EmailServices.ContainerAppNameVariable]);
 
 // ANTI-FORGERY, as a token system rather than only the automatic middleware. The middleware's
 // verdict is recorded on IAntiforgeryValidationFeature and read only by a form consumer, so for

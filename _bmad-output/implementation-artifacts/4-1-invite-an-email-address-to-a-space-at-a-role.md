@@ -4,7 +4,7 @@ baseline_commit: dc61dd3283e34fdc6f1835a0ac0116ee147c3f6b
 
 # Story 4.1: Invite an email address to a Space at a Role
 
-Status: review
+Status: done
 
 Epic: 4 — Bring people into one piece of your work (the first story of the epic)
 Story key: `4-1-invite-an-email-address-to-a-space-at-a-role`
@@ -405,6 +405,29 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1627-1663` (`status: final
   - [x] `tests/TESTING-CONVENTIONS.md` gains a short "Outbox and email" section: the recording fake sender, how to assert same-transaction enqueue, seeding an unclaimed row, and no timers.
   - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-4` stays `in-progress`.
   - [x] Run `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers. Rerun a failure once, alone, before calling it real.
+
+### Review Findings
+
+Code review 2026-11-01 (bmad-code-review, `65d3b4a..HEAD`, full mode; Blind Hunter, Edge Case Hunter and Acceptance Auditor). 46 raw findings, 32 after deduplication: 4 decision-needed (all decided by Lee, 2026-11-01: D1 and D2 became patches, D3 and D4 deferrals), 14 patch, 2 defer, 14 dismissed. Every patch was applied.
+
+- [x] [Review][Decision] D1 (high) — **Decided by Lee, 2026-11-01: (a).** Applied: `EmailServices.AddYelloEmailSender` refuses to start when `CONTAINER_APP_NAME` is set and `Email:DropFolder` is too (with or without ACS); the sender choice logs at Warning (event 1044); the gate is widened (P4). Proven by `EmailSenderSelectionTests` and the process case `HostStartupTests.A_Host_in_Azure_Container_Apps_refuses_to_start_with_an_email_drop_folder`; plants below. Finding: the file-drop sender has no runtime guard against a deployed Host — `AddYelloEmailSender` takes no environment and picks the drop whenever `Email:DropFolder` is set and `ConnectionStrings:acs` is not (`EmailServices.cs:52-80`). The only protection is a static source scan. An `Email__DropFolder` set on a Container App revision by portal or CLI, in the base `appsettings.json`, or a container started as Development (the published image carries `appsettings.Development.json`) writes every invitation, with its plaintext token, to container disk and sends none, logged only at Information. AC11 says "in Development only"; Q13 (a) relaxed it to "any environment" without amending AC11 or a recorded Lee decision.
+- [x] [Review][Decision] D2 (medium) — **Decided by Lee, 2026-11-01: (a).** Applied: `EmailNotSentException.IsPermanent` (ACS 4xx but 408 and 429); the dispatcher deletes a row unsent on a permanent refusal or at its tenth claim (`MaxAttempts`), logging the outbox id and attempt count only (event 1045). Proven by `A_permanently_refused_or_tenth_attempt_message_is_deleted_and_a_transient_one_is_kept`. Finding: a permanently refused message is retried forever — `Attempts` is written and never read (`OutboxDispatcher.cs:146`); `AcsEmailSender` turns every non-202 (permanent 400/401/403 as well as 429/5xx) into the same `EmailNotSentException` (`AcsEmailSender.cs:89-92`); 429 `Retry-After` is ignored. A poison row costs an ACS call and a Warning every 5 minutes for as long as traffic flows, and keeps its address and plaintext token in the policy-free table indefinitely (contrary to Q7's "nothing survives dispatch"). The fix drops an undeliverable invitation email, which the issuer never learns of (the answer was `204`).
+- [x] [Review][Defer] D3 (medium) — **Decided by Lee, 2026-11-01: (b), deferred** to story 4.6 for Lee or the PM (`deferred-work.md`, code review of 4.1). Finding: no rate limit on issuing Invitations — `MapIssueInvitation` has no `RequireRateLimiting` (`InvitationEndpoints.cs:48-50`); only register and authenticate are limited. Any self-registered Account, as Owner of its Personal Space, can script mail to unlimited fresh addresses from the product's sender, with attacker-chosen Space name (200) and display name (128) in subject and body. An Azure-managed domain has low quotas, so abuse can get it throttled or suspended for every tenant. No requirement covers this.
+- [x] [Review][Defer] D4 (medium) — **Decided by Lee, 2026-11-01: (a), deferred** to Lee/TEA (`deferred-work.md`, code review of 4.1); the Debug Log's plant 1 row is corrected. Finding: AC5's permanent planted oracle is a proxy — the spec (AC5, plant 1) asks for a handler variant that skips only the token and outbox work when an Account exists. The permanent oracle compares a normal issue with `409 already-a-member` (`IsolationTimingTests.cs`), which also skips the pending read, the issuer-name read and the Invitation insert. The 43-47% gap it catches does not show the 20% method can see a variant that still inserts the Invitation but skips the outbox row and token (one `SaveChanges` of ~17 ms). The Debug Log records plant 1 as "covered".
+- [x] [Review][Patch] P1 (high): the drain never ends while sends fail — with more than 10 unsendable rows and 30 s timeouts, the run's own failed claims go stale (5 min) before it reaches a claim that returns nothing, so it re-claims and re-sends forever with no backoff [Yello.Infrastructure/Outbox/OutboxDispatcher.cs:120]
+- [x] [Review][Patch] P2 (medium): a slow batch outlives its claim — rows 9-10 of a sequentially sent batch can go stale and be claimed by a second replica or kick, so mail is sent twice in normal slow-provider conditions; re-stamp each row's claim with a guarded update before sending it [Yello.Infrastructure/Outbox/OutboxDispatcher.cs:129]
+- [x] [Review][Patch] P3 (medium): a sender exception other than `EmailNotSentException`, or a failed delete after a send, aborts the whole drain; anything outside `RunAsync`'s filter is an unobserved, unlogged task exception and skips the re-sweep check (AC6 "logged failure") [Yello.Infrastructure/Outbox/OutboxDispatcher.cs:90]
+- [x] [Review][Patch] P4 (medium): the Q13 drop-folder gate does not scan the base `appsettings.json`, other `appsettings.*.json` (Staging), or `.github/workflows` (the deploy job runs `az containerapp update`) [tests/Yello.Tests.Architecture/SecretHygieneTests.Email.cs:69]
+- [x] [Review][Patch] P5 (medium): nothing tests that startup fails loudly — no sender, no `Email:Sender`, unusable ACS connection string are unseen branches (AC11) [Yello.Infrastructure/Email/EmailServices.cs:52]
+- [x] [Review][Patch] P6 (low): an implausible `Email:Sender` starts the Host and every ACS send is then refused [Yello.Infrastructure/Email/EmailServices.cs:59]
+- [x] [Review][Patch] P7 (low): the relative Development drop folder resolves against the process working directory, so `dotnet run --project Yello.Host` from the repo root writes token-bearing files outside the repository and `.gitignore`; resolve against the content root [Yello.Host/Program.cs:182]
+- [x] [Review][Patch] P8 (low): the per-`char` scan sees only surrogate halves, so supplementary-plane Format characters (tag characters U+E0020-E007F, U+E0001) pass the plausibility rule that AC3 says excludes Format characters; scan runes, in both the Domain rule and its client mirror [Yello.Domain/Accounts/EmailAddressRule.cs:65]
+- [x] [Review][Patch] P9 (low): a 254-character address of NFC-expanding characters overflows `NormalizedEmailAddress nvarchar(254)` and answers `500` instead of `400` [Yello.Domain/Accounts/EmailAddressRule.cs:50]
+- [x] [Review][Patch] P10 (low): the endpoint's `_ =>` arm turns any unexpected outcome into the boundary `404`; match the null "Space gone" outcome explicitly [Yello.Host/Endpoints/InvitationEndpoints.cs:104]
+- [x] [Review][Patch] P11 (low): AC12's deletion test does not assert that an unsent outbox row survives the Space deletion, which AC12 says to record [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.IssueInvitation.cs:640]
+- [x] [Review][Patch] P12 (low): the I-14 disclosure test's second Space holds only a Project; AC7 asks for both Spaces populated with Project, Task, Label and Status names and a second Member [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.IssueInvitationOutbox.cs]
+- [x] [Review][Patch] P13 (low): `FakeYelloApi.Invitations.cs` keeps its own route and problem-type literals, and `InvitationTests` still says `ProblemTypes` "does not carry them yet", so a contract route change would not break the fake [tests/Yello.Tests.Client/FakeYelloApi.Invitations.cs]
+- [x] [Review][Patch] P14 (low): `OutboxEventuallyHoldsNoRowForAsync` polls SQL back to back for up to 30 s with no delay, against the one-engine memory budget [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.IssueInvitationOutbox.cs]
 
 ## Dev Notes
 
@@ -849,7 +872,7 @@ The 20 % method sees the token and outbox work, so the I-7 duration proof is not
 
 | Plant | Expected red | Seen |
 |---|---|---|
-| 1 handler skips outbox and token work when an Account exists | AC5 duration | covered by the permanent oracle (issue vs already-a-member, the same shape reached through the product): caught at 43-47 % on both surfaces. A process Host cannot take a planted handler |
+| 1 handler skips outbox and token work when an Account exists | AC5 duration | **not run, so unproven** (corrected at code review, Lee's D4 (a), 2026-11-01). The permanent oracle (issue vs already-a-member) is caught at 43-47 % on both surfaces, but its 409 arm also skips the pending read, the issuer-name read and the Invitation insert, so it does not show the 20 % method can see a variant that skips only the token and the outbox row. A process Host cannot take a planted handler. Ledgered to Lee/TEA |
 | 2 one arm answers differently (an Account-existence branch in the store) | the byte comparison | red 1/1 |
 | 3 enqueue on a separate context | forced-rollback case | red 1/1 |
 | 4 dispatch before the commit (sent on enqueue) | forced-rollback case | red 1/1 (the first try did not compile; corrected) |
@@ -869,6 +892,9 @@ The 20 % method sees the token and outbox work, so the I-7 duration proof is not
 | 16 Invitation FILTER predicate dropped | `SpaceIsolationSchemaTests`, the policy schema case | red 2/2. The isolation row with the EF filter also dropped was not run: the schema half was enough to show the policy layer. Recorded, not claimed |
 | 17 invited address logged | I-17 log case | red 1/1 |
 | Q13 `Email__DropFolder` in `containers.bicep` | drop-folder gate | red 1/1 |
+| Review D1: `Email:DropFolder` in the base `Yello.Host/appsettings.json` | widened drop-folder gate | red 1/1 |
+| Review D1: the `CONTAINER_APP_NAME` refusal disabled in `EmailServices` | `EmailSenderSelectionTests` (both arms) and the `HostStartupTests` process case | red 3/3 |
+| Review D2: the abandon branch disabled in `OutboxDispatcher` | the permanent/tenth-attempt case | red 1/1 |
 
 ### Completion Notes List
 
@@ -1004,3 +1030,4 @@ The 20 % method sees the token and outbox work, so the I-7 duration proof is not
 ## Change Log
 
 - 2026-11-01 - Story 4.1 implemented (bmad-dev-story): Invitation issue route, schema and migration, outbox and dispatcher, ACS and file-drop senders, invite form, Bicep, ledger, docs. Build 0 warnings, 0 errors. Full run `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`: 1,897 total, 1,887 passed, 0 failed, 10 skipped (28m 16s; the 10 are the 3 bundle cases and the explicit tiers; baseline was 1,858 / 1,792 / 0 / 66, and all 56 ATDD scaffolds are now active). Status set to review.
+- 2026-11-01 - Code review (bmad-code-review, `65d3b4a..HEAD`): 46 raw findings, 32 after deduplication. Lee decided D1-D4 (D1, D2 applied; D3, D4 ledgered). 14 patches applied: the outbox drain ends on a failing pass, renews each claim before sending, logs every failure and abandons permanent or tenth-attempt rows; a Host in Azure Container Apps refuses `Email:DropFolder`; the drop-folder gate also scans every non-Development appsettings file and the CI workflows; the sender address is checked; a relative drop folder resolves against the content root; the email rule scans runes and bounds the normalised length; plus test hardening. Build 0 warnings, 0 errors. Full run `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`: 1,913 total, 1,903 passed, 0 failed, 10 skipped (27m 28s). Status set to done.

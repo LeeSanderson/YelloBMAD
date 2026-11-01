@@ -77,7 +77,7 @@ internal static partial class StartupLog
 
     [LoggerMessage(
         EventId = 1044,
-        Level = LogLevel.Information,
+        Level = LogLevel.Warning,
         Message = "Outgoing mail is sent through the {Sender} (story 4.1).")]
     internal static partial void EmailSenderResolved(ILogger logger, string sender);
 }

@@ -13,8 +13,8 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 4.1 ATDD run (2026-11-01).</b> Every case is skipped with the AC it
-/// waits for; the dev phase removes each <c>Skip</c> as Task 7 makes it pass, and records any locator it corrects. The API
+/// <b>Written as red-phase scaffolds by the story 4.1 ATDD run (2026-11-01)</b> and activated by its dev phase, which
+/// recorded each locator it corrected. The API
 /// is <see cref="FakeYelloApi"/> at the network edge, taught by this run the issue route
 /// (<c>FakeYelloApi.Invitations.cs</c>, held and released like 3.3's deletion); no Host, no database, no engine. Build
 /// <c>Yello.Client</c> in Debug before running them.
@@ -33,7 +33,7 @@ namespace Yello.Tests.Client;
 /// <para>
 /// <b>Decided, not assumed:</b> Q2 (Lee, 2026-11-01) - an Owner and an Admin both offer Admin, Member and Viewer. The
 /// new problem types are named as the story names them (<c>already-a-member</c>, <c>invitation-pending</c>,
-/// <c>role-not-offerable</c>); they are literals here because <c>ProblemTypes</c> does not carry them yet.
+/// <c>role-not-offerable</c>), read from <c>ProblemTypes</c> so a contract change breaks these cases too.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Client")]
@@ -68,13 +68,19 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     private const string NotSentCopy = "Not sent.";
     private const string NotAvailableCopy = "Not available.";
 
-    private const string AlreadyAMemberType = "urn:yello:problem:already-a-member";
-    private const string InvitationPendingType = "urn:yello:problem:invitation-pending";
-    private const string RoleNotOfferableType = "urn:yello:problem:role-not-offerable";
 
     private const string TextSpacingOverride =
         "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } "
         + "p { margin-block-end: 2em !important; }";
+
+    /// <summary>
+    /// The two disclosable `409`s on the address and the sentence each is said with beside the field.
+    /// </summary>
+    public static TheoryData<string, string> AddressConflicts => new()
+    {
+        { ProblemTypes.AlreadyAMember, AlreadyAMemberCopy },
+        { ProblemTypes.InvitationPending, PendingCopy },
+    };
 
     /// <summary>
     /// A 1.4.10 reflow probe, as <c>SpaceCreateAndRenameTests.Reflow</c>: the page never scrolls sideways and nothing in
@@ -460,8 +466,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// <param name="copy">The sentence expected beside the field.</param>
     /// <returns>A task.</returns>
     [Theory]
-    [InlineData(AlreadyAMemberType, AlreadyAMemberCopy)]
-    [InlineData(InvitationPendingType, PendingCopy)]
+    [MemberData(nameof(AddressConflicts))]
     [Trait("Requirement", "UX-DR37")]
     public async Task A_409_on_the_address_is_said_beside_the_email_field(string problemType, string copy)
     {
@@ -503,7 +508,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     {
         var api = TwoSpaces("owner");
 
-        api.NextInvitationRefusal = (400, RoleNotOfferableType, null);
+        api.NextInvitationRefusal = (400, ProblemTypes.RoleNotOfferable, null);
 
         var (context, page) = await surface.OpenAsync(EnglishLocale);
 

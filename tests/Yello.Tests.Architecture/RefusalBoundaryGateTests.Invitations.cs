@@ -308,6 +308,12 @@ public sealed partial class RefusalBoundaryGateTests
             ("a b@example.test", false),
             ("tab\t@example.test", false),
             ("zero​width@example.test", false),
+            ("tag\U000E0041@example.test", false),
+            ("lang\U000E0001@example.test", false),
+            ("lone\uD800@example.test", false),
+            ("smile\U0001F600@example.test", true),
+            ("a@" + new string('क़', 252), false),
+            ("a@" + new string('क़', 126), true),
         ];
 
         foreach (var (candidate, plausible) in edges)

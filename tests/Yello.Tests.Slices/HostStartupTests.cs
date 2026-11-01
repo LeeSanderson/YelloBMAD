@@ -112,10 +112,37 @@ public sealed class HostStartupTests(SqlServerEngine engine)
     }
 
     /// <summary>
-    /// Starts <c>Yello.Host</c>, collects its console output until it has bound or the window
-    /// closes, then stops it.
+    /// Story 4.1 code review, Lee's decision D1 (a): a Host that finds itself in Azure Container Apps
+    /// (<c>CONTAINER_APP_NAME</c>, which the platform sets on every replica) refuses to start with an
+    /// <c>Email:DropFolder</c>, so no deployed Host can write invitation tokens to its disk. Needs no
+    /// container: the refusal comes while the services are registered, before any connection.
+    /// Anchor: <see cref="The_Host_does_not_touch_the_database_outside_Development"/> starts the same
+    /// Production Host with the same drop folder and no <c>CONTAINER_APP_NAME</c>.
     /// </summary>
-    private static async Task<string> RunHostAsync(string environment, string connectionString)
+    [Fact]
+    [Trait("Requirement", "NFR-6")]
+    public async Task A_Host_in_Azure_Container_Apps_refuses_to_start_with_an_email_drop_folder()
+    {
+        const string unreachable = "Server=127.0.0.1,1;Database=yello;User ID=sa;Password=Not$Used1;TrustServerCertificate=true";
+
+        var output = await RunHostAsync(
+            "Production",
+            unreachable,
+            new Dictionary<string, string>(StringComparer.Ordinal) { ["CONTAINER_APP_NAME"] = "yello-host" });
+
+        Assert.Contains("Azure Container Apps", output, StringComparison.Ordinal);
+        Assert.DoesNotContain("Now listening on", output, StringComparison.Ordinal);
+        Assert.DoesNotContain(MailDrop.Unread, output, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Starts <c>Yello.Host</c>, collects its console output until it has bound or the window
+    /// closes, then stops it. A Host that exits on its own has its error output appended.
+    /// </summary>
+    private static async Task<string> RunHostAsync(
+        string environment,
+        string connectionString,
+        IReadOnlyDictionary<string, string>? settings = null)
     {
         var executable = HostExecutable();
 
@@ -141,6 +168,11 @@ public sealed class HostStartupTests(SqlServerEngine engine)
         // Story 4.1: the Host refuses to start with no email sender (AC11). The Production case needs one; nothing is sent.
         startInfo.Environment["Email__DropFolder"] = MailDrop.Unread;
         startInfo.Environment["Email__Sender"] = MailDrop.Sender;
+
+        foreach (var (key, value) in settings ?? new Dictionary<string, string>(StringComparer.Ordinal))
+        {
+            startInfo.Environment[key] = value;
+        }
 
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException($"Could not start '{executable.FullName}'.");
@@ -177,6 +209,14 @@ public sealed class HostStartupTests(SqlServerEngine engine)
                 process.Kill(entireProcessTree: true);
             }
         }
+
+        // A Host that refused to start wrote its unhandled exception to its error stream, then exited, which ended the
+        // read above. A Host still running was killed above, so its error stream ends too.
+        using var exit = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+        await process.WaitForExitAsync(exit.Token);
+
+        log.Add(await process.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken));
 
         return string.Join(Environment.NewLine, log);
     }

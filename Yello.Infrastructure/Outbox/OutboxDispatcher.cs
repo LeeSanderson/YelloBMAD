@@ -50,6 +50,12 @@ internal sealed class OutboxDispatcher(
     /// </summary>
     private const int ClaimBatch = 10;
 
+    /// <summary>
+    /// The claim at which a message that still fails is deleted unsent (Lee's decision D2 (a)). <c>Attempts</c> counts
+    /// claims, each followed by one send.
+    /// </summary>
+    internal const int MaxAttempts = 10;
+
     private int _running;
 
     private int _requested;
@@ -87,10 +93,15 @@ internal sealed class OutboxDispatcher(
                 await DrainAsync().ConfigureAwait(false);
             }
         }
-        catch (Exception exception) when (exception is DbException or InvalidOperationException or OperationCanceledException)
+        // S2221 disabled here, deliberately and narrowly (the StartupConnectivityCheck precedent): a fire-and-forget run
+        // has no caller to observe what an allow-list of exception types omits, so the list itself would be the defect.
+#pragma warning disable S2221 // "Catch a list of specific exception subtype or use exception filters"
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+#pragma warning restore S2221
         {
-            // Off any request path, nothing above this frame would observe it. A Host with no database configured lands
-            // here too, no louder.
+            // Off any request path, nothing above this frame would observe it, so every failure is logged here rather than
+            // left as an unobserved task exception (story 4.1 code review). A Host with no database configured lands here
+            // too, no louder.
             OutboxLog.SweepFailed(logger, exception);
         }
         finally
@@ -117,7 +128,13 @@ internal sealed class OutboxDispatcher(
 
             await using (context.ConfigureAwait(false))
             {
-                while (true)
+                // A pass in which anything failed is the run's last (story 4.1 code review): its failed rows stay claimed
+                // for five minutes, so a run that went on claiming would, with the provider down and enough rows queued,
+                // meet its own failures again once their claims went stale and never end. The rest waits for the next
+                // commit, sweep or process start - which is the back-off.
+                var failed = false;
+
+                while (!failed)
                 {
                     var claimed = await ClaimAsync(context).ConfigureAwait(false);
 
@@ -128,12 +145,26 @@ internal sealed class OutboxDispatcher(
 
                     foreach (var message in claimed)
                     {
-                        await SendAsync(context, sender, message).ConfigureAwait(false);
+                        failed |= !await SendAsync(context, sender, message).ConfigureAwait(false);
                     }
                 }
             }
         }
     }
+
+    /// <summary>
+    /// Re-stamps one claimed row's claim just before it is sent, guarded on the claim this run took, so a row late in a
+    /// slow batch is never past its five minutes while it is being sent and cannot be claimed and sent by a second
+    /// dispatcher at the same time (story 4.1 code review). <c>false</c> when another claimant has taken it since.
+    /// </summary>
+    private static async Task<bool> RenewClaimAsync(YelloDbContext context, OutboxMessage message) =>
+        await context.Database.ExecuteSqlAsync(
+            $"""
+            UPDATE dbo.[OutboxMessage] WITH (ROWLOCK)
+            SET ClaimedAt = SYSDATETIMEOFFSET()
+            WHERE Id = {message.Id} AND ClaimedAt = {message.ClaimedAt}
+            """,
+            CancellationToken.None).ConfigureAwait(false) == 1;
 
     /// <summary>
     /// Claims up to <see cref="ClaimBatch"/> rows in one statement, by the database clock, skipping rows another
@@ -151,27 +182,67 @@ internal sealed class OutboxDispatcher(
             .ToListAsync(CancellationToken.None)
             .ConfigureAwait(false);
 
-    private async Task SendAsync(YelloDbContext context, IEmailSender sender, OutboxMessage message)
+    /// <summary>
+    /// Sends one claimed row and deletes it; or, when the provider refuses it for good or it has been tried
+    /// <see cref="MaxAttempts"/> times, deletes it unsent (Lee's decision D2 (a), story 4.1 code review). Every failure is
+    /// caught here, so one bad row never stops the rest of its batch.
+    /// </summary>
+    /// <returns><c>false</c> when the row is left for a later sweep, so the run ends after this pass.</returns>
+    private async Task<bool> SendAsync(YelloDbContext context, IEmailSender sender, OutboxMessage message)
     {
+        if (!await RenewClaimAsync(context, message).ConfigureAwait(false))
+        {
+            // Another claimant took it after its claim went stale: theirs to send.
+            return true;
+        }
+
         try
         {
             await sender.SendAsync(
                 new OutboxEmail(message.Kind, message.Recipient, message.Subject, message.Body),
                 CancellationToken.None).ConfigureAwait(false);
         }
-        catch (EmailNotSentException exception)
+        // S2221 disabled for the same reason as in RunAsync: one row's unforeseen failure must not end its batch.
+#pragma warning disable S2221 // "Catch a list of specific exception subtype or use exception filters"
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+#pragma warning restore S2221
         {
-            // Left claimed: claimed again once the claim is five minutes stale, by the next sweep.
+            if (exception is EmailNotSentException { IsPermanent: true } || message.Attempts >= MaxAttempts)
+            {
+                // Nothing about an undeliverable message - its address, its content, its token - outlives the decision
+                // to stop trying (Q7). Logged by id and attempt count only.
+                await DeleteAsync(context, message).ConfigureAwait(false);
+                OutboxLog.Abandoned(logger, message.Id, message.Attempts, exception);
+
+                // Settled - nothing of it is left to meet again - so it does not end the run.
+                return true;
+            }
+
+            // Left claimed: claimed again once the claim is five minutes stale, by a later sweep.
             OutboxLog.NotSent(logger, message.Id, exception);
 
-            return;
+            return false;
         }
 
-        await context.Set<OutboxMessage>()
-            .Where(sent => sent.Id == message.Id)
-            .ExecuteDeleteAsync(CancellationToken.None)
-            .ConfigureAwait(false);
+        try
+        {
+            await DeleteAsync(context, message).ConfigureAwait(false);
+        }
+        catch (DbException exception)
+        {
+            // Sent, but still in the outbox: it is sent again once its claim is stale (at least once, as recorded).
+            OutboxLog.SentButNotDeleted(logger, message.Id, exception);
+
+            return false;
+        }
 
         OutboxLog.Sent(logger, message.Id);
+
+        return true;
     }
+
+    private static Task<int> DeleteAsync(YelloDbContext context, OutboxMessage message) =>
+        context.Set<OutboxMessage>()
+            .Where(row => row.Id == message.Id)
+            .ExecuteDeleteAsync(CancellationToken.None);
 }

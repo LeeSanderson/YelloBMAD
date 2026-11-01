@@ -6,7 +6,7 @@ namespace Yello.Infrastructure.Outbox;
 /// Source-generated log messages for the outbox. AR-34, NFR-6, I-17; story 4.1.
 /// </summary>
 /// <remarks>
-/// <b>EventIds 1041-1044.</b> <b>The outbox row's id, and nothing else</b>: never the recipient, the subject, the body
+/// <b>EventIds 1041-1043 and 1045-1046</b> (1044 is the Host's sender choice). <b>The outbox row's id, and nothing else</b>: never the recipient, the subject, the body
 /// or the token the body carries. A gate holds that no log message takes a parameter named for any of them.
 /// </remarks>
 internal static partial class OutboxLog
@@ -28,4 +28,16 @@ internal static partial class OutboxLog
         Level = LogLevel.Warning,
         Message = "The outbox could not be swept; unsent messages wait for the next sweep.")]
     internal static partial void SweepFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        EventId = 1045,
+        Level = LogLevel.Warning,
+        Message = "Outbox message {OutboxId} was deleted unsent after {Attempts} attempts or a permanent refusal.")]
+    internal static partial void Abandoned(ILogger logger, Guid outboxId, int attempts, Exception exception);
+
+    [LoggerMessage(
+        EventId = 1046,
+        Level = LogLevel.Warning,
+        Message = "Outbox message {OutboxId} was sent but could not be deleted; it is sent again once its claim is stale.")]
+    internal static partial void SentButNotDeleted(ILogger logger, Guid outboxId, Exception exception);
 }
