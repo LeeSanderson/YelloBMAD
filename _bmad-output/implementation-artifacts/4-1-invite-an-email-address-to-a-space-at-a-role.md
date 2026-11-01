@@ -476,6 +476,14 @@ AC4's Membership-arrival race is 4.3's (acceptance creates Memberships). Note it
 
 ### Open questions (decide in Task 1; each is reversible; record as "Qn - (x)")
 
+**Decided by Lee, 2026-11-01 (not open):**
+- Q1: ON DELETE CASCADE for Invitations on Space delete.
+- Q2: an Admin may invite at Admin, as the matrix and FR-10 are written.
+- Q3: lookalike addresses get no special handling (NFC plus BIN2, as registration does).
+- Q6: a policy-free `OutboxMessage` table with no Space column, deleted on send, recorded as an AD-2 variance.
+- Q4: no new package is approved. Use HttpClient REST for ACS email.
+- The remaining questions are for the dev phase.
+
 1. **[LEE] Invitations on a Space deletion** (ledger `:689`, which names Lee/PM; story 3.3's C1).
    - **(a) Recommended. `ON DELETE CASCADE`.** FR-7 says that deleting a Space destroys "its Projects, Tasks, Memberships and Invitations" (`prd.md:202-211`). FR-10's "rather than being deleted" is read as covering the transition **out of pending** (accept, revoke, expire), not the Space's own destruction. AD-2 requires a non-nullable `SpaceId`, and the gate `Every_Space_scoped_entity_has_a_non_nullable_SpaceId` enforces it, so "keep the row with a nulled Space" is not available without relaxing AD-2. `SpaceStore.DeleteAsync` stays one statement.
      - Cost: SM-4 and SM-C3 count only Invitations of Spaces that still exist. Record that as a metric definition note in `success-metrics.md`, or ledger it to Lee.
