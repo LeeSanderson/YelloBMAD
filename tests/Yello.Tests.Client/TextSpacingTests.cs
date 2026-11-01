@@ -643,6 +643,52 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
         }
     }
 
+    /// <summary>
+    /// Story 4.2 AC9, UX-DR40, WCAG 1.4.12 and 1.4.4 (ledger <c>deferred-work.md:20</c>) - the pending Invitation list in
+    /// Space settings, holding a long-but-ordinary address and a long issuer name with the in-place confirm open on that
+    /// row, under 1.4.12 text spacing and 200% text-only zoom: no text clipped (the address, the Role, "Sent by", the date,
+    /// the warning, the danger "Revoke" and "Cancel"), no sideways page scroll. Anchored: the warning is on screen before
+    /// the check runs. Written red by the story 4.2 ATDD run; the locators are <c>InvitationListTests</c>' assumptions.
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = "red: AC9 - the Invitation list and its confirm do not exist yet (story 4.2 Task 6)")]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR40")]
+    [Trait("Requirement", "UX-DR14")]
+    public async Task Text_spacing_and_text_only_zoom_clip_nothing_in_the_Invitation_list(bool zoom)
+    {
+        var api = Seeded();
+        var listed = new Yello.Tests.Shared.ListedInvitation(
+            Guid.NewGuid(),
+            $"invitee.{Guid.NewGuid().ToString("N")[..12]}@example.test",
+            "viewer",
+            "Maximiliana Konstantinopoulou-Abernathy",
+            DateTimeOffset.UtcNow.AddDays(-2));
+
+        api.PendingInvitations[Northwind] = [listed];
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/settings").ToString());
+
+            var row = page.Locator("main .invitation-section li", new PageLocatorOptions { HasText = listed.EmailAddress });
+
+            await row.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Revoke", Exact = true }).ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await row.GetByText("Revoke this invitation? The email already sent cannot be recalled.").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+        }
+    }
+
     private static FakeYelloApi Seeded()
     {
         var api = new FakeYelloApi { SignedIn = true };

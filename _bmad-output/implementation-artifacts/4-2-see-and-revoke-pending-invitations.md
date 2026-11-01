@@ -593,6 +593,46 @@ The pattern is story, then ATDD scaffolds (`[Fact(Skip = "red: ACn - ...")]` plu
 - `deferred-work.md`: `:20`, `:532`, `:723`, and the D3 entry under "code review of 4-1".
 - `4-1-invite-an-email-address-to-a-space-at-a-role.md`: AC8, AC12, AC13, Q5, Q8, Q11, C4, C9, Review Findings, Debug Log.
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+**Checklist:** `_bmad-output/test-artifacts/atdd-checklist-4-2-see-and-revoke-pending-invitations.md` (decisions, seed
+constraints, the red verification, and the one finding below).
+
+**Scaffolds** (every one skipped `red: AC<n> - ...`, or pending until 4.2; Q3 and Q16 at their recommended options):
+
+| File | Cases | ACs |
+|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ListInvitations.cs` | 4 methods, 5 cases | AC1, AC5, AC6 (Q4, Q5, Q8, Q16) |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RevokeInvitation.cs` | 10 methods, 12 cases | AC2, AC3, AC4, AC5, AC7, AC10, I-17 (Q2, Q3, Q11, Q12) |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RevokeInvitationRace.cs` | 1 | AC4 race (Q10) |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.InvitationRevoke.cs` | 6 gates | AC1, AC2, AC3, AC4, AC5, AC7, AC9, AC11 (Q13, Q16) |
+| `tests/Yello.Tests.Isolation/IsolationCases.Invitations.cs` | 11 rows, `PendingUntil: "4.2"` (22 when active) | AC8 |
+| `tests/Yello.Tests.Client/InvitationListTests.cs` | 10 methods, 12 cases | AC9 |
+| `tests/Yello.Tests.Client/TextSpacingTests.cs` | 1 method, 2 cases | AC9 (ledger `:20`) |
+
+Harness: `InvitationWire` (`ListedInvitation`, `ParseList`, and the temporary `RevokeRoute`, `RevokePathOf`,
+`NotPendingProblemType` - swap them for the Task 2 contract members and delete them), `WireDatabase.SetInvitationStateAsync`,
+and the list and revoke on `FakeYelloApi.Invitations.cs`. Handler unit tests are not scaffolded: their types do not exist.
+
+**Green today:** none of the new scaffolds (each needs a route or type 4.2 adds). The existing gates AC11 names stay
+active and green unchanged.
+
+**Activation order:** (1) `A_revoke_racing_an_acceptance_that_commits_under_it_answers_409_and_leaves_it_accepted` - the
+riskiest assumption, that one `ExecuteUpdateAsync` composed with `OfferPredicates.Actionable` is a single guarded
+`UPDATE` that waits and re-evaluates under RCSI; (2) the unknown-id `404` case and `ISO-INVITATION-FOREIGN-ID-IN-OWN-SPACE`
+(Q3); (3) `Only_the_Invitation_store_writes_an_Invitation_state` and the terminal-state `409` theory; (4) the list gates and
+wire cases, then the list isolation rows; (5) the remaining revoke cases and isolation rows - clear every
+`PendingUntil: "4.2"` before review (GATE-003); (6) the handler gates and the problem-type gate; (7) the browser cases,
+with `Yello.Client` built in Debug.
+
+**Finding:** an unmapped `GET` on the Invitations path answers the boundary `404 not-available` today, so every `404`
+scaffold is anchored on a served request on the same route. And 4.1's
+`A_sent_invitation_clears_the_form_keeps_focus_and_announces_no_address` asserts the address is absent from the page after
+an issue, which AC9's re-read would contradict against a real list; the fake lists issued Invitations only when
+`ListIssuedInvitations` is set. Narrow that 4.1 assertion to the live regions or keep the default, and record which.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

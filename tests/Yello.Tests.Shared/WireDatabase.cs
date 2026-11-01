@@ -588,6 +588,43 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// Sets one Invitation's stored state directly, under its Space's own key - for the terminal rows no endpoint reaches
+    /// yet (story 4.2 AC4, AC5, AC6: <c>Accepted</c> until story 4.3 builds acceptance, and a <c>Revoked</c> seed). Seed the
+    /// row with <see cref="AddInvitationAsync"/> first. Written by the story 4.2 ATDD run.
+    /// </summary>
+    /// <remarks>
+    /// <c>State</c> is <c>nvarchar(16)</c> with no check constraint (migration <c>20261101140742_Invitations</c>) and is
+    /// stored as the <c>InvitationState</c> member's name, so only <c>Pending</c>, <c>Accepted</c> or <c>Revoked</c> is
+    /// accepted here ("expired" is derived, never stored: AD-27). The update keeps <c>SpaceId</c>, so the
+    /// <c>BLOCK AFTER UPDATE</c> predicate admits it.
+    /// </remarks>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="invitationId">The Invitation.</param>
+    /// <param name="state">The stored state: <c>Pending</c>, <c>Accepted</c> or <c>Revoked</c>.</param>
+    /// <returns>A task.</returns>
+    public Task SetInvitationStateAsync(Guid spaceId, Guid invitationId, string state) =>
+        state is "Pending" or "Accepted" or "Revoked"
+            ? SetInvitationStateCoreAsync(spaceId, invitationId, state)
+            : throw new ArgumentException("An Invitation is stored Pending, Accepted or Revoked; expired is derived (AD-27).", nameof(state));
+
+    private async Task SetInvitationStateCoreAsync(Guid spaceId, Guid invitationId, string state)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+
+        var changed = await ExecuteAsync(
+            connection,
+            null,
+            "UPDATE dbo.[Invitation] SET State = @state WHERE Id = @id",
+            ("@state", state),
+            ("@id", invitationId)).ConfigureAwait(false);
+
+        if (changed != 1)
+        {
+            throw new InvalidOperationException($"Expected to change one Invitation; changed {changed}.");
+        }
+    }
+
+    /// <summary>
     /// Every Invitation in <paramref name="spaceId"/>, read under that Space's own key - the database's view, independent
     /// of the Host's query filter. Story 4.1 (ATDD run); only skipped scaffolds call this.
     /// </summary>
