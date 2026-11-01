@@ -18,8 +18,8 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 4.2 ATDD run (2026-11-01).</b> Every case is skipped with the AC it
-/// waits for: the route is not mapped yet, so today a <c>GET</c> on the path meets no endpoint. The row shape is the
+/// <b>Written as red-phase scaffolds by the story 4.2 ATDD run (2026-11-01)</b>, each skipped with the AC it waited for;
+/// activated by the dev phase once <c>GET</c> on the path was mapped. The row shape is the
 /// harness's <see cref="ListedInvitation"/> until <c>InvitationResponse</c> exists.
 /// </para>
 /// <para>
@@ -44,7 +44,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// id as the tie-break in the database's own <c>uniqueidentifier</c> order.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - GET /api/v1/spaces/{spaceId}/invitations is not mapped yet (story 4.2 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "UX-DR14")]
     public async Task The_list_shows_each_pending_Invitations_address_Role_issuer_and_date_newest_first()
@@ -100,7 +100,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>Pending</c> and all four rows remain. Plant 1: the list without <c>OfferPredicates.Actionable</c> returns four.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the Invitation list is not mapped yet (story 4.2 Task 4, Task 5)")]
+    [Fact]
     [Trait("Requirement", "UX-DR14")]
     [Trait("Requirement", "FR-10")]
     [Trait("Requirement", "AR-31")]
@@ -152,7 +152,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// once one is issued, the same caller's list holds exactly it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the Invitation list is not mapped yet (story 4.2 Task 5)")]
+    [Fact]
     [Trait("Requirement", "UX-DR14")]
     public async Task The_list_is_empty_for_a_Space_with_no_Invitations()
     {
@@ -192,7 +192,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="role">The caller's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - the Invitation list is not mapped yet, so nothing declares IssueAndRevokeInvitations on it (Q16 (a))")]
+    [Theory]
     [InlineData(Role.Member)]
     [InlineData(Role.Viewer)]
     [Trait("Requirement", "FR-12")]

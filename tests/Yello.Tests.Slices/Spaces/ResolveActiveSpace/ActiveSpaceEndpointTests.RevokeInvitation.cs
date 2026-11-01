@@ -1,6 +1,7 @@
 using System.Net;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Invitations;
 using Yello.Contracts.Spaces;
 using Yello.Domain.Accounts;
 using Yello.Domain.Memberships;
@@ -17,10 +18,9 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 4.2 ATDD run (2026-11-01).</b> Every case is skipped with the AC it
-/// waits for. The route and the new problem type are <see cref="InvitationWire"/>'s temporary
-/// <see cref="InvitationWire.RevokePathOf"/> and <see cref="InvitationWire.NotPendingProblemType"/> until Task 2 puts
-/// them in <c>Yello.Contracts</c>.
+/// <b>Written as red-phase scaffolds by the story 4.2 ATDD run (2026-11-01).</b> Every case was skipped with the AC it
+/// waited for; the dev phase activated each one, saw it red for that reason, and swapped the ATDD stand-ins for
+/// <see cref="InvitationRoutes.InvitationOf"/> and <see cref="ProblemTypes.InvitationNotPending"/>.
 /// </para>
 /// <para>
 /// <b>Seeding</b> is as in <c>.ListInvitations.cs</c>: live Invitations through 4.1's issue route, terminal and expired
@@ -49,7 +49,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>404</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - DELETE /api/v1/spaces/{spaceId}/invitations/{invitationId} is not mapped yet (story 4.2 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     public async Task An_Admin_revokes_the_Owners_Invitation_and_the_Owner_revokes_the_Admins()
     {
@@ -97,7 +97,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// the revoke as <c>ExecuteDelete</c> leaves no row.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the revoke is not mapped yet (story 4.2 Task 4, Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "AD-27")]
@@ -142,7 +142,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// One row stays <c>Revoked</c> and the new one is <c>Pending</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the revoke is not mapped yet (story 4.2 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "AR-31")]
     [Trait("Requirement", "AD-27")]
@@ -185,7 +185,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// issued neither, revokes the other (<c>204</c>). Nothing depends on the issuer's continuing authority.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the list and the revoke are not mapped yet (story 4.2 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "AD-5")]
     public async Task An_Invitation_whose_issuer_was_demoted_stays_listed_and_revocable_by_any_Owner_or_Admin()
@@ -243,7 +243,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// is untouched by the removal, the Owner still lists it with the captured issuer name, and revokes it (<c>204</c>).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the list and the revoke are not mapped yet (story 4.2 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "AD-5")]
     public async Task An_Invitation_whose_issuer_was_removed_stays_listed_and_revocable()
@@ -300,7 +300,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="terminal">Which terminal state: <c>Accepted</c>, <c>Revoked</c> or <c>Expired</c>.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC4 - the revoke and urn:yello:problem:invitation-not-pending do not exist yet (story 4.2 Task 2, Task 5)")]
+    [Theory]
     [MemberData(nameof(TerminalInvitations))]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "FR-14")]
@@ -338,7 +338,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.True(anchor?.StatusCode == HttpStatusCode.NoContent, $"{anchor?.StatusCode} {anchor?.Body}");
         Assert.True(refused?.StatusCode == HttpStatusCode.Conflict, $"{refused?.StatusCode} {refused?.Body}");
-        Assert.Equal(InvitationWire.NotPendingProblemType, ProblemType(refused!));
+        Assert.Equal(ProblemTypes.InvitationNotPending, ProblemType(refused!));
         Assert.DoesNotContain("@", refused!.Body, StringComparison.Ordinal);
         Assert.DoesNotContain(await RefusalsOfAsync(database, accountId), row => row.TargetSpaceId == spaceId);
 
@@ -356,7 +356,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>204</c>. Plant 10: the unknown-id branch answering <c>409</c> or recording a refusal.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the revoke is not mapped yet (story 4.2 Task 5; Q3 (a))")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "FR-12")]
@@ -419,7 +419,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// invalid-idempotency-key</c> and leaves its Invitation <c>Pending</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the revoke is not mapped yet (story 4.2 Task 5)")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "AR-25")]
     public async Task A_revoke_replays_under_its_key_and_a_new_key_is_refused_409()
@@ -458,7 +458,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal(original!.StatusCode, replay?.StatusCode);
         Assert.Equal(original.Body, replay!.Body);
         Assert.True(fresh?.StatusCode == HttpStatusCode.Conflict, $"{fresh?.StatusCode} {fresh?.Body}");
-        Assert.Equal(InvitationWire.NotPendingProblemType, ProblemType(fresh!));
+        Assert.Equal(ProblemTypes.InvitationNotPending, ProblemType(fresh!));
         Assert.Equal(HttpStatusCode.BadRequest, malformed?.StatusCode);
         Assert.Equal(ProblemTypes.InvalidIdempotencyKey, ProblemType(malformed!));
 
@@ -476,7 +476,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// own address (<c>TESTING-CONVENTIONS.md</c> "Outbox and email"). Plant 9: the revoke enqueues a row.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the revoke is not mapped yet (story 4.2 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-39")]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "AD-10")]
@@ -522,7 +522,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// is the Host's (its listening line is in it) and each request was served as asserted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC2 - the list and the revoke are not mapped yet (story 4.2 Task 5)")]
+    [Fact]
     [Trait("Requirement", "NFR-6")]
     [Trait("Requirement", "AD-23")]
     public async Task Neither_the_address_nor_the_issuer_name_reaches_the_Host_log_on_list_or_revoke()
@@ -564,7 +564,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>Idempotency-Key</c> when one is given.
     /// </summary>
     private static Task<WireResponse> RevokeAsync(WireSession session, Guid spaceId, Guid invitationId, string? key = null) =>
-        session.SendWithHeadersAsync(HttpMethod.Delete, InvitationWire.RevokePathOf(spaceId, invitationId), content: null, KeyHeaders(key));
+        session.SendWithHeadersAsync(HttpMethod.Delete, InvitationRoutes.InvitationOf(spaceId, invitationId), content: null, KeyHeaders(key));
 
     /// <summary>
     /// The id of the one Invitation in <paramref name="spaceId"/> stored with exactly <paramref name="address"/>, read under

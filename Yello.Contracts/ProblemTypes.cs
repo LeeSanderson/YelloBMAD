@@ -390,8 +390,20 @@ public static class ProblemTypes
     /// Story 4.1, AC13, open question 12 (a).
     /// </summary>
     /// <remarks>
-    /// <b>Disclosable</b>: the issuer sees that Invitation in the Space's list (story 4.2). An expired one does not block
-    /// a reissue (FR-39).
+    /// <b>Disclosable</b>: the issuer sees that Invitation in the Space's pending list (<c>GET</c> on
+    /// <c>InvitationRoutes.List</c>, story 4.2). An expired one does not block a reissue (FR-39).
     /// </remarks>
     public static string InvitationPending => "urn:yello:problem:invitation-pending";
+
+    /// <summary>
+    /// The Invitation a revoke named is no longer pending: it was accepted, it was already revoked, or it has expired.
+    /// Answered <c>409</c>; nothing is written. Story 4.2, AC4, open question 2 (a); FR-12, AD-26, AD-27.
+    /// </summary>
+    /// <remarks>
+    /// <b>Disclosable</b>: the caller is an Owner or Admin of the Space, who could see the Invitation in the list while it
+    /// was pending (AD-26: a transition refused because the offer left <c>Pending</c> is <c>409</c>, never <c>404</c>). One
+    /// type covers all three terminal states; the body names neither the state nor the address. An id that names nothing
+    /// in this Space is the boundary's <c>404</c> instead (open question 3 (a)).
+    /// </remarks>
+    public static string InvitationNotPending => "urn:yello:problem:invitation-not-pending";
 }

@@ -8,6 +8,8 @@ using Yello.Application.Accounts.RegisterAccount;
 using Yello.Application.Accounts.SignOut;
 using Yello.Application.Invitations;
 using Yello.Application.Invitations.IssueInvitation;
+using Yello.Application.Invitations.ListInvitations;
+using Yello.Application.Invitations.RevokeInvitation;
 using Yello.Application.Outbox;
 using Yello.Application.Projects.CreateProject;
 using Yello.Application.Projects.DeleteProject;
@@ -130,6 +132,8 @@ builder.Services.AddScoped<RenameSpaceHandler>();
 builder.Services.AddScoped<DeleteSpaceHandler>();
 builder.Services.AddScoped<ReadDeletionSummaryHandler>();
 builder.Services.AddScoped<IssueInvitationHandler>();
+builder.Services.AddScoped<ListInvitationsHandler>();
+builder.Services.AddScoped<RevokeInvitationHandler>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
 builder.Services.AddAccountScopedResolution();
@@ -496,7 +500,13 @@ api.MapDeleteLabel();
 // Invitations (story 4.1). POST /api/v1/spaces/{spaceId}/invitations issues one to an email address at a Role, under
 // IssueAndRevokeInvitations (Owner and Admin), on both surfaces; 204 with no body whether or not the address has an
 // Account (AD-23). The email is enqueued in the same unit of work and sent after the commit. No bound on issue.
+// Story 4.2: GET on the same path lists the Space's actionable pending Invitations (address, Role, captured issuer name,
+// issue date; newest first, unpaged) and DELETE .../invitations/{invitationId} revokes one - 204, 409
+// invitation-not-pending for an accepted, revoked or expired one, or the unrecorded boundary 404 for an id that names
+// nothing here. Both under IssueAndRevokeInvitations on both surfaces; the revoke sends no email and deletes no row.
 api.MapIssueInvitation();
+api.MapListInvitations();
+api.MapRevokeInvitation();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

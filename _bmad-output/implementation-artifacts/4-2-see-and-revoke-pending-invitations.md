@@ -1,6 +1,10 @@
+---
+baseline_commit: 53b087c8563a48b31b68fbc992afcfabbbe46d70
+---
+
 # Story 4.2: See and revoke pending Invitations
 
-Status: ready-for-dev
+Status: review
 
 Epic: 4 — Bring people into one piece of your work (the second story of the epic)
 Story key: `4-2-see-and-revoke-pending-invitations`
@@ -224,48 +228,48 @@ AC1 to AC7 are reproduced **verbatim** from `epics.md:1673-1701` (`status: final
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: decide the open questions** (all ACs)
-  - [ ] Read the Dev Notes, then the open questions. Decide each one as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default, and no human is in the loop, so do not stop to ask.
-  - [ ] **Questions marked [SECURITY].** Q3 and Q16 each have an alternative that relaxes isolation or privacy. Take only the recommended option, which relaxes nothing. If you believe the alternative is needed, stop and return it as a blocker for Lee. Do not build it.
-- [ ] **Task 2: Contracts** (AC1, AC2, AC4)
-  - [ ] In `Yello.Contracts/Invitations/InvitationRoutes.cs`, add `List` (= `Issue`), `Invitation` (`/api/v1/spaces/{spaceId:guid}/invitations/{invitationId:guid}`), `InvitationIdParameter` and `InvitationOf(Guid, Guid)`.
-  - [ ] Add `Yello.Contracts/Invitations/InvitationResponse.cs` with `(Guid Id, string EmailAddress, string Role, string IssuerName, DateTimeOffset IssuedAt)`. **No property is named `Token`, `Secret` or `Plaintext`** (`Only_the_issuance_response_carries_a_Token_secret`).
-  - [ ] In `ProblemTypes`, add `InvitationNotPending => "urn:yello:problem:invitation-not-pending"`. Its remarks state that the type is answered `409`, is disclosable because the caller is an Owner or Admin of the Space, and covers accepted, revoked and expired.
-- [ ] **Task 3: Application** (AC1-AC5, AC7; C2)
-  - [ ] Add `Yello.Application/Invitations/ListInvitations/ListInvitationsHandler.cs`: `HandleAsync(CancellationToken)` returning `IReadOnlyList<PendingInvitation>`, a read model in Application that carries the five fields. It reads no Role and no Space.
-  - [ ] Add `Yello.Application/Invitations/RevokeInvitation/RevokeInvitationHandler.cs`: `HandleAsync(Guid invitationId, CancellationToken)` returning `InvitationRevocation { Revoked, NotPending, NotFound }`. It takes **no** `IOutbox` (AC7) and never reads `context.Role` or the issuer (AC2).
-  - [ ] Extend the port. Either add `ListPendingAsync` and `RevokeAsync` to `IInvitationStore`, or add a sibling port. Watch S1200, the reason 4.1 moved configurations around, and record the choice.
-- [ ] **Task 4: Infrastructure** (AC1, AC2, AC4, AC5)
-  - [ ] **The list read in `InvitationStore`:**
+- [x] **Task 1: decide the open questions** (all ACs)
+  - [x] Read the Dev Notes, then the open questions. Decide each one as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default, and no human is in the loop, so do not stop to ask.
+  - [x] **Questions marked [SECURITY].** Q3 and Q16 each have an alternative that relaxes isolation or privacy. Take only the recommended option, which relaxes nothing. If you believe the alternative is needed, stop and return it as a blocker for Lee. Do not build it.
+- [x] **Task 2: Contracts** (AC1, AC2, AC4)
+  - [x] In `Yello.Contracts/Invitations/InvitationRoutes.cs`, add `List` (= `Issue`), `Invitation` (`/api/v1/spaces/{spaceId:guid}/invitations/{invitationId:guid}`), `InvitationIdParameter` and `InvitationOf(Guid, Guid)`.
+  - [x] Add `Yello.Contracts/Invitations/InvitationResponse.cs` with `(Guid Id, string EmailAddress, string Role, string IssuerName, DateTimeOffset IssuedAt)`. **No property is named `Token`, `Secret` or `Plaintext`** (`Only_the_issuance_response_carries_a_Token_secret`).
+  - [x] In `ProblemTypes`, add `InvitationNotPending => "urn:yello:problem:invitation-not-pending"`. Its remarks state that the type is answered `409`, is disclosable because the caller is an Owner or Admin of the Space, and covers accepted, revoked and expired.
+- [x] **Task 3: Application** (AC1-AC5, AC7; C2)
+  - [x] Add `Yello.Application/Invitations/ListInvitations/ListInvitationsHandler.cs`: `HandleAsync(CancellationToken)` returning `IReadOnlyList<PendingInvitation>`, a read model in Application that carries the five fields. It reads no Role and no Space.
+  - [x] Add `Yello.Application/Invitations/RevokeInvitation/RevokeInvitationHandler.cs`: `HandleAsync(Guid invitationId, CancellationToken)` returning `InvitationRevocation { Revoked, NotPending, NotFound }`. It takes **no** `IOutbox` (AC7) and never reads `context.Role` or the issuer (AC2).
+  - [x] Extend the port. Either add `ListPendingAsync` and `RevokeAsync` to `IInvitationStore`, or add a sibling port. Watch S1200, the reason 4.1 moved configurations around, and record the choice.
+- [x] **Task 4: Infrastructure** (AC1, AC2, AC4, AC5)
+  - [x] **The list read in `InvitationStore`:**
     - `Set<Invitation>().AsNoTracking().Where(OfferPredicates.Actionable)`;
     - `.OrderByDescending(CreatedAt).ThenByDescending(Id)`;
     - `.Select(...)` of the five columns only.
     - No `Where` on `SpaceId`: both layers already narrow it, as `IssueAsync` relies on.
-  - [ ] **The revoke in `InvitationStore`:**
+  - [x] **The revoke in `InvitationStore`:**
     1. `Set<Invitation>().Where(i => i.Id == id).Where(OfferPredicates.Actionable).ExecuteUpdateAsync(s => s.SetProperty(i => i.State, InvitationState.Revoked))`;
     2. if the rowcount is 1, `Revoked`;
     3. if it is 0, `AnyAsync(i => i.Id == id)` (existence only, under RLS): `NotPending` if true, `NotFound` if false.
 
     No `SaveChanges` is needed after `ExecuteUpdate`. The pipeline's transaction holds the statement, and `IdempotencyStore` saves after. Confirm that `IdempotencyStore`'s "no pending changes" rule is satisfied: `ExecuteUpdate` leaves no tracked changes. No application lock and no `HOLDLOCK` (Q10).
-  - [ ] Index check: the revoke seeks `PK_Invitation (Id)`, and the list scans `(SpaceId, ...)`. If the list's plan is not a seek on a `SpaceId`-leading index, add `IX_Invitation_SpaceId_CreatedAt` in a migration (expand-only, hand-edited per `TESTING-CONVENTIONS.md:519-540`). Otherwise add no migration. Record which.
-- [ ] **Task 5: Host** (AC1, AC2, AC4, AC10)
-  - [ ] In `InvitationEndpoints`, add:
+  - [x] Index check: the revoke seeks `PK_Invitation (Id)`, and the list scans `(SpaceId, ...)`. If the list's plan is not a seek on a `SpaceId`-leading index, add `IX_Invitation_SpaceId_CreatedAt` in a migration (expand-only, hand-edited per `TESTING-CONVENTIONS.md:519-540`). Otherwise add no migration. Record which.
+- [x] **Task 5: Host** (AC1, AC2, AC4, AC10)
+  - [x] In `InvitationEndpoints`, add:
     - `MapListInvitations`: `MapGet(InvitationRoutes.List, ...)` with `.RequiresCapability(Capability.IssueAndRevokeInvitations)`, answering `Results.Ok(list.Select(Response).ToList())`;
     - `MapRevokeInvitation`: `MapDelete(InvitationRoutes.Invitation, ...)` with the same capability, answering `Revoked` → `Results.NoContent()`, `NotPending` → `409` `InvitationNotPending` with the title "This Invitation is no longer pending." and no address, and `NotFound` → `BoundaryProblems.NotAvailable()`, not recorded.
     - **No `_ =>` arm** that turns a new outcome into a `404`. This is 4.1 review P10.
-  - [ ] In `Program.cs`, register both handlers next to `IssueInvitationHandler` (`:132`) and both routes next to `MapIssueInvitation` (`:499`). Update the route comment block.
-- [ ] **Task 6: Client** (AC9)
-  - [ ] Change `InvitationSection.razor` (list, purge, loading, re-`GET` after issue and after `409`).
-  - [ ] Add `InvitationRow.razor`.
-  - [ ] Update `ClientCopy.resx` (Q15), `RefusalCopy.OwnKeys` and `components.css`.
-  - [ ] Rewrite `SpaceSettings.razor`'s and `InvitationSection.razor`'s header comments so they say what exists.
-  - [ ] Extend `tests/Yello.Tests.Client/FakeYelloApi.Invitations.cs` to cover `GET` (a seeded list per Space) and `DELETE` (a recorded revoke, a hold, and a `NextRevokeRefusal`). It must use `InvitationRoutes` and `ProblemTypes`, **never its own literals** (4.1 review P13).
-- [ ] **Task 7: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** use `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log.
-- [ ] **Task 8: ledger, docs, verification**
-  - [ ] Apply the ledger dispositions below to `deferred-work.md`. Keep each CLOSED or UPDATED note on one line, introduce no TAB or FORM FEED, and keep the final newline.
-  - [ ] `grep -rn "4\.2" Yello.* tests` and rewrite every comment that predicts 4.2 so it says what exists. This includes `OfferPredicates.cs:13`, `InvitationState.cs:24`, `IInvitationStore.cs:78`, `ProblemTypes.cs:393`, `InvitationSection.razor:14` and `SpaceSettings.razor:13`.
-  - [ ] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-4` stays `in-progress`.
-  - [ ] Run `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers. Rerun a failure once, alone, before calling it real.
+  - [x] In `Program.cs`, register both handlers next to `IssueInvitationHandler` (`:132`) and both routes next to `MapIssueInvitation` (`:499`). Update the route comment block.
+- [x] **Task 6: Client** (AC9)
+  - [x] Change `InvitationSection.razor` (list, purge, loading, re-`GET` after issue and after `409`).
+  - [x] Add `InvitationRow.razor`.
+  - [x] Update `ClientCopy.resx` (Q15), `RefusalCopy.OwnKeys` and `components.css`.
+  - [x] Rewrite `SpaceSettings.razor`'s and `InvitationSection.razor`'s header comments so they say what exists.
+  - [x] Extend `tests/Yello.Tests.Client/FakeYelloApi.Invitations.cs` to cover `GET` (a seeded list per Space) and `DELETE` (a recorded revoke, a hold, and a `NextRevokeRefusal`). It must use `InvitationRoutes` and `ProblemTypes`, **never its own literals** (4.1 review P13).
+- [x] **Task 7: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** use `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log.
+- [x] **Task 8: ledger, docs, verification**
+  - [x] Apply the ledger dispositions below to `deferred-work.md`. Keep each CLOSED or UPDATED note on one line, introduce no TAB or FORM FEED, and keep the final newline.
+  - [x] `grep -rn "4\.2" Yello.* tests` and rewrite every comment that predicts 4.2 so it says what exists. This includes `OfferPredicates.cs:13`, `InvitationState.cs:24`, `IInvitationStore.cs:78`, `ProblemTypes.cs:393`, `InvitationSection.razor:14` and `SpaceSettings.razor:13`.
+  - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-4` stays `in-progress`.
+  - [x] Run `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers. Rerun a failure once, alone, before calling it real.
 
 ## Dev Notes
 
@@ -637,10 +641,113 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended story cycle, 2026-11-01.
+
 ### Debug Log References
+
+**Red-green.** The ATDD run verified every scaffold red for its stated reason: the route or type was missing, and an unmapped `GET` answered the boundary `404`. Each was activated by removing its `Skip`, in the checklist's order. The Slices, Architecture, Isolation and Client groups were each run green after their task. Before Task 6, the one Architecture failure was the expected one: `The_invitation_not_pending_problem_type_is_declared_and_has_client_copy_naming_story_4_2` (no `ClientCopy.resx` entry yet). The race case (activation step 1) was green on the first run against the single guarded `ExecuteUpdateAsync`, and plants 2 and 3 below prove that it can fail.
+
+**Scaffolds corrected:** none. The route patterns, type names, locators and copy all matched what Tasks 2 to 6 built. The ATDD stand-ins `InvitationWire.RevokeRoute`, `RevokePathOf` and `NotPendingProblemType` were swapped for `InvitationRoutes.Invitation`, `InvitationRoutes.InvitationOf` and `ProblemTypes.InvitationNotPending` in every use: Isolation, the Slices revoke and race partials, the Client fake and `InvitationListTests`. They were then deleted from `InvitationWire`. The scaffold headers now say the cases are active.
+
+**The ATDD finding about 4.1's address-absent assertion:** the default was kept. `FakeYelloApi.ListIssuedInvitations` stays off, so 4.1's `A_sent_invitation_clears_the_form_keeps_focus_and_announces_no_address` keeps the page it was written against. Only `After_a_successful_issue_the_list_rereads_and_shows_the_new_row` turns it on.
+
+**A defect my own change caused, caught by an existing gate:** a first `text-transform: uppercase` on `.invitation-list__role` failed `DesignFoundationGateTests.Every_casing_transform_excludes_the_locales_it_is_lossy_in`. The Role span now uses base.css's `type-role-label`, which already excludes the lossy-casing and case-less locales.
+
+**Index check (Task 4):** no migration. Both isolation layers narrow the list to `SpaceId = SESSION_CONTEXT`. `IX_Invitation_SpaceId_NormalizedEmailAddress` already leads on `SpaceId`, so the plan seeks it, does a key lookup and sorts at most 7 days of issues. The revoke seeks `PK_Invitation`.
+
+**SYSDATETIMEOFFSET inside the UPDATE:** proved behaviourally rather than by reading logs. The race case and the expired-`409` arm pass with the composed predicate and fail under plant 2. 4.1's gate (ii), `The_shared_actionable_predicate_reads_the_database_clock_and_never_a_CSharp_clock`, still holds the translation.
+
+**Plants.** Each was applied by a scratch script that kept the original text in memory and restored it in a `finally`. `git checkout`, `git restore` and `git reset` were never used. Afterwards `git status` and `git grep` showed no remnant. Independent plants were batched into one build only when their expected-red tests did not overlap.
+
+| # | Plant | Expected red | Seen |
+|---|---|---|---|
+| 1 | The list without `OfferPredicates.Actionable` | AC6 | Red: `The_list_shows_only_live_pending_Invitations_...` |
+| 2 | The revoke without the actionable guard | The race case; the accepted and expired `409` cases | Red: the race case, all three terminal arms (Accepted, Revoked, Expired), and the replay's new-key `409` |
+| 3 | The revoke as load, C# check, `SaveChanges` | The race case (or masked) | Red: the race case, 1/1, and the state-writer gate (anchor gone) |
+| 4 | The revoke as `ExecuteDelete` | AC5 retention; the state-writer gate | Red: both |
+| 5 | A second `State` writer in another type (`SpaceStore`) | The state-writer gate | Red |
+| 6 | The list under `ReadProjectsAndTasks` | The capability gate; the Member and Viewer rows | Red: the routes gate, both Slices `403` arms, and `ISO-RECORD-KIND-LIST-INVITATIONS-MEMBER`/`-VIEWER` on both surfaces |
+| 7 | `RequiresCapability` removed from the revoke | `Every_spaceId_endpoint_declares_exactly_one_capability`; the Member and Viewer revoke rows | Red: both gates. The Host also refused to start, so every wire case in that build failed and P7 is not isolated on the wire |
+| 8 | The response gains `NormalizedEmailAddress` | The response-shape gate | Red |
+| 9 | The revoke handler takes an outbox and enqueues | The AC7 wire case; the no-outbox gate | Gate red. The wire case stayed green: the handler cannot know the invitee's address, so the planted row went to another recipient, and the gate is the catch |
+| 10 | The unknown-id branch answers `409` | `ISO-INVITATION-FOREIGN-ID-IN-OWN-SPACE`; the unknown-id case | Red: both surfaces, and the Slices case |
+| 11 | The revoke filtered on the caller as issuer | AC2 non-issuer; AC3 arms | Not planted. Neither the handler nor the store receives the caller (no `ActiveSpaceContext` parameter), so the plant needs a signature change. `Neither_the_list_nor_the_revoke_reads_the_issuers_Account` and the AC2/AC3 wire cases hold it |
+| 12 | The client removes the row before the answer | The not-optimistic case | Red |
+| 13 | The announcement includes the address | The announcement case | Red |
+| 14 | The purge registration skipped | The switch-purge case (or masked) | **Masked, 0/1**: `SpaceSettings` keys the section on `(SectionKey.Invitations, SpaceId)`, so a switch disposes it and a fresh instance starts empty. This is the 3.4 Labels finding. The registration stays, because it is what clears the list before navigation completes |
+| 15 | A revoke with its own `ExpiresAt >` comparison | Gate (i) | Red: `Only_the_shared_actionable_predicate_compares_ExpiresAt`, and 4.1's database-clock gate |
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created (create-story, 2026-11-01).
+- **Implemented FR-12 and UX-DR14** with FR-10's retention clause. `GET /api/v1/spaces/{spaceId}/invitations` lists the actionable pending Invitations: id, address, Role code, issuer name captured at issue, and issue date. It is newest first and unpaged, under `IssueAndRevokeInvitations` on both surfaces. `DELETE .../invitations/{invitationId}` revokes with one guarded `ExecuteUpdateAsync` composed with `OfferPredicates.Actionable`. It answers `204`, or `409 invitation-not-pending` (accepted, revoked or expired), or the unrecorded boundary `404` for an id that names nothing here. It sends no email and deletes no row. The client lists the Invitations in the Invitations section with an in-place confirm. It is never optimistic, it purges on leaving the Space, and no announcement carries an address.
+- **Port choice (Task 3):** `ListPendingAsync` and `RevokeAsync` were added to `IInvitationStore` rather than a sibling port. S1200 did not fire: the store gained no new coupled types beyond `PendingInvitation` and `InvitationRevocation`.
+- **Problem-type gate:** 4.2 has its own sibling gate (`The_invitation_not_pending_problem_type_is_declared_and_has_client_copy_naming_story_4_2`, as the ATDD run wrote it). 4.1's gate was not generalised.
+- **The A-10 gate** `Only_the_Invitation_store_writes_an_Invitation_state` is live. The issue's insert of `Pending` (the object initializer's `set_State`) is the other sanctioned write. 4.3 adds its accept.
+- **Not locked, and recorded:** a revoke committing between an issue's actionable-pending read and its insert can only make that issue answer `invitation-pending` for an Invitation that was just revoked. The answer is benign and visible, and a retry succeeds.
+- **Handler unit tests** (`ListAndRevokeInvitationHandlerTests`, no database) cover the pass-through and the three outcomes. `IssueInvitationHandlerTests.RecordingStore` gained the two new port members, throwing `NotSupportedException`.
+- **C1 (UX-DR34 against UX-DR14):** no client gate restricts where an address renders, so no allowed list changed. The address renders only in `InvitationRow`, in Space settings.
+- **Decisions (each reversible; cut any line to revisit):**
+  - Q1 - (a): `DELETE .../invitations/{invitationId}` answers `204`, the API Token revoke precedent. Cost: the route reads as removal although the row is kept.
+  - Q2 - (a): one `409 urn:yello:problem:invitation-not-pending` for accepted, revoked and expired, with no address and no state named. Cost: the client cannot tell which terminal state applies.
+  - Q3 - (a) [SECURITY, non-relaxing]: an unknown id or another Space's id gets the byte-identical boundary `404`, unrecorded. Cost: none. Isolation is unchanged.
+  - Q4 - (a): expired Invitations are not listed and not revocable (`409`), and the row stays `Pending`. Cost: an issuer is not told that an Invitation lapsed.
+  - Q5 - (a): the response is `(Id, EmailAddress, Role, IssuerName, IssuedAt)`. Cost: `ExpiresAt` can be added later as an additive field.
+  - Q6 - (a): an absolute short date in `<time datetime>`, not the mockup's relative time. Cost: it differs from the mockup.
+  - Q7 - (a): the captured issuer name only, never "Sent by you". Cost: the mockup's wording is not matched.
+  - Q8 - (a): newest first and unpaged. The growth is added to D3's ledger entry (owner 4.6, Lee/PM). Cost: an abusive issuer makes the list long.
+  - Q9 - (a): confirm in place: "Revoke this invitation? The email already sent cannot be recalled." Cost: one extra click.
+  - Q10 - (a): one guarded `ExecuteUpdate` with a rowcount check, no application lock and no `HOLDLOCK`. Cost: the benign issue/revoke interleaving above.
+  - Q11 - (a): "can no longer be accepted" is proved through the state, the predicate and re-issue. The acceptance-route proof is ledgered to 4.3. Cost: none until 4.3.
+  - Q12 - (a): demotion and removal run through `WireDatabase`. Account deletion is ledgered to 5.4, and the product-route re-runs to 4.4 and 4.5. Cost: two arms are seeded rather than driven through the product.
+  - Q13 - (a): the state-writer gate is built now. Cost: 4.3 must amend it.
+  - Q14 - (a): `InvitationCapabilities.PermitsIssueInvitations` is kept for the whole section. Cost: the name says "issue" for a section that also revokes.
+  - Q15 - (a): the recommended copy, with no count beside the heading. Cost: none.
+  - Q16 - (a) [SECURITY, non-relaxing]: the list is under `IssueAndRevokeInvitations`, and a Member or Viewer gets a recorded `403`. Cost: none. Privacy is unchanged.
+- **Ledger (`deferred-work.md`).** Lines `:20`, `:532`, `:723` and D3 (`:731`) were UPDATED, each on one line. A new section, "Deferred from: dev of 4-2", holds three entries: the acceptance route's uniform answer for a revoked Invitation (4.3, low); the issuer-deleted arm, where 5.4 must tombstone because the `Restrict` foreign key blocks deletion (5.4, medium); and the AC3 arms re-run through the product's own routes (4.4 and 4.5, low).
+- **Verification:** `docker info` gave 29.5.3. `dotnet build Yello.slnx` finished with 0 warnings and 0 errors, then `dotnet build-server shutdown`. The full suite (`dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`) was the last thing run: **1,975 total, 1,965 passed, 0 failed, 10 skipped**. The baseline was 1,945 total and 42 skipped. All 32 of 4.2's scaffold skips are now active. The 10 remaining skips are the 3 migration-bundle cases plus the explicit tiers and the recorded 3.4 heap spike. No failure needed a rerun.
 
 ### File List
+
+New:
+
+- `Yello.Contracts/Invitations/InvitationResponse.cs`
+- `Yello.Application/Invitations/ListInvitations/ListInvitationsHandler.cs`
+- `Yello.Application/Invitations/RevokeInvitation/RevokeInvitationHandler.cs`
+- `Yello.Client/Components/InvitationRow.razor`
+- `tests/Yello.Tests.Slices/Invitations/RevokeInvitation/ListAndRevokeInvitationHandlerTests.cs`
+
+Modified:
+
+- `Yello.Contracts/Invitations/InvitationRoutes.cs`
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Domain/Invitations/Invitation.cs`
+- `Yello.Domain/Invitations/InvitationState.cs`
+- `Yello.Application/Invitations/IInvitationStore.cs`
+- `Yello.Infrastructure/Persistence/InvitationStore.cs`
+- `Yello.Infrastructure/Persistence/OfferPredicates.cs`
+- `Yello.Host/Endpoints/InvitationEndpoints.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Client/Components/InvitationSection.razor`
+- `Yello.Client/Pages/SpaceSettings.razor`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Refusals/RefusalCopy.cs`
+- `Yello.Client/wwwroot/css/components.css`
+- `tests/Yello.Tests.Shared/InvitationWire.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.InvitationRevoke.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.Invitations.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.Invitations.cs`
+- `tests/Yello.Tests.Client/InvitationListTests.cs`
+- `tests/Yello.Tests.Client/TextSpacingTests.cs`
+- `tests/Yello.Tests.Slices/Invitations/IssueInvitation/IssueInvitationHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ListInvitations.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RevokeInvitation.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RevokeInvitationRace.cs`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/4-2-see-and-revoke-pending-invitations.md`
+
+## Change Log
+
+- 2026-11-01 - Story 4.2 implemented (dev-story). The pending Invitation list and its revoke work end to end: contracts, slices, the guarded store update, endpoints, and the client list with an in-place confirm. All 32 ATDD scaffolds and all 11 isolation rows are active. 14 of 15 plants were run: 12 seen red, 1 red only at its gate (P9), and 1 masked (P14); P11 was not plantable. The ledger is updated.
+- 2026-11-01 - Verification: build 0/0; full suite 1,975 total, 1,965 passed, 0 failed, 10 skipped. Status set to review.

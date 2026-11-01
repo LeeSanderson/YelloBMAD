@@ -12,7 +12,7 @@ namespace Yello.Tests.Isolation;
 /// A-4, A-5), each stating both surfaces. Written by the story 4.1 ATDD run (2026-11-01) as <c>PendingUntil: "4.1"</c>;
 /// converted by its dev phase (GATE-003). Story 4.2 - list and revoke Invitations: the rows for <c>GET</c> on the same path
 /// and <c>DELETE</c> on <c>.../invitations/{invitationId}</c> (AC8), written by the story 4.2 ATDD run as
-/// <c>PendingUntil: "4.2"</c>.
+/// <c>PendingUntil: "4.2"</c> and converted by its dev phase (GATE-003).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -86,9 +86,9 @@ internal static partial class IsolationCases
             Runner: CaseRunner.Timing),
 
         // Story 4.2 - list and revoke Invitations (AC8; I-1, I-2, I-3, I-4, I-12, I-13, I-17). Written by the story 4.2
-        // ATDD run (2026-11-01) as PendingUntil "4.2": GATE-003 fails the suite if any is still pending at review. The
-        // revoke's route is InvitationWire.RevokeRoute until Task 2 declares InvitationRoutes.Invitation. Every seeded
-        // address is held as its issuer's secret, so the I-17 log check reads it.
+        // ATDD run (2026-11-01) as PendingUntil "4.2"; converted by its dev phase (GATE-003), the ATDD route stand-ins
+        // swapped for InvitationRoutes.Invitation and InvitationRoutes.InvitationOf. Every seeded address is held as its
+        // issuer's secret, so the I-17 log check reads it.
         new(
             "ISO-LIST-INVITATIONS-FOREIGN-SPACE", "I-1 (4.2 AC8)", IsolationVector.DirectIdentifier, HttpMethod.Get, InvitationRoutes.Issue,
             async world =>
@@ -97,9 +97,7 @@ internal static partial class IsolationCases
 
                 return await ForeignAsync(world, InvitationRoutes.InvitationsOf);
             },
-            Both(new BoundaryNotFound()),
-            PendingUntil: "4.2",
-            PendingReason: Story42Pending),
+            Both(new BoundaryNotFound())),
 
         new(
             "ISO-LIST-INVITATIONS-OWN-SPACE", "I-3 (4.2 AC8)", IsolationVector.Listing, HttpMethod.Get, InvitationRoutes.Issue,
@@ -110,26 +108,20 @@ internal static partial class IsolationCases
 
                 return await OwnAsync(world, InvitationRoutes.InvitationsOf(world.A.SpaceId));
             },
-            Both(new Served(HttpStatusCode.OK, ListsExactlyTheCallersPendingInvitationsAsync, "200, exactly SA's actionable Invitations, none of SB's ids or addresses")),
-            PendingUntil: "4.2",
-            PendingReason: Story42Pending),
+            Both(new Served(HttpStatusCode.OK, ListsExactlyTheCallersPendingInvitationsAsync, "200, exactly SA's actionable Invitations, none of SB's ids or addresses"))),
 
         new(
             "ISO-RECORD-KIND-LIST-INVITATIONS-MEMBER", "V-1, C-6, NFR-7 (4.2 AC1, AC8; Q16 (a))", IsolationVector.RecordKind, HttpMethod.Get, InvitationRoutes.Issue,
             world => LesserRoleTouchesItsInvitationAsync(world, "member", revoke: false),
-            Both(new RoleRefused(InvitationWire.CapabilityCode) { Then = TheActorsInvitationsAreStillPendingAsync }),
-            PendingUntil: "4.2",
-            PendingReason: Story42Pending),
+            Both(new RoleRefused(InvitationWire.CapabilityCode) { Then = TheActorsInvitationsAreStillPendingAsync })),
 
         new(
             "ISO-RECORD-KIND-LIST-INVITATIONS-VIEWER", "V-1, C-6, NFR-7 (4.2 AC1, AC8; Q16 (a))", IsolationVector.RecordKind, HttpMethod.Get, InvitationRoutes.Issue,
             world => LesserRoleTouchesItsInvitationAsync(world, "viewer", revoke: false),
-            Both(new RoleRefused(InvitationWire.CapabilityCode) { Then = TheActorsInvitationsAreStillPendingAsync }),
-            PendingUntil: "4.2",
-            PendingReason: Story42Pending),
+            Both(new RoleRefused(InvitationWire.CapabilityCode) { Then = TheActorsInvitationsAreStillPendingAsync })),
 
         new(
-            "ISO-REVOKE-INVITATION-FOREIGN-SPACE", "I-2 (4.2 AC8)", IsolationVector.Write, HttpMethod.Delete, InvitationWire.RevokeRoute,
+            "ISO-REVOKE-INVITATION-FOREIGN-SPACE", "I-2 (4.2 AC8)", IsolationVector.Write, HttpMethod.Delete, InvitationRoutes.Invitation,
             async world =>
             {
                 var (foreign, _) = await IssueThroughTheProductAsync(world, world.B, "revoked-foreign");
@@ -137,15 +129,13 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Delete,
-                    [new(InvitationWire.RevokePathOf(world.B.SpaceId, foreign), InvitationWire.RevokePathOf(Guid.NewGuid(), foreign))],
+                    [new(InvitationRoutes.InvitationOf(world.B.SpaceId, foreign), InvitationRoutes.InvitationOf(Guid.NewGuid(), foreign))],
                     world.B.SpaceId);
             },
-            Both(new BoundaryNotFound { Then = TheNamedInvitationIsStillPendingAsync }),
-            PendingUntil: "4.2",
-            PendingReason: Story42Pending),
+            Both(new BoundaryNotFound { Then = TheNamedInvitationIsStillPendingAsync })),
 
         new(
-            "ISO-INVITATION-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-13 (4.2 AC4, AC8; Q3 (a))", IsolationVector.DeepLink, HttpMethod.Delete, InvitationWire.RevokeRoute,
+            "ISO-INVITATION-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-13 (4.2 AC4, AC8; Q3 (a))", IsolationVector.DeepLink, HttpMethod.Delete, InvitationRoutes.Invitation,
             async world =>
             {
                 var (foreign, _) = await IssueThroughTheProductAsync(world, world.B, "foreign-id");
@@ -155,26 +145,20 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Delete,
-                    [new(InvitationWire.RevokePathOf(world.A.SpaceId, foreign), InvitationWire.RevokePathOf(world.A.SpaceId, Guid.NewGuid()))],
+                    [new(InvitationRoutes.InvitationOf(world.A.SpaceId, foreign), InvitationRoutes.InvitationOf(world.A.SpaceId, Guid.NewGuid()))],
                     TargetSpaceId: null);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheNamedInvitationIsStillPendingAsync }),
-            PendingUntil: "4.2",
-            PendingReason: Story42Pending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheNamedInvitationIsStillPendingAsync })),
 
         new(
-            "ISO-RECORD-KIND-REVOKE-INVITATION-MEMBER", "V-1, C-6, NFR-7 (4.2 AC2, AC8)", IsolationVector.RecordKind, HttpMethod.Delete, InvitationWire.RevokeRoute,
+            "ISO-RECORD-KIND-REVOKE-INVITATION-MEMBER", "V-1, C-6, NFR-7 (4.2 AC2, AC8)", IsolationVector.RecordKind, HttpMethod.Delete, InvitationRoutes.Invitation,
             world => LesserRoleTouchesItsInvitationAsync(world, "member", revoke: true),
-            Both(new RoleRefused(InvitationWire.CapabilityCode) { Then = TheNamedInvitationIsStillPendingAsync }),
-            PendingUntil: "4.2",
-            PendingReason: Story42Pending),
+            Both(new RoleRefused(InvitationWire.CapabilityCode) { Then = TheNamedInvitationIsStillPendingAsync })),
 
         new(
-            "ISO-RECORD-KIND-REVOKE-INVITATION-VIEWER", "V-1, C-6, NFR-7 (4.2 AC2, AC8)", IsolationVector.RecordKind, HttpMethod.Delete, InvitationWire.RevokeRoute,
+            "ISO-RECORD-KIND-REVOKE-INVITATION-VIEWER", "V-1, C-6, NFR-7 (4.2 AC2, AC8)", IsolationVector.RecordKind, HttpMethod.Delete, InvitationRoutes.Invitation,
             world => LesserRoleTouchesItsInvitationAsync(world, "viewer", revoke: true),
-            Both(new RoleRefused(InvitationWire.CapabilityCode) { Then = TheNamedInvitationIsStillPendingAsync }),
-            PendingUntil: "4.2",
-            PendingReason: Story42Pending),
+            Both(new RoleRefused(InvitationWire.CapabilityCode) { Then = TheNamedInvitationIsStillPendingAsync })),
 
         TokenOwnOtherSpace(
             "LIST-INVITATIONS",
@@ -185,17 +169,15 @@ internal static partial class IsolationCases
             with
         {
             TestDesignId = "I-12 (4.2 AC8; the 3.4 AC3 gate)",
-            PendingUntil = "4.2",
-            PendingReason = Story42Pending,
         },
 
         new(
-            "ISO-TOKEN-OWN-OTHER-SPACE-REVOKE-INVITATION", "I-12 (4.2 AC8; the 3.4 AC3 gate)", IsolationVector.TokenOwnOtherSpace, HttpMethod.Delete, InvitationWire.RevokeRoute,
+            "ISO-TOKEN-OWN-OTHER-SPACE-REVOKE-INVITATION", "I-12 (4.2 AC8; the 3.4 AC3 gate)", IsolationVector.TokenOwnOtherSpace, HttpMethod.Delete, InvitationRoutes.Invitation,
             async world =>
             {
                 var (first, second) = await world.OwnerOfTwoAsync("Tr");
                 var (invitation, _) = await IssueThroughTheProductAsync(world, second.Actor, "token-elsewhere-revoke");
-                var path = InvitationWire.RevokePathOf(second.SpaceId, invitation);
+                var path = InvitationRoutes.InvitationOf(second.SpaceId, invitation);
 
                 return new CaseRequest(first.Actor, HttpMethod.Delete, [new(path, path)], second.SpaceId, Other: second.Actor);
             },
@@ -203,16 +185,8 @@ internal static partial class IsolationCases
             {
                 [IsolationSurface.Session] = new Served(HttpStatusCode.NoContent, TheNamedInvitationIsRevokedAsync, "204 - a Session carries no Space (FR-2); the Account owns SA2"),
                 [IsolationSurface.ApiToken] = new SameAsNonMember { Then = TheNamedInvitationIsStillPendingAsync },
-            },
-            PendingUntil: "4.2",
-            PendingReason: Story42Pending),
+            }),
     ];
-
-    /// <summary>
-    /// Why story 4.2's rows are pending: the routes they name are mapped by its dev phase. GATE-003 fails any of them still
-    /// pending once 4.2 reaches review.
-    /// </summary>
-    private const string Story42Pending = "GET and DELETE on the Invitation routes are mapped by story 4.2's dev phase (Task 5)";
 
     /// <summary>
     /// An Invitation issued through the product - 4.1's route on the owner's Session, in the owner's own Space - to a fresh
@@ -246,7 +220,7 @@ internal static partial class IsolationCases
 
         await world.Database.ChangeRoleAsync(actor.SpaceId, actor.AccountId, roleStableCode);
 
-        var path = revoke ? InvitationWire.RevokePathOf(actor.SpaceId, invitation) : InvitationRoutes.InvitationsOf(actor.SpaceId);
+        var path = revoke ? InvitationRoutes.InvitationOf(actor.SpaceId, invitation) : InvitationRoutes.InvitationsOf(actor.SpaceId);
 
         return new CaseRequest(actor, revoke ? HttpMethod.Delete : HttpMethod.Get, [new(path, path)], actor.SpaceId);
     }

@@ -1,0 +1,159 @@
+@using System.Globalization
+@using Yello.Client.Spaces
+@using Yello.Contracts.Invitations
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    ONE PENDING INVITATION IN SPACE SETTINGS' LIST - story 4.2: AC1, AC2, AC9; FR-12; UX-DR12, UX-DR14, UX-DR26, UX-DR38.
+
+    Its address, its Role's display name, "Sent by" the name captured at issue (never a live lookup, and nothing about the
+    issuer's current standing), and its issue date as an absolute short date in a time element (open question 6 (a)).
+    The address renders here because this is Space settings, read only by Owners and Admins (UX-DR14; the story's C1).
+
+    REVOKE ASKS FIRST, IN PLACE (open question 9 (a); UX-DR12): the row's control is replaced by the warning - the email
+    already sent cannot be recalled - the danger action and Cancel, never a dialog; focus moves to Cancel, and Esc or
+    Cancel restores the row with focus on its Revoke. NOT OPTIMISTIC (UX-DR26): the row stays until the server agrees.
+    Each Revoke is described by the row's address, so several are not identical controls to a screen reader.
+*@
+
+<li class="invitation-list__row">
+    <span class="invitation-list__address" id="@AddressId">@Invitation.EmailAddress</span>
+    <span class="invitation-list__role type-role-label">@Localizer[RoleCopy.NameKey(Invitation.Role)]</span>
+    <span class="invitation-list__issuer">@string.Format(CultureInfo.CurrentCulture, Localizer["InvitationSentBy"], Invitation.IssuerName)</span>
+    <time class="invitation-list__issued type-meta" datetime="@IssuedInstant">@IssuedDate</time>
+
+    @if (Confirming)
+    {
+        <span class="destructive-confirm invitation-list__confirm" @onkeydown="ConfirmKeyDownAsync">
+            <span>@Localizer["InvitationRevokeWarning"]</span>
+            <button type="button" class="button-danger" aria-describedby="@AddressId" @onclick="RevokeAsync">@Localizer["InvitationRevoke"]</button>
+            <button type="button" class="button-secondary" @onclick="CancelAsync" @ref="_cancel">@Localizer["InvitationCancel"]</button>
+        </span>
+    }
+
+    @if (Revoking)
+    {
+        <span class="invitation-list__progress" role="status">@Localizer["InvitationRevoking"]</span>
+    }
+
+    @if (ShowsRevoke)
+    {
+        <button type="button" class="button-secondary" aria-describedby="@AddressId" @onclick="AskAsync" @ref="_revoke">@Localizer["InvitationRevoke"]</button>
+    }
+
+    @if (Refusal is { } refusal)
+    {
+        <p class="invitation-list__refusal" role="status">@refusal</p>
+    }
+</li>
+
+@code {
+    private ElementReference _revoke;
+    private ElementReference _cancel;
+    private bool _wasConfirming;
+    private bool _focusCancel;
+    private bool _focusRevoke;
+    private int _focusRequestsSeen;
+
+    /// <summary>The Invitation.</summary>
+    [Parameter]
+    [EditorRequired]
+    public InvitationResponse Invitation { get; set; } = new(Guid.Empty, string.Empty, string.Empty, string.Empty, DateTimeOffset.MinValue);
+
+    /// <summary>Whether its revocation is being confirmed.</summary>
+    [Parameter]
+    public bool Confirming { get; set; }
+
+    /// <summary>Whether its revocation is with the server.</summary>
+    [Parameter]
+    public bool Revoking { get; set; }
+
+    /// <summary>The words for its refused or unsent revocation, or <c>null</c>.</summary>
+    [Parameter]
+    public string? Refusal { get; set; }
+
+    /// <summary>
+    /// Bumped by the list to move focus to this row's Revoke - after the row before it was revoked (UX-DR39: the nearest
+    /// surviving control, never <c>body</c>).
+    /// </summary>
+    [Parameter]
+    public int FocusRevokeRequest { get; set; }
+
+    /// <summary>Raised by the first Revoke, with the Invitation's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnAskToRevoke { get; set; }
+
+    /// <summary>Raised by the confirming Revoke, with the Invitation's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnRevoke { get; set; }
+
+    /// <summary>Raised by Cancel, or by Esc in the confirm.</summary>
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private bool ShowsRevoke => !Confirming && !Revoking;
+
+    private string AddressId => $"invitation-{Invitation.Id:N}";
+
+    private string IssuedInstant => Invitation.IssuedAt.ToString("O", CultureInfo.InvariantCulture);
+
+    private string IssuedDate => Invitation.IssuedAt.ToLocalTime().ToString("d", CultureInfo.CurrentCulture);
+
+    /// <summary>
+    /// The confirm opening takes focus to its Cancel: neither choice is a default, and a misplaced Enter revokes nothing.
+    /// A new focus request from the list takes focus to this row's Revoke.
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        if (Confirming && !_wasConfirming)
+        {
+            _focusCancel = true;
+        }
+
+        _wasConfirming = Confirming;
+
+        if (FocusRevokeRequest != _focusRequestsSeen)
+        {
+            _focusRequestsSeen = FocusRevokeRequest;
+            _focusRevoke = FocusRevokeRequest > 0;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusCancel && Confirming)
+        {
+            _focusCancel = false;
+            await _cancel.FocusAsync();
+        }
+
+        // Spent on the first render it could apply to, whether or not the control is there, so a stale request cannot pull
+        // focus on a later, unrelated render.
+        if (_focusRevoke && !Confirming)
+        {
+            _focusRevoke = false;
+
+            if (ShowsRevoke)
+            {
+                await _revoke.FocusAsync();
+            }
+        }
+    }
+
+    private Task AskAsync() => OnAskToRevoke.InvokeAsync(Invitation.Id);
+
+    private Task RevokeAsync() => Revoking ? Task.CompletedTask : OnRevoke.InvokeAsync(Invitation.Id);
+
+    /// <summary>Cancel, or Esc in the confirm: nothing is sent, and focus returns to the row's Revoke.</summary>
+    private Task CancelAsync()
+    {
+        _focusRevoke = true;
+
+        return OnCancel.InvokeAsync();
+    }
+
+    private Task ConfirmKeyDownAsync(KeyboardEventArgs args) =>
+        args.Key == "Escape" ? CancelAsync() : Task.CompletedTask;
+}

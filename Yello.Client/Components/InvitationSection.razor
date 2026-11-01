@@ -5,16 +5,22 @@
 @using Yello.Contracts
 @using Yello.Contracts.Invitations
 
+@implements IDisposable
+
 @inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
 @inject ActiveSpaceState ActiveSpace
 @inject SpaceWrites Writes
 
 @*
-    THE INVITATIONS SECTION OF SPACE SETTINGS - story 4.1: AC1, AC2, AC3, AC10; FR-10, FR-42; UX-DR27, UX-DR33, UX-DR37,
-    UX-DR38. Story 4.2 adds the pending list to this same section (deferred-work.md:532, open question 8 (a)).
+    THE INVITATIONS SECTION OF SPACE SETTINGS - story 4.1 (the invite form: AC1, AC2, AC3, AC10; FR-10, FR-42) and story
+    4.2 (the pending list and its revoke: AC1, AC2, AC6, AC9; FR-12); UX-DR12, UX-DR14, UX-DR26, UX-DR27, UX-DR31, UX-DR33,
+    UX-DR37, UX-DR38, UX-DR39.
 
-    OWNER AND ADMIN ONLY. Space settings renders this only when InvitationCapabilities.PermitsIssueInvitations; for a
-    Member or a Viewer it is absent from the DOM, never disabled or hidden (UX-DR27).
+    OWNER AND ADMIN ONLY. Space settings renders this only when InvitationCapabilities.PermitsIssueInvitations - one
+    predicate for the one capability, issue-and-revoke-invitations, that covers the form, the list and the revoke (open
+    question 14 (a)); for a Member or a Viewer it is absent from the DOM, never disabled or hidden (UX-DR27), and the list
+    is never asked for.
 
     THE FORM: an email field - type="email", autocomplete="off" and a field name fresh per render, because the address is
     someone else's and the browser must not offer the person's own (a recorded variance from Register.razor's "email";
@@ -27,7 +33,19 @@
     NO address (UX-DR38). A disclosable 409 (already a Member here; already invited) or an implausible address is said
     beside the field; role-not-offerable beside the Role group; a 403 in the capability copy on the section; a 404 is the
     Space refusal surface. One Idempotency-Key per deliberate send, kept for an identical resend after an attempt that got
-    no answer ("Not sent.", the 2.5 deletes' precedent) and dropped once anything answers.
+    no answer ("Not sent.", the 2.5 deletes' precedent) and dropped once anything answers. The issue's 204 has no body, so
+    a successful issue reads the list again: the new Invitation appears once the server lists it, never optimistically.
+
+    THE PENDING LIST (story 4.2), below the form under "Pending invitations": each actionable pending Invitation as an
+    InvitationRow - address, Role, "Sent by" and date - newest first, or "No pending invitations." and nothing else (no
+    count, no prompt; UX-DR26). RENDERED ONLY AFTER THE SERVER HAS ANSWERED and PURGED WITH THE SPACE (UX-DR31): the
+    addresses, any confirm, any revoke in flight and any refusal go synchronously the moment the tab leaves the Space.
+
+    REVOKE asks first in place (InvitationRow), then sends DELETE with an Idempotency-Key - fresh per deliberate confirm,
+    kept for the identical resend after no answer. Never optimistic: the row stays until the answer. 204 removes it and
+    announces "Invitation revoked." - no address (UX-DR38) - with focus on the next row's Revoke, or on the list heading
+    when there is none (UX-DR39). 409 invitation-not-pending reads the list again and says so; 404 is the Space refusal
+    surface; 403 the capability copy on the row; no answer or a 5xx is "Not sent.".
 *@
 
 <div class="invitation-section">
@@ -81,6 +99,46 @@
     {
         <p class="invitation-section__status" role="status">@status</p>
     }
+
+    @if (IsLoading)
+    {
+        <div class="invitation-section__loading" aria-busy="true">
+            <p class="visually-hidden">@Localizer["InvitationsLoading"]</p>
+        </div>
+    }
+
+    @if (_listRefusal is { } listRefusal)
+    {
+        <p class="invitation-section__status" role="status">@listRefusal</p>
+    }
+
+    @if (_invitations is not null)
+    {
+        <h3 class="invitation-list__heading" tabindex="-1" @ref="_listHeading">@Localizer["InvitationsPendingHeading"]</h3>
+
+        @if (_invitations.Count == 0)
+        {
+            <p class="invitation-list__empty">@Localizer["InvitationsEmpty"]</p>
+        }
+
+        @if (_invitations.Count > 0)
+        {
+            <ul class="invitation-list">
+                @foreach (var invitation in _invitations)
+                {
+                    <InvitationRow @key="invitation.Id"
+                                   Invitation="@invitation"
+                                   Confirming="@(_confirming == invitation.Id)"
+                                   Revoking="@(_revoking == invitation.Id)"
+                                   Refusal="@(_rowRefusal?.InvitationId == invitation.Id ? _rowRefusal.Value.Text : null)"
+                                   FocusRevokeRequest="@(_focusRevokeOf == invitation.Id ? _focusRevokeRequests : 0)"
+                                   OnAskToRevoke="AskToRevoke"
+                                   OnRevoke="RevokeAsync"
+                                   OnCancel="CancelRevoke" />
+                }
+            </ul>
+        }
+    }
 </div>
 
 @code {
@@ -102,6 +160,26 @@
     private bool _inFlight;
     private bool _focusField;
 
+    private static readonly JsonSerializerOptions ListJsonOptions = new(JsonSerializerDefaults.Web);
+
+    private IDisposable? _purgeRegistration;
+
+    /// <summary>
+    /// Bumped by every purge and by disposal. An answer that started before one is dropped when it arrives.
+    /// </summary>
+    private int _generation;
+
+    private ElementReference _listHeading;
+    private List<InvitationResponse>? _invitations;
+    private string? _listRefusal;
+    private Guid? _confirming;
+    private Guid? _revoking;
+    private (Guid InvitationId, string Text)? _rowRefusal;
+    private (Guid InvitationId, string Key)? _revokeKey;
+    private Guid? _focusRevokeOf;
+    private int _focusRevokeRequests;
+    private bool _focusListHeading;
+
     // The key of the last send that got no answer, and the body it was for: an identical resend reuses it.
     private string? _key;
     private IssueInvitationRequest? _keyFor;
@@ -116,6 +194,21 @@
     public EventCallback<ProblemResponse?> OnSpaceRefused { get; set; }
 
     /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _purgeRegistration = ActiveSpace.RegisterPurge(Purge);
+
+        await LoadAsync(_generation);
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _generation++;
+        _purgeRegistration?.Dispose();
+    }
+
+    /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (_focusField && _field is not null)
@@ -123,6 +216,239 @@
             _focusField = false;
             await _field.FocusAsync();
         }
+
+        if (_focusListHeading && _invitations is not null)
+        {
+            _focusListHeading = false;
+            await _listHeading.FocusAsync();
+        }
+    }
+
+    private bool IsLoading => _invitations is null && _listRefusal is null;
+
+    /// <summary>
+    /// The Space is being left: its pending Invitations - other people's addresses - and everything about revoking one go
+    /// synchronously, before anything else renders (UX-DR31).
+    /// </summary>
+    private void Purge()
+    {
+        _generation++;
+        _invitations = null;
+        _listRefusal = null;
+        _confirming = null;
+        _revoking = null;
+        _rowRefusal = null;
+        _revokeKey = null;
+        _focusRevokeOf = null;
+        _focusListHeading = false;
+        _announcement = null;
+        _announcements++;
+    }
+
+    /// <summary>
+    /// Reads the pending list. Nothing is rendered from cache before the server answers; a read again after an issue or a
+    /// 409 keeps the rows on screen until it answers. An answer that started before a purge is dropped.
+    /// </summary>
+    private async Task LoadAsync(int generation)
+    {
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(InvitationRoutes.InvitationsOf(SpaceId), UriKind.Relative), token);
+
+            if (generation != _generation || token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                var invitations = await response.Content.ReadFromJsonAsync<List<InvitationResponse>>(ListJsonOptions, token);
+
+                if (invitations is not null && generation == _generation)
+                {
+                    _invitations = invitations;
+                    _listRefusal = null;
+                }
+
+                return;
+            }
+
+            await RefuseListAsync(response, token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended: both purges have run.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            if (generation == _generation)
+            {
+                await OnSpaceRefused.InvokeAsync(null);
+            }
+        }
+    }
+
+    /// <summary>
+    /// A refused read: a 404 is the Space refusal surface; a 403 - unreachable in practice, the section being absent for
+    /// those Roles - the capability copy in the section. A 401 is YelloApiHandler's.
+    /// </summary>
+    private async Task RefuseListAsync(HttpResponseMessage response, CancellationToken token)
+    {
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            return;
+        }
+
+        var problem = await SpaceWrites.ProblemOfAsync(response, token);
+
+        if (response.StatusCode == HttpStatusCode.Forbidden)
+        {
+            _listRefusal = RefusalText.Of(Localizer, problem);
+            return;
+        }
+
+        await OnSpaceRefused.InvokeAsync(problem);
+    }
+
+    private void AskToRevoke(Guid invitationId)
+    {
+        _confirming = invitationId;
+        _rowRefusal = null;
+    }
+
+    private void CancelRevoke() => _confirming = null;
+
+    /// <summary>
+    /// Revokes once the server agrees - never before (UX-DR26).
+    /// </summary>
+    private async Task RevokeAsync(Guid invitationId)
+    {
+        if (_revoking is not null)
+        {
+            return;
+        }
+
+        // A fresh key per deliberate confirm; the key of an attempt that got no answer is kept for its identical resend.
+        if (_revokeKey is not { } kept || kept.InvitationId != invitationId)
+        {
+            _revokeKey = (invitationId, Guid.NewGuid().ToString("D"));
+        }
+
+        _confirming = null;
+        _rowRefusal = null;
+        _revoking = invitationId;
+
+        var generation = _generation;
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Delete, InvitationRoutes.InvitationOf(SpaceId, invitationId), _revokeKey.Value.Key, token);
+
+            if (generation == _generation)
+            {
+                await UseRevokeAnswerAsync(invitationId, answer, generation);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // No answer - a timeout included: the row says it was not sent, and the key is kept for the resend.
+            _rowRefusal = (invitationId, Localizer["TaskEditNotSent"]);
+        }
+        finally
+        {
+            if (generation == _generation)
+            {
+                _revoking = null;
+            }
+        }
+    }
+
+    private async Task UseRevokeAnswerAsync(Guid invitationId, SpaceWriteAnswer answer, int generation)
+    {
+        if (answer.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            return;
+        }
+
+        if (answer.StatusCode >= HttpStatusCode.InternalServerError)
+        {
+            // The outcome is not known: treated as no answer, so the key is kept.
+            _rowRefusal = (invitationId, Localizer["TaskEditNotSent"]);
+            return;
+        }
+
+        _revokeKey = null;
+
+        if (answer.StatusCode == HttpStatusCode.NoContent)
+        {
+            Revoked(invitationId);
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.NotFound)
+        {
+            await OnSpaceRefused.InvokeAsync(answer.Problem);
+            return;
+        }
+
+        if (string.Equals(answer.Problem?.Type, ProblemTypes.InvitationNotPending, StringComparison.Ordinal))
+        {
+            // No longer outstanding: the list as the server now holds it, then the refusal - naming no address.
+            await LoadAsync(generation);
+            Say(RefusalText.Of(Localizer, answer.Problem));
+            return;
+        }
+
+        _rowRefusal = (invitationId, RefusalText.Of(Localizer, answer.Problem));
+    }
+
+    /// <summary>
+    /// The revoked row leaves, focus goes to the next row's Revoke or to the list heading - never to body (UX-DR39) - and
+    /// the revoke is announced with no address (UX-DR38).
+    /// </summary>
+    private void Revoked(Guid invitationId)
+    {
+        if (_invitations is { } invitations)
+        {
+            var index = invitations.FindIndex(invitation => invitation.Id == invitationId);
+
+            if (index >= 0)
+            {
+                invitations.RemoveAt(index);
+            }
+
+            FocusAfterRevoke(index >= 0 && index < invitations.Count ? invitations[index].Id : null);
+        }
+
+        Say(Localizer["InvitationRevoked"]);
+    }
+
+    private void FocusAfterRevoke(Guid? next)
+    {
+        if (next is { } nextId)
+        {
+            _focusRevokeOf = nextId;
+            _focusRevokeRequests++;
+            return;
+        }
+
+        _focusListHeading = true;
+    }
+
+    /// <summary>
+    /// Says a sentence politely - the same one again included - or, with <c>null</c>, clears the regions.
+    /// </summary>
+    private void Say(string? words)
+    {
+        _announcement = words;
+        _announcements++;
     }
 
     private async Task SendAsync()
@@ -199,6 +525,9 @@
             _focusField = true;
             _announcement = Localizer["InvitationSent"];
             _announcements++;
+
+            // The 204 has no body (4.1 Q5): the new Invitation is shown once the server lists it.
+            await LoadAsync(_generation);
             return;
         }
 

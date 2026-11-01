@@ -16,8 +16,8 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds.</b> None of the subjects exists yet, so each gate finds it by name (route pattern,
-/// reflection, Cecil or the resource file) and is skipped with the AC it waits for. The names are the story's Project
+/// <b>Written as red-phase scaffolds, activated by the dev phase.</b> Each gate finds its subject by name (route pattern,
+/// reflection, Cecil or the resource file), so a renamed subject turns it red. The names are the story's Project
 /// Structure Notes: <c>Yello.Contracts.Invitations.InvitationResponse</c>, <c>ListInvitationsHandler</c> and
 /// <c>RevokeInvitationHandler</c> in <c>Yello.Application</c>, <c>Yello.Infrastructure.Persistence.InvitationStore</c>. A
 /// different name is corrected here first and recorded in the Debug Log. The route patterns stay literals, as in
@@ -47,7 +47,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Sibling of <c>The_Label_routes_declare_their_capability_serve_both_surfaces_and_consult_no_bound</c>. Plants 6 and 7:
     /// the list under <c>ReadProjectsAndTasks</c>, or the revoke without <c>RequiresCapability</c>.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC2 - the list and the revoke are not mapped yet (story 4.2 Task 5)")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "AD-4")]
     [Trait("Requirement", "AD-23")]
@@ -73,7 +73,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// token hash, the normalised address, the issuer's Account, the Space, the state or the expiry. Plant 8: a sixth
     /// property.
     /// </summary>
-    [Fact(Skip = "red: AC1 - Yello.Contracts.Invitations.InvitationResponse is not declared yet (story 4.2 Task 2)")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "NFR-6")]
     [Trait("Requirement", "AD-23")]
@@ -100,7 +100,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>The_only_bulk_writes_of_a_Space_are_the_rename_and_the_deletion_in_SpaceStore</c> is. 4.3 adds its accept here.
     /// Plants 4 and 5: the revoke as <c>ExecuteDelete</c>, or a second <c>State</c> writer in another type.
     /// </summary>
-    [Fact(Skip = "red: AC5, AC11 - no revoke writes Invitation.State yet, so the anchor is absent (story 4.2 Task 4; Q13 (a))")]
+    [Fact]
     [Trait("Requirement", "AR-31")]
     [Trait("Requirement", "AD-27")]
     [Trait("Requirement", "FR-10")]
@@ -158,7 +158,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// cannot: <c>RevokeInvitationHandler</c>'s constructors name no outbox type. Anchor: the handler exists and takes an
     /// Invitation port. Plant 9: an <c>IOutbox</c> parameter.
     /// </summary>
-    [Fact(Skip = "red: AC7 - RevokeInvitationHandler is not declared yet (story 4.2 Task 3)")]
+    [Fact]
     [Trait("Requirement", "FR-39")]
     [Trait("Requirement", "AR-33")]
     public void The_revoke_handler_takes_no_outbox()
@@ -176,7 +176,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// the list shows the name captured at issue). Anchor: both handlers exist. Plant 11: a revoke filtered on
     /// <c>IssuedByAccountId == caller</c> in a handler.
     /// </summary>
-    [Fact(Skip = "red: AC2, AC3 - ListInvitationsHandler and RevokeInvitationHandler are not declared yet (story 4.2 Task 3)")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "AR-3")]
     [Trait("Requirement", "AD-5")]
@@ -198,7 +198,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// AC4, AC9, AR-34, Q2 (a) - <c>invitation-not-pending</c> is declared in <c>ProblemTypes</c> and has client copy of its
     /// own in <c>ClientCopy.resx</c> whose comment names story 4.2. Sibling of 4.1's problem-type gate.
     /// </summary>
-    [Fact(Skip = "red: AC4, AC9 - urn:yello:problem:invitation-not-pending and its copy do not exist yet (story 4.2 Task 2, Task 6)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-12")]
     public void The_invitation_not_pending_problem_type_is_declared_and_has_client_copy_naming_story_4_2()

@@ -145,6 +145,12 @@ public static class RefusalCopy
     public static string InvitationPendingKey => "invitation-pending";
 
     /// <summary>
+    /// The Invitation a revoke named is no longer pending - accepted, revoked or expired (story 4.2, AC4, Q2 (a)); said in
+    /// the Invitation list after it is read again. Names no address.
+    /// </summary>
+    public static string InvitationNotPendingKey => "invitation-not-pending";
+
+    /// <summary>
     /// The resource a refusal is rendered with.
     /// </summary>
     /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
@@ -221,6 +227,7 @@ public static class RefusalCopy
         [ProblemTypes.RoleNotOfferable] = RoleNotOfferableKey,
         [ProblemTypes.AlreadyAMember] = AlreadyAMemberKey,
         [ProblemTypes.InvitationPending] = InvitationPendingKey,
+        [ProblemTypes.InvitationNotPending] = InvitationNotPendingKey,
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static string? OwnKey(string? type) =>

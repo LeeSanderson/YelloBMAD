@@ -14,13 +14,13 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 4.2 ATDD run (2026-11-01).</b> Every case is skipped with AC9 and what it
+/// <b>Written as red-phase scaffolds by the story 4.2 ATDD run (2026-11-01).</b> Each was skipped with AC9 and what it
 /// waits for. The API is <see cref="FakeYelloApi"/> at the network edge, taught by this run the list and the revoke
 /// (<c>FakeYelloApi.Invitations.cs</c>); no Host, no database, no engine. Build <c>Yello.Client</c> in Debug before running
 /// them. Same collection as <see cref="InvitationTests"/>, so no new fixture.
 /// </para>
 /// <para>
-/// <b>Locators are assumptions to correct to the markup Task 6 builds</b>, recorded in the Debug Log when corrected: the
+/// <b>Locators</b> were the ATDD run's assumptions, and the markup Task 6 built matches them unchanged: the
 /// section is 4.1's <c>main .invitation-section</c>; the list is a <c>ul</c> in it under a heading "Pending invitations",
 /// each row an <c>li</c> (<c>main .invitation-section li</c> - 4.1's form holds no list item); the row's Revoke is a button
 /// named "Revoke" whose <c>aria-describedby</c> names the element holding the address; the confirm replaces it in place with
@@ -117,7 +117,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="role">The caller's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - the Invitation list is not rendered in Space settings yet (story 4.2 Task 6)")]
+    [Theory]
     [InlineData("owner")]
     [InlineData("admin")]
     [Trait("Requirement", "UX-DR14")]
@@ -164,7 +164,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="role">The lesser Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - the Invitation list is not read or rendered yet (story 4.2 Task 6)")]
+    [Theory]
     [InlineData("member")]
     [InlineData("viewer")]
     [Trait("Requirement", "UX-DR27")]
@@ -207,7 +207,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     /// focus to that row's Revoke.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the row and its in-place confirm do not exist yet (story 4.2 Task 6; Q9 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR12")]
     [Trait("Requirement", "UX-DR26")]
     public async Task Revoke_asks_first_in_place_and_Cancel_sends_nothing_and_returns_focus()
@@ -252,7 +252,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     /// <c>204</c>. Plant 12: the row removed before the answer.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the revoke is not sent by the client yet (story 4.2 Task 6)")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "UX-DR26")]
     public async Task Confirming_sends_DELETE_under_a_key_and_the_row_stays_until_the_204()
@@ -293,7 +293,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     /// including the address.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the revoke announcement does not exist yet (story 4.2 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR38")]
     [Trait("Requirement", "UX-DR39")]
     public async Task A_revoke_is_announced_without_an_address_and_focus_never_falls_to_the_body()
@@ -327,7 +327,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     /// an acceptance committing under it would.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the client's 409 handling does not exist yet (story 4.2 Task 6; Q2 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "UX-DR38")]
     public async Task A_409_on_revoke_rereads_the_list_and_says_the_invitation_is_no_longer_pending()
@@ -353,7 +353,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
 
             api.WithdrawInvitation(Northwind, listed.Id);
 
-            api.ReleaseRevokeRefused(409, InvitationWire.NotPendingProblemType);
+            api.ReleaseRevokeRefused(409, ProblemTypes.InvitationNotPending);
 
             await WaitUntilAsync(() => api.InvitationListReads(Northwind).Count > reads, "The list was not re-read after the 409.");
             await Row(page, listed).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
@@ -368,7 +368,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     /// appears once the server has listed it; there is no optimistic row.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the list is not re-read after an issue yet (story 4.2 Task 6)")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     [Trait("Requirement", "UX-DR26")]
     public async Task After_a_successful_issue_the_list_rereads_and_shows_the_new_row()
@@ -406,7 +406,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     /// row, no count, no prompt. Anchored: the list was read.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the empty state does not exist yet (story 4.2 Task 6; Q15 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR26")]
     public async Task An_empty_list_says_No_pending_invitations()
     {
@@ -432,7 +432,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     /// registration skipped (record as masked if a re-render hides it, as 3.4 found for Labels).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the list and its purge registration do not exist yet (story 4.2 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR31")]
     [Trait("Requirement", "NFR-1")]
     public async Task Leaving_the_Space_purges_its_Invitation_addresses_before_the_next_Space_answers()
@@ -476,7 +476,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     /// does not, plain and under 1.4.12 text spacing. Anchored: the confirm is on screen before the probe runs.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the Invitation list and its confirm do not exist yet (story 4.2 Task 6)")]
+    [Fact]
     [Trait("Requirement", "UX-DR41")]
     [Trait("Requirement", "NFR-9")]
     public async Task The_Invitation_list_reflows_at_320px_with_a_long_address_and_the_confirm_open()

@@ -1137,6 +1137,46 @@
   </data>
   <data name="invitation-pending" xml:space="preserve">
     <value>This address already has a pending invitation.</value>
-    <comment>Story 4.1 (AC13): the invitation-pending refusal, beside the email field. Disclosable: the issuer sees the Invitation in the Space's list (story 4.2).</comment>
+    <comment>Story 4.1 (AC13): the invitation-pending refusal, beside the email field. Disclosable: the issuer sees the Invitation in the Space's pending list (story 4.2).</comment>
+  </data>
+  <data name="invitation-not-pending" xml:space="preserve">
+    <value>This invitation is no longer pending.</value>
+    <comment>Story 4.2 (AC4, AC9, open question 2 (a)): the invitation-not-pending refusal of a revoke - accepted, already revoked or expired. Said after the list is read again. Names no address and no state.</comment>
+  </data>
+  <data name="InvitationsPendingHeading" xml:space="preserve">
+    <value>Pending invitations</value>
+    <comment>Story 4.2 (AC9, open question 15 (a)): the sub-heading of the pending Invitation list, under the Invitations heading in Space settings. No count beside it (UX-DR26).</comment>
+  </data>
+  <data name="InvitationSentBy" xml:space="preserve">
+    <value>Sent by {0}</value>
+    <comment>Story 4.2 (AC1, AC9, open question 15 (a)): a pending Invitation's issuer, {0} being the display name captured at issue - never a live lookup, and nothing about the issuer's current standing.</comment>
+  </data>
+  <data name="InvitationRevoke" xml:space="preserve">
+    <value>Revoke</value>
+    <comment>Story 4.2 (AC2, AC9): revokes a pending Invitation. Asks first, in place; also the danger action inside that confirm.</comment>
+  </data>
+  <data name="InvitationRevokeWarning" xml:space="preserve">
+    <value>Revoke this invitation? The email already sent cannot be recalled.</value>
+    <comment>Story 4.2 (AC7, AC9, open question 9 (a)): the in-place confirmation before an Invitation is revoked. Names no address.</comment>
+  </data>
+  <data name="InvitationCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Story 4.2 (AC9): closes the revoke confirmation; nothing is sent, and focus returns to the row's Revoke.</comment>
+  </data>
+  <data name="InvitationRevoking" xml:space="preserve">
+    <value>Revoking.</value>
+    <comment>Story 4.2 (AC9): a row's progress line while its revoke is in flight. Not optimistic: the row stays until the server answers.</comment>
+  </data>
+  <data name="InvitationRevoked" xml:space="preserve">
+    <value>Invitation revoked.</value>
+    <comment>Story 4.2 (AC9, UX-DR38): announced politely once an Invitation is revoked. Names no address.</comment>
+  </data>
+  <data name="InvitationsEmpty" xml:space="preserve">
+    <value>No pending invitations.</value>
+    <comment>Story 4.2 (AC6, AC9, open question 15 (a)): a Space with no pending Invitation. Nothing else: no prompt and no count (UX-DR26).</comment>
+  </data>
+  <data name="InvitationsLoading" xml:space="preserve">
+    <value>Loading invitations.</value>
+    <comment>Story 4.2 (AC9): visually hidden while the pending Invitations are read (UX-DR31: nothing is rendered from cache). Never names an address.</comment>
   </data>
 </root>

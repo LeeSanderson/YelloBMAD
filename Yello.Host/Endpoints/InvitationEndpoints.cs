@@ -1,5 +1,7 @@
 using Yello.Application.Invitations;
 using Yello.Application.Invitations.IssueInvitation;
+using Yello.Application.Invitations.ListInvitations;
+using Yello.Application.Invitations.RevokeInvitation;
 using Yello.Application.Spaces;
 using Yello.Contracts;
 using Yello.Contracts.Invitations;
@@ -11,7 +13,8 @@ using Yello.Host.Spaces;
 namespace Yello.Host.Endpoints;
 
 /// <summary>
-/// Issue an Invitation into the active Space. FR-10, FR-39; story 4.1, AC1-AC5, AC13.
+/// Issue an Invitation into the active Space (FR-10, FR-39; story 4.1, AC1-AC5, AC13), list its pending Invitations and
+/// revoke one (FR-12; story 4.2, AC1-AC4, AC10).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -48,6 +51,72 @@ public static class InvitationEndpoints
     public static RouteHandlerBuilder MapIssueInvitation(this IEndpointRouteBuilder endpoints) =>
         endpoints.MapPost(InvitationRoutes.Issue, IssueAsync)
             .RequiresCapability(Capability.IssueAndRevokeInvitations);
+
+    /// <summary>
+    /// Registers <c>GET /api/v1/spaces/{spaceId}/invitations</c>: the pending list (story 4.2, AC1). Under
+    /// <c>IssueAndRevokeInvitations</c>, never <c>ReadProjectsAndTasks</c> - the body carries email addresses, which section
+    /// 6.1 and AD-23 confine to Owners and Admins (open question 16 (a)).
+    /// </summary>
+    /// <param name="endpoints">The route builder.</param>
+    /// <returns>The registered route, for further configuration.</returns>
+    public static RouteHandlerBuilder MapListInvitations(this IEndpointRouteBuilder endpoints) =>
+        endpoints.MapGet(InvitationRoutes.List, ListAsync)
+            .RequiresCapability(Capability.IssueAndRevokeInvitations);
+
+    /// <summary>
+    /// Registers <c>DELETE /api/v1/spaces/{spaceId}/invitations/{invitationId}</c>: the revoke (story 4.2, AC2, AC4, open
+    /// question 1 (a)).
+    /// </summary>
+    /// <param name="endpoints">The route builder.</param>
+    /// <returns>The registered route, for further configuration.</returns>
+    public static RouteHandlerBuilder MapRevokeInvitation(this IEndpointRouteBuilder endpoints) =>
+        endpoints.MapDelete(InvitationRoutes.Invitation, RevokeAsync)
+            .RequiresCapability(Capability.IssueAndRevokeInvitations);
+
+    /// <summary>
+    /// Lists the active Space's actionable pending Invitations, newest first.
+    /// </summary>
+    /// <param name="handler">The slice.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns><c>200</c> with the rows, or <c>[]</c>.</returns>
+    public static async Task<IResult> ListAsync(ListInvitationsHandler handler, CancellationToken cancellationToken)
+    {
+        var invitations = await handler.HandleAsync(cancellationToken).ConfigureAwait(false);
+
+        return Results.Ok(invitations.Select(Response).ToList());
+    }
+
+    /// <summary>
+    /// Revokes a pending Invitation in the active Space. Any Owner or Admin may, whoever issued it (FR-12).
+    /// </summary>
+    /// <param name="invitationId">The Invitation, from the route.</param>
+    /// <param name="handler">The slice.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>
+    /// <c>204</c>; <c>409 invitation-not-pending</c> for an accepted, revoked or expired Invitation, naming no address; or
+    /// the boundary's <c>404 not-available</c> - byte for byte, and not recorded - for an id that names nothing in the active
+    /// Space, another Space's included (open question 3 (a)).
+    /// </returns>
+    public static async Task<IResult> RevokeAsync(Guid invitationId, RevokeInvitationHandler handler, CancellationToken cancellationToken)
+    {
+        var revocation = await handler.HandleAsync(invitationId, cancellationToken).ConfigureAwait(false);
+
+        return revocation switch
+        {
+            InvitationRevocation.Revoked => Results.NoContent(),
+
+            InvitationRevocation.NotPending => Results.Problem(
+                statusCode: StatusCodes.Status409Conflict,
+                type: ProblemTypes.InvitationNotPending,
+                title: "This Invitation is no longer pending."),
+
+            // Not recorded: an in-Space not-found crossed no boundary (AD-20). The body is the boundary's.
+            InvitationRevocation.NotFound => BoundaryProblems.NotAvailable(),
+
+            // A new outcome must be answered here, never fall into the boundary's 404 (story 4.1 code review P10).
+            _ => throw new InvalidOperationException($"Unanswered Invitation revocation outcome {revocation}."),
+        };
+    }
 
     /// <summary>
     /// Issues an Invitation into the active Space.
@@ -108,4 +177,7 @@ public static class InvitationEndpoints
             _ => throw new InvalidOperationException($"Unanswered Invitation issue outcome {result.Outcome}."),
         };
     }
+
+    private static InvitationResponse Response(PendingInvitation invitation) =>
+        new(invitation.Id, invitation.EmailAddress, StableCode.Of(invitation.Role), invitation.IssuerName, invitation.IssuedAt);
 }

@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Net;
 using Microsoft.Data.SqlClient;
 using Xunit;
+using Yello.Contracts;
 using Yello.Contracts.Spaces;
 using Yello.Domain.Memberships;
 using Yello.Tests.Shared;
@@ -17,7 +18,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// test does the other write".
 /// </summary>
 /// <remarks>
-/// <b>Written as a red-phase scaffold by the story 4.2 ATDD run (2026-11-01).</b> The test plays 4.3's acceptance itself
+/// <b>Written as a red-phase scaffold by the story 4.2 ATDD run (2026-11-01); activated by its dev phase.</b> The test plays 4.3's acceptance itself
 /// (no product path exists yet): on a connection opened under the Space's key it begins a transaction and sets the row
 /// <c>Accepted</c> without committing, fires the revoke, waits until the revoke is blocked on any <c>LCK_M_%</c>
 /// (<see cref="TaskWire.WaitUntilBlockedOnALockAsync"/>), then commits. A guarded revoke then matches no row and answers
@@ -34,7 +35,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>Accepted</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the revoke and its guarded UPDATE do not exist yet (story 4.2 Task 4, Task 5; Q10 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AD-27")]
@@ -78,7 +79,7 @@ public sealed partial class ActiveSpaceEndpointTests
         });
 
         Assert.True(raced?.StatusCode == HttpStatusCode.Conflict, $"{raced?.StatusCode} {raced?.Body}");
-        Assert.Equal(InvitationWire.NotPendingProblemType, ProblemType(raced!));
+        Assert.Equal(ProblemTypes.InvitationNotPending, ProblemType(raced!));
         Assert.Equal("Accepted", Assert.Single(await wire.InvitationsInAsync(spaceId)).State);
     }
 

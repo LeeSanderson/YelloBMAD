@@ -652,7 +652,7 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9 - the Invitation list and its confirm do not exist yet (story 4.2 Task 6)")]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "UX-DR40")]

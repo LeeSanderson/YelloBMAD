@@ -4,10 +4,11 @@ using System.Text.Json;
 namespace Yello.Tests.Shared;
 
 /// <summary>
-/// The test side of story 4.1's Invitation route: the request body, fresh addresses, and the fixed values the suites
-/// assert against. The route and the problem types are <c>Yello.Contracts</c>' (<c>InvitationRoutes</c>,
-/// <c>ProblemTypes</c>); this holds only what the contract does not. It replaced the ATDD run's temporary
-/// <c>InvitationScaffold</c>, as story 2.4's <c>LabelScaffold</c> was replaced.
+/// The test side of stories 4.1 and 4.2's Invitation routes: the request body, fresh addresses, the list's row shape, and
+/// the fixed values the suites assert against. The routes and the problem types are <c>Yello.Contracts</c>'
+/// (<c>InvitationRoutes</c>, <c>ProblemTypes</c>); this holds only what the contract does not. It replaced 4.1's ATDD
+/// <c>InvitationScaffold</c>; story 4.2's dev phase swapped its own ATDD stand-ins (the revoke route, path and problem
+/// type) for the contract members and deleted them.
 /// </summary>
 public static class InvitationWire
 {
@@ -51,29 +52,6 @@ public static class InvitationWire
     public static string FreshAddress(string label) => $"invitee-{label}-{Guid.NewGuid():N}@example.test";
 
     /// <summary>
-    /// <b>Story 4.2 ATDD run, temporary.</b> The revoke route's pattern, as story 4.2 Task 2 names it
-    /// (<c>InvitationRoutes.Invitation</c>, Q1 (a)). The dev phase swaps every use for the contract constant and deletes
-    /// this, as 4.1's <c>InvitationScaffold</c> was deleted.
-    /// </summary>
-    public static string RevokeRoute => "/api/v1/spaces/{spaceId:guid}/invitations/{invitationId:guid}";
-
-    /// <summary>
-    /// <b>Story 4.2 ATDD run, temporary.</b> One Invitation's path, as a client calls it (<c>InvitationRoutes.InvitationOf</c>
-    /// once Task 2 declares it). Built from the contract's collection path, so only the leaf is the scaffold's.
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <param name="invitationId">The Invitation.</param>
-    /// <returns>The path.</returns>
-    public static string RevokePathOf(Guid spaceId, Guid invitationId) =>
-        $"{Yello.Contracts.Invitations.InvitationRoutes.InvitationsOf(spaceId)}/{invitationId:D}";
-
-    /// <summary>
-    /// <b>Story 4.2 ATDD run, temporary.</b> The revoke's refusal for an Invitation that is accepted, revoked or expired
-    /// (Q2 (a)): <c>ProblemTypes.InvitationNotPending</c> once Task 2 declares it.
-    /// </summary>
-    public static string NotPendingProblemType => "urn:yello:problem:invitation-not-pending";
-
-    /// <summary>
     /// The list row's JSON members, in ordinal order: exactly the five Q5 (a) names (story 4.2 AC1). Never the token hash,
     /// the normalised address, the issuer's Account, the Space, the state or the expiry.
     /// </summary>
@@ -102,8 +80,9 @@ public static class InvitationWire
 }
 
 /// <summary>
-/// One row of story 4.2's Invitation list as the test reads it: the Q5 (a) shape, <c>InvitationResponse</c> once Task 2
-/// declares it. Kept in the harness because <c>Yello.Tests.Client</c>'s fake serialises the same shape.
+/// One row of story 4.2's Invitation list as the test reads it: the Q5 (a) shape of <c>InvitationResponse</c>, restated
+/// independently so a contract change is seen by the suites rather than silently followed. Kept in the harness because
+/// <c>Yello.Tests.Client</c>'s fake serialises the same shape.
 /// </summary>
 /// <param name="Id">The Invitation's id, which the revoke names.</param>
 /// <param name="EmailAddress">The stored, trimmed address.</param>

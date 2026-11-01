@@ -229,6 +229,13 @@ public sealed class IssueInvitationHandlerTests
                 _ => InvitationIssue.AlreadyPending,
             });
         }
+
+        // The issue never lists or revokes (story 4.2's slices have their own tests).
+        public Task<IReadOnlyList<PendingInvitation>> ListPendingAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The issue handler never lists.");
+
+        public Task<InvitationRevocation> RevokeAsync(Guid invitationId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The issue handler never revokes.");
     }
 
     private sealed class RecordingOutbox : IOutbox

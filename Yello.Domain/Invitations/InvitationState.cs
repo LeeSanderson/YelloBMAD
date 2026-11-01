@@ -21,7 +21,7 @@ public enum InvitationState
     Accepted,
 
     /// <summary>
-    /// Revoked by an Owner or Admin (story 4.2).
+    /// Revoked by an Owner or Admin before acceptance (story 4.2): set by the guarded revoke, and retained.
     /// </summary>
     Revoked,
 }

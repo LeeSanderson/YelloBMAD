@@ -37,10 +37,9 @@ namespace Yello.Tests.Client;
 /// assert the address appears nowhere on the page after a <c>204</c> - keep the page they were written against.
 /// </para>
 /// <para>
-/// <b>Contract constants, never literals</b> (4.1 review P13): paths come from <see cref="InvitationRoutes"/> and, until
-/// story 4.2 Task 2 declares <c>InvitationRoutes.InvitationOf</c>, from <see cref="InvitationWire.RevokePathOf"/>; the
-/// <c>409</c>'s type from <see cref="InvitationWire.NotPendingProblemType"/> until <c>ProblemTypes.InvitationNotPending</c>
-/// exists. The dev phase swaps both.
+/// <b>Contract constants, never literals</b> (4.1 review P13): paths come from <see cref="InvitationRoutes"/>
+/// (<see cref="InvitationRoutes.InvitationsOf"/> and <see cref="InvitationRoutes.InvitationOf"/>), and the <c>409</c>'s
+/// type from <see cref="ProblemTypes.InvitationNotPending"/>.
 /// </para>
 /// <para>
 /// <b>Every request is recorded</b> (the body text and its headers, the <c>Idempotency-Key</c> among them) by
@@ -108,13 +107,13 @@ internal sealed partial class FakeYelloApi
         InvitationRoutes.InvitationsOf(spaceId);
 
     /// <summary>
-    /// One Invitation's path - the revoke's - as story 4.2 Task 2 will name it. Story 4.2.
+    /// One Invitation's path - the revoke's - as the contract names it. Story 4.2.
     /// </summary>
     /// <param name="spaceId">The Space.</param>
     /// <param name="invitationId">The Invitation.</param>
     /// <returns>The path.</returns>
     public static string InvitationPathOf(Guid spaceId, Guid invitationId) =>
-        InvitationWire.RevokePathOf(spaceId, invitationId);
+        InvitationRoutes.InvitationOf(spaceId, invitationId);
 
     /// <summary>
     /// Every Invitation issue in <paramref name="spaceId"/> the page sent, in order, each with its body text and headers.
@@ -370,7 +369,7 @@ internal sealed partial class FakeYelloApi
 
         if (_revokedInvitations.ContainsKey(invitationId))
         {
-            return (409, Problem(InvitationWire.NotPendingProblemType));
+            return (409, Problem(ProblemTypes.InvitationNotPending));
         }
 
         var removed = PendingInvitations.TryGetValue(spaceId, out var listed) && RemoveListed(listed, invitationId);

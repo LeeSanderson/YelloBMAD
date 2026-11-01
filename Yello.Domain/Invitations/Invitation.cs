@@ -26,7 +26,15 @@ namespace Yello.Domain.Invitations;
 /// </para>
 /// <para>
 /// <b>The issuer is an Account, not a Membership</b> (FR-12, AD-5): an Invitation survives its issuer's demotion and
-/// removal, and <see cref="IssuerName"/> is the attribution captured at issue.
+/// removal, and <see cref="IssuerName"/> is the attribution captured at issue. FR-12: "An Invitation remains valid if its
+/// issuer later loses the capability to have issued it - by demotion, by removal, or by Account deletion. ... Any
+/// remaining Owner or Admin may revoke it." It was legitimately issued, and does not depend on its issuer's continuing
+/// authority, so neither the pending list nor the revoke (story 4.2) reads the issuer.
+/// </para>
+/// <para>
+/// <b>Terminal states are retained</b> (FR-10, AD-27): a revoke sets <see cref="InvitationState.Revoked"/> and keeps the
+/// row; nothing deletes an Invitation but its Space's deletion. No product surface shows a terminal one; an operator can
+/// derive SM-4 and SM-C3 from the rows with the same predicate.
 /// </para>
 /// </remarks>
 public sealed class Invitation
@@ -65,7 +73,8 @@ public sealed class Invitation
     public required Role Role { get; init; }
 
     /// <summary>
-    /// The stored state. Story 4.1 only ever inserts <see cref="InvitationState.Pending"/>.
+    /// The stored state. Written only by the Invitation store: the issue inserts <see cref="InvitationState.Pending"/>
+    /// (story 4.1) and the revoke's guarded update sets <see cref="InvitationState.Revoked"/> (story 4.2); a gate holds that.
     /// </summary>
     public required InvitationState State { get; set; }
 
