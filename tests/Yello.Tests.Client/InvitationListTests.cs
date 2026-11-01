@@ -158,8 +158,8 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// AC9, AC1, UX-DR27, Q16 (a) - a Member and a Viewer have no Invitation list: the page never asks for it, and Space
-    /// settings reached by hand shows no row and no Revoke. Anchored in the same case: as Admin of Northwind the list was
+    /// AC9, AC1, UX-DR27, Q16 (a) - a Member and a Viewer have no Invitation list: the context bar offers no Space settings
+    /// link, the page never asks for the list, and Space settings reached by hand shows no row and no Revoke. Anchored in the same case: as Admin of Northwind the list was
     /// read and shown. Plant: the section rendered for a Member.
     /// </summary>
     /// <param name="role">The lesser Role.</param>
@@ -191,6 +191,9 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
 
             await ChooseInSwitcherAsync(page, "Harbour Ops");
             await page.Locator(ContextBar, new PageLocatorOptions { HasText = "Harbour Ops" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal(0, await page.Locator(ContextBar).GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = SettingsLink, Exact = true }).CountAsync());
+
             await page.EvaluateAsync("path => Blazor.navigateTo(path)", $"/spaces/{Harbour:D}/settings");
             await page.Locator("main h1").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
@@ -289,7 +292,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC9, UX-DR38, UX-DR39 - a successful revoke announces "Invitation revoked." and nothing said names an address (no
-    /// <c>@</c>); focus moves to the list heading or the next row's Revoke, never to <c>body</c>. Plant 13: the announcement
+    /// <c>@</c>); focus moves to the next row's Revoke (here, where there is one), never to <c>body</c>. Plant 13: the announcement
     /// including the address.
     /// </summary>
     /// <returns>A task.</returns>
@@ -318,6 +321,12 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
             Assert.All(await SaidAsync(page), sentence => Assert.DoesNotContain("@", sentence, StringComparison.Ordinal));
             Assert.DoesNotContain("@", string.Join(' ', await page.Locator("[aria-live='polite'], [role='status']").AllTextContentsAsync()), StringComparison.Ordinal);
             Assert.False(await page.EvaluateAsync<bool>("() => !document.activeElement || document.activeElement === document.body"), "Focus fell to the body after the revoke.");
+
+            // The nearest surviving control (UX-DR39): the next row's Revoke.
+            await page.WaitForFunctionAsync(
+                "address => { const e = document.activeElement; return !!e && e.tagName === 'BUTTON' && !!e.closest('li') && e.closest('li').textContent.includes(address); }",
+                next.EmailAddress,
+                new PageWaitForFunctionOptions { Timeout = Timeout });
         }
     }
 
@@ -360,6 +369,12 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
             await WaitUntilAsync(async () => Array.Exists(await SaidAsync(page), sentence => sentence.Contains(NotPendingCopy, StringComparison.Ordinal)), "\"This invitation is no longer pending.\" was never said.");
 
             Assert.All(await SaidAsync(page), sentence => Assert.DoesNotContain("@", sentence, StringComparison.Ordinal));
+
+            // The row left with the re-read and none took its place: focus goes to the list heading, never body (UX-DR39).
+            await page.WaitForFunctionAsync(
+                "() => { const e = document.activeElement; return !!e && e.tagName === 'H3'; }",
+                null,
+                new PageWaitForFunctionOptions { Timeout = Timeout });
         }
     }
 

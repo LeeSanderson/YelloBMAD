@@ -4,7 +4,7 @@ baseline_commit: 53b087c8563a48b31b68fbc992afcfabbbe46d70
 
 # Story 4.2: See and revoke pending Invitations
 
-Status: review
+Status: done
 
 Epic: 4 — Bring people into one piece of your work (the second story of the epic)
 Story key: `4-2-see-and-revoke-pending-invitations`
@@ -270,6 +270,26 @@ AC1 to AC7 are reproduced **verbatim** from `epics.md:1673-1701` (`status: final
   - [x] `grep -rn "4\.2" Yello.* tests` and rewrite every comment that predicts 4.2 so it says what exists. This includes `OfferPredicates.cs:13`, `InvitationState.cs:24`, `IInvitationStore.cs:78`, `ProblemTypes.cs:393`, `InvitationSection.razor:14` and `SpaceSettings.razor:13`.
   - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-4` stays `in-progress`.
   - [x] Run `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers. Rerun a failure once, alone, before calling it real.
+
+### Review Findings
+
+Code review 2026-11-01 (bmad-code-review, full mode, `f908505..HEAD`). Blind Hunter 16, Edge Case Hunter 10, Acceptance Auditor 8: 34 raw, 26 after deduplication. 0 decision-needed, 13 patch, 2 defer, 11 dismissed. Q3 and Q16 were verified as honoured (the existence read runs under both isolation layers; the list is under `IssueAndRevokeInvitations` on both surfaces).
+
+- [x] [Review][Patch] Overlapping list reads: an older answer can overwrite a newer one, so a just-revoked row can reappear (medium) [Yello.Client/Components/InvitationSection.razor:252]
+- [x] [Review][Patch] A failed re-read after a successful issue or a 409 (network error, timeout, 5xx) replaces the settings page with the Space refusal surface; keep the rows on screen instead (medium) [Yello.Client/Components/InvitationSection.razor:284]
+- [x] [Review][Patch] Focus falls to `body` after a revoke that is not sent, refused or answered 409; return it to the row's Revoke, or to the next surviving row or the heading after a 409 (UX-DR39) (medium) [Yello.Client/Components/InvitationSection.razor:359]
+- [x] [Review][Patch] After a 409 the refusal is announced even when a purge ran during the re-read [Yello.Client/Components/InvitationSection.razor:404]
+- [x] [Review][Patch] The revoke's no-answer catch writes row state without the generation check the other paths use [Yello.Client/Components/InvitationSection.razor:362]
+- [x] [Review][Patch] A revoke's `403` renders on the row; AC9 says "in the section" [Yello.Client/Components/InvitationSection.razor:409]
+- [x] [Review][Patch] The fake API answers the boundary `404` for an id withdrawn "elsewhere", where the Host answers `409`; and it hard-codes the capability code instead of `InvitationWire.CapabilityCode` [tests/Yello.Tests.Client/FakeYelloApi.Invitations.cs]
+- [x] [Review][Patch] The post-revoke focus test only asserts focus is not `body`; assert the next row's Revoke [tests/Yello.Tests.Client/InvitationListTests.cs]
+- [x] [Review][Patch] The Member/Viewer client test does not assert that the Space settings link is absent [tests/Yello.Tests.Client/InvitationListTests.cs]
+- [x] [Review][Patch] Two Slices cases seed a live pending Invitation through `WireDatabase` instead of 4.1's issue route (Testing requirements; AC8 rules) [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ListInvitations.cs:222, ActiveSpaceEndpointTests.RevokeInvitation.cs:388]
+- [x] [Review][Patch] Stale comments that still predict 4.2 or `InvitationResponse` (Task 8) [Yello.Client/Localisation/ClientCopy.resx:1100, ActiveSpaceEndpointTests.ListInvitations.cs:23]
+- [x] [Review][Patch] The Dev Agent Record says 11 isolation rows; AC8 and the diff have 10 [this file, Change Log and ATDD table]
+- [x] [Review][Patch] The AC7 wire case is not a guard against an outbox plant; say so in the plant table (P9) [this file, Debug Log]
+- [x] [Review][Defer] Focus drops to `body` while a revoke is in flight, because the confirming button is replaced by a status span; LabelRow and ApiTokenRow share the pattern [Yello.Client/Components/InvitationRow.razor:35] — deferred, shared pre-existing pattern; owner 4.4
+- [x] [Review][Defer] The Invitation IL gates read only IL calls: raw SQL, expression-tree filters in the store, or an outbox write from the store escape `Only_the_Invitation_store_writes_an_Invitation_state`, `Neither_the_list_nor_the_revoke_reads_the_issuers_Account` and `The_revoke_handler_takes_no_outbox`; the wire cases are the real guard [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.InvitationRevoke.cs:107] — deferred; owner 4.3, which amends these gates
 
 ## Dev Notes
 
@@ -610,7 +630,7 @@ constraints, the red verification, and the one finding below).
 | `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RevokeInvitation.cs` | 10 methods, 12 cases | AC2, AC3, AC4, AC5, AC7, AC10, I-17 (Q2, Q3, Q11, Q12) |
 | `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RevokeInvitationRace.cs` | 1 | AC4 race (Q10) |
 | `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.InvitationRevoke.cs` | 6 gates | AC1, AC2, AC3, AC4, AC5, AC7, AC9, AC11 (Q13, Q16) |
-| `tests/Yello.Tests.Isolation/IsolationCases.Invitations.cs` | 11 rows, `PendingUntil: "4.2"` (22 when active) | AC8 |
+| `tests/Yello.Tests.Isolation/IsolationCases.Invitations.cs` | 10 rows, `PendingUntil: "4.2"` (20 when active; corrected from "11" by the code review) | AC8 |
 | `tests/Yello.Tests.Client/InvitationListTests.cs` | 10 methods, 12 cases | AC9 |
 | `tests/Yello.Tests.Client/TextSpacingTests.cs` | 1 method, 2 cases | AC9 (ledger `:20`) |
 
@@ -669,7 +689,7 @@ Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended story cycle, 2026-
 | 6 | The list under `ReadProjectsAndTasks` | The capability gate; the Member and Viewer rows | Red: the routes gate, both Slices `403` arms, and `ISO-RECORD-KIND-LIST-INVITATIONS-MEMBER`/`-VIEWER` on both surfaces |
 | 7 | `RequiresCapability` removed from the revoke | `Every_spaceId_endpoint_declares_exactly_one_capability`; the Member and Viewer revoke rows | Red: both gates. The Host also refused to start, so every wire case in that build failed and P7 is not isolated on the wire |
 | 8 | The response gains `NormalizedEmailAddress` | The response-shape gate | Red |
-| 9 | The revoke handler takes an outbox and enqueues | The AC7 wire case; the no-outbox gate | Gate red. The wire case stayed green: the handler cannot know the invitee's address, so the planted row went to another recipient, and the gate is the catch |
+| 9 | The revoke handler takes an outbox and enqueues | The AC7 wire case; the no-outbox gate | Gate red. The wire case stayed green: the handler cannot know the invitee's address, so the planted row went to another recipient, and the gate is the catch. **The AC7 wire case is not a guard against an outbox plant; `The_revoke_handler_takes_no_outbox` is** (code review) |
 | 10 | The unknown-id branch answers `409` | `ISO-INVITATION-FOREIGN-ID-IN-OWN-SPACE`; the unknown-id case | Red: both surfaces, and the Slices case |
 | 11 | The revoke filtered on the caller as issuer | AC2 non-issuer; AC3 arms | Not planted. Neither the handler nor the store receives the caller (no `ActiveSpaceContext` parameter), so the plant needs a signature change. `Neither_the_list_nor_the_revoke_reads_the_issuers_Account` and the AC2/AC3 wire cases hold it |
 | 12 | The client removes the row before the answer | The not-optimistic case | Red |
@@ -749,5 +769,6 @@ Modified:
 
 ## Change Log
 
-- 2026-11-01 - Story 4.2 implemented (dev-story). The pending Invitation list and its revoke work end to end: contracts, slices, the guarded store update, endpoints, and the client list with an in-place confirm. All 32 ATDD scaffolds and all 11 isolation rows are active. 14 of 15 plants were run: 12 seen red, 1 red only at its gate (P9), and 1 masked (P14); P11 was not plantable. The ledger is updated.
+- 2026-11-01 - Story 4.2 implemented (dev-story). The pending Invitation list and its revoke work end to end: contracts, slices, the guarded store update, endpoints, and the client list with an in-place confirm. All 32 ATDD scaffolds and all 10 isolation rows are active (the code review corrected "11"). 14 of 15 plants were run: 12 seen red, 1 red only at its gate (P9), and 1 masked (P14); P11 was not plantable. The ledger is updated.
 - 2026-11-01 - Verification: build 0/0; full suite 1,975 total, 1,965 passed, 0 failed, 10 skipped. Status set to review.
+- 2026-11-01 - Code review (bmad-code-review): 34 raw findings, 26 after deduplication; 13 patched, 2 deferred (4.4, 4.3), 11 dismissed, none decision-needed. Client: only the latest list read is used and ids revoked here never return; a failed re-read keeps the rows instead of leaving the Space; focus returns to the row, the next row or the heading after every non-204 answer; a revoke `403` shows in the section; the 409 announcement is dropped after a purge. Tests: two Slices seeds moved to the issue route, the focus, 409-focus and settings-link assertions added, the fake answers `409` for a withdrawn id. Build 0/0; full suite 1,975 total, 1,964 passed, 1 failed, 10 skipped; the one failure, the timing case `A_Token_used_in_another_Space_takes_as_long_to_refuse_as_a_non_member_Session`, passed when rerun alone. Status set to done.

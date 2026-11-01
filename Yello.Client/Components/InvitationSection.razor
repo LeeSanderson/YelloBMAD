@@ -45,7 +45,9 @@
     kept for the identical resend after no answer. Never optimistic: the row stays until the answer. 204 removes it and
     announces "Invitation revoked." - no address (UX-DR38) - with focus on the next row's Revoke, or on the list heading
     when there is none (UX-DR39). 409 invitation-not-pending reads the list again and says so; 404 is the Space refusal
-    surface; 403 the capability copy on the row; no answer or a 5xx is "Not sent.".
+    surface; 403 the capability copy in the section; no answer or a 5xx is "Not sent." on the row. After any answer but a
+    204, focus returns to the row's Revoke (or, after a 409, to the row in its place or the heading) - never body. Only
+    the latest list read's answer is used; a read again that gets no answer or a 5xx keeps the rows already shown.
 *@
 
 <div class="invitation-section">
@@ -169,6 +171,18 @@
     /// </summary>
     private int _generation;
 
+    /// <summary>
+    /// Bumped by every list read. Only the latest read's answer is used, so an older answer arriving late - a slow re-read
+    /// after an issue landing after a revoke's - cannot put back a row the server no longer lists.
+    /// </summary>
+    private int _reads;
+
+    /// <summary>
+    /// The Invitations this Space's revokes have taken off the list. A revoke is terminal, so a list answer that began
+    /// before one committed can never put its row back.
+    /// </summary>
+    private readonly HashSet<Guid> _revokedHere = [];
+
     private ElementReference _listHeading;
     private List<InvitationResponse>? _invitations;
     private string? _listRefusal;
@@ -239,6 +253,7 @@
         _revoking = null;
         _rowRefusal = null;
         _revokeKey = null;
+        _revokedHere.Clear();
         _focusRevokeOf = null;
         _focusListHeading = false;
         _announcement = null;
@@ -247,35 +262,24 @@
 
     /// <summary>
     /// Reads the pending list. Nothing is rendered from cache before the server answers; a read again after an issue or a
-    /// 409 keeps the rows on screen until it answers. An answer that started before a purge is dropped.
+    /// 409 keeps the rows on screen until it answers. An answer that started before a purge, or before a later read, is
+    /// dropped. A first read that gets no answer is the Space refusal surface (the LabelSection precedent); a read again
+    /// that gets no answer, or a 5xx, keeps the rows already shown rather than leaving a Space that just answered.
     /// </summary>
     private async Task LoadAsync(int generation)
     {
         var token = ActiveSpace.Token;
+        var read = ++_reads;
+        var rereading = _invitations is not null;
 
         try
         {
             using var response = await Http.GetAsync(new Uri(InvitationRoutes.InvitationsOf(SpaceId), UriKind.Relative), token);
 
-            if (generation != _generation || token.IsCancellationRequested)
+            if (IsLatestRead(read, generation) && !token.IsCancellationRequested)
             {
-                return;
+                await UseListAnswerAsync(response, read, generation, rereading, token);
             }
-
-            if (response.IsSuccessStatusCode)
-            {
-                var invitations = await response.Content.ReadFromJsonAsync<List<InvitationResponse>>(ListJsonOptions, token);
-
-                if (invitations is not null && generation == _generation)
-                {
-                    _invitations = invitations;
-                    _listRefusal = null;
-                }
-
-                return;
-            }
-
-            await RefuseListAsync(response, token);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -283,11 +287,41 @@
         }
         catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
         {
-            if (generation == _generation)
+            if (IsLatestRead(read, generation) && !rereading)
             {
                 await OnSpaceRefused.InvokeAsync(null);
             }
         }
+    }
+
+    private bool IsLatestRead(int read, int generation) => read == _reads && generation == _generation;
+
+    /// <summary>
+    /// The list's answer: the rows - less any this Space's revokes already took off - or the refusal. A read again that
+    /// gets a 5xx keeps the rows already shown.
+    /// </summary>
+    private async Task UseListAnswerAsync(HttpResponseMessage response, int read, int generation, bool rereading, CancellationToken token)
+    {
+        if (response.IsSuccessStatusCode)
+        {
+            var invitations = await response.Content.ReadFromJsonAsync<List<InvitationResponse>>(ListJsonOptions, token);
+
+            if (invitations is not null && IsLatestRead(read, generation))
+            {
+                invitations.RemoveAll(invitation => _revokedHere.Contains(invitation.Id));
+                _invitations = invitations;
+                _listRefusal = null;
+            }
+
+            return;
+        }
+
+        if (rereading && response.StatusCode >= HttpStatusCode.InternalServerError)
+        {
+            return;
+        }
+
+        await RefuseListAsync(response, token);
     }
 
     /// <summary>
@@ -358,8 +392,13 @@
         }
         catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
         {
-            // No answer - a timeout included: the row says it was not sent, and the key is kept for the resend.
-            _rowRefusal = (invitationId, Localizer["TaskEditNotSent"]);
+            // No answer - a timeout included: the row says it was not sent, and the key is kept for the resend. Dropped
+            // after a purge or disposal, as every other answer is.
+            if (generation == _generation)
+            {
+                _rowRefusal = (invitationId, Localizer["TaskEditNotSent"]);
+                FocusRevokeOf(invitationId);
+            }
         }
         finally
         {
@@ -381,6 +420,7 @@
         {
             // The outcome is not known: treated as no answer, so the key is kept.
             _rowRefusal = (invitationId, Localizer["TaskEditNotSent"]);
+            FocusRevokeOf(invitationId);
             return;
         }
 
@@ -400,13 +440,65 @@
 
         if (string.Equals(answer.Problem?.Type, ProblemTypes.InvitationNotPending, StringComparison.Ordinal))
         {
-            // No longer outstanding: the list as the server now holds it, then the refusal - naming no address.
-            await LoadAsync(generation);
-            Say(RefusalText.Of(Localizer, answer.Problem));
+            await NoLongerPendingAsync(invitationId, answer.Problem, generation);
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.Forbidden)
+        {
+            // The capability copy, in the section (AC9). Unreachable in practice: the section is absent for those Roles.
+            _listRefusal = RefusalText.Of(Localizer, answer.Problem);
+            FocusRevokeOf(invitationId);
             return;
         }
 
         _rowRefusal = (invitationId, RefusalText.Of(Localizer, answer.Problem));
+        FocusRevokeOf(invitationId);
+    }
+
+    /// <summary>
+    /// No longer outstanding: the list as the server now holds it, then the refusal - naming no address. Focus goes to the
+    /// row that took its place, or the heading, never body (UX-DR39); nothing is said after a purge.
+    /// </summary>
+    private async Task NoLongerPendingAsync(Guid invitationId, ProblemResponse? problem, int generation)
+    {
+        var index = _invitations?.FindIndex(invitation => invitation.Id == invitationId) ?? -1;
+
+        await LoadAsync(generation);
+
+        if (generation != _generation)
+        {
+            return;
+        }
+
+        FocusAfterRefusedRevoke(invitationId, index);
+        Say(RefusalText.Of(Localizer, problem));
+    }
+
+    /// <summary>
+    /// After a 409's re-read: the row's own Revoke if the server still lists it (the re-read got no answer), else the row
+    /// now at its place, else the list heading.
+    /// </summary>
+    private void FocusAfterRefusedRevoke(Guid invitationId, int index)
+    {
+        if (_invitations is not { } invitations)
+        {
+            return;
+        }
+
+        if (invitations.Exists(invitation => invitation.Id == invitationId))
+        {
+            FocusRevokeOf(invitationId);
+            return;
+        }
+
+        FocusAfterRevoke(index >= 0 && index < invitations.Count ? invitations[index].Id : null);
+    }
+
+    private void FocusRevokeOf(Guid invitationId)
+    {
+        _focusRevokeOf = invitationId;
+        _focusRevokeRequests++;
     }
 
     /// <summary>
@@ -415,6 +507,8 @@
     /// </summary>
     private void Revoked(Guid invitationId)
     {
+        _revokedHere.Add(invitationId);
+
         if (_invitations is { } invitations)
         {
             var index = invitations.FindIndex(invitation => invitation.Id == invitationId);
@@ -434,8 +528,7 @@
     {
         if (next is { } nextId)
         {
-            _focusRevokeOf = nextId;
-            _focusRevokeRequests++;
+            FocusRevokeOf(nextId);
             return;
         }
 

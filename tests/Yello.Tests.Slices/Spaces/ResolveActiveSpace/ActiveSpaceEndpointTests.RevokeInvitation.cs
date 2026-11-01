@@ -381,12 +381,15 @@ public sealed partial class ActiveSpaceEndpointTests
             var session = await SignedInAsync(client, address);
             accountId = await AccountIdOfAsync(database, address);
             await SeedNamedSpaceAsync(database, spaceId, "Unknown " + Suffix(), accountId, Role.Owner);
-            await SeedForeignSpaceAsync(database, foreignSpaceId, "Elsewhere " + Suffix());
 
-            var now = await wire.DatabaseNowAsync();
-
-            foreignInvitation = await wire.AddInvitationAsync(
-                foreignSpaceId, accountId, "Seeder", foreignInvitee, EmailAddressNormalisation.Normalise(foreignInvitee), "Member", now.AddDays(InvitationWire.ExpiryDays));
+            // The other Space's live Invitation, issued through 4.1's route by that Space's own Owner - the caller is not a
+            // member there.
+            var foreignOwnerAddress = RandomAddress();
+            var foreignOwner = await SignedInAsync(client, foreignOwnerAddress);
+            await SeedNamedSpaceAsync(database, foreignSpaceId, "Elsewhere " + Suffix(), await AccountIdOfAsync(database, foreignOwnerAddress), Role.Owner);
+            await foreignOwner.FetchAntiforgeryTokenAsync();
+            Assert.Equal(HttpStatusCode.NoContent, (await IssueAsync(foreignOwner, foreignSpaceId, foreignInvitee, "member")).StatusCode);
+            foreignInvitation = await InvitationIdOfAsync(wire, foreignSpaceId, foreignInvitee);
 
             await session.FetchAntiforgeryTokenAsync();
             Assert.Equal(HttpStatusCode.NoContent, (await IssueAsync(session, spaceId, live, "member")).StatusCode);

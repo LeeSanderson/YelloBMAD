@@ -19,8 +19,8 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// <remarks>
 /// <para>
 /// <b>Written as red-phase scaffolds by the story 4.2 ATDD run (2026-11-01)</b>, each skipped with the AC it waited for;
-/// activated by the dev phase once <c>GET</c> on the path was mapped. The row shape is the
-/// harness's <see cref="ListedInvitation"/> until <c>InvitationResponse</c> exists.
+/// activated by the dev phase once <c>GET</c> on the path was mapped. Rows are read into the harness's
+/// <see cref="ListedInvitation"/>, which mirrors <c>InvitationResponse</c>.
 /// </para>
 /// <para>
 /// <b>Seeding.</b> Accounts are registered through the product; Spaces are seeded by <see cref="SpaceSeeding"/> with one
@@ -215,11 +215,14 @@ public sealed partial class ActiveSpaceEndpointTests
         {
             var session = await SignedInAsync(client, address);
             accountId = await AccountIdOfAsync(database, address);
-            await SeedNamedSpaceAsync(database, spaceId, "Hidden " + Suffix(), accountId, role);
+            await SeedNamedSpaceAsync(database, spaceId, "Hidden " + Suffix(), accountId, Role.Owner);
 
-            var now = await wire.DatabaseNowAsync();
+            // A live pending Invitation, issued through 4.1's route while the caller was Owner; then the caller's Role drops
+            // to the lesser one (no product path for that until 4.4), so the list it is refused holds an address.
+            await session.FetchAntiforgeryTokenAsync();
+            Assert.Equal(HttpStatusCode.NoContent, (await IssueAsync(session, spaceId, invitee, "member")).StatusCode);
 
-            await wire.AddInvitationAsync(spaceId, accountId, "Seeder", invitee, EmailAddressNormalisation.Normalise(invitee), "Member", now.AddDays(InvitationWire.ExpiryDays));
+            await wire.ChangeRoleAsync(spaceId, accountId, role == Role.Member ? "member" : "viewer");
 
             read = await session.GetAsync(SpaceRoutes.ActiveOf(spaceId));
             refused = await ListInvitationsAsync(session, spaceId);

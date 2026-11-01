@@ -1097,7 +1097,7 @@
   </data>
   <data name="InvitationsHeading" xml:space="preserve">
     <value>Invitations</value>
-    <comment>Story 4.1 (AC10, open question 9 (a)): the heading of Space settings' Invitations section, which holds the invite form (story 4.2 adds the pending list).</comment>
+    <comment>Story 4.1 (AC10, open question 9 (a)): the heading of Space settings' Invitations section, which holds the invite form and, since story 4.2, the pending list.</comment>
   </data>
   <data name="InvitationEmailLabel" xml:space="preserve">
     <value>Email address</value>

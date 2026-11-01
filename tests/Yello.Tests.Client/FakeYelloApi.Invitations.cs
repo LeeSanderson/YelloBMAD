@@ -91,12 +91,18 @@ internal sealed partial class FakeYelloApi
 
     /// <summary>
     /// Takes an Invitation off the list as the server would once it is no longer pending - accepted or revoked elsewhere -
-    /// so the next read omits it. Story 4.2.
+    /// so the next read omits it, and a revoke of it answers <c>409 invitation-not-pending</c> as the Host's would (the id
+    /// still names an Invitation in the Space). Story 4.2.
     /// </summary>
     /// <param name="spaceId">The Space.</param>
     /// <param name="invitationId">The Invitation.</param>
-    public void WithdrawInvitation(Guid spaceId, Guid invitationId) =>
-        _ = PendingInvitations.TryGetValue(spaceId, out var listed) && RemoveListed(listed, invitationId);
+    public void WithdrawInvitation(Guid spaceId, Guid invitationId)
+    {
+        if (PendingInvitations.TryGetValue(spaceId, out var listed) && RemoveListed(listed, invitationId))
+        {
+            _revokedInvitations[invitationId] = 0;
+        }
+    }
 
     /// <summary>
     /// The issue route for one Space, as the contract names it, so a contract change breaks the fake as well as the Host.
@@ -404,7 +410,7 @@ internal sealed partial class FakeYelloApi
 
         return role is "owner" or "admin"
             ? null
-            : (403, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.InsufficientRole, Errors: null, Capability: "issue-and-revoke-invitations"), JsonOptions));
+            : (403, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.InsufficientRole, Errors: null, Capability: InvitationWire.CapabilityCode), JsonOptions));
     }
 
     private bool RemoveListed(List<ListedInvitation> listed, Guid invitationId)
