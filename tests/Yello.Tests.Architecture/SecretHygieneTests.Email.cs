@@ -22,7 +22,7 @@ public sealed partial class SecretHygieneTests
     /// the template, never a parameter; the container reads it as <c>ConnectionStrings__acs</c> through a
     /// <c>secretRef</c>; and the sender is an ordinary <c>Email__Sender</c> value.
     /// </summary>
-    [Fact(Skip = "red: AC11 - the ACS resources, the yello-acs-connection secret and ConnectionStrings__acs arrive with story 4.1 Task 8")]
+    [Fact]
     [Trait("Requirement", "AR-37")]
     [Trait("Requirement", "NFR-6")]
     public void The_acs_connection_string_reaches_the_container_as_a_key_vault_secret_written_from_listKeys()
@@ -44,5 +44,57 @@ public sealed partial class SecretHygieneTests
         Assert.All(acs, entry => Assert.Equal("secretRef", entry.Groups["kind"].Value));
         Assert.Matches(new Regex(@"name:\s*'Email__Sender'[\s,]*value\s*:", RegexOptions.None, TimeSpan.FromSeconds(1)), bicep);
         Assert.DoesNotContain("A NAMED, DISABLED SLOT", bicep, StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Story 4.1 Q13 (a)'s safeguard (orchestrator's condition, 2026-11-01) - the file-drop email sender is chosen whenever
+    /// <c>Email:DropFolder</c> is set, in any environment, so no deployed configuration may set it: nothing under
+    /// <c>infra/</c>, no <c>appsettings.Production*.json</c> anywhere in the repository, and nothing in the AppHost names
+    /// <c>DropFolder</c>, in either spelling (<c>Email:DropFolder</c>, <c>Email__DropFolder</c>). A deployed Host then has
+    /// <c>ConnectionStrings__acs</c> or refuses to start; it can never write mail to a disk. Anchor: the scan reads
+    /// <c>infra/main.bicep</c> and the AppHost's <c>Program.cs</c>, and the setting it looks for is live - the Host's
+    /// Development configuration does name it.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "AR-37")]
+    [Trait("Requirement", "NFR-6")]
+    public void No_deployed_configuration_sets_the_email_drop_folder()
+    {
+        var root = RepositoryLayout.Root;
+
+        var development = new FileInfo(Path.Combine(root.FullName, "Yello.Host", "appsettings.Development.json"));
+
+        Assert.Contains("DropFolder", File.ReadAllText(development.FullName), StringComparison.Ordinal);
+
+        var deployed = root.EnumerateFiles("*.bicep", SearchOption.AllDirectories)
+            .Concat(root.EnumerateFiles("*.bicepparam", SearchOption.AllDirectories))
+            .Concat(root.EnumerateFiles("appsettings.Production*.json", SearchOption.AllDirectories))
+            .Concat(new DirectoryInfo(Path.Combine(root.FullName, "Yello.AppHost")).EnumerateFiles("*", SearchOption.AllDirectories))
+            .Concat(new DirectoryInfo(Path.Combine(root.FullName, "infra")).EnumerateFiles("*", SearchOption.AllDirectories))
+            .Where(file => !IsBuildOutput(file))
+            .DistinctBy(file => file.FullName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        Assert.Contains(deployed, file => RepositoryLayout.RelativePath(file).Equals("infra/main.bicep", StringComparison.Ordinal));
+        Assert.Contains(deployed, file => RepositoryLayout.RelativePath(file).Equals("Yello.AppHost/Program.cs", StringComparison.Ordinal));
+
+        var offenders = deployed
+            .Where(file => File.ReadAllText(file.FullName).Contains("DropFolder", StringComparison.OrdinalIgnoreCase))
+            .Select(RepositoryLayout.RelativePath)
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            "A deployed configuration names the email drop folder, which would write invitations to disk instead of sending them:\n"
+            + string.Join('\n', offenders));
+    }
+
+    private static bool IsBuildOutput(FileInfo file)
+    {
+        var path = file.FullName.Replace('\\', '/');
+
+        string[] outputs = ["/bin/", "/obj/", "/node_modules/", "/.git/", "/artifacts/"];
+
+        return Array.Exists(outputs, output => path.Contains(output, StringComparison.OrdinalIgnoreCase));
     }
 }

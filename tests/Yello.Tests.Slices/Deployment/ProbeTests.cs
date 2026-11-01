@@ -24,6 +24,11 @@ namespace Yello.Tests.Slices.Deployment;
 /// begins. What the slice holds is the probes' own work, and a probe that wakes the database - the
 /// refusal purge offered on every request, say - is a defect whichever component opened the connection.
 /// </para>
+/// <para>
+/// <b>So does the outbox's process-start sweep (story 4.1, AC6)</b>: it runs once, off the startup path, as soon as the Host
+/// has started, and against this database it fails and logs that it failed. The slice starts after that line, so what it
+/// holds is still the probes' own work.
+/// </para>
 /// </remarks>
 [Trait("Suite", "Slices")]
 [Trait("Priority", "P0")]
@@ -55,6 +60,9 @@ public sealed class ProbeTests
         await using var host = await RunningHost.StartAsync(DeploymentHosts.UnreachableDatabase, settings);
         using var deadline = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         deadline.CancelAfter(TimeSpan.FromSeconds(5));
+
+        // The process-start sweep's one attempt (story 4.1) is over before the slice begins.
+        _ = await host.WaitForLogAsync(new HostLogCursor(0, 0), log => log.Contains("The outbox could not be swept", StringComparison.Ordinal));
 
         var cursor = await host.LogCursorAsync();
 

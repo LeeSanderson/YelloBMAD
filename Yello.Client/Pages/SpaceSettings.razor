@@ -9,8 +9,8 @@
 @inject SpaceNarration Narration
 
 @*
-    A SPACE'S SETTINGS - story 2.4, open question 7: its Space name section (story 3.1, AC3) and its Labels section;
-    later stories add their own sections
+    A SPACE'S SETTINGS - story 2.4, open question 7: its Space name section (story 3.1, AC3), its Labels section and its
+    Invitations section (story 4.1, the invite form; story 4.2 adds the pending list); later stories add their own sections
     (deferred-work.md). FR-22; UX-DR27, UX-DR29, UX-DR31, UX-DR32, UX-DR33.
 
     ARRIVES LIKE EVERY SPACE-SCOPED PAGE, through SpaceArrival: an unlisted Space is refused with no request, the
@@ -52,6 +52,11 @@
             {
                 <p class="space-settings__refusal" role="status">@Localizer["manage-labels"]</p>
             }
+
+            @if (permitted && InvitationCapabilities.PermitsIssueInvitations(arrival.Current.Role))
+            {
+                <InvitationSection @key="(SectionKey.Invitations, SpaceId)" SpaceId="@SpaceId" OnSpaceRefused="arrival.Refuse" />
+            }
         }
 
         @if (permitted && SpaceCapabilities.PermitsDeleteSpace(arrival.Current.Role))
@@ -68,6 +73,7 @@
     {
         Name,
         Labels,
+        Invitations,
         Delete,
     }
 

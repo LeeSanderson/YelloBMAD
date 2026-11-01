@@ -124,6 +124,27 @@ public static class RefusalCopy
     public static string InvalidSpaceNameKey => "SpaceNameInvalid";
 
     /// <summary>
+    /// An implausible email address on an Invitation (story 4.1, AC3), beside the email field - the client's own check
+    /// says the same sentence before anything is sent.
+    /// </summary>
+    public static string InvalidEmailAddressKey => "invalid-email-address";
+
+    /// <summary>
+    /// The Role offered is not one an Invitation may carry (story 4.1, AC2), beside the Role group.
+    /// </summary>
+    public static string RoleNotOfferableKey => "role-not-offerable";
+
+    /// <summary>
+    /// The address already holds a Membership in this Space (story 4.1, AC4), beside the email field.
+    /// </summary>
+    public static string AlreadyAMemberKey => "already-a-member";
+
+    /// <summary>
+    /// The address already has a pending Invitation to this Space (story 4.1, AC13), beside the email field.
+    /// </summary>
+    public static string InvitationPendingKey => "invitation-pending";
+
+    /// <summary>
     /// The resource a refusal is rendered with.
     /// </summary>
     /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
@@ -196,6 +217,10 @@ public static class RefusalCopy
         [ProblemTypes.InvalidListQuery] = InvalidListQueryKey,
         [ProblemTypes.InvalidListCursor] = InvalidListCursorKey,
         [ProblemTypes.InvalidSpaceName] = InvalidSpaceNameKey,
+        [ProblemTypes.InvalidEmailAddress] = InvalidEmailAddressKey,
+        [ProblemTypes.RoleNotOfferable] = RoleNotOfferableKey,
+        [ProblemTypes.AlreadyAMember] = AlreadyAMemberKey,
+        [ProblemTypes.InvitationPending] = InvitationPendingKey,
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static string? OwnKey(string? type) =>

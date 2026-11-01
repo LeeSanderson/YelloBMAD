@@ -1732,6 +1732,65 @@
     overflow-wrap: anywhere;
 }
 
+/*
+    THE INVITATIONS SECTION OF SPACE SETTINGS (story 4.1, AC10): the invite form - the email field, the Role group and
+    "Send invitation" - stacked as the Space name section's is, and reflowing at 320px (1.4.10). The Role radios wrap; each
+    choice keeps the target minimum. No icon, no transition.
+*/
+.invitation-section,
+.invitation-section__form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-inline-size: 0;
+}
+
+.invitation-section {
+    margin-block-start: var(--space-4);
+}
+
+.invitation-section__roles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-inline-size: 0;
+}
+
+.invitation-section__roles > legend {
+    padding: 0;
+    margin-block-end: var(--space-1);
+}
+
+.invitation-section__roles > .form-field__message {
+    flex-basis: 100%;
+    margin-block: 0;
+}
+
+.invitation-section__role {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-inline-size: var(--target-min);
+    min-block-size: var(--target-min);
+}
+
+.invitation-section__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.invitation-section__progress,
+.invitation-section__status {
+    margin-block: 0;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
 /* Story 3.1 (AC15): the no-Space state's one action, a link drawn as the primary button it stands in for. */
 .auth-panel__action {
     display: block;

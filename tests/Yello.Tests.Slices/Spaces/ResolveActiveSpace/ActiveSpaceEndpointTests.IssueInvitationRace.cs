@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Net;
 using Microsoft.Data.SqlClient;
 using Xunit;
+using Yello.Contracts;
 using Yello.Domain.Accounts;
 using Yello.Domain.Memberships;
 using Yello.Tests.Shared;
@@ -34,7 +35,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>409 invitation-pending</c>; exactly one row exists.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - ApplicationLocks.InvitationsOf and the store's lock-then-read order arrive with story 4.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     [Trait("Requirement", "AD-27")]
     public async Task An_issue_racing_a_pending_Invitation_for_the_same_address_reads_it_only_under_the_Space_lock()
@@ -42,7 +43,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var address = RandomAddress();
-        var invitee = InvitationScaffold.FreshAddress("raced");
+        var invitee = InvitationWire.FreshAddress("raced");
         var spaceId = Guid.NewGuid();
         WireResponse? raced = null;
 
@@ -79,7 +80,7 @@ public sealed partial class ActiveSpaceEndpointTests
         });
 
         Assert.True(raced?.StatusCode == HttpStatusCode.Conflict, $"{raced?.StatusCode} {raced?.Body}");
-        Assert.Equal(InvitationScaffold.InvitationPending, ProblemType(raced!));
+        Assert.Equal(ProblemTypes.InvitationPending, ProblemType(raced!));
         Assert.Single(await wire.InvitationsInAsync(spaceId));
     }
 

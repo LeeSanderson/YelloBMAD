@@ -67,6 +67,9 @@ param clientCustomHostname string = ''
 @description('Optional custom hostname for the API (P4), e.g. api.example.org. Bound by the runbook; used here only for outputs.')
 param apiCustomHostname string = ''
 
+@description('Where Azure Communication Services keeps its data (story 4.1). A geography such as Europe or United States; the resources themselves are global.')
+param communicationDataLocation string = 'Europe'
+
 @description('First day of the budget period, yyyy-MM-01.')
 param budgetStartDate string
 
@@ -80,6 +83,8 @@ var tags = {
 var registryName = toLower(replace('${namePrefix}acr', '-', ''))
 var keyVaultName = '${namePrefix}-kv'
 var sqlServerName = '${namePrefix}-sql'
+var emailServiceName = '${namePrefix}-email'
+var communicationServiceName = '${namePrefix}-acs'
 
 // The roles, by their built-in ids.
 var roles = {
@@ -202,11 +207,51 @@ resource migrateConnectionSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' 
   }
 }
 
-// THE COMMUNICATION SERVICES KEY - A NAMED, DISABLED SLOT (open question 9 (a)).
-// No email feature exists until story 4.1 (the outbox), so no ACS resource is provisioned and no
-// secret is created. When 4.1 lands it adds, here: the ACS resource, a Key Vault secret named
-// 'yello-acs-connection', and in the Host's container a secret reference to it exposed as
-// 'ConnectionStrings__acs'. Tracked in deferred-work.md against story 4.1.
+// OUTGOING MAIL: AZURE COMMUNICATION SERVICES (story 4.1, AC11; AR-37). An Email Communication Service with an
+// Azure-managed sending domain, a Communication Services resource linked to it, and its connection string written into
+// Key Vault from listKeys() inside this template - never a parameter, never in source. The Host reads it as the secret
+// reference 'yello-acs-connection', exposed as ConnectionStrings__acs (modules/containers.bicep), and sends through the
+// ACS Email REST API with HMAC signing (no SDK). The sender address - the managed domain's DoNotReply - is plain
+// configuration, Email__Sender. The file-drop folder setting is never set here: an Architecture gate holds that.
+resource emailService 'Microsoft.Communication/emailServices@2023-04-01' = {
+  name: emailServiceName
+  location: 'global'
+  tags: tags
+  properties: {
+    dataLocation: communicationDataLocation
+  }
+}
+
+resource emailDomain 'Microsoft.Communication/emailServices/domains@2023-04-01' = {
+  parent: emailService
+  name: 'AzureManagedDomain'
+  location: 'global'
+  tags: tags
+  properties: {
+    domainManagement: 'AzureManaged'
+    userEngagementTracking: 'Disabled'
+  }
+}
+
+resource communication 'Microsoft.Communication/communicationServices@2023-04-01' = {
+  name: communicationServiceName
+  location: 'global'
+  tags: tags
+  properties: {
+    dataLocation: communicationDataLocation
+    linkedDomains: [
+      emailDomain.id
+    ]
+  }
+}
+
+resource acsConnectionSecret 'Microsoft.KeyVault/vaults/secrets@2023-07-01' = {
+  parent: keyVault
+  name: 'yello-acs-connection'
+  properties: {
+    value: communication.listKeys().primaryConnectionString
+  }
+}
 
 resource appSecretsUser 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
   name: guid(keyVault.id, appIdentity.id, roles.keyVaultSecretsUser)
@@ -276,6 +321,7 @@ module containers 'modules/containers.bicep' = {
     migrateIdentityId: migrateIdentity.id
     keyVaultUri: keyVault.properties.vaultUri
     clientOrigin: 'https://${clientHostname}'
+    emailSender: 'DoNotReply@${emailDomain.properties.mailFromSenderDomain}'
     workspaceName: monitoring.outputs.workspaceName
   }
   dependsOn: [
@@ -285,6 +331,7 @@ module containers 'modules/containers.bicep' = {
     migrateSecretsUser
     appConnectionSecret
     migrateConnectionSecret
+    acsConnectionSecret
   ]
 }
 

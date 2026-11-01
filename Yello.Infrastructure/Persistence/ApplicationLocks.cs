@@ -80,6 +80,32 @@ internal static class ApplicationLocks
     internal static string SpacesPerAccount(Guid accountId) => $"Yello/SpacesPerAccount/{accountId:D}";
 
     /// <summary>
+    /// The lock one Space's Invitation issues take before they read whether the address is already a Member or already
+    /// invited there. Story 4.1, the story's Locking section.
+    /// </summary>
+    /// <remarks>
+    /// Named for the request's Space only - never for the address, which the caller could use to probe another Space's
+    /// writers - so no Space ever waits on a name another Space takes.
+    /// </remarks>
+    /// <param name="spaceId">The request's Space.</param>
+    /// <returns>The resource name.</returns>
+    internal static string InvitationsOf(Guid spaceId) => $"Yello/Invitations/{spaceId:D}";
+
+    /// <summary>
+    /// Takes the request's Space's Invitations lock.
+    /// </summary>
+    /// <param name="dbContext">The request's unit of work, scoped to a Space and inside its transaction.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>A task.</returns>
+    internal static Task TakeInvitationsAsync(YelloDbContext dbContext, CancellationToken cancellationToken)
+    {
+        var spaceId = dbContext.ScopedSpaceId
+            ?? throw new InvalidOperationException("The Invitations lock is taken only inside a Space-scoped unit of work.");
+
+        return TakeAsync(dbContext, InvitationsOf(spaceId), cancellationToken);
+    }
+
+    /// <summary>
     /// Takes the acting Account's Spaces-per-Account lock.
     /// </summary>
     /// <param name="dbContext">The Space creation's unit of work, scoped to the Account and inside its transaction.</param>

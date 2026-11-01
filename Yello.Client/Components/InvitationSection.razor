@@ -1,0 +1,253 @@
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Spaces
+@using Yello.Contracts
+@using Yello.Contracts.Invitations
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceWrites Writes
+
+@*
+    THE INVITATIONS SECTION OF SPACE SETTINGS - story 4.1: AC1, AC2, AC3, AC10; FR-10, FR-42; UX-DR27, UX-DR33, UX-DR37,
+    UX-DR38. Story 4.2 adds the pending list to this same section (deferred-work.md:532, open question 8 (a)).
+
+    OWNER AND ADMIN ONLY. Space settings renders this only when InvitationCapabilities.PermitsIssueInvitations; for a
+    Member or a Viewer it is absent from the DOM, never disabled or hidden (UX-DR27).
+
+    THE FORM: an email field - type="email", autocomplete="off" and a field name fresh per render, because the address is
+    someone else's and the browser must not offer the person's own (a recorded variance from Register.razor's "email";
+    UX-DR33) - and a Role picker, a fieldset and legend radio group offering Admin, Member and Viewer, NEVER Owner (FR-42;
+    Lee's Q2: an Admin offers Admin too) and with NO option checked (DESIGN.md:473, EXPERIENCE.md:211): inviting at a Role
+    is consequential. The form is novalidate, so the client's own mirror of the address rule speaks, beside the field.
+
+    NOT OPTIMISTIC. The form keeps what was typed until the server answers; "Sending." is the progress line. On 204 the
+    address and the Role are cleared, focus stays on the email field, and "Invitation sent." is announced politely - naming
+    NO address (UX-DR38). A disclosable 409 (already a Member here; already invited) or an implausible address is said
+    beside the field; role-not-offerable beside the Role group; a 403 in the capability copy on the section; a 404 is the
+    Space refusal surface. One Idempotency-Key per deliberate send, kept for an identical resend after an attempt that got
+    no answer ("Not sent.", the 2.5 deletes' precedent) and dropped once anything answers.
+*@
+
+<div class="invitation-section">
+    <h2 class="type-space-name">@Localizer["InvitationsHeading"]</h2>
+
+    <LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
+
+    <form class="invitation-section__form" @onsubmit="SendAsync" novalidate>
+        <FormField @ref="_field"
+                   FieldId="invitation-email"
+                   FieldName="@_fieldName"
+                   Label="@Localizer["InvitationEmailLabel"]"
+                   InputType="email"
+                   AutoComplete="off"
+                   Value="@_address"
+                   ValueChanged="value => _address = value"
+                   Message="@_addressMessage"
+                   Invalid="@(_addressMessage is not null)" />
+
+        <fieldset class="invitation-section__roles" aria-describedby="@(_roleMessage is not null ? RoleMessageId : null)">
+            <legend class="form-field__label">@Localizer["InvitationRoleLegend"]</legend>
+
+            @foreach (var roleCode in InvitationCapabilities.OfferableRoles)
+            {
+                <label class="invitation-section__role">
+                    <input type="radio" name="@_groupName" value="@roleCode" checked="@(_role == roleCode)" @onchange="ChooseRole" />
+                    @Localizer[RoleCopy.NameKey(roleCode)]
+                </label>
+            }
+
+            @if (_roleMessage is { } roleMessage)
+            {
+                <p class="form-field__message" id="@RoleMessageId">@roleMessage</p>
+            }
+        </fieldset>
+
+        <div class="invitation-section__actions">
+            @if (!_inFlight)
+            {
+                <PrimaryButton>@Localizer["SendInvitation"]</PrimaryButton>
+            }
+
+            @if (_inFlight)
+            {
+                <p class="invitation-section__progress" role="status">@Localizer["InvitationSending"]</p>
+            }
+        </div>
+    </form>
+
+    @if (_status is { } status)
+    {
+        <p class="invitation-section__status" role="status">@status</p>
+    }
+</div>
+
+@code {
+    private const string RoleMessageId = "invitation-role-message";
+
+    // A field name and a radio group name no browser's autofill would match to a saved value (UX-DR33): random per render.
+    private readonly string _fieldName = Guid.NewGuid().ToString("N");
+    private readonly string _groupName = Guid.NewGuid().ToString("N");
+
+    private FormField? _field;
+
+    private string _address = string.Empty;
+    private string? _role;
+    private string? _addressMessage;
+    private string? _roleMessage;
+    private string? _status;
+    private string? _announcement;
+    private int _announcements;
+    private bool _inFlight;
+    private bool _focusField;
+
+    // The key of the last send that got no answer, and the body it was for: an identical resend reuses it.
+    private string? _key;
+    private IssueInvitationRequest? _keyFor;
+
+    /// <summary>The Space Invitations are issued into - the route's, which the pipeline resolves.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>Raised when the server refuses the Space itself, so the page renders the one refusal surface.</summary>
+    [Parameter]
+    public EventCallback<ProblemResponse?> OnSpaceRefused { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusField && _field is not null)
+        {
+            _focusField = false;
+            await _field.FocusAsync();
+        }
+    }
+
+    private async Task SendAsync()
+    {
+        if (_inFlight)
+        {
+            return;
+        }
+
+        if (!IsReadyToSend())
+        {
+            return;
+        }
+
+        var request = new IssueInvitationRequest(_address, _role);
+
+        if (_key is null || _keyFor != request)
+        {
+            _key = Guid.NewGuid().ToString("D");
+            _keyFor = request;
+        }
+
+        _inFlight = true;
+
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var answer = await Writes.SendAsync(HttpMethod.Post, InvitationRoutes.InvitationsOf(SpaceId), request, _key, token);
+
+            if (!token.IsCancellationRequested)
+            {
+                await UseAnswerAsync(answer);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // No answer: the form keeps what was typed, and the same key is sent again with an identical resend.
+            _status = Localizer["TaskEditNotSent"];
+        }
+        finally
+        {
+            _inFlight = false;
+        }
+    }
+
+    /// <summary>
+    /// The server's answer, each said in its place.
+    /// </summary>
+    private async Task UseAnswerAsync(SpaceWriteAnswer answer)
+    {
+        if (answer.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            return;
+        }
+
+        if (answer.StatusCode >= HttpStatusCode.InternalServerError)
+        {
+            // The outcome is not known: treated as no answer, so the key is kept.
+            _status = Localizer["TaskEditNotSent"];
+            return;
+        }
+
+        ForgetKey();
+
+        if (answer.StatusCode == HttpStatusCode.NoContent)
+        {
+            _address = string.Empty;
+            _role = null;
+            _focusField = true;
+            _announcement = Localizer["InvitationSent"];
+            _announcements++;
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.NotFound)
+        {
+            await OnSpaceRefused.InvokeAsync(answer.Problem);
+            return;
+        }
+
+        var type = answer.Problem?.Type;
+
+        if (BelongsBesideTheAddress(type))
+        {
+            _addressMessage = RefusalText.Of(Localizer, answer.Problem);
+            return;
+        }
+
+        if (string.Equals(type, ProblemTypes.RoleNotOfferable, StringComparison.Ordinal))
+        {
+            _roleMessage = RefusalText.Of(Localizer, answer.Problem);
+            return;
+        }
+
+        _status = RefusalText.Of(Localizer, answer.Problem);
+    }
+
+    /// <summary>
+    /// The client's own checks, before anything is sent: an implausible address beside the field, no Role beside the
+    /// group - both at once, so a person correcting the form is told everything.
+    /// </summary>
+    private bool IsReadyToSend()
+    {
+        _addressMessage = EmailAddressRule.IsPlausible(_address) ? null : Localizer[RefusalCopy.InvalidEmailAddressKey].Value;
+        _roleMessage = _role is null ? Localizer["InvitationRoleRequired"].Value : null;
+        _status = null;
+
+        return _addressMessage is null && _roleMessage is null;
+    }
+
+    private void ChooseRole(ChangeEventArgs args) => _role = args.Value?.ToString();
+
+    private void ForgetKey()
+    {
+        _key = null;
+        _keyFor = null;
+    }
+
+    private static bool BelongsBesideTheAddress(string? type) =>
+        string.Equals(type, ProblemTypes.AlreadyAMember, StringComparison.Ordinal)
+        || string.Equals(type, ProblemTypes.InvitationPending, StringComparison.Ordinal)
+        || string.Equals(type, ProblemTypes.InvalidEmailAddress, StringComparison.Ordinal);
+}

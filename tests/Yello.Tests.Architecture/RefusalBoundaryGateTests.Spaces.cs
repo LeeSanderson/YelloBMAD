@@ -79,6 +79,7 @@ public sealed partial class RefusalBoundaryGateTests
         {
             var expected = RoleCapabilityMatrix.Decide(role, Capability.RenameSpace) != CapabilityDecision.Denied
                 || RoleCapabilityMatrix.Decide(role, Capability.ManageLabels) != CapabilityDecision.Denied
+                || RoleCapabilityMatrix.Decide(role, Capability.IssueAndRevokeInvitations) != CapabilityDecision.Denied
                 || RoleCapabilityMatrix.Decide(role, Capability.DeleteSpace) != CapabilityDecision.Denied;
 
             Assert.True(

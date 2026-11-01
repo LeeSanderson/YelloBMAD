@@ -1,6 +1,10 @@
+---
+baseline_commit: dc61dd3283e34fdc6f1835a0ac0116ee147c3f6b
+---
+
 # Story 4.1: Invite an email address to a Space at a Role
 
-Status: ready-for-dev
+Status: review
 
 Epic: 4 — Bring people into one piece of your work (the first story of the epic)
 Story key: `4-1-invite-an-email-address-to-a-space-at-a-role`
@@ -312,11 +316,11 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1627-1663` (`status: final
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1: decide the open questions** (all ACs)
-  - [ ] Read the Dev Notes, then the Open questions. Decide each one as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default, and no human is in the loop, so do not stop to ask.
-  - [ ] **Exception: questions marked [LEE].** Do not take a [LEE] option without a recorded decision from Lee. Where the **recommended** option of a [LEE] question is itself the variance (Q1, Q6), the orchestrator routes it to Lee before dev. If no decision has arrived, build the recommended option, record it as provisional and pending Lee, and keep it expressible as a single later change (one FK action; one table's shape).
-- [ ] **Task 2: Domain** (AC1, AC3, AC8)
-  - [ ] Add `Yello.Domain/Invitations/Invitation.cs`. Fields:
+- [x] **Task 1: decide the open questions** (all ACs)
+  - [x] Read the Dev Notes, then the Open questions. Decide each one as a reversible decision and record it in Completion Notes as "Qn - (x)", with its cost. Each recommendation is the default, and no human is in the loop, so do not stop to ask.
+  - [x] **Exception: questions marked [LEE].** Do not take a [LEE] option without a recorded decision from Lee. Where the **recommended** option of a [LEE] question is itself the variance (Q1, Q6), the orchestrator routes it to Lee before dev. If no decision has arrived, build the recommended option, record it as provisional and pending Lee, and keep it expressible as a single later change (one FK action; one table's shape).
+- [x] **Task 2: Domain** (AC1, AC3, AC8)
+  - [x] Add `Yello.Domain/Invitations/Invitation.cs`. Fields:
     - `Id`;
     - `SpaceId` (init);
     - `EmailAddress`;
@@ -330,17 +334,17 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1627-1663` (`status: final
     - `CreatedAt`.
 
     Also add `InvitationState { Pending, Accepted, Revoked }`.
-  - [ ] Add `Yello.Domain/Accounts/EmailAddressRule.cs`, extracted from `RegisterAccountValidator`. Point registration at it, and keep 1.3's tests green.
-  - [ ] Add `Invitation` to `RefusalBoundaryGateTests.SpaceScopedEntities` (`:126`).
-- [ ] **Task 3: the Invitation token** (AC7; C8)
-  - [ ] The token is 256 random bits from `RandomNumberGenerator`, Base64Url, behind a prefix distinct from the API Token's. Store only `SHA256(token)` in `Invitation.TokenHash`, under a unique index. Mirror `Yello.Infrastructure/ApiTokens/ApiTokenSecret.cs`.
-  - [ ] The plaintext exists only in the rendered outbox body until it is sent.
-  - [ ] Mirror the two gates:
+  - [x] Add `Yello.Domain/Accounts/EmailAddressRule.cs`, extracted from `RegisterAccountValidator`. Point registration at it, and keep 1.3's tests green.
+  - [x] Add `Invitation` to `RefusalBoundaryGateTests.SpaceScopedEntities` (`:126`).
+- [x] **Task 3: the Invitation token** (AC7; C8)
+  - [x] The token is 256 random bits from `RandomNumberGenerator`, Base64Url, behind a prefix distinct from the API Token's. Store only `SHA256(token)` in `Invitation.TokenHash`, under a unique index. Mirror `Yello.Infrastructure/ApiTokens/ApiTokenSecret.cs`.
+  - [x] The plaintext exists only in the rendered outbox body until it is sent.
+  - [x] Mirror the two gates:
     - `A_Token_secret_is_256_random_bits_behind_a_prefix_and_is_stored_as_its_SHA_256`;
     - `Only_the_Token_store_and_its_configuration_read_a_Token_hash`, for the Invitation hash.
-  - [ ] No contract carries the token. `ApiTokenGateTests.Only_the_issuance_response_carries_a_Token_secret` stays green unchanged.
-- [ ] **Task 4: persistence** (AC1, AC3, AC6, AC8, AC12)
-  - [ ] `InvitationConfiguration(this)`:
+  - [x] No contract carries the token. `ApiTokenGateTests.Only_the_issuance_response_carries_a_Token_secret` stays green unchanged.
+- [x] **Task 4: persistence** (AC1, AC3, AC6, AC8, AC12)
+  - [x] `InvitationConfiguration(this)`:
     - query filter `SpaceId == context.ScopedSpaceId`;
     - `HasAlternateKey(SpaceId, Id)`;
     - FK to Space per Q1;
@@ -353,14 +357,14 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1627-1663` (`status: final
     - `ExpiresAt` default per Q10.
 
     Register it in `OnModelCreating`.
-  - [ ] `OutboxMessageConfiguration` (Q6), policy-free, with no Space column.
-  - [ ] Add `SchemaNames.Invitation` and `SchemaNames.OutboxMessage`. Add Invitation to `SpaceScopedTables`.
-  - [ ] Migration `<timestamp>_Invitations`:
+  - [x] `OutboxMessageConfiguration` (Q6), policy-free, with no Space column.
+  - [x] Add `SchemaNames.Invitation` and `SchemaNames.OutboxMessage`. Add Invitation to `SpaceScopedTables`.
+  - [x] Migration `<timestamp>_Invitations`:
     - both tables;
     - `ALTER SECURITY POLICY dbo.SpaceIsolationPolicy ADD FILTER PREDICATE ... ON dbo.[Invitation], ADD BLOCK PREDICATE ... AFTER INSERT, ADD BLOCK PREDICATE ... AFTER UPDATE`. The template is `20261025175001_LabelTables.cs:105-129`. Put Invitation in `TablesThatCannotMove` in `SpaceIsolationSchemaTests`;
     - `Down` drops the predicates before the tables;
     - hand-edit for `IDE0005`, `IDE0161`, `MA0197`, `CA1861` and `S138`. Never add `// <auto-generated />` (`TESTING-CONVENTIONS.md:494-512`). It is expand-only.
-  - [ ] `InvitationStore`. The order inside the unit of work is:
+  - [x] `InvitationStore`. The order inside the unit of work is:
     1. take `ApplicationLocks.InvitationsOf(spaceId)` (`Yello/Invitations/{spaceId:D}`);
     2. run the AC4 Membership-join read;
     3. run the AC13 actionable-pending read (shared predicate);
@@ -369,38 +373,38 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1627-1663` (`status: final
     6. `SaveChanges`.
 
     No `HOLDLOCK` anywhere (3.4 review). Register it in `SpaceContentStores.cs`, and watch S1200.
-  - [ ] Seed helpers in `tests/Yello.Tests.Shared/WireDatabase.cs`: `AddInvitationAsync(spaceId, address, role, expiresAt)` for the expired-row case (R12), and `OutboxRowsAsync()`.
-- [ ] **Task 5: the slice** (AC1-AC5, AC13)
-  - [ ] Add `Yello.Application/Invitations/IssueInvitation/IssueInvitationHandler.cs` (the FR imperative; `ARCHITECTURE-SPINE.md:274`, `:418`).
+  - [x] Seed helpers in `tests/Yello.Tests.Shared/WireDatabase.cs`: `AddInvitationAsync(spaceId, address, role, expiresAt)` for the expired-row case (R12), and `OutboxRowsAsync()`.
+- [x] **Task 5: the slice** (AC1-AC5, AC13)
+  - [x] Add `Yello.Application/Invitations/IssueInvitation/IssueInvitationHandler.cs` (the FR imperative; `ARCHITECTURE-SPINE.md:274`, `:418`).
     - Signature: `HandleAsync(ActiveSpaceContext, string emailAddress, Role role, CancellationToken)`, returning `IssueInvitationResult(Outcome)`.
     - Outcomes: `Issued`, `AlreadyAMember`, `AlreadyPending`.
     - It never reads `context.Role`. That is gated: Role checks are the pipeline's.
     - The Role ceiling for an Admin is Q2's.
-  - [ ] Ports: `IInvitationStore` and `IOutbox` (Application), and `IEmailSender` (Application, consumed only by the Infrastructure dispatcher).
-  - [ ] Add `Yello.Host/Endpoints/InvitationEndpoints.cs` with `MapIssueInvitation` and `.RequiresCapability(Capability.IssueAndRevokeInvitations)`.
+  - [x] Ports: `IInvitationStore` and `IOutbox` (Application), and `IEmailSender` (Application, consumed only by the Infrastructure dispatcher).
+  - [x] Add `Yello.Host/Endpoints/InvitationEndpoints.cs` with `MapIssueInvitation` and `.RequiresCapability(Capability.IssueAndRevokeInvitations)`.
     - The body is read with `JsonRequestBody.ReadAsync`.
     - Validate the address with the Domain rule and the Role with `StableCode` parsing, refusing Owner.
     - Success returns `Results.NoContent()`.
     - Register the handler in `Program.cs:100-126` and the route at `:352-461`.
-  - [ ] `Yello.Contracts`: `Invitations/InvitationRoutes.cs`, `Invitations/IssueInvitationRequest.cs`, and the new `ProblemTypes` (`already-a-member`, `invitation-pending`, `role-not-offerable`, and the address one if no existing validation type fits). Update the AD-19 contract snapshot.
-- [ ] **Task 6: the outbox and email** (AC6, AC7, AC11; Q4, Q6, Q7)
-  - [ ] Code layout: `Yello.Infrastructure/Outbox/` (`OutboxStore`, `OutboxDispatcher`, `OutboxSweepSchedule`) and `Yello.Infrastructure/Email/` (`AcsEmailSender` over `HttpClient` with HMAC-SHA256 signing, `FileDropEmailSender` for Development).
-  - [ ] The Host has a middleware, `OutboxRecoveryTrigger`, modelled on `RefusalRetentionTrigger`, and a process-start kick on `ApplicationStarted`.
-  - [ ] The post-commit signal, as AC6 says.
-  - [ ] `InvitationEmail`, the template that renders subject and body from `(SpaceName, RoleName, IssuerName, link, expiresAt)` and **only** those. Its parameter list is the content contract. Add a gate that the template type takes no other input, plus AC7's test.
-  - [ ] Log messages carry `SpaceId` and the outbox `Id` only. Never the recipient, subject, body or token (`No_log_message_takes_a_name` and I-17).
-- [ ] **Task 7: client** (AC1, AC2, AC10)
-  - [ ] `InvitationSection.razor`, `InvitationCapabilities.cs`, the client email rule mirror, `SectionKey.Invitations`, `SpaceSettings.razor`, `RefusalCopy.OwnKeys`, `ClientCopy.resx` (Q9 copy, sentence case), and CSS in `components.css` only (logical properties, no px or colour literals).
-  - [ ] Extend `FakeYelloApi` for the new route.
-- [ ] **Task 8: infra** (AC11; ledger `:425`)
-  - [ ] Change `infra/main.bicep`, `infra/modules/containers.bicep`, `docs/operations.md`, `SecretHygieneTests` (unchanged rule, and the new entry passes) and `DeploymentShapeTests*`. Do not deploy.
-- [ ] **Task 9: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** use `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log.
-- [ ] **Task 10: ledger, docs, verification**
-  - [ ] `deferred-work.md`: apply the Ledger dispositions below. Keep each CLOSED note on one line, introduce no TAB or FORM FEED, and keep the final newline.
-  - [ ] Rewrite any comment that predicts 4.1 so it says what exists: `grep -rn "4\.1" Yello.* tests infra`, including `DeleteSpaceHandler.cs:13`, `BoundRegistry`'s comments and the Bicep slot comment.
-  - [ ] `tests/TESTING-CONVENTIONS.md` gains a short "Outbox and email" section: the recording fake sender, how to assert same-transaction enqueue, seeding an unclaimed row, and no timers.
-  - [ ] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-4` stays `in-progress`.
-  - [ ] Run `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers. Rerun a failure once, alone, before calling it real.
+  - [x] `Yello.Contracts`: `Invitations/InvitationRoutes.cs`, `Invitations/IssueInvitationRequest.cs`, and the new `ProblemTypes` (`already-a-member`, `invitation-pending`, `role-not-offerable`, and the address one if no existing validation type fits). Update the AD-19 contract snapshot.
+- [x] **Task 6: the outbox and email** (AC6, AC7, AC11; Q4, Q6, Q7)
+  - [x] Code layout: `Yello.Infrastructure/Outbox/` (`OutboxStore`, `OutboxDispatcher`, `OutboxSweepSchedule`) and `Yello.Infrastructure/Email/` (`AcsEmailSender` over `HttpClient` with HMAC-SHA256 signing, `FileDropEmailSender` for Development).
+  - [x] The Host has a middleware, `OutboxRecoveryTrigger`, modelled on `RefusalRetentionTrigger`, and a process-start kick on `ApplicationStarted`.
+  - [x] The post-commit signal, as AC6 says.
+  - [x] `InvitationEmail`, the template that renders subject and body from `(SpaceName, RoleName, IssuerName, link, expiresAt)` and **only** those. Its parameter list is the content contract. Add a gate that the template type takes no other input, plus AC7's test.
+  - [x] Log messages carry `SpaceId` and the outbox `Id` only. Never the recipient, subject, body or token (`No_log_message_takes_a_name` and I-17).
+- [x] **Task 7: client** (AC1, AC2, AC10)
+  - [x] `InvitationSection.razor`, `InvitationCapabilities.cs`, the client email rule mirror, `SectionKey.Invitations`, `SpaceSettings.razor`, `RefusalCopy.OwnKeys`, `ClientCopy.resx` (Q9 copy, sentence case), and CSS in `components.css` only (logical properties, no px or colour literals).
+  - [x] Extend `FakeYelloApi` for the new route.
+- [x] **Task 8: infra** (AC11; ledger `:425`)
+  - [x] Change `infra/main.bicep`, `infra/modules/containers.bicep`, `docs/operations.md`, `SecretHygieneTests` (unchanged rule, and the new entry passes) and `DeploymentShapeTests*`. Do not deploy.
+- [x] **Task 9: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** use `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log.
+- [x] **Task 10: ledger, docs, verification**
+  - [x] `deferred-work.md`: apply the Ledger dispositions below. Keep each CLOSED note on one line, introduce no TAB or FORM FEED, and keep the final newline.
+  - [x] Rewrite any comment that predicts 4.1 so it says what exists: `grep -rn "4\.1" Yello.* tests infra`, including `DeleteSpaceHandler.cs:13`, `BoundRegistry`'s comments and the Bicep slot comment.
+  - [x] `tests/TESTING-CONVENTIONS.md` gains a short "Outbox and email" section: the recording fake sender, how to assert same-transaction enqueue, seeding an unclaimed row, and no timers.
+  - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-4` stays `in-progress`.
+  - [x] Run `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0 warnings, 0 errors), then `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record the totals. The expected skips are the 3 bundle cases plus the explicit tiers. Rerun a failure once, alone, before calling it real.
 
 ## Dev Notes
 
@@ -814,10 +818,189 @@ and the correction recorded in the Debug Log, not deleted.
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, run unattended by the story-cycle orchestrator, 2026-11-01.
+
 ### Debug Log References
+
+**Activation (the ATDD order).** The Q13 harness came first (`HostProcess.CreateStartInfo` sets `Email__DropFolder` = `MailDrop.Unread` and `Email__Sender`). Every scaffold was red before activation, because its subject did not exist (skipped with `red: ACn`). Each was activated and seen green. The plants below are the red proof for the absences.
+
+**Duration oracle (riskiest first), measured on the isolation world:**
+
+| Case | Session | ApiToken |
+|---|---|---|
+| Permanent oracle: issue vs already-a-member (must be told apart) | 22.0 ms vs 11.7 ms, 46.7 % - caught | 28.9 ms vs 16.5 ms, 42.8 % - caught |
+| `ISO-TIMING-ISSUE-INVITATION-NO-ACCOUNT-ORACLE` (must be indistinguishable) | 17.6 ms vs 17.4 ms, 1.3 % | 16.9 ms vs 17.0 ms, 0.6 % |
+
+The 20 % method sees the token and outbox work, so the I-7 duration proof is not masked. The tolerance was not changed.
+
+**Scaffolds corrected (each kept, not deleted):**
+
+- `InvitationScaffold` (temporary) was deleted. Route and problem-type uses were swapped for `InvitationRoutes` and `ProblemTypes`. The test-only helpers (`Body`, `FreshAddress`, `ExpiryDays`, `LinkPath`, `CapabilityCode`) moved to a permanent `tests/Yello.Tests.Shared/InvitationWire.cs`, as `LabelScaffold` was replaced.
+- Mail-count assertions are scoped to the case's own addresses: `One_issue_sends_exactly_one_email...`, `A_failure_after_the_enqueue...`, `A_replay_with_the_same_Idempotency_Key...`, `A_live_pending_Invitation...`, and the two "nothing is written" cases. The reason: every Host sweeps its database's whole outbox at start. The stale-claim case deliberately leaves a row claimed a minute ago, and it becomes claimable 5 minutes later, so it can land in a later case's drop. `Assert.Single(emails)` and `Assert.Empty(...)` would then be order-dependent. The conventions now say so.
+- `Only_the_Invitation_store_and_its_configuration_read_an_Invitation_token_hash`: the readers must be a subset of {configuration, store}, anchored on the configuration. 4.1's store only writes the hash; 4.3's lookup will read it.
+- `Only_the_outbox_store_its_dispatcher_and_its_configuration_refer_to_the_outbox_row`: `InvitationModel` was added to the named list. `YelloDbContext`'s S1200 limit moved 4.1's configurations into it, and it reads no row.
+- `IsolationCases.Invitations.cs`: every `PendingUntil: "4.1"` was cleared (GATE-003).
+- `TextSpacingTests.Text_spacing_and_text_only_zoom_clip_nothing_in_the_invite_form`: the scaffold's 95-character address was red under 200% text-only zoom (`clipped: INPUT.form-field__control`, 3 of 3 runs). No single-line input can show it at 1280px; a native input scrolls its own text (2.3's Task-title precedent). The case now uses an ordinary address, and the long address is held by `InvitationTests`' 320px reflow case.
+- Harness, not scaffolds: `HostRouteTable` (in-process Host) and `HostStartupTests` (its own launcher) needed a sender. `ProbeTests` now takes its log slice after the process-start sweep's one logged attempt against the unreachable database. That sweep is AC6's sanctioned database touch, and not the probes' work.
+
+**Gates amended:** `SpaceScopedEntities` (+Invitation), `Space_is_read_only_where_named` (+`InvitationConfiguration`, a cascade FK that reads nothing), `The_clients_Space_settings_predicate_is_the_union_of_its_sections` (+`IssueAndRevokeInvitations`), and `SpaceIsolationSchemaTests.TablesThatCannotMove` (+Invitation). New: `No_deployed_configuration_sets_the_email_drop_folder` (Q13 safeguard). New handler unit tests are in `IssueInvitationHandlerTests`; they include AC8 gate (ii)'s `ToQueryString()` half and the HMAC signer.
+
+**Plants.** Each original was saved in memory and restored in a `finally` by a script. No `git checkout`, `restore` or `reset` was used. Each plant was rebuilt and run.
+
+| Plant | Expected red | Seen |
+|---|---|---|
+| 1 handler skips outbox and token work when an Account exists | AC5 duration | covered by the permanent oracle (issue vs already-a-member, the same shape reached through the product): caught at 43-47 % on both surfaces. A process Host cannot take a planted handler |
+| 2 one arm answers differently (an Account-existence branch in the store) | the byte comparison | red 1/1 |
+| 3 enqueue on a separate context | forced-rollback case | red 1/1 |
+| 4 dispatch before the commit (sent on enqueue) | forced-rollback case | red 1/1 (the first try did not compile; corrected) |
+| 5 `PeriodicTimer` in the dispatcher | `:701` timer gate | red 1/1 |
+| 6a piggyback trigger removed | piggyback case | red 1/1 |
+| 6b process-start kick removed | process-start and stale-claim cases | red 2/2 |
+| 7 issuer address reaches the template | I-14 | red 1/1 |
+| 8 predicate on a C# clock | gate (ii), structural and `ToQueryString` | red 1/1 and 1/1 |
+| 9 a second `ExpiresAt >` in a store | gate (i) | red 1/1 |
+| 10 application lock skipped | race case | red 1/1 |
+| 11 route declares a capability every Role holds | Member and Viewer 403 cases | red 2/2 |
+| 12a client picker offers Owner | picker case | red 2/2 |
+| 12b server accepts owner | Owner theory | red 1/4 (the `owner` row; the other three rows stay refused as unknown or missing) |
+| 13 section rendered for a Member | absence case | red 2/2 |
+| 14 announcement names the address | announcement case | red 1/1 |
+| 15 `ConnectionStrings__acs` as `value:` | `SecretHygieneTests` | red 1/1 |
+| 16 Invitation FILTER predicate dropped | `SpaceIsolationSchemaTests`, the policy schema case | red 2/2. The isolation row with the EF filter also dropped was not run: the schema half was enough to show the policy layer. Recorded, not claimed |
+| 17 invited address logged | I-17 log case | red 1/1 |
+| Q13 `Email__DropFolder` in `containers.bicep` | drop-folder gate | red 1/1 |
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created (create-story, 2026-10-31).
+- **Built.** The changes, by requirement:
+  - **Issue route (FR-10).** `POST /api/v1/spaces/{spaceId}/invitations` declares `IssueAndRevokeInvitations` and is served on both surfaces. Success is `204` with no body and no `Location`. Refusals are `400 invalid-email-address`, `400 role-not-offerable`, `409 already-a-member` and `409 invitation-pending`.
+  - **Invitation (AD-2).** `Invitation` is under RLS, with FILTER plus BLOCK predicates on insert and update, and has an EF filter. It cascades from its Space, references its issuer Account with no action, and has no Membership reference. The hashed token sits under a unique index. `ExpiresAt` is a column default seven days after `SYSDATETIMEOFFSET()`.
+  - **Expiry (AR-31/AD-27).** One shared predicate, `OfferPredicates.Actionable`, is built on the mapped `DatabaseClock.Now()`.
+  - **Mail (AR-33/AD-10).** A policy-free outbox (Lee's Q6) is written in the same transaction. The dispatcher is signalled by a post-commit hook on the unit of work. The recovery sweep runs at process start and piggybacks on authenticated traffic, at most once a minute. There is no timer.
+  - **Email content (FR-39).** The template takes five strings and nothing else.
+  - **Sender (AC11).** ACS over `HttpClient` with HMAC signing. With no ACS connection, a file drop takes its place when `Email:DropFolder` is set. With neither, the Host fails to start.
+  - **Invite form.** Owner and Admin only. Three Roles, none checked, never Owner. The form is not optimistic, and an Idempotency-Key is reused only on an identical resend.
+  - **Bicep (AR-37).** ACS resources and the `yello-acs-connection` secret.
+  - **AD-23.** No branch depends on whether the address has an Account.
+- **Lee's decisions applied:** Q1 cascade; Q2 an Admin offers Admin; Q3 NFC + BIN2 (ledger `:569` marked decided); Q4 no package; Q6 policy-free outbox, deleted on send, recorded AD-2 variance (`OutboxMessage` remarks, named-reader gate).
+- **Q13 (a), taken as the orchestrator directed.** The file drop is chosen whenever `Email:DropFolder` is set, in any environment. **Safeguard:** `SecretHygieneTests.No_deployed_configuration_sets_the_email_drop_folder` fails if any `*.bicep` or `*.bicepparam`, any file under `infra/`, any `appsettings.Production*.json` or any file in `Yello.AppHost` names `DropFolder`. Anchors: the scan reads `infra/main.bicep` and `Yello.AppHost/Program.cs`, and the Host's Development settings do name the key. It was seen red when `Email__DropFolder` was planted in `containers.bicep`.
+- **Reversible decisions (cut any line to revisit):**
+  - Q5 - (a) `204`, no body, no `Location`. Cost: 4.2's list reads the Invitations itself.
+  - Q7 - (a) the outbox row is deleted on send. The send record is 4.6's (ledgered).
+  - Q8 - (a) `InvitationSection` holds the form now. 4.2 adds the list.
+  - Q9 - (a) copy as recommended, English only (ledgered to UX). The email body is plain text with no HTML part.
+  - Q10 - (a) a column default; the 7 lives in the migration and in `InvitationConfiguration.ExpiryDays`.
+  - Q11 - (a) the stored states are `Pending`, `Accepted` and `Revoked`; "expired" is derived.
+  - Q12 - (a) `409 invitation-pending`. An expired Invitation does not block.
+  - An unknown, empty or missing Role answers the same `400 role-not-offerable` as `owner` (the ATDD assumption kept).
+  - An implausible address gets the new `400 invalid-email-address`, following the one-type-per-field precedent.
+  - The stored `EmailAddress` is the trimmed submission.
+  - With no usable `ClientOrigin` the link is origin-less (`/invitations/{token}`) rather than failing the issue. Every deployed Host has the origin; the isolation-world Host does not.
+  - `Email:Sender` is required with either sender. Development uses `DoNotReply@yello.localhost`.
+  - The Development drop folder is `../artifacts/mail-drop`, relative to the Host's working directory (ledgered).
+  - Admin's role ceiling: none beyond Owner (Lee's Q2).
+  - `IssueInvitationHandler` throws on Owner as a wiring guard.
+  - The outbox port, the sender and the recovery port live in `Yello.Application/Outbox/` (not `Notifications/`). The handler folder is `Application/Invitations/IssueInvitation/` (C4).
+  - AC8 (iii), the A-10 state-writer gate, is ledgered to 5.3. 4.1 writes `State` nowhere.
+  - `MembershipActiveSpaceResolver` takes the outbox signal as an optional parameter, like `YelloDbContext`'s scopes, so existing direct constructions in tests still compile.
+  - `YelloDbContext` exposes no `DbSet<Invitation>` (S1200); stores use `Set<Invitation>()`.
+- **Not verified live:** ACS itself. The signer is unit-tested against Microsoft's documented HMAC recipe (no published vector exists); the API version `2023-03-31` comes from the ACS Email REST reference. Never deployed; `az bicep build` is clean.
+- **4.3 route:** the link `{ClientOrigin}/invitations/{token}` renders the client's not-found until 4.3 ships. No placeholder page was built.
+- **Ledger (`deferred-work.md`):** see DEFERRED in the run summary - `:425` closed, `:689` (and its duplicate) closed, `:569` decided, `:20` and `:532` updated, eight new entries under story 4.1's dev-story section.
+- **Full suite:** see the Change Log.
 
 ### File List
+
+- `Yello.Application/Accounts/RegisterAccount/RegisterAccountValidator.cs`
+- `Yello.Application/Invitations/IInvitationStore.cs` (new)
+- `Yello.Application/Invitations/InvitationEmail.cs` (new)
+- `Yello.Application/Invitations/InvitationLinks.cs` (new)
+- `Yello.Application/Invitations/IssueInvitation/IssueInvitationHandler.cs` (new)
+- `Yello.Application/Outbox/IEmailSender.cs` (new)
+- `Yello.Application/Outbox/IOutbox.cs` (new)
+- `Yello.Application/Outbox/IOutboxRecovery.cs` (new)
+- `Yello.Application/Outbox/OutboxEmail.cs` (new)
+- `Yello.Application/Spaces/DeleteSpace/DeleteSpaceHandler.cs`
+- `Yello.Client/Components/FormField.razor`
+- `Yello.Client/Components/InvitationSection.razor` (new)
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Pages/SpaceSettings.razor`
+- `Yello.Client/Refusals/RefusalCopy.cs`
+- `Yello.Client/Spaces/EmailAddressRule.cs` (new)
+- `Yello.Client/Spaces/InvitationCapabilities.cs` (new)
+- `Yello.Client/Spaces/SpaceCapabilities.cs`
+- `Yello.Client/wwwroot/css/components.css`
+- `Yello.Contracts/Invitations/InvitationRoutes.cs` (new)
+- `Yello.Contracts/Invitations/IssueInvitationRequest.cs` (new)
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Domain/Accounts/EmailAddressRule.cs` (new)
+- `Yello.Domain/Invitations/Invitation.cs` (new)
+- `Yello.Domain/Invitations/InvitationState.cs` (new)
+- `Yello.Host/Endpoints/InvitationEndpoints.cs` (new)
+- `Yello.Host/Outbox/OutboxRecoveryTrigger.cs` (new)
+- `Yello.Host/Program.cs`
+- `Yello.Host/StartupLog.cs`
+- `Yello.Host/appsettings.Development.json`
+- `Yello.Infrastructure/Email/AcsConnection.cs` (new)
+- `Yello.Infrastructure/Email/AcsEmailMessage.cs` (new)
+- `Yello.Infrastructure/Email/AcsEmailSender.cs` (new)
+- `Yello.Infrastructure/Email/AcsRequestSigner.cs` (new)
+- `Yello.Infrastructure/Email/EmailServices.cs` (new)
+- `Yello.Infrastructure/Email/FileDropEmailSender.cs` (new)
+- `Yello.Infrastructure/InfrastructureServices.cs`
+- `Yello.Infrastructure/Invitations/InvitationTokenSecret.cs` (new)
+- `Yello.Infrastructure/Outbox/OutboxCommitSignal.cs` (new)
+- `Yello.Infrastructure/Outbox/OutboxDispatcher.cs` (new)
+- `Yello.Infrastructure/Outbox/OutboxLog.cs` (new)
+- `Yello.Infrastructure/Outbox/OutboxMessage.cs` (new)
+- `Yello.Infrastructure/Outbox/OutboxStore.cs` (new)
+- `Yello.Infrastructure/Outbox/OutboxSweepSchedule.cs` (new)
+- `Yello.Infrastructure/Persistence/ApplicationLocks.cs`
+- `Yello.Infrastructure/Persistence/Configurations/InvitationConfiguration.cs` (new)
+- `Yello.Infrastructure/Persistence/Configurations/InvitationModel.cs` (new)
+- `Yello.Infrastructure/Persistence/Configurations/OutboxMessageConfiguration.cs` (new)
+- `Yello.Infrastructure/Persistence/DatabaseClock.cs` (new)
+- `Yello.Infrastructure/Persistence/InvitationStore.cs` (new)
+- `Yello.Infrastructure/Persistence/MembershipActiveSpaceResolver.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261101140742_Invitations.Designer.cs` (new)
+- `Yello.Infrastructure/Persistence/Migrations/20261101140742_Invitations.cs` (new)
+- `Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs`
+- `Yello.Infrastructure/Persistence/OfferPredicates.cs` (new)
+- `Yello.Infrastructure/Persistence/SchemaNames.cs`
+- `Yello.Infrastructure/Persistence/SpaceStore.cs`
+- `Yello.Infrastructure/Persistence/YelloDbContext.cs`
+- `Yello.Infrastructure/SpaceContentStores.cs`
+- `_bmad-output/implementation-artifacts/4-1-invite-an-email-address-to-a-space-at-a-role.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `docs/operations.md`
+- `infra/main.bicep`
+- `infra/modules/containers.bicep`
+- `tests/TESTING-CONVENTIONS.md`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Invitations.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Spaces.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs`
+- `tests/Yello.Tests.Architecture/SecretHygieneTests.Email.cs`
+- `tests/Yello.Tests.Client/InvitationTests.cs`
+- `tests/Yello.Tests.Client/TextSpacingTests.cs`
+- `tests/Yello.Tests.Isolation/Expectation.cs`
+- `tests/Yello.Tests.Isolation/HostRouteTable.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.Invitations.cs`
+- `tests/Yello.Tests.Isolation/IsolationTimingTests.cs`
+- `tests/Yello.Tests.Shared/HostProcess.cs`
+- `tests/Yello.Tests.Shared/InvitationScaffold.cs` (deleted)
+- `tests/Yello.Tests.Shared/InvitationWire.cs` (new)
+- `tests/Yello.Tests.Shared/MailDrop.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/SpaceIsolationSchemaTests.cs`
+- `tests/Yello.Tests.Slices/Deployment/ProbeTests.cs`
+- `tests/Yello.Tests.Slices/HostStartupTests.cs`
+- `tests/Yello.Tests.Slices/Invitations/IssueInvitation/IssueInvitationHandlerTests.cs` (new)
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.IssueInvitation.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.IssueInvitationOutbox.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.IssueInvitationRace.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.IssueInvitationSchema.cs`
+
+## Change Log
+
+- 2026-11-01 - Story 4.1 implemented (bmad-dev-story): Invitation issue route, schema and migration, outbox and dispatcher, ACS and file-drop senders, invite form, Bicep, ledger, docs. Build 0 warnings, 0 errors. Full run `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`: 1,897 total, 1,887 passed, 0 failed, 10 skipped (28m 16s; the 10 are the 3 bundle cases and the explicit tiers; baseline was 1,858 / 1,792 / 0 / 66, and all 56 ATDD scaffolds are now active). Status set to review.

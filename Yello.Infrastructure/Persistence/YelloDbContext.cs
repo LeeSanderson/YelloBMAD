@@ -168,6 +168,10 @@ public sealed class YelloDbContext(
         modelBuilder.ApplyConfiguration(new ApiTokenConfiguration());
         modelBuilder.ApplyConfiguration(new DataProtectionKeyConfiguration());
 
+        // Story 4.1: the Invitation and outbox configurations and the database clock, named in InvitationModel - split
+        // out only to keep this class's dependencies within S1200's limit.
+        InvitationModel.Apply(modelBuilder, this);
+
         base.OnModelCreating(modelBuilder);
     }
 }

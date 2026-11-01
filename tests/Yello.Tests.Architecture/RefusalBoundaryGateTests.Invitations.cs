@@ -45,7 +45,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// AC1, AD-2, AR-34 - <c>IssueInvitationRequest</c> carries <c>EmailAddress</c> and <c>Role</c>, both strings, and
     /// nothing else: no Space id, no expiry, no token. Sibling of <c>The_Space_request_contracts_carry_a_name_and_nothing_else</c>.
     /// </summary>
-    [Fact(Skip = "red: AC1 - Yello.Contracts.Invitations.IssueInvitationRequest arrives with story 4.1 Task 5")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     [Trait("Requirement", "AD-2")]
     public void The_issue_request_carries_an_address_and_a_Role_and_nothing_else()
@@ -62,7 +62,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>Invitation.Role</c> have <c>init</c> accessors and no ordinary setter. Sibling of
     /// <c>A_Projects_Space_can_only_be_set_when_it_is_created</c>; the database half is the BLOCK AFTER UPDATE predicate.
     /// </summary>
-    [Fact(Skip = "red: AC1 - Yello.Domain.Invitations.Invitation arrives with story 4.1 Task 2")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     [Trait("Requirement", "AD-2")]
     public void An_Invitations_Space_and_Role_can_only_be_set_when_it_is_created()
@@ -87,17 +87,25 @@ public sealed partial class RefusalBoundaryGateTests
     /// Task 3, NFR-6, C8 - only the Invitation store and the table's configuration read <c>Invitation.TokenHash</c>: nothing
     /// else can compare, return or log it. Sibling of <c>Only_the_Token_store_and_its_configuration_read_a_Token_hash</c>.
     /// </summary>
-    [Fact(Skip = "red: AC7 - Invitation.TokenHash, InvitationStore and InvitationConfiguration arrive with story 4.1 Tasks 2-4")]
+    /// <remarks>
+    /// <b>Corrected by the dev phase (story 4.1):</b> the scaffold required both to read it, but 4.1's store only writes the
+    /// hash (an <c>init</c>); story 4.3's lookup is its first reader there. The readers must be a subset of the two named,
+    /// and the anchor is the configuration, which reads it today.
+    /// </remarks>
+    [Fact]
     [Trait("Requirement", "NFR-6")]
     public void Only_the_Invitation_store_and_its_configuration_read_an_Invitation_token_hash()
     {
         var readers = RoleReaders(InvitationTypeName, "get_TokenHash");
 
-        Assert.Equal(
-            [
-                "Yello.Infrastructure.Persistence.Configurations.InvitationConfiguration",
-                "Yello.Infrastructure.Persistence.InvitationStore",
-            ],
+        Assert.Contains("Yello.Infrastructure.Persistence.Configurations.InvitationConfiguration", readers);
+        Assert.Subset(
+            new SortedSet<string>(
+                [
+                    "Yello.Infrastructure.Persistence.Configurations.InvitationConfiguration",
+                    "Yello.Infrastructure.Persistence.InvitationStore",
+                ],
+                StringComparer.Ordinal),
             readers);
     }
 
@@ -107,7 +115,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// bytes. Sibling of <c>A_Token_secret_is_256_random_bits_behind_a_prefix_and_is_stored_as_its_SHA_256</c>; the
     /// methods are found by shape, the prefix by its <c>Prefix</c> constant.
     /// </summary>
-    [Fact(Skip = "red: AC7 - Yello.Infrastructure.Invitations.InvitationTokenSecret arrives with story 4.1 Task 3")]
+    [Fact]
     [Trait("Requirement", "NFR-6")]
     public void An_Invitation_token_is_256_random_bits_behind_its_own_prefix_and_is_stored_as_its_SHA_256()
     {
@@ -147,7 +155,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Anchor: the shared declaration is found, and it compares <c>ExpiresAt</c>. Plant 9: a second <c>ExpiresAt &gt;</c>
     /// in a store.
     /// </summary>
-    [Fact(Skip = "red: AC8 - the shared actionable predicate (OfferPredicates.Actionable or equivalent) arrives with story 4.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "AR-31")]
     [Trait("Requirement", "AD-27")]
     public void Only_the_shared_actionable_predicate_compares_ExpiresAt()
@@ -175,7 +183,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// the predicate contains <c>SYSDATETIMEOFFSET</c> - is a Slices test the dev phase writes once the predicate's type
     /// exists (it cannot compile before). Plant 8: the predicate rewritten with <c>clock.GetUtcNow()</c>.
     /// </summary>
-    [Fact(Skip = "red: AC8 - the database-clock function and the shared predicate arrive with story 4.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "AR-31")]
     [Trait("Requirement", "AD-27")]
     public void The_shared_actionable_predicate_reads_the_database_clock_and_never_a_CSharp_clock()
@@ -200,7 +208,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// display name, the issuer's display name, the link and the expiry - and one takes exactly those five. No Domain type
     /// (Space, Account, Project, Membership) can be passed in, so no Space content can reach the email.
     /// </summary>
-    [Fact(Skip = "red: AC7 - InvitationEmail arrives with story 4.1 Task 6")]
+    [Fact]
     [Trait("Requirement", "FR-39")]
     [Trait("Requirement", "NFR-1")]
     public void The_invitation_email_template_takes_the_Space_the_Role_the_issuer_the_link_and_the_expiry_and_nothing_else()
@@ -228,7 +236,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// outbox row type, so a policy-free table holding a Space name and an address is read in exactly the places named.
     /// Sibling of <c>Space_is_read_only_where_named</c>. Anchor: the store and the dispatcher are among the dependents.
     /// </summary>
-    [Fact(Skip = "red: AC6 - OutboxMessage, OutboxStore and OutboxDispatcher arrive with story 4.1 Task 6")]
+    [Fact]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-2")]
     public void Only_the_outbox_store_its_dispatcher_and_its_configuration_refer_to_the_outbox_row()
@@ -236,7 +244,9 @@ public sealed partial class RefusalBoundaryGateTests
         var row = Assert.Single(ProductionAssemblies.All.SelectMany(assembly => assembly.GetTypes()), type => type.Name == "OutboxMessage");
         var dependents = DependentsOf(row.FullName!);
 
-        string[] named = ["OutboxStore", "OutboxDispatcher", "OutboxMessageConfiguration", "YelloDbContext", "OutboxMessage"];
+        // InvitationModel applies the configuration (added by the dev phase: YelloDbContext's S1200 limit moved story 4.1's
+        // configurations into it); it reads no row.
+        string[] named = ["OutboxStore", "OutboxDispatcher", "OutboxMessageConfiguration", "InvitationModel", "YelloDbContext", "OutboxMessage"];
 
         Assert.Contains(dependents, dependent => dependent.EndsWith(".OutboxStore", StringComparison.Ordinal));
         Assert.Contains(dependents, dependent => dependent.EndsWith(".OutboxDispatcher", StringComparison.Ordinal));
@@ -251,7 +261,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Role: it shows it exactly where <c>IssueAndRevokeInvitations</c> is not denied (Owner, Admin). Sibling of
     /// <c>The_clients_rename_predicate_agrees_with_the_capability_matrix</c>.
     /// </summary>
-    [Fact(Skip = "red: AC10 - InvitationCapabilities.PermitsIssueInvitations arrives with story 4.1 Task 7")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "FR-10")]
     public void The_clients_invite_predicate_agrees_with_the_capability_matrix()
@@ -274,7 +284,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// first nor last, no whitespace, control or Format character, at most 254 characters after trimming. Sibling of the
     /// Space-name rule's client agreement gate.
     /// </summary>
-    [Fact(Skip = "red: AC3 - EmailAddressRule and its client mirror arrive with story 4.1 Tasks 2 and 7")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     [Trait("Requirement", "FR-1")]
     public void The_Domain_email_rule_and_the_clients_mirror_agree_on_every_edge()
@@ -312,7 +322,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>invitation-pending</c>, <c>role-not-offerable</c> and (assumed) <c>invalid-email-address</c>; and each has client
     /// copy of its own in <c>ClientCopy.resx</c> whose comment names story 4.1.
     /// </summary>
-    [Fact(Skip = "red: AC2 - the new ProblemTypes and their ClientCopy entries arrive with story 4.1 Tasks 5 and 7")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-10")]
     public void The_invitation_problem_types_are_declared_and_each_has_client_copy_naming_story_4_1()

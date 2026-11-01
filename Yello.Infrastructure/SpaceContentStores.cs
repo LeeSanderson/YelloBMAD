@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Yello.Application.Invitations;
 using Yello.Domain.Boards;
 using Yello.Domain.Labels;
 using Yello.Domain.Lists;
@@ -14,7 +15,8 @@ namespace Yello.Infrastructure;
 internal static class SpaceContentStores
 {
     /// <summary>
-    /// Adds the Project, Task and Label stores, the Board reader and the List reader (story 2.10).
+    /// Adds the Project, Task and Label stores, the Board reader and the List reader (story 2.10), and the Invitation store
+    /// (story 4.1).
     /// </summary>
     /// <param name="services">The container.</param>
     /// <returns>The same collection, for chaining.</returns>
@@ -29,6 +31,9 @@ internal static class SpaceContentStores
         services.AddScoped<IBoardReader, BoardReader>();
         services.AddScoped<IListReader, ListReader>();
         services.AddScoped<ILabelStore, LabelStore>();
+
+        // Story 4.1: the Space's Invitations, on the request's unit of work like every Space-scoped store.
+        services.AddScoped<IInvitationStore, InvitationStore>();
 
         return services;
     }

@@ -74,4 +74,10 @@ internal static partial class StartupLog
         Level = LogLevel.Error,
         Message = "A value Directory.Build.props stamps into every assembly could not be read, so the startup connectivity check cannot run: {Reason}")]
     internal static partial void BuildMetadataUnreadable(ILogger logger, string reason, Exception exception);
+
+    [LoggerMessage(
+        EventId = 1044,
+        Level = LogLevel.Information,
+        Message = "Outgoing mail is sent through the {Sender} (story 4.1).")]
+    internal static partial void EmailSenderResolved(ILogger logger, string sender);
 }

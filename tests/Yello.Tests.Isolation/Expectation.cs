@@ -429,12 +429,12 @@ internal sealed record SameAnswerWhetherOrNotTheAddressHasAnAccount() : Expectat
         foreach (var (path, _) in request.Paths)
         {
             var registered = await world.NewActorAsync("Ia");
-            var nobody = InvitationScaffold.FreshAddress("i7");
+            var nobody = InvitationWire.FreshAddress("i7");
 
             request.Actor.HoldsSecret(nobody);
 
-            var toNobody = await request.Actor.SendAsync(surface, request.Method, path, InvitationScaffold.Body(nobody, "member"), headers: null);
-            var toAccount = await request.Actor.SendAsync(surface, request.Method, path, InvitationScaffold.Body(registered.EmailAddress, "member"), headers: null);
+            var toNobody = await request.Actor.SendAsync(surface, request.Method, path, InvitationWire.Body(nobody, "member"), headers: null);
+            var toAccount = await request.Actor.SendAsync(surface, request.Method, path, InvitationWire.Body(registered.EmailAddress, "member"), headers: null);
 
             Assert.True(toNobody.StatusCode == HttpStatusCode.NoContent, $"{path}: {toNobody.StatusCode} {toNobody.Body}");
             AssertSameBytes(toNobody, toAccount, path);
@@ -464,7 +464,7 @@ internal sealed record IssueIndistinguishableWhetherOrNotTheAddressHasAnAccount(
             }
 
             var verdict = await DurationIndistinguishability.CompareMeasuredAsync(
-                () => world.Host.ServerDurationOfAsync(() => IssueAsync(request, surface, path, InvitationScaffold.FreshAddress("i7t"))),
+                () => world.Host.ServerDurationOfAsync(() => IssueAsync(request, surface, path, InvitationWire.FreshAddress("i7t"))),
                 () => world.Host.ServerDurationOfAsync(() => IssueAsync(request, surface, path, registered.Dequeue())));
 
             TimingRecord.Add($"issue to no Account vs to an Account / {surface}: {verdict.Describe()}");
@@ -476,7 +476,7 @@ internal sealed record IssueIndistinguishableWhetherOrNotTheAddressHasAnAccount(
     {
         request.Actor.HoldsSecret(address);
 
-        var answer = await request.Actor.SendAsync(surface, request.Method, path, InvitationScaffold.Body(address, "member"), headers: null);
+        var answer = await request.Actor.SendAsync(surface, request.Method, path, InvitationWire.Body(address, "member"), headers: null);
 
         Assert.True(answer.StatusCode == HttpStatusCode.NoContent, $"{path}: {answer.StatusCode} {answer.Body}");
     }

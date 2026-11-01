@@ -138,6 +138,10 @@ public sealed class HostStartupTests(SqlServerEngine engine)
         // Port 0 so a developer running this alongside `aspire run` does not collide.
         startInfo.Environment["ASPNETCORE_URLS"] = "http://127.0.0.1:0";
 
+        // Story 4.1: the Host refuses to start with no email sender (AC11). The Production case needs one; nothing is sent.
+        startInfo.Environment["Email__DropFolder"] = MailDrop.Unread;
+        startInfo.Environment["Email__Sender"] = MailDrop.Sender;
+
         using var process = Process.Start(startInfo)
             ?? throw new InvalidOperationException($"Could not start '{executable.FullName}'.");
 

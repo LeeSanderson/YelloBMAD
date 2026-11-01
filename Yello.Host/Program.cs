@@ -6,6 +6,9 @@ using Yello.Application.ApiTokens.ListApiTokens;
 using Yello.Application.ApiTokens.RevokeApiToken;
 using Yello.Application.Accounts.RegisterAccount;
 using Yello.Application.Accounts.SignOut;
+using Yello.Application.Invitations;
+using Yello.Application.Invitations.IssueInvitation;
+using Yello.Application.Outbox;
 using Yello.Application.Projects.CreateProject;
 using Yello.Application.Projects.DeleteProject;
 using Yello.Application.Projects.ListProjects;
@@ -32,9 +35,11 @@ using Yello.Host;
 using Yello.Host.ApiTokens;
 using Yello.Host.Deployment;
 using Yello.Host.Endpoints;
+using Yello.Host.Outbox;
 using Yello.Host.Sessions;
 using Yello.Host.Spaces;
 using Yello.Infrastructure;
+using Yello.Infrastructure.Email;
 
 // The composition root, AC4's connectivity check, the product's endpoints, and - from story 1.4 -
 // the whole of the cross-origin session contract: the cookie's attributes, CORS, and anti-forgery.
@@ -124,6 +129,7 @@ builder.Services.AddScoped<CreateSpaceHandler>();
 builder.Services.AddScoped<RenameSpaceHandler>();
 builder.Services.AddScoped<DeleteSpaceHandler>();
 builder.Services.AddScoped<ReadDeletionSummaryHandler>();
+builder.Services.AddScoped<IssueInvitationHandler>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
 builder.Services.AddAccountScopedResolution();
@@ -161,6 +167,22 @@ builder.Services
 var clientOrigin = builder.Configuration[CrossOriginPolicy.OriginConfigurationKey];
 
 builder.Services.AddCors(options => CrossOriginPolicy.Configure(options, clientOrigin));
+
+// THE INVITATION LINK'S ORIGIN (story 4.1, AC7): the same configured client origin, so the link an email carries opens
+// the client CORS admits. Without a usable origin the link is origin-less - see InvitationLinks.
+builder.Services.AddSingleton(new InvitationLinks(
+    CrossOriginPolicy.Describe(clientOrigin ?? string.Empty) is null && Uri.TryCreate(clientOrigin, UriKind.Absolute, out var origin)
+        ? origin
+        : null));
+
+// THE EMAIL SENDER, CHOSEN BY CONFIGURATION, OR NO HOST AT ALL (story 4.1, AC11; Q13 (a)). Azure Communication
+// Services with ConnectionStrings:acs; otherwise the file drop with Email:DropFolder (Development's points at a folder
+// git ignores; the wire suites point it at their own); otherwise startup fails loudly here rather than a Host silently
+// discarding every invitation. A deployed environment never sets Email:DropFolder - an Architecture gate holds that.
+var emailSender = builder.Services.AddYelloEmailSender(
+    builder.Configuration.GetConnectionString(EmailServices.AcsConnectionStringName),
+    builder.Configuration[EmailServices.DropFolderConfigurationKey],
+    builder.Configuration[EmailServices.SenderConfigurationKey]);
 
 // ANTI-FORGERY, as a token system rather than only the automatic middleware. The middleware's
 // verdict is recorded on IAntiforgeryValidationFeature and read only by a form consumer, so for
@@ -297,6 +319,8 @@ SpaceLog.NotAvailableFloorResolved(startupLogger, floorSetting.Floor);
 
 ProductionShape.Report(startupLogger, forwardedHeaders);
 
+StartupLog.EmailSenderResolved(startupLogger, emailSender);
+
 app.UseAuthentication();
 
 // After routing (which WebApplication places first) so the named policy on the two endpoints is
@@ -308,6 +332,15 @@ app.UseRateLimiter();
 // authenticated request - which has already read the database - may start it. See
 // RefusalRetentionTrigger.
 app.Use(RefusalRetentionTrigger.InvokeAsync);
+
+// THE OUTBOX'S RECOVERY SWEEP (story 4.1, AC6): piggybacked on inbound authenticated traffic at most once a minute per
+// process, and once at process start below - never on a timer, so an idle database is never woken (AD-10). See
+// OutboxRecoveryTrigger.
+app.Use(OutboxRecoveryTrigger.InvokeAsync);
+
+// The process-start sweep: mail a crash left unsent is sent once the Host has started, off the startup path. It does not
+// block startup, does not migrate, logs its own failure, and does not consume the piggyback throttle.
+app.Lifetime.ApplicationStarted.Register(() => app.Services.GetRequiredService<IOutboxRecovery>().SweepNow());
 
 // AC4's check lives in StartupConnectivityCheck rather than here so that a test can reach it.
 // Two review passes found that nothing asserted this code at all: deleting the call, inverting
@@ -454,6 +487,11 @@ api.MapMoveTask();
 api.MapListLabels();
 api.MapDefineLabel();
 api.MapDeleteLabel();
+
+// Invitations (story 4.1). POST /api/v1/spaces/{spaceId}/invitations issues one to an email address at a Role, under
+// IssueAndRevokeInvitations (Owner and Admin), on both surfaces; 204 with no body whether or not the address has an
+// Account (AD-23). The email is enqueued in the same unit of work and sent after the commit. No bound on issue.
+api.MapIssueInvitation();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

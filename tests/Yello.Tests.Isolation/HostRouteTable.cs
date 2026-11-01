@@ -63,6 +63,10 @@ internal static class HostRouteTable
             "--environment", "Production",
             "--urls", "http://127.0.0.1:0",
             $"--{resourceKey}", "Server=127.0.0.1,1;Database=unused;User ID=sa;Password=Not$Used1;TrustServerCertificate=true",
+
+            // Story 4.1: the Host refuses to start with no email sender; nothing is sent from here.
+            "--Email:DropFolder", MailDrop.Unread,
+            "--Email:Sender", MailDrop.Sender,
         ];
 
         var run = Task.Factory.StartNew(

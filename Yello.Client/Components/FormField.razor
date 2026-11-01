@@ -125,6 +125,12 @@
         }
     }
 
+    /// <summary>
+    /// Moves focus to the control - for a form that keeps focus in place after a send that cleared it (story 4.1, AC10).
+    /// </summary>
+    /// <returns>A task.</returns>
+    public ValueTask FocusAsync() => _control.FocusAsync();
+
     private string MessageId => FieldId + "-message";
 
     private Task HandleInputAsync(ChangeEventArgs args) =>

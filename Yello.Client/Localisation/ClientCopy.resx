@@ -1095,4 +1095,48 @@
     <value>Choose a Space from the switcher above.</value>
     <comment>Story 3.3 (AC15; Q8 (a)): on the refusal page at the entry point, in place of RefusalRouteBack, which would link to the page it is on. Points to the context bar's switcher.</comment>
   </data>
+  <data name="InvitationsHeading" xml:space="preserve">
+    <value>Invitations</value>
+    <comment>Story 4.1 (AC10, open question 9 (a)): the heading of Space settings' Invitations section, which holds the invite form (story 4.2 adds the pending list).</comment>
+  </data>
+  <data name="InvitationEmailLabel" xml:space="preserve">
+    <value>Email address</value>
+    <comment>Story 4.1 (AC10): the invite form's email field label. The address is someone else's, so the field is not autofilled.</comment>
+  </data>
+  <data name="InvitationRoleLegend" xml:space="preserve">
+    <value>Role</value>
+    <comment>Story 4.1 (AC2, AC10): the legend of the invite form's Role group - Admin, Member and Viewer, never Owner, and none chosen at first.</comment>
+  </data>
+  <data name="SendInvitation" xml:space="preserve">
+    <value>Send invitation</value>
+    <comment>Story 4.1 (AC10): the invite form's submit button.</comment>
+  </data>
+  <data name="InvitationSending" xml:space="preserve">
+    <value>Sending.</value>
+    <comment>Story 4.1 (AC10): the invite form's progress line while the issue is in flight. Not optimistic: nothing is said as sent until the server answers.</comment>
+  </data>
+  <data name="InvitationSent" xml:space="preserve">
+    <value>Invitation sent.</value>
+    <comment>Story 4.1 (AC10, UX-DR38): announced politely once an Invitation is issued. Names no address and no Role: an email address appears nowhere outside the Membership management surfaces, and never in an announcement.</comment>
+  </data>
+  <data name="InvitationRoleRequired" xml:space="preserve">
+    <value>Choose a Role.</value>
+    <comment>Story 4.1 (AC2, AC10): said beside the Role group when the invite form is sent with no Role chosen; nothing is sent.</comment>
+  </data>
+  <data name="invalid-email-address" xml:space="preserve">
+    <value>Enter an email address.</value>
+    <comment>Story 4.1 (AC3): the invalid-email-address refusal, and the client's own check before sending, beside the email field. Never echoes the address.</comment>
+  </data>
+  <data name="role-not-offerable" xml:space="preserve">
+    <value>Choose Admin, Member or Viewer.</value>
+    <comment>Story 4.1 (AC2): the role-not-offerable refusal, beside the Role group. Ownership moves only by an Ownership Offer (FR-42), so Owner is never offered.</comment>
+  </data>
+  <data name="already-a-member" xml:space="preserve">
+    <value>This address already belongs to a Member of this Space.</value>
+    <comment>Story 4.1 (AC4): the already-a-member refusal, beside the email field. Disclosable: the issuer can already see that Membership. Never the Member's name.</comment>
+  </data>
+  <data name="invitation-pending" xml:space="preserve">
+    <value>This address already has a pending invitation.</value>
+    <comment>Story 4.1 (AC13): the invitation-pending refusal, beside the email field. Disclosable: the issuer sees the Invitation in the Space's list (story 4.2).</comment>
+  </data>
 </root>

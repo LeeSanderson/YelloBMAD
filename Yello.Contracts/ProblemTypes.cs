@@ -359,4 +359,39 @@ public static class ProblemTypes
     /// <c>Retry-After</c>, and admits nothing (story 1.10 AC14).
     /// </summary>
     public static string ServiceUnavailable => "urn:yello:problem:service-unavailable";
+
+    /// <summary>
+    /// The address is not a plausible email address (the rule registration uses: exactly one <c>@</c>, neither first nor
+    /// last, no whitespace, control or format character, at most 254 characters). Answered <c>400</c>; nothing is written.
+    /// Story 4.1, AC3.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never the address sent.</b>
+    /// </remarks>
+    public static string InvalidEmailAddress => "urn:yello:problem:invalid-email-address";
+
+    /// <summary>
+    /// The Role offered is <c>owner</c>, unknown or missing: an Invitation offers Admin, Member or Viewer only, because
+    /// ownership moves only by an Ownership Offer (FR-42). Answered <c>400</c>; nothing is written. Story 4.1, AC2.
+    /// </summary>
+    public static string RoleNotOfferable => "urn:yello:problem:role-not-offerable";
+
+    /// <summary>
+    /// The address already holds a Membership in this Space. Answered <c>409</c>; nothing is written. Story 4.1, AC4.
+    /// </summary>
+    /// <remarks>
+    /// <b>Disclosable</b>: the issuer can already see that Membership. It depends on Membership in this Space only, never
+    /// on whether an Account exists anywhere (AD-23).
+    /// </remarks>
+    public static string AlreadyAMember => "urn:yello:problem:already-a-member";
+
+    /// <summary>
+    /// The Space already holds an actionable pending Invitation for the address. Answered <c>409</c>; nothing is written.
+    /// Story 4.1, AC13, open question 12 (a).
+    /// </summary>
+    /// <remarks>
+    /// <b>Disclosable</b>: the issuer sees that Invitation in the Space's list (story 4.2). An expired one does not block
+    /// a reissue (FR-39).
+    /// </remarks>
+    public static string InvitationPending => "urn:yello:problem:invitation-pending";
 }

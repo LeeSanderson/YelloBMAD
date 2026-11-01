@@ -40,6 +40,7 @@ Cost table. These are estimates made on 2026-10-25 from Microsoft's published pr
 | Container Registry, Basic | No free grant. About US$0.167 per day. | ≈ £4 | ≈ £4 |
 | Static Web Apps, Free | Free plan | £0 | £0 |
 | Key Vault, standard | US$0.03 per 10,000 operations. References are resolved at revision start. | ≈ £0 | ≈ £0 |
+| Communication Services Email, Azure-managed domain (story 4.1) | No free grant. About US$0.00025 per email plus US$0.00012 per MB. One invitation is one small email. | ≈ £0 | ≈ £0 |
 | Log Analytics | 5 GB per month of free ingestion; the cap is 0.1 GB per day (≤ 3.1 GB per month) | £0 | £0 |
 | Metric alerts (free amount remaining) | Microsoft says a metric alert on this metric is free | £0 | £0 |
 | Log search alert (rate-limit refusals, every 15 minutes; open question 14) | About US$0.50 per rule per month at a 15-minute frequency. Confirm at P1. | ≈ £0.40 | ≈ £0.40 |
@@ -154,6 +155,8 @@ az group create --name <rg> --location <region>
 
 Copy `infra/main.parameters.example.json` to a file **outside the repository**, then fill in the values. None of them is secret.
 
+**Outgoing mail (story 4.1).** The template creates an Email Communication Service with an **Azure-managed domain**, a Communication Services resource linked to it, and the Key Vault secret `yello-acs-connection` from the resource's own keys. The resources are global; their data stays in `communicationDataLocation` (default `Europe`; set it to the geography that matches `<region>`). The sender is the managed domain's `DoNotReply@<guid>.azurecomm.net`, passed to the Host as `Email__Sender`, which is plain configuration. An Azure-managed domain has low sending limits and cannot be renamed. A custom sending domain needs DNS records and is not part of this template. **Never set `Email__DropFolder` in Azure**: it makes the Host write mail to its disk instead of sending it, and an Architecture gate (`No_deployed_configuration_sets_the_email_drop_folder`) fails the build if `infra/`, an `appsettings.Production*.json` or the AppHost names it.
+
 ### P2: Entra rights and the bootstrap
 
 Run the deployment as Owner of the resource group, or as Contributor plus User Access Administrator, because it creates role assignments. Generate three passwords locally, and never commit them:
@@ -254,6 +257,7 @@ Nothing below has been seen working. Each item needs an Azure subscription, and 
 - That the first deployment succeeds while the Container App runs the placeholder image. The placeholder answers neither probe, so its revision may report unhealthy until the first workflow run replaces it. If the deployment refuses to complete, first deploy with the Host's container removed, or push an image to the registry and pass it as `hostImage`.
 - That ingress appends `X-Forwarded-For` and `X-Forwarded-Proto` the way the Host assumes, so a browser can sign in on the deployed client.
 - That the Key Vault secret references resolve through the managed identities, and that the container starts with `ConnectionStrings__yello` populated.
+- That the Communication Services resources deploy with the Azure-managed domain linked, that `yello-acs-connection` is written from `listKeys()`, that the container starts with `ConnectionStrings__acs` and `Email__Sender` populated, and that an invitation email is accepted (`202`) and delivered (story 4.1). The HMAC signing is unit-tested against Microsoft's documented recipe only.
 - That the contained-user SQL authentication works for the app and migrate identities.
 - That the `yello-migrate` job runs, that the workflow waits for `Succeeded`, and that promotion follows.
 - That the metric `free_amount_remaining` exists under that name, that the alert reaches the action group, and that the database auto-pauses at exhaustion.

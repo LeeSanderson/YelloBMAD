@@ -1,19 +1,20 @@
 using System.Net;
 using System.Text.Json;
 using Xunit;
+using Yello.Contracts.Invitations;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Isolation;
 
 /// <summary>
 /// Story 4.1 - issue an Invitation: the rows for <c>POST /api/v1/spaces/{spaceId}/invitations</c> (AC9; I-2, I-7, I-12;
-/// A-4, A-5), each stating both surfaces. Written by the story 4.1 ATDD run (2026-11-01), every row
-/// <c>PendingUntil: "4.1"</c>; GATE-003 requires each to be converted before the story reaches review.
+/// A-4, A-5), each stating both surfaces. Written by the story 4.1 ATDD run (2026-11-01) as <c>PendingUntil: "4.1"</c>;
+/// converted by its dev phase (GATE-003).
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The route is <see cref="InvitationScaffold.Issue"/></b> until <c>Yello.Contracts</c> holds
-/// <c>InvitationRoutes.Issue</c>; on activation the constant is swapped and the scaffold deleted.
+/// <b>The route is <see cref="InvitationRoutes.Issue"/></b>; the ATDD run's temporary scaffold constant was swapped for it
+/// by the dev phase.
 /// </para>
 /// <para>
 /// <b>I-14 (the email discloses nothing) is not a row here</b>: the isolation world's Host has no mail drop, so it is the
@@ -29,71 +30,57 @@ namespace Yello.Tests.Isolation;
 /// </remarks>
 internal static partial class IsolationCases
 {
-    private const string IssueInvitationPending = "POST /spaces/{spaceId}/invitations is mapped by story 4.1 Task 5";
-
     private static IEnumerable<IsolationCase> InvitationCases() =>
     [
         new(
-            "ISO-ISSUE-INVITATION-FOREIGN-SPACE", "I-2 (4.1 AC9)", IsolationVector.Write, HttpMethod.Post, InvitationScaffold.Issue,
+            "ISO-ISSUE-INVITATION-FOREIGN-SPACE", "I-2 (4.1 AC9)", IsolationVector.Write, HttpMethod.Post, InvitationRoutes.Issue,
             world =>
             {
-                var invitee = InvitationScaffold.FreshAddress("foreign");
+                var invitee = InvitationWire.FreshAddress("foreign");
 
                 world.A.HoldsSecret(invitee);
 
                 return Task.FromResult(new CaseRequest(
                     world.A,
                     HttpMethod.Post,
-                    [new(InvitationScaffold.InvitationsOf(world.B.SpaceId), InvitationScaffold.InvitationsOf(Guid.NewGuid()))],
+                    [new(InvitationRoutes.InvitationsOf(world.B.SpaceId), InvitationRoutes.InvitationsOf(Guid.NewGuid()))],
                     world.B.SpaceId,
-                    Body: () => InvitationScaffold.Body(invitee, "member")));
+                    Body: () => InvitationWire.Body(invitee, "member")));
             },
-            Both(new BoundaryNotFound { Then = NoInvitationOrOutboxRowForTheCaseAddressAsync }),
-            PendingUntil: "4.1",
-            PendingReason: IssueInvitationPending),
+            Both(new BoundaryNotFound { Then = NoInvitationOrOutboxRowForTheCaseAddressAsync })),
 
         new(
-            "ISO-RECORD-KIND-ISSUE-INVITATION-MEMBER", "V-1, C-6, NFR-7 (4.1 AC1, AC9)", IsolationVector.RecordKind, HttpMethod.Post, InvitationScaffold.Issue,
+            "ISO-RECORD-KIND-ISSUE-INVITATION-MEMBER", "V-1, C-6, NFR-7 (4.1 AC1, AC9)", IsolationVector.RecordKind, HttpMethod.Post, InvitationRoutes.Issue,
             world => LesserRoleIssuesAnInvitationAsync(world, "member"),
-            Both(new RoleRefused(InvitationScaffold.CapabilityCode) { Then = NoInvitationOrOutboxRowForTheCaseAddressAsync }),
-            PendingUntil: "4.1",
-            PendingReason: IssueInvitationPending + " with RequiresCapability(IssueAndRevokeInvitations)"),
+            Both(new RoleRefused(InvitationWire.CapabilityCode) { Then = NoInvitationOrOutboxRowForTheCaseAddressAsync })),
 
         new(
-            "ISO-RECORD-KIND-ISSUE-INVITATION-VIEWER", "V-1, C-6, NFR-7 (4.1 AC1, AC9)", IsolationVector.RecordKind, HttpMethod.Post, InvitationScaffold.Issue,
+            "ISO-RECORD-KIND-ISSUE-INVITATION-VIEWER", "V-1, C-6, NFR-7 (4.1 AC1, AC9)", IsolationVector.RecordKind, HttpMethod.Post, InvitationRoutes.Issue,
             world => LesserRoleIssuesAnInvitationAsync(world, "viewer"),
-            Both(new RoleRefused(InvitationScaffold.CapabilityCode) { Then = NoInvitationOrOutboxRowForTheCaseAddressAsync }),
-            PendingUntil: "4.1",
-            PendingReason: IssueInvitationPending + " with RequiresCapability(IssueAndRevokeInvitations)"),
+            Both(new RoleRefused(InvitationWire.CapabilityCode) { Then = NoInvitationOrOutboxRowForTheCaseAddressAsync })),
 
         TokenOwnOtherSpace(
             "ISSUE-INVITATION",
             HttpMethod.Post,
-            InvitationScaffold.Issue,
+            InvitationRoutes.Issue,
             HttpStatusCode.NoContent,
-            second => InvitationScaffold.InvitationsOf(second.SpaceId),
-            () => InvitationScaffold.Body(InvitationScaffold.FreshAddress("token-elsewhere"), "member"))
+            second => InvitationRoutes.InvitationsOf(second.SpaceId),
+            () => InvitationWire.Body(InvitationWire.FreshAddress("token-elsewhere"), "member"))
             with
         {
             TestDesignId = "I-12 (4.1 AC9; the 3.4 AC3 gate)",
-            PendingUntil = "4.1",
-            PendingReason = IssueInvitationPending,
         },
 
         new(
-            "ISO-ISSUE-INVITATION-NO-ACCOUNT-ORACLE", "I-7 (4.1 AC5, AC9; duration: ISO-TIMING-ISSUE-INVITATION-NO-ACCOUNT-ORACLE)", IsolationVector.Api, HttpMethod.Post, InvitationScaffold.Issue,
+            "ISO-ISSUE-INVITATION-NO-ACCOUNT-ORACLE", "I-7 (4.1 AC5, AC9; duration: ISO-TIMING-ISSUE-INVITATION-NO-ACCOUNT-ORACLE)", IsolationVector.Api, HttpMethod.Post, InvitationRoutes.Issue,
             FreshActorIssuesInItsOwnSpaceAsync,
-            Both(new SameAnswerWhetherOrNotTheAddressHasAnAccount()),
-            PendingUntil: "4.1",
-            PendingReason: IssueInvitationPending),
+            Both(new SameAnswerWhetherOrNotTheAddressHasAnAccount())),
 
         new(
-            "ISO-TIMING-ISSUE-INVITATION-NO-ACCOUNT-ORACLE", "I-7 (4.1 AC5)", IsolationVector.Timing, HttpMethod.Post, InvitationScaffold.Issue,
+            "ISO-TIMING-ISSUE-INVITATION-NO-ACCOUNT-ORACLE", "I-7 (4.1 AC5)", IsolationVector.Timing, HttpMethod.Post, InvitationRoutes.Issue,
             FreshActorIssuesInItsOwnSpaceAsync,
             Both(new IssueIndistinguishableWhetherOrNotTheAddressHasAnAccount()),
-            Runner: CaseRunner.Timing,
-            PendingUntil: "4.1",
-            PendingReason: IssueInvitationPending + "; the timing collection runs it alone"),
+            Runner: CaseRunner.Timing),
     ];
 
     /// <summary>
@@ -103,14 +90,14 @@ internal static partial class IsolationCases
     private static async Task<CaseRequest> LesserRoleIssuesAnInvitationAsync(IsolationWorld world, string roleStableCode)
     {
         var actor = await world.NewActorAsync(string.Equals(roleStableCode, "member", StringComparison.Ordinal) ? "Mi" : "Vi");
-        var invitee = InvitationScaffold.FreshAddress("lesser");
+        var invitee = InvitationWire.FreshAddress("lesser");
 
         await world.Database.ChangeRoleAsync(actor.SpaceId, actor.AccountId, roleStableCode);
         actor.HoldsSecret(invitee);
 
-        var path = InvitationScaffold.InvitationsOf(actor.SpaceId);
+        var path = InvitationRoutes.InvitationsOf(actor.SpaceId);
 
-        return new CaseRequest(actor, HttpMethod.Post, [new(path, path)], actor.SpaceId, Body: () => InvitationScaffold.Body(invitee, "member"));
+        return new CaseRequest(actor, HttpMethod.Post, [new(path, path)], actor.SpaceId, Body: () => InvitationWire.Body(invitee, "member"));
     }
 
     /// <summary>
@@ -120,7 +107,7 @@ internal static partial class IsolationCases
     private static async Task<CaseRequest> FreshActorIssuesInItsOwnSpaceAsync(IsolationWorld world)
     {
         var actor = await world.NewActorAsync("Io");
-        var path = InvitationScaffold.InvitationsOf(actor.SpaceId);
+        var path = InvitationRoutes.InvitationsOf(actor.SpaceId);
 
         return new CaseRequest(actor, HttpMethod.Post, [new(path, path)], actor.SpaceId);
     }

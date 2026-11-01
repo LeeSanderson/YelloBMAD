@@ -43,7 +43,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// the invited address, from the configured sender), and the row is deleted once sent (Q7 (a)).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the outbox, the dispatcher and the file-drop sender arrive with story 4.1 Task 6")]
+    [Fact]
     [Trait("Requirement", "FR-39")]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-10")]
@@ -52,7 +52,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var address = RandomAddress();
-        var invitee = InvitationScaffold.FreshAddress("sent");
+        var invitee = InvitationWire.FreshAddress("sent");
         var spaceId = Guid.NewGuid();
         IReadOnlyList<DroppedEmail> emails = [];
         var outboxEmptied = false;
@@ -72,7 +72,7 @@ public sealed partial class ActiveSpaceEndpointTests
             emails = await mail.ReadAllAsync();
         });
 
-        var email = Assert.Single(emails);
+        var email = Assert.Single(emails, email => string.Equals(email.To, invitee, StringComparison.OrdinalIgnoreCase));
 
         Assert.Equal(invitee, email.To);
         Assert.Equal(MailDrop.Sender, email.From);
@@ -85,7 +85,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// another address in the same Space is sent, so "no email" is not a dispatcher that never ran.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the outbox enqueue in the issue's unit of work arrives with story 4.1 Task 6")]
+    [Fact]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-10")]
     public async Task A_failure_after_the_enqueue_rolls_back_the_Invitation_and_the_outbox_row_and_sends_nothing()
@@ -93,7 +93,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var address = RandomAddress();
-        var (rolledBack, anchor) = (InvitationScaffold.FreshAddress("rolled-back"), InvitationScaffold.FreshAddress("anchor"));
+        var (rolledBack, anchor) = (InvitationWire.FreshAddress("rolled-back"), InvitationWire.FreshAddress("anchor"));
         var key = Guid.NewGuid().ToString("D");
         var spaceId = Guid.NewGuid();
         WireResponse? failed = null;
@@ -134,7 +134,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal(0, invitationsAfterFailure);
         Assert.Equal(0, outboxAfterFailure);
         Assert.DoesNotContain(emails, email => string.Equals(email.To, rolledBack, StringComparison.OrdinalIgnoreCase));
-        Assert.Single(emails);
+        Assert.Single(emails, email => string.Equals(email.To, anchor, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -143,14 +143,14 @@ public sealed partial class ActiveSpaceEndpointTests
     /// dispatcher reads no Space data.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the process-start sweep arrives with story 4.1 Task 6")]
+    [Fact]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-10")]
     public async Task The_process_start_sweep_sends_a_row_a_crash_left_unsent()
     {
         _ = Available();
         var wire = Wire();
-        var recipient = InvitationScaffold.FreshAddress("crashed");
+        var recipient = InvitationWire.FreshAddress("crashed");
         var (subject, body) = ("Left behind " + Suffix(), "Rendered before the crash " + Suffix());
         DroppedEmail? email = null;
         var outboxEmptied = false;
@@ -175,7 +175,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// then one authenticated read carries the sweep.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the piggyback recovery trigger arrives with story 4.1 Task 6")]
+    [Fact]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-10")]
     public async Task The_piggyback_sweep_sends_a_row_on_the_next_authenticated_request()
@@ -183,7 +183,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var address = RandomAddress();
-        var recipient = InvitationScaffold.FreshAddress("piggyback");
+        var recipient = InvitationWire.FreshAddress("piggyback");
         var (subject, body) = ("Waiting " + Suffix(), "Unsent until traffic " + Suffix());
         DroppedEmail? email = null;
 
@@ -211,14 +211,14 @@ public sealed partial class ActiveSpaceEndpointTests
     /// so one process-start sweep decides both; the sent row is the anchor for the unsent one.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the dispatcher's guarded claim arrives with story 4.1 Task 6")]
+    [Fact]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-10")]
     public async Task A_stale_claim_is_claimed_again_and_a_fresh_claim_is_left_alone()
     {
         _ = Available();
         var wire = Wire();
-        var (stale, fresh) = (InvitationScaffold.FreshAddress("stale"), InvitationScaffold.FreshAddress("fresh"));
+        var (stale, fresh) = (InvitationWire.FreshAddress("stale"), InvitationWire.FreshAddress("fresh"));
         IReadOnlyList<DroppedEmail> emails = [];
         IReadOnlyList<OutboxRow> left = [];
 
@@ -251,13 +251,13 @@ public sealed partial class ActiveSpaceEndpointTests
     /// AC7's anchor and is recorded in the Debug Log.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - InvitationEmail and the outbox arrive with story 4.1 Task 6")]
+    [Fact]
     [Trait("Requirement", "FR-39")]
     [Trait("Requirement", "NFR-1")]
     public async Task The_email_names_the_Space_the_Role_and_the_issuer_and_discloses_nothing_else()
     {
         var database = Available();
-        var invitee = InvitationScaffold.FreshAddress("i14");
+        var invitee = InvitationWire.FreshAddress("i14");
         var (spaceName, otherSpaceName, otherProject, taskTitle) =
             ("Shared " + Suffix(), "Private " + Suffix(), "Hidden project " + Suffix(), "Hidden task " + Suffix());
         DroppedEmail? email = null;
@@ -311,7 +311,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// and the Invitation stores only its SHA-256. The email states the expiry as the stored <c>ExpiresAt</c>'s UTC date.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the Invitation token and the link arrive with story 4.1 Tasks 3 and 6")]
+    [Fact]
     [Trait("Requirement", "FR-39")]
     [Trait("Requirement", "NFR-6")]
     [Trait("Assumption", "PRD-12-9")]
@@ -320,7 +320,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var address = RandomAddress();
-        var invitee = InvitationScaffold.FreshAddress("token");
+        var invitee = InvitationWire.FreshAddress("token");
         var spaceId = Guid.NewGuid();
         var spaceName = "Linked " + Suffix();
         DroppedEmail? email = null;

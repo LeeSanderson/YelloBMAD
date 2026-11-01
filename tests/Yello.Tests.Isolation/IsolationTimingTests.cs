@@ -1,4 +1,5 @@
 using Xunit;
+using Yello.Contracts.Invitations;
 using Yello.Contracts.Spaces;
 using Yello.Tests.Shared;
 
@@ -89,7 +90,7 @@ public sealed class IsolationTimingTests(IsolationWorldFixture fixture) : IClass
     /// </summary>
     /// <param name="surface">The surface.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC5 - POST /spaces/{spaceId}/invitations is mapped by story 4.1 Task 5")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AR-28")]
@@ -99,13 +100,13 @@ public sealed class IsolationTimingTests(IsolationWorldFixture fixture) : IClass
         var world = fixture.World;
         var issuer = await world.NewActorAsync("Oi");
         var member = await world.NewActorAsync("Om");
-        var path = InvitationScaffold.InvitationsOf(issuer.SpaceId);
+        var path = InvitationRoutes.InvitationsOf(issuer.SpaceId);
 
         await world.Database.AddMembershipAsync(issuer.SpaceId, member.AccountId, "member");
 
         var verdict = await DurationIndistinguishability.CompareMeasuredAsync(
-            () => world.Host.ServerDurationOfAsync(() => issuer.SendAsync(surface, HttpMethod.Post, path, InvitationScaffold.Body(InvitationScaffold.FreshAddress("oracle"), "member"), headers: null)),
-            () => world.Host.ServerDurationOfAsync(() => issuer.SendAsync(surface, HttpMethod.Post, path, InvitationScaffold.Body(member.EmailAddress, "member"), headers: null)));
+            () => world.Host.ServerDurationOfAsync(() => issuer.SendAsync(surface, HttpMethod.Post, path, InvitationWire.Body(InvitationWire.FreshAddress("oracle"), "member"), headers: null)),
+            () => world.Host.ServerDurationOfAsync(() => issuer.SendAsync(surface, HttpMethod.Post, path, InvitationWire.Body(member.EmailAddress, "member"), headers: null)));
 
         TimingRecord.Add($"oracle (issue vs already-a-member) / {surface}: {verdict.Describe()}");
         Assert.False(verdict.AreIndistinguishable, $"{surface}: the oracle was not caught - {verdict.Describe()}");

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using Xunit;
+using Yello.Contracts.Invitations;
 using Yello.Contracts;
 using Yello.Contracts.Spaces;
 using Yello.Domain.Accounts;
@@ -17,7 +18,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// <remarks>
 /// <para>
 /// <b>Written as red-phase scaffolds by the story 4.1 ATDD run (2026-11-01).</b> Every case is skipped with the AC it
-/// waits for. The route, the problem types and the fixed values are <see cref="InvitationScaffold"/>'s until
+/// waits for. The route, the problem types and the fixed values are <see cref="InvitationWire"/>'s until
 /// <c>Yello.Contracts</c> holds them; emails are read from the Host's drop folder (<see cref="MailDrop"/>, assumed Q13
 /// (a) - the recording sender a Host started as a process allows).
 /// </para>
@@ -49,7 +50,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="issuer">The issuer's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - POST /spaces/{spaceId}/invitations is mapped by story 4.1 Task 5")]
+    [Theory]
     [InlineData(Role.Owner)]
     [InlineData(Role.Admin)]
     [Trait("Requirement", "FR-10")]
@@ -64,7 +65,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var displayName = DisplayName();
         var spaceId = Guid.NewGuid();
         var accountId = Guid.Empty;
-        var invited = OfferableRoles.ToDictionary(role => role, role => " " + InvitationScaffold.FreshAddress(role).ToUpperInvariant() + " ", StringComparer.Ordinal);
+        var invited = OfferableRoles.ToDictionary(role => role, role => " " + InvitationWire.FreshAddress(role).ToUpperInvariant() + " ", StringComparer.Ordinal);
         var answers = new List<WireResponse>();
         using var mail = new MailDrop();
 
@@ -108,7 +109,7 @@ public sealed partial class ActiveSpaceEndpointTests
             Assert.Equal(accountId, row.IssuedByAccountId);
             Assert.Equal(displayName, row.IssuerName);
             Assert.Equal(32, row.TokenHash.Length);
-            Assert.InRange(row.ExpiresAt, before.AddDays(InvitationScaffold.ExpiryDays), after.AddDays(InvitationScaffold.ExpiryDays));
+            Assert.InRange(row.ExpiresAt, before.AddDays(InvitationWire.ExpiryDays), after.AddDays(InvitationWire.ExpiryDays));
         }
 
         Assert.Equal(3, rows.Select(row => Convert.ToHexString(row.TokenHash)).Distinct(StringComparer.Ordinal).Count());
@@ -121,7 +122,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="role">The caller's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - the route and its RequiresCapability(IssueAndRevokeInvitations) arrive with story 4.1 Task 5")]
+    [Theory]
     [InlineData(Role.Member)]
     [InlineData(Role.Viewer)]
     [Trait("Requirement", "FR-10")]
@@ -131,7 +132,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var address = RandomAddress();
-        var invitee = InvitationScaffold.FreshAddress("refused");
+        var invitee = InvitationWire.FreshAddress("refused");
         var spaceId = Guid.NewGuid();
         var accountId = Guid.Empty;
         WireResponse? read = null;
@@ -164,7 +165,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal((spaceId, "InsufficientRole", "IssueAndRevokeInvitations"), (recorded.TargetSpaceId, recorded.Kind, recorded.Capability));
         Assert.Empty(await wire.InvitationsInAsync(spaceId));
         Assert.DoesNotContain(await wire.OutboxRowsAsync(), row => string.Equals(row.Recipient, invitee, StringComparison.OrdinalIgnoreCase));
-        Assert.Empty(await mail.ReadAllAsync());
+        Assert.DoesNotContain(await mail.ReadAllAsync(), email => string.Equals(email.To, invitee, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -173,7 +174,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// outbox row exists for the address.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - POST /spaces/{spaceId}/invitations is mapped by story 4.1 Task 5")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AR-10")]
     public async Task A_non_members_issue_is_the_boundary_404_and_nothing_is_written()
@@ -181,7 +182,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var address = RandomAddress();
-        var invitee = InvitationScaffold.FreshAddress("foreign");
+        var invitee = InvitationWire.FreshAddress("foreign");
         var foreign = Guid.NewGuid();
         var foreignName = "Foreign " + Suffix();
         var accountId = Guid.Empty;
@@ -209,7 +210,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Contains(await RefusalsOfAsync(database, accountId), row => row.TargetSpaceId == foreign && row.Kind == "CrossSpace");
         Assert.Empty(await wire.InvitationsInAsync(foreign));
         Assert.DoesNotContain(await wire.OutboxRowsAsync(), row => string.Equals(row.Recipient, invitee, StringComparison.OrdinalIgnoreCase));
-        Assert.Empty(await mail.ReadAllAsync());
+        Assert.DoesNotContain(await mail.ReadAllAsync(), email => string.Equals(email.To, invitee, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -219,7 +220,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="role">The submitted Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - the Role parse refusing owner arrives with story 4.1 Task 5")]
+    [Theory]
     [InlineData("owner")]
     [InlineData("superuser")]
     [InlineData("")]
@@ -231,7 +232,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var address = RandomAddress();
-        var (refusedInvitee, acceptedInvitee) = (InvitationScaffold.FreshAddress("owner"), InvitationScaffold.FreshAddress("anchor"));
+        var (refusedInvitee, acceptedInvitee) = (InvitationWire.FreshAddress("owner"), InvitationWire.FreshAddress("anchor"));
         var spaceId = Guid.NewGuid();
         WireResponse? refused = null;
         WireResponse? accepted = null;
@@ -249,7 +250,7 @@ public sealed partial class ActiveSpaceEndpointTests
         });
 
         Assert.True(refused?.StatusCode == HttpStatusCode.BadRequest, $"{refused?.StatusCode} {refused?.Body}");
-        Assert.Equal(InvitationScaffold.RoleNotOfferable, ProblemType(refused!));
+        Assert.Equal(ProblemTypes.RoleNotOfferable, ProblemType(refused!));
         Assert.Equal(HttpStatusCode.NoContent, accepted?.StatusCode);
 
         var rows = await wire.InvitationsInAsync(spaceId);
@@ -264,7 +265,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// characters.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the shared EmailAddressRule and the route arrive with story 4.1 Tasks 2 and 5")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     public async Task Any_plausible_address_is_invited_with_no_domain_restriction_and_no_Account_needed()
     {
@@ -273,7 +274,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var address = RandomAddress();
         var spaceId = Guid.NewGuid();
         var suffix = Guid.NewGuid().ToString("N");
-        var longest = new string('l', InvitationScaffold.EmailAddressMaxLength - "@example.test".Length - suffix.Length) + suffix + "@example.test";
+        var longest = new string('l', InvitationWire.EmailAddressMaxLength - "@example.test".Length - suffix.Length) + suffix + "@example.test";
         string[] invitees =
         [
             $"first.last+tag-{suffix}@mail.sub.example.co.uk",
@@ -298,7 +299,7 @@ public sealed partial class ActiveSpaceEndpointTests
             }
         });
 
-        Assert.Equal(InvitationScaffold.EmailAddressMaxLength, longest.Length);
+        Assert.Equal(InvitationWire.EmailAddressMaxLength, longest.Length);
         Assert.All(statuses, status => Assert.Equal(HttpStatusCode.NoContent, status));
         Assert.Equal(invitees.Order(StringComparer.Ordinal), (await wire.InvitationsInAsync(spaceId)).Select(row => row.EmailAddress).Order(StringComparer.Ordinal));
     }
@@ -310,7 +311,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// address in the same Space is <c>204</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the shared EmailAddressRule and the route arrive with story 4.1 Tasks 2 and 5")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     public async Task An_implausible_address_is_refused_400_and_nothing_is_written()
     {
@@ -318,7 +319,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var wire = Wire();
         var address = RandomAddress();
         var spaceId = Guid.NewGuid();
-        var anchor = InvitationScaffold.FreshAddress("plausible");
+        var anchor = InvitationWire.FreshAddress("plausible");
         string?[] implausible =
         [
             null,
@@ -331,7 +332,7 @@ public sealed partial class ActiveSpaceEndpointTests
             "a b@example.test",
             "tab\t@example.test",
             "zero​width@example.test",
-            new string('x', InvitationScaffold.EmailAddressMaxLength + 1 - "@example.test".Length) + "@example.test",
+            new string('x', InvitationWire.EmailAddressMaxLength + 1 - "@example.test".Length) + "@example.test",
         ];
         var refusals = new List<WireResponse>();
         WireResponse? accepted = null;
@@ -356,7 +357,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.All(refusals, refusal =>
         {
             Assert.True(refusal.StatusCode == HttpStatusCode.BadRequest, $"{refusal.StatusCode} {refusal.Body}");
-            Assert.Equal(InvitationScaffold.InvalidEmailAddress, ProblemType(refusal));
+            Assert.Equal(ProblemTypes.InvalidEmailAddress, ProblemType(refusal));
             Assert.DoesNotContain("example.test", refusal.Body, StringComparison.Ordinal);
         });
 
@@ -370,14 +371,14 @@ public sealed partial class ActiveSpaceEndpointTests
     /// is written. Anchor: a fresh address in the same Space is <c>204</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the Membership-in-this-Space read arrives with story 4.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     public async Task An_address_already_a_Member_of_this_Space_is_refused_409_already_a_member()
     {
         var database = Available();
         var wire = Wire();
         var (ownerAddress, memberAddress) = (RandomAddress(), RandomAddress());
-        var anchor = InvitationScaffold.FreshAddress("anchor");
+        var anchor = InvitationWire.FreshAddress("anchor");
         var spaceId = Guid.NewGuid();
         WireResponse? member = null;
         WireResponse? self = null;
@@ -402,7 +403,7 @@ public sealed partial class ActiveSpaceEndpointTests
         foreach (var refused in new[] { member, self })
         {
             Assert.True(refused?.StatusCode == HttpStatusCode.Conflict, $"{refused?.StatusCode} {refused?.Body}");
-            Assert.Equal(InvitationScaffold.AlreadyAMember, ProblemType(refused!));
+            Assert.Equal(ProblemTypes.AlreadyAMember, ProblemType(refused!));
         }
 
         Assert.Equal(HttpStatusCode.NoContent, accepted?.StatusCode);
@@ -415,7 +416,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// never on whether an Account exists anywhere.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - POST /spaces/{spaceId}/invitations is mapped by story 4.1 Task 5")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     [Trait("Requirement", "AD-23")]
     public async Task A_member_of_another_Space_is_invited_like_anyone_else()
@@ -450,7 +451,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// does not branch: each gets exactly one email, and the two emails are the same text once the token is set aside.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - POST /spaces/{spaceId}/invitations and the outbox arrive with story 4.1 Tasks 5 and 6")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     [Trait("Requirement", "AR-28")]
     [Trait("Requirement", "AD-23")]
@@ -458,7 +459,7 @@ public sealed partial class ActiveSpaceEndpointTests
     {
         var database = Available();
         var (ownerAddress, registered) = (RandomAddress(), RandomAddress());
-        var nobody = InvitationScaffold.FreshAddress("nobody");
+        var nobody = InvitationWire.FreshAddress("nobody");
         var spaceId = Guid.NewGuid();
         WireResponse? toNobody = null;
         WireResponse? toAccount = null;
@@ -498,7 +499,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>409 invitation-pending</c>; one row and one email exist.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - the actionable-pending read arrives with story 4.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     [Trait("Requirement", "AD-27")]
     public async Task A_live_pending_Invitation_for_the_same_address_is_refused_409_invitation_pending()
@@ -506,7 +507,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var address = RandomAddress();
-        var invitee = InvitationScaffold.FreshAddress("twice");
+        var invitee = InvitationWire.FreshAddress("twice");
         var spaceId = Guid.NewGuid();
         WireResponse? first = null;
         WireResponse? again = null;
@@ -527,9 +528,9 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.Equal(HttpStatusCode.NoContent, first?.StatusCode);
         Assert.True(again?.StatusCode == HttpStatusCode.Conflict, $"{again?.StatusCode} {again?.Body}");
-        Assert.Equal(InvitationScaffold.InvitationPending, ProblemType(again!));
+        Assert.Equal(ProblemTypes.InvitationPending, ProblemType(again!));
         Assert.Single(await wire.InvitationsInAsync(spaceId));
-        Assert.Single(await mail.ReadAllAsync());
+        Assert.Single(await mail.ReadAllAsync(), email => string.Equals(email.To, invitee, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -539,7 +540,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// never deleted (AD-27). Both seeded rows are the R12 method: <see cref="WireDatabase.AddInvitationAsync"/>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - the Invitation table and the shared actionable predicate arrive with story 4.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "FR-39")]
     [Trait("Requirement", "AR-31")]
     [Trait("Requirement", "AD-27")]
@@ -548,7 +549,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var address = RandomAddress();
-        var (lapsed, live) = (InvitationScaffold.FreshAddress("lapsed"), InvitationScaffold.FreshAddress("live"));
+        var (lapsed, live) = (InvitationWire.FreshAddress("lapsed"), InvitationWire.FreshAddress("live"));
         var spaceId = Guid.NewGuid();
         WireResponse? reissued = null;
         WireResponse? blocked = null;
@@ -573,7 +574,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.True(reissued?.StatusCode == HttpStatusCode.NoContent, $"{reissued?.StatusCode} {reissued?.Body}");
         Assert.Equal(HttpStatusCode.Conflict, blocked?.StatusCode);
-        Assert.Equal(InvitationScaffold.InvitationPending, ProblemType(blocked!));
+        Assert.Equal(ProblemTypes.InvitationPending, ProblemType(blocked!));
 
         var rows = await wire.InvitationsInAsync(spaceId);
 
@@ -587,7 +588,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// count of one is not a dispatcher that never ran.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - POST /spaces/{spaceId}/invitations and the outbox arrive with story 4.1 Tasks 5 and 6")]
+    [Fact]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-18")]
     public async Task A_replay_with_the_same_Idempotency_Key_writes_one_Invitation_and_sends_one_email()
@@ -595,7 +596,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var address = RandomAddress();
-        var (invitee, later) = (InvitationScaffold.FreshAddress("replayed"), InvitationScaffold.FreshAddress("later"));
+        var (invitee, later) = (InvitationWire.FreshAddress("replayed"), InvitationWire.FreshAddress("later"));
         var key = Guid.NewGuid().ToString("D");
         var spaceId = Guid.NewGuid();
         WireResponse? original = null;
@@ -625,7 +626,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal(original.Body, replay!.Body);
         Assert.Single(await wire.InvitationsInAsync(spaceId), row => row.EmailAddress == invitee);
         Assert.Single(emails, email => email.To == invitee);
-        Assert.Equal(2, emails.Count);
+        Assert.Single(emails, email => email.To == later);
     }
 
     /// <summary>
@@ -633,7 +634,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Invitation exists before the deletion.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the Invitation table and its ON DELETE CASCADE arrive with story 4.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "FR-7")]
     [Trait("Requirement", "FR-10")]
     public async Task Deleting_a_Space_deletes_its_Invitations()
@@ -641,7 +642,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var address = RandomAddress();
-        var invitee = InvitationScaffold.FreshAddress("cascade");
+        var invitee = InvitationWire.FreshAddress("cascade");
         var spaceId = Guid.NewGuid();
         var beforeDeletion = 0;
         WireResponse? deleted = null;
@@ -671,7 +672,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// log is the Host's (its listening line is in it), and the token is read from the email.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the route, the outbox and their log messages arrive with story 4.1 Tasks 5 and 6")]
+    [Fact]
     [Trait("Requirement", "NFR-6")]
     [Trait("Requirement", "AD-23")]
     public async Task Neither_the_invited_address_nor_the_token_reaches_the_Host_log()
@@ -679,7 +680,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var address = RandomAddress();
         var displayName = DisplayName();
-        var invitee = InvitationScaffold.FreshAddress("logged");
+        var invitee = InvitationWire.FreshAddress("logged");
         var spaceName = "Unlogged " + Suffix();
         var spaceId = Guid.NewGuid();
         DroppedEmail? email = null;
@@ -694,7 +695,7 @@ public sealed partial class ActiveSpaceEndpointTests
             await session.FetchAntiforgeryTokenAsync();
             Assert.Equal(HttpStatusCode.NoContent, (await IssueAsync(session, spaceId, invitee, "member")).StatusCode);
             Assert.Equal(HttpStatusCode.Conflict, (await IssueAsync(session, spaceId, invitee, "member")).StatusCode);
-            Assert.Equal(HttpStatusCode.BadRequest, (await IssueAsync(session, spaceId, InvitationScaffold.FreshAddress("owner"), "owner")).StatusCode);
+            Assert.Equal(HttpStatusCode.BadRequest, (await IssueAsync(session, spaceId, InvitationWire.FreshAddress("owner"), "owner")).StatusCode);
 
             email = await mail.WaitForEmailToAsync(invitee);
         });
@@ -712,7 +713,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>{emailAddress, role}</c>, and an <c>Idempotency-Key</c> when one is given.
     /// </summary>
     private static Task<WireResponse> IssueAsync(WireSession session, Guid spaceId, string? emailAddress, string? role, string? key = null) =>
-        session.SendWithHeadersAsync(HttpMethod.Post, InvitationScaffold.InvitationsOf(spaceId), InvitationScaffold.Body(emailAddress, role), KeyHeaders(key));
+        session.SendWithHeadersAsync(HttpMethod.Post, InvitationRoutes.InvitationsOf(spaceId), InvitationWire.Body(emailAddress, role), KeyHeaders(key));
 
     /// <summary>
     /// The raw-SQL helper on this class's own database.
@@ -724,7 +725,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     private static string TokenOf(DroppedEmail email)
     {
-        var link = ClientOrigin + InvitationScaffold.LinkPath;
+        var link = ClientOrigin + InvitationWire.LinkPath;
         var start = email.PlainText.IndexOf(link, StringComparison.Ordinal);
 
         Assert.True(start >= 0, $"The email carries no {link} link:\n{email.PlainText}");
@@ -741,7 +742,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     private static string WithoutToken(string plainText)
     {
-        var link = ClientOrigin + InvitationScaffold.LinkPath;
+        var link = ClientOrigin + InvitationWire.LinkPath;
         var start = plainText.IndexOf(link, StringComparison.Ordinal);
 
         if (start < 0)

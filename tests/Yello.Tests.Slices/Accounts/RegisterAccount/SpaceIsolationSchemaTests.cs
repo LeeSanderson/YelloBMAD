@@ -94,7 +94,7 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
     /// read-only test would never notice.
     /// </remarks>
     private static readonly string[] TablesThatCannotMove =
-        [SchemaNames.ProjectTable, SchemaNames.TaskTable, SchemaNames.LabelTable, SchemaNames.TaskLabelTable];
+        [SchemaNames.ProjectTable, SchemaNames.TaskTable, SchemaNames.LabelTable, SchemaNames.TaskLabelTable, SchemaNames.InvitationTable];
 
     [Fact]
     public async Task Every_Space_scoped_table_carries_a_filter_and_a_block_predicate()

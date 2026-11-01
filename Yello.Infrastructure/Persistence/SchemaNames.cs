@@ -84,6 +84,23 @@ public static class SchemaNames
     public static string TaskLabelTable => "TaskLabel";
 
     /// <summary>
+    /// The Invitation table (story 4.1). Space-scoped, and like <see cref="ProjectTable"/> its policy carries a BLOCK
+    /// predicate <c>AFTER UPDATE</c>, so no statement can move an Invitation to another Space.
+    /// </summary>
+    public static string InvitationTable => "Invitation";
+
+    /// <summary>
+    /// The unique index an Invitation is resolved through by its token's hash (story 4.1, Task 3; story 4.3 reads it).
+    /// </summary>
+    public static string InvitationTokenHashUniqueIndex => "UX_Invitation_TokenHash";
+
+    /// <summary>
+    /// The outbox (story 4.1, AD-10). <b>Not</b> Space-scoped: it has no Space column and carries no predicate - Lee's
+    /// Q6, a recorded AD-2 variance; see <c>OutboxMessage</c>.
+    /// </summary>
+    public static string OutboxMessageTable => "OutboxMessage";
+
+    /// <summary>
     /// The idempotency record (story 2.1, AD-18). Space-scoped: a stored response holds Space content.
     /// </summary>
     public static string IdempotencyRecordTable => "IdempotencyRecord";
@@ -205,5 +222,5 @@ public static class SchemaNames
     /// reader would have acted on.
     /// </remarks>
     public static IReadOnlyList<string> SpaceScopedTables { get; } =
-        [MembershipTable, StatusDefinitionTable, SpacePresenceTable, ProjectTable, IdempotencyRecordTable, TaskTable, LabelTable, TaskLabelTable];
+        [MembershipTable, StatusDefinitionTable, SpacePresenceTable, ProjectTable, IdempotencyRecordTable, TaskTable, LabelTable, TaskLabelTable, InvitationTable];
 }

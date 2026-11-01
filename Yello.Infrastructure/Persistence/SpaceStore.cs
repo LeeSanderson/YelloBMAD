@@ -24,10 +24,13 @@ namespace Yello.Infrastructure.Persistence;
 /// <b>The deletion is one statement, run under the <c>SpaceId</c> key alone</b> (story 3.3, AC10). The database's
 /// cascades do the rest - <c>Membership</c> (and through it <c>ApiToken</c>, so every Token bound to the Space goes in
 /// the same transaction: AD-6, FR-36), <c>Project</c> (and through it <c>Task</c> and <c>TaskLabel</c>),
-/// <c>StatusDefinition</c>, <c>Label</c>, <c>SpacePresence</c> and <c>IdempotencyRecord</c>. <c>Task → StatusDefinition</c>
+/// <c>StatusDefinition</c>, <c>Label</c>, <c>SpacePresence</c>, <c>IdempotencyRecord</c> and <c>Invitation</c> (story 4.1,
+/// Lee's Q1: cascade). <c>Task → StatusDefinition</c>
 /// and <c>TaskLabel → Label</c> are <c>NO ACTION</c>, which SQL Server checks at the end of the statement, after the
 /// cascades have emptied both sides; the populated-Space slice case proves it. Child rows are never deleted by hand.
-/// <c>AccessRefusal</c> carries no foreign key, so the refusals naming the Space outlive it (NFR-7).
+/// <c>AccessRefusal</c> carries no foreign key, so the refusals naming the Space outlive it (NFR-7); neither does
+/// <c>OutboxMessage</c>, so an invitation email still unsent when its Space is deleted is still delivered, and its link
+/// answers story 4.3's uniform "no longer valid".
 /// </para>
 /// <para>
 /// <b>The deletion takes the Space's Projects-per-Space lock first</b> (open question 4 (a)), as a Project creation's bound

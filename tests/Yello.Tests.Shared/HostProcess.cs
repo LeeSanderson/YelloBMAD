@@ -266,6 +266,13 @@ public static class HostProcess
         // applied after this and wins.
         startInfo.Environment["RateLimiting__PermitsPerWindow"] = "1000000";
 
+        // AN EMAIL SENDER, BY DEFAULT, FROM STORY 4.1 (AC11, the ATDD phase's Q13 (a)). The Host refuses to start with no
+        // sender rather than discard mail silently, and a process Host cannot be given a fake - so every Host these suites
+        // start drops its mail into a shared folder nobody reads. A case that reads mail passes its own MailDrop's
+        // settings, which are applied after this and win.
+        startInfo.Environment["Email__DropFolder"] = MailDrop.Unread;
+        startInfo.Environment["Email__Sender"] = MailDrop.Sender;
+
         foreach (var (key, value) in settings)
         {
             startInfo.Environment[key] = value;

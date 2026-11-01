@@ -7,6 +7,7 @@ using Yello.Domain.Accounts;
 using Yello.Domain.Spaces;
 using Yello.Domain.Statuses;
 using Yello.Infrastructure.ApiTokens;
+using Yello.Infrastructure.Email;
 using Yello.Infrastructure.Identity;
 using Yello.Infrastructure.Localisation;
 using Yello.Infrastructure.Persistence;
@@ -120,6 +121,11 @@ public static class InfrastructureServices
         // Its bound and its retention, registered beside it - split out only to keep this class's
         // dependencies within S1200's limit.
         services.AddSpaceBoundaryLimits();
+
+        // STORY 4.1: the outbox - its store on the request's unit of work, the post-commit signal the unit of work
+        // fires, and the dispatcher that sends after the commit, at process start and on inbound traffic, never on a
+        // timer. The sender itself is chosen by configuration in the Host (EmailServices.AddYelloEmailSender).
+        services.AddOutbox();
 
         return services;
     }

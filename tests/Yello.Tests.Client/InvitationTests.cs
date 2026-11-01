@@ -137,7 +137,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="role">The caller's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - the Invitations section (InvitationSection, SectionKey.Invitations) does not exist in Space settings yet")]
+    [Theory]
     [InlineData("owner")]
     [InlineData("admin")]
     [Trait("Requirement", "UX-DR27")]
@@ -169,7 +169,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="role">The lesser Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - the Invitations section does not exist yet, so the Admin anchor cannot find it")]
+    [Theory]
     [InlineData("member")]
     [InlineData("viewer")]
     [Trait("Requirement", "UX-DR27")]
@@ -213,7 +213,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="role">The caller's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - the Role picker of the invite form does not exist yet")]
+    [Theory]
     [InlineData("owner")]
     [InlineData("admin")]
     [Trait("Requirement", "FR-42")]
@@ -248,7 +248,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// checked when the form first renders. Anchored: the three radios are found first.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the Role picker of the invite form does not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     public async Task No_Role_is_chosen_when_the_invite_form_first_renders()
     {
@@ -274,7 +274,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// another name. The Space-name precedent (<c>SpaceCreateAndRenameTests</c>).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the invite form's email field does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR33")]
     public async Task The_email_field_is_an_email_input_that_no_browser_can_autofill()
     {
@@ -316,7 +316,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// <param name="choice">The radio chosen.</param>
     /// <param name="code">The Role code the body must carry.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC10 - the invite form does not exist yet, so nothing is posted to the invitations route")]
+    [Theory]
     [InlineData("Admin", "admin")]
     [InlineData("Member", "member")]
     [InlineData("Viewer", "viewer")]
@@ -364,7 +364,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// form.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the invite form does not exist yet, so there is no resend to reuse a key")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "NFR-5")]
     public async Task An_invitation_resent_after_no_answer_reuses_its_key()
@@ -409,7 +409,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// announcement naming the address turns this red.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the invite form does not exist yet, so there is no 204 to clear it or announce")]
+    [Fact]
     [Trait("Requirement", "UX-DR38")]
     [Trait("Requirement", "UX-DR25")]
     public async Task A_sent_invitation_clears_the_form_keeps_focus_and_announces_no_address()
@@ -459,7 +459,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// <param name="problemType">The refusal's problem type.</param>
     /// <param name="copy">The sentence expected beside the field.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC10 - the invite form does not exist yet, and neither does its already-a-member or invitation-pending copy")]
+    [Theory]
     [InlineData(AlreadyAMemberType, AlreadyAMemberCopy)]
     [InlineData(InvitationPendingType, PendingCopy)]
     [Trait("Requirement", "UX-DR37")]
@@ -496,7 +496,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// the Role group: inside its <c>fieldset</c> or named by its <c>aria-describedby</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the invite form does not exist yet, and neither does its role-not-offerable copy")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "UX-DR37")]
     public async Task A_role_not_offerable_refusal_is_said_beside_the_Role_group()
@@ -535,7 +535,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// <param name="copy">The sentence expected.</param>
     /// <param name="besideRole">Whether the sentence belongs beside the Role group (otherwise beside the email field).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC3 - the invite form and its client mirror of the email rule (and the no-Role check) do not exist yet")]
+    [Theory]
     [InlineData("valid", false, NoRoleCopy, true)]
     [InlineData("empty", true, InvalidAddressCopy, false)]
     [InlineData("no-at", true, InvalidAddressCopy, false)]
@@ -579,7 +579,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// section in the existing capability copy for <c>issue-and-revoke-invitations</c>, never as "Not available.".
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the invite form does not exist yet, so a 403 has nowhere to be said")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task A_403_on_the_issue_is_said_in_the_capability_copy()
     {
@@ -607,7 +607,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// "Not available.", with the invite form gone.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the invite form does not exist yet, so a 404 cannot reach OnSpaceRefused")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task A_404_on_the_issue_renders_the_Space_refusal_surface()
     {
@@ -636,7 +636,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     /// page does not. Anchored: the message is on screen before the probe runs.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the invite form does not exist yet, so there is nothing to reflow")]
+    [Fact]
     [Trait("Requirement", "UX-DR41")]
     [Trait("Requirement", "NFR-9")]
     public async Task The_invite_form_reflows_at_320px_and_never_scrolls_sideways()

@@ -606,7 +606,7 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC10 - the invite form (InvitationSection) does not exist in Space settings yet")]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "UX-DR40")]
@@ -616,7 +616,11 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
         var api = Seeded();
         const string section = "main .invitation-section";
 
-        var address = $"a.rather.long.local.part.for.an.invitee.{Guid.NewGuid():N}@a-long-subdomain.of.an.example.test";
+        // Corrected by the dev phase (story 4.1): the scaffold's 95-character address cannot fit any single-line input at
+        // 200% text at 1280px, and a native input scrolls its own text by design (the 2.3 Task-title precedent in
+        // deferred-work.md:20). An address of ordinary length is what the zoom case can judge; the long one is
+        // InvitationTests' 320px reflow case.
+        var address = $"invitee.{Guid.NewGuid().ToString("N")[..12]}@example.test";
         var (context, page) = await surface.OpenAsync(EnglishLocale);
 
         await using (context)

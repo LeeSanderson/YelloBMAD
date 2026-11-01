@@ -22,7 +22,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// predicate on <c>dbo.Invitation</c>, so a row cannot be read, written or moved under another Space's key.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the Invitations migration adds the table to the security policy in story 4.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AR-4")]
     public async Task The_Invitation_table_is_under_the_Space_policy_with_its_filter_and_both_block_predicates()
@@ -48,7 +48,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// removal), and has no foreign key to <c>Membership</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the Invitations migration creates the table and its foreign keys in story 4.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "FR-7")]
     [Trait("Requirement", "FR-12")]
     public async Task An_Invitation_cascades_from_its_Space_restricts_its_issuer_and_references_no_Membership()
@@ -71,7 +71,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// comparison is one function and one collation; <c>EmailAddress</c> holds 254 and <c>IssuerName</c> 128.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the Invitations migration creates the address columns in story 4.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "FR-10")]
     public async Task The_normalised_address_column_matches_the_Accounts_exactly()
     {
@@ -98,7 +98,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>SYSDATETIMEOFFSET()</c>, so the stamp and the shared predicate read one clock; no C# clock stamps it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - the ExpiresAt column default arrives with the Invitations migration, story 4.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "AR-31")]
     [Trait("Requirement", "AD-27")]
     [Trait("Assumption", "PRD-12-9")]
@@ -116,7 +116,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal("datetimeoffset", column[0]);
         Assert.Contains("sysdatetimeoffset", column[1], StringComparison.Ordinal);
         Assert.Contains("day", column[1], StringComparison.Ordinal);
-        Assert.Contains(InvitationScaffold.ExpiryDays.ToString(System.Globalization.CultureInfo.InvariantCulture), column[1], StringComparison.Ordinal);
+        Assert.Contains(InvitationWire.ExpiryDays.ToString(System.Globalization.CultureInfo.InvariantCulture), column[1], StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -125,7 +125,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// so such an index would block the reissue FR-39 requires.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - the Invitation indexes arrive with the Invitations migration, story 4.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "FR-39")]
     [Trait("Requirement", "AD-27")]
     public async Task The_token_hash_is_unique_and_no_unique_index_is_filtered_on_State()
@@ -153,7 +153,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// its rendered-content columns.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the OutboxMessage table arrives with the Invitations migration, story 4.1 Task 4")]
+    [Fact]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-10")]
     public async Task The_outbox_has_no_Space_column_no_policy_and_no_foreign_key()

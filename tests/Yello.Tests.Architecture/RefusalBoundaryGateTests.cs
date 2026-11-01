@@ -129,6 +129,7 @@ public sealed partial class RefusalBoundaryGateTests
         "Yello.Domain.Tasks.TaskItem",
         "Yello.Domain.Projects.Project",
         "Yello.Domain.Labels.Label",
+        "Yello.Domain.Invitations.Invitation",
     ];
 
     /// <summary>
@@ -430,6 +431,10 @@ public sealed partial class RefusalBoundaryGateTests
 
             // Story 2.4: the Label's foreign key to its Space, declared in the model and reading nothing.
             "Yello.Infrastructure.Persistence.Configurations.LabelConfiguration",
+
+            // Story 4.1: the Invitation's cascading foreign key to its Space (Lee's Q1), declared in the model and reading
+            // nothing.
+            "Yello.Infrastructure.Persistence.Configurations.InvitationConfiguration",
 
             // Story 3.1: the provisioning both registration and creation build a new Space through, its rows, and the
             // store that writes them and renames the resolved Space - which reads nothing, and whose one update is held

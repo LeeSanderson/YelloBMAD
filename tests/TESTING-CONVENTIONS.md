@@ -489,6 +489,33 @@ runs, so a container-backed class fails entirely when the runtime is down, inclu
 never touch a database — and the whole of AC4's duration guarantee is decided by the hasher, which
 needs no rows.
 
+## Outbox and email - added by story 4.1
+
+The Host sends mail through an outbox (AD-10): the row is written in the request's own transaction and sent after the
+commit, at process start, or on the next authenticated request. There is no timer.
+
+- **The recording sender is a folder, not a fake.** Every wire suite starts `Yello.Host` as a separate Production
+  process, so no test can swap a service in it. The Host's file-drop sender is the recording sender instead. It is
+  chosen whenever `Email:DropFolder` is set (story 4.1, Q13 (a)). A case that reads mail creates a `MailDrop` and passes
+  `mail.With(settings)` to `HostProcess.RunAsync`. `MailDrop.WaitForEmailToAsync(address)` waits on the file system with
+  a deadline, never a sleep. Each file is the exact JSON the Host would post to ACS.
+- **Every Host has a sender.** The Host refuses to start without one, so `HostProcess.CreateStartInfo` sets
+  `Email__DropFolder` to `MailDrop.Unread` and `Email__Sender` by default. An in-process Host (`HostRouteTable`) passes
+  the same two settings as arguments.
+- **Scope mail assertions to the case's own addresses.** Each Host sweeps the whole outbox of its database at start, so a
+  row another case left unsent (a seeded claim, for example) can land in any later case's drop. Assert "one email to
+  this address", never "one email".
+- **Same-transaction enqueue.** Prove it with a forced rollback after the enqueue: an `AFTER INSERT` trigger on
+  `IdempotencyRecord` that throws for the case's own key, dropped in a `finally`. Then assert no Invitation, no outbox row
+  and no email, and anchor it with a later issue that is sent.
+- **Seeding an unclaimed row.** `WireDatabase.AddOutboxRowAsync` writes a row as a crash leaves it, never claimed or
+  claimed n minutes ago by the database clock. The table has no policy and no Space column (Lee's Q6), so it needs no
+  session key. Seed it before the Host starts to test the process-start sweep, and after sign-in to test the piggyback
+  sweep on the next authenticated request.
+- **No timers.** `RefusalBoundaryGateTests.No_production_code_runs_on_a_timer_or_as_a_hosted_service` still holds. The
+  dispatcher is a singleton started by a commit, by `ApplicationStarted` or by request traffic.
+- **Never assert on the token or the address in a log except by absence.** Both are secrets in logs (NFR-6, I-17).
+
 ## EF Core migrations need a hand-editing pass
 
 `dotnet ef migrations add` scaffolds a migration that **fails this build**: `IDE0005`, `IDE0161`,

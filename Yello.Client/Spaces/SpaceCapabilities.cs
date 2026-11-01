@@ -12,7 +12,7 @@ namespace Yello.Client.Spaces;
 /// </para>
 /// <para>
 /// <b>The link's audience is defined in one place</b>: <see cref="PermitsSpaceSettings"/> is the union of the page's
-/// sections' predicates - the name section's and the Label section's - so the link is never offered where no section
+/// sections' predicates - the name section's, the Label section's, the Invitations section's and the delete section's - so the link is never offered where no section
 /// would render, nor withheld where one would. Held against the matrix by
 /// <c>RefusalBoundaryGateTests.The_clients_rename_predicate_agrees_with_the_capability_matrix</c> and
 /// <c>The_clients_Space_settings_predicate_is_the_union_of_its_sections</c>.
@@ -41,7 +41,13 @@ public static class SpaceCapabilities
     /// Whether a Role may reach Space settings: whether any of its sections would render for it.
     /// </summary>
     /// <param name="roleCode">The Role's stable code, from the active Space's answer.</param>
-    /// <returns><c>true</c> when the name section, the Label section or the delete section is offered to the Role.</returns>
+    /// <returns>
+    /// <c>true</c> when the name section, the Label section, the Invitations section (story 4.1) or the delete section is
+    /// offered to the Role.
+    /// </returns>
     public static bool PermitsSpaceSettings(string roleCode) =>
-        PermitsRenameSpace(roleCode) || LabelCapabilities.PermitsManageLabels(roleCode) || PermitsDeleteSpace(roleCode);
+        PermitsRenameSpace(roleCode)
+        || LabelCapabilities.PermitsManageLabels(roleCode)
+        || InvitationCapabilities.PermitsIssueInvitations(roleCode)
+        || PermitsDeleteSpace(roleCode);
 }

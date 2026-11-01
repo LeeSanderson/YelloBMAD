@@ -16,7 +16,7 @@ namespace Yello.Tests.Shared;
 /// recording sender, pointed at a folder the test owns.
 /// </para>
 /// <para>
-/// <b>Assumed for the dev phase, recorded in the ATDD checklist as Q13 (a):</b>
+/// <b>Q13 (a), taken by the dev phase (story 4.1) with a gate that no deployed configuration sets the drop folder:</b>
 /// <list type="bullet">
 /// <item>The sender is chosen by configuration: <c>ConnectionStrings:acs</c> present - the ACS adapter; otherwise
 /// <c>Email:DropFolder</c> present - the file-drop sender, in <b>any</b> environment (Development defaults it to a
@@ -25,9 +25,9 @@ namespace Yello.Tests.Shared;
 /// <item>The sender writes one <c>*.json</c> file per message, whole (written to a temporary name, then moved), holding
 /// exactly the body it would <c>POST</c> to ACS Email (<c>senderAddress</c>, <c>recipients.to[].address</c>,
 /// <c>content.subject</c>, <c>content.plainText</c>, optional <c>content.html</c>).</item>
-/// <item><see cref="HostProcess.CreateStartInfo"/> gains a default <c>Email__DropFolder</c>, or every Host-starting test
-/// in the solution fails at startup the moment AC11's "fails loudly" lands. A case that reads mail passes
-/// <see cref="Settings"/>, which is applied last and wins.</item>
+/// <item><see cref="HostProcess.CreateStartInfo"/> sets a default <c>Email__DropFolder</c> (<see cref="Unread"/>), or every
+/// Host-starting test in the solution would fail at startup now that AC11's "fails loudly" has landed. A case that reads
+/// mail passes <see cref="Settings"/>, which is applied last and wins.</item>
 /// </list>
 /// </para>
 /// </remarks>
@@ -49,6 +49,12 @@ public sealed class MailDrop : IDisposable
     /// The sender address the Host is configured with (AC11's non-secret <c>Email__Sender</c>).
     /// </summary>
     public static string Sender => "DoNotReply@yello.test";
+
+    /// <summary>
+    /// The folder every Host these suites start drops into unless the case passes a <see cref="MailDrop"/> of its own:
+    /// mail nobody reads.
+    /// </summary>
+    public static string Unread { get; } = Path.Combine(Path.GetTempPath(), "yello-mail-drop", "unread");
 
     /// <summary>
     /// The folder.

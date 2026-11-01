@@ -11,11 +11,13 @@ param appIdentityId string
 param migrateIdentityId string
 param keyVaultUri string
 param clientOrigin string
+param emailSender string
 param workspaceName string
 
 // Versionless secret URIs: a rotated secret is picked up by the next revision without editing this.
 var appSecretUrl = '${keyVaultUri}secrets/yello-app-connection'
 var migrateSecretUrl = '${keyVaultUri}secrets/yello-migrate-connection'
+var acsSecretUrl = '${keyVaultUri}secrets/yello-acs-connection'
 
 resource workspace 'Microsoft.OperationalInsights/workspaces@2023-09-01' existing = {
   name: workspaceName
@@ -73,6 +75,11 @@ resource host 'Microsoft.App/containerApps@2024-03-01' = {
           keyVaultUrl: appSecretUrl
           identity: appIdentityId
         }
+        {
+          name: 'yello-acs-connection'
+          keyVaultUrl: acsSecretUrl
+          identity: appIdentityId
+        }
       ]
     }
     template: {
@@ -104,6 +111,15 @@ resource host 'Microsoft.App/containerApps@2024-03-01' = {
             {
               name: 'ConnectionStrings__yello'
               secretRef: 'yello-app-connection'
+            }
+            {
+              // Story 4.1: outgoing mail through Azure Communication Services. The sender is plain configuration.
+              name: 'ConnectionStrings__acs'
+              secretRef: 'yello-acs-connection'
+            }
+            {
+              name: 'Email__Sender'
+              value: emailSender
             }
           ]
           // Both answered from process state, with no database round trip (AC6).

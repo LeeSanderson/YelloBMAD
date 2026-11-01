@@ -134,6 +134,73 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.ToTable("ApiToken", (string)null);
                 });
 
+            modelBuilder.Entity("Yello.Domain.Invitations.Invitation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("EmailAddress")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("DATEADD(day, 7, SYSDATETIMEOFFSET())");
+
+                    b.Property<Guid>("IssuedByAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("IssuerName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("NormalizedEmailAddress")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)")
+                        .UseCollation("Latin1_General_100_BIN2");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<Guid>("SpaceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("SpaceId");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<byte[]>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varbinary(32)")
+                        .IsFixedLength(false);
+
+                    b.HasKey("Id");
+
+                    b.HasAlternateKey("SpaceId", "Id");
+
+                    b.HasIndex("IssuedByAccountId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_Invitation_TokenHash");
+
+                    b.HasIndex("SpaceId", "NormalizedEmailAddress");
+
+                    b.ToTable("Invitation", (string)null);
+                });
+
             modelBuilder.Entity("Yello.Domain.Labels.Label", b =>
                 {
                     b.Property<Guid>("Id")
@@ -343,6 +410,45 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.ToTable("Task", (string)null);
                 });
 
+            modelBuilder.Entity("Yello.Infrastructure.Outbox.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Body")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTimeOffset?>("ClaimedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("EnqueuedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(64)");
+
+                    b.Property<string>("Recipient")
+                        .IsRequired()
+                        .HasMaxLength(254)
+                        .HasColumnType("nvarchar(254)");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasMaxLength(512)
+                        .HasColumnType("nvarchar(512)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("OutboxMessage", (string)null);
+                });
+
             modelBuilder.Entity("Yello.Infrastructure.Persistence.AccountIdempotencyRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -490,6 +596,21 @@ namespace Yello.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("BoundSpaceId", "AccountId")
                         .HasPrincipalKey("SpaceId", "AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Yello.Domain.Invitations.Invitation", b =>
+                {
+                    b.HasOne("Yello.Domain.Accounts.Account", null)
+                        .WithMany()
+                        .HasForeignKey("IssuedByAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Yello.Domain.Spaces.Space", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

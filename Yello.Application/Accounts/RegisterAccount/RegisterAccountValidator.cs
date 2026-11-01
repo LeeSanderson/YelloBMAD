@@ -1,4 +1,4 @@
-using System.Globalization;
+using Yello.Domain.Accounts;
 
 namespace Yello.Application.Accounts.RegisterAccount;
 
@@ -35,12 +35,6 @@ namespace Yello.Application.Accounts.RegisterAccount;
 /// </remarks>
 public static class RegisterAccountValidator
 {
-    /// <summary>
-    /// RFC 5321 caps an email path at 256 octets including the angle brackets, leaving 254 for
-    /// the address. Matches the column.
-    /// </summary>
-    private const int EmailAddressMaxLength = 254;
-
     /// <summary>
     /// Matches the display-name column.
     /// </summary>
@@ -86,11 +80,11 @@ public static class RegisterAccountValidator
         {
             failures.Add(RegisterAccountFailure.EmailAddressRequired);
         }
-        else if (command.EmailAddress.Trim().Length > EmailAddressMaxLength)
+        else if (command.EmailAddress.Trim().Length > EmailAddressRule.MaxLength)
         {
             failures.Add(RegisterAccountFailure.EmailAddressTooLong);
         }
-        else if (!IsPlausibleEmailAddress(command.EmailAddress.Trim()))
+        else if (!EmailAddressRule.IsPlausible(command.EmailAddress))
         {
             failures.Add(RegisterAccountFailure.EmailAddressMalformed);
         }
@@ -115,55 +109,6 @@ public static class RegisterAccountValidator
 
         return failures;
     }
-
-    /// <summary>
-    /// A deliberately shallow check: one <c>@</c>, something either side of it, and no
-    /// whitespace.
-    /// </summary>
-    /// <remarks>
-    /// <para>
-    /// <b>Shallow on purpose.</b> RFC 5322's grammar admits quoted local parts, comments and
-    /// bracketed address literals, and every "full" validating regular expression in circulation
-    /// rejects addresses that genuinely deliver. Since Yello sends no mail at all - there is no
-    /// email verification anywhere in the contract, and adding one would breach AD-23 by
-    /// creating an out-of-band enumeration oracle - the only thing a stricter rule could achieve
-    /// here is refusing a real person's real address.
-    /// </para>
-    /// <para>
-    /// Written as a scan rather than a regular expression so there is no pattern to backtrack:
-    /// this runs on unauthenticated input, before any cost is incurred.
-    /// </para>
-    /// <para>
-    /// <b>Shallow is not the same as blind, and the difference was found at code review on
-    /// 2026-09-10.</b> The rule used to refuse only whitespace, which let every invisible
-    /// character through: <c>a@b.com​</c>, <c>a@b.com﻿</c>, <c>a\0b@c.com</c> and
-    /// <c>a‮b@c.com</c> all passed, normalised to values distinct from the visible address,
-    /// and became separate Accounts for what a person reads as one address. Worse on the duplicate
-    /// path than the new-address one: an address that differs from a registered one only by an
-    /// invisible character is a <i>new</i> Account rather than a refusal, so nobody is told
-    /// anything is wrong. Rejecting the control and format categories is the narrowest rule that
-    /// closes it, and it refuses nothing a real address can contain - no deliverable address has
-    /// ever held a zero-width space.
-    /// </para>
-    /// </remarks>
-    private static bool IsPlausibleEmailAddress(string candidate)
-    {
-        var at = candidate.IndexOf('@', StringComparison.Ordinal);
-
-        return at > 0
-            && at == candidate.LastIndexOf('@')
-            && at < candidate.Length - 1
-            && !candidate.Any(IsNeverPartOfAnAddress);
-    }
-
-    /// <summary>
-    /// Characters no email address can contain: whitespace, the control category, and the format
-    /// category that carries the zero-width and bidirectional marks.
-    /// </summary>
-    private static bool IsNeverPartOfAnAddress(char character) =>
-        char.IsWhiteSpace(character)
-        || char.IsControl(character)
-        || char.GetUnicodeCategory(character) is UnicodeCategory.Format;
 }
 
 /// <summary>
