@@ -106,6 +106,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var wire = Wire();
         Invited? invited = null;
         InvitationRow? before = null;
+        InvitationRow? afterViews = null;
         var membershipsBefore = 0;
         var membershipsAfterViews = 0;
         var outboxBefore = 0;
@@ -132,6 +133,7 @@ public sealed partial class ActiveSpaceEndpointTests
             views.Add(await ViewAsync(invitee, invited.Token));
 
             membershipsAfterViews = (await MembershipsInAsync(database, invited.SpaceId)).Count;
+            afterViews = Assert.Single(await wire.InvitationsInAsync(invited.SpaceId));
             recordsAfterViews = await IdempotencyRecordCountAsync(database, invited.SpaceId);
 
             await invitee.FetchAntiforgeryTokenAsync();
@@ -146,6 +148,11 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal(before! with { State = "Accepted", TokenHash = after.TokenHash }, after);
         Assert.Equal(before.TokenHash, after.TokenHash);
         Assert.Equal(membershipsBefore, membershipsAfterViews);
+
+        // The row as the three views left it, before the accept overwrites State (code review of story 4.3): every column,
+        // State included, unchanged by a read.
+        Assert.Equal(before with { TokenHash = afterViews!.TokenHash }, afterViews);
+        Assert.Equal(before.TokenHash, afterViews.TokenHash);
         Assert.Equal(recordsBefore, recordsAfterViews);
         Assert.True(accepted?.StatusCode == HttpStatusCode.OK, $"{accepted?.StatusCode} {accepted?.Body}");
         Assert.Equal(membershipsBefore + 1, (await MembershipsInAsync(database, invited.SpaceId)).Count);

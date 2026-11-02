@@ -181,6 +181,22 @@ internal static partial class IsolationCases
         {
             Assumption = "PRD-12-9",
         },
+
+        // Code review of story 4.3: the accept's uniform 404 is held to the same floor and does the same work (the sentinel
+        // key, the lock on the sentinel's resource, the same screen), so it is timed as the view is. A Token is no
+        // credential on the accept (Lee's Q7 (a)), so that surface is the byte-identical 401.
+        new IsolationCase(
+            "ISO-TIMING-ACCEPT-INVITATION-NOT-VALID-SAME-DURATION", "I-7, I-13 (4.3 AC6; Lee's Q6 (a), Q7 (a))", IsolationVector.Timing, HttpMethod.Post, InvitationRoutes.Acceptance,
+            async world => await FiveStatesAsync(world, accept: true),
+            new Dictionary<IsolationSurface, Expectation>
+            {
+                [IsolationSurface.Session] = new NotValidIndistinguishable(),
+                [IsolationSurface.ApiToken] = new NoCredential(),
+            },
+            Runner: CaseRunner.Timing) with
+        {
+            Assumption = "PRD-12-9",
+        },
     ];
 
     /// <summary>

@@ -463,14 +463,26 @@ public sealed partial class ActiveSpaceEndpointTests
             withSession = await AcceptAsync(invitee, invited.Token);
         });
 
-        Assert.Equal(HttpStatusCode.Unauthorized, anonymous?.StatusCode);
-        Assert.Equal(anonymous!.StatusCode, withToken?.StatusCode);
-        Assert.Equal(anonymous.Body, withToken!.Body);
-        Assert.Equal(anonymous.HeaderNames, withToken.HeaderNames);
-        Assert.Equal(1, membershipsBeforeSession);
-        Assert.Equal("Pending", stateBeforeSession);
-        Assert.True(withSession?.StatusCode == HttpStatusCode.OK, $"The Session's anchor: {withSession?.StatusCode} {withSession?.Body}");
+        // Every assertion names what it saw (code review of story 4.3): the one full-run failure of this case could not be
+        // attributed to a step, because the bare Assert.Equal lines reported no response.
+        Assert.True(anonymous?.StatusCode == HttpStatusCode.Unauthorized, $"No credential: {Described(anonymous)}");
+        Assert.True(withToken?.StatusCode == HttpStatusCode.Unauthorized, $"A bearer Token: {Described(withToken)}");
+        Assert.True(string.Equals(anonymous.Body, withToken.Body, StringComparison.Ordinal), $"The two 401 bodies differ. No credential: {Described(anonymous)}. Token: {Described(withToken)}");
+        Assert.True(
+            anonymous.HeaderNames.SequenceEqual(withToken.HeaderNames, StringComparer.OrdinalIgnoreCase),
+            $"The two 401s' header names differ. No credential: {Described(anonymous)}. Token: {Described(withToken)}");
+        Assert.True(membershipsBeforeSession == 1, $"The invitee held {membershipsBeforeSession} Memberships before its Session accepted; only its Personal Space was expected.");
+        Assert.True(stateBeforeSession == "Pending", $"The Invitation was {stateBeforeSession} before the Session accepted.");
+        Assert.True(withSession?.StatusCode == HttpStatusCode.OK, $"The Session's anchor: {Described(withSession)}");
     }
+
+    /// <summary>
+    /// A response as a failure message states it: status, header names and body.
+    /// </summary>
+    private static string Described(WireResponse? response) =>
+        response is null
+            ? "no response"
+            : $"{response.StatusCode:D} [{string.Join(", ", response.HeaderNames)}] {response.Body}";
 
     /// <summary>
     /// AC4 ("loading a URL is never sufficient"), AD-28 - a <c>GET</c> on the accept route is <c>405</c> or the unmatched

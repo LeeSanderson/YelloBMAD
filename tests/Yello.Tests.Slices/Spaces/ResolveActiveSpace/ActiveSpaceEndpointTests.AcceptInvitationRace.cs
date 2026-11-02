@@ -93,6 +93,60 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
+    /// AC11, AD-18, code review of story 4.3 - a resend after a lost answer, overlapping the first send: two accepts under
+    /// the <b>same</b> <c>Idempotency-Key</c> both look the key up before the Space's Invitations lock and find nothing; held
+    /// on the lock until both are blocked, then released. The first accepts and records its <c>200</c>; the second, whose
+    /// screen then sees the Invitation accepted, replays that <c>200</c> - never the uniform "no longer valid" for an
+    /// Invitation its own Account has just accepted. One Membership; the row <c>Accepted</c>. Plant: no late look-up (the
+    /// second answers <c>404 invitation-not-valid</c>).
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AD-18")]
+    [Trait("Requirement", "AR-25")]
+    [Trait("Requirement", "FR-11")]
+    public async Task Two_accepts_under_one_key_held_on_the_Space_lock_both_answer_the_one_200()
+    {
+        var database = Available();
+        var wire = Wire();
+        Invited? invited = null;
+        WireResponse[] raced = [];
+
+        using var mail = new MailDrop();
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, mail.With(Configured), async client =>
+        {
+            invited = await InviteAsync(client, database, wire, mail, "raced-one-key", "member");
+
+            var invitee = await RegisteredAndSignedInAsync(client, invited.Invitee, DisplayName());
+
+            await invitee.FetchAntiforgeryTokenAsync();
+
+            var cancellationToken = TestContext.Current.CancellationToken;
+            var key = Guid.NewGuid().ToString("D");
+
+            await using var holder = await database.OpenForSpaceAsync(invited.SpaceId, cancellationToken);
+            await using var observer = await database.OpenWithoutSpaceContextAsync(cancellationToken);
+            await using var held = await holder.BeginTransactionAsync(cancellationToken);
+
+            await TakeApplicationLockAsync(holder, held, InvitationsLockOf(invited.SpaceId), cancellationToken);
+
+            var first = AcceptAsync(invitee, invited.Token, key);
+            var second = AcceptAsync(invitee, invited.Token, key);
+
+            await TaskWire.WaitUntilBlockedOnALockAsync(observer, 2, Task.WhenAll(first, second), cancellationToken);
+            await held.CommitAsync(cancellationToken);
+
+            raced = await Task.WhenAll(first, second);
+        });
+
+        Assert.All(raced, answer => Assert.True(answer.StatusCode == HttpStatusCode.OK, $"{answer.StatusCode} {answer.Body}"));
+        Assert.Equal(raced[0].Body, raced[1].Body);
+        Assert.Single(await MembershipsInAsync(database, invited!.SpaceId), row => row.AccountId != invited.OwnerId);
+        Assert.Equal("Accepted", Assert.Single(await wire.InvitationsInAsync(invited.SpaceId)).State);
+    }
+
+    /// <summary>
     /// AC5 race 2, AD-27, AD-28 - an accept racing a revoke that commits under it: the test holds the row set
     /// <c>Revoked</c> uncommitted, fires the accept, waits until it is blocked on the row, then commits. The accept's guarded
     /// <c>UPDATE</c> re-evaluates against the committed <c>Revoked</c>, matches no row, and answers the uniform <c>404</c>;

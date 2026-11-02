@@ -21,6 +21,8 @@ public sealed partial class InvitationView
     private InvitationOfferResponse? _offer;
     private string? _notice;
     private string? _acceptKey;
+    private string? _readToken;
+    private bool _joinOffered;
     private int _generation;
     private bool _focusHeading;
     private ElementReference _heading;
@@ -41,7 +43,7 @@ public sealed partial class InvitationView
     /// <summary>
     /// The offer is addressed to the Account this browser is signed in as (Lee's Q5 (a)): the join action is offered.
     /// </summary>
-    private bool IsAddressedToTheSession => _offer?.AddressedToYou == true;
+    private bool IsAddressedToTheSession => _offer?.AddressedToYou == true || _joinOffered;
 
     private string OfferHeading =>
         string.Format(CultureInfo.CurrentCulture, Localizer["InvitationOfferHeading"], _offer?.IssuerName, _offer?.SpaceName);
@@ -67,7 +69,30 @@ public sealed partial class InvitationView
     };
 
     /// <inheritdoc />
-    protected override Task OnParametersSetAsync() => ReadAsync();
+    /// <remarks>
+    /// Read once per token (code review of story 4.3): a parent re-render that supplies the same token again leaves the
+    /// page as it is, and a different token - a second link opened in the same tab - starts from nothing, so no key, form,
+    /// notice or typed field of one Invitation is carried to another.
+    /// </remarks>
+    protected override Task OnParametersSetAsync()
+    {
+        if (string.Equals(Token, _readToken, StringComparison.Ordinal))
+        {
+            return Task.CompletedTask;
+        }
+
+        _readToken = Token;
+        _joinOffered = false;
+        _acceptKey = null;
+        _form = InvitationOfferForm.None;
+        _notice = null;
+        _failureCodes = [];
+        _displayName = string.Empty;
+        _emailAddress = string.Empty;
+        _password = string.Empty;
+
+        return ReadAsync();
+    }
 
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -119,12 +144,18 @@ public sealed partial class InvitationView
     /// </summary>
     private async Task JoinAsync()
     {
+        // A second press before the page re-rendered its disabled button is not a second act.
+        if (IsBusy)
+        {
+            return;
+        }
+
         _notice = null;
         _work = InvitationWork.Joining;
 
         try
         {
-            await AcceptAsync();
+            _ = await AcceptAsync();
         }
         finally
         {
@@ -138,6 +169,11 @@ public sealed partial class InvitationView
     /// </summary>
     private async Task RegisterAndJoinAsync()
     {
+        if (IsBusy)
+        {
+            return;
+        }
+
         _notice = null;
         _failureCodes = [];
         _work = InvitationWork.CreatingAccount;
@@ -150,9 +186,15 @@ public sealed partial class InvitationView
                 return;
             }
 
+            // The Account exists and is signed in now: whatever the accept answers, the next press is a join, never a
+            // second registration (code review of story 4.3).
+            _form = InvitationOfferForm.None;
             _work = InvitationWork.Joining;
 
-            await AcceptAsync();
+            // Unanswered, or refused on the offer (the bound): the address matched or is not yet known, so the join
+            // action is offered, and a resend after no answer carries the key kept for it. A mismatch has left the offer
+            // for the different-Account state already.
+            _joinOffered = !await AcceptAsync() && _phase == InvitationViewPhase.Offer;
         }
         finally
         {
@@ -166,6 +208,11 @@ public sealed partial class InvitationView
     /// </summary>
     private async Task SignInAsync()
     {
+        if (IsBusy)
+        {
+            return;
+        }
+
         _notice = null;
         _work = InvitationWork.SigningIn;
 
@@ -192,7 +239,13 @@ public sealed partial class InvitationView
     /// </summary>
     private async Task SignOutAsync()
     {
+        if (IsBusy)
+        {
+            return;
+        }
+
         _work = InvitationWork.SigningOut;
+        _joinOffered = false;
 
         try
         {
@@ -240,7 +293,8 @@ public sealed partial class InvitationView
     /// The accept. A fresh key per press, kept only for an identical resend after an accept that got no answer (open
     /// question 11 (a)). Never optimistic: the page lands in the Space only after the <c>200</c>.
     /// </summary>
-    private async Task AcceptAsync()
+    /// <returns><c>true</c> when the accept was answered <c>200</c> and the page is landing in the Space.</returns>
+    private async Task<bool> AcceptAsync()
     {
         _acceptKey ??= Guid.NewGuid().ToString("D");
 
@@ -249,7 +303,7 @@ public sealed partial class InvitationView
         if (!answer.Answered)
         {
             _notice = Localizer[NotSentKey];
-            return;
+            return false;
         }
 
         // An answer: whatever it was, the next press is a new act with a new key.
@@ -258,10 +312,12 @@ public sealed partial class InvitationView
         if (answer.SpaceId is { } spaceId)
         {
             Joined(spaceId);
-            return;
+            return true;
         }
 
         Refused(answer.Problem);
+
+        return false;
     }
 
     /// <summary>

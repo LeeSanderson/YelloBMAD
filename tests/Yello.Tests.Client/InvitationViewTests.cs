@@ -430,6 +430,54 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// AC13, AD-18, code review of story 4.3 - after "Create an Account and join" has registered and signed in, an accept
+    /// that gets no answer says "Not sent." and offers "Join {Space}", not the registration form again: the resend is the
+    /// accept alone, under the same <c>Idempotency-Key</c>, and registration was sent exactly once. Anchor: the resend lands
+    /// in the joined Space.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AD-18")]
+    [Trait("Requirement", "AD-22")]
+    public async Task An_unanswered_accept_after_registering_offers_Join_and_never_registers_again()
+    {
+        var (api, token) = Offered(signedIn: false);
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenViewAsync(api, page, token);
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = CreateAndJoinAction, Exact = true }).ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await page.GetByLabel("Your name", new PageGetByLabelOptions { Exact = true }).FillAsync("New Person");
+            await page.GetByLabel("Email address", new PageGetByLabelOptions { Exact = true }).FillAsync(InvitedAddress);
+            await page.GetByLabel("Password", new PageGetByLabelOptions { Exact = true }).FillAsync("a-long-enough-password-1!");
+
+            var held = api.HoldAcceptAsync();
+
+            await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = CreateAndJoinAction, Exact = true }).ClickAsync();
+            await held;
+            api.ReleaseAcceptUnanswered();
+
+            await page.GetByText(NotSentCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var join = page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = JoinAction, Exact = true });
+
+            await join.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal(0, await page.GetByLabel("Your name", new PageGetByLabelOptions { Exact = true }).CountAsync());
+
+            await join.ClickAsync();
+            await WaitForPathAsync(page, $"/spaces/{Northwind:D}");
+
+            var keys = api.InvitationAccepts.Select(request => request.Header(Idempotency.HeaderName)).ToList();
+
+            Assert.Equal(2, keys.Count);
+            Assert.Single(keys.Distinct(StringComparer.Ordinal));
+            Assert.Single(api.Requests, request => request.Method == "POST" && request.Path == AccountRoutes.Register);
+        }
+    }
+
+    /// <summary>
     /// AC13, NFR-9, WCAG 1.4.10 - at 320 by 256 (1280 by 1024 at 400%) the offer reflows: no sideways page scroll and no
     /// element in <c>main</c> that scrolls sideways.
     /// </summary>

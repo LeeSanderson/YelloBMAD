@@ -133,7 +133,8 @@ internal static partial class ActiveSpaceResolution
 
                 if (UnitOfWorkResults.IsFailure(result))
                 {
-                    return result;
+                    return await InvitationIdempotency.LateReplayAsync(httpContext, logger, invitation, accountId, idempotent, cancellationToken).ConfigureAwait(false)
+                        ?? result;
                 }
 
                 // Not the request's token: the endpoint has finished, so a client that disconnects now must not decide
@@ -208,6 +209,42 @@ internal static partial class ActiveSpaceResolution
     /// </summary>
     private static class InvitationIdempotency
     {
+        /// <summary>
+        /// A refused accept whose <c>Idempotency-Key</c> was first used by a request that committed while this one waited on
+        /// the Space's Invitations lock (code review of story 4.3): both looked the key up before the lock and found
+        /// nothing, the first accepted and recorded its <c>200</c>, and this one's screen then saw the Invitation
+        /// accepted. Read again now that the lock is held - read committed snapshot sees what the first committed - and
+        /// replay the first answer instead of the uniform <c>404</c>, so a resend after a lost answer is never told the
+        /// Invitation it just accepted is no longer valid. <c>null</c> when there is no key or still no record.
+        /// </summary>
+        internal static async Task<object?> LateReplayAsync(
+            HttpContext httpContext,
+            ILogger logger,
+            InvitationContext invitation,
+            Guid accountId,
+            IdempotentRequest idempotent,
+            CancellationToken cancellationToken)
+        {
+            if (idempotent.Key is null || idempotent.Answer is not null)
+            {
+                return null;
+            }
+
+            var recorded = await httpContext.RequestServices.GetRequiredService<IIdempotencyStore>()
+                .FindAsync(accountId, idempotent.Key, cancellationToken)
+                .ConfigureAwait(false);
+
+            // The fingerprint taken before the endpoint read the body; a record for another body is the uniform refusal.
+            if (recorded is null || !string.Equals(recorded.Fingerprint, idempotent.Fingerprint, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            SpaceLog.IdempotentReplay(logger, invitation.SpaceId);
+
+            return IdempotentResponses.Replay(httpContext, recorded);
+        }
+
         /// <summary>
         /// Records a materialised success for the request's key, in the same unit of work as its effect.
         /// </summary>

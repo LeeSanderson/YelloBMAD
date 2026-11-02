@@ -67,6 +67,8 @@ public sealed partial class RefusalBoundaryGateTests
 
     private static readonly string[] SecretPropertyNames = ["Token", "Secret", "Plaintext"];
 
+    private static readonly string[] TokenIndexGetters = ["get_TokenHash", "get_InvitationId", "get_OfferedSpaceId"];
+
     /// <summary>
     /// AC4, AC9, AD-4, AD-25, Lee's Q4 (a) and Q7 (a) - the view is exactly <c>GET</c> on its path and the accept exactly
     /// <c>POST</c> on its; neither carries <c>{spaceId}</c> nor declares a Space capability (no Role is held by an invitee);
@@ -242,6 +244,17 @@ public sealed partial class RefusalBoundaryGateTests
             .ToList();
 
         Assert.True(others.Count == 0, "The policy-free token index is reached outside its named readers:\n" + string.Join('\n', others));
+
+        // Code review of story 4.3: the Invitation store may write the index (its setters) but never read it - no column
+        // of it, the hash or not, is read outside the configuration and the one reader (Lee's Q1 (a): "read by exactly one
+        // named type").
+        var columnReaders = TokenIndexGetters
+            .SelectMany(getter => RoleReaders(index.FullName!, getter))
+            .Where(type => type != configuration && type != reader && type != index.FullName && !type.EndsWith(".InvitationModel", StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(columnReaders.Count == 0, "The policy-free token index is read outside its one named reader:\n" + string.Join('\n', columnReaders));
     }
 
     /// <summary>
