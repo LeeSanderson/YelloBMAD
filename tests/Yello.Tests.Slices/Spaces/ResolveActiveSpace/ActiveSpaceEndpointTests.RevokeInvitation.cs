@@ -239,6 +239,75 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
+    /// Story 4.4 AC8 (ledger <c>deferred-work.md:758</c>) - 4.2 AC3's demotion arm through the product's own route: the issuer
+    /// joins as Admin through an Invitation at Admin, accepted (4.3), issues two Invitations, and is then demoted to Member by
+    /// the Owner through <c>PATCH .../memberships/{id}</c> (<c>200</c>), not through <see cref="WireDatabase.ChangeRoleAsync"/>.
+    /// The Owner still lists both with the issuer's name as captured at issue and revokes one (<c>204</c>); a second Admin,
+    /// who issued neither, revokes the other (<c>204</c>).
+    /// </summary>
+    /// <remarks>
+    /// <b>Written as a red-phase scaffold by the story 4.4 ATDD run (2026-11-02)</b>, beside the case it replaces, because the
+    /// raw-SQL original must stay green until the route exists. When this is green, the dev phase deletes
+    /// <see cref="An_Invitation_whose_issuer_was_demoted_stays_listed_and_revocable_by_any_Owner_or_Admin"/>, takes its name for
+    /// this case, updates the file remark (<c>:28-29</c>) and the ledger line. The removal arm stays 4.5's.
+    /// </remarks>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC8 - story 4.4 maps PATCH /api/v1/spaces/{spaceId}/memberships/{membershipId}; then this replaces the raw-SQL demotion arm")]
+    [Trait("Requirement", "FR-12")]
+    [Trait("Requirement", "FR-13")]
+    [Trait("Requirement", "AD-5")]
+    public async Task An_Invitation_whose_issuer_was_demoted_through_the_product_stays_listed_and_revocable_by_any_Owner_or_Admin()
+    {
+        var database = Available();
+        var wire = Wire();
+        var (ownerAddress, issuerAddress, otherAdminAddress) = (RandomAddress(), RandomAddress(), RandomAddress());
+        var issuerName = DisplayName();
+        var (first, second) = (InvitationWire.FreshAddress("demoted-1"), InvitationWire.FreshAddress("demoted-2"));
+        var spaceId = Guid.NewGuid();
+        var issuerId = Guid.Empty;
+        WireResponse? demoted = null;
+        WireResponse? listed = null;
+        WireResponse? byOwner = null;
+        WireResponse? byOtherAdmin = null;
+
+        using var mail = new MailDrop();
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, mail.With(Configured), async client =>
+        {
+            var owner = await SignedInAsync(client, ownerAddress);
+            await SeedNamedSpaceAsync(database, spaceId, "Demoted by PATCH " + Suffix(), await AccountIdOfAsync(database, ownerAddress), Role.Owner);
+
+            var issuer = await JoinedThroughTheProductAsync(client, wire, mail, (owner, spaceId), issuerAddress, issuerName, "admin");
+            issuerId = await AccountIdOfAsync(database, issuerAddress);
+            var otherAdmin = await JoinedThroughTheProductAsync(client, wire, mail, (owner, spaceId), otherAdminAddress, DisplayName(), "admin");
+
+            Assert.Equal(HttpStatusCode.NoContent, (await IssueAsync(issuer, spaceId, first, "member")).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await IssueAsync(issuer, spaceId, second, "viewer")).StatusCode);
+
+            await owner.FetchAntiforgeryTokenAsync();
+            demoted = await ChangeRoleOverWireAsync(owner, spaceId, (await wire.MembershipOfAsync(spaceId, issuerId)).Id, "member");
+
+            listed = await ListInvitationsAsync(owner, spaceId);
+            byOwner = await RevokeAsync(owner, spaceId, await InvitationIdOfAsync(wire, spaceId, first));
+
+            await otherAdmin.FetchAntiforgeryTokenAsync();
+            byOtherAdmin = await RevokeAsync(otherAdmin, spaceId, await InvitationIdOfAsync(wire, spaceId, second));
+        });
+
+        Assert.True(demoted?.StatusCode == HttpStatusCode.OK, $"The Owner's demotion through the product: {Described(demoted)}");
+        Assert.Equal("Member", (await wire.MembershipOfAsync(spaceId, issuerId)).Role);
+        Assert.True(listed?.StatusCode == HttpStatusCode.OK, Described(listed));
+        Assert.Equal(
+            [(first, issuerName), (second, issuerName)],
+            InvitationWire.ParseList(listed.Body).Where(row => row.EmailAddress == first || row.EmailAddress == second).Select(row => (row.EmailAddress, row.IssuerName)).OrderBy(row => row.EmailAddress == second));
+        Assert.True(byOwner?.StatusCode == HttpStatusCode.NoContent, Described(byOwner));
+        Assert.True(byOtherAdmin?.StatusCode == HttpStatusCode.NoContent, Described(byOtherAdmin));
+        Assert.All(
+            (await wire.InvitationsInAsync(spaceId)).Where(row => row.EmailAddress == first || row.EmailAddress == second),
+            row => Assert.Equal("Revoked", row.State));
+    }
+
+    /// <summary>
     /// AC3, FR-12, AD-5, Q12 (a), the removal arm - an Admin issues, and their Membership is then removed: the Invitation row
     /// is untouched by the removal, the Owner still lists it with the captured issuer name, and revokes it (<c>204</c>).
     /// </summary>

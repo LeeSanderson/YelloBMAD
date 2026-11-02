@@ -191,6 +191,11 @@ internal static partial class IsolationCases
         // ATDD run (2026-11-01) as PendingUntil "4.3" in IsolationCases.InvitationAcceptance.cs; GATE-003 fails the suite if
         // any is still pending when 4.3 reaches review.
         .. InvitationAcceptanceCases(),
+
+        // Story 4.4 - list Memberships and change a Role (AC9; I-1, I-2, I-3, I-4, I-11, I-12, I-13, I-17). Written by the
+        // story 4.4 ATDD run (2026-11-02) as PendingUntil "4.4" in IsolationCases.Memberships.cs; GATE-003 fails the suite if
+        // any is still pending when 4.4 reaches review.
+        .. MembershipCases(),
     ];
 
     /// <summary>

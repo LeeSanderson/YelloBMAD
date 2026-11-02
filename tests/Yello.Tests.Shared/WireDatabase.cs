@@ -686,6 +686,124 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// Every Membership in <paramref name="spaceId"/>, read under that Space's own key (the <c>Membership</c> FILTER
+    /// predicate), in join order - the database's view, independent of the Host's query filter. Story 4.4 (ATDD run): the
+    /// Membership ids the Role change names, and the stored Role a refused change must leave as it was.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>Its Memberships, ordered by <c>(CreatedAt, Id)</c>.</returns>
+    public async Task<IReadOnlyList<MembershipRow>> MembershipRowsInAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT Id, AccountId, Role, CreatedAt FROM dbo.[Membership] WHERE SpaceId = @space ORDER BY CreatedAt, Id";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+
+        var rows = new List<MembershipRow>();
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            rows.Add(new MembershipRow(reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), await reader.GetFieldValueAsync<DateTimeOffset>(3).ConfigureAwait(false)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// The one Membership <paramref name="accountId"/> holds in <paramref name="spaceId"/>. Story 4.4 (ATDD run).
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="accountId">The member.</param>
+    /// <returns>The row.</returns>
+    public async Task<MembershipRow> MembershipOfAsync(Guid spaceId, Guid accountId)
+    {
+        var rows = (await MembershipRowsInAsync(spaceId).ConfigureAwait(false)).Where(row => row.AccountId == accountId).ToList();
+
+        return rows.Count == 1
+            ? rows[0]
+            : throw new InvalidOperationException($"Expected one Membership for {accountId} in {spaceId}; found {rows.Count}.");
+    }
+
+    /// <summary>
+    /// The S-2 invariant (<c>test-design-qa.md:319</c>; AR-12, AD-5), story 4.4 (ATDD run): for each of
+    /// <paramref name="spaceIds"/> that still exists, the number of Owner Memberships it holds, read under that Space's own
+    /// key, reported only when it is not exactly one. <c>Space</c> carries no policy, so its existence is read without a
+    /// key. Scoped to the case's Spaces rather than the whole database: the class's database is shared by every partial of
+    /// <c>ActiveSpaceEndpointTests</c>, and earlier stories' cases deliberately leave Spaces with no Owner
+    /// (<c>ChangeRoleAsync</c> on a Personal Space's Owner; the 1.9 and 3.4 rows). Recorded as a deviation in the 4.4 ATDD
+    /// checklist.
+    /// </summary>
+    /// <param name="spaceIds">The Spaces the case touched.</param>
+    /// <returns>"space: n Owners" for each Space that breaks the invariant; empty when it holds.</returns>
+    public Task<IReadOnlyList<string>> SpacesNotHoldingExactlyOneOwnerAsync(IEnumerable<Guid> spaceIds)
+    {
+        ArgumentNullException.ThrowIfNull(spaceIds);
+
+        return SpacesNotHoldingExactlyOneOwnerCoreAsync(spaceIds);
+    }
+
+    private async Task<IReadOnlyList<string>> SpacesNotHoldingExactlyOneOwnerCoreAsync(IEnumerable<Guid> spaceIds)
+    {
+        var broken = new List<string>();
+
+        foreach (var spaceId in spaceIds.Distinct())
+        {
+            var exists = Convert.ToInt32(
+                await ScalarAsync("SELECT COUNT(*) FROM dbo.[Space] WHERE Id = @space", ("@space", spaceId)).ConfigureAwait(false),
+                System.Globalization.CultureInfo.InvariantCulture);
+
+            if (exists == 0)
+            {
+                continue;
+            }
+
+            var owners = (await MembershipRowsInAsync(spaceId).ConfigureAwait(false)).Count(row => row.Role == "Owner");
+
+            if (owners != 1)
+            {
+                broken.Add($"{spaceId:D}: {owners} Owners");
+            }
+        }
+
+        return broken;
+    }
+
+    /// <summary>
+    /// Sets an Account's display name directly. <c>Account</c> carries no policy. No product route renames an Account (story
+    /// 4.4 "not in this story"); story 4.4 (ATDD run) uses this only to show the Membership list reads the name live (Lee's
+    /// Q5 (a)). <c>DisplayName</c> is <c>nvarchar(128)</c>, not null: the caller passes a short, non-empty name.
+    /// </summary>
+    /// <param name="accountId">The Account.</param>
+    /// <param name="displayName">The new name.</param>
+    /// <returns>A task.</returns>
+    public Task SetDisplayNameAsync(Guid accountId, string displayName)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(displayName);
+
+        return SetDisplayNameCoreAsync(accountId, displayName);
+    }
+
+    private async Task SetDisplayNameCoreAsync(Guid accountId, string displayName)
+    {
+        await using var connection = await OpenAsync().ConfigureAwait(false);
+
+        var changed = await ExecuteAsync(
+            connection,
+            null,
+            "UPDATE dbo.[Account] SET DisplayName = @name WHERE Id = @account",
+            ("@name", displayName),
+            ("@account", accountId)).ConfigureAwait(false);
+
+        if (changed != 1)
+        {
+            throw new InvalidOperationException($"Expected to rename one Account; renamed {changed}.");
+        }
+    }
+
+    /// <summary>
     /// How many Accounts are registered with exactly <paramref name="emailAddress"/>. <c>Account</c> carries no policy.
     /// Story 4.3 (ATDD run): AC8's "no second Account".
     /// </summary>
@@ -990,6 +1108,15 @@ public sealed record InvitationRow(
     string IssuerName,
     DateTimeOffset CreatedAt);
 #pragma warning restore CA1819
+
+/// <summary>
+/// One <c>dbo.[Membership]</c> row as the database holds it. Story 4.4 (ATDD run).
+/// </summary>
+/// <param name="Id">The Membership's id - the Role change names it.</param>
+/// <param name="AccountId">The member.</param>
+/// <param name="Role">The stored Role: its name, for example <c>Owner</c> (<c>HasConversion&lt;string&gt;</c>).</param>
+/// <param name="CreatedAt">When it was created - the list's keyset leads with it.</param>
+public sealed record MembershipRow(Guid Id, Guid AccountId, string Role, DateTimeOffset CreatedAt);
 
 /// <summary>
 /// One <c>dbo.[OutboxMessage]</c> row as Lee's Q6 shapes it: rendered at enqueue, no Space column, deleted on send.

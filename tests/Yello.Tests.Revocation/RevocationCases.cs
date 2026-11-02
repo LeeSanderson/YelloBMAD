@@ -1,9 +1,12 @@
 using System.Net;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.ApiTokens;
+using Yello.Contracts.Invitations;
+using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
 using Yello.Tests.Shared;
 
@@ -29,6 +32,12 @@ namespace Yello.Tests.Revocation;
 internal static class RevocationCases
 {
     private const string CrossSpace = "CrossSpace";
+
+    /// <summary>
+    /// The Owner's Space, as each <c>REV-ROLE-CHANGED-BY-OWNER</c> run's actor sees it after joining: its Session and a Token
+    /// bound there. Story 4.4 (ATDD run).
+    /// </summary>
+    private static readonly ConditionalWeakTable<RevocationContext, ProductActor> Joined = new();
 
     /// <summary>
     /// Every revocation case.
@@ -85,6 +94,16 @@ internal static class RevocationCases
             "REV-ROLE-CHANGED", "I-10, NFR-2",
             Both(new RevocationStep(context => context.World.Database.ChangeRoleAsync(context.Actor.SpaceId, context.Actor.AccountId, "viewer"), new ServedAtRole("viewer")))),
 
+        // Story 4.4's row (AC6, V-1; the 3.3 REV-SPACE-DELETED-BY-OWNER precedent): the Owner demotes an Admin to Member
+        // through the product's PATCH - the endpoint-driven twin of REV-ROLE-CHANGED, which stays as the raw-SQL proof.
+        new(
+            "REV-ROLE-CHANGED-BY-OWNER", "I-10, NFR-2, V-1 (4.4 AC6)",
+            Both(new RevocationStep(AdminDemotedByTheOwnerAsync, new GovernedAsMember())))
+        {
+            Assumption = "PRD-12-4",
+            Skip = "red: AC6 - story 4.4 maps PATCH /api/v1/spaces/{spaceId}/memberships/{membershipId} (Q9 (a)); the row joins through 4.3's accept",
+        },
+
         new(
             "REV-ROLLED-BACK-REMOVAL", "V-3 (negative anchor)",
             Both(new RevocationStep(context => context.World.Database.RemoveMembershipAsync(context.Actor.SpaceId, context.Actor.AccountId, commit: false), new ServedAtRole("owner")))),
@@ -112,7 +131,7 @@ internal static class RevocationCases
     public static IEnumerable<TheoryDataRow<string, IsolationSurface>> CrossProduct =>
         All.SelectMany(@case => Enum.GetValues<IsolationSurface>().Select(surface =>
         {
-            var row = new TheoryDataRow<string, IsolationSurface>(@case.Id, surface) { TestDisplayName = $"{@case.Id} / {surface}" };
+            var row = new TheoryDataRow<string, IsolationSurface>(@case.Id, surface) { TestDisplayName = $"{@case.Id} / {surface}", Skip = @case.Skip };
 
             // A case resting on an unresolved assumption carries it as a trait on each surface's row (story 3.4, AC14).
             return @case.Assumption is { } assumption ? row.WithTrait("Assumption", assumption) : row;
@@ -143,6 +162,51 @@ internal static class RevocationCases
     /// </summary>
     private static async Task OwnerDeletesTheSpaceAsync(RevocationContext context) =>
         Assert.Equal(HttpStatusCode.NoContent, (await context.Actor.SendAsync(IsolationSurface.Session, HttpMethod.Delete, SpaceRoutes.ActiveOf(context.Actor.SpaceId))).StatusCode);
+
+    /// <summary>
+    /// Story 4.4 - a fresh Owner invites the row's actor at Admin through 4.1's route; the actor accepts through 4.3's route
+    /// and issues itself a Token bound to the Owner's Space; both surfaces list the Space's Invitations (<c>200</c>, the
+    /// anchor: the Admin held the capability); then the Owner demotes it to Member through <c>PATCH .../memberships/{id}</c>
+    /// (<c>200</c>). Both Accounts' addresses and names, and the Invitation token, are held as secrets (I-17).
+    /// </summary>
+    private static async Task AdminDemotedByTheOwnerAsync(RevocationContext context)
+    {
+        var (world, actor) = (context.World, context.Actor);
+        var owner = await world.NewActorAsync();
+
+        actor.HoldsSecret(actor.EmailAddress);
+        actor.HoldsSecret(actor.DisplayName);
+        owner.HoldsSecret(owner.EmailAddress);
+        owner.HoldsSecret(owner.DisplayName);
+
+        var issued = await owner.SendAsync(IsolationSurface.Session, HttpMethod.Post, InvitationRoutes.InvitationsOf(owner.SpaceId), InvitationWire.Body(actor.EmailAddress, "admin"), headers: null);
+
+        Assert.True(issued.StatusCode == HttpStatusCode.NoContent, $"Issuing through the product: {issued.StatusCode} {issued.Body}");
+
+        var token = InvitationWire.TokenIn(await world.Mail.WaitForEmailToAsync(actor.EmailAddress));
+
+        owner.HoldsSecret(token);
+
+        var accepted = await actor.SendAsync(IsolationSurface.Session, HttpMethod.Post, InvitationRoutes.Acceptance, InvitationWire.AcceptBody(token), headers: null);
+
+        Assert.True(accepted.StatusCode == HttpStatusCode.OK, $"Accepting through the product: {accepted.StatusCode} {accepted.Body}");
+
+        var view = actor.InSpace(owner.SpaceId, owner.SpaceName, await actor.IssueTokenAsync(owner.SpaceId, "rev-admin"));
+
+        foreach (var surface in Enum.GetValues<IsolationSurface>())
+        {
+            var anchor = await view.SendAsync(surface, HttpMethod.Get, InvitationRoutes.InvitationsOf(owner.SpaceId));
+
+            Assert.True(anchor.StatusCode == HttpStatusCode.OK, $"As Admin, {surface} lists the Invitations before the change: {anchor.StatusCode} {anchor.Body}");
+        }
+
+        var membership = await world.Database.MembershipOfAsync(owner.SpaceId, actor.AccountId);
+        var demoted = await owner.SendAsync(IsolationSurface.Session, HttpMethod.Patch, MembershipWire.MembershipOf(owner.SpaceId, membership.Id), MembershipWire.ChangeBody("member"), headers: null);
+
+        Assert.True(demoted.StatusCode == HttpStatusCode.OK, $"The Owner's demotion through the product: {demoted.StatusCode} {demoted.Body}");
+
+        Joined.AddOrUpdate(context, view);
+    }
 
     private static async Task RevokeOwnTokenAsync(RevocationContext context) =>
         Assert.Equal(HttpStatusCode.NoContent, (await context.Actor.Session.DeleteAsync(ApiTokenRoutes.RevokeOf(context.Actor.TokenId))).StatusCode);
@@ -243,6 +307,30 @@ internal static class RevocationCases
     }
 
     /// <summary>
+    /// Story 4.4 - after <see cref="AdminDemotedByTheOwnerAsync"/>, the very next request on the surface is governed by the new
+    /// Role: listing the Owner's Space's Invitations is <c>403 insufficient-role</c> naming
+    /// <c>issue-and-revoke-invitations</c>, and the actor's own write - a Project created there - still succeeds (<c>201</c>).
+    /// Read per request, nothing cached (NFR-2).
+    /// </summary>
+    private sealed record GovernedAsMember() : NextAnswer("403 on the Invitations list, 201 on a Project create: governed as Member")
+    {
+        public override async Task VerifyAsync(RevocationContext context, IsolationSurface surface)
+        {
+            Assert.True(Joined.TryGetValue(context, out var view), "The event recorded no joined view of the Owner's Space.");
+
+            var refused = await view.SendAsync(surface, HttpMethod.Get, InvitationRoutes.InvitationsOf(view.SpaceId));
+
+            Assert.True(refused.StatusCode == HttpStatusCode.Forbidden, $"{surface}: the very next Invitations list answered {refused.StatusCode} {refused.Body}");
+            Assert.Contains(ProblemTypes.InsufficientRole, refused.Body, StringComparison.Ordinal);
+            Assert.Contains(InvitationWire.CapabilityCode, refused.Body, StringComparison.Ordinal);
+
+            var written = await view.SendAsync(surface, HttpMethod.Post, ProjectRoutes.ListIn(view.SpaceId));
+
+            Assert.True(written.StatusCode == HttpStatusCode.Created, $"{surface}: a Member's Project create answered {written.StatusCode} {written.Body}");
+        }
+    }
+
+    /// <summary>
     /// The anchor for Lee's decision 2: the Session's own sign-out answers <c>204</c> and stamps.
     /// </summary>
     private sealed record SignOutStamps() : NextAnswer("sign-out with the Session: 204, SessionsValidAfter stamped")
@@ -287,6 +375,12 @@ internal sealed record RevocationCase(string Id, string TestDesignId, IReadOnlyD
     /// each surface's generated row (story 3.4, AC14), or <c>null</c>.
     /// </summary>
     public string? Assumption { get; init; }
+
+    /// <summary>
+    /// A red-phase skip reason (story 4.4's ATDD run): the row is generated on every surface but skipped with this reason
+    /// until its story's route exists, or <c>null</c> for a live row.
+    /// </summary>
+    public string? Skip { get; init; }
 }
 
 /// <summary>

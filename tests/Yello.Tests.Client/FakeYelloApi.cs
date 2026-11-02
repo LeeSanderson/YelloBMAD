@@ -739,6 +739,13 @@ internal sealed partial class FakeYelloApi
             return acceptance;
         }
 
+        // Story 4.4 - the Membership list and the Role change (FakeYelloApi.Memberships.cs). Both fell to the unmatched 404
+        // before, and no earlier case sends either.
+        if (await MembershipAsync(request).ConfigureAwait(false) is { } membership)
+        {
+            return membership;
+        }
+
         switch (request.Method, request.Path)
         {
             case ("OPTIONS", _):

@@ -29,12 +29,20 @@ internal sealed class RevocationWorld : IAsyncDisposable
 
     private readonly List<ProductActor> _actors = [];
 
-    private RevocationWorld(SqlServerEngine engine, RunningHost host, WireDatabase database)
+    private RevocationWorld(SqlServerEngine engine, RunningHost host, WireDatabase database, MailDrop mail)
     {
         _engine = engine;
         Host = host;
         Database = database;
+        Mail = mail;
     }
+
+    /// <summary>
+    /// The Host's mail drop. Added by the story 4.4 ATDD run for <c>REV-ROLE-CHANGED-BY-OWNER</c>: an Invitation's token
+    /// exists in plaintext only in its email, and the row's actor joins the Owner's Space through one (the
+    /// <c>IsolationWorld.Mail</c> precedent, 4.3). Rows written before 4.4 read no mail.
+    /// </summary>
+    public MailDrop Mail { get; }
 
     /// <summary>
     /// The Host.
@@ -59,6 +67,7 @@ internal sealed class RevocationWorld : IAsyncDisposable
     public static async Task<RevocationWorld> StartAsync(SqlServerEngine engine)
     {
         var connectionString = await engine.CreateDatabaseAsync(TestContext.Current.CancellationToken);
+        var mail = new MailDrop();
 
         try
         {
@@ -67,10 +76,11 @@ internal sealed class RevocationWorld : IAsyncDisposable
                 await context.Database.MigrateAsync(TestContext.Current.CancellationToken);
             }
 
-            return new RevocationWorld(engine, await RunningHost.StartAsync(connectionString), new WireDatabase(connectionString));
+            return new RevocationWorld(engine, await RunningHost.StartAsync(connectionString, mail.Settings), new WireDatabase(connectionString), mail);
         }
         catch
         {
+            mail.Dispose();
             await engine.DropDatabaseAsync(connectionString);
             throw;
         }
@@ -107,6 +117,7 @@ internal sealed class RevocationWorld : IAsyncDisposable
         }
         finally
         {
+            Mail.Dispose();
             await _engine.DropDatabaseAsync(Database.ConnectionString);
         }
     }

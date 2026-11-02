@@ -488,6 +488,54 @@ No new package. Use:
 
 No web research was needed or run: every API used is already in the codebase.
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-4-4-manage-memberships-and-roles.md` (decisions per Q, seed constraints
+checked, findings). Written by the ATDD run of 2026-11-02 against Lee's Q1-Q5 (a) and Q6-Q19 at their recommendations. Every
+scaffold is `Skip = "red: AC<n> - ..."`, every isolation row `PendingUntil: "4.4"`. Route and problem-type stand-ins live in
+`tests/Yello.Tests.Shared/MembershipWire.cs` (`ListRoute`, `MembershipRoute`, `MembershipsOf`, `MembershipOf`,
+`OwnerRoleFixedProblemType`, `RoleNotAssignableProblemType`); Task 3 swaps every use for `MembershipRoutes`/`ProblemTypes` and
+deletes the six.
+
+| File | Cases | ACs | Green today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ListMemberships.cs` | 5 | AC1, AC2, AC7 | none |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ChangeMembershipRole.cs` | 24 (14 methods) | AC4, AC5, AC6, AC11 | `A_second_Owner_fails_2601_on_the_filtered_index_while_an_Admin_update_of_the_same_row_succeeds` |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ChangeMembershipRoleRace.cs` | 3 | AC11 (races 1-3) | `An_acceptance_answers_while_the_Spaces_Memberships_lock_is_held` (race 3) |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RevokeInvitation.cs` (one added) | 1 | AC8 (twin of the raw-SQL demotion arm; delete the original when green) | none |
+| `tests/Yello.Tests.Slices/Memberships/MembershipLabelsTests.cs` | 7 (5 methods, reflection until Task 3) | AC3 | none |
+| `tests/Yello.Tests.Isolation/IsolationCases.Memberships.cs` (spread in `IsolationCases.Invitations.cs`) | 11 rows, pending | AC9 (AC1, AC4) | n/a |
+| `tests/Yello.Tests.Revocation/RevocationCases.cs` (`REV-ROLE-CHANGED-BY-OWNER`; `RevocationWorld` gained `Mail`, `RevocationCase` gained `Skip`) | 1 row x 2 surfaces | AC6 (V-1) | none |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Memberships.cs` | 14 | AC1, AC2, AC4, AC5, AC7, AC10 | `Only_the_Membership_list_and_the_Invitation_list_carry_an_email_address`, `Only_named_types_read_an_Accounts_email_address`, `Attribution_never_reads_a_live_Account_name`, and their two detector oracles |
+| `tests/Yello.Tests.Client/MembershipSectionTests.cs` (+ `FakeYelloApi.Memberships.cs`) | 13 methods (19 cases) | AC10 (AC1-AC4), ledger `:546`, `:550`, `:762` | none |
+
+Harness added (no product code): `WireDatabase.MembershipRowsInAsync`/`MembershipOfAsync`/`SpacesNotHoldingExactlyOneOwnerAsync`
+(S-2, scoped to the case's Spaces because the class database is shared)/`SetDisplayNameAsync`. The green-today cases are standing
+regression gates: leave them active. The existing no-cache gate is `SpaceResolutionSeamTests.No_production_code_introduces_a_cache`.
+
+**Activation order (riskiest assumption first):**
+
+1. `An_Admin_demoted_while_its_change_is_queued_is_refused_403_and_the_target_is_unchanged` - the acting authority (Role sets from
+   the pipeline, the guarded `UPDATE` with the actor clause under `Yello/Memberships/{spaceId}`, the typed refusal turned into
+   the pipeline's recorded `403`) without widening either Role-read gate. Then `An_Admin_beyond_its_authority_...` (x4),
+   `ISO-CHANGE-ROLE-ADMIN-BEYOND-AUTHORITY`, and the three authority gates.
+2. The Owner's and Admin's changes, the Member/Viewer refusals, the own-row `409`, the body `400` (S-2 after each); then the
+   BLOCK AFTER UPDATE case with the `SpaceIsolationSchemaTests` amendment.
+3. The list (403/404, 60-row walk, 100-row bound, shape with the live name), the routes and contract gates, the in-Space `404`,
+   the replay.
+4. `MembershipChanged`: one publish, no publish, same Role.
+5. Race 1 (its deciding assertion is that both waited; plant 5 is masked on the end state).
+6. V-1 (x2), `REV-ROLE-CHANGED-BY-OWNER`, the AC8 twin.
+7. The isolation rows (clear every `PendingUntil: "4.4"` before review, GATE-003), the log case, the problem-type gate.
+8. `MembershipLabelsTests`, then the client gates.
+9. The browser cases (build `Yello.Client` in Debug first), the three ledger cases last, each seen red under the old markup.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the
+correction recorded in the Debug Log, not deleted.
+
+Verified at the ATDD run: `dotnet build Yello.slnx` 0 warnings, 0 errors; full run (`--max-parallel-test-modules 1`) 2,116
+total, 2,056 passed, 0 failed, 60 skipped (10 existing + 50 scaffolds).
+
 ### Testing requirements
 
 Follow `tests/TESTING-CONVENTIONS.md`:
