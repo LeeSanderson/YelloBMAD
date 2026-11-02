@@ -13,6 +13,7 @@ using Yello.Contracts.Labels;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
 using Yello.Contracts.Tasks;
+using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -697,7 +698,9 @@ internal sealed partial class FakeYelloApi
             {
                 ["Access-Control-Allow-Origin"] = origin,
                 ["Access-Control-Allow-Credentials"] = "true",
-                ["Access-Control-Allow-Headers"] = $"content-type, {Antiforgery.HeaderName}, {Idempotency.HeaderName}",
+                // Story 4.3 (ATDD run): the Invitation view's token header (Lee's Q4 (a)), which a cross-origin request may
+                // carry only once the preflight allows it - as the Host's CrossOriginPolicy must.
+                ["Access-Control-Allow-Headers"] = $"content-type, {Antiforgery.HeaderName}, {Idempotency.HeaderName}, {InvitationWire.TokenHeaderName}",
                 ["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE",
                 ["Vary"] = "Origin",
             },
@@ -727,6 +730,13 @@ internal sealed partial class FakeYelloApi
         if (await InvitationAsync(request).ConfigureAwait(false) is { } invitation)
         {
             return invitation;
+        }
+
+        // Story 4.3 - the Invitation view, the accept and registration (FakeYelloApi.InvitationAcceptance.cs). Each fell to
+        // the unmatched 404 before, and no earlier case sends one.
+        if (await InvitationAcceptanceAsync(request).ConfigureAwait(false) is { } acceptance)
+        {
+            return acceptance;
         }
 
         switch (request.Method, request.Path)

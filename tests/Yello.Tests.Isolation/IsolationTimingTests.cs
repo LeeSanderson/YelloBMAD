@@ -111,6 +111,35 @@ public sealed class IsolationTimingTests(IsolationWorldFixture fixture) : IClass
         TimingRecord.Add($"oracle (issue vs already-a-member) / {surface}: {verdict.Describe()}");
         Assert.False(verdict.AreIndistinguishable, $"{surface}: the oracle was not caught - {verdict.Describe()}");
     }
+
+    /// <summary>
+    /// Story 4.3 AC6, Lee's Q6 (a) (written by its ATDD run) - the permanent planted oracle for
+    /// <c>ISO-TIMING-INVITATION-NOT-VALID-SAME-DURATION</c>: the method must tell the view's uniform <c>404</c> for a token
+    /// never issued (resolution, the sentinel Space key, the read and the floor) from an arm that returns early and does
+    /// none of it - the unmatched path under the view's route, which the floor does not cover. That is the planted
+    /// "return early for an unrecognised token" variant reached through the product, since a Host started as a process
+    /// cannot be given a planted handler (the 4.1 D4 precedent: a proxy, recorded as one). If this is not caught, record the
+    /// duration proof as masked in the ledger (Lee/TEA), never delete it.
+    /// </summary>
+    /// <param name="surface">The surface.</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = "red: AC6 - the view route and its NotAvailableFloor-style floor do not exist; Tasks 4 and 6, Lee's Q6 (a)")]
+    [InlineData(IsolationSurface.Session)]
+    [InlineData(IsolationSurface.ApiToken)]
+    [Trait("Requirement", "FR-11")]
+    [Trait("Requirement", "UX-DR18")]
+    public async Task The_duration_method_tells_the_not_valid_answer_from_an_arm_that_does_no_work(IsolationSurface surface)
+    {
+        var world = fixture.World;
+        var early = InvitationWire.OfferRoute + "/early";
+
+        var verdict = await DurationIndistinguishability.CompareMeasuredAsync(
+            () => world.Host.ServerDurationOfAsync(() => world.A.SendAsync(surface, HttpMethod.Get, InvitationWire.OfferRoute, body: null, InvitationWire.TokenHeaders(InvitationWire.UnrecognisedToken()))),
+            () => world.Host.ServerDurationOfAsync(() => world.A.SendAsync(surface, HttpMethod.Get, early, body: null, InvitationWire.TokenHeaders(InvitationWire.UnrecognisedToken()))));
+
+        TimingRecord.Add($"oracle (not valid vs early return) / {surface}: {verdict.Describe()}");
+        Assert.False(verdict.AreIndistinguishable, $"{surface}: the oracle was not caught - {verdict.Describe()}");
+    }
 }
 
 /// <summary>

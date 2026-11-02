@@ -362,10 +362,11 @@ public sealed class ProductActor
     /// <param name="surface">Which surface.</param>
     /// <param name="method">The method.</param>
     /// <param name="path">The route.</param>
-    /// <param name="body">The body.</param>
+    /// <param name="body">The body, or <c>null</c> for none (story 4.3: the Invitation view is a <c>GET</c> whose token
+    /// travels in a header).</param>
     /// <param name="headers">Extra headers, or <c>null</c> for none.</param>
     /// <returns>The answer.</returns>
-    public Task<WireResponse> SendAsync(IsolationSurface surface, HttpMethod method, string path, HttpContent body, IReadOnlyDictionary<string, string>? headers)
+    public Task<WireResponse> SendAsync(IsolationSurface surface, HttpMethod method, string path, HttpContent? body, IReadOnlyDictionary<string, string>? headers)
     {
         ArgumentNullException.ThrowIfNull(method);
 

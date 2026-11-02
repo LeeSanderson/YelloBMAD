@@ -484,6 +484,70 @@ Recent commits: `99bd3d3` (4.2 review close), `71e68ac` (4.2 implementation), `5
 - `deferred-work.md`: `:20`, `:36`, `:213-221`, `:277`, `:670`, `:718`, `:722`, `:723`, `:725`, `:736`, `:743`.
 - `4-1-invite-an-email-address-to-a-space-at-a-role.md`: AC3, AC5, AC7, AC8, Q11, C2, C9, Review Findings (D4, P10, P13, P14). `4-2-see-and-revoke-pending-invitations.md`: AC2, AC4, Q2, Q3, Q10, Q11, "Locking and the race", Review Findings, Debug Log.
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+**Checklist:** `_bmad-output/test-artifacts/atdd-checklist-4-3-accept-an-invitation.md` (story 4.3 ATDD run, 2026-11-01;
+scaffolded against Lee's Q1-Q7 (a) and the Q8-Q19 recommendations, each named in its skip reason).
+
+**Scaffold files** (every case `[Fact(Skip = "red: AC<n> - ...")]` / `[Theory(Skip = ...)]`, every isolation row
+`PendingUntil: "4.3"`):
+
+| File | Cases | ACs |
+|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ViewInvitation.cs` | 4 | AC1, AC2, AC7 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AcceptInvitation.cs` | 10 | AC3, AC4, AC5, AC6, AC7, AC11, Q12, I-17 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AcceptInvitationRace.cs` | 3 | AC5 (races 1-3) |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AcceptInvitationBound.cs` | 4 | AC9 |
+| `tests/Yello.Tests.Isolation/IsolationCases.InvitationAcceptance.cs` (hooked into `IsolationCases.Invitations.cs`) | 9 rows (18 when active) | AC6, AC7, AC8, AC10 |
+| `tests/Yello.Tests.Isolation/IsolationTimingTests.cs` (permanent duration oracle added) | 1 theory (2) | AC6 |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.InvitationAcceptance.cs` | 12 (8 skipped, 4 active) | AC3, AC4, AC5, AC6, AC7, AC9, AC12 |
+| `tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.Invitation.cs` | 2 | AC12 (setter gate, spine amendment) |
+| `tests/Yello.Tests.Architecture/DesignFoundationGateTests.InvitationView.cs` | 7 (5 skipped, 2 active) | AC2, AC13 |
+| `tests/Yello.Tests.Client/InvitationViewTests.cs` | 10 | AC13 (with AC2, AC3, AC4, AC6, AC7, AC9) |
+| `tests/Yello.Tests.Client/TextSpacingTests.cs` (one theory added) | 1 theory (2) | AC13, ledger `:20` |
+
+Harness (no product code): `InvitationWire` (five TEMPORARY stand-ins - `OfferRoute`, `AcceptanceRoute`,
+`TokenHeaderName`, `NotValidProblemType`, `ForAnotherAccountProblemType` - to swap for the Task 3 contract members and
+delete; plus `TokenIn(email)`, `AcceptBody`, `UnrecognisedToken`, `MalformedTokens`, `OfferedInvitation`),
+`WireDatabase.SetInvitationExpiresAtAsync` / `MembershipsOfAccountAsync` / `AccountCountAsync`, `IsolationWorld.Mail`,
+`CaseRequest.Headers`, `ProductActor.SendAsync` with a nullable body, `FakeYelloApi.InvitationAcceptance.cs` (and the token
+header allowed in the fake's CORS).
+
+**Green today, left active (standing regression gates, each with a detector oracle):**
+`No_raw_SQL_names_an_Invitation_table_outside_the_Invitation_store` (+ `The_raw_SQL_scan_detects_a_plant`),
+`Only_the_registration_slice_constructs_an_Account` (+ `The_Account_construction_scan_detects_a_plant`),
+`The_host_page_has_a_fixed_title_and_no_preview_metadata` (+ `The_preview_metadata_scan_detects_a_plant`). Every other new
+case is skipped. Red verified by temporary unskip (restored in a `finally`): the view case and race 3 both failed with the
+unmapped route's `404 not-available`, the stated reason. Full run after this ATDD phase (`dotnet build Yello.slnx` 0
+warnings, 0 errors; `--max-parallel-test-modules 1`): 2,029 total, 1,971 passed, 0 failed, 58 skipped (baseline 1,975 /
+1,965 / 0 / 10, plus 48 skipped scaffolds and 6 active gates).
+
+**Activation order (riskiest assumption first):**
+
+1. `Five_states_are_one_answer_on_the_view_and_on_the_accept` - token resolution before any Space context through the
+   policy-free index (Q1), the `SpaceId`-only unit reading through RLS and `Actionable` (Q2), the sentinel key for an
+   unrecognised token, the index's cascade with its Space, and one byte-identical body (Q6); then the two isolation
+   five-state rows.
+2. The view: `The_view_answers_exactly_...`, `Viewing_an_Invitation_writes_nothing_...`, the credential and mismatch cases,
+   the view contract gate, `ISO-INVITATION-VIEW-DISCLOSES-ONLY-THE-OFFER`.
+3. The setter, token-index and dependents gates; the spine amendment (Task 2) and its gate.
+4. The accept: joins, race 2, race 1, race 3, second acceptance, mismatch, no-Session/Token, GET, already-a-Member, replay,
+   the third-write and route gates.
+5. The bound: at 100, at 99, the bound race, the full-Space ordering case.
+6. Registration from the Invitation and the AD-22 slice gate; the I-17 log case; the remaining isolation rows - clear every
+   `PendingUntil: "4.3"` before review (GATE-003).
+7. The timing row and its permanent oracle (record masking honestly if the oracle is not caught).
+8. Handler unit tests (dev-written), the problem-type gate, the client gates.
+9. The browser cases, after `Yello.Client` is built in Debug.
+
+Findings for dev (detail in the checklist): race 3's end state cannot show a missing lock (the issue's own
+`invitation-pending` check refuses), so its decisive assertion is that the accept waited; `Space_is_read_only_where_named`,
+`SchemaVarianceTests.NamedVariances` and the Host's `CrossOriginPolicy` (the token header) are active gates/config the dev
+phase amends, not scaffolded.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and
+the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

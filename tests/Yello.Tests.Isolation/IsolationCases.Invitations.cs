@@ -186,6 +186,11 @@ internal static partial class IsolationCases
                 [IsolationSurface.Session] = new Served(HttpStatusCode.NoContent, TheNamedInvitationIsRevokedAsync, "204 - a Session carries no Space (FR-2); the Account owns SA2"),
                 [IsolationSurface.ApiToken] = new SameAsNonMember { Then = TheNamedInvitationIsStillPendingAsync },
             }),
+
+        // Story 4.3 - view and accept an Invitation (AC10; I-1, I-2, I-4, I-7, I-13, I-14, I-17). Written by the story 4.3
+        // ATDD run (2026-11-01) as PendingUntil "4.3" in IsolationCases.InvitationAcceptance.cs; GATE-003 fails the suite if
+        // any is still pending when 4.3 reaches review.
+        .. InvitationAcceptanceCases(),
     ];
 
     /// <summary>

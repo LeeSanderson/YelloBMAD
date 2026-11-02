@@ -35,12 +35,20 @@ internal sealed class IsolationWorld : IAsyncDisposable
 
     private readonly List<ProductActor> _actors = [];
 
-    private IsolationWorld(SqlServerEngine engine, RunningHost host, WireDatabase database)
+    private IsolationWorld(SqlServerEngine engine, RunningHost host, WireDatabase database, MailDrop mail)
     {
         _engine = engine;
         Host = host;
         Database = database;
+        Mail = mail;
     }
+
+    /// <summary>
+    /// The folder the world's Host drops its mail into. Story 4.3 (ATDD run): an Invitation's token exists in plaintext only
+    /// in its email, so a row about the view or the accept reads it here (<see cref="InvitationWire.TokenIn"/>). Rows
+    /// before 4.3 read no mail; the Host dropped into <see cref="MailDrop.Unread"/> instead, which nobody read either.
+    /// </summary>
+    public MailDrop Mail { get; }
 
     /// <summary>
     /// Account A.
@@ -84,6 +92,7 @@ internal sealed class IsolationWorld : IAsyncDisposable
     private static async Task<IsolationWorld> StartCoreAsync(SqlServerEngine engine, int? maxPoolSize)
     {
         var connectionString = await engine.CreateDatabaseAsync(TestContext.Current.CancellationToken);
+        var mail = new MailDrop();
         RunningHost host;
 
         try
@@ -98,15 +107,16 @@ internal sealed class IsolationWorld : IAsyncDisposable
                 forHost.MaxPoolSize = size;
             }
 
-            host = await RunningHost.StartAsync(forHost.ConnectionString);
+            host = await RunningHost.StartAsync(forHost.ConnectionString, mail.Settings);
         }
         catch
         {
+            mail.Dispose();
             await engine.DropDatabaseAsync(connectionString);
             throw;
         }
 
-        var world = new IsolationWorld(engine, host, new WireDatabase(connectionString));
+        var world = new IsolationWorld(engine, host, new WireDatabase(connectionString), mail);
 
         try
         {
@@ -270,6 +280,7 @@ internal sealed class IsolationWorld : IAsyncDisposable
         }
         finally
         {
+            Mail.Dispose();
             await _engine.DropDatabaseAsync(Database.ConnectionString);
         }
     }

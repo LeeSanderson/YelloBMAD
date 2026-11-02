@@ -2074,6 +2074,10 @@ internal enum CaseRunner
 /// Story 3.4 Q1 (a): for each of <paramref name="Paths"/>, the path an Account with no Membership near the foreign id
 /// (B) sends under its own Space, whose answer the case's must equal byte for byte.
 /// </param>
+/// <param name="Headers">
+/// Story 4.3 (ATDD run): extra request headers every path is sent with - the Invitation view's token travels in
+/// <c>Yello-Invitation-Token</c> (Lee's Q4 (a)), never in the path. <c>null</c> keeps the earlier sends unchanged.
+/// </param>
 internal sealed record CaseRequest(
     ProductActor Actor,
     HttpMethod Method,
@@ -2082,18 +2086,20 @@ internal sealed record CaseRequest(
     Func<HttpContent>? Body = null,
     Func<HttpContent>? AnchorBody = null,
     ProductActor? Other = null,
-    IReadOnlyList<string>? StrangerPaths = null)
+    IReadOnlyList<string>? StrangerPaths = null,
+    IReadOnlyDictionary<string, string>? Headers = null)
 {
     /// <summary>
-    /// Sends <paramref name="path"/> as the case's actor on <paramref name="surface"/>, with the case's body if it has one.
+    /// Sends <paramref name="path"/> as the case's actor on <paramref name="surface"/>, with the case's body and headers if
+    /// it has them.
     /// </summary>
     /// <param name="surface">The surface.</param>
     /// <param name="path">The path.</param>
     /// <returns>The answer.</returns>
     public Task<WireResponse> SendAsync(IsolationSurface surface, string path) =>
-        Body is null
+        Body is null && Headers is null
             ? Actor.SendAsync(surface, Method, path)
-            : Actor.SendAsync(surface, Method, path, Body(), headers: null);
+            : Actor.SendAsync(surface, Method, path, Body?.Invoke(), Headers);
 
     /// <summary>
     /// Sends the anchor path, with the anchor's own body when the case gives one, otherwise as <see cref="SendAsync"/>.
@@ -2104,7 +2110,7 @@ internal sealed record CaseRequest(
     public Task<WireResponse> SendAnchorAsync(IsolationSurface surface, string anchorPath) =>
         AnchorBody is null
             ? SendAsync(surface, anchorPath)
-            : Actor.SendAsync(surface, Method, anchorPath, AnchorBody(), headers: null);
+            : Actor.SendAsync(surface, Method, anchorPath, AnchorBody(), Headers);
 }
 
 /// <summary>

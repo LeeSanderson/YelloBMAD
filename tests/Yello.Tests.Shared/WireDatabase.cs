@@ -625,6 +625,78 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// Moves one Invitation's <c>ExpiresAt</c>, under its Space's own key - story 4.3's expired arm (AC6; R12, the
+    /// seeding-the-past method), applied to an Invitation issued through the product so its token is real and its token
+    /// index row (Lee's Q1 (a)) exists. Written by the story 4.3 ATDD run.
+    /// </summary>
+    /// <remarks>
+    /// <c>ExpiresAt</c> is <c>datetimeoffset</c>, not null, with a default and no check constraint (migration
+    /// <c>20261101140742_Invitations</c>). The update keeps <c>SpaceId</c>, so the <c>BLOCK AFTER UPDATE</c> predicate
+    /// admits it; <c>State</c> is untouched - an expired Invitation is stored <c>Pending</c> (AD-27).
+    /// </remarks>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="invitationId">The Invitation.</param>
+    /// <param name="expiresAt">The expiry to store.</param>
+    /// <returns>A task.</returns>
+    public async Task SetInvitationExpiresAtAsync(Guid spaceId, Guid invitationId, DateTimeOffset expiresAt)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+
+        var changed = await ExecuteAsync(
+            connection,
+            null,
+            "UPDATE dbo.[Invitation] SET ExpiresAt = @expires WHERE Id = @id",
+            ("@expires", expiresAt),
+            ("@id", invitationId)).ConfigureAwait(false);
+
+        if (changed != 1)
+        {
+            throw new InvalidOperationException($"Expected to change one Invitation; changed {changed}.");
+        }
+    }
+
+    /// <summary>
+    /// Every Membership an Account holds, in any Space, read under the <c>AccountId</c> key (story 1.7's predicate shows
+    /// exactly that Account's Memberships across Spaces) with an explicit <c>WHERE AccountId</c>. Story 4.3 (ATDD run):
+    /// AC3 and AC8's "exactly these Memberships, nothing else".
+    /// </summary>
+    /// <param name="accountId">The Account.</param>
+    /// <returns>Each Membership's Space and stored Role.</returns>
+    public async Task<IReadOnlyList<(Guid SpaceId, string Role)>> MembershipsOfAccountAsync(Guid accountId)
+    {
+        await using var connection = await OpenAsync().ConfigureAwait(false);
+
+        await SetKeyAsync(connection, "AccountId", accountId).ConfigureAwait(false);
+
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT SpaceId, Role FROM dbo.[Membership] WHERE AccountId = @account";
+        command.Parameters.Add(new SqlParameter("@account", accountId));
+
+        var rows = new List<(Guid, string)>();
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            rows.Add((reader.GetGuid(0), reader.GetString(1)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// How many Accounts are registered with exactly <paramref name="emailAddress"/>. <c>Account</c> carries no policy.
+    /// Story 4.3 (ATDD run): AC8's "no second Account".
+    /// </summary>
+    /// <param name="emailAddress">The address, as submitted.</param>
+    /// <returns>The count.</returns>
+    public async Task<int> AccountCountAsync(string emailAddress) =>
+        Convert.ToInt32(
+            await ScalarAsync("SELECT COUNT(*) FROM dbo.[Account] WHERE EmailAddress = @address", ("@address", emailAddress)).ConfigureAwait(false),
+            System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>
     /// Every Invitation in <paramref name="spaceId"/>, read under that Space's own key - the database's view, independent
     /// of the Host's query filter. Story 4.1 (ATDD run); only skipped scaffolds call this.
     /// </summary>

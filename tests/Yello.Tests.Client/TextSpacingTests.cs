@@ -689,6 +689,39 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
         }
     }
 
+    /// <summary>
+    /// Story 4.3 AC2, AC13, UX-DR18, NFR-9, WCAG 1.4.12 and 1.4.4 (ledger <c>deferred-work.md:20</c>) - the Invitation view's
+    /// offer, with no Session (the heading, "Join as Member.", the Role's meaning, "Create an Account and join", the sign-in
+    /// prompt and the footer), under 1.4.12 text spacing and 200% text-only zoom: no text clipped, no sideways page scroll.
+    /// Anchored: the heading is on screen before the check runs. Written red by the story 4.3 ATDD run; the locators are
+    /// <c>InvitationViewTests</c>' assumptions.
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = "red: AC2 / AC13 - InvitationView.razor does not exist; Task 7 (ledger :20)")]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR40")]
+    [Trait("Requirement", "UX-DR18")]
+    public async Task Text_spacing_and_text_only_zoom_clip_nothing_in_the_invitation_view(bool zoom)
+    {
+        var (api, token) = InvitationViewTests.Offered(signedIn: false);
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, Yello.Tests.Shared.InvitationWire.LinkPath.TrimStart('/') + token).ToString());
+            await page.Locator("main h1", new PageLocatorOptions { HasText = "invited you to" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+        }
+    }
+
     private static FakeYelloApi Seeded()
     {
         var api = new FakeYelloApi { SignedIn = true };
