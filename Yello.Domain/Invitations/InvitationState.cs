@@ -16,7 +16,8 @@ public enum InvitationState
     Pending,
 
     /// <summary>
-    /// Accepted (story 4.3).
+    /// Accepted (story 4.3): written by the accept's one guarded statement in <c>InvitationStore</c>, beside the caller's
+    /// one new Membership. Terminal.
     /// </summary>
     Accepted,
 

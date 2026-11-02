@@ -1179,4 +1179,80 @@
     <value>Loading invitations.</value>
     <comment>Story 4.2 (AC9): visually hidden while the pending Invitations are read (UX-DR31: nothing is rendered from cache). Never names an address.</comment>
   </data>
+  <data name="invitation-not-valid" xml:space="preserve">
+    <value>This invitation is no longer valid.</value>
+    <comment>Story 4.3 (AC6, Lee's Q6 (a), UX-DR18): the one answer for a revoked, accepted, expired, lapsed or unrecognised Invitation, on the view and the accept - the heading of the Invitation view's no-longer-valid state. Discloses neither the Space, its contents, nor who revoked it; the same words whatever the state.</comment>
+  </data>
+  <data name="invitation-for-another-account" xml:space="preserve">
+    <value>This invitation is for a different Account.</value>
+    <comment>Story 4.3 (AC7, open question 13 (a)): the heading when a different Account is signed in. Names neither address: the helpful version would disclose the invited address to whoever holds the link, which on a forwarded link is a stranger (EXPERIENCE.md:265).</comment>
+  </data>
+  <data name="InvitationOfferHeading" xml:space="preserve">
+    <value>{0} invited you to {1}.</value>
+    <comment>Story 4.3 (AC2, open question 15 (a)): the Invitation view's heading. {0} is the issuer's display name as captured at issue, {1} the Space's name. The page title stays the fixed "Yello".</comment>
+  </data>
+  <data name="InvitationJoinAs" xml:space="preserve">
+    <value>Join as {0}.</value>
+    <comment>Story 4.3 (AC2, open question 15 (a)): the Role offered, {0} being the Role's name (RoleMember and its siblings).</comment>
+  </data>
+  <data name="InvitationRoleMeaning" xml:space="preserve">
+    <value>{0}: {1}.</value>
+    <comment>Story 4.3 (AC2): the offered Role's one-line meaning, {0} the Role's name and {1} what it permits (RolePermitsMember and its siblings).</comment>
+  </data>
+  <data name="InvitationJoin" xml:space="preserve">
+    <value>Join {0}</value>
+    <comment>Story 4.3 (AC4, open question 15 (a)): the accept, offered to the signed-in Account the Invitation names. {0} is the Space's name. Sent only from this deliberate press.</comment>
+  </data>
+  <data name="InvitationCreateAndJoin" xml:space="preserve">
+    <value>Create an Account and join</value>
+    <comment>Story 4.3 (AC3, Lee's Q3 (a)): opens, and then submits, the three-field registration form on the Invitation view: registration, sign-in and the accept in that order. Sentence case; uppercased only by CSS.</comment>
+  </data>
+  <data name="InvitationHaveAnAccount" xml:space="preserve">
+    <value>Already have an Account?</value>
+    <comment>Story 4.3 (AC13, open question 16 (a)): before the inline sign-in action, for an invitee who already holds an Account.</comment>
+  </data>
+  <data name="InvitationSignIn" xml:space="preserve">
+    <value>Sign in</value>
+    <comment>Story 4.3 (AC13, open question 16 (a)): signs in on the Invitation view itself - no navigation and no return address, so the token stays in the page's URL alone.</comment>
+  </data>
+  <data name="InvitationCreatingAccount" xml:space="preserve">
+    <value>Creating your Account.</value>
+    <comment>Story 4.3 (AC13, open question 15 (a)): said while registration and sign-in run from the Invitation view (EXPERIENCE.md:273: submit-and-wait).</comment>
+  </data>
+  <data name="InvitationJoining" xml:space="preserve">
+    <value>Joining.</value>
+    <comment>Story 4.3 (AC13, open question 15 (a)): said while the accept is on the wire. Never optimistic: the page lands in the Space only after the answer.</comment>
+  </data>
+  <data name="InvitationOwnSpace" xml:space="preserve">
+    <value>You'll also get a Space of your own.</value>
+    <comment>Story 4.3 (AC3, FR-11 :279, open question 15 (a)): the footer for an invitee with no Session - registering provisions their own Personal Space, independently of the invited one.</comment>
+  </data>
+  <data name="InvitationJoined" xml:space="preserve">
+    <value>You joined {0}.</value>
+    <comment>Story 4.3 (AC13, open question 19 (a)): said on the joined Space's home after the accept's 200, {0} being its name. Names no address.</comment>
+  </data>
+  <data name="InvitationNotValidBody" xml:space="preserve">
+    <value>Ask whoever invited you to send a new one.</value>
+    <comment>Story 4.3 (AC6, open question 15 (a)): under the no-longer-valid heading. Says nothing about why.</comment>
+  </data>
+  <data name="InvitationGoToYello" xml:space="preserve">
+    <value>Go to Yello</value>
+    <comment>Story 4.3 (AC6, open question 15 (a)): the link away from an Invitation that is no longer valid, to the entry point.</comment>
+  </data>
+  <data name="InvitationForAnotherAccountBody" xml:space="preserve">
+    <value>Sign out and sign in as the Account it was sent to.</value>
+    <comment>Story 4.3 (AC7, open question 15 (a)): under the different-Account heading. Sign out returns to the same Invitation, which re-reads the offer for no Session.</comment>
+  </data>
+  <data name="InvitationLoading" xml:space="preserve">
+    <value>Loading the invitation.</value>
+    <comment>Story 4.3 (AC13): visually hidden while the Invitation view is read. Nothing Space-named is rendered before the server answers.</comment>
+  </data>
+  <data name="InvitationNotSent" xml:space="preserve">
+    <value>Not sent.</value>
+    <comment>Story 4.3 (AC13, open question 11 (a)): an accept that got no answer. Nothing was joined; the same press is sent again under the same Idempotency-Key, so a lost answer is never a second act.</comment>
+  </data>
+  <data name="InvitationUnavailable" xml:space="preserve">
+    <value>This invitation could not be loaded.</value>
+    <comment>Story 4.3 (AC13): the Invitation view got no usable answer from the server. Says nothing about the Invitation itself; the link may be opened again.</comment>
+  </data>
 </root>

@@ -406,4 +406,28 @@ public static class ProblemTypes
     /// in this Space is the boundary's <c>404</c> instead (open question 3 (a)).
     /// </remarks>
     public static string InvitationNotPending => "urn:yello:problem:invitation-not-pending";
+
+    /// <summary>
+    /// The Invitation a token names is revoked, accepted, expired or lapsed, or the token names no Invitation at all.
+    /// Answered <c>404</c> on both the view and the accept, byte for byte the same for all five, and not recorded as an
+    /// access refusal. Story 4.3, AC6, Lee's Q6 (a); FR-11, AD-28, UX-DR18.
+    /// </summary>
+    /// <remarks>
+    /// <b>Discloses nothing</b>: no Space, no state, no address, no instance. A distinct answer for a token that never
+    /// existed would make the routes an existence oracle, which is why the five states share one body. It is not the
+    /// boundary's <see cref="NotAvailable"/>, whose body stays byte-identical on every Space-scoped route.
+    /// </remarks>
+    public static string InvitationNotValid => "urn:yello:problem:invitation-not-valid";
+
+    /// <summary>
+    /// The accept was sent by a signed-in Account the actionable Invitation does not name. Answered <c>403</c>; nothing is
+    /// written, and it is not recorded as an access refusal (it is neither of AD-20's kinds). Story 4.3, AC7, open question
+    /// 13 (a).
+    /// </summary>
+    /// <remarks>
+    /// <b>Names neither address</b> (UX-DR18): the helpful version would disclose the invited address to whoever holds the
+    /// link, which on a forwarded link is a stranger. A token that is no longer actionable answers
+    /// <see cref="InvitationNotValid"/> instead, whoever is signed in.
+    /// </remarks>
+    public static string InvitationForAnotherAccount => "urn:yello:problem:invitation-for-another-account";
 }

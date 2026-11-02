@@ -97,7 +97,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// the only bulk write generic over <c>Invitation</c> is its <c>ExecuteUpdateAsync</c> (the revoke - the anchor), no
     /// <c>ExecuteDelete</c> on <c>Invitation</c> exists anywhere, and only it calls <c>Invitation.set_State</c> (the issue's
     /// object initializer, which stores <c>Pending</c> - the other sanctioned write). Read from the compiled IL, as
-    /// <c>The_only_bulk_writes_of_a_Space_are_the_rename_and_the_deletion_in_SpaceStore</c> is. 4.3 adds its accept here.
+    /// <c>The_only_bulk_writes_of_a_Space_are_the_rename_and_the_deletion_in_SpaceStore</c> is. Story 4.3 added its accept, in the same store (the third sanctioned write; <c>The_accept_is_the_Invitation_stores_third_sanctioned_state_write</c>).
     /// Plants 4 and 5: the revoke as <c>ExecuteDelete</c>, or a second <c>State</c> writer in another type.
     /// </summary>
     [Fact]

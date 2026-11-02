@@ -85,5 +85,11 @@ public sealed class ListAndRevokeInvitationHandlerTests
 
             return Task.FromResult(revocation);
         }
+
+        public Task<InvitationOffer?> ReadOfferAsync(InvitationContext context, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Neither the list nor the revoke reads an offer.");
+
+        public Task<InvitationAcceptanceOutcome> AcceptAsync(InvitationContext context, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Neither the list nor the revoke accepts.");
     }
 }

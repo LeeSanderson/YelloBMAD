@@ -14,7 +14,7 @@ namespace Yello.Host.Endpoints;
 
 /// <summary>
 /// Issue an Invitation into the active Space (FR-10, FR-39; story 4.1, AC1-AC5, AC13), list its pending Invitations and
-/// revoke one (FR-12; story 4.2, AC1-AC4, AC10).
+/// revoke one (FR-12; story 4.2, AC1-AC4, AC10). Story 4.3's view and accept are <see cref="InvitationAcceptanceEndpoints"/>.
 /// </summary>
 /// <remarks>
 /// <para>

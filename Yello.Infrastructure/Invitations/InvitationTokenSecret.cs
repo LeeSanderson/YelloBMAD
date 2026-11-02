@@ -15,7 +15,8 @@ namespace Yello.Infrastructure.Invitations;
 /// nothing else either (UX-DR18).
 /// </para>
 /// <para>
-/// <b>Only its SHA-256 is stored</b>, under a unique index story 4.3 resolves an Invitation through. The plaintext exists
+/// <b>Only its SHA-256 is stored</b> - on the Invitation under a unique index, and in story 4.3's policy-free token index
+/// (<c>InvitationToken</c>), through which <c>InvitationScope</c> resolves a presented token to its Space. The plaintext exists
 /// only in the rendered outbox row until the email is sent, and then only in the email.
 /// </para>
 /// </remarks>

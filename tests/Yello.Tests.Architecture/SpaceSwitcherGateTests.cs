@@ -136,6 +136,11 @@ public sealed partial class SpaceSwitcherGateTests
         Assert.True(SetsTheTitle("<HeadContent><title>x</title></HeadContent>"));
         Assert.True(SetsTheTitle("await js.InvokeVoidAsync(\"eval\", \"document.title = name\");"));
         Assert.False(SetsTheTitle("<h1 class=\"type-page-title\">Projects</h1>"));
+
+        // Story 4.3: the Invitation view's robots meta alone is not a title; anything beside it is.
+        Assert.False(SetsTheTitle("<HeadContent>\n    <meta name=\"robots\" content=\"noindex\" />\n</HeadContent>"));
+        Assert.True(SetsTheTitle("<HeadContent><meta name=\"robots\" content=\"noindex\" /><title>x</title></HeadContent>"));
+        Assert.True(SetsTheTitle("<HeadContent>\n    <meta name=\"robots\" content=\"noindex\" />\n</HeadContent>\n<PageTitle>Yello</PageTitle>"));
     }
 
     /// <summary>
@@ -425,10 +430,19 @@ public sealed partial class SpaceSwitcherGateTests
     private static List<Role> RolesThatMay(Capability capability) =>
         [.. Enum.GetValues<Role>().Where(role => RoleCapabilityMatrix.Decide(role, capability) != CapabilityDecision.Denied)];
 
-    private static bool SetsTheTitle(string text) =>
-        text.Contains("<PageTitle", StringComparison.Ordinal)
-        || text.Contains("<HeadContent", StringComparison.Ordinal)
-        || DocumentTitle.IsMatch(text);
+    private static bool SetsTheTitle(string text)
+    {
+        // Story 4.3 (AC2, UX-DR18): the one head content the client may add is the Invitation view's robots noindex meta,
+        // alone in its HeadContent - it sets no title. Anything else in a HeadContent, or a PageTitle, still counts.
+        var withoutNoindex = RobotsNoindexHead.Replace(text, string.Empty);
+
+        return withoutNoindex.Contains("<PageTitle", StringComparison.Ordinal)
+            || withoutNoindex.Contains("<HeadContent", StringComparison.Ordinal)
+            || DocumentTitle.IsMatch(withoutNoindex);
+    }
+
+    [GeneratedRegex(@"<HeadContent>\s*<meta name=""robots"" content=""noindex"" />\s*</HeadContent>", RegexOptions.None, 1000)]
+    private static partial Regex RobotsNoindexHead { get; }
 
     /// <summary>
     /// Every file the client is built or served from: components, C#, and what <c>wwwroot</c> serves

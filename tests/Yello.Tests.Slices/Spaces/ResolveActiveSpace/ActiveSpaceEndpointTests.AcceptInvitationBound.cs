@@ -18,7 +18,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 4.3 ATDD run (2026-11-01).</b>
+/// <b>Written as red-phase scaffolds by the story 4.3 ATDD run (2026-11-01); activated by its dev phase (2026-11-02).</b>
 /// </para>
 /// <para>
 /// <b>Seeding N Memberships in one Space</b> (<see cref="SeedSpaceHoldingMembershipsAsync"/>): the sibling the story asks
@@ -40,7 +40,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// once a Membership is removed); nothing recorded as an <c>AccessRefusal</c>. Plant 6: the count skipped (101 rows).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the accept route and BoundCounter's MembershipsPerSpace arm do not exist; Tasks 4 and 6")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     [Trait("Requirement", "NFR-8")]
@@ -83,7 +83,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// a route or a seed that never admits anyone.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the accept route is not mapped; Tasks 4-6")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "NFR-8")]
     public async Task At_99_Memberships_the_same_accept_succeeds_and_makes_100()
@@ -116,7 +116,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// still <c>Pending</c>. Plant 5 or 6 (no lock, or no count): 101.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the accept route, its lock and its bound consultation do not exist; Tasks 4-6, Q8 (a)")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-25")]
     [Trait("Requirement", "NFR-8")]
@@ -169,7 +169,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>409 bound-reached</c>. Plant 6 (the bound checked before the guard): both answer <c>409</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the accept route and Q9 (a)'s order of checks do not exist; Tasks 4-6")]
+    [Fact]
     [Trait("Requirement", "AR-30")]
     [Trait("Requirement", "AD-23")]
     [Trait("Requirement", "AD-28")]
@@ -207,9 +207,9 @@ public sealed partial class ActiveSpaceEndpointTests
         });
 
         Assert.True(stranger?.StatusCode == HttpStatusCode.Forbidden, $"{stranger?.StatusCode} {stranger?.Body}");
-        Assert.Equal(InvitationWire.ForAnotherAccountProblemType, ProblemType(stranger!));
+        Assert.Equal(ProblemTypes.InvitationForAnotherAccount, ProblemType(stranger!));
         Assert.True(dead?.StatusCode == HttpStatusCode.NotFound, $"{dead?.StatusCode} {dead?.Body}");
-        Assert.Equal(InvitationWire.NotValidProblemType, ProblemType(dead!));
+        Assert.Equal(ProblemTypes.InvitationNotValid, ProblemType(dead!));
         Assert.True(addressee?.StatusCode == HttpStatusCode.Conflict, $"The addressee's anchor: {addressee?.StatusCode} {addressee?.Body}");
         Assert.Equal(ProblemTypes.BoundReached, ProblemType(addressee!));
         Assert.Equal(InvitationWire.MembershipsPerSpace, (await MembershipsInAsync(database, live!.SpaceId)).Count);

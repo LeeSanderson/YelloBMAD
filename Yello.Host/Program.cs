@@ -7,9 +7,11 @@ using Yello.Application.ApiTokens.RevokeApiToken;
 using Yello.Application.Accounts.RegisterAccount;
 using Yello.Application.Accounts.SignOut;
 using Yello.Application.Invitations;
+using Yello.Application.Invitations.AcceptInvitation;
 using Yello.Application.Invitations.IssueInvitation;
 using Yello.Application.Invitations.ListInvitations;
 using Yello.Application.Invitations.RevokeInvitation;
+using Yello.Application.Invitations.ViewInvitation;
 using Yello.Application.Outbox;
 using Yello.Application.Projects.CreateProject;
 using Yello.Application.Projects.DeleteProject;
@@ -134,6 +136,9 @@ builder.Services.AddScoped<ReadDeletionSummaryHandler>();
 builder.Services.AddScoped<IssueInvitationHandler>();
 builder.Services.AddScoped<ListInvitationsHandler>();
 builder.Services.AddScoped<RevokeInvitationHandler>();
+builder.Services.AddScoped<ViewInvitationHandler>();
+builder.Services.AddScoped<AcceptInvitationHandler>();
+builder.Services.AddScoped<InvitationRequest>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
 builder.Services.AddAccountScopedResolution();
@@ -507,6 +512,17 @@ api.MapDeleteLabel();
 api.MapIssueInvitation();
 api.MapListInvitations();
 api.MapRevokeInvitation();
+
+// Story 4.3: the Invitation view and accept, reached by the token rather than a {spaceId}. GET /api/v1/invitations/offer
+// (the token in the Yello-Invitation-Token header) answers the offer - Space name, Role, issuer name, and with a Session
+// whether it is addressed to it - writing nothing, on any credential or none. POST /api/v1/invitations/acceptance
+// ({ invitationToken }) is Session-only: one guarded update under the Space's Invitations lock, authorised by the caller's
+// own address, then one Membership at the Invitation's Role; 200 { spaceId }, 403 invitation-for-another-account, 409
+// already-a-member, or 409 bound-reached at 100 Memberships. Both answer one byte-identical 404 invitation-not-valid for a
+// revoked, accepted, expired or unrecognised token, held to the not-found floor, and record no refusal. The pipeline's
+// Invitation step resolves the token through the policy-free token index and keys the unit of work to that Space alone.
+api.MapViewInvitation();
+api.MapAcceptInvitation();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

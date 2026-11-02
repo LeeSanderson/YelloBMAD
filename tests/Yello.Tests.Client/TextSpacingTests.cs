@@ -698,7 +698,7 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 / AC13 - InvitationView.razor does not exist; Task 7 (ledger :20)")]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "UX-DR40")]

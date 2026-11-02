@@ -32,6 +32,8 @@ public static class ClientRoutes
     /// </summary>
     private const string SpacesSegment = "spaces";
 
+    private const string InvitationsPath = "/invitations/";
+
     /// <summary>
     /// What ends a route's path: its query, or its fragment. <c>SearchValues</c>, not an array, so nothing static in the
     /// client is a mutable collection (story 3.4, AC12).
@@ -136,6 +138,16 @@ public static class ClientRoutes
     public static string SpaceSettings(Guid spaceId) => $"/spaces/{spaceId:D}/settings";
 
     /// <summary>
+    /// The Invitation view (story 4.3, AC2, AC13): the page the email's link opens, the opaque token and nothing else in the
+    /// path - no Space name, no Space id (UX-DR18). The segment is the Host's <c>InvitationLinks.Path</c>, which this client
+    /// cannot reference across the ring; <c>DesignFoundationGateTests.The_client_invitation_route_is_the_Hosts_link_path_and_is_reached_without_a_Session</c>
+    /// holds the two equal.
+    /// </summary>
+    /// <param name="token">The token, exactly as the link carries it.</param>
+    /// <returns>The path.</returns>
+    public static string Invitation(string token) => InvitationsPath + token;
+
+    /// <summary>
     /// The Space a client route is in, or <c>null</c> for a route outside every Space.
     /// </summary>
     /// <param name="relativePath">
@@ -161,18 +173,27 @@ public static class ClientRoutes
     }
 
     /// <summary>
-    /// Whether a client route is one a person reaches without a Session - sign-in or registration -
-    /// where the context bar is never drawn.
+    /// Whether a client route is one a person reaches without a Session - sign-in, registration, or an Invitation's view
+    /// (story 4.3, AC2: a link holder is never bounced to sign-in) - where the context bar is never drawn.
     /// </summary>
     /// <param name="relativePath">The path relative to the base address.</param>
-    /// <returns><c>true</c> for sign-in and registration, with or without a query, in any case.</returns>
+    /// <returns><c>true</c> for sign-in, registration and an Invitation, with or without a query, in any case.</returns>
     public static bool IsReachedWithoutASession(string? relativePath)
     {
         var path = PathOf(relativePath);
 
         return string.Equals(path, SignIn.TrimStart('/'), StringComparison.OrdinalIgnoreCase)
-            || string.Equals(path, Register.TrimStart('/'), StringComparison.OrdinalIgnoreCase);
+            || string.Equals(path, Register.TrimStart('/'), StringComparison.OrdinalIgnoreCase)
+            || IsAnInvitation(path);
     }
+
+    /// <summary>
+    /// Whether a path (already trimmed of slashes, query and fragment) is an Invitation's view: the segment and one token.
+    /// </summary>
+    private static bool IsAnInvitation(string path) =>
+        path.Split('/') is [var first, var token]
+        && string.Equals(first, InvitationsPath.Trim('/'), StringComparison.OrdinalIgnoreCase)
+        && token.Length > 0;
 
     /// <summary>
     /// Whether a client route is the entry point, <see cref="Home"/>.

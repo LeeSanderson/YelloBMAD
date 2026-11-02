@@ -32,8 +32,16 @@ internal static class SpaceContentStores
         services.AddScoped<IListReader, ListReader>();
         services.AddScoped<ILabelStore, LabelStore>();
 
-        // Story 4.1: the Space's Invitations, on the request's unit of work like every Space-scoped store.
-        services.AddScoped<IInvitationStore, InvitationStore>();
+        // Story 4.1: the Space's Invitations, on the request's unit of work like every Space-scoped store. Story 4.3: the
+        // same instance answers the accept's screen, which the pipeline reads before it consults the bound.
+        services.AddScoped<InvitationStore>();
+        services.AddScoped<IInvitationStore>(provider => provider.GetRequiredService<InvitationStore>());
+        services.AddScoped<IInvitationAcceptanceScreen>(provider => provider.GetRequiredService<InvitationStore>());
+
+        // Story 4.3: the Invitation unit of work - the token resolved to its Space through the policy-free token index, and
+        // the SpaceId key alone set to that Space (Lee's Q1 (a) and Q2 (a); the AD-2 / AD-24 amendment of 2026-11-02). The
+        // pipeline's Invitation step is its only caller.
+        services.AddScoped<IInvitationScope, InvitationScope>();
 
         return services;
     }

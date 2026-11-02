@@ -29,7 +29,7 @@ public sealed partial class SpaceSwitcherGateTests
     /// new Space), and the one acceptance unit of work (the Space the token resolved to, server-side). The acceptance unit
     /// sets no <c>AccountId</c> key. Plant 12: a second <c>SpaceId</c>-key setter type.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the acceptance unit of work does not exist; Task 4, Lee's Q2 (a)")]
+    [Fact]
     [Trait("Requirement", "AR-6")]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AD-24")]
@@ -58,7 +58,7 @@ public sealed partial class SpaceSwitcherGateTests
     /// registration-while-accepting is two units of work. AD-24's rule line stands. Sibling of
     /// <c>The_AD_24_amendment_names_Space_creation_and_states_its_reason</c>.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the spine has no story 4.3 amendment yet; Task 2, Lee's Q2 (a)")]
+    [Fact]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AD-24")]

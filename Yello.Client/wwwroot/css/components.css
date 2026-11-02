@@ -1903,3 +1903,67 @@
     padding-inline: var(--space-2);
     color: var(--text-muted);
 }
+
+/*
+    THE INVITATION VIEW (story 4.3, AC2; DESIGN.md:270-276, :475). The one surface an unauthenticated stranger sees, with
+    the most generous padding in the product: spacing.6 on every side, which no other component exceeds
+    (DesignFoundationGateTests.No_component_declares_more_padding_than_the_invitation_view). The card ground, the hairline
+    and rounded.lg, as the registration panel it sits in the same page shell as - and sized in rem with no fixed width, so
+    it reflows at 320px and grows under a 200% text-only zoom.
+*/
+.invitation-view {
+    inline-size: 100%;
+    max-inline-size: 30rem;
+    box-sizing: border-box;
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    padding-block: var(--space-6);
+    padding-inline: var(--space-6);
+    overflow-wrap: anywhere;
+}
+
+.invitation-view__heading {
+    margin-block: 0 var(--space-4);
+}
+
+.invitation-view__role,
+.invitation-view__meaning,
+.invitation-view__aside,
+.invitation-view__footer {
+    margin-block: 0 var(--space-4);
+}
+
+/* A polite region in the page from the offer's first render, so what changes in it is announced. */
+.invitation-view__status {
+    margin-block: 0 var(--space-2);
+}
+
+.invitation-view__meaning,
+.invitation-view__footer {
+    color: var(--text-muted);
+}
+
+.invitation-view__form {
+    margin-block: 0 var(--space-4);
+}
+
+/* "Sign in" after "Already have an Account?": a button that reads as the sentence's link. */
+.invitation-view__link {
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+    padding: 0;
+    appearance: none;
+    background-color: transparent;
+    border: 0;
+    font: inherit;
+    cursor: pointer;
+}
+
+.invitation-view__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}

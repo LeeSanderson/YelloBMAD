@@ -2,7 +2,8 @@ namespace Yello.Application.Invitations;
 
 /// <summary>
 /// Builds the link an invitation email carries: <c>{ClientOrigin}/invitations/{token}</c>. AD-28, UX-DR18; story 4.1,
-/// AC7. Story 4.3 builds the client route the link opens.
+/// AC7. The link opens story 4.3's Invitation view (the client's <c>ClientRoutes.Invitation</c>, which a gate holds equal
+/// to <see cref="Path"/>).
 /// </summary>
 /// <remarks>
 /// <para>

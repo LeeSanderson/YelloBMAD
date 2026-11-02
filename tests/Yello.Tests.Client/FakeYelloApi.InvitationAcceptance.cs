@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Yello.Contracts;
 using Yello.Contracts.Accounts;
+using Yello.Contracts.Invitations;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
@@ -58,13 +59,13 @@ internal sealed partial class FakeYelloApi
     /// Every view read the page sent, in order, each with its headers.
     /// </summary>
     public IReadOnlyList<FakeRequest> InvitationOfferReads =>
-        [.. _requests.Where(request => request.Method == "GET" && request.Path == InvitationWire.OfferRoute)];
+        [.. _requests.Where(request => request.Method == "GET" && request.Path == InvitationRoutes.Offer)];
 
     /// <summary>
     /// Every accept the page sent, in order, each with its body and headers.
     /// </summary>
     public IReadOnlyList<FakeRequest> InvitationAccepts =>
-        [.. _requests.Where(request => request.Method == "POST" && request.Path == InvitationWire.AcceptanceRoute)];
+        [.. _requests.Where(request => request.Method == "POST" && request.Path == InvitationRoutes.Acceptance)];
 
     /// <summary>
     /// Holds the <b>next</b> accept until it is released.
@@ -98,19 +99,19 @@ internal sealed partial class FakeYelloApi
     private async Task<(int Status, string Body)?> InvitationAcceptanceAsync(FakeRequest request) =>
         (request.Method, request.Path) switch
         {
-            ("GET", var path) when path == InvitationWire.OfferRoute => Offer(request),
-            ("POST", var path) when path == InvitationWire.AcceptanceRoute => await AcceptInvitationAsync(request).ConfigureAwait(false),
+            ("GET", var path) when path == InvitationRoutes.Offer => Offer(request),
+            ("POST", var path) when path == InvitationRoutes.Acceptance => await AcceptInvitationAsync(request).ConfigureAwait(false),
             ("POST", var path) when path == AccountRoutes.Register => (204, string.Empty),
             _ => null,
         };
 
     private (int Status, string Body) Offer(FakeRequest request)
     {
-        var token = request.Header(InvitationWire.TokenHeaderName) ?? string.Empty;
+        var token = request.Header(InvitationRoutes.TokenHeader) ?? string.Empty;
 
         if (_spentTokens.ContainsKey(token) || !Offers.TryGetValue(token, out var offered))
         {
-            return (404, Problem(InvitationWire.NotValidProblemType));
+            return (404, Problem(ProblemTypes.InvitationNotValid));
         }
 
         return (200, JsonSerializer.Serialize(offered.Offer with { AddressedToYou = SignedIn ? AddresseeSignedIn : null }, JsonOptions));
@@ -148,12 +149,12 @@ internal sealed partial class FakeYelloApi
 
         if (_spentTokens.ContainsKey(token) || !Offers.TryGetValue(token, out var offered))
         {
-            return (404, Problem(InvitationWire.NotValidProblemType));
+            return (404, Problem(ProblemTypes.InvitationNotValid));
         }
 
         if (!AddresseeSignedIn)
         {
-            return (403, Problem(InvitationWire.ForAnotherAccountProblemType));
+            return (403, Problem(ProblemTypes.InvitationForAnotherAccount));
         }
 
         _spentTokens[token] = 0;

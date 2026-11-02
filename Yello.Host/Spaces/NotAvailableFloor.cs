@@ -79,7 +79,9 @@ internal static class NotAvailableFloor
 
     /// <summary>
     /// Holds a Space-scoped request's <c>404</c> until the floor has elapsed, and passes every other answer,
-    /// and every request that is not Space-scoped, straight through.
+    /// and every request that is not Space-scoped, straight through. Story 4.3 (Lee's Q6 (a)): the Invitation
+    /// view's and accept's uniform <c>404 invitation-not-valid</c> is held to the same floor, so a revoked, an
+    /// accepted, an expired and an unrecognised token answer in the same time as well as the same bytes.
     /// </summary>
     /// <param name="context">The request.</param>
     /// <param name="next">The rest of the pipeline.</param>
@@ -88,7 +90,7 @@ internal static class NotAvailableFloor
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        return ActiveSpaceResolution.IsSpaceScoped(context.HttpContext)
+        return ActiveSpaceResolution.IsSpaceScoped(context.HttpContext) || ActiveSpaceResolution.InvitationResolution.IsResolvedByToken(context.HttpContext)
             ? HoldCoreAsync(context, next)
             : next(context);
     }

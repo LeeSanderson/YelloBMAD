@@ -24,7 +24,11 @@ namespace Yello.Host;
 /// to a fixed minimum, so a boundary refusal and an in-Space not-found take the same time. Then Space
 /// resolution, the capability check, the bound and the refusal record. Last, the Space creation step
 /// (story 3.1), which only the creation endpoint opts into: its own unit of work under both session
-/// keys, its idempotency replay and the Spaces-per-Account bound. The group also stamps every
+/// keys, its idempotency replay and the Spaces-per-Account bound. Then the Invitation step (story 4.3),
+/// which only the Invitation view and accept opt into: the token resolved to its Space on the server, its
+/// unit of work under the <c>SpaceId</c> key alone, the accept's idempotency replay, screen and
+/// Memberships-per-Space bound. A Session-only route (the accept) without a Session is answered <c>401</c>
+/// by the first filter, as a Space-scoped one is. The group also stamps every
 /// endpoint it maps, which is how the Host knows at startup that no <c>{spaceId}</c> route was
 /// mapped around it.
 /// </para>
@@ -44,5 +48,6 @@ internal static class ApiRouteGroup
             .AddEndpointFilter(AntiforgeryRequirement.ValidateStateChangingAsync)
             .AddEndpointFilter(NotAvailableFloor.HoldAsync)
             .AddEndpointFilter(ActiveSpaceResolution.ResolveAsync)
-            .AddEndpointFilter(ActiveSpaceResolution.CreateSpaceAsync);
+            .AddEndpointFilter(ActiveSpaceResolution.CreateSpaceAsync)
+            .AddEndpointFilter(ActiveSpaceResolution.InvitationResolution.ResolveTokenAsync);
 }

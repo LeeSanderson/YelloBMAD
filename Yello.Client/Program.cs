@@ -124,6 +124,9 @@ builder.Services.AddScoped<SpaceNarration>();
 builder.Services.AddScoped<DepartureNarration>();
 builder.Services.AddScoped<PageHeadingFocus>();
 
+// Story 4.3: the Invitation view's requests - the view, the accept, and the unchanged registration and sign-in it chains.
+builder.Services.AddScoped<InvitationCalls>();
+
 var host = builder.Build();
 
 // WHAT HAPPENS WHEN A SESSION ENDS, wired once. AC3, UX-DR30.

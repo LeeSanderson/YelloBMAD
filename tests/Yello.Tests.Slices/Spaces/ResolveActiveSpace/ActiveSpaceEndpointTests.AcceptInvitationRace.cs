@@ -19,7 +19,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 4.3 ATDD run (2026-11-01).</b> Deterministic: the test holds the lock (or
+/// <b>Written as red-phase scaffolds by the story 4.3 ATDD run (2026-11-01); activated by its dev phase (2026-11-02).</b> Deterministic: the test holds the lock (or
 /// the row) on a connection opened under the Space's key, fires the request(s), waits on <c>LCK_M_%</c> through
 /// <see cref="TaskWire.WaitUntilBlockedOnALockAsync"/> (or <see cref="LabelWire.WaitUntilBlockedOrAnsweredAsync"/> where
 /// answering at once is the defect), then commits. Never a delay.
@@ -44,7 +44,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>200</c>s or a <c>500</c> from the alternate key.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the accept route is not mapped and takes no Invitations lock yet; Task 4, Q8 (a)")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "AR-32")]
     [Trait("Requirement", "AD-28")]
@@ -87,7 +87,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var refused = Assert.Single(raced, answer => answer.StatusCode != HttpStatusCode.OK);
 
         Assert.True(refused.StatusCode == HttpStatusCode.NotFound, $"{refused.StatusCode} {refused.Body}");
-        Assert.Equal(InvitationWire.NotValidProblemType, ProblemType(refused));
+        Assert.Equal(ProblemTypes.InvitationNotValid, ProblemType(refused));
         Assert.Single(await MembershipsInAsync(database, invited!.SpaceId), row => row.AccountId != invited.OwnerId);
         Assert.Equal("Accepted", Assert.Single(await wire.InvitationsInAsync(invited.SpaceId)).State);
     }
@@ -100,7 +100,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// committed <c>Pending</c> before the holder committed): a Membership.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the accept route is not mapped; Task 4 (the guarded ExecuteUpdate composed with OfferPredicates.Actionable)")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "AD-27")]
@@ -138,7 +138,7 @@ public sealed partial class ActiveSpaceEndpointTests
         });
 
         Assert.True(raced?.StatusCode == HttpStatusCode.NotFound, $"{raced?.StatusCode} {raced?.Body}");
-        Assert.Equal(InvitationWire.NotValidProblemType, ProblemType(raced!));
+        Assert.Equal(ProblemTypes.InvitationNotValid, ProblemType(raced!));
         Assert.DoesNotContain(await MembershipsInAsync(database, invited!.SpaceId), row => row.AccountId != invited.OwnerId);
         Assert.Equal("Revoked", Assert.Single(await wire.InvitationsInAsync(invited.SpaceId)).State);
     }
@@ -156,7 +156,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// a missing lock; the wait can. Recorded for the dev phase in the ATDD checklist.
     /// </remarks>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the accept route is not mapped and takes no Invitations lock yet; Task 4, Q8 (a)")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "FR-10")]
     [Trait("Requirement", "AD-27")]

@@ -9,11 +9,11 @@ using Yello.Contracts;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.ApiTokens;
 using Yello.Contracts.Boards;
+using Yello.Contracts.Invitations;
 using Yello.Contracts.Labels;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
 using Yello.Contracts.Tasks;
-using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -698,9 +698,9 @@ internal sealed partial class FakeYelloApi
             {
                 ["Access-Control-Allow-Origin"] = origin,
                 ["Access-Control-Allow-Credentials"] = "true",
-                // Story 4.3 (ATDD run): the Invitation view's token header (Lee's Q4 (a)), which a cross-origin request may
+                // Story 4.3: the Invitation view's token header (Lee's Q4 (a)), which a cross-origin request may
                 // carry only once the preflight allows it - as the Host's CrossOriginPolicy must.
-                ["Access-Control-Allow-Headers"] = $"content-type, {Antiforgery.HeaderName}, {Idempotency.HeaderName}, {InvitationWire.TokenHeaderName}",
+                ["Access-Control-Allow-Headers"] = $"content-type, {Antiforgery.HeaderName}, {Idempotency.HeaderName}, {InvitationRoutes.TokenHeader}",
                 ["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE",
                 ["Vary"] = "Origin",
             },

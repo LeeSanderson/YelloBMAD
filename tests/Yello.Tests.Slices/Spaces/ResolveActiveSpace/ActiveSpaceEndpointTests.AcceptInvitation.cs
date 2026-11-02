@@ -20,7 +20,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 4.3 ATDD run (2026-11-01).</b> See <c>.ViewInvitation.cs</c> for the
+/// <b>Written as red-phase scaffolds by the story 4.3 ATDD run (2026-11-01); activated by its dev phase (2026-11-02).</b> See <c>.ViewInvitation.cs</c> for the
 /// stand-ins, the seeding and the 4.2 trap: every refusal here is anchored on a served accept of the same route, and the
 /// uniform <c>404</c> is asserted to differ in type and body from the unmatched path's <c>not-available</c>.
 /// </para>
@@ -40,7 +40,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Anchor: the view showed the offer before the accept (a deliberate act after the Space and Role were shown).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the accept route (POST /api/v1/invitations/acceptance) is not mapped; Tasks 4-6, Lee's Q2 (a), Q10 (a) 200 { spaceId }")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "AR-32")]
     [Trait("Requirement", "AD-28")]
@@ -90,7 +90,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// load-check-save): a second Membership, or a 2601/2627 answered as <c>500</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the accept route is not mapped; Task 4 (the guarded update), Lee's Q6 (a)")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "AR-32")]
     [Trait("Requirement", "AD-26")]
@@ -117,7 +117,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.True(first?.StatusCode == HttpStatusCode.OK, $"{first?.StatusCode} {first?.Body}");
         Assert.True(second?.StatusCode == HttpStatusCode.NotFound, $"{second?.StatusCode} {second?.Body}");
-        Assert.Equal(InvitationWire.NotValidProblemType, ProblemType(second!));
+        Assert.Equal(ProblemTypes.InvitationNotValid, ProblemType(second!));
         Assert.Single(await MembershipsInAsync(database, invited!.SpaceId), row => row.AccountId != invited.OwnerId);
     }
 
@@ -128,7 +128,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Membership, the row <c>Accepted</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the accept route and its idempotency record are not built; Task 6, Q11 (a)")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "AR-25")]
     [Trait("Requirement", "FR-11")]
@@ -168,7 +168,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal(original!.StatusCode, replay?.StatusCode);
         Assert.Equal(original.Body, replay!.Body);
         Assert.True(fresh?.StatusCode == HttpStatusCode.NotFound, $"{fresh?.StatusCode} {fresh?.Body}");
-        Assert.Equal(InvitationWire.NotValidProblemType, ProblemType(fresh!));
+        Assert.Equal(ProblemTypes.InvitationNotValid, ProblemType(fresh!));
         Assert.Equal("Accepted", Assert.Single(await wire.InvitationsInAsync(invited!.SpaceId)).State);
         Assert.Single(await MembershipsInAsync(database, invited.SpaceId), row => row.AccountId != invited.OwnerId);
     }
@@ -185,7 +185,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// unrecognised token answered with a distinct body.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - neither route is mapped and invitation-not-valid is not declared; Tasks 3-6, Lee's Q6 (a)")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "AR-32")]
     [Trait("Requirement", "UX-DR18")]
@@ -267,7 +267,7 @@ public sealed partial class ActiveSpaceEndpointTests
             accepts.Add(("revoked, by its addressee", await AcceptAsync(revokedAddressee, revoked.Token)));
 
             offer = await ViewAnonymouslyAsync(client, live.Token);
-            unmatched = await new WireSession(client).GetAnonymouslyAsync(InvitationWire.OfferRoute + "/nothing-here");
+            unmatched = await new WireSession(client).GetAnonymouslyAsync(InvitationRoutes.Offer + "/nothing-here");
         });
 
         Assert.True(offer?.StatusCode == HttpStatusCode.OK, $"The live anchor: {offer?.StatusCode} {offer?.Body}");
@@ -278,7 +278,7 @@ public sealed partial class ActiveSpaceEndpointTests
             var (_, first) = route[0];
 
             Assert.True(first.StatusCode == HttpStatusCode.NotFound, $"{first.StatusCode} {first.Body}");
-            Assert.Equal(InvitationWire.NotValidProblemType, ProblemType(first));
+            Assert.Equal(ProblemTypes.InvitationNotValid, ProblemType(first));
             Assert.NotEqual(ProblemTypes.NotAvailable, ProblemType(first));
             Assert.NotEqual(unmatched!.Body, first.Body);
 
@@ -310,7 +310,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// address clause.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the accept route and invitation-for-another-account do not exist; Tasks 3-6, Q13 (a)")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "AR-32")]
     [Trait("Requirement", "AD-28")]
@@ -346,7 +346,7 @@ public sealed partial class ActiveSpaceEndpointTests
         });
 
         Assert.True(refused?.StatusCode == HttpStatusCode.Forbidden, $"{refused?.StatusCode} {refused?.Body}");
-        Assert.Equal(InvitationWire.ForAnotherAccountProblemType, ProblemType(refused!));
+        Assert.Equal(ProblemTypes.InvitationForAnotherAccount, ProblemType(refused!));
         Assert.DoesNotContain("@", refused!.Body, StringComparison.Ordinal);
 
         foreach (var address in new[] { invited!.Invitee, strangerAddress })
@@ -368,7 +368,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>Accepted</c>. Plant 17 is the gate's (the acceptance slice referencing <c>NewSpace</c>), not this case's.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the accept route is not mapped; registration is unchanged (Lee's Q3 (a)); Tasks 4-6")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "FR-4")]
     [Trait("Requirement", "AR-27")]
@@ -427,7 +427,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// its Personal Space. Anchor: the invitee's Session then accepts <c>200</c>. Plant 11: a Token accepted on the route.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the accept route is not mapped as Session-only; Task 6, Lee's Q7 (a)")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "AD-4")]
     [Trait("Requirement", "AD-28")]
@@ -453,8 +453,8 @@ public sealed partial class ActiveSpaceEndpointTests
             var inviteeId = await AccountIdOfAsync(database, invited.Invitee);
             var bearer = await BearerForAsync(invitee, await PersonalSpaceOfAsync(database, displayName));
 
-            anonymous = await new WireSession(client).PostAsync(InvitationWire.AcceptanceRoute, InvitationWire.AcceptBody(invited.Token), withAntiforgeryToken: false);
-            withToken = await invitee.SendWithTokenAndHeadersAsync(HttpMethod.Post, InvitationWire.AcceptanceRoute, bearer, InvitationWire.AcceptBody(invited.Token), NoKey);
+            anonymous = await new WireSession(client).PostAsync(InvitationRoutes.Acceptance, InvitationWire.AcceptBody(invited.Token), withAntiforgeryToken: false);
+            withToken = await invitee.SendWithTokenAndHeadersAsync(HttpMethod.Post, InvitationRoutes.Acceptance, bearer, InvitationWire.AcceptBody(invited.Token), NoKey);
 
             membershipsBeforeSession = (await wire.MembershipsOfAccountAsync(inviteeId)).Count;
             stateBeforeSession = Assert.Single(await wire.InvitationsInAsync(invited.SpaceId)).State;
@@ -478,7 +478,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// served <c>POST</c> on the same route first, so the absence is not a route that does not exist (the 4.2 trap).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the accept route is not mapped, so the POST anchor fails; Task 6")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "AD-28")]
     public async Task A_GET_on_the_accept_route_creates_nothing()
@@ -504,7 +504,7 @@ public sealed partial class ActiveSpaceEndpointTests
             fetchedId = await AccountIdOfAsync(database, fetched.Invitee);
             await poster.FetchAntiforgeryTokenAsync();
             posted = await AcceptAsync(poster, anchor.Token);
-            got = await fetcher.SendWithHeadersAsync(HttpMethod.Get, InvitationWire.AcceptanceRoute, content: null, InvitationWire.TokenHeaders(fetched.Token), withAntiforgeryToken: false);
+            got = await fetcher.SendWithHeadersAsync(HttpMethod.Get, InvitationRoutes.Acceptance, content: null, InvitationWire.TokenHeaders(fetched.Token), withAntiforgeryToken: false);
         });
 
         Assert.True(posted?.StatusCode == HttpStatusCode.OK, $"The POST anchor: {posted?.StatusCode} {posted?.Body}");
@@ -519,7 +519,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Invitation stays <c>Pending</c> and the Membership keeps its Role. Nothing is written.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the accept route is not mapped; Q12 (a)")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     public async Task An_Account_already_a_Member_accepting_is_refused_409_already_a_member_and_nothing_changes()
     {
@@ -557,7 +557,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// asserted. Plant 16: the token logged.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 / AC7 - neither route is mapped; Tasks 4-6 (log only ids after resolution)")]
+    [Fact]
     [Trait("Requirement", "NFR-6")]
     [Trait("Requirement", "AD-23")]
     public async Task Neither_the_token_nor_an_address_nor_a_name_reaches_the_Host_log_on_view_or_accept()

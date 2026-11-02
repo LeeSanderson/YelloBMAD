@@ -2,6 +2,7 @@ using Microsoft.Playwright;
 using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.Accounts;
+using Yello.Contracts.Invitations;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
@@ -16,8 +17,8 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 4.3 ATDD run (2026-11-01).</b> Each is skipped with AC13 (or the AC it
-/// shows) and what it waits for. The API is <see cref="FakeYelloApi"/> at the network edge, taught the view, the accept and
+/// <b>Written as red-phase scaffolds by the story 4.3 ATDD run (2026-11-01), and activated by its dev phase
+/// (2026-11-02).</b> The API is <see cref="FakeYelloApi"/> at the network edge, taught the view, the accept and
 /// registration by this run (<c>FakeYelloApi.InvitationAcceptance.cs</c>); no Host, no database, no engine. Build
 /// <c>Yello.Client</c> in Debug before running them. Same collection as <see cref="InvitationTests"/>, so no new fixture.
 /// </para>
@@ -112,7 +113,7 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
     /// carried the token in its header, not its URL (Lee's Q4 (a)).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 / AC13 - InvitationView.razor at /invitations/{Token} does not exist; Task 7, Q15 (a) copy")]
+    [Fact]
     [Trait("Requirement", "UX-DR18")]
     [Trait("Requirement", "NFR-9")]
     public async Task The_offer_names_the_Space_the_Role_and_the_issuer_under_a_fixed_title_with_no_preview_metadata()
@@ -144,7 +145,7 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
 
             var read = Assert.Single(api.InvitationOfferReads);
 
-            Assert.Equal(token, read.Header(InvitationWire.TokenHeaderName));
+            Assert.Equal(token, read.Header(InvitationRoutes.TokenHeader));
             Assert.DoesNotContain(token, read.Path + read.Query, StringComparison.Ordinal);
         }
     }
@@ -155,7 +156,7 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
     /// <c>{ invitationToken }</c> and an <c>Idempotency-Key</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 / AC13 - InvitationView.razor does not exist; Task 7, Q11 (a) Idempotency-Key per click")]
+    [Fact]
     [Trait("Requirement", "AD-28")]
     [Trait("Requirement", "AD-18")]
     public async Task Opening_the_link_sends_no_accept_and_clicking_Join_sends_exactly_one()
@@ -190,7 +191,7 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
     /// the switcher lists the new Space, and "You joined {Space}." is said - with no address in anything said.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - InvitationView.razor does not exist; Task 7, Q15 (a) copy, Q19 (a) landing")]
+    [Fact]
     [Trait("Requirement", "UX-DR31")]
     [Trait("Requirement", "UX-DR38")]
     public async Task The_accept_waits_for_its_answer_then_lands_in_the_joined_Space_and_says_so()
@@ -227,7 +228,7 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
     /// action. Anchor: a live token's offer names them (the first case).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 / AC13 - InvitationView.razor and the invitation-not-valid copy do not exist; Task 7, Q15 (a) copy")]
+    [Fact]
     [Trait("Requirement", "UX-DR18")]
     public async Task A_token_no_longer_valid_shows_the_uniform_copy_and_nothing_of_the_Space()
     {
@@ -256,7 +257,7 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
     /// invitation, which re-renders the offer for no Session.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 / AC13 - InvitationView.razor and the different-Account copy do not exist; Task 7, Lee's Q5 (a), Q15 (a) copy")]
+    [Fact]
     [Trait("Requirement", "UX-DR18")]
     [Trait("Requirement", "UX-DR38")]
     public async Task A_different_Account_is_told_without_either_address_and_can_sign_out_back_to_the_invitation()
@@ -292,7 +293,7 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
     /// Memberships, the maximum." on the view, and the page stays on the invitation.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 / AC13 - InvitationView.razor does not exist; Task 7 (RefusalCopy's memberships-per-space)")]
+    [Fact]
     [Trait("Requirement", "UX-DR35")]
     [Trait("Requirement", "AR-30")]
     public async Task A_full_Space_says_its_bound_on_the_view()
@@ -319,7 +320,7 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
     /// in that order, re-fetching the anti-forgery token after sign-in; the person lands in the joined Space.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 / AC13 - InvitationView.razor and its registration chain do not exist; Task 7, Lee's Q3 (a)")]
+    [Fact]
     [Trait("Requirement", "FR-4")]
     [Trait("Requirement", "AD-22")]
     public async Task Registering_from_the_view_chains_register_then_sign_in_then_accept()
@@ -338,7 +339,7 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
 
             Assert.Equal(string.Empty, await email.InputValueAsync());
 
-            await page.GetByLabel("Display name", new PageGetByLabelOptions { Exact = true }).FillAsync("New Person");
+            await page.GetByLabel("Your name", new PageGetByLabelOptions { Exact = true }).FillAsync("New Person");
             await email.FillAsync(InvitedAddress);
             await page.GetByLabel("Password", new PageGetByLabelOptions { Exact = true }).FillAsync("a-long-enough-password-1!");
             await page.GetByRole(AriaRole.Button, new PageGetByRoleOptions { Name = CreateAndJoinAction, Exact = true }).ClickAsync();
@@ -348,14 +349,14 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
             var order = api.Requests
                 .Where(request => request.Method == "POST")
                 .Select(request => request.Path)
-                .Where(path => path == AccountRoutes.Register || path == SessionRoutes.Authenticate || path == InvitationWire.AcceptanceRoute)
+                .Where(path => path == AccountRoutes.Register || path == SessionRoutes.Authenticate || path == InvitationRoutes.Acceptance)
                 .ToList();
 
-            Assert.Equal([AccountRoutes.Register, SessionRoutes.Authenticate, InvitationWire.AcceptanceRoute], order);
+            Assert.Equal([AccountRoutes.Register, SessionRoutes.Authenticate, InvitationRoutes.Acceptance], order);
 
             var requests = api.Requests.ToList();
             var signIn = requests.FindIndex(request => request.Method == "POST" && request.Path == SessionRoutes.Authenticate);
-            var accept = requests.FindIndex(request => request.Method == "POST" && request.Path == InvitationWire.AcceptanceRoute);
+            var accept = requests.FindIndex(request => request.Method == "POST" && request.Path == InvitationRoutes.Acceptance);
 
             Assert.Contains(requests.Skip(signIn).Take(accept - signIn), request => request.Path == SessionRoutes.AntiforgeryToken);
         }
@@ -367,7 +368,7 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
     /// applies) and "Join {Space}" is offered; no request's URL ever carries the token.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - InvitationView.razor and its inline sign-in do not exist; Task 7, Q16 (a)")]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     [Trait("Requirement", "NFR-6")]
     public async Task Signing_in_from_the_view_happens_inline_and_the_token_stays_out_of_every_request_URL()
@@ -396,7 +397,7 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
     /// says "Not sent." and the resend carries the same <c>Idempotency-Key</c>, so a lost answer is never a second act.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - InvitationView.razor does not exist; Task 7")]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     [Trait("Requirement", "AD-18")]
     public async Task Focus_starts_on_the_heading_and_an_unanswered_accept_says_Not_sent_and_keeps_its_key()
@@ -433,7 +434,7 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
     /// element in <c>main</c> that scrolls sideways.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - InvitationView.razor does not exist; Task 7")]
+    [Fact]
     [Trait("Requirement", "NFR-9")]
     public async Task The_view_reflows_at_320_by_256()
     {

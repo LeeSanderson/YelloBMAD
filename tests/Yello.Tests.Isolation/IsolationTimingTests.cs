@@ -123,7 +123,7 @@ public sealed class IsolationTimingTests(IsolationWorldFixture fixture) : IClass
     /// </summary>
     /// <param name="surface">The surface.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC6 - the view route and its NotAvailableFloor-style floor do not exist; Tasks 4 and 6, Lee's Q6 (a)")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "FR-11")]
@@ -131,10 +131,10 @@ public sealed class IsolationTimingTests(IsolationWorldFixture fixture) : IClass
     public async Task The_duration_method_tells_the_not_valid_answer_from_an_arm_that_does_no_work(IsolationSurface surface)
     {
         var world = fixture.World;
-        var early = InvitationWire.OfferRoute + "/early";
+        var early = InvitationRoutes.Offer + "/early";
 
         var verdict = await DurationIndistinguishability.CompareMeasuredAsync(
-            () => world.Host.ServerDurationOfAsync(() => world.A.SendAsync(surface, HttpMethod.Get, InvitationWire.OfferRoute, body: null, InvitationWire.TokenHeaders(InvitationWire.UnrecognisedToken()))),
+            () => world.Host.ServerDurationOfAsync(() => world.A.SendAsync(surface, HttpMethod.Get, InvitationRoutes.Offer, body: null, InvitationWire.TokenHeaders(InvitationWire.UnrecognisedToken()))),
             () => world.Host.ServerDurationOfAsync(() => world.A.SendAsync(surface, HttpMethod.Get, early, body: null, InvitationWire.TokenHeaders(InvitationWire.UnrecognisedToken()))));
 
         TimingRecord.Add($"oracle (not valid vs early return) / {surface}: {verdict.Describe()}");

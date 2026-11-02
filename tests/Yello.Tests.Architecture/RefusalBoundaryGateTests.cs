@@ -68,6 +68,16 @@ public sealed partial class RefusalBoundaryGateTests
     /// </summary>
     private const string CreatesASpace = "POST /api/v1/spaces";
 
+    /// <summary>
+    /// The third and fourth, named by story 4.3 (C7) and the AD-2 / AD-24 amendment of 2026-11-02: the Invitation view and
+    /// accept reach the invited Space's Invitation (and the accept its Memberships) on the Invitation unit of work, keyed to
+    /// the Space the token resolved to on the server. The token identifies one offer and nothing else; every state that is
+    /// not an actionable Invitation - a token never issued included - answers one byte-identical <c>404</c> held to the
+    /// not-found floor, and it records nothing, so there is no boundary refusal here to be told apart either.
+    /// </summary>
+    private static readonly string[] ReachesThroughAnInvitationToken =
+        ["GET /api/v1/invitations/offer", "POST /api/v1/invitations/acceptance"];
+
     private static readonly string MatrixTypeName = typeof(RoleCapabilityMatrix).FullName!;
     private static readonly string RecorderPortName = typeof(IAccessRefusalRecorder).FullName!;
     private static readonly string PresencePortName = typeof(ISpacePresenceRegister).FullName!;
@@ -256,9 +266,13 @@ public sealed partial class RefusalBoundaryGateTests
         // Story 3.1's exemption must be found reaching too, through the same port crossing.
         Assert.Contains(reaching, endpoint => MethodAndPattern(endpoint) == CreatesASpace);
 
+        // Story 4.3's two must be found reaching too, through the Invitation store's port.
+        Assert.All(ReachesThroughAnInvitationToken, route => Assert.Contains(reaching, endpoint => MethodAndPattern(endpoint) == route));
+
         var offenders = reaching
             .Where(endpoint => !CarriesSpaceId(endpoint))
             .Where(endpoint => endpoint.RoutePattern.RawText != CreatesItsOwnSpace && MethodAndPattern(endpoint) != CreatesASpace)
+            .Where(endpoint => !ReachesThroughAnInvitationToken.Contains(MethodAndPattern(endpoint), StringComparer.Ordinal))
             .Select(MethodAndPattern)
             .ToList();
 
@@ -442,6 +456,10 @@ public sealed partial class RefusalBoundaryGateTests
             "Yello.Domain.Spaces.NewSpace",
             "Yello.Domain.Spaces.ProvisionedSpace",
             "Yello.Infrastructure.Persistence.SpaceStore",
+
+            // Story 4.3: the Invitation view's one read of the invited Space's name, joined on the Invitation's own SpaceId
+            // under the Space key the token resolved to (InvitationStore.ReadOfferAsync).
+            "Yello.Infrastructure.Persistence.InvitationStore",
         ];
 
         var dependents = DependentsOf(space);

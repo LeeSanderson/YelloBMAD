@@ -190,6 +190,20 @@ public sealed class SessionState : IDisposable
     /// <returns>A task that completes once everything is purged and the landing is announced.</returns>
     public Task SignedOutAsync() => EndAsync(_announceSignOut);
 
+    /// <summary>
+    /// Ends the Session on this client because the person signed out, as <see cref="SignedOutAsync()"/> does - the same
+    /// purge - but lands with <paramref name="landing"/> instead of on sign-in. Story 4.3, AC7: the Invitation view signs a
+    /// different Account out and stays at the Invitation's address, re-reading the offer for no Session.
+    /// </summary>
+    /// <param name="landing">Where the person lands, run once everything is purged.</param>
+    /// <returns>A task that completes once everything is purged and the landing has run.</returns>
+    public Task SignedOutAsync(Func<Task> landing)
+    {
+        ArgumentNullException.ThrowIfNull(landing);
+
+        return EndAsync(landing);
+    }
+
     private async Task EndAsync(Func<Task>? announce)
     {
         IsSignedIn = false;

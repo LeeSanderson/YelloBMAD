@@ -1,0 +1,152 @@
+@page "/invitations/{Token}"
+
+@*
+    THE INVITATION VIEW. Story 4.3: AC2, AC3, AC4, AC6, AC7, AC9, AC13; FR-11, UX-DR18, UX-DR35, NFR-9.
+
+    THE ONE SURFACE AN UNAUTHENTICATED STRANGER SEES (DESIGN.md:475). Reached without a Session - ClientRoutes
+    lists it, so it is never bounced to sign-in and no context bar is drawn. The page URL carries the opaque token
+    and nothing else; the token goes to the API in a request header (the view) or the body (the accept), never in a
+    request URL (Lee's Q4 (a)), and is never stored.
+
+    NOTHING LEAKS INTO A PREVIEW. The title stays the host page's fixed "Yello" - this page sets none, as no page does
+    (UX-DR33) - there is no og: or twitter: metadata, and noindex is said twice: here, for browsers that run this, and as
+    an X-Robots-Tag header from the static host (staticwebapp.config.json) for scrapers that do not.
+
+    LOADING A URL IS NEVER ACCEPTANCE (FR-11 :277-278, AD-28). The view is read on arrival; the accept is sent only
+    from a deliberate press - "Join {Space}", or the end of "Create an Account and join" - with an Idempotency-Key
+    per press, kept for an identical resend after "Not sent.". Never optimistic: the page lands in the Space only
+    after the 200.
+
+    REGISTRATION FROM THE INVITATION (Lee's Q3 (a)) chains the unchanged registration route, then sign-in with the
+    same credentials, then the accept. The email field is never pre-filled: the invited address is never echoed to
+    a link holder (UX-DR18), and appears nowhere on this page.
+
+    A DIFFERENT ACCOUNT is told so without either address, because the helpful version "discloses the invited
+    address to whoever holds the link, which on a forwarded link is a stranger" (EXPERIENCE.md:265). Signing out
+    stays here and re-reads the offer for no Session.
+
+    Every state is its own @if block, so no copy is hidden behind an else.
+*@
+
+@using Yello.Client.Sessions
+@using Yello.Client.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject InvitationCalls Calls
+@inject SessionState Session
+@inject SpaceDirectory Directory
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceNarration Narration
+@inject NavigationManager Navigation
+
+<HeadContent>
+    <meta name="robots" content="noindex" />
+</HeadContent>
+
+<div class="auth-surface">
+    <section class="invitation-view">
+        @if (_phase == InvitationViewPhase.Loading)
+        {
+            <p class="visually-hidden" role="status">@Localizer["InvitationLoading"]</p>
+        }
+
+        @if (_phase == InvitationViewPhase.Offer && _offer is not null)
+        {
+            <h1 class="type-dialog-title invitation-view__heading" tabindex="-1" @ref="_heading">@OfferHeading</h1>
+            <p class="invitation-view__role">@JoinAsCopy</p>
+            <p class="invitation-view__meaning">@RoleMeaningCopy</p>
+
+            @if (IsAddressedToTheSession)
+            {
+                <button type="button" class="button-primary" disabled="@IsBusy" @onclick="JoinAsync">@JoinCopy</button>
+            }
+
+            @if (!IsAddressedToTheSession && _form == InvitationOfferForm.None)
+            {
+                <button type="button" class="button-primary" disabled="@IsBusy" @onclick="OpenRegistration">@Localizer["InvitationCreateAndJoin"]</button>
+                <p class="invitation-view__aside">@Localizer["InvitationHaveAnAccount"] <button type="button" class="invitation-view__link text-link" @onclick="OpenSignIn">@Localizer["InvitationSignIn"]</button></p>
+            }
+
+            @if (!IsAddressedToTheSession && _form == InvitationOfferForm.Register)
+            {
+                <form class="invitation-view__form" @onsubmit="RegisterAndJoinAsync" @onsubmit:preventDefault>
+                    <FormField FieldId="invitation-display-name"
+                               Label="@(Localizer["DisplayNameLabel"].Value)"
+                               Message="@(MessageFor(RegistrationFields.DisplayName) ?? Localizer["DisplayNameHint"].Value)"
+                               Invalid="@(MessageFor(RegistrationFields.DisplayName) is not null)"
+                               AutoComplete="name"
+                               Disabled="@IsBusy"
+                               @bind-Value="_displayName" />
+                    <FormField FieldId="invitation-email-address"
+                               Label="@(Localizer["EmailAddressLabel"].Value)"
+                               Message="@MessageFor(RegistrationFields.EmailAddress)"
+                               Invalid="@(MessageFor(RegistrationFields.EmailAddress) is not null)"
+                               InputType="email"
+                               AutoComplete="email"
+                               Disabled="@IsBusy"
+                               @bind-Value="_emailAddress" />
+                    <FormField FieldId="invitation-password"
+                               Label="@(Localizer["PasswordLabel"].Value)"
+                               Message="@MessageFor(RegistrationFields.Password)"
+                               Invalid="@(MessageFor(RegistrationFields.Password) is not null)"
+                               InputType="password"
+                               AutoComplete="new-password"
+                               Disabled="@IsBusy"
+                               @bind-Value="_password" />
+                    <PrimaryButton Disabled="@IsBusy">@Localizer["InvitationCreateAndJoin"]</PrimaryButton>
+                </form>
+            }
+
+            @if (!IsAddressedToTheSession && _form == InvitationOfferForm.SignIn)
+            {
+                <form class="invitation-view__form" @onsubmit="SignInAsync" @onsubmit:preventDefault>
+                    <FormField FieldId="invitation-sign-in-email-address"
+                               Label="@(Localizer["EmailAddressLabel"].Value)"
+                               InputType="email"
+                               AutoComplete="email"
+                               Disabled="@IsBusy"
+                               @bind-Value="_emailAddress" />
+                    <FormField FieldId="invitation-sign-in-password"
+                               Label="@(Localizer["PasswordLabel"].Value)"
+                               InputType="password"
+                               AutoComplete="current-password"
+                               Disabled="@IsBusy"
+                               @bind-Value="_password" />
+                    <PrimaryButton Disabled="@IsBusy">@Localizer["InvitationSignIn"]</PrimaryButton>
+                </form>
+            }
+
+            @* One polite region, in the page from the offer's first render and empty until something is said, so what
+               is under way ("Joining.") and what came back ("Not sent.", the bound) are announced as they change. *@
+            <p class="invitation-view__status" role="status">@StatusCopy</p>
+
+            @if (!IsAddressedToTheSession)
+            {
+                <p class="invitation-view__footer">@Localizer["InvitationOwnSpace"]</p>
+            }
+        }
+
+        @if (_phase == InvitationViewPhase.NotValid)
+        {
+            <h1 class="type-dialog-title invitation-view__heading" tabindex="-1" @ref="_heading">@Localizer["invitation-not-valid"]</h1>
+            <p>@Localizer["InvitationNotValidBody"]</p>
+            <p><a class="text-link" href="@ClientRoutes.Home">@Localizer["InvitationGoToYello"]</a></p>
+        }
+
+        @if (_phase == InvitationViewPhase.ForAnotherAccount)
+        {
+            <h1 class="type-dialog-title invitation-view__heading" tabindex="-1" @ref="_heading">@Localizer["invitation-for-another-account"]</h1>
+            <p>@Localizer["InvitationForAnotherAccountBody"]</p>
+            <div class="invitation-view__actions">
+                <button type="button" class="button-primary" disabled="@IsBusy" @onclick="SignOutAsync">@Localizer["SignOutLabel"]</button>
+                <a class="button-secondary" href="@ClientRoutes.Home">@Localizer["InvitationCancel"]</a>
+            </div>
+        }
+
+        @if (_phase == InvitationViewPhase.Unavailable)
+        {
+            <h1 class="type-dialog-title invitation-view__heading" tabindex="-1" @ref="_heading">@Localizer["InvitationUnavailable"]</h1>
+            <p><a class="text-link" href="@ClientRoutes.Home">@Localizer["InvitationGoToYello"]</a></p>
+        }
+    </section>
+</div>

@@ -151,6 +151,16 @@ public static class RefusalCopy
     public static string InvitationNotPendingKey => "invitation-not-pending";
 
     /// <summary>
+    /// Story 4.3 (AC6, Lee's Q6 (a)): the uniform answer for a revoked, accepted, expired, lapsed or unrecognised Invitation.
+    /// </summary>
+    public static string InvitationNotValidKey => "invitation-not-valid";
+
+    /// <summary>
+    /// Story 4.3 (AC7, open question 13 (a)): the accept by a signed-in Account the Invitation does not name.
+    /// </summary>
+    public static string InvitationForAnotherAccountKey => "invitation-for-another-account";
+
+    /// <summary>
     /// The resource a refusal is rendered with.
     /// </summary>
     /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
@@ -228,6 +238,8 @@ public static class RefusalCopy
         [ProblemTypes.AlreadyAMember] = AlreadyAMemberKey,
         [ProblemTypes.InvitationPending] = InvitationPendingKey,
         [ProblemTypes.InvitationNotPending] = InvitationNotPendingKey,
+        [ProblemTypes.InvitationNotValid] = InvitationNotValidKey,
+        [ProblemTypes.InvitationForAnotherAccount] = InvitationForAnotherAccountKey,
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static string? OwnKey(string? type) =>

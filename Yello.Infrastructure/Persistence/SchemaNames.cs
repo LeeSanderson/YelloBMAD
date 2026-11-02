@@ -90,9 +90,21 @@ public static class SchemaNames
     public static string InvitationTable => "Invitation";
 
     /// <summary>
-    /// The unique index an Invitation is resolved through by its token's hash (story 4.1, Task 3; story 4.3 reads it).
+    /// The unique index on an Invitation's token hash (story 4.1, Task 3): one Invitation per token. Story 4.3 resolves a
+    /// token through <see cref="InvitationTokenTable"/>, which is outside the policy.
     /// </summary>
     public static string InvitationTokenHashUniqueIndex => "UX_Invitation_TokenHash";
+
+    /// <summary>
+    /// The Invitation token index (story 4.3, Lee's Q1 (a)). <b>Not</b> Space-scoped: its Space column is
+    /// <c>OfferedSpaceId</c>, and it carries no predicate - see <c>InvitationTokenConfiguration</c>.
+    /// </summary>
+    public static string InvitationTokenTable => "InvitationToken";
+
+    /// <summary>
+    /// The unique index the token index is read through: one seek by the hash of the presented token.
+    /// </summary>
+    public static string InvitationTokenIndexTokenHashUniqueIndex => "UX_InvitationToken_TokenHash";
 
     /// <summary>
     /// The outbox (story 4.1, AD-10). <b>Not</b> Space-scoped: it has no Space column and carries no predicate - Lee's

@@ -16,7 +16,7 @@ namespace Yello.Domain.Bounds;
 /// <b>Enforced by the stories named, each of which consults this registry rather than declaring its
 /// own limit:</b> concurrent active Sessions per Space by story 1.6, at Space resolution; Projects
 /// per Space by 2.1; Tasks per Project by 2.2; Spaces per Account by 3.1; Memberships per Space by
-/// 4.3; concurrent editors per Task by 7.3.
+/// 4.3, on the accept; concurrent editors per Task by 7.3.
 /// </para>
 /// <para>
 /// <b>Checked by the pipeline, never by a slice</b> (AR-3), and the refusal is raised inside the

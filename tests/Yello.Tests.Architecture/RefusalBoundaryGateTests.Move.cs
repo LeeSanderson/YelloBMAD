@@ -101,6 +101,11 @@ public sealed partial class RefusalBoundaryGateTests
                 Yello.Contracts.Spaces.SpaceRoutes.Directory,
                 Yello.Contracts.ApiTokens.ApiTokenRoutes.Issue,
                 TaskMovePattern,
+
+                // Story 4.3: the Invitation accept, Session-only (Lee's Q7 (a)) - a Token is bound to one Space and must
+                // never join its Account to another. Its route carries no {spaceId}, so its shape alone already answers a
+                // Token as no credential; the marker also gives it the 401 ahead of anti-forgery.
+                Yello.Contracts.Invitations.InvitationRoutes.Acceptance,
             }.Order(StringComparer.Ordinal),
             marked);
     }

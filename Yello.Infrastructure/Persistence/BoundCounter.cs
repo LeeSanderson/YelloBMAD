@@ -40,9 +40,9 @@ namespace Yello.Infrastructure.Persistence;
 /// passes and the slice answers the boundary's <c>404</c> - the bound never discloses a Project.
 /// </para>
 /// <para>
-/// <b>Three bounds today.</b> Spaces per Account (story 3.1) is the first counted outside a Space: on the
-/// Space creation unit of work, under the Account's own lock. Memberships per Space (4.3) adds its own
-/// count here when its creation endpoint declares it.
+/// <b>Four bounds today.</b> Spaces per Account (story 3.1) is the first counted outside a Space: on the
+/// Space creation unit of work, under the Account's own lock. Memberships per Space (story 4.3) is counted on the
+/// Invitation unit of work the accept runs on, under the Space's Invitations lock.
 /// </para>
 /// </remarks>
 /// <param name="dbContext">The request's unit of work.</param>
@@ -62,11 +62,12 @@ internal sealed class BoundCounter(YelloDbContext dbContext) : IBoundCounter
 
             Bound.SpacesPerAccount => CountSpacesPerAccountAsync(cancellationToken),
 
+            Bound.MembershipsPerSpace => CountMembershipsAsync(cancellationToken),
+
             _ => throw new ArgumentOutOfRangeException(
                 nameof(bound),
                 bound,
-                "No creation endpoint consults this bound through the pipeline yet (Memberships per Space is 4.3's); "
-                + "add its count here when one does."),
+                "No creation endpoint consults this bound through the pipeline yet; add its count here when one does."),
         };
 
     /// <summary>
@@ -89,6 +90,22 @@ internal sealed class BoundCounter(YelloDbContext dbContext) : IBoundCounter
 
         return await dbContext.Database
             .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM dbo.[Membership] WHERE AccountId = {accountId}")
+            .SingleAsync(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// The Space's Memberships, at any Role, counted under the Space's Invitations lock (story 4.3, AC9; open question 8
+    /// (a)): acceptance is the only way a Membership joins an existing Space, and every accept and every issue takes that
+    /// lock first, so two accepts at 99 cannot both pass. Runs on the Invitation unit of work, under the <c>SpaceId</c> key
+    /// alone, so the policy narrows the count to the invited Space.
+    /// </summary>
+    private async Task<int> CountMembershipsAsync(CancellationToken cancellationToken)
+    {
+        await ApplicationLocks.TakeInvitationsAsync(dbContext, cancellationToken).ConfigureAwait(false);
+
+        return await dbContext.Database
+            .SqlQuery<int>($"SELECT COUNT(*) AS [Value] FROM dbo.[Membership]")
             .SingleAsync(cancellationToken)
             .ConfigureAwait(false);
     }

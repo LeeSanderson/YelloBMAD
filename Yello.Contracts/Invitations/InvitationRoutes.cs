@@ -48,4 +48,29 @@ public static class InvitationRoutes
     /// <param name="invitationId">The Invitation.</param>
     /// <returns>The path.</returns>
     public static string InvitationOf(Guid spaceId, Guid invitationId) => $"/api/v1/spaces/{spaceId:D}/invitations/{invitationId:D}";
+
+    /// <summary>
+    /// <c>GET</c> here with the token in <see cref="TokenHeader"/>: the Invitation view (story 4.3, AC1, AC2; Lee's Q4 (a)).
+    /// <c>200</c> with an <see cref="InvitationOfferResponse"/>, or <c>404 invitation-not-valid</c> for a revoked, accepted,
+    /// expired or unrecognised token. A safe read that writes nothing, served the same whatever credential is presented.
+    /// </summary>
+    /// <remarks>
+    /// <b>No <c>{spaceId}</c></b> (story 4.3, C7): the link holder does not know the Space until the view answers, and the
+    /// page URL must not carry it. The token never travels in an API path, so no request line any layer logs carries it.
+    /// </remarks>
+    public static string Offer => "/api/v1/invitations/offer";
+
+    /// <summary>
+    /// <c>POST</c> an <see cref="AcceptInvitationRequest"/> here, with a Session, the anti-forgery token and an optional
+    /// <c>Idempotency-Key</c>: the accept (story 4.3, AC4; Lee's Q4 (a), Q7 (a)). <c>200</c> with an
+    /// <see cref="AcceptedInvitationResponse"/>; <c>401</c> without a Session (a bearer Token included);
+    /// <c>404 invitation-not-valid</c>; <c>403 invitation-for-another-account</c>; <c>409 already-a-member</c>; or
+    /// <c>409 bound-reached</c> at 100 Memberships.
+    /// </summary>
+    public static string Acceptance => "/api/v1/invitations/acceptance";
+
+    /// <summary>
+    /// The request header the view's token travels in (Lee's Q4 (a)), never a URL.
+    /// </summary>
+    public static string TokenHeader => "Yello-Invitation-Token";
 }

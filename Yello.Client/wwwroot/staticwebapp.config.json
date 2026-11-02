@@ -1,4 +1,13 @@
 {
+  "routes": [
+    {
+      "route": "/invitations/*",
+      "headers": {
+        "X-Robots-Tag": "noindex",
+        "Referrer-Policy": "no-referrer"
+      }
+    }
+  ],
   "navigationFallback": {
     "rewrite": "/index.html",
     "exclude": [

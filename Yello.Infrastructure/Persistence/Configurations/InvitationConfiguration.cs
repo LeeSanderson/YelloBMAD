@@ -21,8 +21,8 @@ namespace Yello.Infrastructure.Persistence.Configurations;
 /// </para>
 /// <para>
 /// <b>The address is stored twice</b>: as submitted (trimmed), for 4.2's list; and normalised, in the Account column's
-/// exact type and <c>Latin1_General_100_BIN2</c> collation (Lee's Q3), so 4.3 compares with one function and one
-/// collation. <c>(SpaceId, NormalizedEmailAddress)</c> is the index both duplicate checks seek.
+/// exact type and <c>Latin1_General_100_BIN2</c> collation (Lee's Q3), so story 4.3's accept compares the caller's
+/// address with one function and one collation. <c>(SpaceId, NormalizedEmailAddress)</c> is the index both duplicate checks seek.
 /// </para>
 /// <para>
 /// <b>No unique index filtered on <c>State</c></b>: expiry is derived, so an expired Invitation is still
@@ -114,7 +114,8 @@ internal sealed class InvitationConfiguration(YelloDbContext context) : IEntityT
         // AC4's and AC13's seek: this Space's Invitations for one address.
         builder.HasIndex(invitation => new { invitation.SpaceId, invitation.NormalizedEmailAddress });
 
-        // Story 4.3 resolves an Invitation through its token's hash.
+        // One Invitation per token. Story 4.3 resolves a token through the policy-free InvitationToken index instead,
+        // because this table is under the Space policy.
         builder.HasIndex(invitation => invitation.TokenHash)
             .IsUnique()
             .HasDatabaseName(SchemaNames.InvitationTokenHashUniqueIndex);

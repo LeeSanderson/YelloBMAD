@@ -188,8 +188,6 @@ namespace Yello.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("SpaceId", "Id");
-
                     b.HasIndex("IssuedByAccountId");
 
                     b.HasIndex("TokenHash")
@@ -568,6 +566,31 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.ToTable("IdempotencyRecord", (string)null);
                 });
 
+            modelBuilder.Entity("Yello.Infrastructure.Persistence.InvitationToken", b =>
+                {
+                    b.Property<Guid>("InvitationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("OfferedSpaceId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("TokenHash")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("varbinary(32)")
+                        .IsFixedLength(false);
+
+                    b.HasKey("InvitationId");
+
+                    b.HasIndex("TokenHash")
+                        .IsUnique()
+                        .HasDatabaseName("UX_InvitationToken_TokenHash");
+
+                    b.HasIndex("OfferedSpaceId", "InvitationId");
+
+                    b.ToTable("InvitationToken", (string)null);
+                });
+
             modelBuilder.Entity("Yello.Infrastructure.Persistence.TaskLabel", b =>
                 {
                     b.Property<Guid>("SpaceId")
@@ -697,6 +720,16 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.HasOne("Yello.Domain.Spaces.Space", null)
                         .WithMany()
                         .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Yello.Infrastructure.Persistence.InvitationToken", b =>
+                {
+                    b.HasOne("Yello.Domain.Invitations.Invitation", null)
+                        .WithMany()
+                        .HasForeignKey("OfferedSpaceId", "InvitationId")
+                        .HasPrincipalKey("SpaceId", "Id")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

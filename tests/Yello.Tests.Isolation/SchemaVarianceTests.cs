@@ -31,6 +31,7 @@ public sealed class SchemaVarianceTests(SqlServerEngine engine)
     {
         ["AccessRefusal.TargetSpaceId"] = "written after the rollback with no session context; AD-20",
         ["ApiToken.BoundSpaceId"] = "looked up by hash before any Space is known; story 1.8 Q4",
+        ["InvitationToken.OfferedSpaceId"] = "an Invitation token looked up by hash before any Space is known; story 4.3, Lee's Q1 (a)",
     };
 
     // Per column, not per table: a filter predicate covers a column only when it names that column

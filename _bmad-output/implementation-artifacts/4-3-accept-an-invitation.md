@@ -1,6 +1,10 @@
+---
+baseline_commit: 17191e8d4ffdd836929599ea2aef549d89cee9b2
+---
+
 # Story 4.3: Accept an Invitation
 
-Status: ready-for-dev
+Status: review
 
 Epic: 4 — Bring people into one piece of your work (the third story of the epic)
 Story key: `4-3-accept-an-invitation`
@@ -244,34 +248,34 @@ AC1 to AC9 are reproduced **verbatim** from `epics.md:1711-1753` (`status: final
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0: Lee's decisions** (before any code)
-  - [ ] Q1-Q7 are **[LEE]**. The orchestrator routes them to Lee before development. Record each answer in this file under "Decided by Lee" (the `9077806` precedent) before ATDD. If development starts without an answer, stop and return the question as a blocker; do **not** build an option that adds a policy-free table, a session-key setter, or a token-to-Space resolution without Lee's recorded decision.
-- [ ] **Task 1: decide the other open questions** (Q8-Q19). Each recommendation is the default. Record each as "Qn - (x)" with its cost in Completion Notes.
-- [ ] **Task 2: spine amendment** (AC12; Q2)
-  - [ ] Add a dated amendment to `ARCHITECTURE-SPINE.md` in the form Lee approves (AD-2 and/or AD-24, and AD-28): the acceptance unit of work, the key's source, what it reads, what it writes, and why it is not a third Account-scoped surface. Additive; AD-24's rule line stands. Add the phrase gate.
-  - [ ] Correct AD-24's 2026-10-29 amendment sentence that names "story 4.3's registration-while-accepting" as needing both keys (C1), by an additive note, not by rewriting history.
-- [ ] **Task 3: Contracts** (AC2, AC4, AC6, AC7)
-  - [ ] Extend `Yello.Contracts/Invitations/InvitationRoutes.cs` with the view and accept routes (Q4) and their client helpers.
-  - [ ] `InvitationOfferResponse(string SpaceName, string Role, string IssuerName, bool? AddressedToYou)` (per Q5) and `AcceptedInvitationResponse(Guid SpaceId)`; the accept request (per Q4) carries the token only. **No property named `Token`, `Secret` or `Plaintext`** (`ApiTokenGateTests.Only_the_issuance_response_carries_a_Token_secret` matches names exactly) — e.g. `InvitationToken`.
-  - [ ] `ProblemTypes.InvitationNotValid` and `ProblemTypes.InvitationForAnotherAccount`, with remarks on status and disclosure.
-- [ ] **Task 4: Infrastructure** (AC1, AC4-AC6, AC9)
-  - [ ] Token resolution per Q1 (a): policy-free `InvitationToken` table (`TokenHash` unique, `InvitationId`, `OfferedSpaceId`), written by `InvitationStore.IssueAsync` in the issue's transaction, foreign key to `Invitation (SpaceId, Id)` with cascade (so a Space deletion still takes it), one named reader; `SchemaVarianceTests.NamedVariances` gains `InvitationToken.OfferedSpaceId` with its reason; a named-reader gate in the `Space_is_read_only_where_named` style. Hand-edited, expand-only migration (`TESTING-CONVENTIONS.md:519-540`); backfill existing Invitations from `Invitation.TokenHash` in the migration. Or Q1 (b) if Lee chooses it.
-  - [ ] The acceptance unit of work (name e.g. `InvitationScope`, beside `SpaceCreationScope`): begin transaction, `SpaceSessionContext.SetAsync(resolvedSpaceId)`, narrow `SpaceScope` (never `Resolve` — no Role is held), clear on dispose. The view uses it read-only; the accept writes.
-  - [ ] `InvitationStore`: `ReadOfferAsync` (projection of Space name + Role + IssuerName + address-match boolean, through `Actionable`), `AcceptAsync` (the guarded update + insert; outcomes `Accepted(spaceId) | NotValid | ForAnotherAccount | AlreadyAMember`), both under `ApplicationLocks.TakeInvitationsAsync` for the accept (Q8). Watch S1200; split by port if it fires and record it.
-  - [ ] `BoundCounter`: the `MembershipsPerSpace` arm.
-- [ ] **Task 5: Application** (AC4-AC7)
-  - [ ] `Yello.Application/Invitations/ViewInvitation/ViewInvitationHandler.cs` and `Yello.Application/Invitations/AcceptInvitation/AcceptInvitationHandler.cs` (C8: `Invitations/`, not `Memberships/`). Handlers read no Role and never count (AR-3). The accept handler takes no `IOutbox` and never references `NewSpace` or `RegisterAccountHandler` (gates).
-- [ ] **Task 6: Host** (AC1, AC4, AC6, AC7, AC9, AC11)
-  - [ ] A pipeline step for the acceptance unit, in `ActiveSpaceResolution` (the `Creation.cs` model; nested types to stay under S1200): resolve the token, open the unit, idempotency (Q11), the endpoint, bound consultation in Q9's order, commit or roll back. The view step: resolve, open read-only, floor (Q6), answer.
-  - [ ] Endpoints in `InvitationEndpoints`: explicit outcome switch, **no `_ =>` arm** that turns an unknown outcome into a `404` (4.1 review P10). `Program.cs`: register and map next to the 4.2 routes; update the route comment block.
-  - [ ] Development-time client hosting: the `X-Robots-Tag` and `Referrer-Policy` headers for `/invitations/*` (AC2), if the Host serves the client.
-- [ ] **Task 7: Client** (AC2, AC3, AC7, AC9, AC13). `InvitationView.razor`, `ClientRoutes`, `staticwebapp.config.json`, `ClientCopy.resx`, `RefusalCopy.OwnKeys`, `components.css`, `FakeYelloApi.Invitations.cs`.
-- [ ] **Task 8: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log.
-- [ ] **Task 9: ledger, docs, verification**
-  - [ ] Apply the ledger dispositions below (one line per CLOSED/UPDATED note, no TAB or FORM FEED, keep the final newline).
-  - [ ] `grep -rn "4\.3" Yello.* tests` and rewrite every comment that predicts 4.3 so it says what exists (at least `AccountRegistrationStore`, `RegisterAccountHandler`, `InvitationState.Accepted`, `Invitation.State`, `OfferPredicates`, `InvitationTokenSecret`, `InvitationLinks`, `BoundRegistry`, `BoundCounter`, `InvitationStore`).
-  - [ ] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-4` stays `in-progress`.
-  - [ ] `docker info --format '{{.ServerVersion}}'`, `dotnet build Yello.slnx` (0/0), `dotnet build-server shutdown`, `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record totals. Rerun a failure once, alone, before calling it real.
+- [x] **Task 0: Lee's decisions** (before any code)
+  - [x] Q1-Q7 are **[LEE]**. The orchestrator routes them to Lee before development. Record each answer in this file under "Decided by Lee" (the `9077806` precedent) before ATDD. If development starts without an answer, stop and return the question as a blocker; do **not** build an option that adds a policy-free table, a session-key setter, or a token-to-Space resolution without Lee's recorded decision.
+- [x] **Task 1: decide the other open questions** (Q8-Q19). Each recommendation is the default. Record each as "Qn - (x)" with its cost in Completion Notes.
+- [x] **Task 2: spine amendment** (AC12; Q2)
+  - [x] Add a dated amendment to `ARCHITECTURE-SPINE.md` in the form Lee approves (AD-2 and/or AD-24, and AD-28): the acceptance unit of work, the key's source, what it reads, what it writes, and why it is not a third Account-scoped surface. Additive; AD-24's rule line stands. Add the phrase gate.
+  - [x] Correct AD-24's 2026-10-29 amendment sentence that names "story 4.3's registration-while-accepting" as needing both keys (C1), by an additive note, not by rewriting history.
+- [x] **Task 3: Contracts** (AC2, AC4, AC6, AC7)
+  - [x] Extend `Yello.Contracts/Invitations/InvitationRoutes.cs` with the view and accept routes (Q4) and their client helpers.
+  - [x] `InvitationOfferResponse(string SpaceName, string Role, string IssuerName, bool? AddressedToYou)` (per Q5) and `AcceptedInvitationResponse(Guid SpaceId)`; the accept request (per Q4) carries the token only. **No property named `Token`, `Secret` or `Plaintext`** (`ApiTokenGateTests.Only_the_issuance_response_carries_a_Token_secret` matches names exactly) — e.g. `InvitationToken`.
+  - [x] `ProblemTypes.InvitationNotValid` and `ProblemTypes.InvitationForAnotherAccount`, with remarks on status and disclosure.
+- [x] **Task 4: Infrastructure** (AC1, AC4-AC6, AC9)
+  - [x] Token resolution per Q1 (a): policy-free `InvitationToken` table (`TokenHash` unique, `InvitationId`, `OfferedSpaceId`), written by `InvitationStore.IssueAsync` in the issue's transaction, foreign key to `Invitation (SpaceId, Id)` with cascade (so a Space deletion still takes it), one named reader; `SchemaVarianceTests.NamedVariances` gains `InvitationToken.OfferedSpaceId` with its reason; a named-reader gate in the `Space_is_read_only_where_named` style. Hand-edited, expand-only migration (`TESTING-CONVENTIONS.md:519-540`); backfill existing Invitations from `Invitation.TokenHash` in the migration. Or Q1 (b) if Lee chooses it.
+  - [x] The acceptance unit of work (name e.g. `InvitationScope`, beside `SpaceCreationScope`): begin transaction, `SpaceSessionContext.SetAsync(resolvedSpaceId)`, narrow `SpaceScope` (never `Resolve` — no Role is held), clear on dispose. The view uses it read-only; the accept writes.
+  - [x] `InvitationStore`: `ReadOfferAsync` (projection of Space name + Role + IssuerName + address-match boolean, through `Actionable`), `AcceptAsync` (the guarded update + insert; outcomes `Accepted(spaceId) | NotValid | ForAnotherAccount | AlreadyAMember`), both under `ApplicationLocks.TakeInvitationsAsync` for the accept (Q8). Watch S1200; split by port if it fires and record it.
+  - [x] `BoundCounter`: the `MembershipsPerSpace` arm.
+- [x] **Task 5: Application** (AC4-AC7)
+  - [x] `Yello.Application/Invitations/ViewInvitation/ViewInvitationHandler.cs` and `Yello.Application/Invitations/AcceptInvitation/AcceptInvitationHandler.cs` (C8: `Invitations/`, not `Memberships/`). Handlers read no Role and never count (AR-3). The accept handler takes no `IOutbox` and never references `NewSpace` or `RegisterAccountHandler` (gates).
+- [x] **Task 6: Host** (AC1, AC4, AC6, AC7, AC9, AC11)
+  - [x] A pipeline step for the acceptance unit, in `ActiveSpaceResolution` (the `Creation.cs` model; nested types to stay under S1200): resolve the token, open the unit, idempotency (Q11), the endpoint, bound consultation in Q9's order, commit or roll back. The view step: resolve, open read-only, floor (Q6), answer.
+  - [x] Endpoints in `InvitationEndpoints`: explicit outcome switch, **no `_ =>` arm** that turns an unknown outcome into a `404` (4.1 review P10). `Program.cs`: register and map next to the 4.2 routes; update the route comment block.
+  - [x] Development-time client hosting: the `X-Robots-Tag` and `Referrer-Policy` headers for `/invitations/*` (AC2), if the Host serves the client.
+- [x] **Task 7: Client** (AC2, AC3, AC7, AC9, AC13). `InvitationView.razor`, `ClientRoutes`, `staticwebapp.config.json`, `ClientCopy.resx`, `RefusalCopy.OwnKeys`, `components.css`, `FakeYelloApi.Invitations.cs`.
+- [x] **Task 8: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log.
+- [x] **Task 9: ledger, docs, verification**
+  - [x] Apply the ledger dispositions below (one line per CLOSED/UPDATED note, no TAB or FORM FEED, keep the final newline).
+  - [x] `grep -rn "4\.3" Yello.* tests` and rewrite every comment that predicts 4.3 so it says what exists (at least `AccountRegistrationStore`, `RegisterAccountHandler`, `InvitationState.Accepted`, `Invitation.State`, `OfferPredicates`, `InvitationTokenSecret`, `InvitationLinks`, `BoundRegistry`, `BoundCounter`, `InvitationStore`).
+  - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-4` stays `in-progress`.
+  - [x] `docker info --format '{{.ServerVersion}}'`, `dotnet build Yello.slnx` (0/0), `dotnet build-server shutdown`, `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record totals. Rerun a failure once, alone, before calling it real.
 
 ## Dev Notes
 
@@ -552,12 +556,144 @@ the correction recorded in the Debug Log, not deleted.
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, 2026-11-02.
 
 ### Debug Log References
+
+**Red-green.** The ATDD run had already seen two scaffolds red for the stated reason (the unmapped route's `404 not-available`). This phase wrote the contracts, the token index, `InvitationScope`, the store, the pipeline step and the endpoints before activating, so each scaffold went green on activation; the red half of each was then shown by its plant (table below), restored in a `finally` by a scratchpad runner that saved each file's text in memory. No `git checkout`, `restore` or `reset` was used. `git status` and a grep for the planted text confirmed every file restored.
+
+| Plant | Expected red | Seen |
+|---|---|---|
+| 1 The view sets `State = Accepted` | AC1 safe-read case | RED `Viewing_an_Invitation_writes_nothing_and_only_the_accept_changes_anything` (the view then reads nothing through `Actionable` and answers 404; the unit's rollback also discards the write) |
+| 2 Accept without the `Actionable` guard (update only) | race 2; expired/revoked arms | RED race 2 (`An_accept_racing_a_revoke_that_commits_under_it_...`); the five-state case stayed green because the screen still composes `Actionable` - race 2 is the real guard for the statement's own guard |
+| 3 Accept as load, C# check, `SaveChanges` | race 1 or 2 | RED race 2; race 1 green (the lock serialises it) - race 2 is the guard |
+| 4 Accept without the address clause (screen and update) | AC7 accept case | first pass refused at compile by S1172; second pass with analyzers silenced in the planted file: RED `A_different_Account_accepting_is_refused_403_...` |
+| 5 Accept without the Invitations lock (screen, accept, bound count) | race 3 | RED race 3 ("answered while held"), race 1 and the bound race |
+| 6a Bound count skipped | AC9 at 100 | (second pass) RED `The_101st_Membership_is_refused_...` |
+| 6b Bound checked before the guard | full-Space ordering | RED `In_a_full_Space_a_stranger_or_a_dead_token_never_learns_the_Space_is_full` |
+| 7 Unrecognised token returns early (distinct answer) | AC6 byte case; duration oracle | RED `Five_states_are_one_answer_...`; the permanent oracle `The_duration_method_tells_the_not_valid_answer_from_an_arm_that_does_no_work` is green (caught) on both surfaces in the isolation run - not masked |
+| 8 View body gains `SpaceId` | response shape | RED `The_view_answers_exactly_the_Space_the_Role_and_the_issuer_...`; the contract gate holds the type |
+| 9 Mismatch copy names an address | AC7 client case | RED `A_different_Account_is_told_without_either_address_...` |
+| 10 Client sends the accept on load | AC4 client case | RED `Opening_the_link_sends_no_accept_and_clicking_Join_sends_exactly_one` |
+| 11 No Session-only marker on the accept | no-Session/Token case | (second pass) RED wire `An_accept_with_no_Session_or_with_a_bearer_Token_...` (the anonymous 401 falls behind anti-forgery's 400) and RED route gate. A Token still gets no Membership: the step's own Session check fails closed |
+| 12 A second `SpaceId`-key setter | setter gate | (second pass) RED `The_SpaceId_key_is_set_by_exactly_the_named_units_of_work` |
+| 13 State write moved to another type | state-writer gate | (second pass) RED `Only_the_Invitation_store_writes_an_Invitation_state` |
+| 14 The view's own `ExpiresAt >` | predicate gate | (second pass) RED `Only_the_shared_actionable_predicate_compares_ExpiresAt` |
+| 15 noindex removed from `staticwebapp.config.json` | config gate | RED `The_static_host_sends_noindex_and_no_referrer_for_invitation_pages` |
+| 16 The token logged | I-17 case | RED `Neither_the_token_nor_an_address_nor_a_name_reaches_the_Host_log_...` |
+| 17 Acceptance handler reaches `NewSpace` | AD-22 slice gate | first pass (`_ = typeof(NewSpace)`) GREEN - masked: that form left nothing the gate's walk sees; second pass (a call to `NewSpace.Provision`) RED `The_acceptance_slice_never_provisions_...`. Recorded: the gate sees calls and signatures, not a bare `typeof` |
+
+**Scaffolds corrected, and why.**
+- `RefusalBoundaryGateTests.The_acceptance_unit_of_work_is_reached_only_by_its_port_its_registration_and_the_pipeline_step`: the scaffold asserted a `Yello.Host` dependent of the *concrete* unit, which is internal to Infrastructure (the ring forbids the Host naming it). Corrected to the stronger shape: the concrete `InvitationScope` is named only by itself and its registration; its port `IInvitationScope` is reached only by the Host's pipeline step (`ActiveSpaceResolution`). The registration is `SpaceContentStores`, not `InfrastructureServices` (S1200 holds that class at its limit).
+- `DesignFoundationGateTests.No_component_declares_more_padding_than_the_invitation_view`: two existing rules pad 36px and are not components - the page shell `.auth-surface` and the Board's `.board-column--skeleton`. Named as exclusions with reasons rather than giving the view `spacing.7`, which `DESIGN.md:275` does not.
+- `DesignFoundationGateTests.The_invitation_page_has_a_fixed_title_and_a_noindex_meta`: the scaffold required `<PageTitle>Yello</PageTitle>`, but story 1.7's standing gate `SpaceSwitcherGateTests.No_client_code_sets_the_document_title` forbids any client title setter (UX-DR33) and the host page's title is already exactly `Yello`. Corrected to assert no `PageTitle`; the 1.7 gate's detector now admits a `HeadContent` holding only the robots noindex meta (its detector test gained both directions).
+- `InvitationViewTests.Registering_from_the_view_chains_register_then_sign_in_then_accept`: the label is "Your name" (`DisplayNameLabel`, as `Register.razor` renders it), not "Display name".
+- Two existing gates widened by name, each with its reason: `No_endpoint_without_spaceId_in_its_path_reaches_a_Space_scoped_entity` (the view and accept, C7) and `The_endpoints_unreachable_with_a_Token_are_Token_management_the_switcher_and_the_move` (the accept's Session-only marker). `Space_is_read_only_where_named` names `InvitationStore` (the view's Space-name read). `SchemaVarianceTests.NamedVariances` names `InvitationToken.OfferedSpaceId`.
+- The five `InvitationWire` stand-ins were swapped for `InvitationRoutes.Offer`/`.Acceptance`/`.TokenHeader` and `ProblemTypes.InvitationNotValid`/`.InvitationForAnotherAccount` in every use and deleted; the arch gate's two route patterns are kept as literals on purpose.
+
+**Analyzer-driven shape (S1200).** The pipeline step is two nested types (`InvitationResolution`, `InvitationIdempotency`) inside `ActiveSpaceResolution`; the view/accept endpoints are their own class (`InvitationAcceptanceEndpoints`); the client page's requests live in `InvitationCalls`. The Session-only `401` for a route without `{spaceId}` is answered in `AccountScopedResolution.EstablishAsync` (the filter already ahead of anti-forgery), reusing story 1.8's existing `SessionOnlyEndpoint` marker - the accept is not an Account-scoped surface and establishes no context there.
+
+**Iteration runs.** Slices (21 new wire cases + 6 handler cases), Isolation (307/307, the nine 4.3 rows live on both surfaces, timing row and oracle green), Architecture (437/437), Client (`InvitationViewTests` 10/10, the text-spacing theory 2/2): all green before the full run.
+
+**Full run (the last thing run before review):** `docker info` 29.5.3; `dotnet build Yello.slnx` 0 warnings, 0 errors; `dotnet build-server shutdown`; `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`: **2,055 total, 2,045 passed, 0 failed, 10 skipped** (baseline 2,029 / 1,971 / 0 / 58: the 48 story-4.3 scaffolds are all live, plus 6 handler cases and the rows and theories they expand to; the 10 skips are the pre-existing ones, three of them the migration-bundle tests).
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created (create-story, 2026-11-01). Seven open questions (Q1-Q7) are marked [LEE] and must be decided before development.
+- **Built (FR-11, AR-30/AD-25/NFR-8, AR-32/AD-28, AR-27/AD-22, AR-31/AD-27, UX-DR18, UX-DR35).** `GET /api/v1/invitations/offer` (token in `Yello-Invitation-Token`) and `POST /api/v1/invitations/acceptance` (`{ invitationToken }`, Session-only). The token is hashed and resolved through the policy-free `InvitationToken` index (written in the issue's save, cascading from the Invitation, backfilled by migration `20261102004259_InvitationTokenIndex`); `InvitationScope` opens one transaction and sets the `SpaceId` key alone to the stored `OfferedSpaceId` (a server-generated sentinel for anything unrecognised). The view reads through `OfferPredicates.Actionable`, never commits. The accept: idempotency replay, the store's screen under the Space's Invitations lock (actionable, addressed to the caller's own `Account` address, not already a Member), the Memberships-per-Space bound from the registry, then one guarded `ExecuteUpdate` (`Actionable` AND the caller's address) and one Membership at the row's Role; 200 `{ spaceId }`, uniform `404 invitation-not-valid`, `403 invitation-for-another-account`, `409 already-a-member`, `409 bound-reached`. Both 404s held to the not-found floor; nothing recorded as an `AccessRefusal`. Client `InvitationView.razor` at `/invitations/{Token}`; spine amendments to AD-2, AD-24 (C1 correction) and AD-28 dated 2026-11-02.
+- **Lee's Q1-Q7 (a)** built as decided; no other choice relaxes isolation, RLS, a filter or a key. The migration's backfill switches the Space policy off inside its own transaction (story 2.10's `ListViewSortKeys` precedent) - migration-time only.
+- Q8 - (a) the accept takes `Yello/Invitations/{spaceId}` first (screen, accept and the Memberships count). Cost: accepts and issues in one Space queue at one lock. Cut by reverting to a separate Memberships lock with a fixed order.
+- Q9 - (a) lock, actionable, addressed, already-a-Member, bound, write; the pipeline asks the store's screen port (`IInvitationAcceptanceScreen`) before `CreationBound.ConsultAsync`. Cost: the accept reads the Invitation twice (screen, then its own guarded statement re-decides).
+- Q10 - (a) `200 AcceptedInvitationResponse(SpaceId)`.
+- Q11 - (a) `Idempotency-Key` honoured on the Space-scoped `IdempotencyStore` in the invited Space, keyed with the caller's Account; it works with `SpaceScope` narrowed but not resolved. Cost: the record goes with the Space if it is deleted.
+- Q12 - (a) `409 already-a-member` (4.1's type), nothing written.
+- Q13 - (a) `403 invitation-for-another-account`, unrecorded.
+- Q14 - (a) no `MembershipChanged` publisher; ledgered to 7.7.
+- Q15 - (a) the listed copy, plus "{Role}: {meaning}." for the Role's one-line meaning (RoleCopy's `RolePermits*` phrases do not read as a sentence after the Role's name) and "This invitation could not be loaded." for a view with no usable answer; "Sign out" and "Cancel" reuse `SignOutLabel` and `InvitationCancel`.
+- Q16 - (a) inline sign-in on the view; no return-URL parameter.
+- Q17 - (a) "lapsed" has no stored form; covered by the derived-expired arm.
+- Q18 - (a) the raw-SQL scan beside the IL gates, its reach stated in the gate's remarks.
+- Q19 - (a) `SpaceDirectory.Forget`, then `SpaceNavigation.GoTo(SpaceHome)`; "You joined {Space}." is held in `SpaceNarration` and said by the Space's home.
+- Reversible: the page sets no `PageTitle` (story 1.7's UX-DR33 gate wins; the host title is already "Yello"); only the robots meta is added through `HeadContent`. Cut by reverting the 1.7 detector's one allowance.
+- Reversible: state changes are said through one polite `role="status"` region present from the offer's first render, and a new state's heading takes focus - not `LiveAnnouncement`, whose hidden copy would duplicate the visible "Not sent." and bound sentences.
+- Reversible: `InvitationToken` is keyed on `InvitationId` (one token per Invitation), `TokenHash` unique.
+- Reversible: Lee's Q3 (a) "registration's files do not change" was read as including their comments, so `AccountRegistrationStore` and `RegisterAccountHandler` were not touched by Task 9's comment pass.
+- Recorded behaviour (AC3): an address already registered answers registration's uniform `204` and then sign-in's ordinary "Email or password is incorrect." on the view - direct registration's existing behaviour, not a new oracle. An accept refused after registration leaves an Account with its Personal Space and no invited Membership (ledgered to UX).
+- `staticwebapp.config.json` route headers follow the SWA schema but were not checked against live documentation or a deployed app (no web check); the Host does not serve the client, so no Development-time header was added (ledgered to Lee).
 
 ### File List
+
+- `_bmad-output/implementation-artifacts/4-3-accept-an-invitation.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md`
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.InvitationView.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.InvitationAcceptance.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.InvitationRevoke.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Move.cs`
+- `tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.cs`
+- `tests/Yello.Tests.Architecture/SpaceSwitcherGateTests.Invitation.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.InvitationAcceptance.cs`
+- `tests/Yello.Tests.Client/InvitationViewTests.cs`
+- `tests/Yello.Tests.Client/TextSpacingTests.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.InvitationAcceptance.cs`
+- `tests/Yello.Tests.Isolation/IsolationTimingTests.cs`
+- `tests/Yello.Tests.Isolation/SchemaVarianceTests.cs`
+- `tests/Yello.Tests.Shared/InvitationWire.cs`
+- `tests/Yello.Tests.Slices/Invitations/AcceptInvitation/ViewAndAcceptInvitationHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Invitations/IssueInvitation/IssueInvitationHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Invitations/RevokeInvitation/ListAndRevokeInvitationHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AcceptInvitation.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AcceptInvitationBound.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AcceptInvitationRace.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ViewInvitation.cs`
+- `Yello.Application/Invitations/AcceptInvitation/AcceptInvitationHandler.cs`
+- `Yello.Application/Invitations/IInvitationAcceptanceScreen.cs`
+- `Yello.Application/Invitations/IInvitationScope.cs`
+- `Yello.Application/Invitations/IInvitationStore.cs`
+- `Yello.Application/Invitations/InvitationLinks.cs`
+- `Yello.Application/Invitations/ViewInvitation/ViewInvitationHandler.cs`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Pages/ClientRoutes.cs`
+- `Yello.Client/Pages/InvitationCalls.cs`
+- `Yello.Client/Pages/InvitationView.razor`
+- `Yello.Client/Pages/InvitationView.razor.cs`
+- `Yello.Client/Program.cs`
+- `Yello.Client/Refusals/RefusalCopy.cs`
+- `Yello.Client/Sessions/SessionState.cs`
+- `Yello.Client/wwwroot/css/components.css`
+- `Yello.Client/wwwroot/staticwebapp.config.json`
+- `Yello.Contracts/Invitations/AcceptedInvitationResponse.cs`
+- `Yello.Contracts/Invitations/AcceptInvitationRequest.cs`
+- `Yello.Contracts/Invitations/InvitationOfferResponse.cs`
+- `Yello.Contracts/Invitations/InvitationRoutes.cs`
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Domain/Bounds/BoundRegistry.cs`
+- `Yello.Domain/Invitations/InvitationState.cs`
+- `Yello.Host/ApiRouteGroup.cs`
+- `Yello.Host/Endpoints/InvitationAcceptanceEndpoints.cs`
+- `Yello.Host/Endpoints/InvitationEndpoints.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Host/Spaces/AccountScopedResolution.cs`
+- `Yello.Host/Spaces/ActiveSpaceResolution.Invitation.cs`
+- `Yello.Host/Spaces/NotAvailableFloor.cs`
+- `Yello.Infrastructure/Invitations/InvitationTokenSecret.cs`
+- `Yello.Infrastructure/Persistence/BoundCounter.cs`
+- `Yello.Infrastructure/Persistence/Configurations/InvitationConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Configurations/InvitationModel.cs`
+- `Yello.Infrastructure/Persistence/Configurations/InvitationTokenConfiguration.cs`
+- `Yello.Infrastructure/Persistence/InvitationScope.cs`
+- `Yello.Infrastructure/Persistence/InvitationStore.cs`
+- `Yello.Infrastructure/Persistence/InvitationToken.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261102004259_InvitationTokenIndex.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261102004259_InvitationTokenIndex.Designer.cs`
+- `Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs`
+- `Yello.Infrastructure/Persistence/OfferPredicates.cs`
+- `Yello.Infrastructure/Persistence/SchemaNames.cs`
+- `Yello.Infrastructure/SpaceContentStores.cs`
+
+## Change Log
+
+- 2026-11-02 - Story 4.3 implemented (bmad-dev-story): the Invitation view and accept on the policy-free token index and the `SpaceId`-only Invitation unit of work (Lee's Q1-Q7 (a)); Q8-Q19 decided at their recommendations; spine amendments to AD-2, AD-24 and AD-28; all 48 ATDD scaffolds and nine isolation rows live; 17 plants seen red; ledger dispositions applied. Status: review.

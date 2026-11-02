@@ -78,38 +78,11 @@ public static class InvitationWire
         return [.. document.RootElement.EnumerateArray().Select(row => row.EnumerateObject().Select(member => member.Name).Order(StringComparer.Ordinal).ToList())];
     }
 
-    // ---- Story 4.3 (ATDD run, 2026-11-01) ----------------------------------------------------------------------------
+    // ---- Story 4.3 ------------------------------------------------------------------------------------------------------
     //
-    // TEMPORARY stand-ins, as 4.2's ATDD run left RevokeRoute here: OfferRoute, AcceptanceRoute, TokenHeaderName,
-    // NotValidProblemType and ForAnotherAccountProblemType are what Lee's Q4 (a), Q6 (a) and the story's Q13 (a) name, and
-    // Task 3 declares them in Yello.Contracts (InvitationRoutes, ProblemTypes). The dev phase swaps every use for the
-    // contract member and deletes these five. Everything else below stays: it is the test's reading of the wire.
-
-    /// <summary>
-    /// TEMPORARY (story 4.3 ATDD): the view, <c>GET</c> with the token in <see cref="TokenHeaderName"/> (Lee's Q4 (a)).
-    /// </summary>
-    public static string OfferRoute => "/api/v1/invitations/offer";
-
-    /// <summary>
-    /// TEMPORARY (story 4.3 ATDD): the accept, <c>POST</c> with <see cref="AcceptBody"/> (Lee's Q4 (a)).
-    /// </summary>
-    public static string AcceptanceRoute => "/api/v1/invitations/acceptance";
-
-    /// <summary>
-    /// TEMPORARY (story 4.3 ATDD): the request header the view's token travels in, never a URL (Lee's Q4 (a)).
-    /// </summary>
-    public static string TokenHeaderName => "Yello-Invitation-Token";
-
-    /// <summary>
-    /// TEMPORARY (story 4.3 ATDD): the one answer for a revoked, accepted, expired, lapsed or unrecognised Invitation, on
-    /// both routes - <c>404</c>, a type of its own, distinct from the boundary's <c>not-available</c> (Lee's Q6 (a)).
-    /// </summary>
-    public static string NotValidProblemType => "urn:yello:problem:invitation-not-valid";
-
-    /// <summary>
-    /// TEMPORARY (story 4.3 ATDD): the accept's <c>403</c> for a signed-in Account the Invitation does not name (Q13 (a)).
-    /// </summary>
-    public static string ForAnotherAccountProblemType => "urn:yello:problem:invitation-for-another-account";
+    // The routes, the token header and the two problem types are Yello.Contracts' (InvitationRoutes.Offer, .Acceptance,
+    // .TokenHeader; ProblemTypes.InvitationNotValid, .InvitationForAnotherAccount): story 4.3's dev phase swapped its ATDD
+    // stand-ins for them and deleted the stand-ins. Everything below is the test's reading of the wire.
 
     /// <summary>
     /// The bound the accept consults, as the <c>409 bound-reached</c> body names it (AR-30, UX-DR35).
@@ -149,12 +122,12 @@ public static class InvitationWire
         JsonContent.Create(new { invitationToken }, options: JsonOptions);
 
     /// <summary>
-    /// The view's headers: the token in <see cref="TokenHeaderName"/>.
+    /// The view's headers: the token in <c>InvitationRoutes.TokenHeader</c>.
     /// </summary>
     /// <param name="token">The token, sent exactly as given.</param>
     /// <returns>The headers.</returns>
     public static Dictionary<string, string> TokenHeaders(string token) =>
-        new(StringComparer.Ordinal) { [TokenHeaderName] = token };
+        new(StringComparer.Ordinal) { [Yello.Contracts.Invitations.InvitationRoutes.TokenHeader] = token };
 
     /// <summary>
     /// A well-formed token that was never issued: the prefix and 32 fresh random bytes, Base64Url.

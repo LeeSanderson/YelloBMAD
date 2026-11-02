@@ -3,6 +3,7 @@ using System.Text.Json;
 using Xunit;
 using Yello.Domain.Accounts;
 using Yello.Domain.Memberships;
+using Yello.Contracts.Invitations;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
 
@@ -17,10 +18,10 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 4.3 ATDD run (2026-11-01).</b> Every case is skipped with the AC it
-/// waits for. The route, the header and the problem types are <see cref="InvitationWire"/>'s temporary stand-ins
-/// (<c>OfferRoute</c>, <c>AcceptanceRoute</c>, <c>TokenHeaderName</c>, <c>NotValidProblemType</c>,
-/// <c>ForAnotherAccountProblemType</c>) until Task 3 declares them in <c>Yello.Contracts</c>; the dev phase swaps them.
+/// <b>Written as red-phase scaffolds by the story 4.3 ATDD run (2026-11-01), and activated by its dev phase
+/// (2026-11-02)</b>, which swapped <see cref="InvitationWire"/>'s temporary stand-ins for the contract's
+/// <c>InvitationRoutes.Offer</c>, <c>.Acceptance</c>, <c>.TokenHeader</c> and <c>ProblemTypes.InvitationNotValid</c>,
+/// <c>.InvitationForAnotherAccount</c>, and deleted them. Each case was also seen red under its plant (story Debug Log).
 /// </para>
 /// <para>
 /// <b>The 4.2 trap, avoided.</b> An unmapped path under <c>/api</c> already answers the boundary <c>404 not-available</c>,
@@ -50,7 +51,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// gains <c>SpaceId</c> or the address.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the view route (GET /api/v1/invitations/offer) is not mapped; Task 6, Lee's Q4 (a)")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "UX-DR18")]
     [Trait("Requirement", "AR-32")]
@@ -95,7 +96,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>State = Accepted</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the view route is not mapped (and the accept anchor needs AC4's route); Task 6")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "AR-32")]
     [Trait("Requirement", "AD-28")]
@@ -159,7 +160,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// whose Account is not the invited one, <c>true</c> for the addressee's.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 / AC7 - the view route and its Q5 (a) addressee indicator do not exist; Tasks 3 and 6")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "UX-DR18")]
     [Trait("Requirement", "AD-4")]
@@ -182,7 +183,7 @@ public sealed partial class ActiveSpaceEndpointTests
             answers["none"] = await ViewAnonymouslyAsync(client, invited.Token);
             answers["issuer"] = await ViewAsync(invited.Owner, invited.Token);
             answers["addressee"] = await ViewAsync(invitee, invited.Token);
-            answers["token"] = await invited.Owner.SendWithTokenAndHeadersAsync(HttpMethod.Get, InvitationWire.OfferRoute, bearer, content: null, InvitationWire.TokenHeaders(invited.Token));
+            answers["token"] = await invited.Owner.SendWithTokenAndHeadersAsync(HttpMethod.Get, InvitationRoutes.Offer, bearer, content: null, InvitationWire.TokenHeaders(invited.Token));
         });
 
         Assert.All(answers.Values, answer => Assert.True(answer.StatusCode == HttpStatusCode.OK, $"{answer.StatusCode} {answer.Body}"));
@@ -204,7 +205,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// theirs.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the view route and its addressee indicator do not exist; Tasks 3 and 6, Lee's Q5 (a)")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "UX-DR18")]
     public async Task A_different_Account_viewing_is_told_it_is_not_theirs_without_either_address()
@@ -248,21 +249,21 @@ public sealed partial class ActiveSpaceEndpointTests
     /// header.
     /// </summary>
     private static Task<WireResponse> ViewAsync(WireSession session, string token) =>
-        session.SendWithHeadersAsync(HttpMethod.Get, InvitationWire.OfferRoute, content: null, InvitationWire.TokenHeaders(token), withAntiforgeryToken: false);
+        session.SendWithHeadersAsync(HttpMethod.Get, InvitationRoutes.Offer, content: null, InvitationWire.TokenHeaders(token), withAntiforgeryToken: false);
 
     /// <summary>
     /// The view as a link holder with no Session sends it - a mail scanner, a prefetcher, a forwarded link: a client of its
     /// own, holding no cookie.
     /// </summary>
     private static Task<WireResponse> ViewAnonymouslyAsync(HttpClient client, string token) =>
-        new WireSession(client).SendWithHeadersAsync(HttpMethod.Get, InvitationWire.OfferRoute, content: null, InvitationWire.TokenHeaders(token), withAntiforgeryToken: false);
+        new WireSession(client).SendWithHeadersAsync(HttpMethod.Get, InvitationRoutes.Offer, content: null, InvitationWire.TokenHeaders(token), withAntiforgeryToken: false);
 
     /// <summary>
     /// The accept as the browser sends it: the Session's cookie and anti-forgery header, the body
     /// <c>{ invitationToken }</c>, and an <c>Idempotency-Key</c> when one is given (Lee's Q4 (a); Q11 (a)).
     /// </summary>
     private static Task<WireResponse> AcceptAsync(WireSession session, string token, string? key = null) =>
-        session.SendWithHeadersAsync(HttpMethod.Post, InvitationWire.AcceptanceRoute, InvitationWire.AcceptBody(token), KeyHeaders(key));
+        session.SendWithHeadersAsync(HttpMethod.Post, InvitationRoutes.Acceptance, InvitationWire.AcceptBody(token), KeyHeaders(key));
 
     /// <summary>
     /// A bearer Token the session's Account issues for <paramref name="spaceId"/> (story 1.8's route), as its plaintext.

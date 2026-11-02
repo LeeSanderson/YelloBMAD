@@ -236,6 +236,13 @@ public sealed class IssueInvitationHandlerTests
 
         public Task<InvitationRevocation> RevokeAsync(Guid invitationId, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The issue handler never revokes.");
+
+        // Nor views or accepts (story 4.3's slices have their own tests).
+        public Task<InvitationOffer?> ReadOfferAsync(InvitationContext context, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The issue handler never reads an offer.");
+
+        public Task<InvitationAcceptanceOutcome> AcceptAsync(InvitationContext context, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The issue handler never accepts.");
     }
 
     private sealed class RecordingOutbox : IOutbox

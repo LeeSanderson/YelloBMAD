@@ -1,4 +1,5 @@
 using Yello.Application.Spaces;
+using Yello.Host.ApiTokens;
 using Yello.Host.Sessions;
 
 namespace Yello.Host.Spaces;
@@ -69,7 +70,9 @@ internal static class AccountScopedResolution
 
         if (httpContext.GetEndpoint()?.Metadata.GetMetadata<AccountScopedEndpoint>() is null)
         {
-            return next(context);
+            return RequiresTheSessionItLacks(httpContext)
+                ? ValueTask.FromResult<object?>(BoundaryProblems.Unauthenticated())
+                : next(context);
         }
 
         if (SessionPrincipal.AccountIdOf(httpContext.User) is not { } accountId)
@@ -82,6 +85,21 @@ internal static class AccountScopedResolution
 
         return next(context);
     }
+
+    /// <summary>
+    /// Whether a Session-only route without <c>{spaceId}</c> - story 4.3's Invitation accept - was reached without a
+    /// Session. It is <b>not</b> an Account-scoped surface and establishes no context here (it sets no <c>AccountId</c>
+    /// key); it shares only this filter's answer: the authentication boundary's <c>401</c>, ahead of anti-forgery, and
+    /// nothing recorded. Only a Session is a credential there (Lee's Q7 (a)) - the Token scheme authenticates nothing on a
+    /// route without <c>{spaceId}</c> - so a bearer Token gets the same <c>401</c>, byte for byte, as no credential at all.
+    /// A Space-scoped Session-only route is answered by the Space boundary's own check instead.
+    /// </summary>
+    /// <param name="httpContext">The request.</param>
+    /// <returns><c>true</c> when the request must be answered <c>401</c>.</returns>
+    private static bool RequiresTheSessionItLacks(HttpContext httpContext) =>
+        !ActiveSpaceResolution.IsSpaceScoped(httpContext)
+        && httpContext.GetEndpoint()?.Metadata.GetMetadata<SessionOnlyEndpoint>() is not null
+        && SessionPrincipal.AccountIdOf(httpContext.User) is null;
 }
 
 /// <summary>

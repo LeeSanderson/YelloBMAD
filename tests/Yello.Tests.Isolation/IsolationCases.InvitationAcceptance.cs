@@ -14,13 +14,12 @@ namespace Yello.Tests.Isolation;
 /// Story 4.3 - view and accept an Invitation: the rows for <c>GET /api/v1/invitations/offer</c> (the token in the
 /// <c>Yello-Invitation-Token</c> header, Lee's Q4 (a)) and <c>POST /api/v1/invitations/acceptance</c> (Session only, Lee's
 /// Q7 (a)), each stating both surfaces (AC10; I-1, I-7, I-13, I-14, I-17). Written by the story 4.3 ATDD run (2026-11-01)
-/// as <c>PendingUntil: "4.3"</c>: GATE-003 fails the suite if any is still pending when 4.3 reaches review.
+/// as <c>PendingUntil: "4.3"</c>, and made live by its dev phase (GATE-003).
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The routes are <see cref="InvitationWire"/>'s temporary stand-ins</b> (<c>OfferRoute</c>, <c>AcceptanceRoute</c>,
-/// <c>TokenHeaderName</c>, <c>NotValidProblemType</c>, <c>ForAnotherAccountProblemType</c>) until Task 3 declares them in
-/// <c>Yello.Contracts</c>; the dev phase swaps them, as 4.2's did. Neither route carries <c>{spaceId}</c> (C7), so these
+/// <b>The routes, the token header and the problem types are <c>Yello.Contracts</c>'</b> (<c>InvitationRoutes</c>,
+/// <c>ProblemTypes</c>); the dev phase swapped the ATDD stand-ins for them, as 4.2's did. Neither route carries <c>{spaceId}</c> (C7), so these
 /// rows are not boundary rows of the usual shape: the actor reaches a Space through a token, and each row says what the
 /// token may and may not open.
 /// </para>
@@ -40,10 +39,6 @@ namespace Yello.Tests.Isolation;
 /// </remarks>
 internal static partial class IsolationCases
 {
-    private const string Story43Pending =
-        "story 4.3 maps the Invitation view and accept (Tasks 3-6); the routes, the token header and the problem types are "
-        + "InvitationWire's ATDD stand-ins until then";
-
     /// <summary>
     /// The tokens a five-state row prepared, by the request it returned: each state's token, and the live anchor's.
     /// </summary>
@@ -57,7 +52,7 @@ internal static partial class IsolationCases
     private static IEnumerable<IsolationCase> InvitationAcceptanceCases() =>
     [
         new IsolationCase(
-            "ISO-INVITATION-VIEW-DISCLOSES-ONLY-THE-OFFER", "I-14 (4.3 AC2, AC10)", IsolationVector.DeepLink, HttpMethod.Get, InvitationWire.OfferRoute,
+            "ISO-INVITATION-VIEW-DISCLOSES-ONLY-THE-OFFER", "I-14 (4.3 AC2, AC10)", IsolationVector.DeepLink, HttpMethod.Get, InvitationRoutes.Offer,
             async world =>
             {
                 var (issuing, _) = await world.OwnerOfTwoAsync("Io");
@@ -65,36 +60,30 @@ internal static partial class IsolationCases
 
                 return ViewRequest(world.A, token) with { Other = issuing.Actor };
             },
-            Both(new Served(HttpStatusCode.OK, TheViewDisclosesOnlyTheOfferAsync, "200, the Space name, Role and issuer of the token's Invitation, and nothing of the Space's content")),
-            PendingUntil: "4.3",
-            PendingReason: Story43Pending),
+            Both(new Served(HttpStatusCode.OK, TheViewDisclosesOnlyTheOfferAsync, "200, the Space name, Role and issuer of the token's Invitation, and nothing of the Space's content"))),
 
         new IsolationCase(
-            "ISO-INVITATION-NOT-VALID-SAME-FOR-FIVE-STATES", "I-13 (4.3 AC6, AC10; Lee's Q6 (a))", IsolationVector.DeepLink, HttpMethod.Get, InvitationWire.OfferRoute,
+            "ISO-INVITATION-NOT-VALID-SAME-FOR-FIVE-STATES", "I-13 (4.3 AC6, AC10; Lee's Q6 (a))", IsolationVector.DeepLink, HttpMethod.Get, InvitationRoutes.Offer,
             async world => await FiveStatesAsync(world, accept: false),
-            Both(new UniformNotValid()),
-            PendingUntil: "4.3",
-            PendingReason: Story43Pending) with
+            Both(new UniformNotValid())) with
         {
             Assumption = "PRD-12-9",
         },
 
         new IsolationCase(
-            "ISO-ACCEPT-INVITATION-NOT-VALID-SAME-FOR-FIVE-STATES", "I-13 (4.3 AC6, AC10; Lee's Q6 (a), Q7 (a))", IsolationVector.DeepLink, HttpMethod.Post, InvitationWire.AcceptanceRoute,
+            "ISO-ACCEPT-INVITATION-NOT-VALID-SAME-FOR-FIVE-STATES", "I-13 (4.3 AC6, AC10; Lee's Q6 (a), Q7 (a))", IsolationVector.DeepLink, HttpMethod.Post, InvitationRoutes.Acceptance,
             async world => await FiveStatesAsync(world, accept: true),
             new Dictionary<IsolationSurface, Expectation>
             {
                 [IsolationSurface.Session] = new UniformNotValid(),
                 [IsolationSurface.ApiToken] = new NoCredential(),
-            },
-            PendingUntil: "4.3",
-            PendingReason: Story43Pending) with
+            }) with
         {
             Assumption = "PRD-12-9",
         },
 
         new IsolationCase(
-            "ISO-ACCEPT-INVITATION-NO-SESSION", "I-2, AD-4 (4.3 AC4, AC10; Lee's Q7 (a))", IsolationVector.Api, HttpMethod.Post, InvitationWire.AcceptanceRoute,
+            "ISO-ACCEPT-INVITATION-NO-SESSION", "I-2, AD-4 (4.3 AC4, AC10; Lee's Q7 (a))", IsolationVector.Api, HttpMethod.Post, InvitationRoutes.Acceptance,
             async world =>
             {
                 var inviter = await world.NewActorAsync("Ns");
@@ -107,12 +96,10 @@ internal static partial class IsolationCases
             {
                 [IsolationSurface.Session] = new Served(HttpStatusCode.OK, TheActorJoinedTheInvitedSpaceAndNoSessionIsRefusedAsync, "200, the addressee joins the inviter's Space; the same request with no credential is the 401 anchor"),
                 [IsolationSurface.ApiToken] = new NoCredential { Then = TheActorJoinedNothingAndTheInvitationIsPendingAsync },
-            },
-            PendingUntil: "4.3",
-            PendingReason: Story43Pending),
+            }),
 
         new IsolationCase(
-            "ISO-ACCEPT-INVITATION-OTHER-ACCOUNT", "I-2, I-13 (4.3 AC7, AC10; Q13 (a))", IsolationVector.Write, HttpMethod.Post, InvitationWire.AcceptanceRoute,
+            "ISO-ACCEPT-INVITATION-OTHER-ACCOUNT", "I-2, I-13 (4.3 AC7, AC10; Q13 (a))", IsolationVector.Write, HttpMethod.Post, InvitationRoutes.Acceptance,
             async world =>
             {
                 var inviter = await world.NewActorAsync("Oa");
@@ -124,12 +111,10 @@ internal static partial class IsolationCases
             {
                 [IsolationSurface.Session] = new Served(HttpStatusCode.Forbidden, TheMismatchIsStatedWithoutAnAddressAndNothingIsWrittenAsync, "403 invitation-for-another-account, no address, nothing written"),
                 [IsolationSurface.ApiToken] = new NoCredential { Then = TheActorJoinedNothingAndTheInvitationIsPendingAsync },
-            },
-            PendingUntil: "4.3",
-            PendingReason: Story43Pending),
+            }),
 
         new IsolationCase(
-            "ISO-ACCEPT-JOINS-ONLY-THE-INVITED-SPACE", "I-2, UJ-2 (4.3 AC8, AC10)", IsolationVector.Write, HttpMethod.Post, InvitationWire.AcceptanceRoute,
+            "ISO-ACCEPT-JOINS-ONLY-THE-INVITED-SPACE", "I-2, UJ-2 (4.3 AC8, AC10)", IsolationVector.Write, HttpMethod.Post, InvitationRoutes.Acceptance,
             async world =>
             {
                 var (own, elsewhere) = await world.OwnerElsewhereAsync("member");
@@ -145,9 +130,7 @@ internal static partial class IsolationCases
             {
                 [IsolationSurface.Session] = new Served(HttpStatusCode.OK, TheInviteeJoinedOnlyTheInvitedSpaceAsync, "200, one Account, Memberships B (Owner), C (unchanged) and A (invited), B and C unchanged"),
                 [IsolationSurface.ApiToken] = new NoCredential { Then = TheActorJoinedNothingAndTheInvitationIsPendingAsync },
-            },
-            PendingUntil: "4.3",
-            PendingReason: Story43Pending),
+            }),
 
         new IsolationCase(
             "ISO-INVITER-SEES-NOTHING-OF-THE-INVITEES-OTHER-SPACES", "I-1, UJ-2 (4.3 AC8, AC10)", IsolationVector.DirectIdentifier, HttpMethod.Get, SpaceRoutes.Active,
@@ -157,7 +140,7 @@ internal static partial class IsolationCases
                 var inviter = await world.NewActorAsync("Is");
                 var invitee = own.Actor;
                 var (_, _, token) = await InviteWithTokenAsync(world, inviter, invitee.EmailAddress, "member");
-                var accepted = await invitee.SendAsync(IsolationSurface.Session, HttpMethod.Post, InvitationWire.AcceptanceRoute, InvitationWire.AcceptBody(token), headers: null);
+                var accepted = await invitee.SendAsync(IsolationSurface.Session, HttpMethod.Post, InvitationRoutes.Acceptance, InvitationWire.AcceptBody(token), headers: null);
 
                 Assert.True(accepted.StatusCode == HttpStatusCode.OK, $"Accepting through the product: {accepted.StatusCode} {accepted.Body}");
 
@@ -168,12 +151,10 @@ internal static partial class IsolationCases
                     own.SpaceId,
                     Other: elsewhere.Actor);
             },
-            Both(new BoundaryNotFound { Then = TheInviterReadsNothingOfTheInviteesOtherSpacesAsync }),
-            PendingUntil: "4.3",
-            PendingReason: Story43Pending),
+            Both(new BoundaryNotFound { Then = TheInviterReadsNothingOfTheInviteesOtherSpacesAsync })),
 
         new IsolationCase(
-            "ISO-ACCEPT-INVITATION-TOKEN-FROM-ANOTHER-SPACE", "I-2, I-4 (4.3 AC7, AC10)", IsolationVector.DeepLink, HttpMethod.Post, InvitationWire.AcceptanceRoute,
+            "ISO-ACCEPT-INVITATION-TOKEN-FROM-ANOTHER-SPACE", "I-2, I-4 (4.3 AC7, AC10)", IsolationVector.DeepLink, HttpMethod.Post, InvitationRoutes.Acceptance,
             async world =>
             {
                 var ownerOfX = await world.NewActorAsync("Tx");
@@ -190,17 +171,13 @@ internal static partial class IsolationCases
             {
                 [IsolationSurface.Session] = new Served(HttpStatusCode.Forbidden, TheMismatchIsStatedWithoutAnAddressAndNothingIsWrittenAsync, "403 invitation-for-another-account; never a Membership in Y"),
                 [IsolationSurface.ApiToken] = new NoCredential { Then = TheActorJoinedNothingAndTheInvitationIsPendingAsync },
-            },
-            PendingUntil: "4.3",
-            PendingReason: Story43Pending),
+            }),
 
         new IsolationCase(
-            "ISO-TIMING-INVITATION-NOT-VALID-SAME-DURATION", "I-7, I-13 (4.3 AC6; Lee's Q6 (a))", IsolationVector.Timing, HttpMethod.Get, InvitationWire.OfferRoute,
+            "ISO-TIMING-INVITATION-NOT-VALID-SAME-DURATION", "I-7, I-13 (4.3 AC6; Lee's Q6 (a))", IsolationVector.Timing, HttpMethod.Get, InvitationRoutes.Offer,
             async world => await FiveStatesAsync(world, accept: false),
             Both(new NotValidIndistinguishable()),
-            Runner: CaseRunner.Timing,
-            PendingUntil: "4.3",
-            PendingReason: Story43Pending) with
+            Runner: CaseRunner.Timing) with
         {
             Assumption = "PRD-12-9",
         },
@@ -210,13 +187,13 @@ internal static partial class IsolationCases
     /// The view as <paramref name="actor"/> sends it, the token in its header.
     /// </summary>
     private static CaseRequest ViewRequest(ProductActor actor, string token) =>
-        new(actor, HttpMethod.Get, [new(InvitationWire.OfferRoute, InvitationWire.OfferRoute)], TargetSpaceId: null, Headers: InvitationWire.TokenHeaders(token));
+        new(actor, HttpMethod.Get, [new(InvitationRoutes.Offer, InvitationRoutes.Offer)], TargetSpaceId: null, Headers: InvitationWire.TokenHeaders(token));
 
     /// <summary>
     /// The accept as <paramref name="actor"/> sends it, the token in its body.
     /// </summary>
     private static CaseRequest AcceptRequest(ProductActor actor, string token) =>
-        new(actor, HttpMethod.Post, [new(InvitationWire.AcceptanceRoute, InvitationWire.AcceptanceRoute)], TargetSpaceId: null, Body: () => InvitationWire.AcceptBody(token));
+        new(actor, HttpMethod.Post, [new(InvitationRoutes.Acceptance, InvitationRoutes.Acceptance)], TargetSpaceId: null, Body: () => InvitationWire.AcceptBody(token));
 
     /// <summary>
     /// An Invitation issued through 4.1's route on <paramref name="issuer"/>'s Session, in its Space, to
@@ -259,7 +236,7 @@ internal static partial class IsolationCases
 
         Assert.True(revoke.StatusCode == HttpStatusCode.NoContent, $"Revoking through the product: {revoke.StatusCode} {revoke.Body}");
 
-        var acceptance = await acceptor.SendAsync(IsolationSurface.Session, HttpMethod.Post, InvitationWire.AcceptanceRoute, InvitationWire.AcceptBody(accepted), headers: null);
+        var acceptance = await acceptor.SendAsync(IsolationSurface.Session, HttpMethod.Post, InvitationRoutes.Acceptance, InvitationWire.AcceptBody(accepted), headers: null);
 
         Assert.True(acceptance.StatusCode == HttpStatusCode.OK, $"Accepting through the product: {acceptance.StatusCode} {acceptance.Body}");
 
@@ -288,8 +265,8 @@ internal static partial class IsolationCases
     /// </summary>
     internal static Task<WireResponse> SendWithTokenAsync(CaseRequest request, IsolationSurface surface, string token) =>
         request.Method == HttpMethod.Get
-            ? request.Actor.SendAsync(surface, HttpMethod.Get, InvitationWire.OfferRoute, body: null, InvitationWire.TokenHeaders(token))
-            : request.Actor.SendAsync(surface, HttpMethod.Post, InvitationWire.AcceptanceRoute, InvitationWire.AcceptBody(token), headers: null);
+            ? request.Actor.SendAsync(surface, HttpMethod.Get, InvitationRoutes.Offer, body: null, InvitationWire.TokenHeaders(token))
+            : request.Actor.SendAsync(surface, HttpMethod.Post, InvitationRoutes.Acceptance, InvitationWire.AcceptBody(token), headers: null);
 
     /// <summary>
     /// The states a five-state row prepared.
@@ -334,7 +311,7 @@ internal static partial class IsolationCases
         Assert.Equal(inviter.SpaceId, InvitationWire.AcceptedSpaceId(answer.Body));
         Assert.Contains((inviter.SpaceId, "Member"), await world.Database.MembershipsOfAccountAsync(request.Actor.AccountId));
 
-        var anchor = await world.SendWithoutCredentialAsync(HttpMethod.Post, InvitationWire.AcceptanceRoute);
+        var anchor = await world.SendWithoutCredentialAsync(HttpMethod.Post, InvitationRoutes.Acceptance);
 
         Assert.Equal(HttpStatusCode.Unauthorized, anchor.StatusCode);
     }
@@ -361,7 +338,7 @@ internal static partial class IsolationCases
     {
         using (var body = JsonDocument.Parse(answer.Body))
         {
-            Assert.Equal(InvitationWire.ForAnotherAccountProblemType, body.RootElement.GetProperty("type").GetString());
+            Assert.Equal(ProblemTypes.InvitationForAnotherAccount, body.RootElement.GetProperty("type").GetString());
         }
 
         Assert.DoesNotContain("@", answer.Body, StringComparison.Ordinal);
@@ -456,14 +433,14 @@ internal sealed record UniformNotValid() : Expectation("404 invitation-not-valid
         var (_, first) = answers[0];
 
         Assert.True(first.StatusCode == HttpStatusCode.NotFound, $"{first.StatusCode} {first.Body}");
-        Assert.Contains(InvitationWire.NotValidProblemType, first.Body, StringComparison.Ordinal);
+        Assert.Contains(ProblemTypes.InvitationNotValid, first.Body, StringComparison.Ordinal);
         Assert.DoesNotContain(ProblemTypes.NotAvailable, first.Body, StringComparison.Ordinal);
         Assert.NotEqual(live.StatusCode, first.StatusCode);
 
         foreach (var (state, answer) in answers)
         {
             AssertSameBytes(first, answer, state);
-            AssertDisclosesNothing(world, answer, InvitationWire.OfferRoute);
+            AssertDisclosesNothing(world, answer, InvitationRoutes.Offer);
             Assert.DoesNotContain("@", answer.Body, StringComparison.Ordinal);
         }
 

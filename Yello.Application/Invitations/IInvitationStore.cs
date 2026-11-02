@@ -4,8 +4,8 @@ using Yello.Domain.Memberships;
 namespace Yello.Application.Invitations;
 
 /// <summary>
-/// Issues, lists and revokes Invitations in the Space the current unit of work is scoped to. FR-10, FR-12; stories 4.1
-/// and 4.2.
+/// Issues, lists, revokes, shows and accepts Invitations in the Space the current unit of work is scoped to. FR-10,
+/// FR-11, FR-12; stories 4.1, 4.2 and 4.3.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -53,6 +53,64 @@ public interface IInvitationStore
         string emailAddress,
         Role role,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The offer an actionable Invitation makes, read through the shared actionable predicate on the Invitation unit of
+    /// work (story 4.3, AC1, AC2): the Space's name, the Role and the issuer's captured name, and - with a Session - whether
+    /// the Invitation names the caller's address. <c>null</c> for anything that is not an actionable Invitation. Writes
+    /// nothing.
+    /// </summary>
+    /// <param name="context">The Invitation unit of work's context.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The offer, or <c>null</c>.</returns>
+    Task<InvitationOffer?> ReadOfferAsync(InvitationContext context, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Accepts the Invitation as the Session's Account (story 4.3, AC4, AC5): under the Space's Invitations lock, one
+    /// guarded <c>UPDATE</c> composed with the shared actionable predicate and the caller's own normalised address, then -
+    /// only on a rowcount of one - one Membership at the Invitation's Role. The token is never the authority.
+    /// </summary>
+    /// <param name="context">The Invitation unit of work's context; its Account is required.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>What the accept came to.</returns>
+    Task<InvitationAcceptanceOutcome> AcceptAsync(InvitationContext context, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// What an actionable Invitation offers, as the view reads it. Story 4.3, AC2.
+/// </summary>
+/// <param name="SpaceName">The invited Space's name.</param>
+/// <param name="Role">The Role offered.</param>
+/// <param name="IssuerName">The issuer's display name as captured at issue.</param>
+/// <param name="AddressedToYou">With a Session, whether the Invitation names its Account's address; otherwise <c>null</c>.</param>
+public sealed record InvitationOffer(string SpaceName, Role Role, string IssuerName, bool? AddressedToYou);
+
+/// <summary>
+/// What an accept came to, or - from the screen - would come to before the bound. Story 4.3, AC4-AC7, open question 12.
+/// </summary>
+public enum InvitationAcceptanceOutcome
+{
+    /// <summary>
+    /// Accepted: the Invitation is <c>Accepted</c> and the caller holds one Membership at its Role. From the screen: the
+    /// accept would be admitted, subject to the bound.
+    /// </summary>
+    Accepted,
+
+    /// <summary>
+    /// The token names no actionable Invitation - revoked, accepted, expired, never issued, or gone with its Space. The one
+    /// uniform answer (AC6); nothing written.
+    /// </summary>
+    NotValid,
+
+    /// <summary>
+    /// The Invitation is actionable but names another address than the caller's (AC7). Nothing written.
+    /// </summary>
+    ForAnotherAccount,
+
+    /// <summary>
+    /// The caller already holds a Membership in the Space (open question 12 (a)). Nothing written.
+    /// </summary>
+    AlreadyAMember,
 }
 
 /// <summary>

@@ -50,14 +50,20 @@ namespace Yello.Tests.Architecture;
 public sealed partial class RefusalBoundaryGateTests
 {
     /// <summary>
-    /// TEMPORARY stand-in patterns (Lee's Q4 (a)), as the story names them; the dev phase points these at
-    /// <c>InvitationRoutes</c> once Task 3 declares the routes, or keeps them as the literals the gate asserts.
+    /// The two routes' patterns (Lee's Q4 (a)), kept as the literals the gate asserts rather than read from
+    /// <c>InvitationRoutes</c>, so a change to the contract is seen here (story 4.3 dev phase).
     /// </summary>
     private const string OfferPattern = "/api/v1/invitations/offer";
 
     private const string AcceptancePattern = "/api/v1/invitations/acceptance";
 
     private const string SpaceSessionContextName = "Yello.Infrastructure.Persistence.SpaceSessionContext";
+
+    /// <summary>
+    /// Where the acceptance unit of work and its port are registered: beside the Invitation store (the scaffold named
+    /// <c>InfrastructureServices</c>, which S1200 holds at its coupling limit - corrected by the dev phase).
+    /// </summary>
+    private const string InvitationUnitRegistration = "Yello.Infrastructure.SpaceContentStores";
 
     private static readonly string[] SecretPropertyNames = ["Token", "Secret", "Plaintext"];
 
@@ -68,7 +74,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <see cref="Bound.MembershipsPerSpace"/>; the view consults no bound. Plant 11: the accept without the Session-only
     /// marker.
     /// </summary>
-    [Fact(Skip = "red: AC4 / AC9 - the view and accept routes are not mapped; Task 6, Lee's Q4 (a) and Q7 (a)")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "AD-4")]
     [Trait("Requirement", "AR-30")]
@@ -97,7 +103,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// the Role's code and the issuer's name (strings) and the addressee indicator (<c>bool?</c>): never the address, an id,
     /// the expiry, the state or a count. Plant 8: a fifth property.
     /// </summary>
-    [Fact(Skip = "red: AC2 - InvitationOfferResponse is not declared; Task 3, Lee's Q5 (a)")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "UX-DR18")]
     [Trait("Requirement", "AD-23")]
@@ -121,7 +127,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// (<c>ApiTokenGateTests.Only_the_issuance_response_carries_a_Token_secret</c> matches names exactly); the accept's answer
     /// carries the Space's id and nothing else.
     /// </summary>
-    [Fact(Skip = "red: AC4 - AcceptInvitationRequest and AcceptedInvitationResponse are not declared; Task 3")]
+    [Fact]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "AD-28")]
     public void The_accept_request_carries_the_token_alone_and_its_answer_the_Space_alone()
@@ -146,7 +152,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// its async state machine included - runs <c>ExecuteUpdateAsync</c> over <c>Invitation</c> (the one guarded statement,
     /// never load-check-save, plant 3) and inserts a <c>Membership</c>. 4.2's gate keeps every other writer out.
     /// </summary>
-    [Fact(Skip = "red: AC5 / AC12 - InvitationStore has no accept; Task 4")]
+    [Fact]
     [Trait("Requirement", "AR-31")]
     [Trait("Requirement", "AD-27")]
     [Trait("Requirement", "AR-32")]
@@ -217,7 +223,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// all. Sibling of <c>Space_is_read_only_where_named</c>. The schema half is <c>SchemaVarianceTests.NamedVariances</c>
     /// (<c>InvitationToken.OfferedSpaceId</c>), which fails on its own until the variance is named.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the InvitationToken index does not exist; Task 4, Lee's Q1 (a)")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "NFR-6")]
     public void The_token_index_is_read_by_its_configuration_and_one_named_reader_only()
@@ -244,22 +250,33 @@ public sealed partial class RefusalBoundaryGateTests
     /// for the view and the accept. No handler, endpoint or other store reaches it, so nothing else runs under a key set from
     /// a token. Modelled on <c>Only_the_pipeline_depends_on_the_capability_matrix_and_the_refusal_recorder</c>.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the acceptance unit of work does not exist; Task 4, Lee's Q2 (a)")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AD-24")]
     public void The_acceptance_unit_of_work_is_reached_only_by_its_port_its_registration_and_the_pipeline_step()
     {
         var unit = Assert.Single(RoleReaders(SpaceSessionContextName, "SetAsync"), setter => setter.Contains("Invitation", StringComparison.Ordinal));
-        var dependents = DependentsOf(unit);
+
+        // The concrete unit is internal to Infrastructure: only its own type and its registration name it.
+        var unitDependents = DependentsOf(unit).Where(dependent => dependent != unit && dependent != InvitationUnitRegistration).ToList();
+
+        Assert.True(unitDependents.Count == 0, $"The acceptance unit of work {unit} is reached outside its registration:\n" + string.Join('\n', unitDependents));
+
+        // Its port is what the Host reaches, and only the pipeline's Invitation step does.
+        var port = Assert.Single(
+            ProductionAssemblies.Application.GetTypes(),
+            type => type.IsInterface && type.Name.StartsWith('I') && type.Name.Contains("Invitation", StringComparison.Ordinal)
+                && ProductionAssemblies.Infrastructure.GetType(unit)!.GetInterfaces().Contains(type));
+        var dependents = DependentsOf(port.FullName!);
 
         Assert.Contains(dependents, dependent => dependent.StartsWith("Yello.Host.", StringComparison.Ordinal));
 
         var others = dependents
-            .Where(dependent => dependent != unit && dependent != "Yello.Infrastructure.InfrastructureServices")
+            .Where(dependent => dependent != unit && dependent != InvitationUnitRegistration && dependent != port.FullName)
             .Where(dependent => !IsTheInvitationPipelineStep(dependent) && !IsAnApplicationPort(dependent))
             .ToList();
 
-        Assert.True(others.Count == 0, $"The acceptance unit of work {unit} is reached outside its pipeline step:\n" + string.Join('\n', others));
+        Assert.True(others.Count == 0, $"The acceptance unit of work's port {port.FullName} is reached outside its pipeline step:\n" + string.Join('\n', others));
     }
 
     /// <summary>
@@ -295,7 +312,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// mailed on acceptance), and its constructor takes an Invitation port. Sibling of 4.2's
     /// <c>The_revoke_handler_takes_no_outbox</c>.
     /// </summary>
-    [Fact(Skip = "red: AC3 - AcceptInvitationHandler does not exist; Task 5, Q14 (a) no outbox or publisher")]
+    [Fact]
     [Trait("Requirement", "AR-27")]
     [Trait("Requirement", "AD-22")]
     [Trait("Requirement", "AR-3")]
@@ -319,7 +336,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// 4.3; and neither is the boundary's <c>not-available</c>, whose body must stay byte-identical
     /// (<c>RefusalCopyTests.Every_not_found_cause_renders_the_same_refusal</c>). Sibling of 4.2's problem-type gate.
     /// </summary>
-    [Fact(Skip = "red: AC6 / AC7 - the two problem types and their copy are not declared; Tasks 3 and 7")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-11")]
     [Trait("Requirement", "UX-DR18")]
