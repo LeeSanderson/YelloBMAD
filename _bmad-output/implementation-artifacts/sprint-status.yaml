@@ -113,7 +113,7 @@ development_status:
   4-1-invite-an-email-address-to-a-space-at-a-role: done
   4-2-see-and-revoke-pending-invitations: done
   4-3-accept-an-invitation: done
-  4-4-manage-memberships-and-roles: backlog
+  4-4-manage-memberships-and-roles: ready-for-dev
   4-5-remove-a-membership-or-leave-a-space: backlog
   4-6-assign-a-task-and-be-told: backlog
   4-7-a-viewers-space-and-a-role-that-drops-beneath-you: backlog
