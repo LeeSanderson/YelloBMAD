@@ -384,6 +384,8 @@ Space settings gains a "Members" section for Owners and Admins. It shows a paged
 
 **[LEE]** marks a question whose answer touches isolation, RLS, a `SESSION_CONTEXT` key, a cross-Space read, Role/authority escalation, or security. Q1-Q5 go to Lee before development; each has concrete options and a recommendation. Q6-Q19 are decided by the dev phase as reversible, recorded decisions: take the recommendation unless the code shows it is wrong, and record why.
 
+**Decided by Lee, 2026-11-02 (not open):** Q1 - (a) a pipeline-owned acting authority: Role sets the actor may change from and to (Owner in neither), in a holder only the pipeline writes, composed into the one guarded `UPDATE` with the actor-still-holds-its-Role clause kept; Q2 - (a) "at least one Owner" held by the guarded statement plus the S-2 invariant test, with a dated note on AD-5 (no block predicate or trigger); Q3 - (a) add `BLOCK AFTER UPDATE` on `Membership` with `fn_SpaceIsolationPredicate(SpaceId)` in an expand-only migration; Q4 - (a) the list sits under `ChangeMembershipRole` with Token parity, plus the two address gates; Q5 - (a) a live `Account.DisplayName` read for current Memberships in Membership management only, with a named-reader gate. Q6-Q19 remain for the dev phase.
+
 1. **[LEE] Enforcing the Admin's "Member ↔ Viewer only" target rule without a slice reading the Role** (ledger `:329`; AD-1, AR-3, AD-20).
    - **(a) Recommended. A pipeline-owned acting authority.**
      - Domain declares each Qualified cell's target rule as Role sets (`From`, `To`), and Owner is in none.
