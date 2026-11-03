@@ -271,7 +271,8 @@ internal sealed partial class FakeYelloApi
 
             listed[at] = changed;
 
-            return (200, JsonSerializer.Serialize(changed, JsonOptions));
+            // The Host's shape: the row without its address (code review 2026-11-03, decided by Lee).
+            return (200, JsonSerializer.Serialize(new ChangedRow(changed.Id, changed.DisplayName, changed.Role, changed.IsYou), JsonOptions));
         }
     }
 

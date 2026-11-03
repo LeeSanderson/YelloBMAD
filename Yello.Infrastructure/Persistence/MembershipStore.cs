@@ -215,9 +215,10 @@ internal sealed class MembershipStore(YelloDbContext dbContext, IMembershipChang
             .SingleOrDefaultAsync(cancellationToken);
 
     /// <summary>
-    /// The target's row as the list shows it.
+    /// The target's row as a Role change answers it: no address, because the answer is recorded whole by the idempotency
+    /// record and no idempotency record may hold one (AD-23; code review 2026-11-03, decided by Lee, option (b)).
     /// </summary>
-    private async Task<ListedMembership> RowAsync(Guid callerAccountId, Guid membershipId, CancellationToken cancellationToken)
+    private async Task<ChangedMembership> RowAsync(Guid callerAccountId, Guid membershipId, CancellationToken cancellationToken)
     {
         var row = await dbContext.Memberships
             .AsNoTracking()
@@ -230,15 +231,13 @@ internal sealed class MembershipStore(YelloDbContext dbContext, IMembershipChang
                 {
                     membership.Id,
                     membership.Role,
-                    membership.CreatedAt,
                     IsYou = membership.AccountId == callerAccountId,
                     account.DisplayName,
-                    account.EmailAddress,
                 })
             .SingleAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return new ListedMembership(row.Id, row.DisplayName, row.EmailAddress, StableCode.Of(row.Role), row.IsYou, row.CreatedAt);
+        return new ChangedMembership(row.Id, row.DisplayName, StableCode.Of(row.Role), row.IsYou);
     }
 
     /// <summary>

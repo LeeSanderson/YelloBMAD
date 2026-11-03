@@ -74,7 +74,7 @@ public static class MembershipEndpoints
 
         var (rows, total, nextAfter) = await handler.HandleAsync(context.AccountId, after, cancellationToken).ConfigureAwait(false);
 
-        return Results.Ok(new MembershipPageResponse(total, rows.Select(Response).ToList(), nextAfter));
+        return Results.Ok(new MembershipPageResponse(total, rows.Select(ListResponse).ToList(), nextAfter));
     }
 
     /// <summary>
@@ -113,7 +113,7 @@ public static class MembershipEndpoints
 
         return result.Outcome switch
         {
-            RoleChangeOutcome.Changed or RoleChangeOutcome.Unchanged => Results.Ok(Response(result.Row!)),
+            RoleChangeOutcome.Changed or RoleChangeOutcome.Unchanged => Results.Ok(ChangeResponse(result.Row!)),
 
             RoleChangeOutcome.OwnerRoleFixed => Results.Problem(
                 statusCode: StatusCodes.Status409Conflict,
@@ -131,6 +131,11 @@ public static class MembershipEndpoints
         };
     }
 
-    private static MembershipResponse Response(ListedMembership membership) =>
+    private static MembershipResponse ListResponse(ListedMembership membership) =>
         new(membership.Id, membership.DisplayName, membership.EmailAddress, membership.RoleCode, membership.IsYou);
+
+    // No address: the pipeline records this answer whole, and no idempotency record may hold one (AD-23; code review
+    // 2026-11-03, decided by Lee, option (b)).
+    private static MembershipRoleChangeResponse ChangeResponse(ChangedMembership membership) =>
+        new(membership.Id, membership.DisplayName, membership.RoleCode, membership.IsYou);
 }

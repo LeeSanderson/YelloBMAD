@@ -68,8 +68,26 @@ public static class MembershipWire
     /// </summary>
     /// <param name="body">The body.</param>
     /// <returns>The row.</returns>
-    public static ListedMembership ParseRow(string body) =>
-        JsonSerializer.Deserialize<ListedMembership>(body, JsonOptions) ?? throw new InvalidOperationException("The change answered no row.");
+    public static ChangedRow ParseRow(string body) =>
+        JsonSerializer.Deserialize<ChangedRow>(body, JsonOptions) ?? throw new InvalidOperationException("The change answered no row.");
+
+    /// <summary>
+    /// The Role change's row as JSON member names, in ordinal order: <c>MembershipRoleChangeResponse(Id, DisplayName, Role,
+    /// IsYou)</c> - never an address (code review 2026-11-03, decided by Lee).
+    /// </summary>
+    public static IReadOnlyList<string> ChangedRowMembers { get; } = ["displayName", "id", "isYou", "role"];
+
+    /// <summary>
+    /// A JSON object's member names, in ordinal order.
+    /// </summary>
+    /// <param name="body">The JSON object.</param>
+    /// <returns>The names.</returns>
+    public static IReadOnlyList<string> ObjectMemberNames(string body)
+    {
+        using var document = JsonDocument.Parse(body);
+
+        return NamesOf(document.RootElement);
+    }
 
     /// <summary>
     /// The member names of a page body and of each of its rows, in ordinal order, so a shape assertion sees a member the
@@ -112,3 +130,13 @@ public sealed record MembershipPage(int Total, IReadOnlyList<ListedMembership> M
 /// <param name="Role">The Role's stable code: <c>owner</c>, <c>admin</c>, <c>member</c> or <c>viewer</c>.</param>
 /// <param name="IsYou">Whether the row is the caller's own Membership.</param>
 public sealed record ListedMembership(Guid Id, string DisplayName, string EmailAddress, string Role, bool IsYou);
+
+/// <summary>
+/// The row a Role change answers, as the test reads it: <c>MembershipRoleChangeResponse</c>'s shape, no address (code review
+/// 2026-11-03, decided by Lee).
+/// </summary>
+/// <param name="Id">The Membership's id.</param>
+/// <param name="DisplayName">The display name.</param>
+/// <param name="Role">The Role's stable code.</param>
+/// <param name="IsYou">Whether it is the caller's own row.</param>
+public sealed record ChangedRow(Guid Id, string DisplayName, string Role, bool IsYou);

@@ -71,11 +71,26 @@ public sealed record ListedMembership(Guid Id, string DisplayName, string EmailA
 public sealed record MembershipCursor(DateTimeOffset CreatedAt, Guid Id);
 
 /// <summary>
+/// One Membership as a Role change answers it: the list's row without the address. Story 4.4, AC4; code review
+/// 2026-11-03, decided by Lee (option (b)).
+/// </summary>
+/// <remarks>
+/// <b>No address, deliberately.</b> The change's answer is recorded whole by the pipeline's idempotency record, and AD-23
+/// confines addresses to the list response, so no idempotency record may hold one. The client keeps the address it
+/// already shows from the list.
+/// </remarks>
+/// <param name="Id">The Membership's id.</param>
+/// <param name="DisplayName">The Account's display name, read live for a current Member (Lee's Q5 (a)).</param>
+/// <param name="RoleCode">The Role's stable code.</param>
+/// <param name="IsYou">Whether it is the acting Account's own Membership.</param>
+public sealed record ChangedMembership(Guid Id, string DisplayName, string RoleCode, bool IsYou);
+
+/// <summary>
 /// What a Role change came to. Story 4.4, AC4.
 /// </summary>
 /// <param name="Outcome">What happened.</param>
 /// <param name="Row">The target's row as it now stands, when it exists in this Space.</param>
-public sealed record RoleChangeResult(RoleChangeOutcome Outcome, ListedMembership? Row);
+public sealed record RoleChangeResult(RoleChangeOutcome Outcome, ChangedMembership? Row);
 
 /// <summary>
 /// The outcomes of a Role change. Story 4.4, AC4, AC5, Q10 (a), Q11 (a).

@@ -47,6 +47,15 @@ public static class MembershipCapabilities
         roleCode is Owner or Admin;
 
     /// <summary>
+    /// Whether <paramref name="roleCode"/>'s authority to change a Role is the Admin's "Member ↔ Viewer only" - so a
+    /// <c>403</c> on a change is that limit, said as such, and any other Role's <c>403</c> is the refusal's own copy (code
+    /// review 2026-11-03).
+    /// </summary>
+    /// <param name="roleCode">The viewer's Role, as its stable code.</param>
+    /// <returns><c>true</c> for an Admin.</returns>
+    public static bool IsLimitedToMemberAndViewer(string roleCode) => roleCode is Admin;
+
+    /// <summary>
     /// The Roles a row offers, in the order the picker lists them: the viewer's target rule for the row's current Role.
     /// </summary>
     /// <param name="viewerRole">The viewer's Role, as its stable code.</param>

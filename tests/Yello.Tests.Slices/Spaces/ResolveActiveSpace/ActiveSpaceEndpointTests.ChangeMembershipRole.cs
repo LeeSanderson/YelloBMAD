@@ -10,6 +10,7 @@ using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
 using Yello.Contracts.Tasks;
 using Yello.Contracts.Memberships;
+using Yello.Domain.Accounts;
 using Yello.Domain.Memberships;
 using Yello.Tests.Shared;
 using LabelWire = Yello.Tests.Slices.Tasks.LabelWire;
@@ -126,7 +127,8 @@ public sealed partial class ActiveSpaceEndpointTests
         });
 
         Assert.True(changed?.StatusCode == HttpStatusCode.OK, $"The Owner's {from} -> {to}: {Described(changed)}");
-        Assert.Equal(new ListedMembership(target!.Id, targetName, targetAddress, to, IsYou: false), MembershipWire.ParseRow(changed.Body));
+        Assert.Equal(new ChangedRow(target!.Id, targetName, to, IsYou: false), MembershipWire.ParseRow(changed.Body));
+        Assert.DoesNotContain(targetAddress, changed.Body, StringComparison.OrdinalIgnoreCase);
         Assert.Equal(StoredRole(to), (await wire.MembershipOfAsync(spaceId, target.AccountId)).Role);
         await AssertOneOwnerEachAsync(wire, spaceId);
     }
@@ -650,6 +652,79 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.True(answers["malformed"].StatusCode == HttpStatusCode.BadRequest, $"The malformed key: {Described(answers["malformed"])}");
         Assert.Equal(ProblemTypes.InvalidIdempotencyKey, ProblemType(answers["malformed"]));
         Assert.Equal("Viewer", (await wire.MembershipOfAsync(spaceId, memberId)).Role);
+    }
+
+    /// <summary>
+    /// AC2, AD-23, code review 2026-11-03 (decided by Lee, option (b)) - a Role change's answer carries no email address, and
+    /// neither does the idempotency record that stores it: the <c>PATCH</c> body has exactly <c>displayName</c>, <c>id</c>,
+    /// <c>isYou</c> and <c>role</c>, and the one <c>IdempotencyRecord</c> written under the change's key holds the row (the
+    /// anchor: its id and display name) but neither the address as typed nor its normalised form. The replay is the same
+    /// bytes. The target is seeded with <c>AddMembershipAsync</c>: the case is about the record, not how the Member joined.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AD-23")]
+    [Trait("Requirement", "UX-DR34")]
+    [Trait("Requirement", "AR-25")]
+    public async Task A_Role_change_answer_and_its_idempotency_record_carry_no_email_address()
+    {
+        var database = Available();
+        var wire = Wire();
+        var (ownerAddress, memberAddress) = (RandomAddress(), RandomAddress());
+        var spaceId = Guid.NewGuid();
+        var key = Guid.NewGuid().ToString("D");
+        var memberName = DisplayName();
+        var memberId = Guid.Empty;
+        var membershipId = Guid.Empty;
+        WireResponse? changed = null;
+        WireResponse? replay = null;
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        {
+            var owner = await SignedInAsync(client, ownerAddress);
+            await SeedNamedSpaceAsync(database, spaceId, "Addressless " + Suffix(), await AccountIdOfAsync(database, ownerAddress), Role.Owner);
+            _ = await SignedInAsync(client, memberAddress);
+            memberId = await AccountIdOfAsync(database, memberAddress);
+            await wire.AddMembershipAsync(spaceId, memberId, "member");
+            await wire.SetDisplayNameAsync(memberId, memberName);
+            membershipId = (await wire.MembershipOfAsync(spaceId, memberId)).Id;
+
+            await owner.FetchAntiforgeryTokenAsync();
+            changed = await ChangeRoleOverWireAsync(owner, spaceId, membershipId, "viewer", key);
+            replay = await ChangeRoleOverWireAsync(owner, spaceId, membershipId, "viewer", key);
+        });
+
+        Assert.True(changed?.StatusCode == HttpStatusCode.OK, $"The change: {Described(changed)}");
+        Assert.Equal(MembershipWire.ChangedRowMembers, MembershipWire.ObjectMemberNames(changed.Body));
+        Assert.Equal(new ChangedRow(membershipId, memberName, "viewer", IsYou: false), MembershipWire.ParseRow(changed.Body));
+        Assert.True(replay?.StatusCode == HttpStatusCode.OK && replay.Body == changed.Body, $"The replay: {Described(replay)}; the change was {Described(changed)}");
+
+        var addresses = new[] { memberAddress, EmailAddressNormalisation.Normalise(memberAddress) };
+
+        Assert.All(addresses, address => Assert.DoesNotContain(address, changed.Body, StringComparison.OrdinalIgnoreCase));
+
+        await using var scoped = await database.OpenForSpaceAsync(spaceId, TestContext.Current.CancellationToken);
+        await using var command = scoped.CreateCommand();
+
+        command.CommandText = "SELECT Body FROM dbo.[IdempotencyRecord] WHERE SpaceId = @space AND [Key] = @key";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+        command.Parameters.Add(new SqlParameter("@key", key));
+
+        var bodies = new List<string>();
+
+        await using (var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken))
+        {
+            while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+            {
+                bodies.Add(await reader.IsDBNullAsync(0, TestContext.Current.CancellationToken) ? string.Empty : reader.GetString(0));
+            }
+        }
+
+        var stored = Assert.Single(bodies);
+
+        Assert.Contains(membershipId.ToString("D"), stored, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(memberName, stored, StringComparison.Ordinal);
+        Assert.All(addresses, address => Assert.DoesNotContain(address, stored, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>

@@ -4,7 +4,7 @@ baseline_commit: 885ac9eca02ec45c021eed575ac42a2868586d6e
 
 # Story 4.4: Manage Memberships and Roles
 
-Status: review
+Status: done
 
 Epic: 4 — Bring people into one piece of your work (the fourth story of the epic)
 Story key: `4-4-manage-memberships-and-roles`
@@ -319,6 +319,34 @@ AC1 to AC7 are reproduced **verbatim** from `epics.md:1761-1794` (`status: final
   - [x] Grep `Yello.* tests` for comments predicting "4.4" (for example `Membership.cs:48`, `CapabilityDecision.cs:24`, `ActiveSpaceResolution.cs:182`) and rewrite them to say what exists.
   - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-4` stays `in-progress`. FR-13 stays staged (7.7, 7.8).
   - [x] Run `docker info --format '{{.ServerVersion}}'`, `dotnet build Yello.slnx` (0/0), `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record totals. Rerun a failure once, alone, before calling it real.
+
+### Review Findings
+
+Code review 2026-11-03 (bmad-code-review, full mode, diff `f6f0207..84eef75`; Blind Hunter, Edge Case Hunter, Acceptance Auditor). 45 raw findings, 34 after de-duplication: 1 decision-needed (decided by Lee, applied), 7 patch (all applied), 13 defer, 13 dismissed. Orchestrator checks: no Role escalation found through `PATCH`, a race (the lock plus the actor clause) or an `Idempotency-Key` replay (the Role gate runs before the replay); Owner is in no authority set, so no Role change can reach or write an Owner row. C3 (an Admin invites at Admin) is not 4.4's: it is Lee's 4.1 Q2, an Invitation creates a Membership (FR-10) rather than changing a Role (FR-13), and it is already ledgered to Lee/PM. Plant 14's two lines in `MembershipRow.razor` are restored: no `disabled` attribute anywhere in the section and the radios bind `checked` only to the chosen code. Migration `20261102085905_MembershipBlockAfterUpdate` is one `ALTER SECURITY POLICY` statement inside EF's migration transaction (no `suppressTransaction`), in the shape of `Invitations` and `LabelTables`, and its `Down` drops exactly that predicate. Lee's Q1-Q5 (a) are honoured in the code.
+
+- [x] [Review][Decision] The Role-change answer stores the target's email address at rest in the idempotency record — `PATCH .../memberships/{id}` answers `200 MembershipResponse`, which carries `EmailAddress`; the pipeline records the whole body (`IdempotentResponses.Capture`), so every keyed Role change copies an address into `IdempotencyRecord` and replays serve it. AC2/AD-23 confine addresses to the list response; neither address gate sees this copy. First endpoint whose recorded body holds an address. **Decided by Lee, 2026-11-03: option (b).** `PATCH .../memberships/{id}` answers a new `MembershipRoleChangeResponse(Id, DisplayName, Role, IsYou)` with no address; the store's row read no longer reads `Account.EmailAddress`; the client merges it into the row it already shows, keeping that row's address. No `IdempotencyRecord` may hold an address. Proved by `A_Role_change_answer_and_its_idempotency_record_carry_no_email_address` (the body's members, the stored record's body and the replay) and the contract-shape gate.
+- [x] [Review][Patch] A `409 idempotency-key-in-flight` on a Role change drops the key, so the resend cannot replay the committed change [Yello.Client/Components/MembershipSection.razor:527]
+- [x] [Review][Patch] The Qualified-route gate strips "Remove", so 4.5's `RemoveMembership` would be satisfied by `ChangeMembershipRoleHandler` [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Memberships.cs:337]
+- [x] [Review][Patch] A `403` on a change always shows the Admin-limit copy, an Owner included; the `RefusalText` branch is unreachable [Yello.Client/Components/MembershipSection.razor:549]
+- [x] [Review][Patch] The picker legend and the change announcement use the bare display name, not the row's disambiguated label [Yello.Client/Components/MembershipRow.razor:147; MembershipSection.razor:576]
+- [x] [Review][Patch] A failed "Show more" leaves "Not sent." on screen after a later Show more succeeds [Yello.Client/Components/MembershipSection.razor:416]
+- [x] [Review][Patch] A "Show more" answered 400/409/429 raises the Space refusal surface instead of a row-level "Not sent." [Yello.Client/Components/MembershipSection.razor:433]
+- [x] [Review][Patch] Race test remarks say "nothing takes the Memberships lock yet" [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ChangeMembershipRoleRace.cs:32]
+- [x] [Review][Defer] A change answered `404` re-reads page 1 only, dropping appended pages [Yello.Client/Components/MembershipSection.razor:583] — deferred to 4.5 (unreachable until a Membership can be removed)
+- [x] [Review][Defer] An actor whose own Membership is removed while its change waits gets a recorded `403`, not the boundary `404` [Yello.Infrastructure/Persistence/MembershipStore.cs:154] — deferred to 4.5
+- [x] [Review][Defer] A second row's Change while one change is in flight is dropped silently [Yello.Client/Components/MembershipSection.razor:462] — deferred to 4.5 (adds the second row action)
+- [x] [Review][Defer] Look-alike display names (trailing or double spaces, zero-width or confusable characters) get no discriminator [Yello.Contracts/Memberships/MembershipLabels.cs:41] — deferred to 4.6 (first name outside the list), Lee/UX
+- [x] [Review][Defer] The `2601` → `409 owner-role-fixed` mapping is reached by no test (plant 3 masked on the wire; the transcription gate caught the plant) [Yello.Infrastructure/Persistence/MembershipStore.cs:132] — deferred to 5.2 (the swap writes Owner)
+- [x] [Review][Defer] The no-cache gate misses a static dictionary (plant 10; the REV rows caught it) [tests/Yello.Tests.Architecture/SpaceResolutionSeamTests.cs:224] — deferred to 7.8
+- [x] [Review][Defer] The publish tests count publishes but do not prove "after commit" [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ChangeMembershipRole.cs] — deferred to 7.7 (first subscriber)
+- [x] [Review][Defer] Space creation and registration insert the Owner Membership without a `MembershipChanged` publish [Yello.Infrastructure/Persistence/SpaceStore.cs:51] — deferred to 7.7, pre-existing
+- [x] [Review][Defer] An open picker whose options vanish after a Role re-read shows Change/Cancel with no radios [Yello.Client/Components/MembershipRow.razor:44] — deferred to 7.7
+- [x] [Review][Defer] Space home's narration region can render, empty, above a refusal [Yello.Client/Pages/SpaceHome.razor:33] — deferred to 7.7
+- [x] [Review][Defer] The attribution gate admits whole types (`InvitationStore`, `MembershipStore`), not the named methods [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Memberships.cs] — deferred to 7.2
+- [x] [Review][Defer] Label delete: focus falls to body when the progress line settles [Yello.Client/Components/LabelRow.razor:29] — deferred to the Epic 4 retrospective (Lee), pre-existing
+- [x] [Review][Defer] Label delete: a 5xx on the 404 re-read raises the Space refusal surface [Yello.Client/Components/LabelSection.razor:428] — deferred to the Epic 4 retrospective (Lee)
+
+Verified after the review fixes: `dotnet build Yello.slnx` 0 warnings, 0 errors; full run (`--max-parallel-test-modules 1`) 2,181 total, 2,171 passed, 0 failed, 10 skipped, with no reruns needed. The new address case went red under a plant (the address appended to the answered name in `MembershipStore.RowAsync`), and the plant was restored in a `finally`.
 
 ## Dev Notes
 
@@ -732,6 +760,7 @@ New:
 - Yello.Contracts/Memberships/MembershipPageResponse.cs
 - Yello.Contracts/Memberships/ChangeMembershipRoleRequest.cs
 - Yello.Contracts/Memberships/MembershipLabels.cs
+- Yello.Contracts/Memberships/MembershipRoleChangeResponse.cs (code review, Lee's option (b))
 - Yello.Application/Memberships/ActingAuthority.cs
 - Yello.Application/Memberships/IMembershipStore.cs
 - Yello.Application/Memberships/IMembershipChanges.cs

@@ -131,6 +131,7 @@ public sealed partial class RefusalBoundaryGateTests
     public void The_Membership_contracts_carry_exactly_their_named_members()
     {
         var response = ProductionAssemblies.Contracts.GetType("Yello.Contracts.Memberships.MembershipResponse");
+        var changed = ProductionAssemblies.Contracts.GetType("Yello.Contracts.Memberships.MembershipRoleChangeResponse");
         var page = ProductionAssemblies.Contracts.GetType("Yello.Contracts.Memberships.MembershipPageResponse");
         var request = ProductionAssemblies.Contracts.GetType("Yello.Contracts.Memberships.ChangeMembershipRoleRequest");
 
@@ -142,6 +143,10 @@ public sealed partial class RefusalBoundaryGateTests
         Assert.Equal(["Memberships", "NextAfter", "Total"], PropertyNames(page));
         Assert.Equal(typeof(int), page.GetProperty("Total")?.PropertyType);
         Assert.Equal(["Role"], PropertyNames(request));
+
+        // The Role change's answer: the row without its address (code review 2026-11-03, decided by Lee, option (b)).
+        Assert.True(changed is not null, "MembershipRoleChangeResponse is not declared in Yello.Contracts.Memberships.");
+        Assert.Equal(["DisplayName", "Id", "IsYou", "Role"], PropertyNames(changed));
     }
 
     /// <summary>
@@ -333,8 +338,10 @@ public sealed partial class RefusalBoundaryGateTests
 
         foreach (var capability in routes.Select(endpoint => endpoint.Metadata.GetMetadata<RequiredCapability>()!.Capability).Distinct())
         {
+            // The capability's whole name (code review 2026-11-03): a stripped stem such as "Membership" would let 4.5's
+            // RemoveMembership pass on ChangeMembershipRoleHandler's dependency alone.
             Assert.True(
-                consumers.Any(consumer => consumer.Contains(capability.ToString().Replace("Change", string.Empty, StringComparison.Ordinal).Replace("Remove", string.Empty, StringComparison.Ordinal), StringComparison.Ordinal)),
+                consumers.Any(consumer => consumer.Contains(capability.ToString(), StringComparison.Ordinal)),
                 $"No slice for the Qualified capability {capability} depends on {holder.FullName}. Its dependents: {string.Join(", ", consumers)}.");
         }
     }

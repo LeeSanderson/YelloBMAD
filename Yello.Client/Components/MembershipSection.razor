@@ -420,6 +420,7 @@
         shown.AddRange(added);
         _total = page.Total;
         _nextAfter = page.NextAfter;
+        _listRefusal = null;
 
         var focusable = added.Find(membership => MembershipCapabilities.OfferableRoles(ViewerRole, membership.Role).Count > 0 && !membership.IsYou);
 
@@ -437,7 +438,9 @@
             return;
         }
 
-        if (response.StatusCode >= HttpStatusCode.InternalServerError)
+        // Only a 403 or a 404 says something about the Space or the Role; any other answer to a next page - a 5xx, a 429, a
+        // cursor refused - leaves the rows shown and says the page did not come (code review 2026-11-03).
+        if (response.StatusCode is not (HttpStatusCode.NotFound or HttpStatusCode.Forbidden))
         {
             _listRefusal = Localizer["TaskEditNotSent"];
             return;
@@ -524,11 +527,16 @@
             return;
         }
 
-        _changeKey = null;
+        // A first use of the key still finishing - the change may have committed: the key is kept, so the resend replays it
+        // (code review 2026-11-03; as every other section does).
+        if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
+        {
+            _changeKey = null;
+        }
 
         if (answer.StatusCode == HttpStatusCode.OK)
         {
-            if (await answer.Response.Content.ReadFromJsonAsync<MembershipResponse>(JsonOptions, token) is { } changed && generation == _generation)
+            if (await answer.Response.Content.ReadFromJsonAsync<MembershipRoleChangeResponse>(JsonOptions, token) is { } changed && generation == _generation)
             {
                 Changed(changed);
             }
@@ -544,11 +552,7 @@
 
         if (answer.StatusCode == HttpStatusCode.Forbidden)
         {
-            // The authority may have been lost meanwhile: the Role is asked again, and a Role that no longer permits Space
-            // settings follows the page's narrated exit. Otherwise it is the Admin's limit, said on the row.
-            _rowRefusal = (membershipId, MembershipCapabilities.PermitsManageMemberships(ViewerRole) ? Localizer["MembershipAdminLimit"] : RefusalText.Of(Localizer, answer.Problem));
-            FocusControlOrHeading(membershipId);
-            await OnRoleDoubted.InvokeAsync();
+            await ForbiddenAsync(membershipId, answer.Problem);
             return;
         }
 
@@ -557,23 +561,42 @@
     }
 
     /// <summary>
-    /// The row becomes the server's answer, the change is announced by display name - never the address (UX-DR38) - and
-    /// focus returns to the row's Change Role (UX-DR39).
+    /// A <c>403</c> on a change. The authority may have been lost meanwhile: the Role is asked again, and a Role that no
+    /// longer permits Space settings follows the page's narrated exit. For an Admin it is the Admin's limit, said on the row;
+    /// for any other Role the refusal's own copy (code review 2026-11-03).
     /// </summary>
-    private void Changed(MembershipResponse row)
+    private async Task ForbiddenAsync(Guid membershipId, ProblemResponse? problem)
     {
+        _rowRefusal = (membershipId, MembershipCapabilities.IsLimitedToMemberAndViewer(ViewerRole) ? Localizer["MembershipAdminLimit"] : RefusalText.Of(Localizer, problem));
+        FocusControlOrHeading(membershipId);
+        await OnRoleDoubted.InvokeAsync();
+    }
+
+    /// <summary>
+    /// The row takes the server's answer - merged into the row shown, which keeps its address, because the answer carries
+    /// none (code review 2026-11-03, decided by Lee) - the change is announced by the row's label, never the address
+    /// (UX-DR38, AC3), and focus returns to the row's Change Role (UX-DR39).
+    /// </summary>
+    private void Changed(MembershipRoleChangeResponse row)
+    {
+        var said = row.DisplayName;
+
         if (_memberships is { } memberships)
         {
             var at = memberships.FindIndex(membership => membership.Id == row.Id);
 
             if (at >= 0)
             {
-                memberships[at] = row;
+                memberships[at] = memberships[at] with { DisplayName = row.DisplayName, Role = row.Role, IsYou = row.IsYou };
+
+                // The labels are worked out again: the live name may have changed.
+                _labels = null;
+                said = LabelOf(memberships[at]);
             }
         }
 
         FocusControlOrHeading(row.Id);
-        Say(string.Format(CultureInfo.CurrentCulture, Localizer[ChangedKey(row.Role)], row.DisplayName));
+        Say(string.Format(CultureInfo.CurrentCulture, Localizer[ChangedKey(row.Role)], said));
     }
 
     /// <summary>

@@ -29,7 +29,7 @@ public static class MembershipRoutes
 
     /// <summary>
     /// <c>PATCH</c> a <see cref="ChangeMembershipRoleRequest"/> here: <c>200</c> with the updated
-    /// <see cref="MembershipResponse"/>; <c>400 role-not-assignable</c> for <c>owner</c> or an unknown code;
+    /// <see cref="MembershipRoleChangeResponse"/> (no address); <c>400 role-not-assignable</c> for <c>owner</c> or an unknown code;
     /// <c>403 insufficient-role</c> beyond the caller's authority; <c>409 owner-role-fixed</c> for the Owner's own row; the
     /// boundary's <c>404</c> for an id that names nothing in this Space (AC4, Q10 (a), Q11 (a)).
     /// </summary>

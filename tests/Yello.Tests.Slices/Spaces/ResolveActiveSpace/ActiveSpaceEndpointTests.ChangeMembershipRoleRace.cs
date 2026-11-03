@@ -29,9 +29,9 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// would bury it; recorded. Race 3's invitee joins through the product, because the accept is its subject.
 /// </para>
 /// <para>
-/// <b>Race 3 is green today, left active</b> as a standing gate: nothing takes the Memberships lock yet, so the accept
-/// answers while it is held. It turns red if 4.4 (or a later story) makes acceptance queue behind a Role change, which Q17
-/// (a) says it must not.
+/// <b>Race 3 is a standing gate</b>: the Role change takes the Memberships lock and acceptance takes the Invitations lock
+/// only, so the accept answers while the Memberships lock is held. It turns red if a later story makes acceptance queue
+/// behind a Role change, which Q17 (a) says it must not.
 /// </para>
 /// </remarks>
 public sealed partial class ActiveSpaceEndpointTests
