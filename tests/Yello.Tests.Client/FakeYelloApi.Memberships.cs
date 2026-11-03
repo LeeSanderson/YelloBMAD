@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Yello.Contracts;
+using Yello.Contracts.Memberships;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
@@ -29,9 +30,8 @@ namespace Yello.Tests.Client;
 /// waits for its release (<see cref="HoldRoleChangeAsync"/>); <see cref="NextRoleChangeRefusal"/> refuses the next one.
 /// </para>
 /// <para>
-/// <b>Contract constants, never literals</b> (4.1 review P13): the paths and the two new problem types are
-/// <see cref="MembershipWire"/>'s ATDD stand-ins until Task 3 declares <c>MembershipRoutes</c> and the <c>ProblemTypes</c>
-/// members; the dev phase swaps them here as everywhere.
+/// <b>Contract constants, never literals</b> (4.1 review P13): the paths are <c>MembershipRoutes</c>' and the two new
+/// problem types <c>ProblemTypes.OwnerRoleFixed</c> and <c>ProblemTypes.RoleNotAssignable</c>.
 /// </para>
 /// </remarks>
 internal sealed partial class FakeYelloApi
@@ -60,7 +60,7 @@ internal sealed partial class FakeYelloApi
     /// </summary>
     /// <param name="spaceId">The Space.</param>
     /// <returns>The path.</returns>
-    public static string MembershipsPathOf(Guid spaceId) => MembershipWire.MembershipsOf(spaceId);
+    public static string MembershipsPathOf(Guid spaceId) => MembershipRoutes.MembershipsOf(spaceId);
 
     /// <summary>
     /// One Membership's path - the Role change's - as the contract names it. Story 4.4.
@@ -68,7 +68,7 @@ internal sealed partial class FakeYelloApi
     /// <param name="spaceId">The Space.</param>
     /// <param name="membershipId">The Membership.</param>
     /// <returns>The path.</returns>
-    public static string MembershipPathOf(Guid spaceId, Guid membershipId) => MembershipWire.MembershipOf(spaceId, membershipId);
+    public static string MembershipPathOf(Guid spaceId, Guid membershipId) => MembershipRoutes.MembershipOf(spaceId, membershipId);
 
     /// <summary>
     /// Every read of <paramref name="spaceId"/>'s Membership list the page sent, in order, each with its query. Story 4.4.
@@ -235,7 +235,7 @@ internal sealed partial class FakeYelloApi
 
         if (role is not ("admin" or "member" or "viewer"))
         {
-            return (400, Problem(MembershipWire.RoleNotAssignableProblemType));
+            return (400, Problem(ProblemTypes.RoleNotAssignable));
         }
 
         var viewer = Roles[spaceId];
@@ -259,7 +259,7 @@ internal sealed partial class FakeYelloApi
 
             if (target.Role == "owner")
             {
-                return viewer == "owner" ? (409, Problem(MembershipWire.OwnerRoleFixedProblemType)) : insufficient;
+                return viewer == "owner" ? (409, Problem(ProblemTypes.OwnerRoleFixed)) : insufficient;
             }
 
             if (viewer == "admin" && (target.Role == "admin" || role == "admin"))

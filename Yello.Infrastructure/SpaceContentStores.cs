@@ -1,10 +1,12 @@
 using Microsoft.Extensions.DependencyInjection;
 using Yello.Application.Invitations;
+using Yello.Application.Memberships;
 using Yello.Domain.Boards;
 using Yello.Domain.Labels;
 using Yello.Domain.Lists;
 using Yello.Domain.Projects;
 using Yello.Domain.Tasks;
+using Yello.Infrastructure.Memberships;
 using Yello.Infrastructure.Persistence;
 
 namespace Yello.Infrastructure;
@@ -15,8 +17,8 @@ namespace Yello.Infrastructure;
 internal static class SpaceContentStores
 {
     /// <summary>
-    /// Adds the Project, Task and Label stores, the Board reader and the List reader (story 2.10), and the Invitation store
-    /// (story 4.1).
+    /// Adds the Project, Task and Label stores, the Board reader and the List reader (story 2.10), the Invitation store
+    /// (story 4.1) and the Membership store with its <c>MembershipChanged</c> publisher (story 4.4).
     /// </summary>
     /// <param name="services">The container.</param>
     /// <returns>The same collection, for chaining.</returns>
@@ -42,6 +44,13 @@ internal static class SpaceContentStores
         // the SpaceId key alone set to that Space (Lee's Q1 (a) and Q2 (a); the AD-2 / AD-24 amendment of 2026-11-02). The
         // pipeline's Invitation step is its only caller.
         services.AddScoped<IInvitationScope, InvitationScope>();
+
+        // Story 4.4: the Space's Memberships - the list and the Role change - on the request's unit of work, and the
+        // MembershipChanged publisher both units of work tell after they commit (AC6, Q7 (a)). No subscriber is registered
+        // until stories 7.3 and 7.7.
+        services.AddScoped<IMembershipStore, MembershipStore>();
+        services.AddScoped<MembershipChangePublisher>();
+        services.AddScoped<IMembershipChanges>(provider => provider.GetRequiredService<MembershipChangePublisher>());
 
         return services;
     }

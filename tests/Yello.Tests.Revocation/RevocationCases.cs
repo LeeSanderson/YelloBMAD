@@ -8,6 +8,7 @@ using Yello.Contracts.ApiTokens;
 using Yello.Contracts.Invitations;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
+using Yello.Contracts.Memberships;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Revocation;
@@ -101,7 +102,6 @@ internal static class RevocationCases
             Both(new RevocationStep(AdminDemotedByTheOwnerAsync, new GovernedAsMember())))
         {
             Assumption = "PRD-12-4",
-            Skip = "red: AC6 - story 4.4 maps PATCH /api/v1/spaces/{spaceId}/memberships/{membershipId} (Q9 (a)); the row joins through 4.3's accept",
         },
 
         new(
@@ -201,7 +201,7 @@ internal static class RevocationCases
         }
 
         var membership = await world.Database.MembershipOfAsync(owner.SpaceId, actor.AccountId);
-        var demoted = await owner.SendAsync(IsolationSurface.Session, HttpMethod.Patch, MembershipWire.MembershipOf(owner.SpaceId, membership.Id), MembershipWire.ChangeBody("member"), headers: null);
+        var demoted = await owner.SendAsync(IsolationSurface.Session, HttpMethod.Patch, MembershipRoutes.MembershipOf(owner.SpaceId, membership.Id), MembershipWire.ChangeBody("member"), headers: null);
 
         Assert.True(demoted.StatusCode == HttpStatusCode.OK, $"The Owner's demotion through the product: {demoted.StatusCode} {demoted.Body}");
 

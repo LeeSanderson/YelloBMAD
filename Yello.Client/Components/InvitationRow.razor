@@ -14,7 +14,9 @@
     REVOKE ASKS FIRST, IN PLACE (open question 9 (a); UX-DR12): the row's control is replaced by the warning - the email
     already sent cannot be recalled - the danger action and Cancel, never a dialog; focus moves to Cancel, and Esc or
     Cancel restores the row with focus on its Revoke. NOT OPTIMISTIC (UX-DR26): the row stays until the server agrees.
-    Each Revoke is described by the row's address, so several are not identical controls to a screen reader.
+    Each Revoke is described by the row's address, so several are not identical controls to a screen reader. While the
+    revoke is in flight the progress line replaces the confirm and takes focus, so focus never falls to body (story 4.4,
+    ledger :762, Q14 (a)).
 *@
 
 <li class="invitation-list__row">
@@ -34,7 +36,7 @@
 
     @if (Revoking)
     {
-        <span class="invitation-list__progress" role="status">@Localizer["InvitationRevoking"]</span>
+        <span class="invitation-list__progress" role="status" tabindex="-1" @ref="_progress">@Localizer["InvitationRevoking"]</span>
     }
 
     @if (ShowsRevoke)
@@ -51,7 +53,10 @@
 @code {
     private ElementReference _revoke;
     private ElementReference _cancel;
+    private ElementReference _progress;
     private bool _wasConfirming;
+    private bool _wasRevoking;
+    private bool _focusProgress;
     private bool _focusCancel;
     private bool _focusRevoke;
     private int _focusRequestsSeen;
@@ -113,6 +118,13 @@
 
         _wasConfirming = Confirming;
 
+        if (Revoking && !_wasRevoking)
+        {
+            _focusProgress = true;
+        }
+
+        _wasRevoking = Revoking;
+
         if (FocusRevokeRequest != _focusRequestsSeen)
         {
             _focusRequestsSeen = FocusRevokeRequest;
@@ -123,6 +135,12 @@
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_focusProgress && Revoking)
+        {
+            _focusProgress = false;
+            await _progress.FocusAsync();
+        }
+
         if (_focusCancel && Confirming)
         {
             _focusCancel = false;

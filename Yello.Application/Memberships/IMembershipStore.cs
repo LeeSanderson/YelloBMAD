@@ -1,0 +1,109 @@
+using Yello.Domain.Memberships;
+
+namespace Yello.Application.Memberships;
+
+/// <summary>
+/// Lists the resolved Space's Memberships and changes one's Role, in the request's Space-scoped unit of work. FR-13,
+/// UX-DR14; story 4.4, AC1, AC2, AC4-AC7.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>The Role is read by the store, never by the slice</b> (AD-1, AR-3): the list returns it as its stable code inside a
+/// read model, and the change receives the acting authority's Role sets and composes them into one guarded statement.
+/// </para>
+/// <para>
+/// <b>One serialised decision on change</b> (Q17 (a)): the store takes the Space's Memberships lock, then runs the guarded
+/// <c>UPDATE</c> - target in the authority's <c>From</c> set, new Role in its <c>To</c> set, a different Role, and the actor
+/// still holding a Role in its <c>HeldBy</c> set - and only on a rowcount of zero reads why.
+/// </para>
+/// </remarks>
+public interface IMembershipStore
+{
+    /// <summary>
+    /// One page of the resolved Space's Memberships in join order (<c>CreatedAt</c>, then <c>Id</c>), and the Space's true
+    /// Membership count. AC1, Q8 (a).
+    /// </summary>
+    /// <param name="callerAccountId">The acting Account, which marks its own row.</param>
+    /// <param name="after">The last row of the previous page, or <c>null</c> for the first.</param>
+    /// <param name="take">How many rows to read at most.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The rows and the total.</returns>
+    Task<(IReadOnlyList<ListedMembership> Rows, int Total)> ListAsync(
+        Guid callerAccountId,
+        MembershipCursor? after,
+        int take,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Changes a Membership's Role within the actor's authority (AC4, AC5; Lee's Q1 (a)). On a committed change the target's
+    /// Account is recorded for a <c>MembershipChanged</c> publish after commit (AC6).
+    /// </summary>
+    /// <param name="actorAccountId">The acting Account.</param>
+    /// <param name="membershipId">The target, from the route.</param>
+    /// <param name="proposed">The Role asked for - never Owner.</param>
+    /// <param name="authority">The acting authority's Role sets, from the pipeline.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>What the change came to, with the target's row as it now stands.</returns>
+    Task<RoleChangeResult> ChangeRoleAsync(
+        Guid actorAccountId,
+        Guid membershipId,
+        Role proposed,
+        RoleChangeAuthority authority,
+        CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// One Membership as the list reads it. Story 4.4, AC1, AC2, AC7.
+/// </summary>
+/// <param name="Id">The Membership's id.</param>
+/// <param name="DisplayName">The Account's display name, read live for a current Member (Lee's Q5 (a)).</param>
+/// <param name="EmailAddress">The Account's address as typed at registration (Lee's Q4 (a)).</param>
+/// <param name="RoleCode">The Role's stable code - read by the store, so the slice reads no Role.</param>
+/// <param name="IsYou">Whether it is the acting Account's own Membership.</param>
+/// <param name="CreatedAt">When it was created - the keyset's first column, never answered.</param>
+public sealed record ListedMembership(Guid Id, string DisplayName, string EmailAddress, string RoleCode, bool IsYou, DateTimeOffset CreatedAt);
+
+/// <summary>
+/// The keyset position a page follows: the last served row's <c>(CreatedAt, Id)</c>. Story 4.4, Q8 (a).
+/// </summary>
+/// <param name="CreatedAt">The row's creation instant.</param>
+/// <param name="Id">The row's id - the tiebreaker.</param>
+public sealed record MembershipCursor(DateTimeOffset CreatedAt, Guid Id);
+
+/// <summary>
+/// What a Role change came to. Story 4.4, AC4.
+/// </summary>
+/// <param name="Outcome">What happened.</param>
+/// <param name="Row">The target's row as it now stands, when it exists in this Space.</param>
+public sealed record RoleChangeResult(RoleChangeOutcome Outcome, ListedMembership? Row);
+
+/// <summary>
+/// The outcomes of a Role change. Story 4.4, AC4, AC5, Q10 (a), Q11 (a).
+/// </summary>
+public enum RoleChangeOutcome
+{
+    /// <summary>
+    /// Written and committed with the request: <c>200</c> with the updated row.
+    /// </summary>
+    Changed,
+
+    /// <summary>
+    /// The target already held the Role: <c>200</c> with the unchanged row, nothing written or published.
+    /// </summary>
+    Unchanged,
+
+    /// <summary>
+    /// The id names no Membership in this Space: the boundary's <c>404</c>, unrecorded.
+    /// </summary>
+    NotFound,
+
+    /// <summary>
+    /// The Owner's own Membership, by the Owner: <c>409 owner-role-fixed</c>.
+    /// </summary>
+    OwnerRoleFixed,
+
+    /// <summary>
+    /// Outside the acting authority: the pipeline's recorded <c>403 insufficient-role</c> (AD-20).
+    /// </summary>
+    BeyondAuthority,
+}

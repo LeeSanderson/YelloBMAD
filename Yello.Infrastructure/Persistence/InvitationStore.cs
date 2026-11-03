@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Yello.Application.Invitations;
+using Yello.Application.Memberships;
 using Yello.Domain;
 using Yello.Domain.Accounts;
 using Yello.Domain.Invitations;
@@ -75,7 +76,13 @@ namespace Yello.Infrastructure.Persistence;
 /// <param name="dbContext">The request's unit of work.</param>
 /// <param name="identifiers">Produces the Invitation's identity (AR-34).</param>
 /// <param name="clock">Stamps the issue instant.</param>
-internal sealed class InvitationStore(YelloDbContext dbContext, IIdentifierGenerator identifiers, TimeProvider clock)
+/// <param name="membershipChanges">Records the accept's new Membership for its <c>MembershipChanged</c> publish after commit
+/// (story 4.4, Q18 (a); AD-9: "any operation mutating a Membership").</param>
+internal sealed class InvitationStore(
+    YelloDbContext dbContext,
+    IIdentifierGenerator identifiers,
+    TimeProvider clock,
+    IMembershipChanges membershipChanges)
     : IInvitationStore, IInvitationAcceptanceScreen
 {
     /// <inheritdoc />
@@ -329,6 +336,9 @@ internal sealed class InvitationStore(YelloDbContext dbContext, IIdentifierGener
         });
 
         await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        // Published once the Invitation unit of work commits, never on its rollback (story 4.4, Q18 (a)).
+        membershipChanges.Record(accountId, offered.SpaceId);
 
         return InvitationAcceptanceOutcome.Accepted;
     }

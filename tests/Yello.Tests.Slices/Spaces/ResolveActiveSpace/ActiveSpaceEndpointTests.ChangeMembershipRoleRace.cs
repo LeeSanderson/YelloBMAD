@@ -36,9 +36,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </remarks>
 public sealed partial class ActiveSpaceEndpointTests
 {
-    private const string RacePending =
-        "red: AC11 - the Role change takes Yello/Memberships/{spaceId} before its guarded UPDATE (Q17 (a)) and re-checks the actor's Role (Lee's Q1 (a))";
-
     /// <summary>
     /// AC11 race 1, Q17 (a), S-2 - two writers on one target: the Owner's Viewer to Admin and an Admin's Viewer to Member,
     /// distinct keys, held on the Space's Memberships lock until both are blocked, then released. The second to run sees the
@@ -49,7 +46,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// serialises the two as well - and is recorded so; the deciding assertion is that both waited on the held lock.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = RacePending)]
+    [Fact]
     [Trait("Requirement", "FR-13")]
     [Trait("Requirement", "AR-12")]
     [Trait("Assumption", "PRD-12-4")]
@@ -119,7 +116,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// actor's Role and finds the authority gone. Plant 4: the actor clause removed - it answers <c>200</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = RacePending)]
+    [Fact]
     [Trait("Requirement", "NFR-2")]
     [Trait("Requirement", "FR-13")]
     [Trait("Requirement", "AD-20")]

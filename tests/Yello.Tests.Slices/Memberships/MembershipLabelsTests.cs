@@ -30,9 +30,6 @@ namespace Yello.Tests.Slices.Memberships;
 [Trait("Requirement", "UX-DR34")]
 public sealed class MembershipLabelsTests
 {
-    private const string Pending =
-        "red: AC3 - story 4.4 declares Yello.Contracts.Memberships.MembershipLabels.Disambiguate and Initials (Q13 (a))";
-
     private const string LabelsTypeName = "Yello.Contracts.Memberships.MembershipLabels";
 
     private static readonly Guid First = Guid.Parse("0d9b3f4e-6c1a-4a8e-9f0b-1c2d3e4f5a6b");
@@ -43,7 +40,7 @@ public sealed class MembershipLabelsTests
     /// AC3 - two Memberships named "Sam Lee" get two distinct labels, each the name, a middle dot and four upper-case hex
     /// characters; a unique name in the same Space gets none.
     /// </summary>
-    [Fact(Skip = Pending)]
+    [Fact]
     public void Two_identical_names_get_two_distinct_suffixes_and_a_unique_name_gets_none()
     {
         var labels = Disambiguate([(First, "Sam Lee"), (Second, "Sam Lee"), (Third, "Ana Diaz")]);
@@ -58,7 +55,7 @@ public sealed class MembershipLabelsTests
     /// AC3, the 4.1 Q3 normalisation family - names are compared ordinally after NFC: "Sam Lee" and "sam lee" are two names
     /// (no suffix), while a composed and a decomposed "José" are one name (both suffixed).
     /// </summary>
-    [Fact(Skip = Pending)]
+    [Fact]
     public void Names_are_compared_ordinally_after_NFC()
     {
         var byCase = Disambiguate([(First, "Sam Lee"), (Second, "sam lee")]);
@@ -72,7 +69,7 @@ public sealed class MembershipLabelsTests
     /// AC3 - the suffix is stable: the same Memberships, asked twice and in reverse order, get the same labels. A reader's
     /// "Sam Lee · 3F2A" never silently becomes someone else (the reason Q13 rejects a join-order ordinal).
     /// </summary>
-    [Fact(Skip = Pending)]
+    [Fact]
     public void The_suffix_is_stable_across_calls_and_orderings()
     {
         (Guid, string)[] members = [(First, "Sam Lee"), (Second, "Sam Lee"), (Third, "Sam Lee")];
@@ -89,7 +86,7 @@ public sealed class MembershipLabelsTests
     /// Membership id and the display name (its signature is checked), so no address can reach it. Plant 13: the
     /// discriminator built from the address.
     /// </summary>
-    [Fact(Skip = Pending)]
+    [Fact]
     public void The_suffix_never_carries_an_at_sign_or_a_fragment_of_an_address()
     {
         var method = DisambiguateMethod();
@@ -114,7 +111,7 @@ public sealed class MembershipLabelsTests
     /// </summary>
     /// <param name="displayName">The display name.</param>
     /// <param name="expected">The initials.</param>
-    [Theory(Skip = Pending)]
+    [Theory]
     [InlineData("Sam Lee", "SL")]
     [InlineData("priya raman", "PR")]
     [InlineData("Ada", "A")]

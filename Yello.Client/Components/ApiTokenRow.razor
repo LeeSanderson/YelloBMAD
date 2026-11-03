@@ -10,7 +10,8 @@
     Its name, its Space's name and when it was made - no Role, no chip, nothing per-Space but
     identity (AR-29). Revoke asks first, in place: the warning, Revoke as the danger action, Cancel.
     Each Revoke button is described by the Token's name, so a list of them is not a list of
-    identical controls to a screen reader.
+    identical controls to a screen reader. While the revoke is in flight a progress line replaces the confirm and takes
+    focus, so focus never falls to body (story 4.4, ledger :762, Q14 (a)).
 *@
 
 <li class="api-token-list__row">
@@ -27,13 +28,22 @@
         </span>
     }
 
-    @if (!Confirming)
+    @if (Revoking)
+    {
+        <span class="api-token-list__progress" role="status" tabindex="-1" @ref="_progress">@Localizer["ApiTokenRevoking"]</span>
+    }
+
+    @if (!Confirming && !Revoking)
     {
         <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="AskAsync">@Localizer["ApiTokenRevoke"]</button>
     }
 </li>
 
 @code {
+    private ElementReference _progress;
+    private bool _wasRevoking;
+    private bool _focusProgress;
+
     /// <summary>The Token.</summary>
     [Parameter]
     [EditorRequired]
@@ -42,6 +52,10 @@
     /// <summary>Whether the revocation is being confirmed.</summary>
     [Parameter]
     public bool Confirming { get; set; }
+
+    /// <summary>Whether its revoke is with the server (story 4.4, ledger <c>:762</c>).</summary>
+    [Parameter]
+    public bool Revoking { get; set; }
 
     /// <summary>Raised by the first Revoke, with the Token's id.</summary>
     [Parameter]
@@ -66,4 +80,27 @@
     private Task RevokeAsync() => OnRevoke.InvokeAsync(Token.Id);
 
     private Task CancelAsync() => OnCancel.InvokeAsync();
+
+    /// <summary>
+    /// The revoke going out takes focus to the progress line that replaces the confirm (story 4.4, ledger <c>:762</c>).
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        if (Revoking && !_wasRevoking)
+        {
+            _focusProgress = true;
+        }
+
+        _wasRevoking = Revoking;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusProgress && Revoking)
+        {
+            _focusProgress = false;
+            await _progress.FocusAsync();
+        }
+    }
 }

@@ -42,12 +42,21 @@ public static class SpaceCapabilities
     /// </summary>
     /// <param name="roleCode">The Role's stable code, from the active Space's answer.</param>
     /// <returns>
-    /// <c>true</c> when the name section, the Label section, the Invitations section (story 4.1) or the delete section is
-    /// offered to the Role.
+    /// <c>true</c> when the name section, the Label section, the Members section (story 4.4), the Invitations section
+    /// (story 4.1) or the delete section is offered to the Role.
     /// </returns>
     public static bool PermitsSpaceSettings(string roleCode) =>
-        PermitsRenameSpace(roleCode)
-        || LabelCapabilities.PermitsManageLabels(roleCode)
-        || InvitationCapabilities.PermitsIssueInvitations(roleCode)
-        || PermitsDeleteSpace(roleCode);
+        Sections.Any(permits => permits(roleCode));
+
+    /// <summary>
+    /// Each section's own predicate: the name, the Labels, the Members (story 4.4), the Invitations and the delete.
+    /// </summary>
+    private static readonly IReadOnlyList<Func<string, bool>> Sections =
+    [
+        PermitsRenameSpace,
+        LabelCapabilities.PermitsManageLabels,
+        MembershipCapabilities.PermitsManageMemberships,
+        InvitationCapabilities.PermitsIssueInvitations,
+        PermitsDeleteSpace,
+    ];
 }

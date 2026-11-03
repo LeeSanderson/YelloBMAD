@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Memberships;
 using Yello.Domain.Accounts;
 using Yello.Domain.Memberships;
 using Yello.Tests.Shared;
@@ -41,15 +42,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </remarks>
 public sealed partial class ActiveSpaceEndpointTests
 {
-    private const string ListPending =
-        "red: AC1 - story 4.4 maps GET /api/v1/spaces/{spaceId}/memberships (Tasks 3-6; Q8 (a), Q9 (a), Lee's Q4 (a))";
-
-    private const string ListShapePending =
-        "red: AC1, AC2, AC7 - the list's row is MembershipResponse(Id, DisplayName, EmailAddress, Role, IsYou), the address as typed and the name read live (Lee's Q4 (a), Q5 (a))";
-
-    private const string ListLogPending =
-        "red: AC2 - the list and the Role change take ids only in their log messages (AD-23, NFR-6, I-17)";
-
     /// <summary>
     /// AC1, Q8 (a), NFR-8 - the Owner and an Admin each walk every page of a 60-Membership Space: every page answers
     /// <c>200</c> with <c>Total = 60</c>; the first holds exactly 50 rows and a cursor, the last none; the pages' union is
@@ -57,7 +49,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// exactly one row - the caller's own - is <c>isYou</c>. Plant 16: the list unpaged (60 rows on one page).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = ListPending)]
+    [Fact]
     [Trait("Requirement", "FR-13")]
     [Trait("Requirement", "UX-DR14")]
     [Trait("Requirement", "NFR-8")]
@@ -117,7 +109,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// pages share no row. Plant 16: one page of 100.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = ListPending)]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "UX-DR14")]
     public async Task At_exactly_100_Memberships_the_first_page_holds_50_and_a_cursor_and_the_second_50_and_none()
@@ -156,7 +148,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// route's <c>404</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = ListPending)]
+    [Fact]
     [Trait("Requirement", "FR-13")]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "AD-23")]
@@ -219,7 +211,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Member's is not. Plant 11's runtime twin: an extra member on the row.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = ListShapePending)]
+    [Fact]
     [Trait("Requirement", "UX-DR14")]
     [Trait("Requirement", "UX-DR34")]
     [Trait("Requirement", "AD-23")]
@@ -286,7 +278,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Host's (its listening line is in it), and both requests were served.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = ListLogPending)]
+    [Fact]
     [Trait("Requirement", "NFR-6")]
     [Trait("Requirement", "AD-23")]
     public async Task Neither_an_address_nor_a_display_name_reaches_the_Host_log_on_list_or_change()
@@ -327,14 +319,14 @@ public sealed partial class ActiveSpaceEndpointTests
     /// The list as the browser sends it: the Session's cookie, a <c>GET</c>, the cursor when one is given.
     /// </summary>
     private static Task<WireResponse> ListMembershipsAsync(WireSession session, Guid spaceId, string? after = null) =>
-        session.SendWithHeadersAsync(HttpMethod.Get, MembershipWire.MembershipsOf(spaceId, after), content: null, NoKey, withAntiforgeryToken: false);
+        session.SendWithHeadersAsync(HttpMethod.Get, MembershipRoutes.MembershipsOf(spaceId, after), content: null, NoKey, withAntiforgeryToken: false);
 
     /// <summary>
     /// The Role change as the browser sends it: the Session's cookie and anti-forgery header, <c>{ role }</c>, and an
     /// <c>Idempotency-Key</c> when one is given.
     /// </summary>
     private static Task<WireResponse> ChangeRoleOverWireAsync(WireSession session, Guid spaceId, Guid membershipId, string? role, string? key = null) =>
-        session.SendWithHeadersAsync(HttpMethod.Patch, MembershipWire.MembershipOf(spaceId, membershipId), MembershipWire.ChangeBody(role), KeyHeaders(key));
+        session.SendWithHeadersAsync(HttpMethod.Patch, MembershipRoutes.MembershipOf(spaceId, membershipId), MembershipWire.ChangeBody(role), KeyHeaders(key));
 
     /// <summary>
     /// Every page of the list, following <c>nextAfter</c> until it is absent; stops at the first answer that is not a

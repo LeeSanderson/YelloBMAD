@@ -137,6 +137,7 @@
                     <ApiTokenRow @key="token.Id"
                                  Token="@token"
                                  Confirming="@(_confirmingRevoke == token.Id)"
+                                 Revoking="@(_revoking == token.Id)"
                                  OnAskToRevoke="AskToRevoke"
                                  OnRevoke="RevokeAsync"
                                  OnCancel="CancelRevoke" />
@@ -173,6 +174,7 @@
     private Guid _spaceId;
 
     private Guid? _confirmingRevoke;
+    private Guid? _revoking;
     private string? _revokeRefusal;
 
     /// <summary>
@@ -418,8 +420,14 @@
 
     private async Task RevokeAsync(Guid tokenId)
     {
+        if (_revoking is not null)
+        {
+            return;
+        }
+
         _confirmingRevoke = null;
         _revokeRefusal = null;
+        _revoking = tokenId;
 
         var generation = _generation;
 
@@ -450,6 +458,13 @@
         {
             return;
         }
+        finally
+        {
+            if (generation == _generation)
+            {
+                _revoking = null;
+            }
+        }
 
         await LoadTokensAsync(generation);
     }
@@ -466,6 +481,7 @@
         _focusPlaintext = false;
         _focusHeading = false;
         _confirmingRevoke = null;
+        _revoking = null;
         _revokeRefusal = null;
         _issueRefusal = null;
         _nameMessage = null;

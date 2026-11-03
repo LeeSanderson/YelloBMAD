@@ -1,0 +1,653 @@
+@using System.Globalization
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Spaces
+@using Yello.Contracts
+@using Yello.Contracts.Memberships
+
+@implements IDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceWrites Writes
+
+@*
+    THE MEMBERS SECTION OF SPACE SETTINGS - story 4.4: AC1, AC2, AC3, AC4, AC10; FR-13; UX-DR11, UX-DR14, UX-DR26,
+    UX-DR27, UX-DR29, UX-DR31, UX-DR34, UX-DR38, UX-DR39.
+
+    OWNER AND ADMIN ONLY. Space settings renders this only when MembershipCapabilities.PermitsManageMemberships (the Roles
+    change-membership-role admits); for a Member or a Viewer it is absent from the DOM and the list is never asked for.
+
+    EVERY MEMBERSHIP, A PAGE AT A TIME (Q8 (a); AD-29, UX-DR26): the server's 50 a page in join order; "Show more" asks for
+    the next page with the cursor the last one answered and APPENDS it - a row once shown is never recycled or replaced.
+    No infinite scroll. The heading's meta is the true total against the bound: "{n} of 100".
+
+    ADDRESSES ARE SHOWN HERE AND NOWHERE ELSE IN YELLO (UX-DR34; Lee's Q4 (a)), and the sub-copy says so. RENDERED ONLY
+    AFTER THE SERVER HAS ANSWERED and PURGED WITH THE SPACE (UX-DR31): the rows, any picker, any change in flight and any
+    refusal go synchronously the moment the tab leaves the Space. Nothing said aloud ever names an address (UX-DR38).
+
+    A CHANGE (MembershipRow's picker) is sent once with an Idempotency-Key - fresh per deliberate "Change", kept for the
+    identical resend after no answer - and is NEVER OPTIMISTIC. 200: the row is the server's answer, "{name} is now a
+    {Role}." is announced, and focus returns to the row's "Change Role". 403: the Role is asked again (the authority may
+    have been lost meanwhile); a Role that no longer permits Space settings follows the page's narrated exit (UX-DR29), and
+    otherwise the capability-shaped copy is said on the row. 409 owner-role-fixed: "Ownership moves only by an Ownership
+    Offer." 404: the list is read again (Q16 (a)) - "That Membership no longer exists." if it answers, the Space refusal
+    surface if it does not. No answer or a 5xx: "Not sent.", the key kept.
+*@
+
+<section class="membership-section" aria-labelledby="membership-section-heading">
+    <div class="membership-section__header">
+        <h2 class="type-space-name membership-section__heading" id="membership-section-heading" tabindex="-1" @ref="_heading">@Localizer["MembersHeading"]</h2>
+
+        @if (_total is { } total)
+        {
+            <span class="membership-section__count type-meta">@CountOf(total)</span>
+        }
+    </div>
+
+    <p class="membership-section__note">@AddressNote</p>
+
+    <LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
+
+    @if (IsLoading)
+    {
+        <div class="membership-section__loading" aria-busy="true">
+            <p class="visually-hidden">@Localizer["MembersLoading"]</p>
+        </div>
+    }
+
+    @if (_listRefusal is { } listRefusal)
+    {
+        <p class="membership-section__status" role="status">@listRefusal</p>
+    }
+
+    @if (_memberships is { Count: > 0 } memberships)
+    {
+        <ul class="membership-list">
+            @foreach (var membership in memberships)
+            {
+                <MembershipRow @key="membership.Id"
+                               Membership="@membership"
+                               Label="@LabelOf(membership)"
+                               ViewerRole="@ViewerRole"
+                               Picking="@(_picking == membership.Id)"
+                               Changing="@(_changing == membership.Id)"
+                               Refusal="@(_rowRefusal?.MembershipId == membership.Id ? _rowRefusal.Value.Text : null)"
+                               FocusRequest="@(_focusControlOf == membership.Id ? _focusRequests : 0)"
+                               OnAsk="AskToChange"
+                               OnChange="ChangeAsync"
+                               OnCancel="CancelChange" />
+            }
+        </ul>
+    }
+
+    @if (_nextAfter is not null && !_loadingMore)
+    {
+        <button type="button" class="button-secondary membership-section__more" @onclick="ShowMoreAsync" @ref="_showMore">@Localizer["MembersShowMore"]</button>
+    }
+
+    @if (_loadingMore)
+    {
+        <p class="membership-section__progress" role="status" tabindex="-1" @ref="_moreProgress">@Localizer["MembersLoading"]</p>
+    }
+</section>
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private IDisposable? _purgeRegistration;
+
+    /// <summary>
+    /// Bumped by every purge and by disposal. An answer that started before one is dropped when it arrives.
+    /// </summary>
+    private int _generation;
+
+    /// <summary>
+    /// Bumped by every first-page read. Only the latest read's answer is used.
+    /// </summary>
+    private int _reads;
+
+    private ElementReference _heading;
+    private ElementReference _moreProgress;
+    private ElementReference _showMore;
+    private bool _focusShowMore;
+    private bool _morePlacedFocus;
+    private List<MembershipResponse>? _memberships;
+    private IReadOnlyDictionary<Guid, string>? _labels;
+    private List<MembershipResponse>? _labelsFor;
+    private int _labelsCount;
+    private int? _total;
+    private string? _nextAfter;
+    private bool _loadingMore;
+    private bool _focusMoreProgress;
+    private bool _focusHeading;
+    private string? _listRefusal;
+    private Guid? _picking;
+    private Guid? _changing;
+    private (Guid MembershipId, string Text)? _rowRefusal;
+    private (Guid MembershipId, string Role, string Key)? _changeKey;
+    private Guid? _focusControlOf;
+    private int _focusRequests;
+    private string? _announcement;
+    private int _announcements;
+
+    /// <summary>The Space whose Memberships these are - the route's, which the pipeline resolves.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>The viewer's Role in this Space, as its stable code - what the rows offer, never what the server permits.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string ViewerRole { get; set; } = string.Empty;
+
+    /// <summary>Raised when the server refuses the Space itself, so the page renders the one refusal surface.</summary>
+    [Parameter]
+    public EventCallback<ProblemResponse?> OnSpaceRefused { get; set; }
+
+    /// <summary>Raised on a <c>403</c>, so the page asks for the Role again (UX-DR29).</summary>
+    [Parameter]
+    public EventCallback OnRoleDoubted { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _purgeRegistration = ActiveSpace.RegisterPurge(Purge);
+
+        await LoadAsync(_generation);
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _generation++;
+        _purgeRegistration?.Dispose();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusMoreProgress && _loadingMore)
+        {
+            _focusMoreProgress = false;
+            await _moreProgress.FocusAsync();
+        }
+
+        if (_focusShowMore && !_loadingMore && _nextAfter is not null)
+        {
+            _focusShowMore = false;
+            await _showMore.FocusAsync();
+        }
+
+        if (_focusHeading && _memberships is not null)
+        {
+            _focusHeading = false;
+            await _heading.FocusAsync();
+        }
+    }
+
+    private bool IsLoading => _memberships is null && _listRefusal is null;
+
+    private string AddressNote =>
+        string.Format(CultureInfo.CurrentCulture, Localizer["MembersAddressNote"], Localizer[RoleCopy.NameKey(ViewerRole)]);
+
+    private string CountOf(int total) =>
+        string.Format(CultureInfo.CurrentCulture, Localizer["MembersCount"], total, MembershipCapabilities.MembershipsPerSpace);
+
+    /// <summary>
+    /// A row's label (AC3): the display name, with a Membership-scoped discriminator when another row shown carries the same
+    /// name. Worked out once per list the section holds, not once per row.
+    /// </summary>
+    private string LabelOf(MembershipResponse membership)
+    {
+        if (_labels is null || _labelsFor != _memberships || _labelsCount != _memberships?.Count)
+        {
+            _labelsFor = _memberships;
+            _labelsCount = _memberships?.Count ?? 0;
+            _labels = MembershipLabels.Disambiguate([.. (_memberships ?? []).Select(row => (row.Id, row.DisplayName))]);
+        }
+
+        return _labels.TryGetValue(membership.Id, out var label) ? label : membership.DisplayName;
+    }
+
+    /// <summary>
+    /// The Space is being left: its Memberships - other people's names and addresses - and everything about changing one
+    /// go synchronously, before anything else renders (UX-DR31).
+    /// </summary>
+    private void Purge()
+    {
+        _generation++;
+        _memberships = null;
+        _total = null;
+        _nextAfter = null;
+        _loadingMore = false;
+        _listRefusal = null;
+        _picking = null;
+        _changing = null;
+        _rowRefusal = null;
+        _changeKey = null;
+        _focusControlOf = null;
+        _focusHeading = false;
+        _focusMoreProgress = false;
+        _focusShowMore = false;
+        Say(null);
+    }
+
+    /// <summary>
+    /// Reads the first page. Nothing is rendered from cache before the server answers; a read again keeps the rows on
+    /// screen until it answers. A first read that gets no answer is the Space refusal surface; a read again that gets no
+    /// answer, or a 5xx, keeps the rows already shown.
+    /// </summary>
+    /// <returns><c>true</c> when the list answered.</returns>
+    private async Task<bool> LoadAsync(int generation)
+    {
+        var token = ActiveSpace.Token;
+        var read = ++_reads;
+        var rereading = _memberships is not null;
+
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(MembershipRoutes.MembershipsOf(SpaceId), UriKind.Relative), token);
+
+            if (!IsLatestRead(read, generation) || token.IsCancellationRequested)
+            {
+                return false;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                return await UseFirstPageAsync(response, read, generation, token);
+            }
+
+            if (rereading && response.StatusCode >= HttpStatusCode.InternalServerError)
+            {
+                return false;
+            }
+
+            await RefuseListAsync(response, token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended: both purges have run.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            if (IsLatestRead(read, generation) && !rereading)
+            {
+                await OnSpaceRefused.InvokeAsync(null);
+            }
+        }
+
+        return false;
+    }
+
+    private bool IsLatestRead(int read, int generation) => read == _reads && generation == _generation;
+
+    /// <summary>
+    /// A first page: the rows, the true total and the cursor - unless a later read or a purge came first.
+    /// </summary>
+    private async Task<bool> UseFirstPageAsync(HttpResponseMessage response, int read, int generation, CancellationToken token)
+    {
+        var page = await response.Content.ReadFromJsonAsync<MembershipPageResponse>(JsonOptions, token);
+
+        if (page is null || !IsLatestRead(read, generation))
+        {
+            return false;
+        }
+
+        _memberships = [.. page.Memberships];
+        _total = page.Total;
+        _nextAfter = page.NextAfter;
+        _listRefusal = null;
+
+        return true;
+    }
+
+    /// <summary>
+    /// A refused read: a 404 is the Space refusal surface; a 403 - the section is absent for those Roles, so only a Role
+    /// lost meanwhile - the capability copy in the section, and the Role asked for again. A 401 is YelloApiHandler's.
+    /// </summary>
+    private async Task RefuseListAsync(HttpResponseMessage response, CancellationToken token)
+    {
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            return;
+        }
+
+        var problem = await SpaceWrites.ProblemOfAsync(response, token);
+
+        if (response.StatusCode == HttpStatusCode.Forbidden)
+        {
+            _listRefusal = RefusalText.Of(Localizer, problem);
+            await OnRoleDoubted.InvokeAsync();
+            return;
+        }
+
+        await OnSpaceRefused.InvokeAsync(problem);
+    }
+
+    /// <summary>
+    /// The next page, appended: the rows already shown stay as they are (AD-29). The status line that replaces Show more
+    /// takes focus while it reads, and the first new row's control - or the heading - takes it after, never body.
+    /// </summary>
+    private async Task ShowMoreAsync()
+    {
+        if (_loadingMore || _nextAfter is not { } after || _memberships is null)
+        {
+            return;
+        }
+
+        _loadingMore = true;
+        _focusMoreProgress = true;
+        _morePlacedFocus = false;
+
+        var generation = _generation;
+        var read = _reads;
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(MembershipRoutes.MembershipsOf(SpaceId, after), UriKind.Relative), token);
+
+            if (IsLatestRead(read, generation) && !token.IsCancellationRequested)
+            {
+                await UseNextPageAsync(response, read, generation, token);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            if (IsLatestRead(read, generation))
+            {
+                _listRefusal = Localizer["TaskEditNotSent"];
+            }
+        }
+        finally
+        {
+            MoreSettled(generation);
+        }
+    }
+
+    /// <summary>
+    /// Show more has its answer: the status line goes, and focus lands on a new row's control or - when nothing new
+    /// offers one - the heading, never body.
+    /// </summary>
+    private void MoreSettled(int generation)
+    {
+        if (generation != _generation)
+        {
+            return;
+        }
+
+        _loadingMore = false;
+
+        if (_morePlacedFocus)
+        {
+            return;
+        }
+
+        // Nothing new offers a control, or the page did not come: Show more again if it is still there, else the heading.
+        _focusShowMore = _nextAfter is not null;
+        _focusHeading = _nextAfter is null;
+    }
+
+    private async Task UseNextPageAsync(HttpResponseMessage response, int read, int generation, CancellationToken token)
+    {
+        if (!response.IsSuccessStatusCode)
+        {
+            await RefuseMoreAsync(response, token);
+            return;
+        }
+
+        var page = await response.Content.ReadFromJsonAsync<MembershipPageResponse>(JsonOptions, token);
+
+        if (page is not null && IsLatestRead(read, generation) && _memberships is { } shown)
+        {
+            Append(shown, page);
+        }
+    }
+
+    private void Append(List<MembershipResponse> shown, MembershipPageResponse page)
+    {
+        var known = shown.Select(membership => membership.Id).ToHashSet();
+        var added = page.Memberships.Where(membership => known.Add(membership.Id)).ToList();
+
+        shown.AddRange(added);
+        _total = page.Total;
+        _nextAfter = page.NextAfter;
+
+        var focusable = added.Find(membership => MembershipCapabilities.OfferableRoles(ViewerRole, membership.Role).Count > 0 && !membership.IsYou);
+
+        if (focusable is not null)
+        {
+            FocusControlOf(focusable.Id);
+            _morePlacedFocus = true;
+        }
+    }
+
+    private async Task RefuseMoreAsync(HttpResponseMessage response, CancellationToken token)
+    {
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            return;
+        }
+
+        if (response.StatusCode >= HttpStatusCode.InternalServerError)
+        {
+            _listRefusal = Localizer["TaskEditNotSent"];
+            return;
+        }
+
+        await RefuseListAsync(response, token);
+    }
+
+    private void AskToChange(Guid membershipId)
+    {
+        _picking = membershipId;
+        _rowRefusal = null;
+    }
+
+    private void CancelChange() => _picking = null;
+
+    /// <summary>
+    /// Sends the change once the person chose a Role - never optimistic (UX-DR26).
+    /// </summary>
+    private async Task ChangeAsync((Guid MembershipId, string Role) change)
+    {
+        if (_changing is not null)
+        {
+            return;
+        }
+
+        var (membershipId, role) = change;
+
+        // A fresh key per deliberate change; the key of an attempt that got no answer is kept for its identical resend.
+        if (_changeKey is not { } kept || kept.MembershipId != membershipId || kept.Role != role)
+        {
+            _changeKey = (membershipId, role, Guid.NewGuid().ToString("D"));
+        }
+
+        _picking = null;
+        _rowRefusal = null;
+        _changing = membershipId;
+
+        var generation = _generation;
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var answer = await Writes.SendAsync(HttpMethod.Patch, MembershipRoutes.MembershipOf(SpaceId, membershipId), new ChangeMembershipRoleRequest(role), _changeKey.Value.Key, token);
+
+            if (generation == _generation)
+            {
+                _changing = null;
+                await UseChangeAnswerAsync(membershipId, answer, generation, token);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // No answer - a timeout included: the row says it was not sent, and the key is kept for the resend.
+            if (generation == _generation)
+            {
+                NotSent(membershipId);
+            }
+        }
+        finally
+        {
+            if (generation == _generation)
+            {
+                _changing = null;
+            }
+        }
+    }
+
+    private async Task UseChangeAnswerAsync(Guid membershipId, SpaceWriteAnswer answer, int generation, CancellationToken token)
+    {
+        if (answer.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            return;
+        }
+
+        if (answer.StatusCode >= HttpStatusCode.InternalServerError)
+        {
+            // The outcome is not known: treated as no answer, so the key is kept.
+            NotSent(membershipId);
+            return;
+        }
+
+        _changeKey = null;
+
+        if (answer.StatusCode == HttpStatusCode.OK)
+        {
+            if (await answer.Response.Content.ReadFromJsonAsync<MembershipResponse>(JsonOptions, token) is { } changed && generation == _generation)
+            {
+                Changed(changed);
+            }
+
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.NotFound)
+        {
+            await GoneAsync(membershipId, answer.Problem, generation);
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.Forbidden)
+        {
+            // The authority may have been lost meanwhile: the Role is asked again, and a Role that no longer permits Space
+            // settings follows the page's narrated exit. Otherwise it is the Admin's limit, said on the row.
+            _rowRefusal = (membershipId, MembershipCapabilities.PermitsManageMemberships(ViewerRole) ? Localizer["MembershipAdminLimit"] : RefusalText.Of(Localizer, answer.Problem));
+            FocusControlOrHeading(membershipId);
+            await OnRoleDoubted.InvokeAsync();
+            return;
+        }
+
+        _rowRefusal = (membershipId, RefusalText.Of(Localizer, answer.Problem));
+        FocusControlOrHeading(membershipId);
+    }
+
+    /// <summary>
+    /// The row becomes the server's answer, the change is announced by display name - never the address (UX-DR38) - and
+    /// focus returns to the row's Change Role (UX-DR39).
+    /// </summary>
+    private void Changed(MembershipResponse row)
+    {
+        if (_memberships is { } memberships)
+        {
+            var at = memberships.FindIndex(membership => membership.Id == row.Id);
+
+            if (at >= 0)
+            {
+                memberships[at] = row;
+            }
+        }
+
+        FocusControlOrHeading(row.Id);
+        Say(string.Format(CultureInfo.CurrentCulture, Localizer[ChangedKey(row.Role)], row.DisplayName));
+    }
+
+    /// <summary>
+    /// A <c>404</c> (Q16 (a)): the list as the server now holds it. If it answers without the row, the row is gone and
+    /// that is said; if the Space itself is refused, the read raises the refusal surface.
+    /// </summary>
+    private async Task GoneAsync(Guid membershipId, ProblemResponse? problem, int generation)
+    {
+        var answered = await LoadAsync(generation);
+
+        if (generation != _generation)
+        {
+            return;
+        }
+
+        if (!answered)
+        {
+            _rowRefusal = (membershipId, RefusalText.Of(Localizer, problem));
+            FocusControlOrHeading(membershipId);
+            return;
+        }
+
+        if (_memberships?.Exists(membership => membership.Id == membershipId) == true)
+        {
+            FocusControlOrHeading(membershipId);
+            return;
+        }
+
+        _focusHeading = true;
+        Say(Localizer["MembershipGone"]);
+    }
+
+    private void NotSent(Guid membershipId)
+    {
+        _rowRefusal = (membershipId, Localizer["TaskEditNotSent"]);
+        FocusControlOrHeading(membershipId);
+    }
+
+    /// <summary>
+    /// The row's Change Role when it still offers one, else the section heading - never body (UX-DR39).
+    /// </summary>
+    private void FocusControlOrHeading(Guid membershipId)
+    {
+        var row = _memberships?.Find(membership => membership.Id == membershipId);
+
+        if (row is not null && !row.IsYou && MembershipCapabilities.OfferableRoles(ViewerRole, row.Role).Count > 0)
+        {
+            FocusControlOf(membershipId);
+            return;
+        }
+
+        _focusHeading = true;
+    }
+
+    private void FocusControlOf(Guid membershipId)
+    {
+        _focusControlOf = membershipId;
+        _focusRequests++;
+    }
+
+    private static string ChangedKey(string roleCode) => roleCode switch
+    {
+        "admin" => "MembershipNowAdmin",
+        "member" => "MembershipNowMember",
+        "viewer" => "MembershipNowViewer",
+        _ => "MembershipNowChanged",
+    };
+
+    /// <summary>
+    /// Says a sentence politely - the same one again included - or, with <c>null</c>, clears the regions.
+    /// </summary>
+    private void Say(string? words)
+    {
+        _announcement = words;
+        _announcements++;
+    }
+}

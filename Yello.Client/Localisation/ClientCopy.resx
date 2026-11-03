@@ -1255,4 +1255,96 @@
     <value>This invitation could not be loaded.</value>
     <comment>Story 4.3 (AC13): the Invitation view got no usable answer from the server. Says nothing about the Invitation itself; the link may be opened again.</comment>
   </data>
+  <data name="MembersHeading" xml:space="preserve">
+    <value>Members</value>
+    <comment>Story 4.4 (AC1, AC10, Q19 (a)): the heading of Space settings' Members section, which lists every Membership with its Role.</comment>
+  </data>
+  <data name="MembersCount" xml:space="preserve">
+    <value>{0} of {1}</value>
+    <comment>Story 4.4 (AC1, Q19 (a)): the Members heading's monospace meta - the true number of Memberships, then the Memberships-per-Space bound. {0} is the count, {1} the bound.</comment>
+  </data>
+  <data name="MembersAddressNote" xml:space="preserve">
+    <value>Email addresses are visible here because you're an {0}. They appear nowhere else in Yello.</value>
+    <comment>Story 4.4 (AC2, Q19 (a); UX-DR34): the Members section's sub-copy. {0} is the viewer's Role name - Owner or Admin, both taking "an".</comment>
+  </data>
+  <data name="MembersLoading" xml:space="preserve">
+    <value>Loading Members.</value>
+    <comment>Story 4.4 (AC10): visually hidden while the Memberships are read, and the status line while "Show more" reads the next page. Never names an address.</comment>
+  </data>
+  <data name="MembersShowMore" xml:space="preserve">
+    <value>Show more</value>
+    <comment>Story 4.4 (AC1, Q8 (a); UX-DR26): appends the next page of Memberships. No infinite scroll.</comment>
+  </data>
+  <data name="MembershipYou" xml:space="preserve">
+    <value>· You</value>
+    <comment>Story 4.4 (AC10, Q19 (a)): marks the viewer's own row in the Members section.</comment>
+  </data>
+  <data name="MembershipChangeRole" xml:space="preserve">
+    <value>Change Role</value>
+    <comment>Story 4.4 (AC4, Q12 (a)): a row's control, present only where the viewer may change that row's Role (absent, never disabled; UX-DR27). Opens the picker in place.</comment>
+  </data>
+  <data name="MembershipChangeLegend" xml:space="preserve">
+    <value>Change {0}'s Role. Currently {1}.</value>
+    <comment>Story 4.4 (AC4, Q12 (a); UX-DR11): the picker's legend. {0} is the display name, {1} the current Role's name - named here, never pre-selected.</comment>
+  </data>
+  <data name="MembershipChange" xml:space="preserve">
+    <value>Change</value>
+    <comment>Story 4.4 (AC4, Q12 (a)): sends the chosen Role. Never optimistic.</comment>
+  </data>
+  <data name="MembershipCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Story 4.4 (AC4, Q12 (a)): closes the picker and sends nothing.</comment>
+  </data>
+  <data name="MembershipChanging" xml:space="preserve">
+    <value>Changing.</value>
+    <comment>Story 4.4 (AC10; ledger :762): a row's status line while its change is in flight; it takes focus so focus never falls to body.</comment>
+  </data>
+  <data name="MembershipRoleRequired" xml:space="preserve">
+    <value>Choose a Role.</value>
+    <comment>Story 4.4 (AC4; UX-DR11): said in the picker when "Change" is pressed with no Role chosen - there is no default.</comment>
+  </data>
+  <data name="MembershipNowAdmin" xml:space="preserve">
+    <value>{0} is now an Admin.</value>
+    <comment>Story 4.4 (AC10, Q19 (a); UX-DR38): announced politely after a change to Admin. {0} is the display name, never the address.</comment>
+  </data>
+  <data name="MembershipNowMember" xml:space="preserve">
+    <value>{0} is now a Member.</value>
+    <comment>Story 4.4 (AC10, Q19 (a); UX-DR38): announced politely after a change to Member. {0} is the display name, never the address.</comment>
+  </data>
+  <data name="MembershipNowViewer" xml:space="preserve">
+    <value>{0} is now a Viewer.</value>
+    <comment>Story 4.4 (AC10, Q19 (a); UX-DR38): announced politely after a change to Viewer. {0} is the display name, never the address.</comment>
+  </data>
+  <data name="MembershipNowChanged" xml:space="preserve">
+    <value>{0}'s Role has changed.</value>
+    <comment>Story 4.4 (AC10): announced after a change to a Role the client has no sentence for - unreachable while the server assigns Admin, Member or Viewer only. {0} is the display name.</comment>
+  </data>
+  <data name="MembershipAdminLimit" xml:space="preserve">
+    <value>Admins can change Roles between Member and Viewer only.</value>
+    <comment>Story 4.4 (AC4, AC10, Q19 (a); FR-13, PRD section 12 #4): said on the row when an Admin's change is refused 403 and the Role, asked again, still permits the section. Capability-shaped.</comment>
+  </data>
+  <data name="MembershipGone" xml:space="preserve">
+    <value>That Membership no longer exists.</value>
+    <comment>Story 4.4 (AC10, Q16 (a)): announced when a change answered 404 and the list, read again, no longer holds the row.</comment>
+  </data>
+  <data name="owner-role-fixed" xml:space="preserve">
+    <value>Ownership moves only by an Ownership Offer.</value>
+    <comment>Story 4.4 (AC4, AC5, Q10 (a), Q19 (a)): the owner-role-fixed refusal (409) of a change to the Owner's own row. FR-42.</comment>
+  </data>
+  <data name="role-not-assignable" xml:space="preserve">
+    <value>Choose Admin, Member or Viewer.</value>
+    <comment>Story 4.4 (AC4, Q10 (a)): the role-not-assignable refusal (400) - owner or an unknown code. Ownership moves only by an Ownership Offer (FR-42).</comment>
+  </data>
+  <data name="LabelGone" xml:space="preserve">
+    <value>That Label no longer exists.</value>
+    <comment>Story 4.4 (ledger :546, Q16 (a)): announced when a Label delete answered 404 and the Label list, read again, no longer holds it.</comment>
+  </data>
+  <data name="LabelDeleting" xml:space="preserve">
+    <value>Deleting.</value>
+    <comment>Story 4.4 (ledger :762, Q14 (a)): a Label row's status line while its delete is in flight; it takes focus so focus never falls to body.</comment>
+  </data>
+  <data name="ApiTokenRevoking" xml:space="preserve">
+    <value>Revoking.</value>
+    <comment>Story 4.4 (ledger :762, Q14 (a)): an API Token row's status line while its revoke is in flight; it takes focus so focus never falls to body.</comment>
+  </data>
 </root>

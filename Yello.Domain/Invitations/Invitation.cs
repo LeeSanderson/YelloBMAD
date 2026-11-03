@@ -97,6 +97,13 @@ public sealed class Invitation
     /// <summary>
     /// The issuer's display name as it stood at issue.
     /// </summary>
+    /// <remarks>
+    /// <b>The rule for every piece of authored content</b> (UX-DR34, <c>EXPERIENCE.md:156</c>; story 4.4, AC7): attribution
+    /// uses the name captured at authoring time, never a live Account lookup, because resolving a current name globally
+    /// would carry a later name change into a Space the reader no longer shares with that person. Story 7.2's description
+    /// authorship inherits it. Only the Membership list reads <c>Account.DisplayName</c> live, for current Members (Lee's 4.4
+    /// Q5 (a)); <c>RefusalBoundaryGateTests.Attribution_never_reads_a_live_Account_name</c> holds the named readers.
+    /// </remarks>
     public required string IssuerName { get; init; }
 
     /// <summary>

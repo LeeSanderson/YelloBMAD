@@ -1,6 +1,7 @@
 using Microsoft.Playwright;
 using Xunit;
 using Yello.Contracts.Labels;
+using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -714,6 +715,50 @@ public sealed class TextSpacingTests(ClientSurfaceFixture surface)
             await api.InstallAsync(page);
             await page.GotoAsync(new Uri(surface.BaseAddress, Yello.Tests.Shared.InvitationWire.LinkPath.TrimStart('/') + token).ToString());
             await page.Locator("main h1", new PageLocatorOptions { HasText = "invited you to" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
+
+            var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+        }
+    }
+
+    /// <summary>
+    /// Story 4.4, AC10, <c>deferred-work.md:20</c> (each new surface adds its own case) - the Members section of Space
+    /// settings, with a long display name and a long address in a row and that row's Role picker open in place, under 1.4.12
+    /// text spacing and 200% text-only zoom: no text clipped and no sideways page scroll. Anchored: the picker is on screen
+    /// before the check runs.
+    /// </summary>
+    /// <param name="zoom">Whether the adaptation is 200% text-only zoom (otherwise 1.4.12 text spacing).</param>
+    /// <returns>A task.</returns>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR14")]
+    [Trait("Requirement", "UX-DR11")]
+    public async Task Text_spacing_and_text_only_zoom_clip_nothing_in_the_Members_section(bool zoom)
+    {
+        var api = Seeded();
+        var address = $"maximiliana.wolfeschlegelsteinhausenberger-{Guid.NewGuid():N}@a-rather-long-domain.example.test";
+
+        api.SpaceMemberships[Northwind] =
+        [
+            new ListedMembership(Guid.NewGuid(), "Olu Owner", $"owner-{Guid.NewGuid():N}@example.test", "owner", IsYou: true),
+            new ListedMembership(Guid.NewGuid(), "Maximiliana Wolfeschlegelsteinhausenberger-Ortiz", address, "member", IsYou: false),
+        ];
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(1280, 900);
+            await api.InstallAsync(page);
+            await page.GotoAsync(new Uri(surface.BaseAddress, $"spaces/{Northwind:D}/settings").ToString());
+
+            var row = page.Locator("main .membership-section li", new PageLocatorOptions { HasText = address });
+
+            await row.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Change Role", Exact = true }).ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await row.Locator("fieldset").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = zoom ? TextOnlyZoom : TextSpacingOverride });
 
             var problems = await page.EvaluateAsync<string[]>(ClippedOrOverlapping);

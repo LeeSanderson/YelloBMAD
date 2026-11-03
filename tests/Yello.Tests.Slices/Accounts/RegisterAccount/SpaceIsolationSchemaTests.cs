@@ -94,7 +94,7 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
     /// read-only test would never notice.
     /// </remarks>
     private static readonly string[] TablesThatCannotMove =
-        [SchemaNames.ProjectTable, SchemaNames.TaskTable, SchemaNames.LabelTable, SchemaNames.TaskLabelTable, SchemaNames.InvitationTable];
+        [SchemaNames.ProjectTable, SchemaNames.TaskTable, SchemaNames.LabelTable, SchemaNames.TaskLabelTable, SchemaNames.InvitationTable, SchemaNames.MembershipTable];
 
     [Fact]
     public async Task Every_Space_scoped_table_carries_a_filter_and_a_block_predicate()
@@ -120,7 +120,8 @@ public sealed class SpaceIsolationSchemaTests(MigratedDatabaseFixture fixture)
                 SchemaNames.SpaceIsolationPolicy);
 
             // Widened deliberately by story 2.4: Label and TaskLabel carry BLOCK AFTER UPDATE too, like Project and
-            // Task, so neither can be moved to another Space. Every other table still carries exactly two.
+            // Task, so neither can be moved to another Space. Story 4.4 (Lee's Q3 (a)): Membership too, the first Space table
+            // whose rows the product updates since 2.4. Every other table still carries exactly two.
             Assert.Equal(TablesThatCannotMove.Contains(table) ? MovableTablePredicates : PredicatesPerTable, predicates);
         }
     }

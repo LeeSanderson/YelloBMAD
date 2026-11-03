@@ -1,0 +1,18 @@
+@*
+    TELLS A SPACE-SCOPED PAGE THAT SpaceArrival HAS ANSWERED - story 4.4, ledger deferred-work.md:550, open question 15 (a).
+
+    Rendered inside SpaceArrival's content, so it first renders only once the Space has answered; the page's own first
+    render was an earlier browser task. Space home writes its narration then, into the status region it rendered empty on
+    its first render, so assistive technology hears a CHANGE to a live region rather than a region inserted already
+    holding its sentence (the LiveAnnouncement rule: regions are empty from the first render). Renders nothing.
+*@
+
+@code {
+    /// <summary>Raised once, after this first renders.</summary>
+    [Parameter]
+    public EventCallback OnArrived { get; set; }
+
+    /// <inheritdoc />
+    protected override Task OnAfterRenderAsync(bool firstRender) =>
+        firstRender ? OnArrived.InvokeAsync() : Task.CompletedTask;
+}

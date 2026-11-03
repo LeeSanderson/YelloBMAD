@@ -6,6 +6,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Xunit;
+using Yello.Application.Memberships;
 using Yello.Application.Spaces;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Spaces;
@@ -143,6 +144,7 @@ public sealed class ActiveSpaceUnitOfWorkTests
             .AddSingleton<ISpaceRequestEstablishment>(new FixedEstablishment())
             .AddSingleton<IActiveSpaceResolver>(new FixedResolver(unitOfWork))
             .AddSingleton<ISpacePresenceRegister>(new AdmittingPresence())
+            .AddScoped<ActingAuthority>()
             .BuildServiceProvider();
 
         return ActiveSpaceResolution.ResolveAsync(

@@ -1,0 +1,238 @@
+@using System.Globalization
+@using Yello.Client.Spaces
+@using Yello.Contracts.Memberships
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    ONE MEMBERSHIP IN SPACE SETTINGS' MEMBERS SECTION - story 4.4: AC2, AC3, AC4, AC10; FR-13; UX-DR11, UX-DR14, UX-DR27,
+    UX-DR34, UX-DR39.
+
+    Its initials avatar (monospace, from the display name alone), its label - the display name, with a Membership-scoped
+    discriminator only when another Membership here carries the same name (MembershipLabels; AC3) - "· You" on one's own
+    row, its address (here, and nowhere else in the product: UX-DR34), and its Role as a fixed chip.
+
+    "CHANGE ROLE" ONLY WHERE THE VIEWER MAY CHANGE IT (MembershipCapabilities.OfferableRoles): every other row for the
+    Owner; Member and Viewer rows for an Admin. Elsewhere the control is ABSENT from the DOM (UX-DR27) - the Owner's row,
+    one's own row, and an Admin's view of another Admin's row are the chip alone.
+
+    THE PICKER OPENS IN PLACE (Q12 (a); UX-DR11): the control is replaced by a fieldset whose legend names the row and its
+    current Role, a radio per offerable Role with NO OPTION CHECKED - the choice is consequential, so there is no default -
+    then "Change" and "Cancel". Never a dialog. Esc or Cancel restores the control with focus on it.
+
+    IN FLIGHT, the status line replaces the control and takes focus, so focus never falls to body (ledger :762, Q14 (a)).
+    Not optimistic: the chip keeps the current Role until the server answers.
+*@
+
+<li class="membership-row">
+    <span class="membership-row__avatar" aria-hidden="true">@MembershipLabels.Initials(Membership.DisplayName)</span>
+    <span class="membership-row__name" id="@NameId">@Label</span>
+
+    @if (Membership.IsYou)
+    {
+        <span class="membership-row__you">@Localizer["MembershipYou"]</span>
+    }
+
+    <span class="membership-row__address">@Membership.EmailAddress</span>
+    <RoleChip Role="@Membership.Role" />
+
+    @if (Picking)
+    {
+        <fieldset class="membership-row__picker" @onkeydown="PickerKeyDownAsync">
+            <legend class="form-field__label">@Legend</legend>
+
+            @foreach (var (roleCode, at) in Options)
+            {
+                <label class="membership-row__option">
+                    <input type="radio" name="@_groupName" value="@roleCode" checked="@(_chosen == roleCode)" @onchange="Choose" @ref="_options[at]" />
+                    @Localizer[RoleCopy.NameKey(roleCode)]
+                </label>
+            }
+
+            @if (_chooseMessage is { } chooseMessage)
+            {
+                <p class="form-field__message" role="status">@chooseMessage</p>
+            }
+
+            <span class="membership-row__actions">
+                <button type="button" class="button-primary" @onclick="ChangeAsync">@Localizer["MembershipChange"]</button>
+                <button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["MembershipCancel"]</button>
+            </span>
+        </fieldset>
+    }
+
+    @if (Changing)
+    {
+        <span class="membership-row__progress" role="status" tabindex="-1" @ref="_progress">@Localizer["MembershipChanging"]</span>
+    }
+
+    @if (ShowsControl)
+    {
+        <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="AskAsync" @ref="_control">@Localizer["MembershipChangeRole"]</button>
+    }
+
+    @if (Refusal is { } refusal)
+    {
+        <p class="membership-row__refusal" role="status">@refusal</p>
+    }
+</li>
+
+@code {
+    // A radio group name unique to this row's picker.
+    private readonly string _groupName = Guid.NewGuid().ToString("N");
+
+    private ElementReference _control;
+    private ElementReference _progress;
+    // One per offerable Role at most (Admin, Member, Viewer); the first takes focus when the picker opens.
+    private readonly ElementReference[] _options = new ElementReference[3];
+    private string? _chosen;
+    private string? _chooseMessage;
+    private bool _wasPicking;
+    private bool _wasChanging;
+    private bool _focusOption;
+    private bool _focusProgress;
+    private bool _focusControl;
+    private int _focusRequestsSeen;
+
+    /// <summary>The Membership, as the list answered it.</summary>
+    [Parameter]
+    [EditorRequired]
+    public MembershipResponse Membership { get; set; } = new(Guid.Empty, string.Empty, string.Empty, string.Empty, IsYou: false);
+
+    /// <summary>Its label: the display name, with a discriminator on a collision (AC3).</summary>
+    [Parameter]
+    [EditorRequired]
+    public string Label { get; set; } = string.Empty;
+
+    /// <summary>The viewer's own Role in this Space, as its stable code.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string ViewerRole { get; set; } = string.Empty;
+
+    /// <summary>Whether its picker is open.</summary>
+    [Parameter]
+    public bool Picking { get; set; }
+
+    /// <summary>Whether its change is with the server.</summary>
+    [Parameter]
+    public bool Changing { get; set; }
+
+    /// <summary>The words for its refused or unsent change, or <c>null</c>.</summary>
+    [Parameter]
+    public string? Refusal { get; set; }
+
+    /// <summary>Bumped by the section to move focus to this row's Change Role (UX-DR39).</summary>
+    [Parameter]
+    public int FocusRequest { get; set; }
+
+    /// <summary>Raised by Change Role, with the Membership's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnAsk { get; set; }
+
+    /// <summary>Raised by Change with a Role chosen: the Membership's id and the Role's code.</summary>
+    [Parameter]
+    public EventCallback<(Guid MembershipId, string Role)> OnChange { get; set; }
+
+    /// <summary>Raised by Cancel, or by Esc in the picker.</summary>
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private IReadOnlyList<string> Offered => MembershipCapabilities.OfferableRoles(ViewerRole, Membership.Role);
+
+    private IEnumerable<(string RoleCode, int At)> Options => Offered.Select((roleCode, at) => (roleCode, at));
+
+    private bool ShowsControl => !Picking && !Changing && Offered.Count > 0 && !Membership.IsYou;
+
+    private string NameId => $"membership-{Membership.Id:N}";
+
+    private string Legend => string.Format(
+        CultureInfo.CurrentCulture,
+        Localizer["MembershipChangeLegend"],
+        Membership.DisplayName,
+        Localizer[RoleCopy.NameKey(Membership.Role)]);
+
+    /// <summary>
+    /// The picker opening takes focus to its first option, with nothing checked; the change going out takes focus to the
+    /// status line that replaces it; a new request from the section takes focus to Change Role.
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        if (Picking && !_wasPicking)
+        {
+            _chosen = null;
+            _chooseMessage = null;
+            _focusOption = true;
+        }
+
+        if (Changing && !_wasChanging)
+        {
+            _focusProgress = true;
+        }
+
+        _wasPicking = Picking;
+        _wasChanging = Changing;
+
+        if (FocusRequest != _focusRequestsSeen)
+        {
+            _focusRequestsSeen = FocusRequest;
+            _focusControl = FocusRequest > 0;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusProgress && Changing)
+        {
+            _focusProgress = false;
+            await _progress.FocusAsync();
+        }
+
+        if (_focusOption && Picking)
+        {
+            _focusOption = false;
+            await _options[0].FocusAsync();
+        }
+
+        // Spent on the first render it could apply to, so a stale request cannot pull focus on a later, unrelated render.
+        if (_focusControl && !Picking && !Changing)
+        {
+            _focusControl = false;
+
+            if (ShowsControl)
+            {
+                await _control.FocusAsync();
+            }
+        }
+    }
+
+    private Task AskAsync() => OnAsk.InvokeAsync(Membership.Id);
+
+    private void Choose(ChangeEventArgs args)
+    {
+        _chosen = args.Value?.ToString();
+        _chooseMessage = null;
+    }
+
+    private Task ChangeAsync()
+    {
+        if (_chosen is not { } chosen)
+        {
+            _chooseMessage = Localizer["MembershipRoleRequired"];
+            return Task.CompletedTask;
+        }
+
+        return OnChange.InvokeAsync((Membership.Id, chosen));
+    }
+
+    /// <summary>Cancel, or Esc in the picker: nothing is sent, and focus returns to the row's Change Role.</summary>
+    private Task CancelAsync()
+    {
+        _focusControl = true;
+
+        return OnCancel.InvokeAsync();
+    }
+
+    private Task PickerKeyDownAsync(KeyboardEventArgs args) =>
+        args.Key == "Escape" ? CancelAsync() : Task.CompletedTask;
+}

@@ -9,6 +9,7 @@ using Yello.Contracts.Labels;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
 using Yello.Contracts.Tasks;
+using Yello.Contracts.Memberships;
 using Yello.Domain.Memberships;
 using Yello.Tests.Shared;
 using LabelWire = Yello.Tests.Slices.Tasks.LabelWire;
@@ -53,27 +54,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </remarks>
 public sealed partial class ActiveSpaceEndpointTests
 {
-    private const string ChangePending =
-        "red: AC4 - story 4.4 maps PATCH /api/v1/spaces/{spaceId}/memberships/{membershipId} under ChangeMembershipRole with the pipeline-owned acting authority (Lee's Q1 (a); Q9 (a))";
-
-    private const string OwnerRowPending =
-        "red: AC4, AC5 - the Owner's row is 409 owner-role-fixed and owner in the body is 400 role-not-assignable (Q10 (a); Lee's Q2 (a))";
-
-    private const string SameRolePending =
-        "red: AC4, AC6 - a same-Role change is a 200 no-op that writes and publishes nothing (Q11 (a))";
-
-    private const string PublishPending =
-        "red: AC6 - MembershipChanged publishes once per affected Account after commit, observed through its log line (Q7 (a))";
-
-    private const string ReplayPending =
-        "red: AC11 - the Role change replays under its Idempotency-Key through the pipeline (AD-18)";
-
-    private const string NextRequestPending =
-        "red: AC6 - a Role change governs the very next request on both surfaces, five capability classes (NFR-2, V-1)";
-
-    private const string BlockAfterUpdatePending =
-        "red: AC5, Task 5 - Lee's Q3 (a): Membership gains BLOCK AFTER UPDATE with fn_SpaceIsolationPredicate(SpaceId) in an expand-only migration";
-
     private static readonly string[] OwnRowTargets = ["admin", "member", "viewer"];
 
     private static readonly string[] UnassignableCodes = ["owner", "OWNER", "superuser"];
@@ -117,7 +97,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <param name="from">The target's Role before.</param>
     /// <param name="to">The Role sent.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = ChangePending)]
+    [Theory]
     [MemberData(nameof(OwnerChanges))]
     [Trait("Requirement", "FR-13")]
     [Trait("Requirement", "AR-12")]
@@ -158,7 +138,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <param name="from">The target's Role before.</param>
     /// <param name="to">The Role sent.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = ChangePending)]
+    [Theory]
     [MemberData(nameof(AdminChanges))]
     [Trait("Requirement", "FR-13")]
     [Trait("Assumption", "PRD-12-4")]
@@ -202,7 +182,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="attempt">Which attempt.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = ChangePending)]
+    [Theory]
     [MemberData(nameof(AdminBeyondAuthority))]
     [Trait("Requirement", "FR-13")]
     [Trait("Requirement", "AD-20")]
@@ -263,7 +243,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="lesser">The actor's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = ChangePending)]
+    [Theory]
     [InlineData("member")]
     [InlineData("viewer")]
     [Trait("Requirement", "FR-13")]
@@ -314,7 +294,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// goes red.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = OwnerRowPending)]
+    [Fact]
     [Trait("Requirement", "FR-13")]
     [Trait("Requirement", "AR-12")]
     [Trait("Requirement", "AD-5")]
@@ -354,7 +334,7 @@ public sealed partial class ActiveSpaceEndpointTests
         foreach (var (role, answer) in refused)
         {
             Assert.True(answer.StatusCode == HttpStatusCode.Conflict, $"The Owner's own row to {role}: {Described(answer)}; the anchor was {Described(anchor)}");
-            Assert.Equal(MembershipWire.OwnerRoleFixedProblemType, ProblemType(answer));
+            Assert.Equal(ProblemTypes.OwnerRoleFixed, ProblemType(answer));
         }
 
         Assert.Equal("Owner", (await wire.MembershipOfAsync(spaceId, ownerId)).Role);
@@ -370,7 +350,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="caller">The caller's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = OwnerRowPending)]
+    [Theory]
     [InlineData("owner")]
     [InlineData("admin")]
     [Trait("Requirement", "FR-13")]
@@ -414,7 +394,7 @@ public sealed partial class ActiveSpaceEndpointTests
         foreach (var (code, answer) in refused)
         {
             Assert.True(answer.StatusCode == HttpStatusCode.BadRequest, $"The {caller}'s change to '{code}': {Described(answer)}; the anchor was {Described(anchor)}");
-            Assert.Equal(MembershipWire.RoleNotAssignableProblemType, ProblemType(answer));
+            Assert.Equal(ProblemTypes.RoleNotAssignable, ProblemType(answer));
         }
 
         Assert.Equal(before, await wire.MembershipOfAsync(spaceId, before!.AccountId));
@@ -430,7 +410,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// (<see cref="WireDatabase.AddMembershipAsync"/>): the caller is no member there, and acceptance would bury the point.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = ChangePending)]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "FR-13")]
@@ -490,7 +470,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// under a new key, never reads as an error.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = SameRolePending)]
+    [Fact]
     [Trait("Requirement", "FR-13")]
     [Trait("Requirement", "AR-16")]
     public async Task A_same_Role_change_answers_200_with_the_unchanged_row_and_publishes_nothing()
@@ -527,7 +507,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// target is seeded directly (see the file's remarks). Plant 9: the publish before commit or on every attempt.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = PublishPending)]
+    [Fact]
     [Trait("Requirement", "AR-16")]
     [Trait("Requirement", "AD-9")]
     public async Task A_committed_change_logs_exactly_one_MembershipChanged_publish_for_the_target_and_the_Space()
@@ -568,7 +548,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// attempt turns the count above one.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = PublishPending)]
+    [Fact]
     [Trait("Requirement", "AR-16")]
     [Trait("Requirement", "AD-9")]
     [Trait("Requirement", "AD-18")]
@@ -633,7 +613,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <see cref="Idempotency.MaxKeyLength"/>) is <c>400 invalid-idempotency-key</c>. The stored Role is the first change's.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = ReplayPending)]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "AR-25")]
     public async Task A_change_replays_under_its_key_a_reused_key_on_another_body_is_422_and_a_malformed_key_400()
@@ -684,7 +664,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <param name="from">The actor's Role before.</param>
     /// <param name="to">The Role the Owner sets.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = NextRequestPending)]
+    [Theory]
     [InlineData("admin", "member")]
     [InlineData("member", "viewer")]
     [Trait("Requirement", "NFR-2")]
@@ -705,7 +685,16 @@ public sealed partial class ActiveSpaceEndpointTests
         await HostProcess.RunAsync(fixture.ConnectionString!, mail.With(Configured), async client =>
         {
             var owner = await SignedInAsync(client, ownerAddress);
-            await SeedNamedSpaceAsync(database, spaceId, "Governed " + Suffix(), await AccountIdOfAsync(database, ownerAddress), Role.Owner);
+            var ownerId = await AccountIdOfAsync(database, ownerAddress);
+
+            // With a Status, so the Task-creation probe has somewhere to land (a seeded Space carries none; dev-phase
+            // correction of the ATDD scaffold, recorded in the story's Debug Log).
+            await SpaceSeeding.SeedAsync(database, spaceId, context =>
+            {
+                context.Spaces.Add(NamedSpace(spaceId, "Governed " + Suffix()));
+                context.Memberships.Add(SpaceSeeding.NewMembership(spaceId, ownerId, Role.Owner));
+                context.StatusDefinitions.Add(SpaceSeeding.NewStatus(spaceId, "To do"));
+            }, TestContext.Current.CancellationToken);
 
             var actor = await JoinedThroughTheProductAsync(client, wire, mail, (owner, spaceId), actorAddress, DisplayName(), from);
             var token = await BearerForAsync(actor, spaceId);
@@ -716,7 +705,7 @@ public sealed partial class ActiveSpaceEndpointTests
                 ("define a Label", HttpMethod.Post, LabelRoutes.LabelsOf(spaceId), () => LabelWire.DefinitionBody("Label " + Suffix(), LabelWire.Rust)),
                 ("list Invitations", HttpMethod.Get, InvitationRoutes.InvitationsOf(spaceId), () => null),
                 ("rename the Space", HttpMethod.Patch, SpaceRoutes.ActiveOf(spaceId), () => JsonContent.Create(new { name = "Renamed " + Suffix() }, options: JsonOptions)),
-                ("list Memberships", HttpMethod.Get, MembershipWire.MembershipsOf(spaceId), () => null),
+                ("list Memberships", HttpMethod.Get, MembershipRoutes.MembershipsOf(spaceId), () => null),
             ];
             (string Name, HttpMethod Method, string Path, Func<HttpContent?> Body)[] memberLoses =
             [
@@ -827,7 +816,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// red the moment the migration lands). Plant 19: the predicate omitted from the migration.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = BlockAfterUpdatePending)]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AR-12")]
     public async Task Membership_carries_a_BLOCK_AFTER_UPDATE_predicate_on_its_Space()

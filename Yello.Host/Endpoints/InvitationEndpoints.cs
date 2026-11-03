@@ -36,14 +36,6 @@ namespace Yello.Host.Endpoints;
 public static class InvitationEndpoints
 {
     /// <summary>
-    /// The Roles an Invitation may offer, by stable code: every Role but Owner (FR-10, FR-42; Lee's Q2 - an Admin may
-    /// offer Admin too).
-    /// </summary>
-    private static readonly Dictionary<string, Role> OfferableRoles = Enum.GetValues<Role>()
-        .Where(role => role != Role.Owner)
-        .ToDictionary(role => StableCode.Of(role), role => role, StringComparer.Ordinal);
-
-    /// <summary>
     /// Registers <c>POST /api/v1/spaces/{spaceId}/invitations</c>.
     /// </summary>
     /// <param name="endpoints">The route builder.</param>
@@ -144,7 +136,7 @@ public static class InvitationEndpoints
                 title: "The email address is not one an email can be sent to.");
         }
 
-        if (request!.Role is not { } code || !OfferableRoles.TryGetValue(code, out var role))
+        if (!AssignableRoles.TryParse(request!.Role, out var role))
         {
             return Results.Problem(
                 statusCode: StatusCodes.Status400BadRequest,

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore.Storage;
 using Yello.Application.Invitations;
 using Yello.Domain;
 using Yello.Infrastructure.Invitations;
+using Yello.Infrastructure.Memberships;
 
 namespace Yello.Infrastructure.Persistence;
 
@@ -37,7 +38,15 @@ namespace Yello.Infrastructure.Persistence;
 /// <param name="dbContext">The request's unit of work.</param>
 /// <param name="spaceScope">The request's Space scope.</param>
 /// <param name="identifiers">Produces the sentinel for a token that resolves to nothing.</param>
-internal sealed class InvitationScope(YelloDbContext dbContext, SpaceScope spaceScope, IIdentifierGenerator identifiers)
+/// <param name="membershipChanges">
+/// The request's <c>MembershipChanged</c> publisher: the accept's new Membership is published once the unit of work has
+/// committed, never on a rollback (story 4.4, Q18 (a)). Optional, so a scope built outside a request still constructs.
+/// </param>
+internal sealed class InvitationScope(
+    YelloDbContext dbContext,
+    SpaceScope spaceScope,
+    IIdentifierGenerator identifiers,
+    MembershipChangePublisher? membershipChanges = null)
     : IInvitationScope
 {
     /// <inheritdoc />
@@ -72,7 +81,7 @@ internal sealed class InvitationScope(YelloDbContext dbContext, SpaceScope space
 
             spaceScope.Narrow(spaceId);
 
-            return new UnitOfWork(transaction, new InvitationContext(spaceId, invitationId, accountId), spaceScope);
+            return new UnitOfWork(transaction, new InvitationContext(spaceId, invitationId, accountId), spaceScope, new CommitHooks(null, membershipChanges));
         }
         catch
         {
@@ -85,19 +94,33 @@ internal sealed class InvitationScope(YelloDbContext dbContext, SpaceScope space
     /// <summary>
     /// The open transaction and the context it runs under.
     /// </summary>
-    private sealed class UnitOfWork(IDbContextTransaction transaction, InvitationContext context, SpaceScope spaceScope)
+    private sealed class UnitOfWork(IDbContextTransaction transaction, InvitationContext context, SpaceScope spaceScope, CommitHooks hooks)
         : IInvitationUnitOfWork
     {
+        private bool _completed;
+
         /// <inheritdoc />
         public InvitationContext Context => context;
 
         /// <inheritdoc />
-        public Task CompleteAsync(CancellationToken cancellationToken) => transaction.CommitAsync(cancellationToken);
+        public async Task CompleteAsync(CancellationToken cancellationToken)
+        {
+            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            _completed = true;
+
+            // After the commit and only after it: the accept's new Membership is published (story 4.4, Q18 (a)).
+            hooks.Committed();
+        }
 
         /// <inheritdoc />
         public ValueTask DisposeAsync()
         {
             spaceScope.Clear();
+
+            if (!_completed)
+            {
+                hooks.Discarded();
+            }
 
             return transaction.DisposeAsync();
         }

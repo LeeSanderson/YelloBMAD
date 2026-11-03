@@ -161,6 +161,16 @@ public static class RefusalCopy
     public static string InvitationForAnotherAccountKey => "invitation-for-another-account";
 
     /// <summary>
+    /// The copy key for <c>owner-role-fixed</c>: a change to the Owner's own row (story 4.4, Q10 (a)).
+    /// </summary>
+    public static string OwnerRoleFixedKey => "owner-role-fixed";
+
+    /// <summary>
+    /// The copy key for <c>role-not-assignable</c>: <c>owner</c> or an unknown code in a Role change (story 4.4, Q10 (a)).
+    /// </summary>
+    public static string RoleNotAssignableKey => "role-not-assignable";
+
+    /// <summary>
     /// The resource a refusal is rendered with.
     /// </summary>
     /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
@@ -240,6 +250,8 @@ public static class RefusalCopy
         [ProblemTypes.InvitationNotPending] = InvitationNotPendingKey,
         [ProblemTypes.InvitationNotValid] = InvitationNotValidKey,
         [ProblemTypes.InvitationForAnotherAccount] = InvitationForAnotherAccountKey,
+        [ProblemTypes.OwnerRoleFixed] = OwnerRoleFixedKey,
+        [ProblemTypes.RoleNotAssignable] = RoleNotAssignableKey,
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static string? OwnKey(string? type) =>

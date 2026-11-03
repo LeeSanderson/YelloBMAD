@@ -92,6 +92,33 @@ internal static class ApplicationLocks
     internal static string InvitationsOf(Guid spaceId) => $"Yello/Invitations/{spaceId:D}";
 
     /// <summary>
+    /// The lock one Space's Membership Role changes take before their guarded statement. Story 4.4, AC11, Q17 (a).
+    /// </summary>
+    /// <remarks>
+    /// Named for the request's Space only, so no Space ever waits on a name another Space takes. Independent of
+    /// <see cref="InvitationsOf"/>: an acceptance inserts a Membership a Role change cannot yet name, so the two never need
+    /// to meet, and a Role change never queues behind an issue or an accept. Story 4.5's removal and story 5.2's ownership
+    /// swap take this lock too, so no Role change interleaves with either (<c>deferred-work.md</c>).
+    /// </remarks>
+    /// <param name="spaceId">The request's Space.</param>
+    /// <returns>The resource name.</returns>
+    internal static string MembershipsOf(Guid spaceId) => $"Yello/Memberships/{spaceId:D}";
+
+    /// <summary>
+    /// Takes the request's Space's Memberships lock.
+    /// </summary>
+    /// <param name="dbContext">The request's unit of work, scoped to a Space and inside its transaction.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>A task.</returns>
+    internal static Task TakeMembershipsAsync(YelloDbContext dbContext, CancellationToken cancellationToken)
+    {
+        var spaceId = dbContext.ScopedSpaceId
+            ?? throw new InvalidOperationException("The Memberships lock is taken only inside a Space-scoped unit of work.");
+
+        return TakeAsync(dbContext, MembershipsOf(spaceId), cancellationToken);
+    }
+
+    /// <summary>
     /// Takes the request's Space's Invitations lock.
     /// </summary>
     /// <param name="dbContext">The request's unit of work, scoped to a Space and inside its transaction.</param>

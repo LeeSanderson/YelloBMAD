@@ -9,7 +9,9 @@
     The Label's chip, then its delete control. Delete asks first, IN PLACE: the control is replaced by the warning
     naming the Label, the danger action and Cancel - never a dialog over the page. Deletion is not optimistic, so the
     row stays until the server agrees; a refusal (the Label is still on Tasks) is said on the row. Each delete control
-    is described by the Label's name, so a list of them is not a list of identical controls to a screen reader.
+    is described by the Label's name, so a list of them is not a list of identical controls to a screen reader. While the
+    delete is in flight a progress line replaces the confirm and takes focus, so focus never falls to body (story 4.4,
+    ledger :762, Q14 (a)).
 *@
 
 <li class="label-list__row">
@@ -24,6 +26,11 @@
         </span>
     }
 
+    @if (Deleting)
+    {
+        <span class="label-list__progress" role="status" tabindex="-1" @ref="_progress">@Localizer["LabelDeleting"]</span>
+    }
+
     @if (!Confirming && !Deleting)
     {
         <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="AskAsync">@Localizer["LabelDelete"]</button>
@@ -36,6 +43,10 @@
 </li>
 
 @code {
+    private ElementReference _progress;
+    private bool _wasDeleting;
+    private bool _focusProgress;
+
     /// <summary>The Label.</summary>
     [Parameter]
     [EditorRequired]
@@ -72,4 +83,27 @@
     private Task DeleteAsync() => OnDelete.InvokeAsync(Label.Id);
 
     private Task CancelAsync() => OnCancel.InvokeAsync();
+
+    /// <summary>
+    /// The delete going out takes focus to the progress line that replaces the confirm (story 4.4, ledger <c>:762</c>).
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        if (Deleting && !_wasDeleting)
+        {
+            _focusProgress = true;
+        }
+
+        _wasDeleting = Deleting;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusProgress && Deleting)
+        {
+            _focusProgress = false;
+            await _progress.FocusAsync();
+        }
+    }
 }

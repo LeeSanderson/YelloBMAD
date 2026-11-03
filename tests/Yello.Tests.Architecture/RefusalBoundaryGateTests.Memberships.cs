@@ -23,7 +23,7 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds, activated by the dev phase.</b> Each gate finds its subject by name (route pattern, reflection,
+/// <b>Red-phase scaffolds of the story 4.4 ATDD run, activated by its dev phase.</b> Each gate finds its subject by name (route pattern, reflection,
 /// Cecil or the resource file), so a renamed subject turns it red. The names are the story's Project Structure Notes:
 /// <c>Yello.Contracts.Memberships.MembershipResponse</c>, <c>Yello.Infrastructure.Persistence.MembershipStore</c>, a holder
 /// in <c>Yello.Application</c> whose name contains <c>Authority</c>, <c>MembershipCapabilities</c> in the client. A
@@ -48,18 +48,6 @@ public sealed partial class RefusalBoundaryGateTests
     private const string MembershipPattern = "/api/v1/spaces/{spaceId:guid}/memberships/{membershipId:guid}";
 
     private const string AccountTypeName = "Yello.Domain.Accounts.Account";
-
-    private const string MembershipRoutesPending =
-        "red: AC1, AC4 - story 4.4 maps GET .../memberships and PATCH .../memberships/{membershipId} under ChangeMembershipRole (Lee's Q4 (a); Q9 (a))";
-
-    private const string AuthorityPending =
-        "red: AC4 - Lee's Q1 (a): the Qualified cells' target rules in RoleCapabilityMatrix and a pipeline-owned acting-authority holder (Tasks 2, 4, 6)";
-
-    private const string MembershipContractPending =
-        "red: AC1, AC4, AC5 - story 4.4 declares MembershipResponse, owner-role-fixed and role-not-assignable (Task 3; Q10 (a))";
-
-    private const string MembershipClientPending =
-        "red: AC4, AC10 - story 4.4 builds MembershipSection, MembershipRow and MembershipCapabilities in the client (Task 7; Q12 (a))";
 
     /// <summary>
     /// Types whose public string properties may carry an address (AC2, Lee's Q4 (a)): the two lists that show one, and the
@@ -111,7 +99,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// never <c>ReadProjectsAndTasks</c>, and no new matrix row), neither is Session-only (a Token reaches both, AD-4 parity)
     /// and neither consults a bound. Sibling of <c>The_Invitation_routes_all_require_IssueAndRevokeInvitations_and_serve_both_surfaces</c>.
     /// </summary>
-    [Fact(Skip = MembershipRoutesPending)]
+    [Fact]
     [Trait("Requirement", "FR-13")]
     [Trait("Requirement", "AD-4")]
     [Trait("Requirement", "AD-23")]
@@ -137,7 +125,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>NextAfter</c> (a nullable string); <c>ChangeMembershipRoleRequest</c> carries exactly <c>Role</c>. Plant 11's
     /// sibling: a sixth property.
     /// </summary>
-    [Fact(Skip = MembershipContractPending)]
+    [Fact]
     [Trait("Requirement", "UX-DR14")]
     [Trait("Requirement", "AD-23")]
     public void The_Membership_contracts_carry_exactly_their_named_members()
@@ -267,7 +255,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// starts with <c>Set</c> - by <c>ActiveSpaceResolution</c> and nothing else, and the slice receives the Role
     /// <b>sets</b>, never the Role. Anchor: the pipeline is found writing it. Plant 7: a second writer.
     /// </summary>
-    [Fact(Skip = AuthorityPending)]
+    [Fact]
     [Trait("Requirement", "AD-1")]
     [Trait("Requirement", "AR-3")]
     [Trait("Requirement", "FR-13")]
@@ -293,7 +281,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// actor.</b> Found by shape: a public static method on <c>RoleCapabilityMatrix</c> taking a <see cref="Role"/> whose answer
     /// has <c>From</c> and <c>To</c> collections of <see cref="Role"/>. Plants 1, 2 and 3.
     /// </summary>
-    [Fact(Skip = AuthorityPending)]
+    [Fact]
     [Trait("Requirement", "FR-13")]
     [Trait("Requirement", "AR-12")]
     [Trait("Assumption", "PRD-12-4")]
@@ -324,7 +312,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Qualified route added without consuming the authority would let an Admin act on the Admin's whole column. Anchor: at
     /// least one such route is mapped.
     /// </summary>
-    [Fact(Skip = AuthorityPending)]
+    [Fact]
     [Trait("Requirement", "FR-13")]
     [Trait("Requirement", "AD-20")]
     public void A_Qualified_cell_reaches_no_endpoint_without_its_target_rule()
@@ -356,7 +344,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// and each has client copy of its own in <c>ClientCopy.resx</c> whose comment names story 4.4. Sibling of 4.2's
     /// <c>The_invitation_not_pending_problem_type_is_declared_and_has_client_copy_naming_story_4_2</c>.
     /// </summary>
-    [Fact(Skip = MembershipContractPending)]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-13")]
     public void The_Membership_problem_types_are_declared_and_each_has_client_copy_naming_story_4_4()
@@ -384,7 +372,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// every Role: shown exactly where <c>ChangeMembershipRole</c> is not denied (Owner, Admin). Sibling of
     /// <c>The_clients_invite_predicate_agrees_with_the_capability_matrix</c>.
     /// </summary>
-    [Fact(Skip = MembershipClientPending)]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "UX-DR14")]
     public void The_clients_Members_section_predicate_agrees_with_the_capability_matrix()
@@ -408,7 +396,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Viewer's row and nothing on an Admin's or the Owner's, the Owner is offered Admin, Member and Viewer on every other
     /// row and nothing on its own, and <c>owner</c> is never offered.
     /// </summary>
-    [Fact(Skip = MembershipClientPending)]
+    [Fact]
     [Trait("Requirement", "UX-DR11")]
     [Trait("Requirement", "FR-13")]
     [Trait("Assumption", "PRD-12-4")]
@@ -447,7 +435,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// No such gate existed for the product's other sections; this one covers the Membership section, the first whose
     /// controls differ by the viewer's Role per row. Plant 14: a disabled Role control for an Admin.
     /// </summary>
-    [Fact(Skip = MembershipClientPending)]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     public void No_control_in_the_Membership_section_is_disabled()
     {

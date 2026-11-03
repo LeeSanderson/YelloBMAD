@@ -519,7 +519,8 @@ public sealed partial class BoardView
 
             case HttpStatusCode.NotFound:
                 // The Board's existing pattern for a 404: the panel closes and the page's one refusal surface follows -
-                // the indistinguishable not-found (deferred-work.md:530, owner 4.4).
+                // the indistinguishable not-found. Story 4.4 re-reads the list on a Label or Membership 404 (Q16 (a)) and
+                // left Task deletion on this pattern.
                 _deleteKeys.Remove(taskId);
                 LeavePanelOf(taskId);
                 await OnRefused.InvokeAsync(answer.Problem);

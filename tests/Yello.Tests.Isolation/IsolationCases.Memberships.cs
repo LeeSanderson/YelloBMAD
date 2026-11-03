@@ -2,6 +2,7 @@ using System.Net;
 using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.Invitations;
+using Yello.Contracts.Memberships;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Isolation;
@@ -9,15 +10,12 @@ namespace Yello.Tests.Isolation;
 /// <summary>
 /// Story 4.4 - list Memberships and change a Role: the rows for <c>GET /api/v1/spaces/{spaceId}/memberships</c> and
 /// <c>PATCH .../memberships/{membershipId}</c> (AC9; I-1, I-2, I-3, I-4, I-11, I-12, I-13, I-17), each stating both surfaces.
-/// Written by the story 4.4 ATDD run (2026-11-02) as <c>PendingUntil: "4.4"</c>: GATE-003 fails the suite if any is still
-/// pending when 4.4 reaches review.
+/// Written by the story 4.4 ATDD run (2026-11-02) as <c>PendingUntil: "4.4"</c>, and made live by its dev phase (GATE-003).
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The routes are <see cref="MembershipWire"/>'s ATDD stand-ins</b> (<c>ListRoute</c>, <c>MembershipRoute</c>,
-/// <c>MembershipsOf</c>, <c>MembershipOf</c>) until Task 3 declares <c>MembershipRoutes</c>; the dev phase swaps them, as
-/// 4.2's and 4.3's did. Both routes fail <c>Every_api_route_the_Host_maps_but_the_named_credential_routes_is_named_by_a_case</c>
-/// the moment they are mapped unless these rows are active - which is the point.
+/// <b>The routes are the contract's <see cref="MembershipRoutes"/></b>, swapped in for the ATDD run's stand-ins. Both routes
+/// fail <c>Every_api_route_the_Host_maps_but_the_named_credential_routes_is_named_by_a_case</c> unless these rows are active.
 /// </para>
 /// <para>
 /// <b>Seeding through the product.</b> Lesser Roles and the Admin of the Qualified row join a fresh host's Space through an
@@ -37,20 +35,15 @@ namespace Yello.Tests.Isolation;
 /// </remarks>
 internal static partial class IsolationCases
 {
-    private const string Story44Pending =
-        "story 4.4 maps the Membership list and the Role change (Tasks 3-6); the routes and problem types are MembershipWire's ATDD stand-ins until then";
-
     private static IEnumerable<IsolationCase> MembershipCases() =>
     [
         new IsolationCase(
-            "ISO-LIST-MEMBERSHIPS-FOREIGN-SPACE", "I-1 (4.4 AC9)", IsolationVector.DirectIdentifier, HttpMethod.Get, MembershipWire.ListRoute,
-            world => ForeignAsync(world, MembershipWire.MembershipsOf),
-            Both(new BoundaryNotFound()),
-            PendingUntil: "4.4",
-            PendingReason: Story44Pending),
+            "ISO-LIST-MEMBERSHIPS-FOREIGN-SPACE", "I-1 (4.4 AC9)", IsolationVector.DirectIdentifier, HttpMethod.Get, MembershipRoutes.List,
+            world => ForeignAsync(world, MembershipRoutes.MembershipsOf),
+            Both(new BoundaryNotFound())),
 
         new IsolationCase(
-            "ISO-CHANGE-ROLE-FOREIGN-SPACE", "I-2 (4.4 AC9)", IsolationVector.Write, HttpMethod.Patch, MembershipWire.MembershipRoute,
+            "ISO-CHANGE-ROLE-FOREIGN-SPACE", "I-2 (4.4 AC9)", IsolationVector.Write, HttpMethod.Patch, MembershipRoutes.Membership,
             async world =>
             {
                 var foreign = await world.Database.MembershipOfAsync(world.B.SpaceId, world.B.AccountId);
@@ -58,16 +51,14 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Patch,
-                    [new(MembershipWire.MembershipOf(world.B.SpaceId, foreign.Id), MembershipWire.MembershipOf(Guid.NewGuid(), foreign.Id))],
+                    [new(MembershipRoutes.MembershipOf(world.B.SpaceId, foreign.Id), MembershipRoutes.MembershipOf(Guid.NewGuid(), foreign.Id))],
                     world.B.SpaceId,
                     Body: () => MembershipWire.ChangeBody("viewer"));
             },
-            Both(new BoundaryNotFound { Then = BStillOwnsItsSpaceAsync }),
-            PendingUntil: "4.4",
-            PendingReason: Story44Pending),
+            Both(new BoundaryNotFound { Then = BStillOwnsItsSpaceAsync })),
 
         new IsolationCase(
-            "ISO-LIST-MEMBERSHIPS-OWN-SPACE", "I-3, I-11 (4.4 AC9)", IsolationVector.Listing, HttpMethod.Get, MembershipWire.ListRoute,
+            "ISO-LIST-MEMBERSHIPS-OWN-SPACE", "I-3, I-11 (4.4 AC9)", IsolationVector.Listing, HttpMethod.Get, MembershipRoutes.List,
             async world =>
             {
                 // The lister's Space holds a Member who also belongs to a second Space, whose other Member and Owner the
@@ -76,71 +67,61 @@ internal static partial class IsolationCases
                 var elsewhere = await world.NewActorAsync("Le");
                 var shared = await JoinedThroughTheProductAsync(world, host, "Ls", "member");
 
-                _ = await JoinedThroughTheProductAsync(world, elsewhere, shared.Origin, "viewer");
+                // Seeded directly: a second accept by the same address would read the first Invitation's email back from the
+                // world's mail drop (dev-phase correction of the ATDD scaffold, recorded in the story's Debug Log).
+                await world.Database.AddMembershipAsync(elsewhere.SpaceId, shared.AccountId, "viewer");
                 var stranger = await JoinedThroughTheProductAsync(world, elsewhere, "Lt", "member");
 
                 HoldsIdentity(host);
                 HoldsIdentity(elsewhere);
 
-                var path = MembershipWire.MembershipsOf(host.SpaceId);
+                var path = MembershipRoutes.MembershipsOf(host.SpaceId);
 
                 return new CaseRequest(host, HttpMethod.Get, [new(path, path)], TargetSpaceId: null, Other: stranger);
             },
-            Both(new Served(HttpStatusCode.OK, ListsExactlyTheHostsMembershipsAsync, "200, exactly the Space's Memberships; nothing of the shared Member's other Space")),
-            PendingUntil: "4.4",
-            PendingReason: Story44Pending),
+            Both(new Served(HttpStatusCode.OK, ListsExactlyTheHostsMembershipsAsync, "200, exactly the Space's Memberships; nothing of the shared Member's other Space"))),
 
         new IsolationCase(
-            "ISO-RECORD-KIND-LIST-MEMBERSHIPS-MEMBER", "V-1, C-6, NFR-7 (4.4 AC1, AC9; Lee's Q4 (a))", IsolationVector.RecordKind, HttpMethod.Get, MembershipWire.ListRoute,
+            "ISO-RECORD-KIND-LIST-MEMBERSHIPS-MEMBER", "V-1, C-6, NFR-7 (4.4 AC1, AC9; Lee's Q4 (a))", IsolationVector.RecordKind, HttpMethod.Get, MembershipRoutes.List,
             world => LesserRoleTouchesTheMembershipsAsync(world, "member", change: false),
-            Both(new RoleRefused(MembershipWire.CapabilityCode) { Then = TheOtherKeepsItsRole("Owner") }),
-            PendingUntil: "4.4",
-            PendingReason: Story44Pending),
+            Both(new RoleRefused(MembershipWire.CapabilityCode) { Then = TheOtherKeepsItsRole("Owner") })),
 
         new IsolationCase(
-            "ISO-RECORD-KIND-LIST-MEMBERSHIPS-VIEWER", "V-1, C-6, NFR-7 (4.4 AC1, AC9; Lee's Q4 (a))", IsolationVector.RecordKind, HttpMethod.Get, MembershipWire.ListRoute,
+            "ISO-RECORD-KIND-LIST-MEMBERSHIPS-VIEWER", "V-1, C-6, NFR-7 (4.4 AC1, AC9; Lee's Q4 (a))", IsolationVector.RecordKind, HttpMethod.Get, MembershipRoutes.List,
             world => LesserRoleTouchesTheMembershipsAsync(world, "viewer", change: false),
-            Both(new RoleRefused(MembershipWire.CapabilityCode) { Then = TheOtherKeepsItsRole("Owner") }),
-            PendingUntil: "4.4",
-            PendingReason: Story44Pending),
+            Both(new RoleRefused(MembershipWire.CapabilityCode) { Then = TheOtherKeepsItsRole("Owner") })),
 
         new IsolationCase(
-            "ISO-RECORD-KIND-CHANGE-ROLE-MEMBER", "V-1, C-6, NFR-7 (4.4 AC4, AC9)", IsolationVector.RecordKind, HttpMethod.Patch, MembershipWire.MembershipRoute,
+            "ISO-RECORD-KIND-CHANGE-ROLE-MEMBER", "V-1, C-6, NFR-7 (4.4 AC4, AC9)", IsolationVector.RecordKind, HttpMethod.Patch, MembershipRoutes.Membership,
             world => LesserRoleTouchesTheMembershipsAsync(world, "member", change: true),
-            Both(new RoleRefused(MembershipWire.CapabilityCode) { Then = TheOtherKeepsItsRole("Owner") }),
-            PendingUntil: "4.4",
-            PendingReason: Story44Pending),
+            Both(new RoleRefused(MembershipWire.CapabilityCode) { Then = TheOtherKeepsItsRole("Owner") })),
 
         new IsolationCase(
-            "ISO-RECORD-KIND-CHANGE-ROLE-VIEWER", "V-1, C-6, NFR-7 (4.4 AC4, AC9)", IsolationVector.RecordKind, HttpMethod.Patch, MembershipWire.MembershipRoute,
+            "ISO-RECORD-KIND-CHANGE-ROLE-VIEWER", "V-1, C-6, NFR-7 (4.4 AC4, AC9)", IsolationVector.RecordKind, HttpMethod.Patch, MembershipRoutes.Membership,
             world => LesserRoleTouchesTheMembershipsAsync(world, "viewer", change: true),
-            Both(new RoleRefused(MembershipWire.CapabilityCode) { Then = TheOtherKeepsItsRole("Owner") }),
-            PendingUntil: "4.4",
-            PendingReason: Story44Pending),
+            Both(new RoleRefused(MembershipWire.CapabilityCode) { Then = TheOtherKeepsItsRole("Owner") })),
 
         // The Qualified seam's row (Lee's Q1 (a)): the pipeline admits the Admin (Qualified), the store's guarded statement
         // finds Member -> Admin outside the Admin's To set, and the pipeline - not the slice - answers and records the 403.
         new IsolationCase(
-            "ISO-CHANGE-ROLE-ADMIN-BEYOND-AUTHORITY", "V-1, C-6, NFR-7 (4.4 AC4, AC9; Lee's Q1 (a); ledger :329)", IsolationVector.RecordKind, HttpMethod.Patch, MembershipWire.MembershipRoute,
+            "ISO-CHANGE-ROLE-ADMIN-BEYOND-AUTHORITY", "V-1, C-6, NFR-7 (4.4 AC4, AC9; Lee's Q1 (a); ledger :329)", IsolationVector.RecordKind, HttpMethod.Patch, MembershipRoutes.Membership,
             async world =>
             {
                 var host = await world.NewActorAsync("Qh");
                 var admin = await JoinedThroughTheProductAsync(world, host, "Qa", "admin");
                 var member = await JoinedThroughTheProductAsync(world, host, "Qm", "member");
                 var target = await world.Database.MembershipOfAsync(host.SpaceId, member.AccountId);
-                var path = MembershipWire.MembershipOf(host.SpaceId, target.Id);
+                var path = MembershipRoutes.MembershipOf(host.SpaceId, target.Id);
 
                 return new CaseRequest(admin, HttpMethod.Patch, [new(path, path)], host.SpaceId, Body: () => MembershipWire.ChangeBody("admin"), Other: member);
             },
-            Both(new RoleRefused(MembershipWire.CapabilityCode) { Then = TheOtherKeepsItsRole("Member") }),
-            PendingUntil: "4.4",
-            PendingReason: Story44Pending) with
+            Both(new RoleRefused(MembershipWire.CapabilityCode) { Then = TheOtherKeepsItsRole("Member") })) with
         {
             Assumption = "PRD-12-4",
         },
 
         new IsolationCase(
-            "ISO-CHANGE-ROLE-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-13 (4.4 AC4, AC9; Q9 (a))", IsolationVector.DeepLink, HttpMethod.Patch, MembershipWire.MembershipRoute,
+            "ISO-CHANGE-ROLE-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-13 (4.4 AC4, AC9; Q9 (a))", IsolationVector.DeepLink, HttpMethod.Patch, MembershipRoutes.Membership,
             async world =>
             {
                 var foreign = await world.Database.MembershipOfAsync(world.B.SpaceId, world.B.AccountId);
@@ -150,35 +131,31 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Patch,
-                    [new(MembershipWire.MembershipOf(world.A.SpaceId, foreign.Id), MembershipWire.MembershipOf(world.A.SpaceId, Guid.NewGuid()))],
+                    [new(MembershipRoutes.MembershipOf(world.A.SpaceId, foreign.Id), MembershipRoutes.MembershipOf(world.A.SpaceId, Guid.NewGuid()))],
                     TargetSpaceId: null,
                     Body: () => MembershipWire.ChangeBody("viewer"));
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = BStillOwnsItsSpaceAsync }),
-            PendingUntil: "4.4",
-            PendingReason: Story44Pending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = BStillOwnsItsSpaceAsync })),
 
         TokenOwnOtherSpace(
             "LIST-MEMBERSHIPS",
             HttpMethod.Get,
-            MembershipWire.ListRoute,
+            MembershipRoutes.List,
             HttpStatusCode.OK,
-            second => MembershipWire.MembershipsOf(second.SpaceId))
+            second => MembershipRoutes.MembershipsOf(second.SpaceId))
             with
         {
             TestDesignId = "I-12 (4.4 AC9; the 3.4 AC3 gate; Lee's Q4 (a) Token parity)",
-            PendingUntil = "4.4",
-            PendingReason = Story44Pending,
         },
 
         new IsolationCase(
-            "ISO-TOKEN-OWN-OTHER-SPACE-CHANGE-ROLE", "I-12 (4.4 AC9; the 3.4 AC3 gate)", IsolationVector.TokenOwnOtherSpace, HttpMethod.Patch, MembershipWire.MembershipRoute,
+            "ISO-TOKEN-OWN-OTHER-SPACE-CHANGE-ROLE", "I-12 (4.4 AC9; the 3.4 AC3 gate)", IsolationVector.TokenOwnOtherSpace, HttpMethod.Patch, MembershipRoutes.Membership,
             async world =>
             {
                 var (first, second) = await world.OwnerOfTwoAsync("Tm");
                 var member = await JoinedThroughTheProductAsync(world, second.Actor, "Tj", "member");
                 var target = await world.Database.MembershipOfAsync(second.SpaceId, member.AccountId);
-                var path = MembershipWire.MembershipOf(second.SpaceId, target.Id);
+                var path = MembershipRoutes.MembershipOf(second.SpaceId, target.Id);
 
                 return new CaseRequest(first.Actor, HttpMethod.Patch, [new(path, path)], second.SpaceId, Body: () => MembershipWire.ChangeBody("viewer"), Other: member);
             },
@@ -186,9 +163,7 @@ internal static partial class IsolationCases
             {
                 [IsolationSurface.Session] = new Served(HttpStatusCode.OK, (_, _, _) => Task.CompletedTask, "200 - a Session carries no Space (FR-2); the Account owns SA2") { Then = TheOtherKeepsItsRole("Viewer") },
                 [IsolationSurface.ApiToken] = new SameAsNonMember { Then = TheOtherKeepsItsRole("Member") },
-            },
-            PendingUntil: "4.4",
-            PendingReason: Story44Pending),
+            }),
     ];
 
     /// <summary>
@@ -237,13 +212,13 @@ internal static partial class IsolationCases
 
         if (!change)
         {
-            var list = MembershipWire.MembershipsOf(host.SpaceId);
+            var list = MembershipRoutes.MembershipsOf(host.SpaceId);
 
             return new CaseRequest(actor, HttpMethod.Get, [new(list, list)], host.SpaceId, Other: host);
         }
 
         var owner = await world.Database.MembershipOfAsync(host.SpaceId, host.AccountId);
-        var path = MembershipWire.MembershipOf(host.SpaceId, owner.Id);
+        var path = MembershipRoutes.MembershipOf(host.SpaceId, owner.Id);
 
         return new CaseRequest(actor, HttpMethod.Patch, [new(path, path)], host.SpaceId, Body: () => MembershipWire.ChangeBody("viewer"), Other: host);
     }

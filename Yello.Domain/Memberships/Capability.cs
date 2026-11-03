@@ -72,14 +72,14 @@ public enum Capability
     IssueAndRevokeInvitations,
 
     /// <summary>
-    /// Change a Membership's Role. Owner; Admin only between Member and Viewer, a target constraint
-    /// stories 4.4 and 4.5 own.
+    /// Change a Membership's Role. Owner; Admin only between Member and Viewer - the target rule
+    /// <see cref="RoleCapabilityMatrix.RoleChangeAuthorityOf"/> declares and the pipeline hands the slice (story 4.4).
     /// </summary>
     ChangeMembershipRole,
 
     /// <summary>
-    /// Remove a Membership. Owner; Admin only for Members and Viewers, a target constraint stories
-    /// 4.4 and 4.5 own.
+    /// Remove a Membership. Owner; Admin only for Members and Viewers, a target rule story 4.5 declares
+    /// beside the Role change's.
     /// </summary>
     RemoveMembership,
 

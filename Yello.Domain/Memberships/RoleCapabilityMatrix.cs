@@ -53,6 +53,48 @@ public static class RoleCapabilityMatrix
     };
 
     /// <summary>
+    /// The Owner's target rule for <see cref="Capability.ChangeMembershipRole"/>: every Role but Owner, from and to.
+    /// </summary>
+    private static readonly RoleChangeAuthority OwnerChanges = new(
+        new HashSet<Role> { Role.Admin, Role.Member, Role.Viewer },
+        new HashSet<Role> { Role.Admin, Role.Member, Role.Viewer },
+        new HashSet<Role> { Role.Owner });
+
+    /// <summary>
+    /// The Admin's target rule for <see cref="Capability.ChangeMembershipRole"/>: "Member ↔ Viewer only".
+    /// </summary>
+    private static readonly RoleChangeAuthority AdminChanges = new(
+        new HashSet<Role> { Role.Member, Role.Viewer },
+        new HashSet<Role> { Role.Member, Role.Viewer },
+        new HashSet<Role> { Role.Owner, Role.Admin });
+
+    /// <summary>
+    /// The Qualified cells' target rule for changing a Role (story 4.4, AC4; Lee's Q1 (a); <c>deferred-work.md:329</c>):
+    /// the Roles <paramref name="actor"/> may change a Membership from and to, and the Roles it must still hold for that.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>FR-13</b> (<c>prd.md:293-301</c>): "An Admin can change Memberships between Member and Viewer only. Only an Owner
+    /// can promote a Membership to Admin, or demote one from Admin" - the latter is PRD section 12 assumption #4
+    /// (<c>prd.md:895</c>), still unconfirmed. "No Role change can produce a second Owner or remove the sole Owner", so
+    /// <see cref="Role.Owner"/> is in no set for any actor (Lee's Q2 (a)).
+    /// </para>
+    /// <para>
+    /// <b>Asked by the pipeline only</b>, with the Role it read on this request, like <see cref="Decide"/>. The answer
+    /// carries sets, never the Role, so the slice that consumes it reads no Role. A Role the matrix denies the capability
+    /// gets <see cref="RoleChangeAuthority.None"/>.
+    /// </para>
+    /// </remarks>
+    /// <param name="actor">The Role the acting Account's Membership carries, read on this request.</param>
+    /// <returns>The target rule.</returns>
+    public static RoleChangeAuthority RoleChangeAuthorityOf(Role actor) => actor switch
+    {
+        Role.Owner => OwnerChanges,
+        Role.Admin => AdminChanges,
+        _ => RoleChangeAuthority.None,
+    };
+
+    /// <summary>
     /// What the matrix says about a Role and a capability.
     /// </summary>
     /// <param name="role">The Role the acting Account's Membership carries, read on this request.</param>

@@ -12,6 +12,9 @@ using Yello.Application.Invitations.IssueInvitation;
 using Yello.Application.Invitations.ListInvitations;
 using Yello.Application.Invitations.RevokeInvitation;
 using Yello.Application.Invitations.ViewInvitation;
+using Yello.Application.Memberships;
+using Yello.Application.Memberships.ChangeMembershipRole;
+using Yello.Application.Memberships.ListMemberships;
 using Yello.Application.Outbox;
 using Yello.Application.Projects.CreateProject;
 using Yello.Application.Projects.DeleteProject;
@@ -139,6 +142,9 @@ builder.Services.AddScoped<RevokeInvitationHandler>();
 builder.Services.AddScoped<ViewInvitationHandler>();
 builder.Services.AddScoped<AcceptInvitationHandler>();
 builder.Services.AddScoped<InvitationRequest>();
+builder.Services.AddScoped<ListMembershipsHandler>();
+builder.Services.AddScoped<ChangeMembershipRoleHandler>();
+builder.Services.AddScoped<ActingAuthority>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
 builder.Services.AddAccountScopedResolution();
@@ -523,6 +529,16 @@ api.MapRevokeInvitation();
 // Invitation step resolves the token through the policy-free token index and keys the unit of work to that Space alone.
 api.MapViewInvitation();
 api.MapAcceptInvitation();
+
+// Memberships (story 4.4). GET /api/v1/spaces/{spaceId}/memberships lists the Space's Memberships - display name, address
+// as typed, Role code and whether it is the caller's - 50 a page in join order, with the true total and an opaque cursor.
+// PATCH .../memberships/{membershipId} with a Role code changes one's Role: 200 with the row (or the unchanged row for the
+// Role it already holds), 400 role-not-assignable for owner or an unknown code, 409 owner-role-fixed for the Owner's own
+// row, the pipeline's recorded 403 beyond the caller's authority (an Admin moves Members and Viewers only), or the
+// unrecorded boundary 404 for an id that names nothing here. Both under ChangeMembershipRole (Owner, Admin) on both
+// surfaces. The pipeline sets the acting authority's Role sets, and a committed change publishes MembershipChanged.
+api.MapListMemberships();
+api.MapChangeMembershipRole();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

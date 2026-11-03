@@ -180,12 +180,13 @@ internal static partial class ActiveSpaceResolution
         }
 
         // The Role off the Membership row on this request (AD-1), against the matrix. A Qualified
-        // cell passes the Role gate; its target constraint is the owning slice's.
-        if (RoleCapabilityMatrix.Decide(unitOfWork.Context.Role, capability) != CapabilityDecision.Denied)
+        // cell passes the Role gate; its target rule reaches the slice as the acting authority's Role
+        // sets, and a change beyond it comes back as the pipeline's recorded 403 (story 4.4).
+        if (QualifiedAuthority.Permits(unitOfWork.Context.Role, capability))
         {
             // Served inside the unit of work, which a Space deleted under the request may end
             // early (story 3.3) - see LostSpace.
-            return await LostSpace.ServeOrRefuseAsync(context, next, unitOfWork, request).ConfigureAwait(false);
+            return await QualifiedAuthority.ServeWithAuthorityAsync(context, next, unitOfWork, request).ConfigureAwait(false);
         }
 
         await unitOfWork.DisposeAsync().ConfigureAwait(false);

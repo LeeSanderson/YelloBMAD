@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Yello.Application.Spaces;
+using Yello.Infrastructure.Memberships;
 using Yello.Infrastructure.Outbox;
 
 namespace Yello.Infrastructure.Persistence;
@@ -48,10 +49,15 @@ namespace Yello.Infrastructure.Persistence;
 /// Optional, as <see cref="YelloDbContext"/>'s scopes are, so a resolver built outside a request - a test - still
 /// constructs; such a resolver signals nothing, and nothing it commits enqueued anything.
 /// </param>
+/// <param name="membershipChanges">
+/// The request's <c>MembershipChanged</c> publisher, told once the unit of work has committed and never on a rollback (story
+/// 4.4, AC6, Q7 (a)). Optional for the same reason as <paramref name="outboxSignal"/>.
+/// </param>
 internal sealed class MembershipActiveSpaceResolver(
     YelloDbContext dbContext,
     SpaceScope spaceScope,
-    OutboxCommitSignal? outboxSignal = null)
+    OutboxCommitSignal? outboxSignal = null,
+    MembershipChangePublisher? membershipChanges = null)
     : IActiveSpaceResolver
 {
     /// <inheritdoc />
@@ -92,7 +98,7 @@ internal sealed class MembershipActiveSpaceResolver(
             var context = new ActiveSpaceContext(accountId, spaceId, membership.Role);
             spaceScope.Resolve(context);
 
-            return new UnitOfWork(transaction, context, spaceScope, outboxSignal);
+            return new UnitOfWork(transaction, context, spaceScope, new CommitHooks(outboxSignal, membershipChanges));
         }
         catch
         {
@@ -112,12 +118,13 @@ internal sealed class MembershipActiveSpaceResolver(
     /// without completing - a refusal after resolution (a Token bound to another Space, story 1.8, or
     /// a denied capability) leaves no resolved Space behind, as a non-member's refusal does not.
     /// </param>
-    /// <param name="outboxSignal">Told once the commit has succeeded, so what the unit of work enqueued is sent then.</param>
+    /// <param name="hooks">Told once the commit has succeeded, so what the unit of work enqueued is sent and what it changed
+    /// is published then - and told when it ends without committing, so neither happens.</param>
     private sealed class UnitOfWork(
         IDbContextTransaction transaction,
         ActiveSpaceContext context,
         SpaceScope spaceScope,
-        OutboxCommitSignal? outboxSignal)
+        CommitHooks hooks)
         : IActiveSpaceUnitOfWork
     {
         private bool _completed;
@@ -131,8 +138,9 @@ internal sealed class MembershipActiveSpaceResolver(
             await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
             _completed = true;
 
-            // After the commit and only after it: an email enqueued by a write that rolled back is never sent.
-            outboxSignal?.Committed();
+            // After the commit and only after it: an email enqueued by a write that rolled back is never sent, and a
+            // Membership change that rolled back is never published.
+            hooks.Committed();
         }
 
         /// <inheritdoc />
@@ -141,6 +149,7 @@ internal sealed class MembershipActiveSpaceResolver(
             if (!_completed)
             {
                 spaceScope.Clear();
+                hooks.Discarded();
             }
 
             return transaction.DisposeAsync();

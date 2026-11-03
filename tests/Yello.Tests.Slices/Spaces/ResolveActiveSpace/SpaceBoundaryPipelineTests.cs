@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Routing.Patterns;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
+using Yello.Application.Memberships;
 using Yello.Contracts.Spaces;
 using Yello.Application.Spaces;
 using Yello.Domain;
@@ -475,6 +476,7 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
             .AddLogging()
             .AddSingleton(TimeProvider.System)
             .AddYelloInfrastructure(fixture.ConnectionString)
+            .AddScoped<ActingAuthority>()
             .AddSingleton(establishment);
 
         if (skipRecord)

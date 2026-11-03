@@ -10,70 +10,14 @@ namespace Yello.Tests.Shared;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>ATDD stand-ins, the 4.2 and 4.3 precedent:</b> <see cref="ListRoute"/>, <see cref="MembershipRoute"/>,
-/// <c>MembershipsOf</c>, <see cref="MembershipOf"/>, <see cref="OwnerRoleFixedProblemType"/> and
-/// <see cref="RoleNotAssignableProblemType"/> exist until Task 3 declares <c>Yello.Contracts.Memberships.MembershipRoutes</c>
-/// and the two <c>ProblemTypes</c> members (story Q9 (a), Q10 (a)). The dev phase swaps every use (Slices, Isolation,
-/// Revocation, the fake, the gates) for the contract members and deletes these six. Everything else here is the test's
-/// reading of the wire and stays.
-/// </para>
-/// <para>
-/// <b>Route patterns are literals on purpose:</b> the isolation gap gate keys a row on the pattern the Host maps, so a stand-in
-/// that differs from the contract by a character fails that gate the day the route is mapped, which is the point.
+/// <b>The routes and problem types are the contract's</b> (<c>MembershipRoutes</c>, <c>ProblemTypes.OwnerRoleFixed</c>,
+/// <c>ProblemTypes.RoleNotAssignable</c>): the ATDD run's six stand-ins were swapped for them and deleted when story 4.4
+/// declared them. Everything here is the test's reading of the wire.
 /// </para>
 /// </remarks>
 public static class MembershipWire
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-    /// <summary>
-    /// ATDD stand-in for <c>MembershipRoutes.List</c>: the collection's pattern as the Host maps it (Q9 (a)).
-    /// </summary>
-    public static string ListRoute => "/api/v1/spaces/{spaceId:guid}/memberships";
-
-    /// <summary>
-    /// ATDD stand-in for <c>MembershipRoutes.Membership</c>: one Membership's pattern, the Role change's (Q9 (a)).
-    /// </summary>
-    public static string MembershipRoute => "/api/v1/spaces/{spaceId:guid}/memberships/{membershipId:guid}";
-
-    /// <summary>
-    /// ATDD stand-in for <c>MembershipRoutes.MembershipsOf(spaceId, after)</c>: the list's path, with the opaque cursor when
-    /// one is given (AC1, Q8 (a)).
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <param name="after">The cursor the previous page answered, or <c>null</c> for the first page.</param>
-    /// <returns>The path.</returns>
-    public static string MembershipsOf(Guid spaceId, string? after) =>
-        after is null
-            ? MembershipsOf(spaceId)
-            : $"/api/v1/spaces/{spaceId:D}/memberships?after={Uri.EscapeDataString(after)}";
-
-    /// <summary>
-    /// The list's first page's path.
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <returns>The path.</returns>
-    public static string MembershipsOf(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}/memberships";
-
-    /// <summary>
-    /// ATDD stand-in for <c>MembershipRoutes.MembershipOf(spaceId, membershipId)</c>: the Role change's path.
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <param name="membershipId">The Membership.</param>
-    /// <returns>The path.</returns>
-    public static string MembershipOf(Guid spaceId, Guid membershipId) => $"/api/v1/spaces/{spaceId:D}/memberships/{membershipId:D}";
-
-    /// <summary>
-    /// ATDD stand-in for <c>ProblemTypes.OwnerRoleFixed</c> (Q10 (a)): the Owner's row changed by anyone with the authority
-    /// to try, or the unique index's <c>2601</c> mapped to a stable answer (AC5 plant 3).
-    /// </summary>
-    public static string OwnerRoleFixedProblemType => "urn:yello:problem:owner-role-fixed";
-
-    /// <summary>
-    /// ATDD stand-in for <c>ProblemTypes.RoleNotAssignable</c> (Q10 (a)): <c>owner</c>, or a code that names no Role, in the
-    /// change's body - refused before anything is read.
-    /// </summary>
-    public static string RoleNotAssignableProblemType => "urn:yello:problem:role-not-assignable";
 
     /// <summary>
     /// The capability both routes declare, as the <c>403</c> body names it (Lee's Q4 (a): the list sits under the write

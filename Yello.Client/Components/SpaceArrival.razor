@@ -259,7 +259,17 @@
     }
 
     private SpaceArrivalContext ArrivalContext =>
-        new(ActiveSpace.Current ?? throw new InvalidOperationException(), EventCallback.Factory.Create<ProblemResponse?>(this, Refuse));
+        new(
+            ActiveSpace.Current ?? throw new InvalidOperationException(),
+            EventCallback.Factory.Create<ProblemResponse?>(this, Refuse),
+            EventCallback.Factory.Create(this, RereadAsync));
+
+    /// <summary>
+    /// The Role asked for again on a page's request, as a re-arrival asks it (story 4.4, AC10): applied in place, so a page
+    /// a lower Role no longer permits follows its own narrated exit.
+    /// </summary>
+    private Task RereadAsync() =>
+        _arrived && !_refused ? AskAsync(ActiveSpace.Token, firstArrival: false) : Task.CompletedTask;
 
     private void Refuse(ProblemResponse? problem)
     {

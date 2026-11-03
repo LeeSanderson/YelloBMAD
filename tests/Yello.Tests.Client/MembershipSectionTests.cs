@@ -17,7 +17,7 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written as red-phase scaffolds by the story 4.4 ATDD run (2026-11-02).</b> Each is skipped with the AC it waits for.
+/// <b>Written as red-phase scaffolds by the story 4.4 ATDD run (2026-11-02)</b>, activated by its dev phase.
 /// The API is <see cref="FakeYelloApi"/> at the network edge, taught by this run the list and the Role change
 /// (<c>FakeYelloApi.Memberships.cs</c>); no Host, no database, no engine. Build <c>Yello.Client</c> in Debug before running
 /// them. Same collection as <see cref="InvitationListTests"/>, so no new fixture.
@@ -39,18 +39,6 @@ namespace Yello.Tests.Client;
 [Collection(nameof(ClientSurfaceCollection))]
 public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
 {
-    private const string Pending =
-        "red: AC10 - story 4.4 builds MembershipSection and MembershipRow in Space settings (Task 7; Q12 (a), Q19 (a))";
-
-    private const string LedgerFocusPending =
-        "red: AC10, ledger :762 - while a row action is in flight its status element takes focus, in all four rows (Q14 (a))";
-
-    private const string LedgerNarrationPending =
-        "red: AC10, ledger :550 - Space home renders the narration region empty and fills it after the first render (Q15 (a))";
-
-    private const string LedgerLabelPending =
-        "red: AC10, ledger :546 - a Label delete answered 404 re-reads the list, drops the row and announces (Q16 (a))";
-
     private const float Timeout = 30_000;
     private const string EnglishLocale = "en-GB";
     private const string ContextBar = "nav.context-bar";
@@ -138,7 +126,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// fixed Owner chip marked "You" with no control, and every other row - Admin, Member, Viewer - a "Change Role" control.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Pending)]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     public async Task The_Owner_sees_Change_Role_on_every_other_row_and_a_fixed_chip_on_its_own()
     {
@@ -176,7 +164,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// <c>aria-disabled</c>. Plant 14: a disabled control for an Admin.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Pending)]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Assumption", "PRD-12-4")]
     public async Task An_Admin_sees_Member_and_Viewer_only_on_Member_and_Viewer_rows_and_nothing_disabled()
@@ -221,7 +209,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// the control and sends nothing. Plant 15: the current Role pre-checked.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Pending)]
+    [Fact]
     [Trait("Requirement", "UX-DR11")]
     public async Task The_Role_picker_opens_in_place_with_no_option_checked_and_Cancel_sends_nothing()
     {
@@ -260,7 +248,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// Role" control.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Pending)]
+    [Fact]
     [Trait("Requirement", "UX-DR38")]
     [Trait("Requirement", "UX-DR39")]
     [Trait("Requirement", "AD-23")]
@@ -306,7 +294,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// in the document.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Pending)]
+    [Fact]
     [Trait("Requirement", "UX-DR34")]
     [Trait("Requirement", "AD-23")]
     public async Task The_address_appears_only_in_the_Members_section_and_is_gone_after_a_Space_switch()
@@ -341,7 +329,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// meta says "100 of 100" throughout; and "Show more" is gone after the last page. No infinite scroll.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Pending)]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "UX-DR26")]
     public async Task Two_pages_load_and_the_second_appends_without_replacing_focused_rows()
@@ -381,7 +369,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// were shown. The capability-shaped copy is the other arm, when the re-read still permits the section.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Pending)]
+    [Fact]
     [Trait("Requirement", "UX-DR29")]
     [Trait("Requirement", "NFR-2")]
     public async Task An_Admin_demoted_meanwhile_is_narrated_out_of_Space_settings_on_the_403()
@@ -415,7 +403,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// Membership-scoped discriminator, and neither label carries an <c>@</c>; a unique name renders bare.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the Members section labels a name collision with MembershipLabels.Disambiguate (Q13 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR34")]
     public async Task Two_Memberships_named_alike_render_distinct_labels()
     {
@@ -450,7 +438,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="role">The lesser Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = Pending)]
+    [Theory]
     [InlineData("member")]
     [InlineData("viewer")]
     [Trait("Requirement", "UX-DR27")]
@@ -492,7 +480,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="row">Which row type.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = LedgerFocusPending)]
+    [Theory]
     [InlineData("membership")]
     [InlineData("invitation")]
     [InlineData("label")]
@@ -588,7 +576,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// unchanged. Plant 17: the region rendered filled.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = LedgerNarrationPending)]
+    [Fact]
     [Trait("Requirement", "UX-DR29")]
     public async Task The_Space_home_narration_region_is_inserted_empty_and_filled_after_the_first_render()
     {
@@ -625,7 +613,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// Project deletions are unchanged (their own cases in <c>DeleteTests</c> stay green).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = LedgerLabelPending)]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     public async Task A_Label_delete_answered_404_rereads_the_list_drops_the_row_and_announces()
     {
@@ -665,7 +653,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="spaced">Whether the text-spacing override is applied.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = Pending)]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "NFR-9")]

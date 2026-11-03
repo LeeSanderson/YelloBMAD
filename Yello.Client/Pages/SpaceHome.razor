@@ -27,14 +27,19 @@
     creation meets renders the one refusal surface. Each row links to its Board (story 2.2).
 *@
 
+@* Rendered empty from this page's first render and filled once the Space has answered (story 4.4, ledger :550,
+   Q15 (a)): a status region inserted already holding its sentence is not announced by every screen reader. Only when
+   there is a sentence to say, so a page that says nothing - a refusal included - is exactly as it was (AD-3). *@
+@if (_narration is not null)
+{
+    <p class="space-home__narration" role="status">@_shown</p>
+}
+
 <SpaceArrival SpaceId="@SpaceId" Context="arrival">
     <div class="space-home">
         <PageHeading>@Localizer["SpaceHomeHeading"]</PageHeading>
 
-        @if (_narration is not null)
-        {
-            <p class="space-home__narration" role="status">@_narration</p>
-        }
+        <AfterArrival OnArrived="ShowNarration" />
 
         <ProjectList @key="SpaceId" SpaceId="@SpaceId" RoleCode="@arrival.Current.Role" OnSpaceRefused="arrival.Refuse" />
     </div>
@@ -42,6 +47,7 @@
 
 @code {
     private string? _narration;
+    private string? _shown;
     private Guid _narratedIn;
 
     /// <summary>
@@ -66,6 +72,19 @@
         if (SpaceId != _narratedIn)
         {
             _narration = null;
+            _shown = null;
+        }
+    }
+
+    /// <summary>
+    /// The Space has answered: the sentence carried here from Space settings is written into the region now, a browser
+    /// task after the region was rendered empty.
+    /// </summary>
+    private void ShowNarration()
+    {
+        if (_narration is not null && SpaceId == _narratedIn)
+        {
+            _shown = _narration;
         }
     }
 }

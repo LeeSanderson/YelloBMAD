@@ -430,4 +430,25 @@ public static class ProblemTypes
     /// <see cref="InvitationNotValid"/> instead, whoever is signed in.
     /// </remarks>
     public static string InvitationForAnotherAccount => "urn:yello:problem:invitation-for-another-account";
+
+    /// <summary>
+    /// A Role change named the Owner's own Membership, by an actor whose authority is the Owner's. Answered <c>409</c>;
+    /// nothing is written, and it is not recorded as an access refusal - the Owner holds full authority, so "insufficient
+    /// Role" would be untrue. Story 4.4, AC4, AC5, open question 10 (a); FR-13, FR-42.
+    /// </summary>
+    /// <remarks>
+    /// <b>Disclosable</b>: the caller is the Owner, who sees its own row in the Membership list. Ownership moves only by an
+    /// Ownership Offer (story 5.2). Also the stable answer should the filtered unique index ever refuse a second Owner
+    /// (<c>2601</c>) - never a <c>500</c>. An Admin touching the Owner's row is <see cref="InsufficientRole"/> instead.
+    /// </remarks>
+    public static string OwnerRoleFixed => "urn:yello:problem:owner-role-fixed";
+
+    /// <summary>
+    /// The Role a change asks for is <c>owner</c>, unknown or missing. Answered <c>400</c> before anything is read; nothing
+    /// is written and nothing is recorded. Story 4.4, AC4, AC5, open question 10 (a); FR-13, FR-42.
+    /// </summary>
+    /// <remarks>
+    /// A statement about the request alone, so it names neither the Membership nor its current Role.
+    /// </remarks>
+    public static string RoleNotAssignable => "urn:yello:problem:role-not-assignable";
 }

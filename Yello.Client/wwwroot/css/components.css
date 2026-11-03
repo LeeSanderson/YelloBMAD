@@ -1413,6 +1413,19 @@
     margin-block: var(--space-3) 0;
 }
 
+/*
+    Story 4.4 (ledger :550): Space home's narration region sits above the page, in the DOM from the first render and empty
+    until it has a sentence - and then it takes no room.
+*/
+.space-home__narration {
+    padding-inline: var(--space-4);
+}
+
+.space-home__narration:empty {
+    margin-block: 0;
+    padding-inline: 0;
+}
+
 .label-section {
     display: flex;
     flex-direction: column;
@@ -1846,6 +1859,147 @@
 
 .invitation-list__confirm {
     min-inline-size: 0;
+}
+
+/*
+    THE MEMBERS SECTION OF SPACE SETTINGS (story 4.4, AC10; mockup space-settings.html:112-179): the heading with its
+    monospace "{n} of 100" meta, the sub-copy, then one row per Membership - the initials avatar, the label, "· You", the
+    address, the Role chip and "Change Role" - wrapping onto as many lines as they need. A long name or address breaks
+    anywhere rather than scroll (1.4.10 at 320px; 1.4.12). The picker opens in place in the row, a fieldset like the
+    invite form's Role group; each choice keeps the target minimum. "Show more" sits under the list. No icon, no shadow,
+    no transition.
+*/
+.membership-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    margin-block-start: var(--space-4);
+    min-inline-size: 0;
+}
+
+.membership-section__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2) var(--space-3);
+    min-inline-size: 0;
+}
+
+.membership-section__heading {
+    margin-block: 0;
+}
+
+.membership-section__count,
+.membership-section__note,
+.membership-section__status,
+.membership-section__progress {
+    margin-block: 0;
+    color: var(--text-muted);
+    overflow-wrap: anywhere;
+}
+
+.membership-section__more {
+    align-self: flex-start;
+}
+
+.membership-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-block-start: var(--border-hairline-width) solid var(--border-hairline);
+}
+
+.membership-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding-block: var(--space-2);
+    border-block-end: var(--border-hairline-width) solid var(--border-hairline);
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+}
+
+/* The avatar: monospace initials (DESIGN.md avatar), the default radius, the chip's fill and ink. */
+.membership-row__avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    min-inline-size: var(--target-min);
+    min-block-size: var(--target-min);
+    padding-inline: var(--space-1);
+    border-radius: var(--radius-default);
+    background: var(--role-chip);
+    color: var(--role-chip-on);
+    font-family: var(--type-meta-family);
+    font-size: var(--type-meta-size);
+    font-weight: var(--type-meta-weight);
+    line-height: var(--type-meta-line-height);
+}
+
+.membership-row__name {
+    min-inline-size: 0;
+    font-weight: var(--type-task-title-weight);
+}
+
+.membership-row__you,
+.membership-row__address,
+.membership-row__progress,
+.membership-row__refusal {
+    min-inline-size: 0;
+    color: var(--text-muted);
+}
+
+.membership-row__address {
+    flex-basis: 100%;
+}
+
+.membership-row__refusal {
+    flex-basis: 100%;
+    margin-block: 0;
+}
+
+.membership-row__picker {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    flex-basis: 100%;
+    gap: var(--space-2) var(--space-3);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-inline-size: 0;
+}
+
+.membership-row__picker > legend {
+    padding: 0;
+    margin-block-end: var(--space-1);
+}
+
+.membership-row__picker > .form-field__message {
+    flex-basis: 100%;
+    margin-block: 0;
+}
+
+.membership-row__option {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-inline-size: var(--target-min);
+    min-block-size: var(--target-min);
+}
+
+.membership-row__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+/* Story 4.4 (ledger :762): the in-flight lines of the Label and API Token rows, as the Invitation row's. */
+.label-list__progress,
+.api-token-list__progress {
+    color: var(--text-muted);
 }
 
 /* Story 3.1 (AC15): the no-Space state's one action, a link drawn as the primary button it stands in for. */

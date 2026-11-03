@@ -516,6 +516,26 @@ commit, at process start, or on the next authenticated request. There is no time
   dispatcher is a singleton started by a commit, by `ApplicationStarted` or by request traffic.
 - **Never assert on the token or the address in a log except by absence.** Both are secrets in logs (NFR-6, I-17).
 
+## Memberships, addresses and attribution - added by story 4.4
+
+- **Addresses are shown in two lists and read by named types.** Only the Membership list and the Invitation list carry an
+  email address in a response contract (`Only_the_Membership_list_and_the_Invitation_list_carry_an_email_address`), and
+  only named stores read `Account.EmailAddress` or `NormalizedEmailAddress`
+  (`Only_named_types_read_an_Accounts_email_address`). A new reader or a new carrier is a decision, not a test edit.
+- **Attribution never reads a live Account name.** Authored content shows the name captured at authoring time
+  (`Invitation.IssuerName`; story 7.2's change log follows it). Resolving a current name globally would carry a later name
+  change into a Space the reader no longer shares with that person (`EXPERIENCE.md:156`). Only the Membership list reads
+  `Account.DisplayName` live, for current Members (Lee's 4.4 Q5 (a)); `Attribution_never_reads_a_live_Account_name`
+  holds the named readers.
+- **Seed through the product where the case is about Membership.** An Admin, Member or Viewer joins through an Invitation
+  at that Role, accepted (4.3). Seed directly (`WireDatabase.AddMembershipAsync`, `SpaceSeeding`) for bulk, for a
+  `MembershipChanged` count (the accept publishes its own), and for a second Membership of one address (the mail drop
+  returns the first email to that address). Record which.
+- **`MembershipChanged` is observed through its log line**, `MembershipChangedPublished`, carrying the Account and the Space
+  ids. Count lines that name the case's own ids.
+- **S-2 after every Role operation.** `WireDatabase.SpacesNotHoldingExactlyOneOwnerAsync` over the case's own Spaces - the
+  class database is shared, and earlier cases leave Spaces with no Owner on purpose.
+
 ## EF Core migrations need a hand-editing pass
 
 `dotnet ef migrations add` scaffolds a migration that **fails this build**: `IDE0005`, `IDE0161`,

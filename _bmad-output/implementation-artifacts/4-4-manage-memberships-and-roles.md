@@ -1,6 +1,10 @@
+---
+baseline_commit: 885ac9eca02ec45c021eed575ac42a2868586d6e
+---
+
 # Story 4.4: Manage Memberships and Roles
 
-Status: ready-for-dev
+Status: review
 
 Epic: 4 — Bring people into one piece of your work (the fourth story of the epic)
 Story key: `4-4-manage-memberships-and-roles`
@@ -281,40 +285,40 @@ AC1 to AC7 are reproduced **verbatim** from `epics.md:1761-1794` (`status: final
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0: Lee's decisions** (before any code)
-  - [ ] Q1-Q5 are **[LEE]**. The orchestrator routes them to Lee before development. Record each answer in this file under "Decided by Lee" before ATDD.
-  - [ ] Do not build any of the following without Lee's recorded decision: a Role-read path for a slice, a new RLS predicate, a new email reader, or a stored display name. If development starts without an answer, stop and return the question as a blocker.
-- [ ] **Task 1: decide Q6-Q19.** Each recommendation is the default. Record each as "Qn - (x)" with its cost in Completion Notes.
-- [ ] **Task 2: Domain** (AC4, AC5)
-  - [ ] Add the Qualified cells' target rules to `RoleCapabilityMatrix` (Q1). Owner appears in no set. Remarks quote FR-13 and PRD §12 #4.
-  - [ ] Add `Role` parsing from a stable code that refuses `owner` for a change (or reuse `InvitationRoles`' parser if one exists).
-- [ ] **Task 3: Contracts** (AC1, AC3, AC4)
-  - [ ] `Yello.Contracts/Memberships/`: `MembershipRoutes`, `MembershipResponse`, `MembershipPageResponse`, `ChangeMembershipRoleRequest`, and `MembershipLabels` (Q13).
-  - [ ] `ProblemTypes.OwnerRoleFixed` (`urn:yello:problem:owner-role-fixed`) and `RoleNotAssignable` (or reuse an existing validation type; Q10). Add remarks on status and disclosure.
-- [ ] **Task 4: Application** (AC1, AC4, AC6)
-  - [ ] `Yello.Application/Memberships/ListMemberships/ListMembershipsHandler.cs` and `Yello.Application/Memberships/ChangeMembershipRole/ChangeMembershipRoleHandler.cs`. Folder `Memberships/` per the spine (`ARCHITECTURE-SPINE.md:277,421`); see C5.
-  - [ ] `IMembershipStore`, the acting-authority holder (Q1), and `IMembershipChanges` plus `IMembershipChangeSubscriber` (Q7).
-  - [ ] Handlers read no Role, count nothing and record nothing (AR-3).
-- [ ] **Task 5: Infrastructure** (AC1, AC4-AC7)
-  - [ ] `MembershipStore`: the paged projection (Role as code, `Account.EmailAddress`, the display name per Q5, `IsYou`), the count, the guarded update under `ApplicationLocks.TakeMembershipsAsync` (Q17) and the disambiguation read.
-  - [ ] Watch S1200, and split by port if it fires.
-  - [ ] Collect `MembershipChanged` records in the unit of work and publish after commit (Q7).
-  - [ ] Q3 (a), if Lee chooses it: a hand-edited, expand-only migration adding `BLOCK AFTER UPDATE` on `Membership` (`fn_SpaceIsolationPredicate(SpaceId)`).
+- [x] **Task 0: Lee's decisions** (before any code)
+  - [x] Q1-Q5 are **[LEE]**. The orchestrator routes them to Lee before development. Record each answer in this file under "Decided by Lee" before ATDD.
+  - [x] Do not build any of the following without Lee's recorded decision: a Role-read path for a slice, a new RLS predicate, a new email reader, or a stored display name. If development starts without an answer, stop and return the question as a blocker.
+- [x] **Task 1: decide Q6-Q19.** Each recommendation is the default. Record each as "Qn - (x)" with its cost in Completion Notes.
+- [x] **Task 2: Domain** (AC4, AC5)
+  - [x] Add the Qualified cells' target rules to `RoleCapabilityMatrix` (Q1). Owner appears in no set. Remarks quote FR-13 and PRD §12 #4.
+  - [x] Add `Role` parsing from a stable code that refuses `owner` for a change (or reuse `InvitationRoles`' parser if one exists).
+- [x] **Task 3: Contracts** (AC1, AC3, AC4)
+  - [x] `Yello.Contracts/Memberships/`: `MembershipRoutes`, `MembershipResponse`, `MembershipPageResponse`, `ChangeMembershipRoleRequest`, and `MembershipLabels` (Q13).
+  - [x] `ProblemTypes.OwnerRoleFixed` (`urn:yello:problem:owner-role-fixed`) and `RoleNotAssignable` (or reuse an existing validation type; Q10). Add remarks on status and disclosure.
+- [x] **Task 4: Application** (AC1, AC4, AC6)
+  - [x] `Yello.Application/Memberships/ListMemberships/ListMembershipsHandler.cs` and `Yello.Application/Memberships/ChangeMembershipRole/ChangeMembershipRoleHandler.cs`. Folder `Memberships/` per the spine (`ARCHITECTURE-SPINE.md:277,421`); see C5.
+  - [x] `IMembershipStore`, the acting-authority holder (Q1), and `IMembershipChanges` plus `IMembershipChangeSubscriber` (Q7).
+  - [x] Handlers read no Role, count nothing and record nothing (AR-3).
+- [x] **Task 5: Infrastructure** (AC1, AC4-AC7)
+  - [x] `MembershipStore`: the paged projection (Role as code, `Account.EmailAddress`, the display name per Q5, `IsYou`), the count, the guarded update under `ApplicationLocks.TakeMembershipsAsync` (Q17) and the disambiguation read.
+  - [x] Watch S1200, and split by port if it fires.
+  - [x] Collect `MembershipChanged` records in the unit of work and publish after commit (Q7).
+  - [x] Q3 (a), if Lee chooses it: a hand-edited, expand-only migration adding `BLOCK AFTER UPDATE` on `Membership` (`fn_SpaceIsolationPredicate(SpaceId)`).
     - Update `SpaceIsolationSchemaTests.TablesThatCannotMove` (`tests/Yello.Tests.Slices/Accounts/RegisterAccount/SpaceIsolationSchemaTests.cs:96-97`) and the per-table predicate counts (`:120-123`).
     - Read `TESTING-CONVENTIONS.md:519-540` before editing the migration.
-- [ ] **Task 6: Host** (AC1, AC4, AC6, AC9)
-  - [ ] `ActiveSpaceResolution` sets the acting authority for Qualified decisions, and turns the endpoint's `QualifiedRefusal` outcome into the recorded `403` (nested types to stay under S1200).
-  - [ ] `Yello.Host/Endpoints/MembershipEndpoints.cs`: an explicit outcome switch, **no `_ =>` arm** (4.1 P10). Register and map in `Program.cs` next to the Invitation routes, and update the route comment block.
-- [ ] **Task 7: Client** (AC2-AC4, AC10)
-  - [ ] Files: `MembershipSection.razor`, `MembershipRow.razor`, `MembershipCapabilities`, `SpaceSettings.razor`, `SpaceCapabilities.PermitsSpaceSettings`, `RoleCopy` (if needed), `RefusalCopy`, `ClientCopy.resx`, `components.css`, `FakeYelloApi.Memberships.cs`.
-  - [ ] Ledger fixes: `InvitationRow`/`LabelRow`/`ApiTokenRow` (`:762`), `SpaceHome` (`:550`), `LabelSection` (`:546`).
-- [ ] **Task 8: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log.
-- [ ] **Task 9: ledger, docs, verification**
-  - [ ] Apply the ledger dispositions below: one line per CLOSED/UPDATED note, no TAB or FORM FEED, keep the final newline.
-  - [ ] If Q1 (a) is chosen, add a dated additive note to AD-1 or AD-20 in `ARCHITECTURE-SPINE.md` naming the acting-authority seam. Q3 (a) adds a sentence to AD-2.
-  - [ ] Grep `Yello.* tests` for comments predicting "4.4" (for example `Membership.cs:48`, `CapabilityDecision.cs:24`, `ActiveSpaceResolution.cs:182`) and rewrite them to say what exists.
-  - [ ] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-4` stays `in-progress`. FR-13 stays staged (7.7, 7.8).
-  - [ ] Run `docker info --format '{{.ServerVersion}}'`, `dotnet build Yello.slnx` (0/0), `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record totals. Rerun a failure once, alone, before calling it real.
+- [x] **Task 6: Host** (AC1, AC4, AC6, AC9)
+  - [x] `ActiveSpaceResolution` sets the acting authority for Qualified decisions, and turns the endpoint's `QualifiedRefusal` outcome into the recorded `403` (nested types to stay under S1200).
+  - [x] `Yello.Host/Endpoints/MembershipEndpoints.cs`: an explicit outcome switch, **no `_ =>` arm** (4.1 P10). Register and map in `Program.cs` next to the Invitation routes, and update the route comment block.
+- [x] **Task 7: Client** (AC2-AC4, AC10)
+  - [x] Files: `MembershipSection.razor`, `MembershipRow.razor`, `MembershipCapabilities`, `SpaceSettings.razor`, `SpaceCapabilities.PermitsSpaceSettings`, `RoleCopy` (if needed), `RefusalCopy`, `ClientCopy.resx`, `components.css`, `FakeYelloApi.Memberships.cs`.
+  - [x] Ledger fixes: `InvitationRow`/`LabelRow`/`ApiTokenRow` (`:762`), `SpaceHome` (`:550`), `LabelSection` (`:546`).
+- [x] **Task 8: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log.
+- [x] **Task 9: ledger, docs, verification**
+  - [x] Apply the ledger dispositions below: one line per CLOSED/UPDATED note, no TAB or FORM FEED, keep the final newline.
+  - [x] If Q1 (a) is chosen, add a dated additive note to AD-1 or AD-20 in `ARCHITECTURE-SPINE.md` naming the acting-authority seam. Q3 (a) adds a sentence to AD-2.
+  - [x] Grep `Yello.* tests` for comments predicting "4.4" (for example `Membership.cs:48`, `CapabilityDecision.cs:24`, `ActiveSpaceResolution.cs:182`) and rewrite them to say what exists.
+  - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-4` stays `in-progress`. FR-13 stays staged (7.7, 7.8).
+  - [x] Run `docker info --format '{{.ServerVersion}}'`, `dotnet build Yello.slnx` (0/0), `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1`. Record totals. Rerun a failure once, alone, before calling it real.
 
 ## Dev Notes
 
@@ -649,12 +653,155 @@ The orchestrator commits each. 4.3's File List names the pipeline and endpoint f
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended story cycle, 2026-11-02.
 
 ### Debug Log References
+
+**Activation.** Every ATDD scaffold was activated in the checklist's order, starting with race 2 and the Admin-beyond-authority theory (the acting authority, the riskiest assumption). The ATDD run had already seen the wire scaffolds red on the unmapped route's boundary `404`; the dev phase saw each go green against the implementation, and saw the guarded behaviours red again under the plants below.
+
+**Scaffolds corrected (recorded, not deleted):**
+
+1. `The_very_next_request_after_a_demotion_is_governed_on_both_surfaces(member, viewer)` - the seeded Space held no Status, so the Task-creation probe answered `500` before the change. The case now seeds one Status with the Space.
+2. `ISO-LIST-MEMBERSHIPS-OWN-SPACE` - the shared Member's second join through the product read the first Invitation's email back from the world's mail drop (`WaitForEmailToAsync` takes the first email to an address), so the accept answered `invitation-not-valid`. The second Membership is now seeded directly (`AddMembershipAsync`).
+3. AC8 - the product-route twin passed; the raw-SQL original was deleted and the twin took its name (`An_Invitation_whose_issuer_was_demoted_stays_listed_and_revocable_by_any_Owner_or_Admin`); the file remark now describes the product route.
+4. The six `MembershipWire` stand-ins were swapped for `MembershipRoutes` and `ProblemTypes.OwnerRoleFixed`/`RoleNotAssignable` in Slices, Isolation, Revocation and the fake, then deleted.
+5. `SpaceBoundaryPipelineTests` and `ActiveSpaceUnitOfWorkTests` compose the pipeline from their own service collections; the pipeline now resolves `ActingAuthority`, so both register it (19 cases failed on the first full run with "No service for type ActingAuthority", green after). Production registers it in `Program.cs`.
+6. Added beyond the scaffolds: `MembershipHandlerTests` (31 cases with the labels tests, no database: paging, the authority handed as sets, fail-closed authority, `Judge`, the cursor, `AssignableRoles`) and `TextSpacingTests.Text_spacing_and_text_only_zoom_clip_nothing_in_the_Members_section` (both adaptations, ledger `:20` rolling).
+
+**Fixes the tests drove:** S1200 on `ActiveSpaceResolution` (the matrix decision moved into the nested `QualifiedAuthority` step); the client copy-literal, disabled-attribute and mutable-static gates (comments rephrased, `IReadOnlyList` statics); the Space-home narration region first lived inside `SpaceArrival` and was filled in the same browser task it was inserted, then rendered on the refusal page and broke `A_Project_id_followed_under_another_Space_..._refuses_as_unlisted`'s fingerprint - it is now outside `SpaceArrival`, rendered only when there is a sentence, and filled after the arrival (`AfterArrival`).
+
+**Plants** (each applied by a script that saved the original and restored it in a `finally`; never `git checkout`/`restore`/`reset`). The run was killed once by the OS for low memory while plant 14 was applied, so its `finally` did not run: the two planted lines in `MembershipRow.razor` were found by grep and restored by hand, and the tree was checked clean of every plant marker before continuing.
+
+| # | Plant | Expected red | Seen |
+|---|---|---|---|
+| 1 | Admin's `To` gains Admin | Admin-promote case; transcription gate | red: `An_Admin_beyond_its_authority...(member-to-admin)` 1/4; `The_target_rules_agree_with_the_matrix_transcription` |
+| 2 | Owner in the Owner's `From` | Owner own-row case; S-2 | red: `The_Owner_changing_its_own_row...`; transcription gate |
+| 3 | Owner in the Owner's `To` | second-Owner case | **masked on the wire**: `owner` in a body is `400 role-not-assignable` before the store, so no request can reach the plant; the transcription gate is red. The `2601` mapping to `409` is in the store and unreachable while Owner is in no set |
+| 4 | actor clause removed | race 2 | red: `An_Admin_demoted_while_its_change_is_queued...` |
+| 5 | Memberships lock removed | race 1 (expected masked on the end state) | red: the deciding assertion (both requests wait on the held lock) fails |
+| 6 | the slice reads `ActiveSpaceContext.Role` | Role-read gate | red: `Nothing_but_the_pipeline_reads_the_Role_off_the_active_Space_context` |
+| 7 | a second writer of the acting authority | writer gate | red: `Only_the_pipeline_sets_the_acting_authority` |
+| 8 | the Qualified refusal escapes unrecorded | record assertion | red: all four `An_Admin_beyond_its_authority...` cases (weak form - the endpoint answering a plain `403` - was blocked by MA0182 on the then-unused `QualifiedRefusal`; the strong form drops the pipeline's record) |
+| 9 | publish on every attempt and on rollback | AC6 no-publish case | red: `Refusals_not_founds_no_ops_and_replays_publish_nothing` (the same-Role case stayed green: it seeds no refusal) |
+| 10 | a static Role cache in the resolver | `REV-ROLE-CHANGED-BY-OWNER`; the no-cache gate | red: `REV-ROLE-CHANGED-BY-OWNER` and `REV-ROLE-CHANGED`, both surfaces. **The no-cache gate stayed green**: it bans `IMemoryCache`/`IDistributedCache`/`HybridCache`, not a static dictionary - recorded, not widened here |
+| 11 | `EmailAddress` on another response | contract gate | red: `Only_the_Membership_list_and_the_Invitation_list_carry_an_email_address` |
+| 12 | another type reads `Account.EmailAddress` | reader gate | red: `Only_named_types_read_an_Accounts_email_address` |
+| 13 | the discriminator carries `@` | the AC3 property case | red: `The_suffix_never_carries_an_at_sign...` |
+| 14 | a `disabled` Role control for an Admin | client gate and browser case | red: `No_control_in_the_Membership_section_is_disabled`; `An_Admin_sees_Member_and_Viewer_only...` |
+| 15 | the picker pre-checks the current Role | the no-default case | red: `The_Role_picker_opens_in_place_with_no_option_checked...` (a first run showed it green because `Yello.Tests.Client` does not build `Yello.Client`; rerun with the client rebuilt) |
+| 16 | the list unpaged | the 100-row case | red: `At_exactly_100_Memberships...` |
+| 17 | the narration region rendered filled | ledger `:550` case | red: `The_Space_home_narration_region_is_inserted_empty...` |
+| 18 | the in-flight status lines without focus | ledger `:762` cases | red: all four rows (membership, invitation, label, api-token) |
+| 19 | BLOCK AFTER UPDATE omitted from the migration | the schema tests | red: `Membership_carries_a_BLOCK_AFTER_UPDATE_predicate_on_its_Space`; `Every_Space_scoped_table_carries_a_filter_and_a_block_predicate` |
+
+**Timing.** No row added to `IsolationTimingTests`: the in-Space not-found is the boundary `404` body and passes through `NotAvailableFloor`, which `ISO-TIMING-IN-SPACE` already proves. The Isolation project ran green (331/331) with both load-sensitive rows.
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created (create-story, 2026-11-02). Five open questions (Q1-Q5) are marked [LEE] and must be decided before development; Q6-Q19 are the dev phase's, with recommendations.
+- **Implemented** FR-13 (request path), AR-12/AD-5, AR-16/AD-9, UX-DR14, UX-DR34, NFR-2 (V-1) and the client ledger items `:546`, `:550`, `:762`. Lee's Q1-Q5 (a) as decided: the pipeline-owned acting authority (`RoleCapabilityMatrix.RoleChangeAuthorityOf` -> `ActingAuthority`, set only by `ActiveSpaceResolution`, composed by `MembershipStore` into one guarded `UPDATE` under `Yello/Memberships/{spaceId}` with the actor clause; `QualifiedRefusal` -> the pipeline's recorded `403`); "at least one Owner" by the guarded statement plus S-2 (dated AD-5 note); `BLOCK AFTER UPDATE` on `Membership` (migration `20261102085905_MembershipBlockAfterUpdate`, `TablesThatCannotMove` updated); the list under `ChangeMembershipRole` with Token parity and the two address gates; a live `Account.DisplayName` read in Membership management only. Neither Role-read gate was widened. Dated spine notes on AD-1, AD-2, AD-5, AD-9.
+
+**Reversible decisions (Q6-Q19), each a line that can be cut:**
+
+- Q6 (a): no remove control; the row leaves room for 4.5's. Cost: none.
+- Q7 (a): `IMembershipChanges` (Application) collected by a scoped `MembershipChangePublisher`, published after commit by both units of work through `CommitHooks`, one `MembershipChangedPublished` log line (EventId 1047) per publish, no production subscriber. Cost: a hook on two units of work.
+- Q8 (a): 50 a page, keyset `(CreatedAt, Id)`, a separate `COUNT` for the total, an opaque versioned cursor (`MembershipCursorText`), "Show more" appends. Cost: two queries a page.
+- Q9 (a): `GET .../memberships?after=` -> `MembershipPageResponse`; `PATCH .../memberships/{id}` `{ role }` -> `200 MembershipResponse`. Cost: none.
+- Q10 (a): `409 owner-role-fixed` for the Owner's own row, `400 role-not-assignable` before any read for `owner` or an unknown code (one shared Domain parser, `AssignableRoles`, now also used by the Invitation issue), `403` for an Admin on the Owner's row; a `2601` from the store maps to `409`. Cost: two problem types.
+- Q11 (a): the same Role is a `200` no-op with the unchanged row, nothing written or published - **but only within the actor's authority**: an Admin "changing" another Admin to Admin is `403`, because the authority check precedes the no-op. Cost: none.
+- Q12 (a): in-row "Change Role" opens a fieldset radio group with nothing checked, the current Role in the legend, then "Change"/"Cancel"; "Change" with nothing chosen says "Choose a Role." Cost: none.
+- Q13 (a): first four hex characters of SHA-256(MembershipId), upper case, in `Yello.Contracts.Memberships.MembershipLabels` (no gate forbids logic in Contracts; `LabelColours` is precedent). Two colliding names whose suffixes also collide (1 in 65,536 per pair) are not separated further. Cost: that edge.
+- Q14 (a): the in-flight status line takes focus in all four rows; `ApiTokenRow` gained a `Revoking` state to have one. Cost: none.
+- Q15 (a), adapted: the region could not be filled in the same component's first after-render (it was inserted and filled in one browser task), so `SpaceHome` renders it outside `SpaceArrival`, only when it holds a sentence, and fills it once the Space has answered (`AfterArrival`). Cost: the sentence sits above the page heading.
+- Q16 (a): a Label delete or a Membership change answered `404` re-reads its list; drops the row and announces if the list answers, raises the Space refusal surface if not. Task and Project deletion unchanged. Cost: one extra read on a rare path.
+- Q17 (a): new `Yello/Memberships/{spaceId}` lock, independent of the Invitations lock (race 3 green). Cost: 4.5 and 5.2 must take it (ledgered).
+- Q18 (a): the accept records `MembershipChanged` for the new Member; `:769` updated. Cost: an accept's publish line in logs.
+- Q19 (a): the copy as listed, except "{name} is now a {Role}." is three keys ("an Admin", "a Member", "a Viewer") for the article. Cost: three keys instead of one.
+- Also decided: a `403` on the change asks the Role again through a new `SpaceArrivalContext.Reread` (the page's narrated exit follows a lower Role); the acting authority's `HeldBy` set is the Roles whose own authority covers it (Owner for the Owner's; Owner or Admin for the Admin's), so the store never receives the actor's Role. Cost: one more record member on `SpaceArrivalContext`.
+
+**Ledger** (`deferred-work.md`): `:329` UPDATED (removal half stays 4.5), `:540` UPDATED (owners 5.1, 6.3), `:546` CLOSED, `:550` CLOSED, `:758` UPDATED (removal arm stays 4.5), `:762` CLOSED, `:769` UPDATED (7.7 subscribes), `:701` UPDATED (seam exists, 7.7). New: the lock and seam constraint for 4.5 and 5.2; C3 (an Admin can create an Admin by invitation) for Lee/PM; AR-12's "at least one Owner" half for Lee.
 
 ### File List
+
+New:
+
+- Yello.Domain/Memberships/RoleChangeAuthority.cs
+- Yello.Domain/Memberships/AssignableRoles.cs
+- Yello.Contracts/Memberships/MembershipRoutes.cs
+- Yello.Contracts/Memberships/MembershipResponse.cs
+- Yello.Contracts/Memberships/MembershipPageResponse.cs
+- Yello.Contracts/Memberships/ChangeMembershipRoleRequest.cs
+- Yello.Contracts/Memberships/MembershipLabels.cs
+- Yello.Application/Memberships/ActingAuthority.cs
+- Yello.Application/Memberships/IMembershipStore.cs
+- Yello.Application/Memberships/IMembershipChanges.cs
+- Yello.Application/Memberships/ListMemberships/ListMembershipsHandler.cs
+- Yello.Application/Memberships/ListMemberships/MembershipCursorText.cs
+- Yello.Application/Memberships/ChangeMembershipRole/ChangeMembershipRoleHandler.cs
+- Yello.Infrastructure/Persistence/MembershipStore.cs
+- Yello.Infrastructure/Persistence/CommitHooks.cs
+- Yello.Infrastructure/Memberships/MembershipChangePublisher.cs
+- Yello.Infrastructure/Memberships/MembershipLog.cs
+- Yello.Infrastructure/Persistence/Migrations/20261102085905_MembershipBlockAfterUpdate.cs
+- Yello.Infrastructure/Persistence/Migrations/20261102085905_MembershipBlockAfterUpdate.Designer.cs
+- Yello.Host/Endpoints/MembershipEndpoints.cs
+- Yello.Host/Spaces/ActiveSpaceResolution.Authority.cs
+- Yello.Client/Components/MembershipSection.razor
+- Yello.Client/Components/MembershipRow.razor
+- Yello.Client/Components/AfterArrival.razor
+- Yello.Client/Spaces/MembershipCapabilities.cs
+- tests/Yello.Tests.Slices/Memberships/MembershipHandlerTests.cs
+
+Modified:
+
+- Yello.Domain/Memberships/RoleCapabilityMatrix.cs
+- Yello.Domain/Memberships/Capability.cs
+- Yello.Domain/Memberships/CapabilityDecision.cs
+- Yello.Domain/Invitations/Invitation.cs
+- Yello.Contracts/ProblemTypes.cs
+- Yello.Infrastructure/Persistence/ApplicationLocks.cs
+- Yello.Infrastructure/Persistence/InvitationScope.cs
+- Yello.Infrastructure/Persistence/InvitationStore.cs
+- Yello.Infrastructure/Persistence/MembershipActiveSpaceResolver.cs
+- Yello.Infrastructure/SpaceContentStores.cs
+- Yello.Host/Endpoints/InvitationEndpoints.cs
+- Yello.Host/Program.cs
+- Yello.Host/Spaces/ActiveSpaceResolution.cs
+- Yello.Client/Components/ApiTokenRow.razor
+- Yello.Client/Components/BoardView.razor.cs
+- Yello.Client/Components/InvitationRow.razor
+- Yello.Client/Components/LabelRow.razor
+- Yello.Client/Components/LabelSection.razor
+- Yello.Client/Components/SpaceArrival.razor
+- Yello.Client/Localisation/ClientCopy.resx
+- Yello.Client/Pages/AccountSettings.razor
+- Yello.Client/Pages/SpaceHome.razor
+- Yello.Client/Pages/SpaceSettings.razor
+- Yello.Client/Refusals/RefusalCopy.cs
+- Yello.Client/Spaces/SpaceArrivalContext.cs
+- Yello.Client/Spaces/SpaceCapabilities.cs
+- Yello.Client/wwwroot/css/components.css
+- tests/TESTING-CONVENTIONS.md
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Memberships.cs
+- tests/Yello.Tests.Client/FakeYelloApi.Memberships.cs
+- tests/Yello.Tests.Client/MembershipSectionTests.cs
+- tests/Yello.Tests.Client/TextSpacingTests.cs
+- tests/Yello.Tests.Isolation/IsolationCases.Memberships.cs
+- tests/Yello.Tests.Revocation/RevocationCases.cs
+- tests/Yello.Tests.Shared/MembershipWire.cs
+- tests/Yello.Tests.Slices/Accounts/RegisterAccount/SpaceIsolationSchemaTests.cs
+- tests/Yello.Tests.Slices/Memberships/MembershipLabelsTests.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ChangeMembershipRole.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ChangeMembershipRoleRace.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ListMemberships.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RevokeInvitation.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/SpaceBoundaryPipelineTests.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceUnitOfWorkTests.cs
+- _bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md
+- _bmad-output/implementation-artifacts/deferred-work.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- _bmad-output/implementation-artifacts/4-4-manage-memberships-and-roles.md
+
+### Change Log
+
+- 2026-11-02 - Story 4.4 implemented (bmad-dev-story): the Membership list and the Role change on both surfaces, the pipeline-owned acting authority, `BLOCK AFTER UPDATE` on `Membership`, the in-process `MembershipChanged` publisher, the Members section of Space settings, and the three client ledger items. 50 ATDD scaffolds activated, 11 isolation rows and the revocation row made live, 19 plants run. Build 0 warnings, 0 errors; full run (`--max-parallel-test-modules 1`) 2,180 total, 2,170 passed, 0 failed, 10 skipped (the 10 pre-existing skips, three of them the migration-bundle cases; none of the 50 4.4 scaffolds remains skipped).
