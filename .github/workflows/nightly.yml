@@ -48,12 +48,9 @@ jobs:
           dotnet restore Yello.slnx
           dotnet tool restore
 
-      # Release for the Host and the wire suites; the browser suite's dev server serves the Debug client, so the client is
-      # built in Debug too.
+      # The browser suite publishes the client itself, in the configuration it was built in.
       - name: Build
-        run: |
-          dotnet build Yello.slnx -c Release --no-restore
-          dotnet build Yello.Client/Yello.Client.csproj -c Debug --no-restore
+        run: dotnet build Yello.slnx -c Release --no-restore
 
       - name: Development certificate
         run: dotnet dev-certs https

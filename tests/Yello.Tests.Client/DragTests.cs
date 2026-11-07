@@ -28,7 +28,6 @@ namespace Yello.Tests.Client;
 [Trait("Priority", "P0")]
 [Trait("Requirement", "UX-DR22")]
 [Trait("Requirement", "FR-29")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class DragTests(ClientSurfaceFixture surface)
 {
     private const string Dialog = "[role='dialog']";

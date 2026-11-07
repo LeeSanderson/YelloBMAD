@@ -1,18 +1,19 @@
+using System.Reflection;
 using Microsoft.Playwright;
 using Xunit;
 
 namespace Yello.Tests.Client;
 
 /// <summary>
-/// One dev server and one browser, shared by every case in the browser suite.
+/// One client server and one browser, shared by every case in the browser suite (an assembly fixture).
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>Shared because starting either one is expensive and neither carries state between cases.</b>
 /// The isolation this suite needs is per-<i>context</i>, not per-process: a fresh
 /// <see cref="IBrowserContext"/> has its own cookie jar, its own storage and its own locale, which
-/// is exactly the boundary the cases care about. Starting a browser per case would buy nothing and
-/// cost seconds each.
+/// is exactly the boundary the cases care about. Contexts are independent, so classes open them in
+/// parallel against the one browser.
 /// </para>
 /// <para>
 /// <b>The browser is Chromium, pinned by the <c>Microsoft.Playwright</c> version.</b> Not
@@ -31,7 +32,7 @@ namespace Yello.Tests.Client;
 /// </remarks>
 public sealed class ClientSurfaceFixture : IAsyncLifetime
 {
-    private ClientDevServer? _server;
+    private PublishedClientHost? _server;
     private IPlaywright? _playwright;
     private IBrowser? _browser;
 
@@ -41,8 +42,8 @@ public sealed class ClientSurfaceFixture : IAsyncLifetime
     public Uri BaseAddress =>
         _server?.BaseAddress
         ?? throw new InvalidOperationException(
-            "The dev server is not running. Await InitializeAsync before reading this - xunit " +
-            "does that through ICollectionFixture. If InitializeAsync threw, that exception is " +
+            "The client host is not running. Await InitializeAsync before reading this - xunit " +
+            "does that through AssemblyFixture. If InitializeAsync threw, that exception is " +
             "the one to fix.");
 
     /// <summary>
@@ -78,11 +79,7 @@ public sealed class ClientSurfaceFixture : IAsyncLifetime
     /// <returns>The context and its page. Disposing the context closes the page with it.</returns>
     public async Task<(IBrowserContext Context, IPage Page)> OpenAsync(string locale, string? timezoneId, bool hasTouch)
     {
-        var browser = _browser
-            ?? throw new InvalidOperationException(
-                "The browser is not running. Await InitializeAsync before reading this.");
-
-        var context = await browser.NewContextAsync(new BrowserNewContextOptions
+        var context = await NewContextAsync(new BrowserNewContextOptions
         {
             Locale = locale,
             TimezoneId = timezoneId,
@@ -95,16 +92,28 @@ public sealed class ClientSurfaceFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// Everything the dev server has written, for a failure message that can explain itself.
+    /// A bare context in the shared browser, for a case that sets its own options.
     /// </summary>
-    public string ServerOutput => _server?.Output ?? "(the dev server was never started)";
+    /// <remarks>
+    /// The published client's API address names a host nothing listens on. A request a case does not answer itself is
+    /// refused at once, as an unreachable API is, rather than waiting on the name to fail to resolve.
+    /// </remarks>
+    internal async Task<IBrowserContext> NewContextAsync(BrowserNewContextOptions options)
+    {
+        var browser = _browser ?? throw new InvalidOperationException("The browser is not running. Await InitializeAsync before reading this.");
+        var context = await browser.NewContextAsync(options).ConfigureAwait(false);
+
+        await context.RouteAsync($"https://{PublishedClientHost.ConfiguredApiHost}/**", route => route.AbortAsync("connectionrefused")).ConfigureAwait(false);
+
+        return context;
+    }
 
     /// <summary>
-    /// Starts the dev server, then the browser.
+    /// Publishes and serves the client, then starts the browser.
     /// </summary>
     public async ValueTask InitializeAsync()
     {
-        _server = await ClientDevServer.StartAsync().ConfigureAwait(false);
+        _server = await PublishedClientHost.StartAsync(BuildConfiguration(), TestContext.Current.CancellationToken).ConfigureAwait(false);
 
         _playwright = await Playwright.CreateAsync().ConfigureAwait(false);
 
@@ -138,7 +147,7 @@ public sealed class ClientSurfaceFixture : IAsyncLifetime
     }
 
     /// <summary>
-    /// Stops the browser, then the dev server.
+    /// Stops the browser, then the client host.
     /// </summary>
     public async ValueTask DisposeAsync()
     {
@@ -154,4 +163,11 @@ public sealed class ClientSurfaceFixture : IAsyncLifetime
             await _server.DisposeAsync().ConfigureAwait(false);
         }
     }
+
+    /// <summary>
+    /// The test assembly's configuration, which the client is published in, so CI's Release run boots a Release client.
+    /// </summary>
+    private static string BuildConfiguration() =>
+        typeof(ClientSurfaceFixture).Assembly.GetCustomAttribute<AssemblyConfigurationAttribute>()?.Configuration
+        ?? throw new InvalidOperationException("The test assembly carries no AssemblyConfigurationAttribute, so the configuration to publish Yello.Client in is unknown.");
 }

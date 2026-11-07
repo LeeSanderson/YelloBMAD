@@ -11,33 +11,18 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Served by <see cref="PublishedClientHost"/></b>, which publishes the client and applies the
-/// published <c>staticwebapp.config.json</c>.
-/// </para>
-/// <para>
-/// <b>Not the dev server.</b> The dev server answers every client route with <c>index.html</c> on its
-/// own, so a case run against it passes whatever the static host's configuration says. This case
-/// needs the <i>published</i> output (<c>dotnet publish Yello.Client -c Release</c>) served by a static
-/// file server on an OS port that implements exactly one rule - <c>navigationFallback</c>, read from
-/// the published <c>staticwebapp.config.json</c> - so the fallback under test is the file's, not the
-/// server's.
-/// </para>
-/// <para>
-/// <b>The static host</b> is <see cref="PublishedClientHost"/>: it publishes the client, overwrites the
-/// published <c>appsettings.Production.json</c> with the API's address as the deploy does, and serves
-/// the output applying the published <c>staticwebapp.config.json</c>'s <c>navigationFallback</c> and
-/// nothing else.
-/// </para>
-/// <para>
-/// <b>No collection and no fixture.</b> The browser and the static host are started in the case; move
-/// them into a collection if a second case ever shares them.
+/// <b>Served by <see cref="PublishedClientHost"/></b>, the suite's one client host: the published output,
+/// with the deploy's <c>appsettings.Production.json</c>, on an OS port, applying the published
+/// <c>staticwebapp.config.json</c>'s <c>navigationFallback</c> and nothing else - so the fallback under
+/// test is the file's, not the server's. A dev server would answer every client route with
+/// <c>index.html</c> on its own and prove nothing.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Client")]
 [Trait("Priority", "P0")]
 [Trait("Requirement", "AD-7")]
 [Trait("Requirement", "AR-38")]
-public sealed class StaticHostFallbackTests
+public sealed class StaticHostFallbackTests(ClientSurfaceFixture surface)
 {
     private const int RenderTimeoutMilliseconds = 30_000;
 
@@ -57,13 +42,10 @@ public sealed class StaticHostFallbackTests
     [Fact]
     public async Task A_deep_link_on_the_published_client_boots_routes_and_calls_the_configured_api()
     {
-        await using var host = await PublishedClientHost.StartAsync(TestContext.Current.CancellationToken);
+        await using var context = await surface.NewContextAsync(new BrowserNewContextOptions());
+        var page = await context.NewPageAsync();
 
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
-        var page = await browser.NewPageAsync();
-
-        var origin = host.BaseAddress.GetLeftPart(UriPartial.Authority);
+        var origin = surface.BaseAddress.GetLeftPart(UriPartial.Authority);
         var apiCall = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
         var ownOriginApiCalls = new ConcurrentQueue<string>();
 
@@ -97,7 +79,7 @@ public sealed class StaticHostFallbackTests
             await route.ContinueAsync();
         });
 
-        var response = await page.GotoAsync(new Uri(host.BaseAddress, $"/spaces/{Guid.NewGuid():D}").ToString());
+        var response = await page.GotoAsync(new Uri(surface.BaseAddress, $"/spaces/{Guid.NewGuid():D}").ToString());
 
         Assert.NotNull(response);
         Assert.Equal(200, response.Status);

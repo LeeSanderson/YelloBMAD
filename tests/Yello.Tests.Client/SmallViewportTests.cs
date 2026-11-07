@@ -33,7 +33,6 @@ namespace Yello.Tests.Client;
 [Trait("Requirement", "UX-DR20")]
 [Trait("Requirement", "UX-DR41")]
 [Trait("Requirement", "NFR-9")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class SmallViewportTests(ClientSurfaceFixture surface)
 {
     private const string Tablist = "main [role='tablist']";

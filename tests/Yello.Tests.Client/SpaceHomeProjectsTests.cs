@@ -29,7 +29,6 @@ namespace Yello.Tests.Client;
 [Trait("Requirement", "FR-17")]
 [Trait("Requirement", "FR-18")]
 [Trait("Requirement", "UX-DR35")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
 {
     private const float Timeout = 30_000;

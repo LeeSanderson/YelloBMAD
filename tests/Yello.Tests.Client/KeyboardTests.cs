@@ -32,7 +32,6 @@ namespace Yello.Tests.Client;
 [Trait("Priority", "P1")]
 [Trait("Requirement", "UX-DR24")]
 [Trait("Requirement", "NFR-9")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class KeyboardTests(ClientSurfaceFixture surface)
 {
     private const string Dialog = "[role='dialog']";

@@ -31,7 +31,6 @@ namespace Yello.Tests.Client;
 [Trait("Suite", "Client")]
 [Trait("Priority", "P0")]
 [Trait("Requirement", "FR-12")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class InvitationListTests(ClientSurfaceFixture surface)
 {
     private const float Timeout = 30_000;

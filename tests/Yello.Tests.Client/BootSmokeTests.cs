@@ -36,7 +36,6 @@ namespace Yello.Tests.Client;
 [Trait("Suite", "Client")]
 [Trait("Priority", "P0")]
 [Trait("Requirement", "NFR-9")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed partial class BootSmokeTests(ClientSurfaceFixture surface)
 {
     /// <summary>

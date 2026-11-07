@@ -41,7 +41,6 @@ namespace Yello.Tests.Client;
 [Trait("Requirement", "FR-23")]
 [Trait("Requirement", "FR-17")]
 [Trait("Requirement", "UX-DR12")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class DeleteTests(ClientSurfaceFixture surface)
 {
     private const float Timeout = 30_000;
@@ -803,6 +802,7 @@ public sealed class DeleteTests(ClientSurfaceFixture surface)
     {
         await page.Locator($"{Card} button[data-task-id='{taskId:D}']").ClickAsync(new LocatorClickOptions { Timeout = Timeout });
         await page.Locator(Dialog).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+        await KeyboardHarness.WaitForSingleLineAsync(page);
     }
 
     /// <summary>

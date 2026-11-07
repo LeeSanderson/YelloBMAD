@@ -8,26 +8,27 @@ using Yello.Tests.Shared;
 namespace Yello.Tests.Client;
 
 /// <summary>
-/// The real client in Chromium against a real Host on a real database (story 1.9 AC11): one dev
-/// server, one browser, one Host with <c>ClientOrigin</c> set to the client's origin, a database of its
-/// own on the suite's one SQL Server, and two Accounts seeded through the real API.
+/// The real client in Chromium against a real Host on a real database (story 1.9 AC11): the suite's
+/// shared client server and browser, one Host with <c>ClientOrigin</c> set to the client's origin, a
+/// database of its own on the suite's one SQL Server, and two Accounts seeded through the real API.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Order matters.</b> The dev server starts first, because the Host's CORS policy must name its
-/// origin; then the database and the Host; then the Accounts, through the Host's own endpoints.
+/// <b>Order matters.</b> The client server is already running (an assembly fixture), and the Host's
+/// CORS policy names its origin; then the database and the Host; then the Accounts, through the Host's
+/// own endpoints.
 /// </para>
 /// <para>
-/// <b>One fake, and only one</b>: the client reads <c>HostBaseAddress</c> from
-/// <c>wwwroot/appsettings.Development.json</c>, which points at the Aspire Host's fixed port, so each
-/// page answers that one file with the real Host's address. Every <c>/api/v1/**</c> request goes to the
-/// real Host - its cookie, its preflight, its <c>401</c>.
+/// <b>One fake, and only one</b>: the published client reads <c>HostBaseAddress</c> from
+/// <c>wwwroot/appsettings.Production.json</c>, which names a host nothing listens on, so each page
+/// answers that one file with the real Host's address. Every <c>/api/v1/**</c> request goes to the real
+/// Host - its cookie, its preflight, its <c>401</c>.
 /// </para>
 /// <para>
-/// <b>Origins.</b> The client is served on <c>http://127.0.0.1:{port}</c> and the Host on
-/// <c>https://127.0.0.1:{port}</c> with the development certificate. Measured by story 1.9: Chromium
-/// keeps the Host's <c>SameSite=None; Secure</c> cookie on those two origins, so the client is not moved
-/// to https and the cookie is not relaxed. <c>IgnoreHTTPSErrors</c> is set for the self-signed loopback
+/// <b>Origins.</b> The client is served on <c>http://localhost:{port}</c> and the Host on
+/// <c>https://127.0.0.1:{port}</c> with the development certificate. Chromium keeps the Host's
+/// <c>SameSite=None; Secure</c> cookie across those two sites, so the client is not moved to https and
+/// the cookie is not relaxed. <c>IgnoreHTTPSErrors</c> is set for the self-signed loopback
 /// certificate only.
 /// </para>
 /// <para>
@@ -36,11 +37,9 @@ namespace Yello.Tests.Client;
 /// </para>
 /// </remarks>
 /// <param name="engine">The process's one SQL Server.</param>
-public sealed class RealHostFixture(SqlServerEngine engine) : IAsyncLifetime
+/// <param name="surface">The suite's one client server and browser.</param>
+public sealed class RealHostFixture(SqlServerEngine engine, ClientSurfaceFixture surface) : IAsyncLifetime
 {
-    private ClientDevServer? _server;
-    private IPlaywright? _playwright;
-    private IBrowser? _browser;
     private RunningHost? _host;
     private string? _connectionString;
     private WireDatabase? _database;
@@ -50,7 +49,7 @@ public sealed class RealHostFixture(SqlServerEngine engine) : IAsyncLifetime
     /// <summary>
     /// The address the client is served on.
     /// </summary>
-    public Uri ClientAddress => (_server ?? throw NotStarted()).BaseAddress;
+    public Uri ClientAddress => surface.BaseAddress;
 
     /// <summary>
     /// The running Host.
@@ -87,8 +86,6 @@ public sealed class RealHostFixture(SqlServerEngine engine) : IAsyncLifetime
             return;
         }
 
-        _server = await ClientDevServer.StartAsync();
-
         _connectionString = await engine.CreateDatabaseAsync(TestContext.Current.CancellationToken);
 
         await using (var context = new YelloDbContext(new DbContextOptionsBuilder<YelloDbContext>().UseSqlServer(_connectionString).Options))
@@ -106,9 +103,6 @@ public sealed class RealHostFixture(SqlServerEngine engine) : IAsyncLifetime
         _database = new WireDatabase(_connectionString);
         _a = await ProductActor.RegisterAsync(_host, _database, "Ana");
         _b = await ProductActor.RegisterAsync(_host, _database, "Ben");
-
-        _playwright = await Playwright.CreateAsync();
-        _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
     }
 
     /// <summary>
@@ -142,9 +136,7 @@ public sealed class RealHostFixture(SqlServerEngine engine) : IAsyncLifetime
     /// <returns>The context and its page.</returns>
     internal async Task<(IBrowserContext Context, IPage Page)> OpenSignedInAsync(ProductActor actor)
     {
-        var browser = _browser ?? throw NotStarted();
-
-        var context = await browser.NewContextAsync(new BrowserNewContextOptions
+        var context = await surface.NewContextAsync(new BrowserNewContextOptions
         {
             Locale = "en-GB",
             IgnoreHTTPSErrors = true,
@@ -155,7 +147,7 @@ public sealed class RealHostFixture(SqlServerEngine engine) : IAsyncLifetime
             var page = await context.NewPageAsync();
 
             // The one fake: where the Host is.
-            await page.RouteAsync("**/appsettings.Development.json", route => route.FulfillAsync(new RouteFulfillOptions
+            await page.RouteAsync("**/appsettings.Production.json", route => route.FulfillAsync(new RouteFulfillOptions
             {
                 Status = 200,
                 ContentType = "application/json",
@@ -180,25 +172,8 @@ public sealed class RealHostFixture(SqlServerEngine engine) : IAsyncLifetime
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
-        // Each teardown runs whatever the one before it did: one failed dispose must not leave the
-        // Host, the database or the dev server behind.
-        try
-        {
-            if (_browser is not null)
-            {
-                await _browser.DisposeAsync();
-            }
-
-            _playwright?.Dispose();
-        }
-        finally
-        {
-            await DisposeHostAndAfterAsync();
-        }
-    }
-
-    private async Task DisposeHostAndAfterAsync()
-    {
+        // Each teardown runs whatever the one before it did: a failed Host dispose must not leave the
+        // database behind.
         try
         {
             if (_host is not null)
@@ -208,24 +183,9 @@ public sealed class RealHostFixture(SqlServerEngine engine) : IAsyncLifetime
         }
         finally
         {
-            await DisposeDatabaseAndServerAsync();
-        }
-    }
-
-    private async Task DisposeDatabaseAndServerAsync()
-    {
-        try
-        {
             if (_connectionString is not null)
             {
                 await engine.DropDatabaseAsync(_connectionString);
-            }
-        }
-        finally
-        {
-            if (_server is not null)
-            {
-                await _server.DisposeAsync();
             }
         }
     }
@@ -235,8 +195,7 @@ public sealed class RealHostFixture(SqlServerEngine engine) : IAsyncLifetime
 }
 
 /// <summary>
-/// The real client against the real Host: one dev server, one browser and one Host for the cases that
-/// need all three (story 1.9 Task 9).
+/// The real client against the real Host, for the cases that need one.
 /// </summary>
 [CollectionDefinition(nameof(RealHostCollection))]
 public sealed class RealHostCollection : ICollectionFixture<RealHostFixture>;

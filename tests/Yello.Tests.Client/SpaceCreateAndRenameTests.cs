@@ -30,7 +30,6 @@ namespace Yello.Tests.Client;
 [Trait("Priority", "P0")]
 [Trait("Requirement", "FR-5")]
 [Trait("Requirement", "FR-6")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
 {
     private const float Timeout = 30_000;

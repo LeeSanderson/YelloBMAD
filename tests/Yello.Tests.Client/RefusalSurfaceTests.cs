@@ -23,7 +23,6 @@ namespace Yello.Tests.Client;
 [Trait("Priority", "P1")]
 [Trait("Requirement", "UX-DR32")]
 [Trait("Requirement", "NFR-9")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class RefusalSurfaceTests(ClientSurfaceFixture surface)
 {
     private const int RenderTimeoutMilliseconds = 30_000;

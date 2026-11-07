@@ -32,7 +32,6 @@ namespace Yello.Tests.Client;
 [Trait("Requirement", "UX-DR31")]
 [Trait("Requirement", "AD-7")]
 [Trait("Requirement", "NFR-1")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class SpaceScopedFirstLoadTests(ClientSurfaceFixture surface)
 {
     private const float Timeout = 30_000;
@@ -169,7 +168,9 @@ public sealed class SpaceScopedFirstLoadTests(ClientSurfaceFixture surface)
             await page.Locator(SpaceName, new PageLocatorOptions { HasText = "Northwind Redesign" })
                 .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
-            // Quiet first, so a prefetch fired just after the name rendered is in the log being read.
+            // The landing's own last request is its Project list: wait for its answer, so that request is not read
+            // as one made after the switch. Then quiet, so a prefetch fired just after it is in the log being read.
+            await page.GetByText("No Projects yet.").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
             Assert.True(api.WasRequested(Northwind), "Anchor: the landing Space was requested.");

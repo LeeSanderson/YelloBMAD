@@ -29,7 +29,7 @@ namespace Yello.Tests.Client;
 /// heap-scan spike, held skipped below, is unreliable and ledgered to Lee.
 /// </para>
 /// <para>
-/// <b>The API is <see cref="FakeYelloApi"/></b> at the network edge, in <see cref="ClientSurfaceCollection"/>: no Host,
+/// <b>The API is <see cref="FakeYelloApi"/></b> at the network edge, in <see cref="BrowserTimingCollection"/>: no Host,
 /// no database, no new engine.
 /// </para>
 /// </remarks>
@@ -38,7 +38,7 @@ namespace Yello.Tests.Client;
 [Trait("Requirement", "UX-DR31")]
 [Trait("Requirement", "NFR-1")]
 [Trait("Requirement", "SM-1")]
-[Collection(nameof(ClientSurfaceCollection))]
+[Collection(nameof(BrowserTimingCollection))]
 public sealed class SpaceSwitchMemoryTests(ClientSurfaceFixture surface)
 {
     private const float Timeout = 30_000;

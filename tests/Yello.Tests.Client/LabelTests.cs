@@ -38,7 +38,6 @@ namespace Yello.Tests.Client;
 [Trait("Priority", "P0")]
 [Trait("Requirement", "FR-22")]
 [Trait("Requirement", "FR-20")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class LabelTests(ClientSurfaceFixture surface)
 {
     private const float Timeout = 30_000;

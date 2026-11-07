@@ -40,7 +40,6 @@ namespace Yello.Tests.Client;
 [Trait("Priority", "P0")]
 [Trait("Requirement", "FR-7")]
 [Trait("Requirement", "UX-DR37")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
 {
     private const float Timeout = 30_000;

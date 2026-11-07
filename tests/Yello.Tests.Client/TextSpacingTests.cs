@@ -27,7 +27,6 @@ namespace Yello.Tests.Client;
 [Trait("Suite", "Client")]
 [Trait("Priority", "P1")]
 [Trait("Requirement", "NFR-9")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class TextSpacingTests(ClientSurfaceFixture surface)
 {
     private const float Timeout = 30_000;

@@ -28,8 +28,8 @@
     a real browser, which nothing else here needs.
 
     NO CONTAINER, AND THAT IS A PROPERTY OF THE CLIENT RATHER THAN A CHOICE. Yello.Client is a
-    standalone WebAssembly application with its own dev server; Yello.Host serves it nothing.
-    So this suite starts one process, needs no SQL Server, and belongs in the PR tier despite
+    standalone WebAssembly application served as static files; Yello.Host serves it nothing.
+    So this suite needs no SQL Server for its own cases, and belongs in the PR tier despite
     being a browser suite. Cases that need a signed-in Session or real data arrive with the
     stories that build them, and those will need more.
   -->
@@ -87,7 +87,7 @@
     No reference to Yello.Client. This suite drives the client as a BLACK BOX over HTTP, which
     is the whole point of a browser level - a compile-time edge to the thing under test would
     let a case assert against a type instead of against what the browser actually received.
-    The dev server is located by build-output convention instead; see ClientDevServer.
+    The client is published by path at start-up instead; see PublishedClientHost.
 
     Story 1.9 (AC11) added the other two for RealHostCollection: the real client in Chromium
     against a real Host on a real database. Yello.Tests.Shared carries the Host harness

@@ -35,7 +35,6 @@ namespace Yello.Tests.Client;
 [Trait("Requirement", "UX-DR28")]
 [Trait("Requirement", "UX-DR31")]
 [Trait("Requirement", "NFR-9")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class SpaceSwitchingTests(ClientSurfaceFixture surface)
 {
     private const float Timeout = 30_000;

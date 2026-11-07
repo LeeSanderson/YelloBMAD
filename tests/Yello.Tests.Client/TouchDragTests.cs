@@ -25,7 +25,7 @@ namespace Yello.Tests.Client;
 [Trait("Suite", "Client")]
 [Trait("Priority", "P0")]
 [Trait("Requirement", "UX-DR23")]
-[Collection(nameof(TouchTimingCollection))]
+[Collection(nameof(BrowserTimingCollection))]
 public sealed class TouchDragTests(ClientSurfaceFixture surface)
 {
     private const int LongThreshold = 1000;

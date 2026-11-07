@@ -90,6 +90,29 @@ internal static class KeyboardHarness
             new PageWaitForFunctionOptions { Timeout = DragHarness.WaitMs, PollingInterval = 50 });
 
     /// <summary>
+    /// Waits until the Task panel's single-line module is installed. It loads after the panel opens, and an Enter
+    /// pressed in the title field before then is the textarea's own line break, which the field shows as a space.
+    /// </summary>
+    /// <remarks>
+    /// Probed on a throwaway field outside the app, so neither Blazor nor the Board sees the key.
+    /// </remarks>
+    public static Task WaitForSingleLineAsync(IPage page) =>
+        page.WaitForFunctionAsync(
+            """
+            () => {
+                const probe = document.createElement('textarea');
+                probe.setAttribute('data-single-line', '');
+                document.body.appendChild(probe);
+                const key = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+                probe.dispatchEvent(key);
+                probe.remove();
+                return key.defaultPrevented;
+            }
+            """,
+            null,
+            new PageWaitForFunctionOptions { Timeout = DragHarness.WaitMs, PollingInterval = 50 });
+
+    /// <summary>
     /// Puts focus back at the top of the document, as a fresh Tab sequence starts (<c>BoardTests</c>' idiom).
     /// </summary>
     public static Task ResetFocusAsync(IPage page) =>

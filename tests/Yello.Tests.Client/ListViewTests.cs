@@ -42,7 +42,6 @@ namespace Yello.Tests.Client;
 [Trait("Requirement", "UX-DR19")]
 [Trait("Requirement", "AD-29")]
 [Trait("Requirement", "NFR-9")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class ListViewTests(ClientSurfaceFixture surface)
 {
     private const int PageSize = 50;

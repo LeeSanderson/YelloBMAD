@@ -18,7 +18,7 @@ namespace Yello.Tests.Client;
 /// window) rather than introducing virtualisation (AC14) - record it as a blocker, never loosen this case.
 /// </para>
 /// <para>
-/// <b>Timed, so alone</b>: <see cref="TouchTimingCollection"/> (<c>DisableParallelization</c>, the same
+/// <b>Timed, so alone</b>: <see cref="BrowserTimingCollection"/> (<c>DisableParallelization</c>, the same
 /// <see cref="ClientSurfaceFixture"/> - no new fixture). <b>Nightly</b> (<c>Tier=Nightly</c>, Q13 (a)): paging 5,000 cards in
 /// takes 99 "Show more" activations, too slow for the PR stage.
 /// </para>
@@ -28,7 +28,7 @@ namespace Yello.Tests.Client;
 [Trait("Tier", "Nightly")]
 [Trait("Requirement", "AD-29")]
 [Trait("Requirement", "NFR-3")]
-[Collection(nameof(TouchTimingCollection))]
+[Collection(nameof(BrowserTimingCollection))]
 public sealed class BoardRenderCostTests(ClientSurfaceFixture surface)
 {
     private const int Scale = 5_000;

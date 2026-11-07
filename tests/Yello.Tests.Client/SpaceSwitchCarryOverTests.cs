@@ -19,7 +19,7 @@ namespace Yello.Tests.Client;
 /// </para>
 /// <para>
 /// <b>The API is <see cref="FakeYelloApi"/></b> at the network edge (story 1.7 Q5): no Host, no database, no container,
-/// so this class adds no engine. It joins <see cref="ClientSurfaceCollection"/> - one dev server, one Chromium.
+/// so this class adds no engine. It uses the shared <see cref="ClientSurfaceFixture"/>.
 /// </para>
 /// <para>
 /// <b>Every absence is anchored</b> on a presence in the same case: the departed Space's names are seen on screen before
@@ -40,7 +40,6 @@ namespace Yello.Tests.Client;
 [Trait("Requirement", "UX-DR31")]
 [Trait("Requirement", "NFR-1")]
 [Trait("Requirement", "NFR-9")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
 {
     private const float Timeout = 30_000;

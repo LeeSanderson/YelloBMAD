@@ -8,16 +8,21 @@ namespace Yello.Tests.Client;
 
 /// <summary>
 /// The published client served the way Azure Static Web Apps serves it: files as they are, and
-/// <c>staticwebapp.config.json</c>'s <c>navigationFallback</c> for everything else. Story 1.10 AC13;
-/// Task 7.
+/// <c>staticwebapp.config.json</c>'s <c>navigationFallback</c> for everything else. Every browser case
+/// boots the client from here.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The published output, not the build output.</b> <c>dotnet publish Yello.Client -c Release</c>
-/// into a temporary folder. The published <c>appsettings.Production.json</c> (committed empty, so the
-/// boot configuration lists it) is then overwritten with <c>HostBaseAddress</c>, and its precompressed
-/// siblings are removed, exactly as the deploy workflow does. The dev server answers every route with
-/// <c>index.html</c> by itself, so serving through it would prove nothing about the file.
+/// <b>The published output, not the build output.</b> It is what ships, and it boots in about half the
+/// time: trimming leaves a quarter of the build output's requests. <c>dotnet publish Yello.Client</c>
+/// runs at start-up, in the test assembly's configuration, into a temporary folder. The publish builds
+/// the client first when its sources have changed, so a case never boots a stale client.
+/// </para>
+/// <para>
+/// <b>Configured as the deploy configures it.</b> The published <c>appsettings.Production.json</c>
+/// (committed empty, so the boot configuration lists it) is overwritten with <c>HostBaseAddress</c>, and
+/// its precompressed siblings are removed, exactly as the deploy workflow does. Nothing listens at that
+/// address: a case fakes the API at the network edge or points the client at a real Host.
 /// </para>
 /// <para>
 /// <b>Exactly one rule.</b> A request for a file that exists gets the file. Otherwise a path that
@@ -101,15 +106,16 @@ internal sealed class PublishedClientHost : IAsyncDisposable
     /// <summary>
     /// Publishes the client and starts serving it.
     /// </summary>
+    /// <param name="configuration">The build configuration to publish, the test assembly's own.</param>
     /// <param name="cancellationToken">Cancels the publish.</param>
     /// <returns>The running host.</returns>
-    public static async Task<PublishedClientHost> StartAsync(CancellationToken cancellationToken)
+    public static async Task<PublishedClientHost> StartAsync(string configuration, CancellationToken cancellationToken)
     {
         var publish = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "yello-client-publish-" + Guid.NewGuid().ToString("N")));
 
         try
         {
-            await PublishAsync(publish, cancellationToken);
+            await PublishAsync(publish, configuration, cancellationToken);
 
             // What the deploy workflow does with the infrastructure's output: overwrite the published
             // (empty) production settings with the API's address, and drop the precompressed copies.
@@ -157,7 +163,7 @@ internal sealed class PublishedClientHost : IAsyncDisposable
         }
     }
 
-    private static async Task PublishAsync(DirectoryInfo output, CancellationToken cancellationToken)
+    private static async Task PublishAsync(DirectoryInfo output, string configuration, CancellationToken cancellationToken)
     {
         var project = Path.Combine(RepositoryRoot().FullName, "Yello.Client", "Yello.Client.csproj");
         var startInfo = new ProcessStartInfo("dotnet")
@@ -167,7 +173,7 @@ internal sealed class PublishedClientHost : IAsyncDisposable
             UseShellExecute = false,
         };
 
-        foreach (var argument in new[] { "publish", project, "-c", "Release", "-o", output.FullName, "--nologo" })
+        foreach (var argument in new[] { "publish", project, "-c", configuration, "-o", output.FullName, "--nologo" })
         {
             startInfo.ArgumentList.Add(argument);
         }
@@ -239,23 +245,37 @@ internal sealed class PublishedClientHost : IAsyncDisposable
         {
             var context = await _listener.GetContextAsync();
 
+            // Answered off the accept loop: parallel cases boot side by side, and one at a time
+            // every boot would queue behind the others' downloads.
+            _ = Task.Run(() => AnswerAsync(context));
+        }
+    }
+
+    private async Task AnswerAsync(HttpListenerContext context)
+    {
+        try
+        {
+            await RespondAsync(context);
+        }
+        catch (HttpListenerException)
+        {
+            // The browser went away mid-response.
+        }
+        catch (Exception exception) when (exception is IOException or InvalidOperationException or UnauthorizedAccessException)
+        {
+            // One bad request is answered 500 and the host keeps serving, so a later request does
+            // not hang until the browser's timeout.
+            context.Response.StatusCode = 500;
+        }
+        finally
+        {
             try
             {
-                await RespondAsync(context);
-            }
-            catch (HttpListenerException)
-            {
-                // The browser went away mid-response.
-            }
-            catch (Exception exception) when (exception is IOException or InvalidOperationException or UnauthorizedAccessException)
-            {
-                // One bad request is answered 500 and the host keeps serving, so a later request does
-                // not hang until the browser's timeout.
-                context.Response.StatusCode = 500;
-            }
-            finally
-            {
                 context.Response.Close();
+            }
+            catch (Exception exception) when (exception is HttpListenerException or ObjectDisposedException)
+            {
+                // The listener stopped, or the browser left, before the answer closed.
             }
         }
     }

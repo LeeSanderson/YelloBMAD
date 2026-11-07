@@ -41,7 +41,6 @@ namespace Yello.Tests.Client;
 [Trait("Priority", "P0")]
 [Trait("Requirement", "FR-20")]
 [Trait("Requirement", "AR-20")]
-[Collection(nameof(ClientSurfaceCollection))]
 public sealed class TaskDetailTests(ClientSurfaceFixture surface)
 {
     private const float Timeout = 30_000;
@@ -913,6 +912,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     {
         await page.Locator($"{Card} button[data-task-id='{taskId:D}']").ClickAsync();
         await page.Locator(Dialog).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+        await KeyboardHarness.WaitForSingleLineAsync(page);
     }
 
     /// <summary>
