@@ -30,6 +30,12 @@ namespace Yello.Tests.Client;
 /// waits for its release (<see cref="HoldRoleChangeAsync"/>); <see cref="NextRoleChangeRefusal"/> refuses the next one.
 /// </para>
 /// <para>
+/// <b>The removal, the leave and the single-row read</b> answer as the Host will: the removal through the pipeline (a Role
+/// other than Owner or Admin is the <c>403</c> naming <c>remove-membership</c>) and then the guarded statement; the leave by
+/// identity (the Owner is <c>409 ownership-held</c>, anyone else leaves and the Space goes from the switcher); the read with
+/// the row's presence from <see cref="MembershipPresence"/>. No earlier case sends any of them.
+/// </para>
+/// <para>
 /// <b>Contract constants, never literals</b> (4.1 review P13): the paths are <c>MembershipRoutes</c>' and the two new
 /// problem types <c>ProblemTypes.OwnerRoleFixed</c> and <c>ProblemTypes.RoleNotAssignable</c>.
 /// </para>
@@ -37,12 +43,116 @@ namespace Yello.Tests.Client;
 internal sealed partial class FakeYelloApi
 {
     private readonly ConcurrentDictionary<string, (string Path, string Body, string Answer)> _roleChangedByKey = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, string> _removedByKey = new(StringComparer.Ordinal);
     private readonly Lock _membershipsLock = new();
 
     private DeleteHold? _roleChangeHold;
     private DeleteHold? _lastRoleChangeHold;
     private DeleteHold? _membershipListHold;
     private DeleteHold? _lastMembershipListHold;
+    private DeleteHold? _removalHold;
+    private DeleteHold? _lastRemovalHold;
+    private DeleteHold? _leaveHold;
+    private DeleteHold? _lastLeaveHold;
+
+    /// <summary>
+    /// Whether each Membership's Account is in its Space now, as the single-row read answers it. A Membership with no entry
+    /// is not.
+    /// </summary>
+    public ConcurrentDictionary<Guid, bool> MembershipPresence { get; } = new();
+
+    /// <summary>
+    /// When set, the next removal is refused with this instead of applied.
+    /// </summary>
+    public (int Status, string ProblemType, string? Capability)? NextRemovalRefusal { get; set; }
+
+    /// <summary>
+    /// When set, the next leave is refused with this instead of applied.
+    /// </summary>
+    public (int Status, string ProblemType, string? Capability)? NextLeaveRefusal { get; set; }
+
+    /// <summary>
+    /// The leave route for one Space: the caller's own Membership.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The path.</returns>
+    public static string LeavePathOf(Guid spaceId) => MembershipWire.LeaveOf(spaceId);
+
+    /// <summary>
+    /// Every removal in <paramref name="spaceId"/> the page sent, in order.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The requests.</returns>
+    public IReadOnlyList<FakeRequest> Removals(Guid spaceId) =>
+        [.. _requests.Where(request => request.Method == "DELETE" && TryMembership(request.Path, out var removedIn, out _) && removedIn == spaceId)];
+
+    /// <summary>
+    /// Every single-row read in <paramref name="spaceId"/> the page sent, in order.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The requests.</returns>
+    public IReadOnlyList<FakeRequest> MembershipReads(Guid spaceId) =>
+        [.. _requests.Where(request => request.Method == "GET" && TryMembership(request.Path, out var readIn, out _) && readIn == spaceId)];
+
+    /// <summary>
+    /// Every leave of <paramref name="spaceId"/> the page sent, in order.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The requests.</returns>
+    public IReadOnlyList<FakeRequest> Leaves(Guid spaceId) =>
+        [.. _requests.Where(request => request.Method == "DELETE" && request.Path == LeavePathOf(spaceId))];
+
+    /// <summary>
+    /// Holds the <b>next</b> removal until it is released.
+    /// </summary>
+    /// <returns>A task that completes when the held removal has arrived and is waiting.</returns>
+    public Task HoldRemovalAsync()
+    {
+        var hold = new DeleteHold();
+
+        _removalHold = hold;
+        _lastRemovalHold = hold;
+
+        return hold.Arrived.Task;
+    }
+
+    /// <summary>
+    /// Lets the held removal go and applies it.
+    /// </summary>
+    public void ReleaseRemoval() => _lastRemovalHold?.Released.TrySetResult(TaskEditOutcome.Deleted);
+
+    /// <summary>
+    /// Lets the held removal go with no answer - the connection reset. Nothing is removed, so a resend under the same key
+    /// is applied.
+    /// </summary>
+    public void ReleaseRemovalUnanswered() =>
+        _lastRemovalHold?.Released.TrySetResult(new TaskEditOutcome(0, string.Empty, Capability: null, Abort: true));
+
+    /// <summary>
+    /// Holds the <b>next</b> leave until it is released.
+    /// </summary>
+    /// <returns>A task that completes when the held leave has arrived and is waiting.</returns>
+    public Task HoldLeaveAsync()
+    {
+        var hold = new DeleteHold();
+
+        _leaveHold = hold;
+        _lastLeaveHold = hold;
+
+        return hold.Arrived.Task;
+    }
+
+    /// <summary>
+    /// Lets the held leave go and applies it: <c>204</c>.
+    /// </summary>
+    public void ReleaseLeave() => _lastLeaveHold?.Released.TrySetResult(TaskEditOutcome.Deleted);
+
+    /// <summary>
+    /// Lets the held leave go, applies it, and loses the answer - the connection resets after the commit. A resend under the
+    /// same key then meets the boundary <c>404</c>, as it does on the Host.
+    /// </summary>
+    public void ReleaseLeaveAppliedButUnanswered() =>
+        _lastLeaveHold?.Released.TrySetResult(new TaskEditOutcome(204, string.Empty, Capability: null, Abort: true));
 
     /// <summary>
     /// Each Space's Memberships as the list answers them, in join order. Story 4.4. Seed it before the page opens.
@@ -148,6 +258,21 @@ internal sealed partial class FakeYelloApi
         if (request.Method == "GET" && TryMemberships(request.Path, out var spaceId))
         {
             return await ListMembershipsAsync(spaceId, request.Query).ConfigureAwait(false);
+        }
+
+        if (request.Method == "GET" && TryMembership(request.Path, out var readIn, out var readId))
+        {
+            return ReadMembership(readIn, readId);
+        }
+
+        if (request.Method == "DELETE" && TryMembership(request.Path, out var removedIn, out var removedId))
+        {
+            return await RemoveMembershipAsync(removedIn, removedId, request).ConfigureAwait(false);
+        }
+
+        if (request.Method == "DELETE" && TryOwnMembership(request.Path, out var leftSpace))
+        {
+            return await LeaveSpaceAsync(leftSpace).ConfigureAwait(false);
         }
 
         return request.Method == "PATCH" && TryMembership(request.Path, out var changedIn, out var membershipId)
@@ -277,6 +402,198 @@ internal sealed partial class FakeYelloApi
     }
 
     /// <summary>
+    /// The single-row read the removal confirm sends: the list's capability first, then the row with its presence from
+    /// <see cref="MembershipPresence"/>, or the boundary <c>404</c> for an id the Space does not list.
+    /// </summary>
+    private (int Status, string Body) ReadMembership(Guid spaceId, Guid membershipId)
+    {
+        if (MembershipRefusal(spaceId) is { } refused)
+        {
+            return refused;
+        }
+
+        if (!SpaceMemberships.TryGetValue(spaceId, out var listed))
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        lock (_membershipsLock)
+        {
+            var row = listed.Find(candidate => candidate.Id == membershipId);
+
+            return row is null
+                ? (404, Problem(ProblemTypes.NotAvailable))
+                : (200, JsonSerializer.Serialize(
+                    new PresentMembership(row.Id, row.DisplayName, row.EmailAddress, row.Role, row.IsYou, MembershipPresence.TryGetValue(row.Id, out var present) && present),
+                    JsonOptions));
+        }
+    }
+
+    /// <summary>
+    /// The removal as the Host answers it: a key already applied to the same path replays the <c>204</c> and is
+    /// <c>422 idempotency-key-reused</c> on another; a held removal waits for its release; a queued refusal removes nothing;
+    /// otherwise <see cref="ApplyRemoval"/>.
+    /// </summary>
+    private async Task<(int Status, string Body)> RemoveMembershipAsync(Guid spaceId, Guid membershipId, FakeRequest request)
+    {
+        var key = request.Header(Idempotency.HeaderName);
+
+        if (key is not null && _removedByKey.TryGetValue(key, out var appliedTo))
+        {
+            return string.Equals(appliedTo, request.Path, StringComparison.Ordinal) ? (204, string.Empty) : (422, Problem(ProblemTypes.IdempotencyKeyReused));
+        }
+
+        var outcome = await DeleteOutcomeAsync(() => Interlocked.Exchange(ref _removalHold, null), () =>
+        {
+            var refusal = NextRemovalRefusal;
+
+            NextRemovalRefusal = null;
+            return refusal;
+        }).ConfigureAwait(false);
+
+        if (outcome.Abort)
+        {
+            return (AbortConnection, string.Empty);
+        }
+
+        if (outcome.Status != 204)
+        {
+            return (outcome.Status, JsonSerializer.Serialize(new ProblemResponse(outcome.ProblemType, Errors: null, Capability: outcome.Capability), JsonOptions));
+        }
+
+        var answer = ApplyRemoval(spaceId, membershipId);
+
+        if (answer.Status == 204 && key is not null)
+        {
+            _removedByKey[key] = request.Path;
+        }
+
+        return answer;
+    }
+
+    /// <summary>
+    /// The pipeline, then the guarded statement: an unlisted Space is the boundary <c>404</c>; a Role other than Owner or
+    /// Admin the <c>403</c> naming <c>remove-membership</c>; an id the Space does not list the boundary <c>404</c>; the
+    /// Owner's row <c>409 ownership-held</c> for the Owner and the <c>403</c> for anyone else; an Admin on another Admin's
+    /// row the <c>403</c>; otherwise the row goes, and the caller's own row takes the Space out of the switcher.
+    /// </summary>
+    private (int Status, string Body) ApplyRemoval(Guid spaceId, Guid membershipId)
+    {
+        var insufficient = (403, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.InsufficientRole, Errors: null, Capability: MembershipWire.RemoveCapabilityCode), JsonOptions));
+
+        if (Switcher.All(space => space.Id != spaceId) || !Roles.TryGetValue(spaceId, out var viewer))
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        if (viewer is not ("owner" or "admin"))
+        {
+            return insufficient;
+        }
+
+        if (!SpaceMemberships.TryGetValue(spaceId, out var listed))
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        lock (_membershipsLock)
+        {
+            var at = listed.FindIndex(row => row.Id == membershipId);
+
+            if (at < 0)
+            {
+                return (404, Problem(ProblemTypes.NotAvailable));
+            }
+
+            var target = listed[at];
+
+            if (target.Role == "owner")
+            {
+                return viewer == "owner" ? (409, Problem(MembershipWire.OwnershipHeldProblemType)) : insufficient;
+            }
+
+            if (viewer == "admin" && target.Role == "admin" && !target.IsYou)
+            {
+                return insufficient;
+            }
+
+            listed.RemoveAt(at);
+
+            if (target.IsYou)
+            {
+                ForgetSpace(spaceId);
+            }
+
+            return (204, string.Empty);
+        }
+    }
+
+    /// <summary>
+    /// The leave as the Host answers it: a held leave waits for its release (applied, refused, unanswered, or applied with
+    /// its answer lost); a queued refusal leaves nothing; an unlisted Space - one never joined, or already left - is the
+    /// boundary <c>404</c>, so a resend after an applied leave meets it; the Owner is <c>409 ownership-held</c>; otherwise the
+    /// Space leaves the switcher with everything the fake held of it.
+    /// </summary>
+    private async Task<(int Status, string Body)> LeaveSpaceAsync(Guid spaceId)
+    {
+        var outcome = await DeleteOutcomeAsync(() => Interlocked.Exchange(ref _leaveHold, null), () =>
+        {
+            var refusal = NextLeaveRefusal;
+
+            NextLeaveRefusal = null;
+            return refusal;
+        }).ConfigureAwait(false);
+
+        if (outcome.Abort && outcome.Status != 204)
+        {
+            return (AbortConnection, string.Empty);
+        }
+
+        if (outcome.Status != 204)
+        {
+            return (outcome.Status, JsonSerializer.Serialize(new ProblemResponse(outcome.ProblemType, Errors: null, Capability: outcome.Capability), JsonOptions));
+        }
+
+        if (Switcher.All(space => space.Id != spaceId) || !Roles.TryGetValue(spaceId, out var role))
+        {
+            return (404, Problem(ProblemTypes.NotAvailable));
+        }
+
+        if (role == "owner")
+        {
+            return (409, Problem(MembershipWire.OwnershipHeldProblemType));
+        }
+
+        ForgetSpace(spaceId);
+
+        return outcome.Abort ? (AbortConnection, string.Empty) : (204, string.Empty);
+    }
+
+    /// <summary>
+    /// The caller no longer belongs to <paramref name="spaceId"/>: out of the switcher, with its Role, Projects, Labels,
+    /// Boards and Memberships.
+    /// </summary>
+    private void ForgetSpace(Guid spaceId)
+    {
+        var index = Switcher.ToList().FindIndex(space => space.Id == spaceId);
+
+        if (index >= 0)
+        {
+            Switcher.RemoveAt(index);
+        }
+
+        _ = Roles.Remove(spaceId);
+        _ = Projects.Remove(spaceId);
+        _ = Labels.Remove(spaceId);
+        _ = SpaceMemberships.TryRemove(spaceId, out _);
+
+        foreach (var board in Boards.Keys.Where(key => key.SpaceId == spaceId).ToList())
+        {
+            _ = Boards.Remove(board);
+        }
+    }
+
+    /// <summary>
     /// The pipeline's answer before either Membership route runs: the boundary <c>404</c> for a Space not listed, and the
     /// <c>403</c> naming <c>change-membership-role</c> for a Role other than Owner or Admin; <c>null</c> when the request
     /// passes.
@@ -291,6 +608,20 @@ internal sealed partial class FakeYelloApi
         return role is "owner" or "admin"
             ? null
             : (403, JsonSerializer.Serialize(new ProblemResponse(ProblemTypes.InsufficientRole, Errors: null, Capability: MembershipWire.CapabilityCode), JsonOptions));
+    }
+
+    /// <summary>
+    /// Whether <paramref name="path"/> is the caller's own Membership in some Space, the leave route.
+    /// </summary>
+    private static bool TryOwnMembership(string path, out Guid spaceId)
+    {
+        const string leaf = "/membership";
+
+        spaceId = Guid.Empty;
+
+        return path.EndsWith(leaf, StringComparison.Ordinal)
+            && TryActiveSpace(path[..^leaf.Length], out spaceId)
+            && path == LeavePathOf(spaceId);
     }
 
     /// <summary>

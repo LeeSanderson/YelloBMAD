@@ -684,6 +684,347 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// The Owner sees a Remove control on every row but its own - Admin, Member and Viewer alike - and its own row carries
+    /// none. The control is named for the row's label.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC8 - MembershipRow renders no Remove control")]
+    [Trait("Requirement", "FR-14")]
+    [Trait("Requirement", "UX-DR27")]
+    public async Task The_Owner_sees_Remove_on_every_row_but_its_own()
+    {
+        var api = TwoSpaces("owner");
+        var (owner, admin, member, viewer) = (Row("Olu Owner", "owner", isYou: true), Row("Ada Admin", "admin"), Row("Mo Member", "member"), Row("Vi Viewer", "viewer"));
+
+        api.SpaceMemberships[Northwind] = [owner, admin, member, viewer];
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSettingsAsync(api, page, Northwind);
+            await RowOf(page, viewer).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal(0, await RemoveButton(page, owner).CountAsync());
+
+            foreach (var other in new[] { admin, member, viewer })
+            {
+                Assert.Equal(1, await RemoveButton(page, other).CountAsync());
+            }
+        }
+    }
+
+    /// <summary>
+    /// An Admin sees Remove on Member and Viewer rows only: none on the Owner's row, another Admin's or its own, and those
+    /// controls are absent rather than disabled - no element in the section carries <c>disabled</c> or
+    /// <c>aria-disabled</c>.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC8 - MembershipRow renders no Remove control")]
+    [Trait("Requirement", "FR-14")]
+    [Trait("Requirement", "UX-DR27")]
+    [Trait("Assumption", "PRD-12-4")]
+    public async Task An_Admin_sees_Remove_on_Member_and_Viewer_rows_only_and_nothing_disabled()
+    {
+        var api = TwoSpaces("admin");
+        var (owner, self, otherAdmin, member, viewer) = (Row("Olu Owner", "owner"), Row("Ada Admin", "admin", isYou: true), Row("Abe Admin", "admin"), Row("Mo Member", "member"), Row("Vi Viewer", "viewer"));
+
+        api.SpaceMemberships[Northwind] = [owner, self, otherAdmin, member, viewer];
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSettingsAsync(api, page, Northwind);
+            await RowOf(page, viewer).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal(1, await RemoveButton(page, member).CountAsync());
+            Assert.Equal(1, await RemoveButton(page, viewer).CountAsync());
+
+            foreach (var fixedRow in new[] { owner, self, otherAdmin })
+            {
+                Assert.Equal(0, await RemoveButton(page, fixedRow).CountAsync());
+            }
+
+            Assert.Equal(0, await page.Locator($"{Section} [disabled], {Section} [aria-disabled]").CountAsync());
+        }
+    }
+
+    /// <summary>
+    /// The removal confirm sits on the blast-radius ladder between Task and Project: it replaces the row's controls in place
+    /// (no dialog), names the person by the row's label and never by address, says what removal does, and states whether
+    /// they are in this Space now - read fresh when the confirm opens, never taken from the list. Neither "Remove" nor
+    /// "Cancel" is focused as a default: focus goes to the confirm's text. Esc restores the Remove control, focused, and
+    /// sends nothing.
+    /// </summary>
+    /// <param name="inSpaceNow">What the single-row read answers.</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = "red: AC6 - no Remove control, no removal confirm and no single-row read in the client")]
+    [InlineData(true)]
+    [InlineData(false)]
+    [Trait("Requirement", "UX-DR36")]
+    [Trait("Requirement", "UX-DR11")]
+    [Trait("Requirement", "AD-23")]
+    public async Task The_remove_confirm_names_the_person_states_whether_they_are_here_now_and_has_no_default(bool inSpaceNow)
+    {
+        var api = TwoSpaces("owner");
+        var member = Row("Mo Member", "member");
+
+        api.SpaceMemberships[Northwind] = [Row("Olu Owner", "owner", isYou: true), member];
+        api.MembershipPresence[member.Id] = inSpaceNow;
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSettingsAsync(api, page, Northwind);
+            await RemoveButton(page, member).ClickAsync();
+
+            var row = RowOf(page, member);
+            var live = inSpaceNow ? "Mo Member is in this Space now." : "Mo Member has not been in this Space in the last 15 minutes.";
+
+            await row.GetByText(live).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var text = await row.TextContentAsync() ?? string.Empty;
+
+            Assert.Contains("Remove Mo Member from this Space? They lose access to everything in it at once.", text, StringComparison.Ordinal);
+            Assert.DoesNotContain("@", (await row.Locator(".destructive-confirm").TextContentAsync()) ?? string.Empty, StringComparison.Ordinal);
+            Assert.Equal(0, await page.Locator("[role=dialog], dialog[open]").CountAsync());
+            Assert.Single(api.MembershipReads(Northwind));
+            Assert.False(
+                await page.EvaluateAsync<bool>("() => !!document.activeElement && document.activeElement.tagName === 'BUTTON'"),
+                "A button holds focus as the confirm's default; focus belongs on the confirm's text.");
+
+            await page.Keyboard.PressAsync("Escape");
+            await RemoveButton(page, member).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.True(await RemoveButton(page, member).EvaluateAsync<bool>("e => e === document.activeElement"), "Esc did not return focus to the Remove control.");
+            Assert.Empty(api.Removals(Northwind));
+        }
+    }
+
+    /// <summary>
+    /// A removal is sent once, with an <c>Idempotency-Key</c>, and is never optimistic: the row stays while the answer is
+    /// held. On <c>204</c> the row is dropped from the rows shown without re-reading the list, the shown total falls by one,
+    /// "{label} was removed." is announced with no address anywhere in what was said, and focus moves to the next row's first
+    /// control, never to <c>body</c>.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC8 - no Remove control in the client")]
+    [Trait("Requirement", "UX-DR38")]
+    [Trait("Requirement", "UX-DR39")]
+    [Trait("Requirement", "AD-29")]
+    [Trait("Requirement", "AD-23")]
+    public async Task A_removal_is_sent_once_with_a_key_drops_the_row_and_moves_focus_to_the_next_row()
+    {
+        var api = TwoSpaces("owner");
+        var (member, viewer) = (Row("Mo Member", "member"), Row("Vi Viewer", "viewer"));
+
+        api.SpaceMemberships[Northwind] = [Row("Olu Owner", "owner", isYou: true), member, viewer];
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSettingsAsync(api, page, Northwind);
+            await page.EvaluateAsync(RecordEverythingSaid);
+
+            var listReads = api.MembershipListReads(Northwind).Count;
+            var held = api.HoldRemovalAsync();
+
+            await ConfirmRemovalAsync(page, member);
+            await held.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+
+            Assert.Equal(1, await RowOf(page, member).CountAsync());
+
+            api.ReleaseRemoval();
+
+            await page.GetByText("Mo Member was removed.").WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = Timeout });
+
+            var removal = Assert.Single(api.Removals(Northwind));
+
+            Assert.False(string.IsNullOrEmpty(removal.Header(Idempotency.HeaderName)), "The removal carried no Idempotency-Key.");
+            Assert.Equal(0, await RowOf(page, member).CountAsync());
+            Assert.Equal(listReads, api.MembershipListReads(Northwind).Count);
+            Assert.Contains("2 of 100", await page.Locator(Section).TextContentAsync() ?? string.Empty, StringComparison.Ordinal);
+            Assert.DoesNotContain(await SaidAsync(page), said => said.Contains('@', StringComparison.Ordinal));
+            Assert.True(await RowOf(page, viewer).EvaluateAsync<bool>("e => e.contains(document.activeElement)"), "Focus did not move to the next row after the removal.");
+        }
+    }
+
+    /// <summary>
+    /// An Admin refused <c>403</c> while it still holds Admin - the target became an Admin meanwhile - re-reads its Role,
+    /// stays on Space settings and is told what Admins may remove: "Admins can remove Members and Viewers only." The row
+    /// stays.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC8 - no Remove control in the client")]
+    [Trait("Requirement", "UX-DR29")]
+    [Trait("Assumption", "PRD-12-4")]
+    public async Task A_removal_refused_403_to_an_Admin_still_holding_Admin_says_what_Admins_may_remove()
+    {
+        var api = TwoSpaces("admin");
+        var member = Row("Mo Member", "member");
+
+        api.SpaceMemberships[Northwind] = [Row("Olu Owner", "owner"), Row("Ada Admin", "admin", isYou: true), member];
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSettingsAsync(api, page, Northwind);
+
+            api.NextRemovalRefusal = (403, ProblemTypes.InsufficientRole, MembershipWire.RemoveCapabilityCode);
+
+            await ConfirmRemovalAsync(page, member);
+            await page.Locator(Section).GetByText("Admins can remove Members and Viewers only.").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.EndsWith($"/spaces/{Northwind:D}/settings", new Uri(page.Url).AbsolutePath, StringComparison.Ordinal);
+            Assert.Equal(1, await RowOf(page, member).CountAsync());
+        }
+    }
+
+    /// <summary>
+    /// A row action answered <c>404</c> on the second page re-reads the first page only to learn whether the Space still
+    /// answers; it does, so that one row is dropped from the rows shown, every row of the appended page stays, the total
+    /// comes from the fresh read, "That Membership no longer exists." is announced, and focus is not on <c>body</c>.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC8 - a row action answered 404 re-reads page 1 and replaces the rows, dropping appended pages")]
+    [Trait("Requirement", "AD-29")]
+    [Trait("Requirement", "UX-DR39")]
+    public async Task A_row_on_the_second_page_answered_404_is_dropped_and_the_appended_page_stays()
+    {
+        var api = TwoSpaces("owner");
+        var rows = Enumerable.Range(0, 100).Select(index => index == 0 ? Row("Olu Owner", "owner", isYou: true) : Row($"Member {index:D3}", "member")).ToList();
+
+        api.SpaceMemberships[Northwind] = rows;
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSettingsAsync(api, page, Northwind);
+            await RowOf(page, rows[49]).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.Locator(Section).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = ShowMore, Exact = true }).ClickAsync();
+            await RowOf(page, rows[99]).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var gone = rows[75];
+
+            await RemoveButton(page, gone).ClickAsync();
+            await RowOf(page, gone).Locator(".destructive-confirm").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            // Gone elsewhere between the confirm opening and the answer.
+            api.SpaceMemberships[Northwind] = [.. rows.Where(row => row.Id != gone.Id)];
+
+            await RowOf(page, gone).Locator(".button-danger").ClickAsync();
+            await page.GetByText("That Membership no longer exists.").WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = Timeout });
+
+            Assert.Equal(0, await RowOf(page, gone).CountAsync());
+            Assert.Equal(99, await page.Locator(Rows).CountAsync());
+            Assert.Equal(1, await RowOf(page, rows[76]).CountAsync());
+            Assert.Equal(1, await RowOf(page, rows[99]).CountAsync());
+            Assert.Contains("99 of 100", await page.Locator(Section).TextContentAsync() ?? string.Empty, StringComparison.Ordinal);
+            Assert.False(await page.EvaluateAsync<bool>("() => document.activeElement === document.body"), "Focus fell to body after the 404.");
+        }
+    }
+
+    /// <summary>
+    /// Row actions are per row: with one row's Role change in flight, another row's removal is sent at once, not dropped.
+    /// Both are answered and both rows reflect their answers - the first shows its new Role, the second is gone. The server
+    /// serialises them on its own lock.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC8 - a section-wide in-flight gate drops a second row's action; and no Remove control exists")]
+    [Trait("Requirement", "UX-DR39")]
+    public async Task A_second_rows_action_proceeds_while_another_rows_is_in_flight()
+    {
+        var api = TwoSpaces("owner");
+        var (changed, removed) = (Row("Mo Member", "member"), Row("Vi Viewer", "viewer"));
+
+        api.SpaceMemberships[Northwind] = [Row("Olu Owner", "owner", isYou: true), changed, removed];
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSettingsAsync(api, page, Northwind);
+
+            var changeHeld = api.HoldRoleChangeAsync();
+            var removalHeld = api.HoldRemovalAsync();
+
+            await ChooseRoleAsync(page, changed, "Viewer");
+            await changeHeld.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+            await ConfirmRemovalAsync(page, removed);
+            await removalHeld.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+
+            api.ReleaseRoleChange();
+            api.ReleaseRemoval();
+
+            await page.GetByText("Mo Member is now a Viewer.").WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = Timeout });
+            await RowOf(page, removed).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
+
+            Assert.Single(api.RoleChanges(Northwind));
+            Assert.Single(api.Removals(Northwind));
+        }
+    }
+
+    /// <summary>
+    /// The removal confirm reflows at 320 by 256 CSS pixels with no sideways scroll, with and without the 1.4.12
+    /// text-spacing override, for a long name.
+    /// </summary>
+    /// <param name="spaced">Whether the text-spacing override is applied.</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = "red: AC8 - no removal confirm in the client")]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "NFR-9")]
+    public async Task The_remove_confirm_reflows_at_320_pixels_with_and_without_text_spacing(bool spaced)
+    {
+        var api = TwoSpaces("owner");
+        var longest = Row("Maximiliana Wolfeschlegelsteinhausenberger-Ortiz", "member");
+
+        api.SpaceMemberships[Northwind] = [Row("Olu Owner", "owner", isYou: true), longest];
+        api.MembershipPresence[longest.Id] = true;
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(320, 256);
+            await OpenSettingsAsync(api, page, Northwind);
+            await RemoveButton(page, longest).ClickAsync();
+            await RowOf(page, longest).Locator(".destructive-confirm").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            if (spaced)
+            {
+                await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = TextSpacingOverride });
+            }
+
+            Assert.Empty(await page.EvaluateAsync<string[]>(Reflow));
+        }
+    }
+
+    /// <summary>
+    /// A row's Remove control, named for the row's label (every test name here is unique, so the label is the name).
+    /// </summary>
+    private static ILocator RemoveButton(IPage page, ListedMembership membership) =>
+        RowOf(page, membership).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = $"Remove {membership.DisplayName}", Exact = true });
+
+    /// <summary>
+    /// Opens the row's removal confirm and presses its "Remove".
+    /// </summary>
+    private static async Task ConfirmRemovalAsync(IPage page, ListedMembership membership)
+    {
+        await RemoveButton(page, membership).ClickAsync();
+
+        var confirm = RowOf(page, membership).Locator(".destructive-confirm");
+
+        await confirm.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+        await confirm.Locator(".button-danger").ClickAsync();
+    }
+
+    /// <summary>
     /// A signed-in Account holding <paramref name="northwindRole"/> in Northwind Redesign and Member of Harbour Ops.
     /// </summary>
     private static FakeYelloApi TwoSpaces(string northwindRole)

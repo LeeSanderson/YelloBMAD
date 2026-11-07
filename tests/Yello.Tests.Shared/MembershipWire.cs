@@ -14,6 +14,10 @@ namespace Yello.Tests.Shared;
 /// <c>ProblemTypes.RoleNotAssignable</c>): the ATDD run's six stand-ins were swapped for them and deleted when story 4.4
 /// declared them. Everything here is the test's reading of the wire.
 /// </para>
+/// <para>
+/// <b>Removal and leaving</b> use the same item route with <c>DELETE</c>, and a leave route for the caller's own Membership.
+/// The leave route and the Owner's problem type are stand-ins below until the contract declares them.
+/// </para>
 /// </remarks>
 public static class MembershipWire
 {
@@ -107,9 +111,65 @@ public static class MembershipWire
         return (page, rows);
     }
 
+    /// <summary>
+    /// The capability the removal route declares, as its <c>403</c> body names it.
+    /// </summary>
+    public static string RemoveCapabilityCode => "remove-membership";
+
+    /// <summary>
+    /// The capability the leave route declares: the one every Role holds, because leaving is decided by the caller's
+    /// identity and not by its Role.
+    /// </summary>
+    public static string LeaveCapabilityCode => "read-projects-and-tasks";
+
+    /// <summary>
+    /// A single row's JSON members once it carries presence, in ordinal order: the list row's five and <c>inSpaceNow</c>.
+    /// Kept apart from <see cref="RowMembers"/> so the list's shape gate keeps holding today's five.
+    /// </summary>
+    public static IReadOnlyList<string> PresentRowMembers { get; } = ["displayName", "emailAddress", "id", "inSpaceNow", "isYou", "role"];
+
+    /// <summary>
+    /// Stand-in for the leave route's pattern, which the contract does not declare yet. The implementation replaces every
+    /// use with the contract's own member and deletes this one.
+    /// </summary>
+    public static string LeaveRoute => "/api/v1/spaces/{spaceId:guid}/membership";
+
+    /// <summary>
+    /// Stand-in for the problem type the Owner meets on its own row, which the contract does not declare yet. Replaced and
+    /// deleted as <see cref="LeaveRoute"/> is.
+    /// </summary>
+    public static string OwnershipHeldProblemType => "urn:yello:problem:ownership-held";
+
+    /// <summary>
+    /// The caller's own Membership in a Space, as a client calls it. Replaced and deleted as <see cref="LeaveRoute"/> is.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The path.</returns>
+    public static string LeaveOf(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}/membership";
+
+    /// <summary>
+    /// Reads a single row read with its presence.
+    /// </summary>
+    /// <param name="body">The body.</param>
+    /// <returns>The row.</returns>
+    public static PresentMembership ParsePresentRow(string body) =>
+        JsonSerializer.Deserialize<PresentMembership>(body, JsonOptions) ?? throw new InvalidOperationException("The read answered no row.");
+
     private static IReadOnlyList<string> NamesOf(JsonElement row) =>
         [.. row.EnumerateObject().Select(member => member.Name).Order(StringComparer.Ordinal)];
 }
+
+/// <summary>
+/// One Membership read on its own, with whether its Account has made a request in this Space within the presence window.
+/// Restated independently of the contract so a change to either is seen.
+/// </summary>
+/// <param name="Id">The Membership's id.</param>
+/// <param name="DisplayName">The display name.</param>
+/// <param name="EmailAddress">The address as typed.</param>
+/// <param name="Role">The Role's stable code.</param>
+/// <param name="IsYou">Whether it is the caller's own row.</param>
+/// <param name="InSpaceNow">Whether an unexpired presence row exists for this Account in this Space.</param>
+public sealed record PresentMembership(Guid Id, string DisplayName, string EmailAddress, string Role, bool IsYou, bool InSpaceNow);
 
 /// <summary>
 /// Story 4.4's list page as the test reads it: <c>MembershipPageResponse</c>'s shape (Q8 (a), Q9 (a)), restated independently

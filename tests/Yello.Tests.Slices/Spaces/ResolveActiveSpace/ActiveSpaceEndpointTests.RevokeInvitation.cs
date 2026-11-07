@@ -301,6 +301,80 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
+    /// Removing a Membership does not withdraw the offers it legitimately made. An Admin joins through an accepted
+    /// Invitation, issues two, and is then removed by the Owner through the product's <c>DELETE</c>. Both Invitation rows
+    /// are untouched by the removal (the issuer key references the Account, not the Membership); the Owner still lists them
+    /// with the issuer name captured at issue and revokes one (<c>204</c>); the other's invitee accepts it (<c>200</c>) and
+    /// becomes a Member. This is the product-route twin of the raw-SQL case above, which is deleted once this one is green,
+    /// and this one then takes its name.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC5 - the issuer cannot be removed through the product yet; DELETE .../memberships/{membershipId} is not mapped")]
+    [Trait("Requirement", "FR-12")]
+    [Trait("Requirement", "FR-14")]
+    [Trait("Requirement", "AD-5")]
+    public async Task An_Invitation_whose_issuer_was_removed_through_the_product_stays_listed_revocable_and_acceptable()
+    {
+        var database = Available();
+        var wire = Wire();
+        var (ownerAddress, issuerAddress) = (RandomAddress(), RandomAddress());
+        var issuerName = DisplayName();
+        var (revokedInvitee, acceptedInvitee) = (InvitationWire.FreshAddress("removed-revoked"), InvitationWire.FreshAddress("removed-accepted"));
+        var spaceId = Guid.NewGuid();
+        IReadOnlyList<InvitationRow> beforeRemoval = [];
+        IReadOnlyList<InvitationRow> afterRemoval = [];
+        WireResponse? removed = null;
+        WireResponse? listed = null;
+        WireResponse? revoked = null;
+        WireResponse? accepted = null;
+
+        using var mail = new MailDrop();
+
+        await HostProcess.RunAsync(fixture.ConnectionString!, mail.With(Configured), async client =>
+        {
+            var owner = await SignedInAsync(client, ownerAddress);
+            await SeedNamedSpaceAsync(database, spaceId, "Issuer removed " + Suffix(), await AccountIdOfAsync(database, ownerAddress), Role.Owner);
+
+            var issuer = await JoinedThroughTheProductAsync(client, wire, mail, (owner, spaceId), issuerAddress, issuerName, "admin");
+
+            await issuer.FetchAntiforgeryTokenAsync();
+            Assert.Equal(HttpStatusCode.NoContent, (await IssueAsync(issuer, spaceId, revokedInvitee, "member")).StatusCode);
+            Assert.Equal(HttpStatusCode.NoContent, (await IssueAsync(issuer, spaceId, acceptedInvitee, "viewer")).StatusCode);
+
+            beforeRemoval = [.. (await wire.InvitationsInAsync(spaceId)).Where(row => row.EmailAddress == revokedInvitee || row.EmailAddress == acceptedInvitee).OrderBy(row => row.Id)];
+
+            await owner.FetchAntiforgeryTokenAsync();
+            removed = await RemoveOverWireAsync(owner, spaceId, (await wire.MembershipOfAsync(spaceId, await AccountIdOfAsync(database, issuerAddress))).Id);
+
+            afterRemoval = [.. (await wire.InvitationsInAsync(spaceId)).Where(row => row.EmailAddress == revokedInvitee || row.EmailAddress == acceptedInvitee).OrderBy(row => row.Id)];
+            listed = await ListInvitationsAsync(owner, spaceId);
+            revoked = await RevokeAsync(owner, spaceId, await InvitationIdOfAsync(wire, spaceId, revokedInvitee));
+
+            var token = InvitationWire.TokenIn(await mail.WaitForEmailToAsync(acceptedInvitee));
+            var invitee = await RegisteredAndSignedInAsync(client, acceptedInvitee, DisplayName());
+
+            await invitee.FetchAntiforgeryTokenAsync();
+            accepted = await AcceptAsync(invitee, token);
+        });
+
+        Assert.True(removed?.StatusCode == HttpStatusCode.NoContent, $"The issuer's removal through the product: {Described(removed)}");
+        Assert.Equal(2, beforeRemoval.Count);
+
+        // The token hash is an array, compared by its bytes; the rest of the row by value.
+        static (InvitationRow Row, string Hash) ByValue(InvitationRow row) => (row with { TokenHash = Array.Empty<byte>() }, Convert.ToHexString(row.TokenHash));
+
+        Assert.Equal(beforeRemoval.Select(ByValue), afterRemoval.Select(ByValue));
+        Assert.True(listed?.StatusCode == HttpStatusCode.OK, $"{listed?.StatusCode} {listed?.Body}");
+        Assert.Equal(
+            [(acceptedInvitee, issuerName), (revokedInvitee, issuerName)],
+            InvitationWire.ParseList(listed!.Body).Select(row => (row.EmailAddress, row.IssuerName)).Order());
+        Assert.True(revoked?.StatusCode == HttpStatusCode.NoContent, $"{revoked?.StatusCode} {revoked?.Body}");
+        Assert.True(accepted?.StatusCode == HttpStatusCode.OK, $"The removed issuer's Invitation, accepted: {Described(accepted)}");
+        Assert.Equal("Viewer", (await wire.MembershipOfAsync(spaceId, await AccountIdOfAsync(database, acceptedInvitee))).Role);
+        await AssertOneOwnerEachAsync(wire, spaceId);
+    }
+
+    /// <summary>
     /// AC4, AC5, FR-12, FR-14, Q2 (a), Q4 (a), AD-26, AD-27 - an accepted, an already-revoked and an expired Invitation are
     /// each refused <c>409 invitation-not-pending</c>: one type for all three, no address in the body, nothing recorded as a
     /// refusal, and the stored row unchanged - the accepted stays <c>Accepted</c>, the expired stays <c>Pending</c> with its

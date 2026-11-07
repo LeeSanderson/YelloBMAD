@@ -268,7 +268,12 @@ AC1 to AC7 are reproduced **verbatim** from `epics.md:1802-1834` and numbered by
 ## Tasks / Subtasks
 
 - [ ] **Task 0: decisions** (before any code)
-  - [ ] Q1, Q2, Q8 and Q12 are marked **[LEE]** (authority, isolation or a security seam). If the orchestrator routes them to Lee, record the answers here under "Decided by Lee" before ATDD. Otherwise take each recommendation and record it as "Qn - (x)" with its cost in Completion Notes.
+  - [x] Q1, Q2, Q8 and Q12 are marked **[LEE]** (authority, isolation or a security seam). If the orchestrator routes them to Lee, record the answers here under "Decided by Lee" before ATDD. Otherwise take each recommendation and record it as "Qn - (x)" with its cost in Completion Notes.
+    - **Decided by Lee (2026-11-07):**
+      - Q1 - (a): a separate leave route under `ReadProjectsAndTasks`, decided by identity, pinned by a gate as the one write under that capability. Token parity: yes.
+      - Q2 - (a): `RemovalAuthority(Removable, HeldBy)` on `ActingAuthority.Removals`, set by the pipeline only. Owner is in no set. Self-target sub-question: (a), so the actor's own non-Owner row is removable on the `{id}` route.
+      - Q8 - (a): "Leave this Space" at the foot of Space home for every non-Owner Role, absent for the Owner, and set aside in the empty-state case.
+      - Q12 - (a): a typed `LostMembership` outcome, answered as the boundary `404` and recorded `CrossSpace`.
   - [ ] Decide Q3-Q7, Q9-Q11 and Q13-Q16 the same way. Each recommendation is the default.
 - [ ] **Task 1: Domain** (AC1, AC2)
   - [ ] `RemovalAuthority` (sets `Removable`, `HeldBy`; `None`; `Judge`) beside `RoleChangeAuthority`, and `RoleCapabilityMatrix.RemovalAuthorityOf`. Owner is in no `Removable` set. Remarks quote FR-14 and the matrix's boundary. **No story ids in new comments** (CLAUDE.md).
@@ -557,6 +562,68 @@ The cycle is: story; decisions recorded; ATDD scaffolds (`Skip = "red: ..."`, `a
   - Tests: `RefusalBoundaryGateTests.Memberships.cs`, `RefusalBoundaryGateTests.cs` (transcription), `IsolationCases.Memberships.cs`, `RevocationCases.cs`, `ActiveSpaceEndpointTests.RevokeInvitation.cs`, `MembershipSectionTests.cs`, `FakeYelloApi.Memberships.cs`, `MembershipHandlerTests.cs`, `TextSpacingTests.cs`, the empty-Space-home "one action" case (Q8), `SpaceBoundaryPipelineTests.cs`/`ActiveSpaceUnitOfWorkTests.cs` if the pipeline gains a dependency
   - Docs: `ARCHITECTURE-SPINE.md` (dated notes on AD-5/AD-1 and AD-6), `deferred-work.md`, `sprint-status.yaml`
 - **No new project, no new package, no new container-backed test class, and no migration expected** (Q7 (a)).
+
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-4-5-remove-a-membership-or-leave-a-space.md` (decisions, assumptions,
+seed constraints and findings).
+
+| Scaffold file | Cases | ACs |
+|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RemoveMembership.cs` | 17 methods (22 cases): 16 skipped, 1 active | AC1, AC2, AC4, AC6, AC7, AC9, AC11 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.LeaveSpace.cs` | 5 methods (7 cases), all skipped | AC2, AC3, AC4, AC11 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RemoveMembershipRace.cs` | 5 methods (6 cases): 4 skipped, 1 active | AC10, AC11 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RevokeInvitation.cs` (one added) | 1, skipped | AC5 (ledger `:758`) |
+| `tests/Yello.Tests.Isolation/IsolationCases.Memberships.cs` (`RemovalCases`) | 11 rows, `PendingUntil: "4.5"` | AC1, AC3, AC6, AC9 |
+| `tests/Yello.Tests.Revocation/RevocationCases.cs` | 2 rows x 2 surfaces, skipped | AC4, AC7 |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.RemoveMembership.cs` | 7, all skipped | AC1, AC2, AC3, AC6, AC8 |
+| `tests/Yello.Tests.Client/MembershipSectionTests.cs` (eight added) | 8 methods (10 cases), all skipped | AC6, AC8 (ledger `:789`, `:791`) |
+| `tests/Yello.Tests.Client/LeaveSpaceTests.cs` (new class, existing assembly fixtures) | 7 methods (11 cases): 6 skipped, 1 active | AC2, AC3, AC7, AC8 |
+
+Harness: `MembershipWire` gains three stand-ins (`LeaveRoute`, `LeaveOf`, `OwnershipHeldProblemType`) that Task 2 replaces
+with contract members and deletes, plus lasting readings (`RemoveCapabilityCode`, `LeaveCapabilityCode`,
+`PresentRowMembers`, `PresentMembership`). `FakeYelloApi.Memberships.cs` answers the removal, the leave and the single-row
+read as the Host will.
+
+**Green today, left active (standing regression gates):**
+`A_Membership_DELETE_under_one_Spaces_key_deletes_nothing_in_another_Space` (the FILTER predicate narrows a raw `DELETE`
+to the keyed Space, so no migration is needed for removal isolation) and
+`A_Token_issue_racing_the_removal_of_its_issuer_is_the_boundary_404_and_never_a_500` (ledger `:398`: the `500` is already
+gone; 3.3's `LostSpace` catches the `547`. Close `:398` citing it), and the browser case
+`LeaveSpaceTests.A_removed_Members_next_request_meets_the_same_refusal_as_a_Space_that_never_existed` (AC7's client half:
+the one refusal surface already answers a Space the server stops listing).
+
+**Activation order** (riskiest assumption first):
+
+1. `An_Admin_removed_while_its_action_waits_meets_the_boundary_404_recorded_CrossSpace` (both arms). It tests Lee's Q12 (a):
+   the store returns a typed `LostMembership` and the **pipeline**, not the slice, turns it into the recorded boundary `404`.
+   The change arm runs on 4.4's existing route, so it goes red first for the right reason (`403` today, ledger `:790`).
+2. `An_Admin_demoted_while_its_removal_is_queued_is_refused_403_and_the_target_stays`, then
+   `An_Admin_removing_another_Admin_or_the_Owner_is_refused_403_recorded_and_nothing_changes`,
+   `ISO-REMOVE-MEMBERSHIP-ADMIN-BEYOND-AUTHORITY`, and the gates `The_removal_rules_agree_with_the_matrix_transcription`,
+   `Only_the_pipeline_sets_the_acting_authority` (existing) and `A_Qualified_cell_reaches_no_endpoint_without_its_target_rule`
+   (existing; now finds `RemoveMembership`). This is Lee's Q2 (a): the removal sets on `ActingAuthority.Removals`, one guarded
+   `DELETE`, Owner in no set.
+3. The Owner/Admin/Member/Viewer removal cases, the Owner's own-row `409`, the Admin's own-row `204`, the not-found case,
+   with S-2 after each; then `The_Membership_routes_declare_one_capability_each_and_serve_both_surfaces` (delete 4.4's
+   `The_Membership_routes_require_ChangeMembershipRole_and_serve_both_surfaces` when this goes green).
+4. The leave: the three-Role case, the Owner's `409`, the Token leave, the replay, then
+   `The_leave_route_is_the_one_write_under_ReadProjectsAndTasks` (Lee's Q1 (a)).
+5. Effects: the Token `401` case, the presence case, the two publish cases per route, what-survives, the very-next-request
+   case, the bound case, the idempotency case.
+6. Races 1 and 3. Then the single-row read (`InSpaceNow`) and its contract gate; then `ownership-held` and its copy gate.
+7. Every isolation row (clear `PendingUntil: "4.5"` before review, GATE-003), then `REV-MEMBERSHIP-REMOVED-BY-ADMIN` and
+   `REV-LEFT-THE-SPACE`, then the AC5 twin (delete the raw-SQL original and take its name).
+8. The client gates (`The_clients_Remove_control_agrees_with_the_removal_rules_for_every_pair`,
+   `No_Remove_or_Leave_control_is_disabled`), then the browser cases: Remove visibility, the confirm, the removal, the `403`
+   copy, ledger `:789` and `:791`, reflow; then `LeaveSpaceTests`.
+
+Amend, not scaffolded (each turns red when the work lands): 4.4's routes gate (replaced, above); `RowMembers` gains
+`inSpaceNow` when `MembershipResponse` does; `SpaceHomeProjectsTests.An_empty_Space_states_no_Projects_yet_and_offers_one_action_to_create_one`
+sets the Leave control aside (Q8); `TextSpacingTests` if it enumerates controls.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and
+the correction recorded in the Debug Log, not deleted.
 
 ### References
 

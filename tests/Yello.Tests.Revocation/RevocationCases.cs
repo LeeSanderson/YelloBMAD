@@ -104,6 +104,31 @@ internal static class RevocationCases
             Assumption = "PRD-12-4",
         },
 
+        // The endpoint-driven twins of REV-MEMBERSHIP-REMOVED, which stays as the raw-SQL schema proof. The actor joins an
+        // Owner's Space through an accepted Invitation, holds a Token bound there, and is then removed by an Admin of that
+        // Space, or leaves. The next request on each surface is against the joined Space.
+        new(
+            "REV-MEMBERSHIP-REMOVED-BY-ADMIN", "V-2, V-3, NFR-2",
+            new Dictionary<IsolationSurface, RevocationStep>
+            {
+                [IsolationSurface.Session] = new(MemberRemovedByAnAdminAsync, new JoinedSpaceNotFound()),
+                [IsolationSurface.ApiToken] = new(MemberRemovedByAnAdminAsync, new JoinedTokenDead()),
+            })
+        {
+            Skip = "red: AC4 - DELETE .../memberships/{membershipId} is not mapped; the Admin's removal is the boundary 404 today",
+        },
+
+        new(
+            "REV-LEFT-THE-SPACE", "V-2, V-3, NFR-2",
+            new Dictionary<IsolationSurface, RevocationStep>
+            {
+                [IsolationSurface.Session] = new(MemberLeavesAsync, new JoinedSpaceNotFound()),
+                [IsolationSurface.ApiToken] = new(MemberLeavesAsync, new JoinedTokenDead()),
+            })
+        {
+            Skip = "red: AC4 - DELETE .../membership (the leave route) is not mapped; the leave is the boundary 404 today",
+        },
+
         new(
             "REV-ROLLED-BACK-REMOVAL", "V-3 (negative anchor)",
             Both(new RevocationStep(context => context.World.Database.RemoveMembershipAsync(context.Actor.SpaceId, context.Actor.AccountId, commit: false), new ServedAtRole("owner")))),
@@ -206,6 +231,94 @@ internal static class RevocationCases
         Assert.True(demoted.StatusCode == HttpStatusCode.OK, $"The Owner's demotion through the product: {demoted.StatusCode} {demoted.Body}");
 
         Joined.AddOrUpdate(context, view);
+    }
+
+    /// <summary>
+    /// A fresh Owner invites an Admin and the row's actor (as Member) through the product; both accept, and the actor issues
+    /// itself a Token bound to the Owner's Space. Both surfaces read that Space (<c>200</c>, the anchor). Then the Admin
+    /// removes the actor through <c>DELETE .../memberships/{id}</c> (<c>204</c>). Every address, name and Invitation token is
+    /// held as a secret.
+    /// </summary>
+    private static async Task MemberRemovedByAnAdminAsync(RevocationContext context)
+    {
+        var (world, actor) = (context.World, context.Actor);
+        var owner = await world.NewActorAsync();
+        var admin = await world.NewActorAsync();
+        var adminView = await JoinOwnersSpaceAsync(world, owner, admin, "admin", "rev-admin");
+        var view = await JoinOwnersSpaceAsync(world, owner, actor, "member", "rev-member");
+
+        await AnchorBothSurfacesAsync(view);
+
+        var membership = await world.Database.MembershipOfAsync(owner.SpaceId, actor.AccountId);
+        var removed = await adminView.SendAsync(IsolationSurface.Session, HttpMethod.Delete, MembershipRoutes.MembershipOf(owner.SpaceId, membership.Id));
+
+        Assert.True(removed.StatusCode == HttpStatusCode.NoContent, $"The Admin's removal through the product: {removed.StatusCode} {removed.Body}");
+
+        Joined.AddOrUpdate(context, view);
+    }
+
+    /// <summary>
+    /// The row's actor joins a fresh Owner's Space as Member through the product, issues itself a Token bound there, reads
+    /// the Space on both surfaces (<c>200</c>, the anchor), then leaves through its Session (<c>204</c>), as the browser
+    /// does. Whatever the surface under test, the event is the leave; the next request on that surface is what the row
+    /// asserts.
+    /// </summary>
+    private static async Task MemberLeavesAsync(RevocationContext context)
+    {
+        var (world, actor) = (context.World, context.Actor);
+        var owner = await world.NewActorAsync();
+        var view = await JoinOwnersSpaceAsync(world, owner, actor, "member", "rev-leaver");
+
+        await AnchorBothSurfacesAsync(view);
+
+        var left = await view.SendAsync(IsolationSurface.Session, HttpMethod.Delete, MembershipWire.LeaveOf(owner.SpaceId));
+
+        Assert.True(left.StatusCode == HttpStatusCode.NoContent, $"The leave through the product: {left.StatusCode} {left.Body}");
+
+        Joined.AddOrUpdate(context, view);
+    }
+
+    /// <summary>
+    /// <paramref name="joiner"/> joins <paramref name="owner"/>'s Space at <paramref name="role"/>: the Owner issues an
+    /// Invitation through the product, the joiner accepts it and issues itself a Token bound there. Both Accounts'
+    /// addresses and names and the Invitation token are held as secrets.
+    /// </summary>
+    /// <returns>The joiner seen from the Owner's Space.</returns>
+    private static async Task<ProductActor> JoinOwnersSpaceAsync(RevocationWorld world, ProductActor owner, ProductActor joiner, string role, string tokenName)
+    {
+        foreach (var party in new[] { owner, joiner })
+        {
+            party.HoldsSecret(party.EmailAddress);
+            party.HoldsSecret(party.DisplayName);
+        }
+
+        var issued = await owner.SendAsync(IsolationSurface.Session, HttpMethod.Post, InvitationRoutes.InvitationsOf(owner.SpaceId), InvitationWire.Body(joiner.EmailAddress, role), headers: null);
+
+        Assert.True(issued.StatusCode == HttpStatusCode.NoContent, $"Issuing through the product: {issued.StatusCode} {issued.Body}");
+
+        var token = InvitationWire.TokenIn(await world.Mail.WaitForEmailToAsync(joiner.EmailAddress));
+
+        owner.HoldsSecret(token);
+
+        var accepted = await joiner.SendAsync(IsolationSurface.Session, HttpMethod.Post, InvitationRoutes.Acceptance, InvitationWire.AcceptBody(token), headers: null);
+
+        Assert.True(accepted.StatusCode == HttpStatusCode.OK, $"Accepting through the product: {accepted.StatusCode} {accepted.Body}");
+
+        return joiner.InSpace(owner.SpaceId, owner.SpaceName, await joiner.IssueTokenAsync(owner.SpaceId, tokenName));
+    }
+
+    /// <summary>
+    /// The joined view reads its Space on both surfaces before the event: a refusal after it cannot be a credential that
+    /// never worked.
+    /// </summary>
+    private static async Task AnchorBothSurfacesAsync(ProductActor view)
+    {
+        foreach (var surface in Enum.GetValues<IsolationSurface>())
+        {
+            var anchor = await view.SendAsync(surface, HttpMethod.Get, SpaceRoutes.ActiveOf(view.SpaceId));
+
+            Assert.True(anchor.StatusCode == HttpStatusCode.OK, $"{surface} reads the joined Space before the event: {anchor.StatusCode} {anchor.Body}");
+        }
     }
 
     private static async Task RevokeOwnTokenAsync(RevocationContext context) =>
@@ -327,6 +440,51 @@ internal static class RevocationCases
             var written = await view.SendAsync(surface, HttpMethod.Post, ProjectRoutes.ListIn(view.SpaceId));
 
             Assert.True(written.StatusCode == HttpStatusCode.Created, $"{surface}: a Member's Project create answered {written.StatusCode} {written.Body}");
+        }
+    }
+
+    /// <summary>
+    /// After the actor lost its Membership in the joined Space, the very next Session request there is the boundary
+    /// <c>404</c> - byte for byte a Space that does not exist - with one more <c>CrossSpace</c> row against that Space, and
+    /// the Session itself still valid: the Account lost the Space, not its sign-in.
+    /// </summary>
+    private sealed record JoinedSpaceNotFound() : NextAnswer("404 = the absent-Space anchor in the joined Space, CrossSpace recorded, Session still valid")
+    {
+        public override async Task VerifyAsync(RevocationContext context, IsolationSurface surface)
+        {
+            Assert.True(Joined.TryGetValue(context, out var view), "The event recorded no joined view of the Owner's Space.");
+
+            var before = await context.World.Database.RefusalKindsAsync(view.AccountId, view.SpaceId);
+            var next = await view.SendAsync(surface, HttpMethod.Get, SpaceRoutes.ActiveOf(view.SpaceId));
+            var anchor = await view.SendAsync(surface, HttpMethod.Get, SpaceRoutes.ActiveOf(Guid.NewGuid()));
+
+            Assert.True(next.StatusCode == HttpStatusCode.NotFound, $"{surface}: the very next request in the joined Space answered {next.StatusCode} {next.Body}");
+            AssertSameBytes(anchor, next);
+
+            var kinds = await context.World.Database.RefusalKindsAsync(view.AccountId, view.SpaceId);
+
+            Assert.Equal(before.Count(kind => kind == CrossSpace) + 1, kinds.Count(kind => kind == CrossSpace));
+            Assert.True((await view.Session.GetAsync(SessionRoutes.Current)).StatusCode is HttpStatusCode.OK or HttpStatusCode.NoContent, "The Session should still be valid for the Account.");
+        }
+    }
+
+    /// <summary>
+    /// After the actor lost its Membership in the joined Space, the Token bound there died with it in the same
+    /// transaction: its very next request is the no-credential <c>401</c>, byte for byte a request with none.
+    /// </summary>
+    private sealed record JoinedTokenDead() : NextAnswer("401 = the no-credential anchor, for the Token bound to the joined Space")
+    {
+        public override async Task VerifyAsync(RevocationContext context, IsolationSurface surface)
+        {
+            Assert.True(Joined.TryGetValue(context, out var view), "The event recorded no joined view of the Owner's Space.");
+
+            var route = SpaceRoutes.ActiveOf(view.SpaceId);
+            var anchor = await context.World.SendWithoutCredentialAsync(HttpMethod.Get, route);
+            var next = await view.SendAsync(surface, HttpMethod.Get, route);
+
+            Assert.True(next.StatusCode == HttpStatusCode.Unauthorized, $"{surface}: the joined Space's Token answered {next.StatusCode} {next.Body}");
+            AssertSameBytes(anchor, next);
+            Assert.Equal(0, await context.World.Database.TokenCountAsync(view.AccountId, view.SpaceId));
         }
     }
 
