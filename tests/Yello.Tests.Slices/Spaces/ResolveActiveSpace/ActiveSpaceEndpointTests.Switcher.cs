@@ -77,7 +77,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var personalA = Guid.Empty;
         var personalB = Guid.Empty;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var sessionA = await RegisteredAndSignedInAsync(client, addressA, nameA);
             var accountA = await AccountIdOfAsync(database, addressA);
@@ -145,7 +145,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? after = null;
         var personal = Guid.Empty;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             accountId = await AccountIdOfAsync(database, address);
@@ -198,7 +198,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         WireResponse? listed = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             var accountId = await AccountIdOfAsync(database, address);
@@ -238,7 +238,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? served = null;
         WireResponse? anonymous = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             accountId = await AccountIdOfAsync(database, address);
@@ -285,7 +285,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         var answers = new List<(Guid Requested, WireResponse Response)>();
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             var accountId = await AccountIdOfAsync(database, address);
@@ -332,7 +332,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? before = null;
         WireResponse? after = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             var accountId = await AccountIdOfAsync(database, address);
@@ -389,7 +389,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? notAMember = null;
         WireResponse? noSuchSpace = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             accountId = await AccountIdOfAsync(database, address);

@@ -63,7 +63,7 @@ public sealed class RegisterAccountEndpointTests(MigratedDatabaseFixture fixture
         var firstBody = string.Empty;
         var secondBody = string.Empty;
 
-        await HostProcess.RunAsync(connectionString, async client =>
+        await fixture.Hosts.RunAsync(connectionString, async client =>
         {
             var session = new WireSession(client);
 
@@ -104,7 +104,7 @@ public sealed class RegisterAccountEndpointTests(MigratedDatabaseFixture fixture
 
         var bodies = new List<string>();
 
-        await HostProcess.RunAsync(connectionString, async client =>
+        await fixture.Hosts.RunAsync(connectionString, async client =>
         {
             var session = new WireSession(client);
 
@@ -237,7 +237,7 @@ public sealed class RegisterAccountEndpointTests(MigratedDatabaseFixture fixture
 
         WireResponse? response = null;
 
-        await HostProcess.RunAsync(connectionString, async client =>
+        await fixture.Hosts.RunAsync(connectionString, async client =>
         {
             var session = new WireSession(client);
 
@@ -282,7 +282,7 @@ public sealed class RegisterAccountEndpointTests(MigratedDatabaseFixture fixture
 
         WireResponse? response = null;
 
-        await HostProcess.RunAsync(connectionString, async client =>
+        await fixture.Hosts.RunAsync(connectionString, async client =>
         {
             var session = new WireSession(client);
 

@@ -72,7 +72,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var spaceId = Guid.Empty;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await TaskWire.RegisterAsync(client, database);
             spaceId = owner.SpaceId;
@@ -121,7 +121,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var (spaceId, memberId) = (Guid.Empty, Guid.Empty);
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await TaskWire.RegisterAsync(client, database);
             var member = await TaskWire.RegisterAsync(client, database);
@@ -168,7 +168,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var (spaceId, ownerId) = (Guid.Empty, Guid.Empty);
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await TaskWire.RegisterAsync(client, database);
             (spaceId, ownerId) = (owner.SpaceId, owner.AccountId);
@@ -215,7 +215,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var (spaceId, ownerId) = (Guid.Empty, Guid.Empty);
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await TaskWire.RegisterAsync(client, database);
             (spaceId, ownerId) = (owner.SpaceId, owner.AccountId);
@@ -262,7 +262,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var spaceId = Guid.Empty;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await TaskWire.RegisterAsync(client, database);
             spaceId = owner.SpaceId;
@@ -331,7 +331,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var spaceName = "Read then gone " + Suffix();
         var accountId = Guid.Empty;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             _ = await SignedInAsync(client, address);
             accountId = await AccountIdOfAsync(database, address);

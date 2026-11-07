@@ -54,7 +54,7 @@ public sealed partial class ProjectEndpointTests
         var projectId = Guid.Empty;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = IdOf(await CreateAsync(owner, "Torn down while filled"));
@@ -123,7 +123,7 @@ public sealed partial class ProjectEndpointTests
         Actor? owner = null;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -168,7 +168,7 @@ public sealed partial class ProjectEndpointTests
         var projectId = Guid.Empty;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = IdOf(await CreateAsync(owner, "Edited while torn down"));
@@ -216,7 +216,7 @@ public sealed partial class ProjectEndpointTests
         Actor? owner = null;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 

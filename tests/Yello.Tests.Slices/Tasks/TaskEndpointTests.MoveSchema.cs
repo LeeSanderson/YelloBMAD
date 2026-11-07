@@ -90,7 +90,7 @@ public sealed partial class TaskEndpointTests
 
         string[] keys = ["b", "A0", "z", "a0", "B", "Z", "0z"];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Mixed case");
@@ -154,7 +154,7 @@ public sealed partial class TaskEndpointTests
         string? stored = null;
         HttpStatusCode? lookalike = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             stored = await StoredAddressAsync(database, owner.AccountId);

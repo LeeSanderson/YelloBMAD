@@ -51,6 +51,11 @@ public sealed class MigratedDatabaseFixture(SqlServerEngine engine) : IAsyncLife
     /// </summary>
     public bool IsAvailable => Database is not null;
 
+    /// <summary>
+    /// The class's shared Hosts. Killed before the database is dropped.
+    /// </summary>
+    public HostPool Hosts { get; } = new();
+
     /// <inheritdoc />
     public async ValueTask InitializeAsync()
     {
@@ -79,6 +84,8 @@ public sealed class MigratedDatabaseFixture(SqlServerEngine engine) : IAsyncLife
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
+        await Hosts.DisposeAsync();
+
         if (ConnectionString is not null)
         {
             // Cleanup is disposal of the whole database. Never delete statements - those would need

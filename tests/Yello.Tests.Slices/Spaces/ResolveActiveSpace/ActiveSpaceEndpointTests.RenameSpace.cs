@@ -43,7 +43,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? answer = null;
         WireResponse? switcher = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             var accountId = await AccountIdOfAsync(database, address);
@@ -83,7 +83,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var newName = "Admin named " + Suffix();
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             await SeedNamedSpaceAsync(database, spaceId, "Before " + Suffix(), await AccountIdOfAsync(database, address), Role.Admin);
@@ -120,7 +120,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? read = null;
         WireResponse? refused = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             accountId = await AccountIdOfAsync(database, address);
@@ -166,7 +166,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? refused = null;
         WireResponse? absent = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             accountId = await AccountIdOfAsync(database, address);
@@ -210,7 +210,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? afterRefusal = null;
         WireResponse? anchor = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             await SeedNamedSpaceAsync(database, spaceId, oldName, await AccountIdOfAsync(database, address), Role.Owner);
@@ -246,7 +246,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? asAdmin = null;
         WireResponse? asViewer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             var membership = SpaceSeeding.NewMembership(spaceId, await AccountIdOfAsync(database, address), Role.Admin);

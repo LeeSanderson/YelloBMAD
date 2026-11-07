@@ -52,7 +52,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? anonymous = null;
         WireResponse? unmatched = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             var personal = await PersonalSpaceOfAsync(database, name);

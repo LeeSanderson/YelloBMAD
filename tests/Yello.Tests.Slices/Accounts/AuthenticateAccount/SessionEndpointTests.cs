@@ -104,7 +104,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
 
         DurationVerdict? verdict = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -139,7 +139,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? current = null;
         string? setCookie = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -182,7 +182,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
 
         string? setCookie = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -223,7 +223,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? unknownAddress = null;
         WireResponse? wrongPassword = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -260,7 +260,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
 
         WireResponse? failure = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -308,7 +308,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
 
         WireResponse? response = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -384,7 +384,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
 
         WireResponse? response = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -414,7 +414,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? without = null;
         WireResponse? with = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -468,7 +468,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         var withoutBody = string.Empty;
         WireResponse? with = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var response = await client.PostAsJsonAsync(
                 AccountRoutes.Register,
@@ -529,7 +529,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? allowed = null;
         WireResponse? refused = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -586,7 +586,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
 
         WireResponse? response = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -704,7 +704,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
 
         var bodies = new List<string>();
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -740,7 +740,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
 
         WireResponse? response = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -924,7 +924,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? replayed = null;
         string? expiry = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -992,7 +992,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? replayed = null;
         WireResponse? replayedSwitcher = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -1046,7 +1046,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? stillSignedIn = null;
         WireResponse? with = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -1084,7 +1084,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? noSession = null;
         WireResponse? current = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var session = new WireSession(client);
 
@@ -1125,7 +1125,7 @@ public sealed class SessionEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? freshSignOut = null;
         WireResponse? later = null;
 
-        await HostProcess.RunAsync(connectionString, Configured, async client =>
+        await fixture.Hosts.RunAsync(connectionString, Configured, async client =>
         {
             var registration = new WireSession(client);
             await RegisterAsync(registration, address);

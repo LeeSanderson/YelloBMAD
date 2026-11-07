@@ -84,7 +84,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         WireResponse? issued = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             accountId = await AccountIdOfAsync(database, address);
@@ -147,7 +147,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? notAMember = null;
         WireResponse? noSuchSpace = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             accountId = await AccountIdOfAsync(database, address);
@@ -212,7 +212,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? nonMemberInB = null;
         WireResponse? tokenInStrangers = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             accountId = await AccountIdOfAsync(database, address);
@@ -282,7 +282,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         DurationVerdict? verdict = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             var accountId = await AccountIdOfAsync(database, address);
@@ -324,7 +324,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? before = null;
         WireResponse? after = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             var accountId = await AccountIdOfAsync(database, address);
@@ -379,7 +379,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? afterRemoval = null;
         var rowsAfterRollback = -1;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             accountId = await AccountIdOfAsync(database, address);
@@ -429,7 +429,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? keptServed = null;
         WireResponse? afterDeletion = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             accountId = await AccountIdOfAsync(database, address);
@@ -477,7 +477,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? before = null;
         WireResponse? after = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             accountId = await AccountIdOfAsync(database, address);
@@ -523,7 +523,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? ownRevoke = null;
         WireResponse? afterOwnRevoke = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var x = await RegisteredAndSignedInAsync(client, addressX, nameX);
             await SeedNamedSpaceAsync(database, spaceX, "Alpha " + Suffix(), await AccountIdOfAsync(database, addressX), Role.Member);
@@ -577,7 +577,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var refusals = new List<(string Cause, WireResponse Response)>();
         WireResponse? anchor = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             var accountId = await AccountIdOfAsync(database, address);
@@ -655,7 +655,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var pairs = new List<(string Surface, WireResponse WithToken, WireResponse Anonymous)>();
         (WireResponse WithToken, WireResponse Anonymous)? signOut = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             accountId = await AccountIdOfAsync(database, address);
@@ -723,7 +723,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? cookieAfter = null;
         WireResponse? tokenAfter = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             await SeedNamedSpaceAsync(database, spaceId, "Alpha " + Suffix(), await AccountIdOfAsync(database, address), Role.Member);
@@ -768,7 +768,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? boundBearerServed = null;
         WireResponse? cookieAndBearerBoundElsewhere = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             var accountId = await AccountIdOfAsync(database, address);
@@ -876,7 +876,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? listed = null;
         var issued = new List<IssuedTokenAnswer>();
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             var accountId = await AccountIdOfAsync(database, address);
@@ -934,7 +934,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? empty = null;
         WireResponse? tooLong = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await RegisteredAndSignedInAsync(client, address, name);
             accountId = await AccountIdOfAsync(database, address);
@@ -991,7 +991,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? nonMember = null;
         WireResponse? member = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var anonymous = new WireSession(client);
             anonymousMalformed = await anonymous.PostAsync(ApiTokenRoutes.IssueIn(spaceId), MalformedBody(), withAntiforgeryToken: false);

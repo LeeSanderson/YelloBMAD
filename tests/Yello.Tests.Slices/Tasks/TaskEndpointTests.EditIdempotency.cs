@@ -38,7 +38,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? replay = null;
         var key = Guid.NewGuid().ToString("D");
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var token = await IssueTokenAsync(owner, owner.SpaceId);
@@ -77,7 +77,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? reused = null;
         var key = Guid.NewGuid().ToString("D");
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var token = await IssueTokenAsync(owner, owner.SpaceId);
@@ -115,7 +115,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? secondAnswer = null;
         var key = Guid.NewGuid().ToString("D");
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             first = await RegisterAsync(client, database);
             second = await RegisterAsync(client, database);

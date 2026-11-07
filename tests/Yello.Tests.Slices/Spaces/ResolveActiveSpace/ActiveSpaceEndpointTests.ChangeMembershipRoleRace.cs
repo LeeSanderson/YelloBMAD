@@ -59,7 +59,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var (adminId, targetId) = (Guid.Empty, Guid.Empty);
         WireResponse[] raced = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await SignedInAsync(client, ownerAddress);
             await SeedNamedSpaceAsync(database, spaceId, "Raced " + Suffix(), await AccountIdOfAsync(database, ownerAddress), Role.Owner);
@@ -130,7 +130,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var (adminId, targetId) = (Guid.Empty, Guid.Empty);
         WireResponse? queued = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             _ = await SignedInAsync(client, ownerAddress);
             await SeedNamedSpaceAsync(database, spaceId, "Demoted in flight " + Suffix(), await AccountIdOfAsync(database, ownerAddress), Role.Owner);

@@ -83,7 +83,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var name = "Client work " + Suffix();
         WireResponse? created = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             await session.FetchAntiforgeryTokenAsync();
@@ -129,7 +129,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var personal = Guid.Empty;
         SpaceSnapshot? before = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var creator = await SignedInAsync(client, creatorAddress);
             var other = await SignedInAsync(client, otherAddress);
@@ -170,7 +170,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var answers = new List<WireResponse>();
         var switchers = new List<WireResponse>();
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             foreach (var address in new[] { RandomAddress(), RandomAddress() })
             {
@@ -220,7 +220,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? anchor = null;
         WireResponse? switcher = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             await session.FetchAntiforgeryTokenAsync();
@@ -259,7 +259,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var proposed = Guid.NewGuid();
         WireResponse? created = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             await session.FetchAntiforgeryTokenAsync();
@@ -295,7 +295,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? withToken = null;
         WireResponse? anchor = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             var personal = Assert.Single(IdentityRows(await session.GetAsync(SpaceRoutes.Directory))).Id;

@@ -58,7 +58,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
         var projectId = Guid.Empty;
         WireResponse? board = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Empty");
@@ -98,7 +98,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
         Actor? owner = null;
         WireResponse? board = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Shaped");
@@ -138,7 +138,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? board = null;
         int[] seeded = [3, 1, 2];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Counted");
@@ -184,7 +184,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
         var projectId = Guid.Empty;
         WireResponse? board = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "This one");
@@ -240,7 +240,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? viewerSession = null;
         WireResponse? viewerToken = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var memberActor = await RegisterAsync(client, database);
@@ -282,7 +282,7 @@ public sealed class BoardEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? anchor = null;
         IReadOnlyList<string> refusalsAfterInSpace = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Present");

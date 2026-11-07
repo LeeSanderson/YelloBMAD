@@ -82,7 +82,7 @@ public sealed partial class ActiveSpaceEndpointTests
         SpaceRowCounts? before = null;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             seeded = await PopulateSpaceAsync(client, database, spaceName);
 
@@ -138,7 +138,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? read = null;
         WireResponse? refused = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             accountId = await AccountIdOfAsync(database, address);
@@ -184,7 +184,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? refused = null;
         WireResponse? absent = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             accountId = await AccountIdOfAsync(database, address);
@@ -228,7 +228,7 @@ public sealed partial class ActiveSpaceEndpointTests
         SpaceRowCounts? afterRollback = null;
         var answers = new Dictionary<string, HttpStatusCode>(StringComparer.Ordinal);
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             seeded = await PopulateSpaceAsync(client, database, "Token-bound " + Suffix());
             before = await SpaceRowCountsAsync(database, seeded.SpaceId);
@@ -285,7 +285,7 @@ public sealed partial class ActiveSpaceEndpointTests
         SpaceRowCounts? afterFailure = null;
         var answers = new Dictionary<string, HttpStatusCode>(StringComparer.Ordinal);
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             seeded = await PopulateSpaceAsync(client, database, "Forced failure " + Suffix());
             before = await SpaceRowCountsAsync(database, seeded.SpaceId);
@@ -330,7 +330,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? listedAfter = null;
         var answers = new Dictionary<string, HttpStatusCode>(StringComparer.Ordinal);
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             seeded = await PopulateSpaceAsync(client, database, "Shared " + Suffix());
 
@@ -382,7 +382,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? session = null;
         WireResponse? created = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await TaskWire.RegisterAsync(client, database);
 
@@ -420,7 +420,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? deleted = null;
         WireResponse? afterDeletion = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             var accountId = await AccountIdOfAsync(database, address);
@@ -459,7 +459,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? replay = null;
         WireResponse? absent = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await TaskWire.RegisterAsync(client, database);
 
@@ -492,7 +492,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var namesAfterRefusal = 0;
         WireResponse? anchor = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await TaskWire.RegisterAsync(client, database);
 
@@ -524,7 +524,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? summary = null;
         var statusCount = 0;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             seeded = await PopulateSpaceAsync(client, database, spaceName);
             statusCount = (await TaskWire.StatusesAsync(database, seeded.SpaceId)).Count;
@@ -566,7 +566,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? absent = null;
         Actor? stranger = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             seeded = await PopulateSpaceAsync(client, database, "Counted " + Suffix());
             stranger = await TaskWire.RegisterAsync(client, database);

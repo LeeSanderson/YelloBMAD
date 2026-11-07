@@ -70,7 +70,7 @@ public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
         var projectId = Guid.Empty;
         WireResponse? created = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var token = await IssueTokenAsync(owner, owner.SpaceId);
@@ -123,7 +123,7 @@ public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
         Actor? owner = null;
         var created = new List<Guid>();
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Ordering");
@@ -171,7 +171,7 @@ public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? refused = null;
         WireResponse? anchor = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Titles");
@@ -207,7 +207,7 @@ public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? byToken = null;
         WireResponse? anchor = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             viewer = await RegisterAsync(client, database);
@@ -257,7 +257,7 @@ public sealed partial class TaskEndpointTests(MigratedDatabaseFixture fixture)
         WireResponse? anchor = null;
         IReadOnlyList<string> refusalsAfterInSpace = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Present");

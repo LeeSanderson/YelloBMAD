@@ -80,7 +80,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         IReadOnlyList<StatusRow> statuses = [];
         IReadOnlyList<ListPage> pages = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Listed by Status");
@@ -112,7 +112,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         var projectId = Guid.Empty;
         IReadOnlyList<ListPage> pages = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Tied on a day");
@@ -154,7 +154,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         var projectId = Guid.Empty;
         IReadOnlyList<ListPage> pages = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Undated last");
@@ -197,7 +197,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         var projectId = Guid.Empty;
         IReadOnlyList<ListPage> pages = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Tied on a Label");
@@ -248,7 +248,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         var projectId = Guid.Empty;
         IReadOnlyList<ListPage> pages = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Unlabelled last");
@@ -303,7 +303,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         var predicate = string.Empty;
         var walks = new Dictionary<string, IReadOnlyList<ListPage>>(StringComparer.Ordinal);
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Filtered");
@@ -373,7 +373,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         WireResponse? withLive = null;
         WireResponse? liveAlone = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Stale filter");
@@ -421,7 +421,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         ListPage? first = null;
         ListPage? next = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Cursor outlives its Task");
@@ -482,7 +482,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         WireResponse? anchor = null;
         IReadOnlyList<string> refusals = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -536,7 +536,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         WireResponse? refused = null;
         IReadOnlyList<string> refusals = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -564,7 +564,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         WireResponse? both = null;
         WireResponse? cursorOnUnknownProject = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Checked in order");
@@ -592,7 +592,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         var database = Available();
         WireResponse? page = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Sized by the server");
@@ -624,7 +624,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         WireResponse? viewerSession = null;
         WireResponse? viewerToken = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var memberActor = await RegisterAsync(client, database);
@@ -667,7 +667,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         WireResponse? page = null;
         WireResponse? board = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -714,7 +714,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         WireResponse? anchor = null;
         IReadOnlyList<string> refusals = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -756,7 +756,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         var atCreation = new List<string?>();
         var names = new Dictionary<string, string>(StringComparer.Ordinal);
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -823,7 +823,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         var taskId = Guid.Empty;
         WireResponse[] answers = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -892,7 +892,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         long first = 0;
         long last = 0;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Five thousand, listed");
@@ -938,7 +938,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         var database = Available();
         IReadOnlyList<string> plans = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Seeks, never scans");
@@ -972,7 +972,7 @@ public sealed class ListPagingTests(MigratedDatabaseFixture fixture) : IClassFix
         var labelled = Guid.Empty;
         var bare = Guid.Empty;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 

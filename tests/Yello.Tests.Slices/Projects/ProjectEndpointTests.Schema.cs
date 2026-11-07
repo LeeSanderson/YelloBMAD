@@ -1,6 +1,5 @@
 using Microsoft.Data.SqlClient;
 using Xunit;
-using Yello.Tests.Shared;
 
 namespace Yello.Tests.Slices.Projects;
 
@@ -66,7 +65,7 @@ public sealed partial class ProjectEndpointTests
         Actor? other = null;
         var projectId = Guid.Empty;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             other = await RegisterAsync(client, database);

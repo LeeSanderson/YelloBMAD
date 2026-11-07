@@ -1,6 +1,5 @@
 using Microsoft.Data.SqlClient;
 using Xunit;
-using Yello.Tests.Shared;
 using static Yello.Tests.Slices.Tasks.TaskWire;
 
 namespace Yello.Tests.Slices.Tasks;
@@ -76,7 +75,7 @@ public sealed partial class TaskEndpointTests
         var taskId = Guid.Empty;
         var otherProject = Guid.Empty;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             other = await RegisterAsync(client, database);
@@ -198,7 +197,7 @@ public sealed partial class TaskEndpointTests
         Actor? first = null;
         Actor? second = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             first = await RegisterAsync(client, database);
             second = await RegisterAsync(client, database);

@@ -49,7 +49,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? fiveThousandth = null;
         WireResponse? fiveThousandFirst = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Full");
@@ -93,7 +93,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? inFull = null;
         WireResponse? inOther = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var full = await CreateProjectAsync(owner, "Full");
@@ -128,7 +128,7 @@ public sealed partial class TaskEndpointTests
         Actor? owner = null;
         WireResponse? unknown = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var full = await CreateProjectAsync(owner, "Full");
@@ -161,7 +161,7 @@ public sealed partial class TaskEndpointTests
         var projectId = Guid.Empty;
         WireResponse[] answers = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -223,7 +223,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? fresh = null;
         var key = Guid.NewGuid().ToString("D");
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Full");

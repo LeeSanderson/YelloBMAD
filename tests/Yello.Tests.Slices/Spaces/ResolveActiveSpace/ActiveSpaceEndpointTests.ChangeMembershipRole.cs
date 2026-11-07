@@ -628,7 +628,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var memberId = Guid.Empty;
         var answers = new Dictionary<string, WireResponse>(StringComparer.Ordinal);
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await SignedInAsync(client, ownerAddress);
             await SeedNamedSpaceAsync(database, spaceId, "Replayed " + Suffix(), await AccountIdOfAsync(database, ownerAddress), Role.Owner);
@@ -679,7 +679,7 @@ public sealed partial class ActiveSpaceEndpointTests
         WireResponse? changed = null;
         WireResponse? replay = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await SignedInAsync(client, ownerAddress);
             await SeedNamedSpaceAsync(database, spaceId, "Addressless " + Suffix(), await AccountIdOfAsync(database, ownerAddress), Role.Owner);

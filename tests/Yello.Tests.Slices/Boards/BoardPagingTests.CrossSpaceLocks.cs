@@ -54,7 +54,7 @@ public sealed partial class BoardPagingTests
         WireResponse? fromA = null;
         WireResponse? inB = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var spaceA = await RegisterAsync(client, database);
             var spaceB = await RegisterAsync(client, database);
@@ -107,7 +107,7 @@ public sealed partial class BoardPagingTests
         WireResponse? inA = null;
         WireResponse? inB = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var spaceA = await RegisterAsync(client, database);
             var spaceB = await RegisterAsync(client, database);
@@ -162,7 +162,7 @@ public sealed partial class BoardPagingTests
         WireResponse? fromA = null;
         WireResponse? inB = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var spaceA = await RegisterAsync(client, database);
             var spaceB = await RegisterAsync(client, database);
@@ -216,7 +216,7 @@ public sealed partial class BoardPagingTests
         WireResponse? fromA = null;
         WireResponse? inB = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var spaceA = await RegisterAsync(client, database);
             var spaceB = await RegisterAsync(client, database);

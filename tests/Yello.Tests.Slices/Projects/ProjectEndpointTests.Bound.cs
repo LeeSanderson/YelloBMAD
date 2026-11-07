@@ -37,7 +37,7 @@ public sealed partial class ProjectEndpointTests
         WireResponse? fiftieth = null;
         WireResponse? fiftyFirst = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             await SeedProjectsAsync(database, owner.SpaceId, ProjectsPerSpace - 1);
@@ -92,7 +92,7 @@ public sealed partial class ProjectEndpointTests
         Actor? owner = null;
         WireResponse[] answers = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -158,7 +158,7 @@ public sealed partial class ProjectEndpointTests
         WireResponse? fresh = null;
         var key = Guid.NewGuid().ToString("D");
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             await SeedProjectsAsync(database, owner.SpaceId, ProjectsPerSpace - 1);

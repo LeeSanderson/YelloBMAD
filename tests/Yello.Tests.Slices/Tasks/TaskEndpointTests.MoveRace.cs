@@ -63,7 +63,7 @@ public sealed partial class TaskEndpointTests
         var keys = new Dictionary<Guid, string>();
         WireResponse[] answers = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var member = await RegisterAsync(client, database);
@@ -133,7 +133,7 @@ public sealed partial class TaskEndpointTests
         var keyC = string.Empty;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             board = await MoveBoardAsync(database, owner, todo: 1, doing: 2);
@@ -189,7 +189,7 @@ public sealed partial class TaskEndpointTests
         MoveBoard? board = null;
         WireResponse[] answers = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var member = await RegisterAsync(client, database);
@@ -247,7 +247,7 @@ public sealed partial class TaskEndpointTests
         MoveBoard? board = null;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             board = await MoveBoardAsync(database, owner, todo: 2, doing: 0);
@@ -293,7 +293,7 @@ public sealed partial class TaskEndpointTests
         MoveBoard? board = null;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             board = await MoveBoardAsync(database, owner, todo: 2, doing: 0);
@@ -337,7 +337,7 @@ public sealed partial class TaskEndpointTests
         MoveBoard? board = null;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             board = await MoveBoardAsync(database, owner, todo: 2, doing: 0);
@@ -383,7 +383,7 @@ public sealed partial class TaskEndpointTests
         MoveBoard? board = null;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             board = await MoveBoardAsync(database, owner, todo: 2, doing: 0);
@@ -428,7 +428,7 @@ public sealed partial class TaskEndpointTests
         TaskRow? before = null;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             board = await MoveBoardAsync(database, owner, todo: 1, doing: 2);
@@ -475,7 +475,7 @@ public sealed partial class TaskEndpointTests
         var placedKey = string.Empty;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             board = await MoveBoardAsync(database, owner, todo: 1, doing: 2);
@@ -523,7 +523,7 @@ public sealed partial class TaskEndpointTests
         MoveBoard? board = null;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             board = await MoveBoardAsync(database, owner, todo: 2, doing: 0);
@@ -568,7 +568,7 @@ public sealed partial class TaskEndpointTests
         MoveBoard? board = null;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             board = await MoveBoardAsync(database, owner, todo: 2, doing: 0);
@@ -614,7 +614,7 @@ public sealed partial class TaskEndpointTests
         var labelId = Guid.Empty;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             board = await MoveBoardAsync(database, owner, todo: 2, doing: 0);
@@ -662,7 +662,7 @@ public sealed partial class TaskEndpointTests
         var labelId = Guid.Empty;
         WireResponse? answer = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             board = await MoveBoardAsync(database, owner, todo: 2, doing: 0);

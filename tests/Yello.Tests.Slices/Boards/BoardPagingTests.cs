@@ -69,7 +69,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         var database = Available();
         WireResponse? board = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Paged");
@@ -104,7 +104,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         var database = Available();
         WireResponse? board = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Appended");
@@ -134,7 +134,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         Guid statusId = default;
         IReadOnlyList<ColumnPage> pages = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Five thousand");
@@ -181,7 +181,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         var placed = new List<(Guid ColumnStatus, PagedTask Task)>();
         int[] split = [2_600, 1_700, 700];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Split");
@@ -223,7 +223,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         Actor? owner = null;
         WireResponse? page = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -268,7 +268,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         // 129 characters of the alphabet: one longer than PositionKey.MaxLength.
         var sent = string.Equals(cursor, OneLongerThanTheLongestKey, StringComparison.Ordinal) ? new string('V', 129) : cursor;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -304,7 +304,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         WireResponse? anchor = null;
         IReadOnlyList<string> refusals = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -345,7 +345,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         WireResponse? viewerSession = null;
         WireResponse? viewerToken = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var memberActor = await RegisterAsync(client, database);
@@ -388,7 +388,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         var database = Available();
         WireResponse? page = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Sized by the server");
@@ -418,7 +418,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         ColumnPage? first = null;
         ColumnPage? next = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Cursor outlives its Task");
@@ -471,7 +471,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         var database = Available();
         var reads = new List<(string Page, long Reads)>();
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Depth independent");
@@ -518,7 +518,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         var database = Available();
         var plan = string.Empty;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Seeks, never scans");
@@ -550,7 +550,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         ColumnPage? first = null;
         ColumnPage? last = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Labelled at scale");
@@ -585,7 +585,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         WireResponse? board = null;
         WireResponse? listing = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var doomed = await CreateProjectAsync(owner, "Being deleted");
@@ -651,7 +651,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         var cancellationToken = TestContext.Current.CancellationToken;
         WireResponse? board = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var member = await RegisterAsync(client, database);
@@ -710,7 +710,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         WireResponse? created = null;
         IReadOnlyList<string> objectLocks = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var spaceA = await RegisterAsync(client, database);
             var spaceB = await RegisterAsync(client, database);
@@ -769,7 +769,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         WireResponse? inA = null;
         WireResponse? inB = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var spaceA = await RegisterAsync(client, database);
             var spaceB = await RegisterAsync(client, database);
@@ -835,7 +835,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         WireResponse? inA = null;
         WireResponse? fromB = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var spaceA = await RegisterAsync(client, database);
             var spaceB = await RegisterAsync(client, database);
@@ -893,7 +893,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         var moverId = Guid.Empty;
         WireResponse? refused = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 

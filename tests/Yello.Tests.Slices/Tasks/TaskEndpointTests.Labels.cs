@@ -53,7 +53,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? created = null;
         WireResponse? listed = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var token = await IssueTokenAsync(owner, owner.SpaceId);
@@ -94,7 +94,7 @@ public sealed partial class TaskEndpointTests
         var second = Guid.Empty;
         WireResponse[] applied = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var admin = await RegisterAsync(client, database);
@@ -142,7 +142,7 @@ public sealed partial class TaskEndpointTests
         var labelId = Guid.Empty;
         var answers = new List<WireResponse>();
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             refusedActor = await RegisterAsync(client, database);
@@ -194,7 +194,7 @@ public sealed partial class TaskEndpointTests
         IReadOnlyList<Guid> afterClear = [];
         WireResponse? untouched = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var member = await RegisterAsync(client, database);
@@ -246,7 +246,7 @@ public sealed partial class TaskEndpointTests
         TaskRow? beforeLabels = null;
         TaskRow? afterLabels = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             (_, taskId) = await ProjectWithTaskAsync(owner, "Survivor");
@@ -287,7 +287,7 @@ public sealed partial class TaskEndpointTests
         TaskRow? after = null;
         WireResponse? refused = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             (_, taskId) = await ProjectWithTaskAsync(owner, "Unchanged");
@@ -335,7 +335,7 @@ public sealed partial class TaskEndpointTests
         IReadOnlyList<Guid> afterRefusals = [];
         WireResponse? anchor = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             viewer = await RegisterAsync(client, database);
@@ -391,7 +391,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? anchor = null;
         var longest = new string('n', LabelName.MaxLength);
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -427,7 +427,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? refused = null;
         WireResponse? anchor = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -460,7 +460,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? taken = null;
         WireResponse? elsewhere = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             other = await RegisterAsync(client, database);
@@ -497,7 +497,7 @@ public sealed partial class TaskEndpointTests
         Actor? owner = null;
         WireResponse? refused = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             refused = await DefineRawAsync(owner, owner.SpaceId, RawBody(body));
@@ -533,7 +533,7 @@ public sealed partial class TaskEndpointTests
         var answers = new Dictionary<string, WireResponse>(StringComparer.Ordinal);
         WireResponse? anchor = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             other = await RegisterAsync(client, database);
@@ -605,7 +605,7 @@ public sealed partial class TaskEndpointTests
             ? JsonSerializer.Serialize(new { labelIds = Enumerable.Range(0, 1001).Select(_ => Guid.NewGuid()) })
             : body;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             (_, taskId) = await ProjectWithTaskAsync(owner, "Shaped");
@@ -639,7 +639,7 @@ public sealed partial class TaskEndpointTests
         IReadOnlyList<Guid> appliedAfterRefusal = [];
         WireResponse? deletedAfterRemoval = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             (_, taskId) = await ProjectWithTaskAsync(owner, "A title nobody may read");
@@ -687,7 +687,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? anchor = null;
         IReadOnlyList<string> refusalsAfterInSpace = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var real = await SeedAsync(owner, owner.SpaceId, "Real");
@@ -728,7 +728,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? listed = null;
         var expected = new List<Guid>();
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var viewer = await RegisterAsync(client, database);
@@ -771,7 +771,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? board = null;
         WireResponse? read = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Read back");

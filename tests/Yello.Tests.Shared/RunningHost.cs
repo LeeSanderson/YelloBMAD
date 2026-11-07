@@ -86,6 +86,11 @@ public sealed partial class RunningHost : IAsyncDisposable
     public HttpClient Client { get; private set; } = new();
 
     /// <summary>
+    /// Whether the process has exited.
+    /// </summary>
+    public bool HasExited => _process.HasExited;
+
+    /// <summary>
     /// Everything the Host has written so far, both streams.
     /// </summary>
     public string Log

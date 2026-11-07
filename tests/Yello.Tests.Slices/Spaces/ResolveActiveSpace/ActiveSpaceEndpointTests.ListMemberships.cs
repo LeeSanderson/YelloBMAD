@@ -63,7 +63,7 @@ public sealed partial class ActiveSpaceEndpointTests
         IReadOnlyList<MembershipRow> stored = [];
         var walked = new Dictionary<string, IReadOnlyList<WireResponse>>(StringComparer.Ordinal);
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await SignedInAsync(client, ownerAddress);
             ownerId = await AccountIdOfAsync(database, ownerAddress);
@@ -119,7 +119,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var spaceId = Guid.NewGuid();
         IReadOnlyList<WireResponse> pages = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await SignedInAsync(client, ownerAddress);
             await SeedSpaceHoldingMembershipsAsync(database, spaceId, "Full list " + Suffix(), await AccountIdOfAsync(database, ownerAddress), InvitationWire.MembershipsPerSpace);

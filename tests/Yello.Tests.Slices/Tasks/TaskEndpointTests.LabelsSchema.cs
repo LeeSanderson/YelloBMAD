@@ -1,6 +1,5 @@
 using Microsoft.Data.SqlClient;
 using Xunit;
-using Yello.Tests.Shared;
 using static Yello.Tests.Slices.Tasks.LabelWire;
 using static Yello.Tests.Slices.Tasks.TaskEditWire;
 using static Yello.Tests.Slices.Tasks.TaskWire;
@@ -70,7 +69,7 @@ public sealed partial class TaskEndpointTests
         Actor? other = null;
         var labelId = Guid.Empty;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             other = await RegisterAsync(client, database);
@@ -168,7 +167,7 @@ public sealed partial class TaskEndpointTests
         var applied = Guid.Empty;
         var unused = Guid.Empty;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var (_, taskId) = await ProjectWithTaskAsync(owner, "Carrier");

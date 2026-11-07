@@ -62,7 +62,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? deleted = null;
         WireResponse? read = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             deleter = owner;
@@ -138,7 +138,7 @@ public sealed partial class TaskEndpointTests
         IReadOnlyList<TaskRow> afterRefusals = [];
         WireResponse? anchor = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             viewer = await RegisterAsync(client, database);
@@ -194,7 +194,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? anchor = null;
         WireResponse? first = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             stranger = await RegisterAsync(client, database);
@@ -250,7 +250,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? taskDeleted = null;
         WireResponse? labelDeleted = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -291,7 +291,7 @@ public sealed partial class TaskEndpointTests
         WireResponse? deleted = null;
         WireResponse? admitted = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             projectId = await CreateProjectAsync(owner, "Full, then not");

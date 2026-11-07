@@ -93,7 +93,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         Actor? owner = null;
         WireResponse? created = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             created = await CreateAsync(owner, "  Northwind Redesign  ");
@@ -133,7 +133,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         IReadOnlyList<Guid> before = [];
         WireResponse? created = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             before = await StatusIdsAsync(database, owner.SpaceId);
@@ -172,7 +172,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         Actor? owner = null;
         var created = new List<Guid>();
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -217,7 +217,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         WireResponse? refused = null;
         WireResponse? anchor = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             refused = await CreateAsync(owner, new string(blank ? ' ' : 'n', length));
@@ -248,7 +248,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         WireResponse? refused = null;
         WireResponse? anchor = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -286,7 +286,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         WireResponse? byToken = null;
         WireResponse? anchor = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             viewer = await RegisterAsync(client, database);
@@ -327,7 +327,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         ProjectRow? before = null;
         WireResponse? renamed = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -362,7 +362,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         WireResponse? bySession = null;
         WireResponse? byToken = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             viewer = await RegisterAsync(client, database);
@@ -404,7 +404,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         WireResponse? absentSpace = null;
         IReadOnlyList<string> refusalsAfterInSpace = [];
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             _ = IdOf(await CreateAsync(owner, "Present"));
@@ -438,7 +438,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         Actor? owner = null;
         WireResponse? listed = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -476,7 +476,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         WireResponse? viewerSession = null;
         WireResponse? viewerToken = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var memberActor = await RegisterAsync(client, database);
@@ -517,7 +517,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         WireResponse? byToken = null;
         WireResponse? bySessionWithoutHeader = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             owner = await RegisterAsync(client, database);
             var token = await IssueTokenAsync(owner, owner.SpaceId);
@@ -553,7 +553,7 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         WireResponse? mapped = null;
         var unmapped = new List<WireResponse>();
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var id = IdOf(await CreateAsync(owner, "Methods"));

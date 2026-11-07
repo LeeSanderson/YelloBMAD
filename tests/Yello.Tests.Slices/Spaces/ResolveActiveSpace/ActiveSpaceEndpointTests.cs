@@ -77,7 +77,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
         WireResponse? notAMember = null;
         WireResponse? noSuchSpace = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             var accountId = await AccountIdOfAsync(database, address);
@@ -130,7 +130,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
         WireResponse? served = null;
         WireResponse? anonymous = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             await SeedSpaceAsync(database, spaceId, "Alpha", await AccountIdOfAsync(database, address));
@@ -169,7 +169,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
         WireResponse? served = null;
         WireResponse? expired = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             await SeedSpaceAsync(database, spaceId, "Alpha", await AccountIdOfAsync(database, address));
@@ -211,7 +211,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
 
         var answers = new List<(Guid Space, IReadOnlyList<string> Names)>();
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             var accountId = await AccountIdOfAsync(database, address);
@@ -261,7 +261,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
         WireResponse? notAMember = null;
         WireResponse? noSuchSpace = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
 
@@ -316,7 +316,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
         var accountId = Guid.Empty;
         var before = DateTimeOffset.UtcNow;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             accountId = await AccountIdOfAsync(database, address);
@@ -364,7 +364,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
 
         WireResponse? anonymous = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             accountId = await AccountIdOfAsync(database, address);
@@ -400,7 +400,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
         WireResponse? boundary = null;
         WireResponse? malformed = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             accountId = await AccountIdOfAsync(database, address);
@@ -439,7 +439,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
         WireResponse? refused = null;
         var accountId = Guid.Empty;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             accountId = await AccountIdOfAsync(database, address);
@@ -485,7 +485,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
 
         WireResponse? served = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             var accountId = await AccountIdOfAsync(database, address);
@@ -515,7 +515,7 @@ public sealed partial class ActiveSpaceEndpointTests(MigratedDatabaseFixture fix
 
         WireResponse? served = null;
 
-        await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
             var session = await SignedInAsync(client, address);
             var accountId = await AccountIdOfAsync(database, address);
