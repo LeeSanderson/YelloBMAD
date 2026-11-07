@@ -99,13 +99,39 @@ public sealed class MailDrop : IDisposable
 
         foreach (var file in _folder.EnumerateFiles("*.json").OrderBy(file => file.Name, StringComparer.Ordinal))
         {
-            await using var stream = file.OpenRead();
+            await using var stream = await OpenWhenFreeAsync(file).ConfigureAwait(false);
             using var document = await JsonDocument.ParseAsync(stream).ConfigureAwait(false);
 
             emails.Add(DroppedEmail.Read(document.RootElement));
         }
 
         return emails;
+    }
+
+    /// <summary>
+    /// Opens a dropped file, retrying briefly while another process holds it.
+    /// </summary>
+    /// <remarks>
+    /// The sender renames a complete file into place, so a <c>.json</c> is never half written; but a virus scanner
+    /// opens each new file and can hold it exclusively for a few milliseconds. No file-system event marks the
+    /// release, so this is the one place a short bounded retry stands in for a signal.
+    /// </remarks>
+    private static async Task<FileStream> OpenWhenFreeAsync(FileInfo file)
+    {
+        const int sharingViolation = -2_147_024_864; // HRESULT 0x80070020, ERROR_SHARING_VIOLATION
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
+
+        while (true)
+        {
+            try
+            {
+                return new FileStream(file.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            }
+            catch (IOException exception) when (exception.HResult == sharingViolation && elapsed.Elapsed < TimeSpan.FromSeconds(5))
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(25)).ConfigureAwait(false);
+            }
+        }
     }
 
     /// <summary>
