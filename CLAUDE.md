@@ -58,13 +58,39 @@ dotnet test --project tests/Yello.Tests.Slices/Yello.Tests.Slices.csproj --no-bu
 
 - **`--no-build` runs the binaries already built.** Rebuild after every change, or the run silently
   tests stale code.
-- **Client (Playwright) tests need `Yello.Client` built in the same configuration as the tests.** The
-  browser dev server serves the client output of the configuration the test assembly was built in.
+- **Run as few tests as the change needs.** A full run takes about 20 minutes (Client about 10, Slices
+  about 6, Isolation about 3). While iterating, run one project filtered to the affected classes:
+  `dotnet test --project <proj> --no-build -- --filter-class "<Namespace.Class>"` (or `--filter-method`
+  / `--filter-namespace`). A bare class name matches nothing and exits 8: use the full name or a leading
+  `*` (`"*TaskEndpointTests"`). The Architecture suite takes seconds and can always run whole.
+  - ATDD: build, then confirm the new scaffolds are discovered (a filtered run or `--list-tests`). No full run.
+  - Develop: affected classes while iterating, then exactly one full run before handing back, without the
+    browser suite (`-p:YelloSkipBrowserSuite=true`, as in `ci.yml`).
+  - Review: apply every accepted patch first, then the affected classes, then one final full run that
+    includes the browser suite, even when no patch was applied. Never a full run per patch.
+- **A full run always goes in the background** (`run_in_background`), and you wait for its completion
+  notification. In the foreground it hits the 10-minute tool timeout. Never poll it with
+  `until grep ...; do sleep` or `Start-Sleep` loops. The story-cycle skill saves it to
+  `artifacts/test-runs/<story>-<phase>.log`.
+- **Client (Playwright) tests boot the published client.** At start-up the suite runs `dotnet publish
+  Yello.Client` in the test assembly's configuration and serves that output. The publish rebuilds the
+  client if its sources changed, so a case never boots stale client code. Expect about 15s for a cold
+  publish and about 4s for a warm one.
 - **Leftover `Yello.Host.exe` processes** can lock `Yello.Host/bin/Debug` and fail the build. Check
   with `Get-Process Yello.Host`.
 - **Migration bundle tests are skipped unless `YELLO_MIGRATION_BUNDLE` is set.** They need
   `artifacts/efbundle-win-x64/efbundle.exe`, which git ignores. Three skips on a full run are
   expected for this reason.
+
+## Code comments
+
+- A comment explains *why* non-obvious code is the way it is: the constraint, the trap, the reason for an
+  odd choice. If the code already says it, do not comment it.
+- No story numbers, AC or requirement ids, review dates, open-question references or narrative history
+  ("added by story 2.4", "corrected at code review on ...", "until ..."). That belongs in the commit
+  message and the story file, and it goes stale in code.
+- No XML doc comment that restates the member's name or signature. Keep `<remarks>` to a few lines.
+- These rules apply to code you write or change. Do not rewrite existing comments as a side task.
 
 ## Test memory budget (read before running tests)
 

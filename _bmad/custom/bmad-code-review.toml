@@ -1,0 +1,8 @@
+# Team overrides for bmad-code-review. Merged over the skill's customize.toml by
+# _bmad/scripts/resolve_customization.py; persistent_facts appends to the defaults.
+
+[workflow]
+
+persistent_facts = [
+  "Code comments (CLAUDE.md, 'Code comments'): a comment explains why non-obvious code is the way it is. No story numbers, AC or requirement ids, review dates or narrative history in code comments; those belong in the commit message and the story file. No XML doc comment that restates the member's name; keep <remarks> to a few lines. When a patch touches code, its comments follow this rule; a comment the reviewed diff added that breaks it is a patch finding. Do not raise findings about comments outside the diff.",
+]

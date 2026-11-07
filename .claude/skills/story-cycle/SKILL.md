@@ -98,7 +98,11 @@ If no story is left, go to **Finish**.
 
 Spawn one `general-purpose` agent per phase, and run phases **sequentially**: each one depends on the files
 the previous one wrote. Pass `model` only for the Review phase, and only when `--review-model` is set. Use the
-prompt templates below, filling every `{placeholder}`. Every prompt ends with the shared **Return contract**.
+prompt templates below, filling every `{placeholder}`, including the **Test-execution policy** and **Comment
+rule** blocks the ATDD, Develop and Review templates name. Every prompt ends with the shared **Return contract**.
+
+You are bound by the same policy: never start a `dotnet test` while a phase agent may be running one, and run
+any full suite you need in the background.
 
 While an agent runs, tell the user in one line what it is doing ("1.6: dev-story running"). Do not run the
 same work yourself.
@@ -111,12 +115,19 @@ A phase report is a claim. Before committing, check it against the repo:
   (Create → `ready-for-dev`, ATDD → still `ready-for-dev`, Develop → `review`, Review → `done` or
   `in-progress`). If they disagree, or the status did not move, treat the phase as **failed**.
 - **ATDD output.** The checklist exists. The story's Dev Notes carry the **ATDD handoff** section (see the ATDD
-  phase). Build and tests are green, with **zero failures**: the skipped count rises by the number of red
-  scaffolds, and any scaffold reported as green-today counts as passing. A failing scaffold would break every
-  gate after it, so it must be skipped, not left red.
-- **Build and tests**, after Develop and after a Review that applied patches: run the project's full build and
-  test commands (in this repo, `dotnet build Yello.slnx` and `dotnet test Yello.slnx`) and compare the totals
-  with the agent's numbers. On any failure or mismatch, treat the phase as **failed**.
+  phase). The build is clean, and the agent's filtered run of the new scaffold classes shows them discovered
+  with **zero failures**: red scaffolds skipped, any scaffold reported as green-today passing. A failing
+  scaffold would break every gate after it, so it must be skipped, not left red. Do not run the full suite
+  after ATDD: the scaffolds are skipped and add nothing a full run would see.
+- **Build and tests**, after Develop and after every Review. Run `dotnet build Yello.slnx`
+  yourself (incremental, so it is cheap) and require 0 warnings and 0 errors. Then read the agent's full-run
+  log, `artifacts/test-runs/{story_key}-{phase}.log` (see the **Test-execution policy**). It must exist, be
+  newer than every file `git status --porcelain` lists, show zero failures, and match the totals the agent
+  reported. The Develop log has no browser-suite results by design (it runs with
+  `-p:YelloSkipBrowserSuite=true`); the Review log must include them, so a story never reaches `done` without
+  one passing browser run. Only when the log is missing, stale or disagrees do you run the full suite yourself, once, by the
+  same policy (background, `--max-parallel-test-modules 1`). On any failure or mismatch, treat the phase as
+  **failed**.
 - **Scope.** `git status --porcelain` lists only files the phase should touch. A Create phase touches only the
   story file and `sprint-status.yaml`.
 
@@ -185,6 +196,67 @@ in this conversation. Rules:
 - Story: {story_key}. Story file: {story_file}. Sprint status: {sprint_status}.
 ```
 
+### Test-execution policy (paste into the ATDD, Develop and Review prompts)
+
+A full `dotnet test Yello.slnx --max-parallel-test-modules 1` takes about 16 minutes (Slices about 7, Client about 4,
+Isolation about 4), and building and testing is over half of each story's time. Earlier runs averaged 20-28
+test invocations per develop phase, ran the full suite in ATDD although every scaffold was skipped, re-ran it
+after each review patch, and hit the Bash tool's 10-minute timeout with `until grep ...; do sleep` loops. This
+policy replaces that. Fill `{phase}` with `atdd`, `develop` or `review`.
+
+```
+Test execution policy. It overrides any step of the BMad skill that says "run all tests", "run the full test
+suite" or "run the full regression suite", except the one full run this policy allows for your phase.
+- Rebuild before every test run: `dotnet build Yello.slnx` (0 warnings, 0 errors). `--no-build` runs whatever
+  was last built. The browser suite publishes `Yello.Client` itself, so it needs no separate client build.
+- One `dotnet test` process at a time, never two (CLAUDE.md, "Test memory budget").
+- Iterate on classes, not suites: one project, filtered to the classes you changed or that cover the code you
+  changed, for example
+    dotnet test --project tests/Yello.Tests.Slices/Yello.Tests.Slices.csproj --no-build -- --filter-class "Yello.Tests.Slices.Memberships.MembershipHandlerTests"
+  (`--filter-namespace` and `--filter-method` work the same way, and accept `*` wildcards; repeat the option
+  to select several). A bare class name matches nothing and exits 8: use the full name or `"*ClassName"`. A large partial class such as `ActiveSpaceEndpointTests` is one class, so narrow it with
+  `--filter-method "*ChangeMembershipRole*"` or similar. The Architecture suite takes seconds; run it whole
+  whenever you touch production code or test conventions.
+- A full run is started with `run_in_background: true`, its output saved to the phase log, and then you wait
+  for the completion notification:
+    New-Item -ItemType Directory -Force artifacts/test-runs | Out-Null; dotnet test Yello.slnx --no-build --max-parallel-test-modules 1 2>&1 | Tee-Object artifacts/test-runs/{story_key}-{phase}.log
+  Never run a full run in the foreground: the tool times out at 10 minutes and the run carries on unseen.
+  Never poll with `until grep ...; do sleep`, `Start-Sleep` or `while` loops. A filtered run that may take
+  more than a few minutes (any Client class, a large Slices class) also goes in the background.
+- If the full run fails: fix, re-run the failing classes until green, then make one more full run. Report how
+  many full runs you made and why.
+```
+
+Phase-specific lines, appended under that block:
+
+- **ATDD:** `No full run. Build, then confirm each new scaffold class is discovered and reports zero failures: one
+  filtered run per project with --filter-class for the new classes (skipped scaffolds start no SQL Server), or
+  --list-tests. Run the Architecture suite whole, because it holds the convention gates new test code can
+  break. Report the discovered, skipped and passing counts per class.`
+- **Develop:** `While iterating, run only the affected classes (and the Architecture suite). That replaces
+  dev-story's per-task "run all existing tests" (step 7) and "run full test suite" (step 8). Exactly one full
+  run, at step 9 ("run the full regression suite"), before you set Status to review, logged as
+  artifacts/test-runs/{story_key}-develop.log. That full run leaves out the browser suite: add
+  -p:YelloSkipBrowserSuite=true after --no-build (the switch ci.yml uses). The browser suite is about a quarter
+  of the full run, and Review's full run includes it. If the story touches Yello.Client, Yello.Contracts or
+  tests/Yello.Tests.Client, still run the affected Client classes filtered (in the background).`
+- **Review:** `Apply every accepted patch first. Then run the classes the patches touch (and the Architecture
+  suite), then one final full run logged as artifacts/test-runs/{story_key}-review.log. Never a full run per
+  patch. Your full run includes the browser suite (no YelloSkipBrowserSuite), because Develop's left it out.
+  Make this one full run even when no patch was applied.`
+
+### Comment rule (paste into the Develop and Review prompts)
+
+```
+Comment rule for code you write or change (CLAUDE.md, "Code comments"):
+- A comment says why non-obvious code is the way it is: the constraint, the trap, the reason for the odd
+  choice. If the code says it, do not comment it.
+- No story numbers, AC or requirement ids, review dates, Q&A references or narrative history ("added by",
+  "corrected at code review", "until ..."). That belongs in the commit message and the story file.
+- No XML doc comment that restates the member's name or signature. Keep <remarks> to a few lines.
+- Do not rewrite existing comments you are not otherwise changing.
+```
+
 ### Create
 
 ```
@@ -227,7 +299,9 @@ After the skill completes, add this section to the story file's Dev Notes, and c
   order, with the scaffold that tests the riskiest assumption first; and the instruction "Activate one at a
   time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the
   correction recorded in the Debug Log, not deleted."
-Run the full build and test suite and report the totals.
+
+{test-execution policy, phase = atdd, with the ATDD line}
+Report the build result and, per new scaffold class, the discovered, skipped and passing counts.
 ```
 
 ### Develop
@@ -246,7 +320,11 @@ Standing answers:
 - HALT conditions (new dependency, three consecutive failures, ambiguous task, missing configuration) → do
   not work around them. Stop and return the blocker with the options you see and your recommendation.
 - Anything you cannot finish in this story → add an entry to {deferred_work} that names the story which owns it.
-The full build and test suite must pass before you set Status to review.
+
+{test-execution policy, phase = develop, with the Develop line}
+{comment rule}
+The build and the one full run must pass before you set Status to review. Report the full run's totals and
+its log path.
 ```
 
 ### Review
@@ -264,12 +342,27 @@ Standing answers:
 - Step 2: if you cannot launch subagents, the skill writes reviewer prompt files and HALTs. Return
   `RESULT: needs-reviewers` with the prompt file paths. The orchestrator runs the reviewers and sends their
   findings back to you.
+- Step 3 routing → patch only what you rate `high` or `medium`. A finding you rate `low` (cosmetic, a nitpick,
+  naming, style, a comment's wording, a test that could be tidier) goes to `defer`, even when the fix is
+  unambiguous. One exception: a comment this diff added that breaks the comment rule below is a `patch`,
+  because deleting or shortening it is mechanical. Severity does not change `decision_needed`: those still
+  go to the user.
+- Step 4 writing low-severity deferrals → in the story file, `- [x] [Review][Defer] <Title> [<file>:<line>] —
+  deferred, low severity` (not "pre-existing"); in {deferred_work}, under the step's `## Deferred from: code
+  review of ...` heading, one line each: what and where, `Severity: low`, and an owner (the story or epic
+  whose code it is, or `sweep` when nothing owns it). With no low patch left open, step 6 sets the story
+  `done` as usual.
 - Step 4 decision-needed findings → do NOT decide them. Return `RESULT: needs-decisions` with each finding's
   title, detail, options and your recommendation. Your answers will come back by message; then continue.
-- Step 4 patch handling → option 1, apply every patch. Then run the full build and tests.
+- Step 4 patch handling → option 1, apply every patch. Then test by the policy below: affected classes first,
+  then one full run.
 - Step 4 deferral reasons → name the story or epic that owns each one.
 - Step 7 "what next?" → 3, done.
-Report the raw finding count, the triaged count, and the finding that mattered most.
+
+{test-execution policy, phase = review, with the Review line}
+{comment rule}
+Report the raw finding count, the triaged count (patched / deferred as low / deferred otherwise / decisions /
+dismissed), the finding that mattered most, and the full run's totals and log path.
 ```
 
 `{baseline_commit}` is the commit **before the story's first test or code change**:
@@ -293,7 +386,7 @@ STORY: {story_key}  STATUS-NOW: <sprint-status value>
 SUMMARY: <what changed, the requirement IDs, the dominant finding>
 DECISIONS: <decisions taken, one line each>
 DEFERRED: <entries added to deferred-work.md, with owners>
-TESTS: <build result; test totals passed/failed/skipped>
+TESTS: <build result; test totals passed/failed/skipped; number of full runs and the log path>
 BLOCKER: <only when blocked, needs-decisions or needs-reviewers: exact question or paths, options, recommendation>
 ```
 

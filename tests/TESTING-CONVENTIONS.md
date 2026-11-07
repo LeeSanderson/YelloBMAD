@@ -198,6 +198,14 @@ story adding an absence assertion does the same.
 spec kernel. The 80% figure in the test design is explicitly "offered as a proposal for Lee to
 accept or drop", and is called "the weakest gate on this list". Do not invent one.
 
+**Comments say why, not when.** In test code as in product code (CLAUDE.md, "Code comments"): a
+comment explains why non-obvious code is the way it is - the race it controls, the plant it was
+proved against, the framework quirk it works around. No story numbers, AC ids, review dates or
+narrative history in a comment; those go in the commit message and the story file. The test's
+name and its `Requirement` / `Assumption` traits already carry the traceability. No XML doc
+comment that restates the member's name, and keep `<remarks>` to a few lines. This applies to
+code you write or change; do not rewrite existing comments as a side task.
+
 ## The browser level — blocker B5
 
 `Yello.Tests.Client`, added by the framework run on 2026-09-07. It is the fifth of the five test
@@ -230,14 +238,28 @@ the shared libraries headless Chromium links against. **The browser is pinned by
 the bundled Chromium was chosen over `Channel = "msedge"`, which would run whatever Edge the
 machine happened to have.
 
-**No container.** `Yello.Client` is a standalone WebAssembly application with its own dev server,
-so this suite starts one process, needs no SQL Server, and belongs in the **PR tier** despite
-being a browser suite. Cases that need a signed-in Session drive the API **faked at the network
-edge** - see "Signed-in cases: the API faked at the network edge" below - so they still start no
-Host and no engine.
+**No container.** `Yello.Client` is a standalone WebAssembly application served as static files,
+so this suite needs no SQL Server for its own cases and belongs in the **PR tier** despite being a
+browser suite. Cases that need a signed-in Session drive the API **faked at the network edge** - see
+"Signed-in cases: the API faked at the network edge" below - so they still start no Host and no
+engine. Only `RealHostCollection` starts the one engine.
 
-The suite serves the real build output and launches it with `--no-build`, so
-`dotnet build Yello.slnx` has to have run first. It says so by name rather than timing out.
+**The published client, not the build output.** `ClientSurfaceFixture` runs `dotnet publish
+Yello.Client` in the test assembly's configuration at start-up and serves the output through
+`PublishedClientHost`, the way Static Web Apps serves it, with the deploy's
+`appsettings.Production.json`. It is what ships, and trimmed it boots in about half the time of the
+build output. The publish rebuilds the client when its sources changed, so a case never boots stale
+client code, whatever was built before.
+
+**One server, one browser, classes in parallel.** `ClientSurfaceFixture` is an assembly fixture.
+Each test class is its own collection, and up to four run at once
+(`[assembly: Parallelization(MaxThreads = 4)]` in `AssemblyInfo.cs`). Each case gets a fresh browser
+context, which is the isolation boundary: its own cookies, storage and locale. Cases in one class
+still run one at a time. So a case must not depend on another class's state, and a wait must name the
+condition it needs: a neighbour's boot can delay any render. Cases that measure time, or what the page
+holds, run in `BrowserTimingCollection` (`DisableParallelization = true`), after the parallel classes.
+Four is measured: six ran the machine out of memory, because every context holds its own WebAssembly
+runtime.
 
 ### What it asserts today
 
@@ -270,11 +292,9 @@ real Chromium with **no Host, no database and no container**. The rules:
   unanswered (`ReleaseTaskEditUnanswered`, a connection reset) and assert the value stays or reverts with
   its copy. A case about two attributes holds the first edit and lets the second be answered, so a revert
   is proved to go to the attribute's last *admitted* value, not to the display before either edit.
-- **Build `Yello.Client` before a browser plant.** The suite serves the client's own build output
-  with `--no-build` and the test project does not reference it, so `dotnet build tests/Yello.Tests.Client`
-  leaves a planted component unserved and the plant looks uncaught. Build `Yello.Client` (or the solution).
-  **And build it in Debug** (story 2.4): the dev server is `dotnet run --no-build` with no configuration, so
-  it serves `Yello.Client/bin/Debug` whatever configuration the test project itself was built and run in.
+- **A browser plant needs no extra build step.** The suite publishes `Yello.Client` when it starts, and
+  the publish rebuilds the client from its current sources, so a planted component is in the client the
+  cases boot.
 - **What it does not prove**, stated in its remarks: the real Session cookie across origins, the
   real preflight, and anything the Host decides. Those are story 1.9's.
 - **Never wait for a client-side navigation with Playwright's URL wait.** Its default waits for
@@ -309,7 +329,7 @@ they share.
   `--motion-long-press-threshold` at each press, so a style tag (`LengthenThresholdAsync`) gives the
   case a 1,000ms window instead of racing 320ms against a loaded machine. The lower bound of a lift
   is then measured on the page's clock (press to lift >= threshold).
-- **Long-press cases run in `TouchTimingCollection`** (`DisableParallelization = true`, the same
+- **Long-press cases run in `BrowserTimingCollection`** (`DisableParallelization = true`, the same
   `ClientSurfaceFixture`): they measure time, so nothing else in the process competes with them.
 
 ### Keyboard: the Board's composite - added by story 2.8
@@ -322,6 +342,10 @@ they share.
   `KeyboardHarness.WaitForKeysAsync` polls by dispatching a cancelable `ArrowUp` on the Board's one
   tab stop (the first card, top of its column, where `↑` moves nothing) until the module prevents
   it. Never a sleep.
+- **Wait for the panel's single-line module before Enter in its title field.** `js/single-line.js` is
+  imported after the Task panel opens, and an Enter pressed before then puts a line break in the
+  textarea, which the field shows as a space. `KeyboardHarness.WaitForSingleLineAsync` polls a
+  throwaway field outside the app until the module prevents its Enter. The panel-opening helpers call it.
 - **Start each key sequence from a known focus.** Either `ResetFocusAsync` (blur, then focus the
   body - `BoardTests`' idiom) before a Tab sequence, or `FocusCardAsync(title)` before arrows. Then
   `PressAndFocusAsync(key, expected)` presses and polls where focus is, named by
@@ -413,7 +437,8 @@ inert rewrite would put the hole straight back.
 
 ## The Host process is served over HTTPS — added by story 1.4
 
-`HostProcess.RunAsync` starts `Yello.Host` on `https://127.0.0.1:0`, not `http`. That is not a
+`HostProcess.CreateStartInfo`, behind `HostProcess.RunAsync`, `RunningHost` and `HostPool`, starts
+`Yello.Host` on `https://127.0.0.1:0`, not `http`. That is not a
 preference and it is not about realism for its own sake.
 
 AC5 requires the Session cookie to carry `Secure`, so the Host sets
@@ -498,7 +523,8 @@ commit, at process start, or on the next authenticated request. There is no time
   process, so no test can swap a service in it. The Host's file-drop sender is the recording sender instead. It is
   chosen whenever `Email:DropFolder` is set (story 4.1, Q13 (a)). A case that reads mail creates a `MailDrop` and passes
   `mail.With(settings)` to `HostProcess.RunAsync`. `MailDrop.WaitForEmailToAsync(address)` waits on the file system with
-  a deadline, never a sleep. Each file is the exact JSON the Host would post to ACS.
+  a deadline, never a sleep. Each file is the exact JSON the Host would post to ACS. A case that reads mail stays on
+  `HostProcess.RunAsync`: a pooled Host (`fixture.Hosts`) cannot take settings of the case's own.
 - **Every Host has a sender.** The Host refuses to start without one, so `HostProcess.CreateStartInfo` sets
   `Email__DropFolder` to `MailDrop.Unread` and `Email__Sender` by default. An in-process Host (`HostRouteTable`) passes
   the same two settings as arguments.
@@ -679,12 +705,18 @@ behaviour belongs to MTP mode under `dotnet test`. Verify exit codes the way CI 
 ```
 dotnet restore
 dotnet tool restore     # installs the pinned Aspire CLI (Aspire.Cli 13.4.6, local tool)
-dotnet build
-dotnet test             # the gate
+dotnet build Yello.slnx
+dotnet test Yello.slnx --no-build --max-parallel-test-modules 1   # the gate: one module at a time
+dotnet test --project <proj> --no-build -- --filter-class "<Namespace.Class>"   # while iterating
 dotnet aspire run       # local orchestration, from Yello.AppHost
 ```
 
-`dotnet test` is the gate. As of story 1.9 it runs **504 tests: 503 passing, 1 skipped** (the
+A full run takes 25-30 minutes on the development machine. Iterate on the affected classes of one
+project and make one full run at the end; run it in the background, never two `dotnet test`
+processes at once. CLAUDE.md ("Build, run, verify" and "Test memory budget") holds the policy and
+the reason: each container-backed project starts a 2 GB SQL Server, and WSL is capped at 8 GB.
+
+`dotnet test Yello.slnx` is the gate. As of story 1.9 it runs **504 tests: 503 passing, 1 skipped** (the
 legacy-factor duration case): **187** architecture, **221** slice, **44** client, **35** isolation
 and **17** revocation. Merge still reports zero tests and exit 0 - it keeps the
 `--ignore-exit-code 8` switch, and `Yello.Tests.Architecture` asserts that only empty suites may.
@@ -752,6 +784,21 @@ a log cursor that waits for the request-finished line of every request a case se
 `WireDatabase` (raw SQL only for what no endpoint does yet: the refusal record, a second owned Space,
 Membership removal, Space and Account deletion, a Role change). Each class gets a world: a database
 of its own on the process's one engine, migrated, and a Host on it.
+
+**A slice case shares its class's Host by default.** Booting a Host takes about 3.3 s, and a process
+per case was most of the slice suite's run time. `HostPool` (`fixture.Hosts` on
+`MigratedDatabaseFixture`) starts the real `Yello.Host` once for each class and settings set, and
+gives each case a fresh client with no cookie container. It is still the real process, so
+`Program.cs` still runs. A case uses `HostProcess.RunAsync`, which starts a process per case, only
+when it needs one of these:
+
+- the Host's log (`HostPool` returns none);
+- settings of its own (a `MailDrop`, a rate limit, a session lifetime);
+- state that only a fresh process has: the process-start outbox sweep, the first-request refusal
+  purge, or a cold start.
+
+A pool holds at most two Hosts and throws on a third settings set, so per-case settings cannot leave
+idle processes running until the class ends.
 
 **A row that writes sends a body** (story 2.1). `ProductActor.SendAsync(surface, method, path, body,
 headers)` carries JSON and any extra header - an `Idempotency-Key`, say - on either surface: the
@@ -880,13 +927,12 @@ or P1 tiers; the test design's checklist settled that in favour of the three sta
   ```
 
   Only the projects that hold the tier's cases are run: a filter that selects nothing exits 8 (the zero-tests trap
-  above). Nightly: Slices (`BoardScaleTimingTests`) and Client (`BoardRenderCostTests`, `RealHostBoardScaleTests` - the
-  Client cases need the Debug client build). Weekly: Slices (`EnvelopeLoadTests`). The workflows run them per project
+  above). Nightly: Slices (`BoardScaleTimingTests`) and Client (`BoardRenderCostTests`, `RealHostBoardScaleTests`). Weekly: Slices (`EnvelopeLoadTests`). The workflows run them per project
   for the same reason, which also keeps `dotnet test Yello.slnx` a single job for the promotion gate.
 - **Local engines only** (R13): the scheduled workflows log in nowhere, read no secret and name no deployment target.
   Their figures are a local engine's, warm - never production evidence (R18) - and every report says so.
 - **The scale collections.** Timed scale cases share `BoardScaleCollection` (`DisableParallelization`), each class on a
-  database of its own on the suite's one engine; the browser's timed case uses `TouchTimingCollection`. A p95 is the
+  database of its own on the suite's one engine; the browser's timed case uses `BrowserTimingCollection`. A p95 is the
   nearest rank of at least 100 samples (`Yello.Tests.Shared.Percentile`, with its own `PercentileTests`), measured by the
   Host's own request-finished figure (`RunningHost.ServerDurationOfAsync`) after a warm-up.
 - **No timer touches the database** (AD-10), not even here: the envelope load runs a fixed number of iterations, never a
