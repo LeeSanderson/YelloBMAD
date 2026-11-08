@@ -432,6 +432,44 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// UX-DR34 with Lee's folding rule: names that look the same at avatar size collide too - "Ann" and "Ann " (a trailing
+    /// space), and "ann" and "Ann" - so each row of a look-alike pair carries a discriminator, the name is shown as its owner
+    /// wrote it, and no label carries an <c>@</c>. "Ann" and "Anne" stay bare: the fold is not a similarity match.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC14 - MembershipLabels' collision key is still NFC plus ordinal (Q7 (a))")]
+    [Trait("Requirement", "UX-DR34")]
+    [Trait("Requirement", "AD-23")]
+    public async Task Look_alike_names_in_the_Members_list_each_carry_a_discriminator()
+    {
+        var api = TwoSpaces("owner");
+        var (spaced, plain, lower) = (Row("Ann ", "member"), Row("Ann", "viewer"), Row("ann", "member"));
+        var distinct = Row("Anne", "member");
+
+        api.SpaceMemberships[Northwind] = [Row("Olu Owner", "owner", isYou: true), spaced, plain, lower, distinct];
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSettingsAsync(api, page, Northwind);
+            await RowOf(page, distinct).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var labels = new List<string>();
+
+            foreach (var alike in new[] { spaced, plain, lower })
+            {
+                labels.Add(await RowOf(page, alike).Locator(".membership-row__name").TextContentAsync() ?? string.Empty);
+            }
+
+            Assert.Equal(3, labels.Distinct(StringComparer.Ordinal).Count());
+            Assert.All(labels, label => Assert.Matches("^\\s*[Aa]nn\\s* · [0-9A-F]{4}\\s*$", label));
+            Assert.All(labels, label => Assert.DoesNotContain("@", label, StringComparison.Ordinal));
+            Assert.Equal("Anne", (await RowOf(page, distinct).Locator(".membership-row__name").TextContentAsync() ?? string.Empty).Trim());
+        }
+    }
+
+    /// <summary>
     /// AC1, UX-DR27, Lee's Q4 (a) - a Member and a Viewer have no Members section: Space settings reached by hand shows none,
     /// and the page never asks for the list. Anchored in the same case: as Owner of Northwind the list was read and shown.
     /// </summary>

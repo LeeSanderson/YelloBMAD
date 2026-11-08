@@ -118,6 +118,59 @@ public sealed class MembershipLabelsTests
     public void Initials_come_from_the_display_name_alone(string displayName, string expected) =>
         Assert.Equal(expected, Initials(displayName));
 
+    /// <summary>
+    /// Look-alike names collide: the collision key is the name after NFC, with
+    /// default-ignorable format characters (category <c>Cf</c>, the zero-width space among them) removed, trimmed, with runs of
+    /// whitespace collapsed to one space, compared ordinal-ignore-case. Each pair here reads as one name at avatar size, so
+    /// both get a discriminator, and neither label carries an <c>@</c>.
+    /// </summary>
+    /// <param name="first">One display name.</param>
+    /// <param name="second">A look-alike of it.</param>
+    [Theory(Skip = "red: AC6, AC14 - MembershipLabels still compares NFC ordinally; the widened collision key is not in place (Q7 (a))")]
+    [InlineData("Ann", "Ann ")]
+    [InlineData("Ann", " Ann")]
+    [InlineData("Ann", "A​nn")]
+    [InlineData("ann", "Ann")]
+    [InlineData("Ann  Lee", "Ann Lee")]
+    [InlineData("Ann\tLee", "Ann Lee")]
+    [Trait("Requirement", "AD-23")]
+    public void Look_alike_names_collide_and_both_get_a_discriminator(string first, string second)
+    {
+        var labels = Disambiguate([(First, first), (Second, second)]);
+
+        Assert.Matches(Suffixed(first), labels[First]);
+        Assert.Matches(Suffixed(second), labels[Second]);
+        Assert.NotEqual(labels[First], labels[Second]);
+        Assert.All(labels.Values, label => Assert.DoesNotContain("@", label, StringComparison.Ordinal));
+    }
+
+    /// <summary>
+    /// Only the comparison folds: a colliding name is shown exactly as its owner wrote it, case, spacing and all, followed by
+    /// the discriminator.
+    /// </summary>
+    [Fact(Skip = "red: AC6 - the widened collision key is not in place, so these two names do not collide yet (Q7 (a))")]
+    [Trait("Requirement", "AD-23")]
+    public void A_folded_collision_keeps_each_name_as_written()
+    {
+        var labels = Disambiguate([(First, "sam  lee"), (Second, "Sam Lee")]);
+
+        Assert.StartsWith("sam  lee · ", labels[First], StringComparison.Ordinal);
+        Assert.StartsWith("Sam Lee · ", labels[Second], StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// The fold is not a prefix or a similarity match: "Ann" and "Anne" are two names, and neither gets a discriminator. Green
+    /// today and after the fold; it keeps the widened key from over-reaching.
+    /// </summary>
+    [Fact]
+    [Trait("Requirement", "AD-23")]
+    public void Different_names_that_share_a_prefix_do_not_collide()
+    {
+        var labels = Disambiguate([(First, "Ann"), (Second, "Anne")]);
+
+        Assert.Equal(("Ann", "Anne"), (labels[First], labels[Second]));
+    }
+
     private static Regex Suffixed(string name) => new("^" + Regex.Escape(name) + " · [0-9A-F]{4}$", RegexOptions.None, TimeSpan.FromSeconds(1));
 
     private static Type LabelsType()

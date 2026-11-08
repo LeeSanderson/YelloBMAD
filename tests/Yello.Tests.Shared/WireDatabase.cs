@@ -994,6 +994,103 @@ public sealed class WireDatabase(string connectionString)
         return rows;
     }
 
+    /// <summary>
+    /// The Membership a Task is assigned to, read under the Task's own Space key, or <c>null</c> when it is unassigned.
+    /// Reads <c>dbo.[Task].AssigneeMembershipId</c>, a column only the assignment migration adds; only skipped scaffolds call
+    /// this until then.
+    /// </summary>
+    /// <param name="spaceId">The Task's Space.</param>
+    /// <param name="taskId">The Task.</param>
+    /// <returns>The Membership id, or <c>null</c>.</returns>
+    /// <exception cref="InvalidOperationException">The Space holds no such Task.</exception>
+    public async Task<Guid?> AssigneeOfAsync(Guid spaceId, Guid taskId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT AssigneeMembershipId FROM dbo.[Task] WHERE SpaceId = @space AND Id = @task";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+        command.Parameters.Add(new SqlParameter("@task", taskId));
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        if (!await reader.ReadAsync().ConfigureAwait(false))
+        {
+            throw new InvalidOperationException($"No Task {taskId} in {spaceId}.");
+        }
+
+        return await reader.IsDBNullAsync(0).ConfigureAwait(false) ? null : reader.GetGuid(0);
+    }
+
+    /// <summary>
+    /// Every Task in <paramref name="spaceId"/> with its Assignee, under that Space's key: (Task, Membership or <c>null</c>).
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>Each Task's id and Assignee, ordered by Task id.</returns>
+    public async Task<IReadOnlyList<(Guid TaskId, Guid? AssigneeMembershipId)>> AssigneesInAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT Id, AssigneeMembershipId FROM dbo.[Task] WHERE SpaceId = @space ORDER BY Id";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+
+        var rows = new List<(Guid, Guid?)>();
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            rows.Add((reader.GetGuid(0), await reader.IsDBNullAsync(1).ConfigureAwait(false) ? null : reader.GetGuid(1)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// The notification send records of <paramref name="spaceId"/>, read under that Space's own key: (kind, when). Reads
+    /// <c>dbo.[NotificationSend]</c>, a table only the assignment migration adds; only skipped scaffolds call this until
+    /// then.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>Each record's kind and time, oldest first.</returns>
+    public async Task<IReadOnlyList<(string Kind, DateTimeOffset RecordedAt)>> NotificationSendsInAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT Kind, RecordedAt FROM dbo.[NotificationSend] WHERE SpaceId = @space ORDER BY RecordedAt, Id";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+
+        var rows = new List<(string, DateTimeOffset)>();
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            rows.Add((reader.GetString(0), await reader.GetFieldValueAsync<DateTimeOffset>(1).ConfigureAwait(false)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// How many notification send records exist in the whole table under the session key of <paramref name="spaceId"/>,
+    /// with no <c>WHERE</c>: the FILTER predicate alone decides what is counted, so another Space's records counting here
+    /// would be the leak.
+    /// </summary>
+    /// <param name="spaceId">The Space whose key the read runs under.</param>
+    /// <returns>The count visible under that key.</returns>
+    public async Task<int> NotificationSendsVisibleUnderAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT COUNT(*) FROM dbo.[NotificationSend]";
+
+        return Convert.ToInt32(await command.ExecuteScalarAsync().ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
     private async Task<SqlConnection> OpenAsync()
     {
         var connection = new SqlConnection(connectionString);

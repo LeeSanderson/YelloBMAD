@@ -108,6 +108,38 @@ public sealed class ListViewGateTests
     }
 
     /// <summary>
+    /// The sorts offered are exactly four distinct stable codes - Status, due date, Label and Assignee - and
+    /// the Assignee's is <c>assignee</c>, mapped to <c>AssigneeMembershipId</c> (grouped by Membership, Unassigned
+    /// last). Replaces <see cref="The_offered_sorts_are_exactly_three_and_none_is_the_Assignee"/> in the commit that adds the
+    /// sort; that gate goes red at that moment, as designed.
+    /// </summary>
+    [Fact(Skip = "red: AC7 - ListSorts offers no Assignee sort and ListSortColumns has no assignee entry yet (Q6 (a))")]
+    [Trait("Requirement", "FR-30")]
+    public void The_offered_sorts_are_exactly_four_and_the_Assignee_is_among_them()
+    {
+        var sorts = SortCodes();
+
+        Assert.Equal(4, sorts.Count);
+        Assert.Equal(sorts.Count, sorts.Distinct(StringComparer.Ordinal).Count());
+        Assert.Contains("assignee", sorts);
+        Assert.Equal("AssigneeMembershipId", SortColumnMap()["assignee"]);
+    }
+
+    /// <summary>
+    /// P-4 for the Assignee sort, by name: the EF model holds an index on <c>Task</c> whose key columns are exactly
+    /// <c>(SpaceId, ProjectId, AssigneeMembershipId, Id)</c>, which the generic index gate then finds for the
+    /// <c>assignee</c> code.
+    /// </summary>
+    [Fact(Skip = "red: AC7 - the Assignee sort's composite index is not in the model yet")]
+    [Trait("Requirement", "FR-30")]
+    public void The_Assignee_sort_has_its_composite_index_in_the_model()
+    {
+        using var context = new YelloDbContextFactory().CreateDbContext([]);
+
+        Assert.True(HasIndexOn(context.Model, ["SpaceId", "ProjectId", "AssigneeMembershipId", "Id"]), "No index on Task (SpaceId, ProjectId, AssigneeMembershipId, Id).");
+    }
+
+    /// <summary>
     /// AC22, Q1 (a) - the List route is stated once in <c>Yello.Contracts</c>, beside the Board's.
     /// </summary>
     [Fact]

@@ -327,7 +327,12 @@ AC1 to AC7 are reproduced **verbatim** from `epics.md:1844-1875` and numbered by
 ## Tasks / Subtasks
 
 - [ ] **Task 0: decisions** (before any code)
-  - [ ] Q1, Q4, Q7 and Q10 are marked **[LEE]**. If the orchestrator routes them to Lee, record the answers here under "Decided by Lee" before ATDD. Otherwise take each recommendation and record it as "Qn - (x)" with its cost in Completion Notes.
+  - [x] Q1, Q4, Q7 and Q10 are marked **[LEE]**. If the orchestrator routes them to Lee, record the answers here under "Decided by Lee" before ATDD. Otherwise take each recommendation and record it as "Qn - (x)" with its cost in Completion Notes.
+    - **Decided by Lee (2026-11-08):**
+      - Q1 - (a): a separate `PUT .../tasks/{taskId}/assignee` route under `Capability.AssignTask`, answering `200 TaskResponse`. The PATCH and its gates stay unchanged.
+      - Q4 - (a): a Space-scoped `NotificationSend` table under the policy, written by `OutboxStore` at enqueue in the request's transaction, for every kind. Retention sub-question: (a), cascade with the Space.
+      - Q7 - (a): the collision key is NFC, then strip `Cf` code points, trim, collapse whitespace, and compare ordinal-ignore-case. Confusables return to the ledger, owned by Lee/UX.
+      - Q10 - (a): no Invitation rate limit in this story. The ledger entry is re-owned to Lee/PM.
   - [ ] Decide Q2, Q3, Q5, Q6, Q8, Q9 and Q11 the same way. Each recommendation is the default.
 - [ ] **Task 1: Domain** (AC2, AC3)
   - [ ] `TaskItem.AssigneeMembershipId` (`Guid?`). `ITaskStore` (or a new `ITaskAssignments` port, if S1200 or cohesion argue for it) gains `AssignAsync(taskId, membershipId?) → AssignOutcome(Assigned(previous), NoSuchTask, InvalidAssignee)`.
@@ -683,6 +688,49 @@ The cycle is: story; decisions recorded; ATDD scaffolds (`Skip = "red: ..."`, `a
 - `tests/TESTING-CONVENTIONS.md`: `:30-73`, `:87-200`, `:209-305`, `:517-543`, `:545-563`, `:565-585`, `:756-877`.
 - `deferred-work.md`: `:628`, `:736`, `:754`, `:802`, `:811`.
 - Story files: `4-5-remove-a-membership-or-leave-a-space.md` (Q9, C1, Debug Log), `4-4-manage-memberships-and-roles.md` (Q5, Q13: `MembershipLabels`), `4-1-invite-an-email-address-to-a-space-at-a-role.md` (Q6, Q7: the outbox), `2-10-view-a-project-as-a-filterable-sortable-list.md` (AC2, AC4-AC6, AC10, AC15-AC17).
+
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-4-6-assign-a-task-and-be-told.md` (decisions, seed constraints,
+findings, the active tests that go red by design when the Assignee lands).
+
+| File | Cases (methods) | ACs | Green today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AssignTask.cs` | 27 (17) | AC1-AC5, AC8, AC9 | none |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AssignTaskRace.cs` | 3 (3) | AC8, AC9 (races 1-3) | none |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.AssignSchema.cs` | 4 (4) | AC2, AC5, AC7 | none |
+| `tests/Yello.Tests.Slices/Lists/ListPagingTests.Assignee.cs` | 5 (4) | AC7 (P-3, P-4, NFR-5) | none |
+| `tests/Yello.Tests.Slices/Memberships/MembershipLabelsTests.cs` (3 added) | 8 (3) | AC6, AC14 (Q7) | `Different_names_that_share_a_prefix_do_not_collide` (standing gate) |
+| `tests/Yello.Tests.Isolation/IsolationCases.Assignment.cs` | 9 rows x 2 surfaces, `PendingUntil: "4.6"` | AC1, AC7, AC12 | pending |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Assignment.cs` | 10 (10) | AC1, AC2, AC4-AC6, AC10, AC13 | none |
+| `tests/Yello.Tests.Architecture/ListViewGateTests.cs` (2 added) | 2 (2) | AC7 | none |
+| `tests/Yello.Tests.Client/AssigneeTests.cs` (new class, existing fixtures) | 9 (9) | AC6, AC7, AC10, AC11 | none |
+| `tests/Yello.Tests.Client/MembershipSectionTests.cs` (1 added) | 1 (1) | AC14 | none |
+
+Supporting: `tests/Yello.Tests.Shared/AssignmentWire.cs` (temporary route, problem-type and List-parameter stand-ins to swap
+for the contract members and delete), new `WireDatabase` and `MailDrop` readers, and `tests/Yello.Tests.Client/FakeYelloApi.Assignees.cs`
+(plus `FakeTask.AssigneeMembershipId` and the fake List's Assignee filter and sort).
+
+Activation order, riskiest assumption first:
+
+1. `A_removal_queued_behind_an_assignment_of_its_target_unassigns_and_answers_204` (race 2: the NO ACTION composite key plus
+   an explicit unassign under the Memberships lock never lets a removal fail `547`).
+2. The schema cases in `TaskEndpointTests.AssignSchema.cs` and the EF-model gate
+   `The_Assignee_is_a_composite_no_action_reference_to_Membership_in_the_model`.
+3. `An_assigned_Member_is_removed_...`, `An_assigned_Member_leaves_...`, `A_refused_removal_leaves_the_targets_Tasks_assigned`,
+   `Deleting_a_Space_that_holds_an_assigned_Task_...`.
+4. The assignment route: the routes and capability gates, then `An_Owner_an_Admin_or_a_Member_assigns_...`, the Token, body,
+   foreign-id, Viewer and demotion cases, then races 1 and 3.
+5. The candidates read and its contract gate.
+6. The email and the send record: I-14, self, change-only, rollback, send-record, replay; the template, outbox-kind and
+   no-reader gates.
+7. The List: the two `ListViewGateTests` gates, then `ListPagingTests.Assignee.cs`.
+8. `MembershipLabelsTests` look-alike cases (rewrite `Names_are_compared_ordinally_after_NFC` in the same change).
+9. The isolation rows (all nine live before review, GATE-003).
+10. The client: `AssigneeTests`, then the `MembershipSectionTests` look-alike case.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the
+correction recorded in the Debug Log, not deleted.
 
 ## Dev Agent Record
 

@@ -158,6 +158,30 @@ public sealed class MailDrop : IDisposable
         return emails.Single(email => string.Equals(email.To, recipient, StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// Waits until an email to <paramref name="recipient"/> that satisfies <paramref name="matching"/> has been dropped, for an address that already holds another kind of email (an Account that joined through an
+    /// Invitation and is then assigned a Task).
+    /// </summary>
+    /// <param name="recipient">The address, as submitted.</param>
+    /// <param name="matching">Which of its emails count.</param>
+    /// <returns>Every matching email to it by then.</returns>
+    public Task<IReadOnlyList<DroppedEmail>> WaitForEmailsToAsync(string recipient, Func<DroppedEmail, bool> matching) =>
+        WaitForEmailsToAsync(recipient, matching, 1);
+
+    /// <summary>
+    /// As <see cref="WaitForEmailsToAsync(string, Func{DroppedEmail, bool})"/>, until <paramref name="count"/> have arrived.
+    /// </summary>
+    /// <param name="recipient">The address, as submitted.</param>
+    /// <param name="matching">Which of its emails count.</param>
+    /// <param name="count">How many must have arrived.</param>
+    /// <returns>Every matching email to it by then.</returns>
+    public Task<IReadOnlyList<DroppedEmail>> WaitForEmailsToAsync(string recipient, Func<DroppedEmail, bool> matching, int count)
+    {
+        ArgumentNullException.ThrowIfNull(matching);
+
+        return WaitForMatchingAsync(recipient, matching, count);
+    }
+
     /// <inheritdoc />
     public void Dispose()
     {
@@ -173,6 +197,17 @@ public sealed class MailDrop : IDisposable
         {
             // As above.
         }
+    }
+
+    private async Task<IReadOnlyList<DroppedEmail>> WaitForMatchingAsync(string recipient, Func<DroppedEmail, bool> matching, int count)
+    {
+        bool Counts(DroppedEmail email) => string.Equals(email.To, recipient, StringComparison.Ordinal) && matching(email);
+
+        var emails = await WaitForAsync(
+            dropped => dropped.Count(Counts) >= count,
+            $"{count} matching email(s) to {recipient}").ConfigureAwait(false);
+
+        return [.. emails.Where(Counts)];
     }
 
     private async Task<IReadOnlyList<DroppedEmail>> WaitForAsync(Func<IReadOnlyList<DroppedEmail>, bool> arrived, string what)

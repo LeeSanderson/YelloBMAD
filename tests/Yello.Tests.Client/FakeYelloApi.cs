@@ -14,6 +14,7 @@ using Yello.Contracts.Labels;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
 using Yello.Contracts.Tasks;
+using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -701,7 +702,7 @@ internal sealed partial class FakeYelloApi
                 // Story 4.3: the Invitation view's token header (Lee's Q4 (a)), which a cross-origin request may
                 // carry only once the preflight allows it - as the Host's CrossOriginPolicy must.
                 ["Access-Control-Allow-Headers"] = $"content-type, {Antiforgery.HeaderName}, {Idempotency.HeaderName}, {InvitationRoutes.TokenHeader}",
-                ["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE",
+                ["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE",
                 ["Vary"] = "Origin",
             },
         }).ConfigureAwait(false);
@@ -744,6 +745,13 @@ internal sealed partial class FakeYelloApi
         if (await MembershipAsync(request).ConfigureAwait(false) is { } membership)
         {
             return membership;
+        }
+
+        // The candidates read and the assignment (FakeYelloApi.Assignees.cs). Both fell to the unmatched 404 before, and no
+        // earlier case sends either.
+        if (await AssigneeAsync(request).ConfigureAwait(false) is { } assignee)
+        {
+            return assignee;
         }
 
         switch (request.Method, request.Path)
@@ -1535,7 +1543,7 @@ internal sealed partial class FakeYelloApi
 
         var request = FakeListQuery.Parse(query);
 
-        if (request.Sort is not ("status" or "due-date" or "label"))
+        if (request.Sort is not ("status" or "due-date" or "label" or "assignee"))
         {
             return (400, Problem(InvalidListQueryType));
         }
@@ -1592,6 +1600,7 @@ internal sealed partial class FakeYelloApi
         {
             "status" => tasks.OrderBy(task => order.GetValueOrDefault(task.StatusId)),
             "due-date" => tasks.OrderBy(task => task.DueDate is null ? 1 : 0).ThenBy(task => task.DueDate),
+            "assignee" => tasks.OrderBy(task => task.AssigneeMembershipId is null ? 1 : 0).ThenBy(task => task.AssigneeMembershipId is { } id ? new System.Data.SqlTypes.SqlGuid(id) : System.Data.SqlTypes.SqlGuid.Null),
             _ => tasks.OrderBy(task => FirstLabelName(task) is null ? 1 : 0).ThenBy(FirstLabelName, StringComparer.Ordinal), // Latin1_General_100_BIN2: ordinal, case-sensitive
         };
 
@@ -2181,6 +2190,16 @@ internal sealed record FakeListQuery(
     string? After)
 {
     /// <summary>
+    /// Any-of Assignees, by Membership id; empty, with <see cref="Unassigned"/> off, for any Assignee or none.
+    /// </summary>
+    public IReadOnlyList<Guid> AssigneeIds { get; init; } = [];
+
+    /// <summary>
+    /// Whether unassigned Tasks match the Assignee filter (the <c>unassigned</c> flag).
+    /// </summary>
+    public bool Unassigned { get; init; }
+
+    /// <summary>
     /// Reads a query string (with or without its leading <c>?</c>).
     /// </summary>
     /// <param name="query">The query string.</param>
@@ -2202,7 +2221,11 @@ internal sealed record FakeListQuery(
             Instant(Single("dueFrom")),
             Instant(Single("dueTo")),
             string.Equals(Single("dueNone"), "true", StringComparison.OrdinalIgnoreCase),
-            Single("after"));
+            Single("after"))
+        {
+            AssigneeIds = Ids(AssignmentWire.AssigneeParameter),
+            Unassigned = string.Equals(Single(AssignmentWire.UnassignedParameter), "true", StringComparison.OrdinalIgnoreCase),
+        };
     }
 
     /// <summary>
@@ -2211,7 +2234,11 @@ internal sealed record FakeListQuery(
     /// <param name="task">The Task.</param>
     /// <returns>Whether it matches.</returns>
     public bool Matches(FakeTask task) =>
-        InStatus(task) && CarriesALabel(task) && IsDue(task);
+        InStatus(task) && CarriesALabel(task) && IsDue(task) && IsAssigned(task);
+
+    private bool IsAssigned(FakeTask task) =>
+        (AssigneeIds.Count == 0 && !Unassigned)
+        || (task.AssigneeMembershipId is { } assignee ? AssigneeIds.Contains(assignee) : Unassigned);
 
     private bool InStatus(FakeTask task) => StatusIds.Count == 0 || StatusIds.Contains(task.StatusId);
 
@@ -2332,6 +2359,10 @@ internal sealed class FakeColumn(Guid statusId, string name, int total, List<Fak
 /// every case written before 2.4 is served the bytes it always was; a Labels edit always sets it (<c>[]</c> when
 /// cleared).
 /// </param>
+/// <param name="AssigneeMembershipId">
+/// Its Assignee's Membership, or <c>null</c> - an appended field (AD-19). <c>null</c> is left out of the body, so every case
+/// written before assignment existed is served the bytes it always was.
+/// </param>
 internal sealed record FakeTask(
     Guid Id,
     string Title,
@@ -2339,7 +2370,8 @@ internal sealed record FakeTask(
     string PositionKey,
     DateTimeOffset CreatedAt,
     DateTimeOffset? DueDate = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<Guid>? LabelIds = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<Guid>? LabelIds = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? AssigneeMembershipId = null);
 
 /// <summary>
 /// One Label as the fake serves it - the shape of story 2.4 Task 4's <c>LabelResponse</c> (<c>{id, name, colour}</c>).
