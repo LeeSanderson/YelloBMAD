@@ -109,19 +109,28 @@ internal static class NotAvailableFloor
 
         if (result is IStatusCodeHttpResult { StatusCode: StatusCodes.Status404NotFound })
         {
-            var remaining = floor - clock.GetElapsedTime(started);
+            // One timer is not a deadline. Windows fires a timer on its ~15.6 ms tick and can fire it up to a
+            // tick early, so a single delay ended the answer one tick before or after the floor depending on how
+            // long the work took: two answers whose work differed by a millisecond landed a whole tick apart.
+            // Waiting until the clock itself says the floor has passed ends every answer at the first tick after
+            // the floor, whatever the work took. Task.Delay truncates to whole milliseconds, so each wait is
+            // rounded up, or a sub-millisecond remainder would be no wait at all and the loop would spin.
+            TimeSpan remaining;
 
-            if (remaining > TimeSpan.Zero)
+            while ((remaining = floor - clock.GetElapsedTime(started)) > TimeSpan.Zero)
             {
                 // Not the request's token: a client that disconnects does not get to learn the duration by
                 // cancelling, and the wait holds no lock and no database connection
                 // (the unit of work has ended), though the client's request stays open for it.
-                await Task.Delay(remaining, clock, CancellationToken.None).ConfigureAwait(false);
+                await Task.Delay(WholeMillisecondsAtLeast(remaining), clock, CancellationToken.None).ConfigureAwait(false);
             }
         }
 
         return result;
     }
+
+    private static TimeSpan WholeMillisecondsAtLeast(TimeSpan duration) =>
+        TimeSpan.FromMilliseconds(Math.Ceiling(duration.TotalMilliseconds));
 }
 
 /// <summary>
