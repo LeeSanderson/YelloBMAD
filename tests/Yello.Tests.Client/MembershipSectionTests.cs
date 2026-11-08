@@ -76,7 +76,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
         """;
 
     /// <summary>
-    /// Installed before any page script (ledger <c>:550</c>): the text each <c>.space-home__narration</c> element holds at the
+    /// Installed before any page script (ledger <c>:550</c>): the text each <c>.role-narration</c> element holds at the
     /// moment it is inserted, in <c>window.__narrationAtInsert</c>.
     /// </summary>
     private const string RecordNarrationAtInsert =
@@ -86,7 +86,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
             for (const record of records) {
                 for (const node of record.addedNodes) {
                     if (!(node instanceof Element)) continue;
-                    const found = node.matches('.space-home__narration') ? [node] : [...node.querySelectorAll('.space-home__narration')];
+                    const found = node.matches('.role-narration') ? [node] : [...node.querySelectorAll('.role-narration')];
                     for (const region of found) window.__narrationAtInsert.push(region.textContent.trim());
                 }
             }
@@ -364,10 +364,11 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// AC10, UX-DR29 - an Admin whose own authority was lost meanwhile: the change answers <c>403</c>, the client re-reads
-    /// the Role (now Member), and Space settings is no longer permitted, so it follows the existing narrated exit to Space
-    /// home ("You're now a Member. Space settings is no longer available."). Anchor: as Admin the section and its control
-    /// were shown. The capability-shaped copy is the other arm, when the re-read still permits the section.
+    /// AC10, UX-DR29, UX-DR39 - an Admin whose own authority was lost meanwhile: the change answers <c>403</c> carrying the
+    /// Member Role, and Space settings is no longer permitted, so the Role narration says "You're now a Member. Space
+    /// settings is no longer available.", takes focus, and the page routes to Space home, where the narration keeps focus.
+    /// The Admin-limit copy never appears. Anchor: as Admin the section and its control were shown. The capability-shaped
+    /// copy is the other arm, when the Role still permits the section.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -391,10 +392,11 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
             api.NextRoleChangeRefusal = (403, ProblemTypes.InsufficientRole, MembershipWire.CapabilityCode);
 
             await ChooseRoleAsync(page, member, "Viewer");
-            await page.Locator(".space-home__narration", new PageLocatorOptions { HasText = "You're now a Member. Space settings is no longer available." })
+            await page.Locator(".role-narration", new PageLocatorOptions { HasText = "You're now a Member. Space settings is no longer available." })
                 .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.WaitForFunctionAsync("path => location.pathname === path", $"/spaces/{Northwind:D}", new PageWaitForFunctionOptions { Timeout = Timeout, PollingInterval = 50 });
 
-            Assert.EndsWith($"/spaces/{Northwind:D}", new Uri(page.Url).AbsolutePath, StringComparison.Ordinal);
+            Assert.True(await page.Locator(".role-narration").EvaluateAsync<bool>("e => e === document.activeElement"), "Focus left the narration.");
             Assert.DoesNotContain(AdminLimitCopy, await page.Locator("main").TextContentAsync() ?? string.Empty, StringComparison.Ordinal);
         }
     }
@@ -609,15 +611,15 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// Ledger <c>deferred-work.md:550</c>, Q15 (a), UX-DR29 - Space home's <c>space-home__narration</c> region is in the
-    /// first rendered DOM <b>empty</b>, and holds the narrated sentence afterwards, so a screen reader announces it (the
+    /// Ledger <c>deferred-work.md:550</c>, Q15 (a), UX-DR29 - the Role narration under the context bar is in the first
+    /// rendered DOM <b>empty</b>, and holds the narrated sentence afterwards, so a screen reader announces it (the
     /// <c>BoardView</c> announcement-region pattern). Reached through the AC10 narrated exit. 3.2's purge behaviour is
     /// unchanged. Plant 17: the region rendered filled.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
     [Trait("Requirement", "UX-DR29")]
-    public async Task The_Space_home_narration_region_is_inserted_empty_and_filled_after_the_first_render()
+    public async Task The_Role_narration_region_is_inserted_empty_and_filled_after_the_first_render()
     {
         var api = TwoSpaces("admin");
         var member = Row("Mo Member", "member");
@@ -636,7 +638,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
             api.NextRoleChangeRefusal = (403, ProblemTypes.InsufficientRole, MembershipWire.CapabilityCode);
 
             await ChooseRoleAsync(page, member, "Viewer");
-            await page.Locator(".space-home__narration", new PageLocatorOptions { HasText = "Space settings is no longer available." })
+            await page.Locator(".role-narration", new PageLocatorOptions { HasText = "Space settings is no longer available." })
                 .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             var atInsert = await page.EvaluateAsync<string[]>("() => window.__narrationAtInsert");
@@ -1052,7 +1054,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// copy from the stale Role first - the log then holds the Admin limit.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the section chooses the Admin-limit copy from the stale Role before the re-read")]
+    [Fact]
     [Trait("Requirement", "UX-DR29")]
     [Trait("Requirement", "NFR-2")]
     public async Task A_demoted_Admins_refused_confirm_read_never_shows_the_Admin_limit()
@@ -1097,7 +1099,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// confirm is still open, and its Remove still there.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - a late refused confirm read closes whichever confirm is open")]
+    [Fact]
     [Trait("Requirement", "UX-DR36")]
     public async Task A_late_refused_confirm_read_never_closes_another_rows_confirm()
     {

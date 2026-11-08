@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.Playwright;
 using Xunit;
 using Yello.Contracts.Spaces;
@@ -34,8 +35,6 @@ namespace Yello.Tests.Client;
 [Trait("Requirement", "UX-DR38")]
 public sealed class RoleDropTests(ClientSurfaceFixture surface)
 {
-    private const string Red = "red: AC4 - the client reads no Role header and has no Role narration yet";
-
     private const float Timeout = 30_000;
     private const string EnglishLocale = "en-GB";
     private const string ContextBar = "nav.context-bar";
@@ -96,9 +95,11 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
         }
         """;
 
-    private static readonly string[] BoardAffordances = ["main button.board__add", ".task-card__actions", ".task-card--movable"];
+    private static readonly string[] BoardAffordances = [".board-column__add", ".task-card__actions", ".task-card--movable"];
 
-    private static readonly string[] SpaceHomeAffordances = ["nav.context-bar a[href$='/settings']"];
+    private static readonly string[] SpaceHomeAffordances = ["a.context-bar__settings"];
+
+    private static readonly JsonSerializerOptions WebJson = new(JsonSerializerDefaults.Web);
 
     private static readonly string[] StatusNames = ["Todo", "Doing", "Done"];
 
@@ -107,19 +108,19 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
     private static readonly Guid Atlas = Guid.NewGuid();
 
     /// <summary>
-    /// A Member on the Board becomes a Viewer; the next request (opening a Task) answers with the Viewer Role, and the
+    /// A Member on the Board becomes a Viewer; the next request (a same-page navigation's re-read) answers with the Viewer Role, and the
     /// narration "You're now a Viewer. Read only in this Space." is rendered <b>before</b> the first affordance - the add
     /// control, a card's actions, a drag handle - is removed. The narration names no Space, and afterwards no affordance is
     /// left. Plant: apply the Role before raising the drop - the log's order inverts.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "AD-9")]
     public async Task A_drop_on_the_Board_is_narrated_before_any_affordance_is_removed()
     {
         var api = Spaces("member");
-        var tasks = SeedBoard(api);
+        _ = SeedBoard(api);
         var (context, page) = await surface.OpenAsync(EnglishLocale);
 
         await using (context)
@@ -129,7 +130,7 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
 
             api.Roles[Northwind] = "viewer";
 
-            await OpenPanelAsync(page, tasks[0].Id);
+            await RequestAgainAsync(page);
             await page.Locator(Narration, new PageLocatorOptions { HasText = NowAViewer }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await page.Locator(".task-card__actions").First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
 
@@ -154,7 +155,7 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
     /// field when the answer lands.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     public async Task Focus_in_a_removed_control_moves_to_the_narration_and_never_to_the_body()
     {
@@ -187,7 +188,7 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
     /// heard. The request that carries the drop is a same-Space navigation's re-read, which keeps the Board and its cards.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     public async Task Focus_on_a_control_the_drop_keeps_stays_where_it_is()
     {
@@ -217,7 +218,7 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
     /// with the Member Role; "You're now a Member." is narrated before the context bar's Space-settings link is removed.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     public async Task An_Admin_on_Space_home_demoted_to_Member_loses_the_settings_link_after_the_narration()
     {
@@ -254,12 +255,12 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
     /// focus unmoved, and the Member's controls appear.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR28")]
     public async Task A_rise_is_said_politely_and_the_controls_appear()
     {
         var api = Spaces("viewer");
-        var tasks = SeedBoard(api);
+        _ = SeedBoard(api);
         var (context, page) = await surface.OpenAsync(EnglishLocale);
 
         await using (context)
@@ -269,7 +270,7 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
 
             api.Roles[Northwind] = "member";
 
-            await OpenPanelAsync(page, tasks[0].Id);
+            await RequestAgainAsync(page);
             await page.Locator(BarPolite, new PageLocatorOptions { HasText = NowAMember }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await page.Locator(".task-card__actions").First.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
@@ -286,13 +287,13 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
     /// by the narration - the bar's polite switch announcement says nothing.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR28")]
     [Trait("Requirement", "X-8")]
     public async Task The_chip_and_the_accessible_name_follow_a_drop_and_a_rise()
     {
         var api = Spaces("member");
-        var tasks = SeedBoard(api);
+        _ = SeedBoard(api);
         var (context, page) = await surface.OpenAsync(EnglishLocale);
 
         await using (context)
@@ -302,17 +303,15 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
 
             api.Roles[Northwind] = "viewer";
 
-            await OpenPanelAsync(page, tasks[0].Id);
+            await RequestAgainAsync(page);
             await page.Locator(RoleChip, new PageLocatorOptions { HasText = "Viewer" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             Assert.Equal($"{NorthwindName} — Viewer, read only in this Space", await page.Locator(ContextBar).GetAttributeAsync("aria-label"));
             Assert.Equal(0, await page.Locator("nav.context-bar .role-chip a, nav.context-bar a .role-chip, nav.context-bar button .role-chip, nav.context-bar .role-chip button").CountAsync());
 
-            await page.Keyboard.PressAsync("Escape");
-
             api.Roles[Northwind] = "member";
 
-            await OpenPanelAsync(page, tasks[1].Id);
+            await RequestAgainAsync(page);
             await page.Locator(RoleChip, new PageLocatorOptions { HasText = "Member" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             Assert.Equal($"{NorthwindName} — Member, can create and edit Projects and Tasks", await page.Locator(ContextBar).GetAttributeAsync("aria-label"));
@@ -331,7 +330,7 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
     /// focus from it. Plants: route before narrating; leave focus on the heading; re-render settings under the lower Role.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - Space settings narrates the exit politely through Space home, focuses the heading, and can flash the refusal")]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     [Trait("Requirement", "UX-DR29")]
     public async Task The_demoted_Admin_in_Space_settings_is_told_focused_then_routed_and_never_half_rendered()
@@ -370,7 +369,7 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
             await page.WaitForFunctionAsync("path => location.pathname === path", $"/spaces/{Northwind:D}", new PageWaitForFunctionOptions { Timeout = Timeout, PollingInterval = 50 });
             await page.Locator(Narration, new PageLocatorOptions { HasText = SettingsGone }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
-            var frames = await page.EvaluateAsync<Frame[]>("() => window.__frames");
+            var frames = JsonSerializer.Deserialize<Frame[]>(await page.EvaluateAsync<string>("() => JSON.stringify(window.__frames)"), WebJson) ?? [];
             var settings = $"/spaces/{Northwind:D}/settings";
             var firstHome = Array.FindIndex(frames, frame => frame.Path != settings);
 
@@ -382,18 +381,18 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// Two tabs of one Account: tab 1 on Northwind, tab 2 on Harbour. Northwind's Role drops; tab 1 narrates on its next
+    /// Two tabs of one Account: tab 1 on Northwind's Board, tab 2 on Harbour. Northwind's Role drops; tab 1 narrates on its next
     /// request; tab 2, which also requests, never shows the narration and its chip is unchanged. Plant: a
     /// <c>BroadcastChannel</c> post of the narration - tab 2 then narrates.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR38")]
     [Trait("Requirement", "UX-DR31")]
     public async Task A_drop_is_narrated_only_in_the_tab_showing_that_Space()
     {
         var api = Spaces("member");
-        var tasks = SeedBoard(api);
+        _ = SeedBoard(api);
         var (context, first) = await surface.OpenAsync(EnglishLocale);
 
         await using (context)
@@ -408,13 +407,16 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
 
             api.Roles[Northwind] = "viewer";
 
-            await OpenPanelAsync(first, tasks[0].Id);
+            await RequestAgainAsync(first);
             await first.Locator(Narration, new PageLocatorOptions { HasText = NowAViewer }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             // Tab 2 makes a request of its own after the drop: a same-Space navigation re-reads Harbour.
             var before = api.RequestCount;
 
-            await second.EvaluateAsync("path => Blazor.navigateTo(path)", $"/spaces/{Harbour:D}");
+            await second.RunAndWaitForResponseAsync(
+                () => second.EvaluateAsync("path => Blazor.navigateTo(path)", $"/spaces/{Harbour:D}"),
+                response => response.Url.Contains($"/spaces/{Harbour:D}", StringComparison.Ordinal),
+                new PageRunAndWaitForResponseOptions { Timeout = Timeout });
             await second.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
             Assert.True(api.RequestCount > before, "Tab 2 sent nothing after the drop, so its silence proves nothing.");
@@ -431,7 +433,7 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
     /// the switch aborts the held request before its answer reaches the handler; confirm the plant reddens it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR38")]
     [Trait("Requirement", "UX-DR31")]
     public async Task A_late_answer_for_the_Space_the_tab_left_is_never_narrated()
@@ -469,7 +471,7 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
     /// sends no request. Anchor: loading the Board sent requests. Plant: a client <c>PeriodicTimer</c> re-reading the Role.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - activate with the Role entry point; it may be green today, and then stands as the no-poll gate")]
+    [Fact]
     [Trait("Requirement", "AD-9")]
     [Trait("Requirement", "AD-10")]
     public async Task An_idle_tab_sends_no_request()
@@ -529,6 +531,13 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
 
         return [.. columns[0].Tasks];
     }
+
+    /// <summary>
+    /// Sends the tab's next ordinary request: a navigation to the address it already shows re-reads the Space in place.
+    /// Opening a Task panel would not do - the panel reads the Board's replica and sends nothing.
+    /// </summary>
+    private static Task RequestAgainAsync(IPage page) =>
+        page.EvaluateAsync("() => Blazor.navigateTo(location.pathname)");
 
     private static async Task OpenPanelAsync(IPage page, Guid taskId)
     {

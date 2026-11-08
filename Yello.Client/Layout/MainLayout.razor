@@ -28,12 +28,15 @@
     which would resolve against <base href="/"> and send the router to "/#main". It moves focus to the
     page's heading (PageHeadingFocus), or to <main> on a page that registers none, so a keyboard user
     passes the bar in one step.
+
+    THE ROLE NARRATION sits directly under the bar, so a Role drop is said in one place whichever surface it lands on.
 *@
 
 @if (ShowsContextBar)
 {
     <button type="button" class="skip-control" @onclick="SkipAsync">@Localizer["SkipToContent"]</button>
     <ContextBar />
+    <RoleNarration />
 }
 
 <main tabindex="-1" @ref="_main">

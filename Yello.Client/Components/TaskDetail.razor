@@ -84,7 +84,7 @@
 
         @if (!_confirming && CanManage)
         {
-            <div class="task-detail__field">
+            <div class="task-detail__field" data-role-gated>
                 <label class="form-field__label" for="@TitleId">@Localizer["TaskDetailTitleLabel"]</label>
                 @* A textarea so a long title wraps rather than being cut off by its box (WCAG 1.4.12); still one line -
                    js/single-line.js stops Enter's newline and turns a pasted line break into a space. *@
@@ -293,7 +293,7 @@
 
         @if (!_confirming && CanManage)
         {
-            <div class="task-detail__field">
+            <div class="task-detail__field" data-role-gated>
                 <button type="button" class="button-secondary task-detail__delete" @onclick="AskToDeleteAsync" @ref="_delete">@Localizer["TaskDelete"]</button>
             </div>
         }

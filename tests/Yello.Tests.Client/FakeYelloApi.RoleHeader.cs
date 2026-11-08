@@ -1,6 +1,5 @@
 using Yello.Contracts;
 using Yello.Contracts.Spaces;
-using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -89,7 +88,7 @@ internal sealed partial class FakeYelloApi
     /// </summary>
     private void AddRoleHeader(Dictionary<string, string> headers, FakeRequest request, int status, string body)
     {
-        headers["Access-Control-Expose-Headers"] = RoleHeaderWire.HeaderName;
+        headers["Access-Control-Expose-Headers"] = RoleHeader.HeaderName;
 
         if (!EchoesRole
             || string.Equals(request.Method, "OPTIONS", StringComparison.Ordinal)
@@ -104,7 +103,7 @@ internal sealed partial class FakeYelloApi
 
         if (judged)
         {
-            headers[RoleHeaderWire.HeaderName] = role;
+            headers[RoleHeader.HeaderName] = role;
         }
     }
 

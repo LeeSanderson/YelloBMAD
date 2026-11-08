@@ -930,9 +930,9 @@
     Nothing on it may refuse to wrap, and a long Label name breaks rather than widening the card.
 */
 /*
-    A MOVER'S CARD HEAD (story 2.6, open question 6 (a)): the title and the actions control side by side, the title
-    taking the room and wrapping, the control a fixed target at the end. Always rendered - never revealed on hover
-    (UX-DR21) - and absent for a Role that cannot move Tasks.
+    THE CARD HEAD: the title and, for a mover, the actions control side by side, the
+    title taking the room and wrapping, the control a fixed target at the end. The control is always rendered - never
+    revealed on hover - and absent for a Role that cannot move Tasks.
 */
 .task-card__head {
     display: flex;
@@ -1408,7 +1408,6 @@
     padding-inline: var(--space-4);
 }
 
-.space-settings__refusal,
 .space-home__narration {
     margin-block: var(--space-3) 0;
 }
@@ -1423,6 +1422,21 @@
 
 .space-home__narration:empty {
     margin-block: 0;
+    padding-inline: 0;
+}
+
+/*
+    THE ROLE NARRATION under the context bar: in the DOM from the first render and empty until a Role change is said,
+    taking no room until then. A programmatic focus target, so its focus ring is the product's own.
+*/
+.role-narration {
+    margin: 0;
+    padding-block: var(--space-2);
+    padding-inline: var(--space-4);
+}
+
+.role-narration:empty {
+    padding-block: 0;
     padding-inline: 0;
 }
 

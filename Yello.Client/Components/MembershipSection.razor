@@ -600,15 +600,30 @@
     }
 
     /// <summary>
-    /// A <c>403</c> on a change. The authority may have been lost meanwhile: the Role is asked again, and a Role that no
-    /// longer permits Space settings follows the page's narrated exit. For an Admin it is the Admin's limit, said on the row;
-    /// for any other Role the refusal's own copy (code review 2026-11-03).
+    /// A <c>403</c> on a change. The authority may have been lost meanwhile, so the copy is chosen from the Role the server
+    /// holds now, never the one this section rendered with: an answer carrying its Role has already reconciled it, and one
+    /// that did not is asked again first. A Role that no longer permits Space settings follows the page's narrated exit and
+    /// nothing is said on the row; a changed Role that still does gets the refusal's own copy; an Admin still an Admin gets
+    /// the Admin's limit.
     /// </summary>
     private async Task ForbiddenAsync(Guid membershipId, ProblemResponse? problem, string adminLimitKey)
     {
-        _rowRefusal = (membershipId, MembershipCapabilities.IsLimitedToMemberAndViewer(ViewerRole) ? Localizer[adminLimitKey] : RefusalText.Of(Localizer, problem));
+        if (string.Equals(ActiveSpace.Current?.Role, ViewerRole, StringComparison.Ordinal))
+        {
+            await OnRoleDoubted.InvokeAsync();
+        }
+
+        var held = ActiveSpace.Current?.Role ?? string.Empty;
+
+        if (!string.Equals(held, ViewerRole, StringComparison.Ordinal) && !SpaceCapabilities.PermitsSpaceSettings(held))
+        {
+            return;
+        }
+
+        var limited = string.Equals(held, ViewerRole, StringComparison.Ordinal) && MembershipCapabilities.IsLimitedToMemberAndViewer(held);
+
+        _rowRefusal = (membershipId, limited ? Localizer[adminLimitKey] : RefusalText.Of(Localizer, problem));
         FocusControlOrHeading(membershipId);
-        await OnRoleDoubted.InvokeAsync();
     }
 
     /// <summary>
@@ -694,7 +709,7 @@
                 return;
             }
 
-            await UseConfirmReadRefusalAsync(membershipId, response, generation, token);
+            await UseConfirmReadRefusalAsync(membershipId, response, generation, read, token);
         }
         catch (OperationCanceledException) when (token.IsCancellationRequested)
         {
@@ -717,7 +732,7 @@
         }
     }
 
-    private async Task UseConfirmReadRefusalAsync(Guid membershipId, HttpResponseMessage response, int generation, CancellationToken token)
+    private async Task UseConfirmReadRefusalAsync(Guid membershipId, HttpResponseMessage response, int generation, int read, CancellationToken token)
     {
         if (response.StatusCode is not (HttpStatusCode.NotFound or HttpStatusCode.Forbidden))
         {
@@ -725,6 +740,12 @@
         }
 
         var problem = await SpaceWrites.ProblemOfAsync(response, token);
+
+        // Another row's confirm may have opened while the body was read; a late refusal for this row never closes it.
+        if (generation != _generation || read != _presenceReads || _confirmingRemoval != membershipId)
+        {
+            return;
+        }
 
         _confirmingRemoval = null;
 

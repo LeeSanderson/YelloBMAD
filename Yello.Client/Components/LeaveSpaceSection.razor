@@ -9,6 +9,7 @@
 @inject ActiveSpaceState ActiveSpace
 @inject SpaceWrites Writes
 @inject SpaceExit Exit
+@inject SpaceDirectory Directory
 
 @*
     "LEAVE THIS SPACE", AT THE FOOT OF SPACE HOME. FR-14; UX-DR11, UX-DR27, UX-DR36, UX-DR38.
@@ -25,6 +26,10 @@
     name. A resend under a kept key that meets 404 is the same: the first attempt committed and took the Membership, so the
     Host no longer resolves the Space for this Account. A first attempt's 404 is the Space refused, rendered as such. No
     answer or a 5xx: "Not sent.", the confirm stays and the key is kept. Anything else: its own copy, in the confirm.
+
+    A LEAVE IS THE ACCOUNT'S, NOT THE SPACE'S. It is sent on the Session's lifetime rather than the Space's purge, so a
+    switch while it is on the wire does not lose a leave that commits: the left Space then goes from the switcher with
+    nothing said in the Space the tab now shows, and any other answer about it is dropped there.
 *@
 
 @if (MembershipCapabilities.MayLeave(RoleCode))
@@ -97,6 +102,7 @@
 
         _shownFor = SpaceId;
         _confirming = false;
+        _leaving = false;
         _key = null;
         _unanswered = false;
         _status = null;
@@ -157,28 +163,45 @@
         _leaving = true;
         _status = null;
 
-        var token = ActiveSpace.Token;
+        var spaceId = SpaceId;
 
         try
         {
-            using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Delete, MembershipRoutes.OwnOf(SpaceId), _key, token);
+            // The Session's lifetime, which the handler links every request to: a switch does not cancel a leave.
+            using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Delete, MembershipRoutes.OwnOf(spaceId), _key, CancellationToken.None);
 
-            if (!token.IsCancellationRequested)
+            if (ActiveSpace.SpaceId != spaceId)
             {
-                await UseAnswerAsync(answer, resent);
+                LeftElsewhere(spaceId, answer, resent);
+                return;
             }
-        }
-        catch (OperationCanceledException) when (token.IsCancellationRequested)
-        {
-            // The tab left this Space, or the Session ended.
+
+            await UseAnswerAsync(answer, resent);
         }
         catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
         {
-            NotSent();
+            // No answer: the key is kept for an identical resend only while the tab is still on that Space.
+            if (ActiveSpace.SpaceId == spaceId)
+            {
+                NotSent();
+            }
         }
         finally
         {
             _leaving = false;
+        }
+    }
+
+    /// <summary>
+    /// The leave answered after the tab moved to another Space, or out of every Space: a committed leave takes the Space
+    /// out of the switcher, silently, and anything else is dropped - nothing about the left Space is said where the tab is
+    /// now.
+    /// </summary>
+    private void LeftElsewhere(Guid spaceId, SpaceWriteAnswer answer, bool resent)
+    {
+        if (answer.StatusCode is HttpStatusCode.NoContent || (answer.StatusCode is HttpStatusCode.NotFound && resent))
+        {
+            Directory.Removed(spaceId);
         }
     }
 

@@ -339,7 +339,7 @@ public sealed class LeaveSpaceTests(ClientSurfaceFixture surface)
     /// Space's purge token - the answer is dropped and the switcher still lists Northwind.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - a leave rides the Space's purge token, so a switch drops its answer")]
+    [Fact]
     [Trait("Requirement", "UX-DR38")]
     [Trait("Requirement", "UX-DR31")]
     public async Task A_leave_answered_after_a_switch_drops_the_left_Space_and_says_nothing_in_the_other()
@@ -371,11 +371,12 @@ public sealed class LeaveSpaceTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// A leave whose answer is lost after the tab has switched Space changes nothing in the Space now shown: the switcher
-    /// still lists both Spaces, nothing is said, and no "Not sent." appears in Harbour.
+    /// A leave whose answer is lost after the tab has switched Space changes nothing in the Space now shown: nothing about
+    /// the leave is said - neither "You left the Space." nor "Not sent." - and Harbour's page stays. The switcher is not asserted: it asks the server
+    /// when opened, and the fake applied the leave there.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - activate with the Session-lifetime leave; confirm it is red against the old token first")]
+    [Fact]
     [Trait("Requirement", "UX-DR38")]
     public async Task A_leave_left_unanswered_after_a_switch_changes_nothing_in_the_other_Space()
     {
@@ -398,8 +399,10 @@ public sealed class LeaveSpaceTests(ClientSurfaceFixture surface)
 
             await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-            Assert.Equal([NorthwindName, HarbourName], await SwitcherNamesAsync(page));
-            Assert.Empty(await SaidAsync(page));
+            var said = await SaidAsync(page);
+
+            Assert.DoesNotContain(said, sentence => sentence.Contains(LeftCopy, StringComparison.Ordinal) || sentence.Contains(NotSentCopy, StringComparison.Ordinal));
+            Assert.EndsWith($"/spaces/{Harbour:D}", new Uri(page.Url).AbsolutePath, StringComparison.Ordinal);
             Assert.Equal(0, await page.Locator("main").GetByText(NotSentCopy).CountAsync());
         }
     }

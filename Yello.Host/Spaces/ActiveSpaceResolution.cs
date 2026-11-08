@@ -179,6 +179,8 @@ internal static partial class ActiveSpaceResolution
             return BoundaryProblems.NotAvailable();
         }
 
+        QualifiedAuthority.EchoJudgedRole(httpContext.Response, unitOfWork.Context.Role);
+
         // The Role off the Membership row on this request (AD-1), against the matrix. A Qualified
         // cell passes the Role gate; its target rule reaches the slice as the acting authority's Role
         // sets, and a change beyond it comes back as the pipeline's recorded 403 (story 4.4).

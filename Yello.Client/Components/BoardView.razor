@@ -101,7 +101,7 @@
 
                 @if (_canManage && !_creating)
                 {
-                    <button type="button" class="button-primary board__empty-action" @onclick="OpenCreate" @ref="_emptyAction">@Localizer["TaskAdd"]</button>
+                    <button type="button" class="button-primary board__empty-action" data-role-gated @onclick="OpenCreate" @ref="_emptyAction">@Localizer["TaskAdd"]</button>
                 }
             </div>
         }

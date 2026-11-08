@@ -709,7 +709,27 @@
   </data>
   <data name="SpaceSettingsNoLongerAvailable" xml:space="preserve">
     <value>You're now a {0}. Space settings is no longer available.</value>
-    <comment>Narrated when a Role re-read lower no longer permits Space settings, then said on Space home (UX-DR29). {0} is the Role's name.</comment>
+    <comment>Narrated when a Role dropped below Space settings, before the page routes to Space home, where the narration stays. {0} is the Role's name; never a Space name.</comment>
+  </data>
+  <data name="SpaceSettingsForOwnersAndAdmins" xml:space="preserve">
+    <value>Space settings is for Owners and Admins.</value>
+    <comment>Said politely on Space home when a Member or a Viewer reaches the Space settings address, which their Role cannot see. Names no Space.</comment>
+  </data>
+  <data name="RoleNarrationOwner" xml:space="preserve">
+    <value>You're now the Owner. You can manage everything in this Space, including ownership.</value>
+    <comment>Said politely when the Role in the active Space rises to Owner. The article is part of the value; no placeholder, so no Space name can be composed in.</comment>
+  </data>
+  <data name="RoleNarrationAdmin" xml:space="preserve">
+    <value>You're now an Admin. You can manage Members and settings.</value>
+    <comment>Narrated assertively when the Role in the active Space drops to Admin, before its controls go; said politely on a rise to Admin. No placeholder, so no Space name can be composed in.</comment>
+  </data>
+  <data name="RoleNarrationMember" xml:space="preserve">
+    <value>You're now a Member. You can create and edit Projects and Tasks.</value>
+    <comment>Narrated assertively when the Role in the active Space drops to Member, before its controls go; said politely on a rise to Member. No placeholder, so no Space name can be composed in.</comment>
+  </data>
+  <data name="RoleNarrationViewer" xml:space="preserve">
+    <value>You're now a Viewer. Read only in this Space.</value>
+    <comment>Narrated assertively when the Role in the active Space drops to Viewer, before its controls go. No placeholder, so no Space name can be composed in.</comment>
   </data>
   <data name="LabelsHeading" xml:space="preserve">
     <value>Labels</value>

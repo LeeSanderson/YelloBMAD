@@ -47,6 +47,13 @@ public static class RoleCopy
     public static string PermitsKey(string roleCode) => "RolePermits" + Pascal(roleCode);
 
     /// <summary>
+    /// The key of the sentence that tells a person their Role in the active Space is now <paramref name="roleCode"/>.
+    /// </summary>
+    /// <param name="roleCode">The Role's stable code.</param>
+    /// <returns>The resource key.</returns>
+    public static string NarrationKey(string roleCode) => "RoleNarration" + Pascal(roleCode);
+
+    /// <summary>
     /// Composes "{Space} — {Role}, {permits}" from the copy.
     /// </summary>
     /// <param name="copy">Resolves a resource key to its value.</param>

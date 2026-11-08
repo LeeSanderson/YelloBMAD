@@ -617,7 +617,7 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
             await WaitForPathAsync(page, $"/spaces/{Northwind:D}");
 
             // Anchor: Northwind's home says the sentence.
-            await page.Locator("main").GetByText(NowAMemberCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.Locator(".role-narration").GetByText(NowAMemberCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             await ChooseInSwitcherAsync(page, HarbourName);
             await WaitForPathAsync(page, $"/spaces/{Harbour:D}");

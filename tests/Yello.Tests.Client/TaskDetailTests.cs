@@ -384,7 +384,7 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
             Assert.Equal("Draft the brief", await TitleField(page).InputValueAsync());
             Assert.Equal("Draft the brief", (await CardOf(page, tasks[0].Id).Locator(".task-card__title").TextContentAsync())?.Trim());
             Assert.Equal(1, await page.GetByText(copy).CountAsync());
-            Assert.Equal(0, await page.Locator("[role='alert']").CountAsync());
+            Assert.Equal(0, await page.Locator("[role='alert']:not(:empty)").CountAsync());
         }
     }
 

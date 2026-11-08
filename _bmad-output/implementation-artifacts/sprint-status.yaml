@@ -116,7 +116,7 @@ development_status:
   4-4-manage-memberships-and-roles: done
   4-5-remove-a-membership-or-leave-a-space: done
   4-6-assign-a-task-and-be-told: done
-  4-7-a-viewers-space-and-a-role-that-drops-beneath-you: ready-for-dev
+  4-7-a-viewers-space-and-a-role-that-drops-beneath-you: review
   epic-4-retrospective: optional
 
   # Epic 5: Hand a Space over and leave cleanly

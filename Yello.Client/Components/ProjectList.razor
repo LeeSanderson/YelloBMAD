@@ -71,12 +71,12 @@
 
         @if (_canManage && !_creating)
         {
-            <button type="button" class="button-primary" @onclick="OpenCreate">@Localizer["ProjectCreate"]</button>
+            <button type="button" class="button-primary" data-role-gated @onclick="OpenCreate">@Localizer["ProjectCreate"]</button>
         }
 
         @if (_canManage && _creating)
         {
-            <form class="project-create" @onsubmit="CreateAsync" @onkeydown="CreateKeyDown" novalidate>
+            <form class="project-create" data-role-gated @onsubmit="CreateAsync" @onkeydown="CreateKeyDown" novalidate>
                 <FormField FieldId="project-create-name"
                            FieldName="@_createFieldName"
                            Label="@Localizer["ProjectNameLabel"]"

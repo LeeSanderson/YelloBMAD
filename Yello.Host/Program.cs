@@ -76,7 +76,9 @@ using Yello.Infrastructure.Email;
 // that re-implements any of these a defect. There is still no AddAuthorization,
 // no UseAuthorization and no authorization policy anywhere in this file: AD-1 makes every
 // authorisation decision a per-request (Account, Space) resolution, and the Role it reads comes off
-// the Membership row on each request, never off a principal a policy could inspect.
+// the Membership row on each request, never off a principal a policy could inspect. The pipeline
+// echoes that Role in the Yello-Role response header on every 2xx and every 403 it answers, never on
+// a 404, so an open tab learns a changed Role from its next answer without polling.
 
 var builder = WebApplication.CreateBuilder(args);
 

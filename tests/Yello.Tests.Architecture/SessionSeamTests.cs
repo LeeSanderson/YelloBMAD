@@ -5,6 +5,7 @@ using Mono.Cecil;
 using Xunit;
 using Yello.Client.Pages;
 using Yello.Client.Sessions;
+using Yello.Client.Spaces;
 using Yello.Contracts.Accounts;
 
 namespace Yello.Tests.Architecture;
@@ -435,7 +436,8 @@ public sealed class SessionSeamTests
     {
         var inner = new RecordingHandler(status);
 
-        using var handler = new YelloApiHandler(session) { InnerHandler = inner };
+        using var activeSpace = new ActiveSpaceState();
+        using var handler = new YelloApiHandler(session, activeSpace) { InnerHandler = inner };
         using var client = new HttpClient(handler) { BaseAddress = new Uri("https://host.yello.test") };
         using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
 

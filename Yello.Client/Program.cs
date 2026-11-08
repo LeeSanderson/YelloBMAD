@@ -98,7 +98,7 @@ builder.Services.AddScoped(services =>
     // Constructed rather than registered through AddHttpClient: that lives in
     // Microsoft.Extensions.Http, which has no central version pin, and adding one is an
     // architecture edit rather than a convenience for a single client.
-    var handler = new YelloApiHandler(services.GetRequiredService<SessionState>())
+    var handler = new YelloApiHandler(services.GetRequiredService<SessionState>(), services.GetRequiredService<ActiveSpaceState>())
     {
         InnerHandler = new HttpClientHandler(),
     };
@@ -118,6 +118,7 @@ builder.Services.AddScoped<ActiveSpaceState>();
 // rules exist once), and the routed page's heading, which the skip control and a first arrival focus.
 builder.Services.AddScoped<SpaceWrites>();
 builder.Services.AddScoped<SpaceNarration>();
+builder.Services.AddScoped<RoleNarrator>();
 
 // Story 3.3 (AC12, open question 6 (a)): the sentence said after a deletion, held across the purge of the Space it is
 // about and taken by the entry point. Dropped with the Session, below.
@@ -179,6 +180,9 @@ sessionState.RegisterPurge(() =>
 var spaceNarration = host.Services.GetRequiredService<SpaceNarration>();
 _ = activeSpace.RegisterPurge(spaceNarration.Forget);
 
+var roleNarrator = host.Services.GetRequiredService<RoleNarrator>();
+_ = activeSpace.RegisterPurge(roleNarrator.Forget);
+
 // THE SYNCHRONOUS PURGE ON LEAVING A SPACE (story 1.7, AC7). A location-changing handler runs BEFORE
 // the router renders the new location - for a link and for browser Back or Forward - so the departed
 // Space is gone before anything of the destination is drawn. A navigation within one Space purges
@@ -190,6 +194,7 @@ _ = activeSpace.RegisterPurge(spaceNarration.Forget);
 _ = navigation.RegisterLocationChangingHandler(context =>
 {
     activeSpace.Navigating(ClientRoutes.SpaceIn(navigation.ToBaseRelativePath(context.TargetLocation)));
+    roleNarrator.Navigating();
 
     return ValueTask.CompletedTask;
 });

@@ -60,7 +60,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     private const string AddLabel = "Add Label";
     private const string DeleteLabel = "Delete Label";
 
-    private const string ManageLabelsCopy = "Only Owners and Admins can manage Labels.";
+    private const string ForOwnersAndAdminsCopy = "Space settings is for Owners and Admins.";
     private const string ManageTasksCopy = "Viewers cannot edit Tasks.";
     private const string ReusedCopy = "That request was already used for something else. Try again.";
     private const string InFlightCopy = "That was already sent. Reload to see it.";
@@ -462,7 +462,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC1, AC14, UX-DR27, UX-DR32, Q7 - a Member has no "Space settings" link (absent, not disabled), and the
-    /// settings address reached by hand shows the within-Space capability copy and no define form. Anchor: the Owner has
+    /// settings address reached by hand takes it to Space home, told why, with no define form on the way. Anchor: the Owner has
     /// the link. Story 3.1 (AC4, open question 4 (a)) moved the link from Space home to the context bar, so it is looked
     /// for in both places.
     /// </summary>
@@ -494,7 +494,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
             Assert.Equal(0, await settingsLink.CountAsync());
 
             await page.EvaluateAsync("path => Blazor.navigateTo(path)", ClientSettings(Harbour));
-            await page.Locator("main").GetByText(ManageLabelsCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.Locator(".role-narration", new PageLocatorOptions { HasText = ForOwnersAndAdminsCopy }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             Assert.Equal(0, await page.Locator("main").GetByLabel(LabelNameField).CountAsync());
             Assert.Equal(0, await page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = AddLabel }).CountAsync());
@@ -684,8 +684,9 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// AC14, UX-DR29, UX-DR37 - a Role re-read lower (Owner to Member) while on Space settings is narrated, then routed to
-    /// Space home: the narration names what happened, and the define form is gone.
+    /// AC14, UX-DR29, UX-DR37, UX-DR39 - a Role re-read lower (Owner to Member) while on Space settings is narrated in the
+    /// Role narration, which takes focus, then routed to Space home, where the narration keeps focus: it names what
+    /// happened, and the define form is gone.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -703,10 +704,11 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
             api.Roles[Northwind] = "member";
 
             await page.EvaluateAsync("path => Blazor.navigateTo(path)", ClientSettings(Northwind));
-            await page.GetByText(NowAMemberCopy).First.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.Locator(".role-narration", new PageLocatorOptions { HasText = NowAMemberCopy }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await WaitForPathAsync(page, ClientSpaceHome(Northwind));
 
             Assert.Equal(0, await page.Locator("main").GetByLabel(LabelNameField).CountAsync());
+            Assert.True(await page.Locator(".role-narration").EvaluateAsync<bool>("e => e === document.activeElement"), "Focus left the narration.");
         }
     }
 

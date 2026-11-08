@@ -36,8 +36,9 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// to manufacture a 403.
 /// </para>
 /// <para>
-/// <b>Seeded Memberships, on purpose</b> (<c>implementation-readiness-report-2026-08-22.md:964-968</c>):
-/// story 4.7 re-exercises the matrix through real Invitation and Role-change paths.
+/// <b>Seeded Memberships, on purpose</b>, as the fast pipeline-level proof: the matrix is proven again through
+/// Memberships made by accepted Invitations and by a demotion, on both surfaces, by
+/// <c>ActiveSpaceEndpointTests.Each_matrix_row_governs_Memberships_that_arrived_through_the_product</c>.
 /// </para>
 /// <para>
 /// <b>Alone, in a collection with parallelisation disabled</b> (<see cref="BoundaryDurationCollection"/>),

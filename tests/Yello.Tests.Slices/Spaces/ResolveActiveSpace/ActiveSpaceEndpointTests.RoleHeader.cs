@@ -16,7 +16,7 @@ using Yello.Tests.Shared;
 namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 
 /// <summary>
-/// The Role an answer was judged under, echoed by the pipeline in a response header (<see cref="RoleHeaderWire.HeaderName"/>)
+/// The Role an answer was judged under, echoed by the pipeline in a response header (<see cref="RoleHeader.HeaderName"/>)
 /// on every <c>2xx</c> and on the <c>403 insufficient-role</c> of a Space-scoped request that resolved a Membership, and on
 /// nothing else: never on a <c>404</c> of either kind, a <c>401</c>, a <c>400</c>, a <c>409</c> or a <c>422</c>. A replay
 /// carries the Role of the replaying request, never one stored with the record.
@@ -34,8 +34,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </remarks>
 public sealed partial class ActiveSpaceEndpointTests
 {
-    private const string RoleHeaderRed = "red: AC4 - the pipeline echoes no Role header yet";
-
     private static readonly bool[] BothSurfaces = [false, true];
 
     private static readonly string[] LowerRoles = ["member", "viewer"];
@@ -47,7 +45,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// still carries the Role, so the client learns why on the refusal itself.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = RoleHeaderRed)]
+    [Fact]
     [Trait("Requirement", "AD-1")]
     [Trait("Requirement", "AD-9")]
     [Trait("Requirement", "FR-16")]
@@ -99,7 +97,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// can never tell the two apart. Anchor: the same Owner's read of its own Space carries it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = RoleHeaderRed)]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "FR-15")]
     [Trait("Requirement", "AD-1")]
@@ -131,7 +129,7 @@ public sealed partial class ActiveSpaceEndpointTests
             answers["409"] = await LeaveOverWireAsync(owner, spaceId);
         });
 
-        Assert.Equal(RoleHeaderWire.RoleCodes[0], answers["anchor: own Space"].Header(RoleHeaderWire.HeaderName));
+        Assert.Equal("owner", answers["anchor: own Space"].Header(RoleHeader.HeaderName));
         Assert.Equal(HttpStatusCode.NotFound, answers["boundary 404"].StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, answers["in-Space 404"].StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, answers["401"].StatusCode);
@@ -142,7 +140,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         foreach (var (what, answer) in answers.Where(pair => !pair.Key.StartsWith("anchor", StringComparison.Ordinal)))
         {
-            Assert.True(answer.Header(RoleHeaderWire.HeaderName) is null, $"The {what} carries the Role header: {Described(answer)}");
+            Assert.True(answer.Header(RoleHeader.HeaderName) is null, $"The {what} carries the Role header: {Described(answer)}");
         }
 
         Assert.Equal(answers["boundary 404"].HeaderNames, answers["in-Space 404"].HeaderNames);
@@ -156,7 +154,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>403 insufficient-role</c> naming <c>manage-projects</c>, carrying <c>viewer</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = RoleHeaderRed)]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "AD-1")]
     [Trait("Requirement", "FR-16")]
@@ -197,15 +195,15 @@ public sealed partial class ActiveSpaceEndpointTests
         var (original, asMember, asViewer) = (answers[0], answers[1], answers[2]);
 
         Assert.True(original.StatusCode == HttpStatusCode.Created, Described(original));
-        Assert.Equal("admin", original.Header(RoleHeaderWire.HeaderName));
+        Assert.Equal("admin", original.Header(RoleHeader.HeaderName));
 
         Assert.True(asMember.StatusCode == HttpStatusCode.Created, Described(asMember));
         Assert.Equal(original.Body, asMember.Body);
-        Assert.Equal("member", asMember.Header(RoleHeaderWire.HeaderName));
+        Assert.Equal("member", asMember.Header(RoleHeader.HeaderName));
 
         Assert.True(asViewer.StatusCode == HttpStatusCode.Forbidden, Described(asViewer));
         Assert.Equal(StableCode.Of(Capability.ManageProjects), CapabilityOf(asViewer));
-        Assert.Equal("viewer", asViewer.Header(RoleHeaderWire.HeaderName));
+        Assert.Equal("viewer", asViewer.Header(RoleHeader.HeaderName));
     }
 
     /// <summary>
@@ -214,7 +212,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Role, and shows the Admin-limit copy only then.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = RoleHeaderRed)]
+    [Fact]
     [Trait("Requirement", "FR-13")]
     [Trait("Requirement", "AD-1")]
     [Trait("Assumption", "PRD-12-4")]
@@ -243,7 +241,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.True(refused?.StatusCode == HttpStatusCode.Forbidden, Described(refused));
         Assert.Equal(MembershipWire.CapabilityCode, CapabilityOf(refused));
-        Assert.Equal("admin", refused.Header(RoleHeaderWire.HeaderName));
+        Assert.Equal("admin", refused.Header(RoleHeader.HeaderName));
     }
 
     /// <summary>
@@ -273,9 +271,9 @@ public sealed partial class ActiveSpaceEndpointTests
             failures.Add($"{what}: expected {status:D}, got {Described(answer)}");
         }
 
-        if (!string.Equals(answer.Header(RoleHeaderWire.HeaderName), role, StringComparison.Ordinal))
+        if (!string.Equals(answer.Header(RoleHeader.HeaderName), role, StringComparison.Ordinal))
         {
-            failures.Add($"{what}: expected {RoleHeaderWire.HeaderName}: {role}, got '{answer.Header(RoleHeaderWire.HeaderName)}'");
+            failures.Add($"{what}: expected {RoleHeader.HeaderName}: {role}, got '{answer.Header(RoleHeader.HeaderName)}'");
         }
     }
 }

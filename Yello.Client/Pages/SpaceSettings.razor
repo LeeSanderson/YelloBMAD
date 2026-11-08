@@ -6,7 +6,9 @@
 @inject IStringLocalizer<ClientCopy> Localizer
 @inject NavigationManager Navigation
 @inject ActiveSpaceState ActiveSpace
-@inject SpaceNarration Narration
+@inject RoleNarrator Narrator
+
+@implements IDisposable
 
 @*
     A SPACE'S SETTINGS - story 2.4, open question 7: its Space name section (story 3.1, AC3), its Labels section, its
@@ -19,53 +21,51 @@
     and the document's title stays the product's name.
 
     OWNER AND ADMIN ONLY (SpaceCapabilities.PermitsSpaceSettings, the union of its sections' predicates). The context
-    bar links here only for them (story 3.1, AC4); each section renders only for a Role its own predicate admits. A Member or Viewer who arrives by the
-    address meets the within-Space capability surface in place - "Only Owners and Admins can manage Labels.", never a
-    toast - and no define form (UX-DR32, UX-DR27).
+    bar links here only for them; each section renders only for a Role its own predicate admits. A
+    Member or Viewer who arrives by the address is taken to Space home and told, politely, that Space settings is for
+    Owners and Admins: nothing of this page renders for them on the way.
 
     THE DELETE SECTION (story 3.3) IS THE OWNER'S ALONE (SpaceCapabilities.PermitsDeleteSpace), and absent for every
     other Role. Its confirm REPLACES this panel's content in place while it is open (AC7, EXPERIENCE.md:67): the name
     and Label sections are not rendered, and nothing is stacked on them. Esc or Cancel brings them back.
 
-    A ROLE RE-READ LOWER WHILE HERE (UX-DR29): the change is narrated, then the page routes to Space home, which says
-    the sentence on arrival; focus then follows Space home's own arrival (UX-DR39).
+    A ROLE THAT DROPS BELOW THIS PAGE WHILE HERE: the drop is narrated with this page's sentence,
+    focus moves to the narration, and only then does the page route to Space home, where the narration stays and keeps
+    focus. Until the route the page keeps its last permitted render, so it is never blanked or half-rendered under the
+    lower Role.
 *@
 
 <SpaceArrival SpaceId="@SpaceId" Context="arrival">
     <div class="space-settings">
         <PageHeading>@Localizer["SpaceSettingsHeading"]</PageHeading>
 
-        @{ var permitted = Permitted(arrival.Current.Role); }
+        @{ var role = RoleShown(arrival.Current.Role); }
+        @{ var permitted = Permitted(role); }
 
-        @if (ShowsSections(arrival.Current.Role))
+        @if (permitted && ShowsSections(role))
         {
-            @if (permitted && SpaceCapabilities.PermitsRenameSpace(arrival.Current.Role))
+            @if (SpaceCapabilities.PermitsRenameSpace(role))
             {
                 <SpaceNameSection @key="(SectionKey.Name, SpaceId)" SpaceId="@SpaceId" CurrentName="@arrival.Current.Name" OnSpaceRefused="arrival.Refuse" />
             }
 
-            @if (LabelCapabilities.PermitsManageLabels(arrival.Current.Role))
+            @if (LabelCapabilities.PermitsManageLabels(role))
             {
                 <LabelSection @key="(SectionKey.Labels, SpaceId)" SpaceId="@SpaceId" OnSpaceRefused="arrival.Refuse" />
             }
 
-            @if (!LabelCapabilities.PermitsManageLabels(arrival.Current.Role))
+            @if (MembershipCapabilities.PermitsManageMemberships(role))
             {
-                <p class="space-settings__refusal" role="status">@Localizer["manage-labels"]</p>
+                <MembershipSection @key="(SectionKey.Memberships, SpaceId)" SpaceId="@SpaceId" ViewerRole="@role" OnSpaceRefused="arrival.Refuse" OnRoleDoubted="arrival.Reread" />
             }
 
-            @if (permitted && MembershipCapabilities.PermitsManageMemberships(arrival.Current.Role))
-            {
-                <MembershipSection @key="(SectionKey.Memberships, SpaceId)" SpaceId="@SpaceId" ViewerRole="@arrival.Current.Role" OnSpaceRefused="arrival.Refuse" OnRoleDoubted="arrival.Reread" />
-            }
-
-            @if (permitted && InvitationCapabilities.PermitsIssueInvitations(arrival.Current.Role))
+            @if (InvitationCapabilities.PermitsIssueInvitations(role))
             {
                 <InvitationSection @key="(SectionKey.Invitations, SpaceId)" SpaceId="@SpaceId" OnSpaceRefused="arrival.Refuse" />
             }
         }
 
-        @if (permitted && SpaceCapabilities.PermitsDeleteSpace(arrival.Current.Role))
+        @if (permitted && SpaceCapabilities.PermitsDeleteSpace(role))
         {
             <SpaceDeleteSection @key="(SectionKey.Delete, SpaceId)" SpaceId="@SpaceId" @bind-Confirming="_confirmingDelete" OnSpaceRefused="arrival.Refuse" />
         }
@@ -84,9 +84,9 @@
         Delete,
     }
 
-    private bool _wasPermitted;
     private bool _confirmingDelete;
     private bool _leaving;
+    private string? _leavingRole;
     private Guid _spaceSeen;
 
     /// <summary>
@@ -104,10 +104,48 @@
         if (SpaceId != _spaceSeen)
         {
             _spaceSeen = SpaceId;
-            _wasPermitted = false;
             _leaving = false;
+            _leavingRole = null;
             _confirmingDelete = false;
         }
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized() => ActiveSpace.RoleDropping += OnRoleDropping;
+
+    /// <inheritdoc />
+    public void Dispose() => ActiveSpace.RoleDropping -= OnRoleDropping;
+
+    /// <summary>
+    /// The Role the page renders under: the one held, or, once a drop below this page is under way, the last one that
+    /// permitted it, so nothing renders again under the lower Role before the route.
+    /// </summary>
+    private string RoleShown(string roleCode) => _leavingRole ?? roleCode;
+
+    /// <summary>
+    /// A drop while this page shows: one that still permits it changes the sections in place; one below it narrates this
+    /// page's sentence, takes focus to the narration, and then routes to Space home.
+    /// </summary>
+    private void OnRoleDropping(object? sender, RoleDropEventArgs drop)
+    {
+        if (_leaving || ActiveSpace.SpaceId != SpaceId || SpaceCapabilities.PermitsSpaceSettings(drop.To) || !SpaceCapabilities.PermitsSpaceSettings(drop.From))
+        {
+            return;
+        }
+
+        _leaving = true;
+        _leavingRole = drop.From;
+        drop.LeaveSurface(string.Format(CultureInfo.CurrentCulture, Localizer["SpaceSettingsNoLongerAvailable"], Localizer[RoleCopy.NameKey(drop.To)]));
+
+        var spaceId = SpaceId;
+
+        _ = InvokeAsync(async () =>
+        {
+            await drop.Narrated;
+
+            // Through the one door: a no-op purge while the tab is still in this Space, and a purge if it has left.
+            Navigation.GoTo(ActiveSpace, ClientRoutes.SpaceHome(spaceId));
+        });
     }
 
     /// <summary>
@@ -116,29 +154,22 @@
     private bool ShowsSections(string roleCode) => !(_confirmingDelete && SpaceCapabilities.PermitsDeleteSpace(roleCode));
 
     /// <summary>
-    /// The Role decides what renders, read on every arrival. A Role that permitted this page on an earlier answer and
-    /// does not on this one is the re-read lower: narrated, then routed (UX-DR29). One that never permitted it - an
-    /// address typed by hand - stays, on the capability surface.
+    /// Whether the Role permits this page. One that never did - an address typed by hand - is taken to Space home and
+    /// told why, politely, since nothing changed under the person; nothing of the page renders on the way.
     /// </summary>
     private bool Permitted(string roleCode)
     {
         var permitted = SpaceCapabilities.PermitsSpaceSettings(roleCode);
 
-        if (permitted)
-        {
-            _wasPermitted = true;
-        }
-        else if (_wasPermitted && !_leaving)
+        if (!permitted && !_leaving)
         {
             _leaving = true;
-            Narration.Say(string.Format(CultureInfo.CurrentCulture, Localizer["SpaceSettingsNoLongerAvailable"], Localizer[RoleCopy.NameKey(roleCode)]));
-            // After this render, never during it. Through the one door (story 3.4 review): a no-op purge while the tab is
-            // still in this Space, and a purge if it has left by the time the callback runs.
-            _ = InvokeAsync(() => Navigation.GoTo(ActiveSpace, ClientRoutes.SpaceHome(SpaceId)));
-        }
-        else
-        {
-            // Never permitted here: the capability surface stands.
+            Narrator.Say(Localizer["SpaceSettingsForOwnersAndAdmins"], polite: true, survivesNextNavigation: true);
+
+            var spaceId = SpaceId;
+
+            // After this render, never during it.
+            _ = InvokeAsync(() => Navigation.GoTo(ActiveSpace, ClientRoutes.SpaceHome(spaceId)));
         }
 
         return permitted;

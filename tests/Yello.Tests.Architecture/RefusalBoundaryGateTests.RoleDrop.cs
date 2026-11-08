@@ -19,9 +19,8 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Green today, and standing:</b> the coverage gate, the nesting gate, the disabled gate, the shared-channel gate and the
-/// poller gate, each with a planted-signal twin so an empty scan cannot pass. <b>Red until built</b> (skipped, naming the
-/// AC): the client ranks, the narration copy, the header writer and the exposed header.
+/// The scans that could pass on nothing found - the disabled, shared-channel and poller gates - each have a planted-signal
+/// twin, so an empty scan cannot pass.
 /// </para>
 /// <para>
 /// <b>Subjects found by name.</b> The client's ranks are a static method <c>RankOf(string)</c> returning an <c>int</c> in
@@ -31,9 +30,9 @@ namespace Yello.Tests.Architecture;
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
 {
-    private const string RoleDropRed = "red: AC11 - ";
-
     private const string RoleHeaderName = "Yello-Role";
+
+    private static readonly string CrossOriginPolicyTypeName = typeof(CrossOriginPolicy).FullName!;
 
     private static readonly Role[] RolesFromHighest = [Role.Owner, Role.Admin, Role.Member, Role.Viewer];
 
@@ -107,7 +106,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The client's Role ranks, which decide whether a Role change is a drop, agree with the matrix's nesting: for every
     /// pair of Roles, the one ranked higher holds a proper superset of the other's capabilities.
     /// </summary>
-    [Fact(Skip = RoleDropRed + "the client has no Role ranks yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR29")]
     [Trait("Requirement", "FR-16")]
     public void The_clients_Role_ranks_agree_with_the_matrix_nesting()
@@ -241,7 +240,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// surface-left sentence keeps its one placeholder, the Role name; and the typed Space-settings URL has its own sentence.
     /// Every entry carries a comment.
     /// </summary>
-    [Fact(Skip = "red: AC4, AC7 - the Role narration copy does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR38")]
     [Trait("Requirement", "UX-DR29")]
     public void The_Role_narration_copy_names_the_Role_and_what_it_permits_and_no_Space()
@@ -272,9 +271,10 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// Exactly one production type writes the Role header - the pipeline, which is the only reader of the judged Role - and
-    /// no slice, endpoint or store names it. The client may read it; it is outside this scan.
+    /// no slice, endpoint or store names it. The client may read it; it is outside this scan. The cross-origin policy names
+    /// it only to expose it to the client, and writes nothing.
     /// </summary>
-    [Fact(Skip = RoleDropRed + "no production type writes the Role header yet")]
+    [Fact]
     [Trait("Requirement", "AD-1")]
     [Trait("Requirement", "AR-3")]
     public void Exactly_one_production_type_writes_the_Role_header()
@@ -285,7 +285,7 @@ public sealed partial class RefusalBoundaryGateTests
         {
             using var module = ModuleDefinition.ReadModule(assembly.Location);
 
-            foreach (var type in module.GetTypes().Where(NamesTheRoleHeader))
+            foreach (var type in module.GetTypes().Where(type => NamesTheRoleHeader(type) && OutermostOf(type).FullName != CrossOriginPolicyTypeName))
             {
                 writers.Add(OutermostOf(type).FullName);
             }
@@ -299,7 +299,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// credentialed answer. Without it the browser hides every non-safelisted response header from <c>fetch</c>, and the
     /// client would never learn a drop.
     /// </summary>
-    [Fact(Skip = "red: AC4 - the cross-origin policy exposes no Role header yet")]
+    [Fact]
     [Trait("Requirement", "AD-9")]
     [Trait("Requirement", "UX-DR29")]
     public void The_cross_origin_policy_exposes_the_Role_header()

@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Cors.Infrastructure;
+using Yello.Contracts.Spaces;
 
 namespace Yello.Host.Sessions;
 
@@ -73,11 +74,14 @@ public static class CrossOriginPolicy
                 return;
             }
 
+            // A browser hides every non-safelisted response header from a cross-origin fetch, so without the exposure the
+            // client would never see a dropped Role on an ordinary answer.
             policy
                 .WithOrigins(configuredOrigin.Trim().TrimEnd('/'))
                 .AllowCredentials()
                 .AllowAnyHeader()
-                .AllowAnyMethod();
+                .AllowAnyMethod()
+                .WithExposedHeaders(RoleHeader.HeaderName);
         });
     }
 

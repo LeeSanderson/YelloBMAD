@@ -308,7 +308,7 @@ public sealed class MoveTests(ClientSurfaceFixture surface)
             Assert.Equal(["Review", "Ship"], await TitlesInAsync(page, "Doing"));
             Assert.Equal("2", await TotalOfAsync(page, "Todo"));
             Assert.Equal("2", await TotalOfAsync(page, "Doing"));
-            Assert.Equal(0, await page.Locator("[role='alert']").CountAsync());
+            Assert.Equal(0, await page.Locator("[role='alert']:not(:empty)").CountAsync());
         }
     }
 

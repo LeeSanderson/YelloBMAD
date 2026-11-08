@@ -1,6 +1,8 @@
 using System.Net;
 using Microsoft.AspNetCore.Components.WebAssembly.Http;
+using Yello.Client.Spaces;
 using Yello.Contracts.Accounts;
+using Yello.Contracts.Spaces;
 
 namespace Yello.Client.Sessions;
 
@@ -40,7 +42,8 @@ namespace Yello.Client.Sessions;
 /// </para>
 /// </remarks>
 /// <param name="session">The client's Session state, and the purge seam.</param>
-public sealed class YelloApiHandler(SessionState session) : DelegatingHandler
+/// <param name="activeSpace">The tab's active Space, told the Role each Space-scoped answer was judged under.</param>
+public sealed class YelloApiHandler(SessionState session, ActiveSpaceState activeSpace) : DelegatingHandler
 {
     /// <inheritdoc />
     protected override Task<HttpResponseMessage> SendAsync(
@@ -80,8 +83,51 @@ public sealed class YelloApiHandler(SessionState session) : DelegatingHandler
         {
             await session.SessionEndedAsync().ConfigureAwait(false);
         }
+        else if (JudgedRoleOf(request, response) is var (spaceId, role))
+        {
+            // Before the caller reads the answer, so a drop is narrated and applied before any surface acts on it - a
+            // refusal's copy included.
+            await activeSpace.ReconcileAsync(spaceId, role, cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            // No Role was judged on this answer; nothing to reconcile.
+        }
 
         return response;
+    }
+
+    /// <summary>
+    /// The Space and the Role a Space-scoped answer was judged under, or <c>null</c> when it carries none. A missing or
+    /// malformed header is ignored, never a failure: it only ever corrects what the tab shows.
+    /// </summary>
+    private static (Guid SpaceId, string Role)? JudgedRoleOf(HttpRequestMessage request, HttpResponseMessage response)
+    {
+        if (request.RequestUri is not { } uri
+            || !response.Headers.TryGetValues(RoleHeader.HeaderName, out var values)
+            || values.FirstOrDefault() is not { Length: > 0 } role)
+        {
+            return null;
+        }
+
+        var prefix = SpaceRoutes.Directory + "/";
+        var path = uri.IsAbsoluteUri ? uri.AbsolutePath : uri.OriginalString;
+
+        if (!path.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var rest = path[prefix.Length..];
+        var end = rest.IndexOf('/', StringComparison.Ordinal);
+        var segment = end < 0 ? rest : rest[..end];
+
+        if (!Guid.TryParse(segment, out var spaceId))
+        {
+            return null;
+        }
+
+        return (spaceId, role);
     }
 
     /// <summary>

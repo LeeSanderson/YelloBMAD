@@ -561,6 +561,23 @@ commit, at process start, or on the next authenticated request. There is no time
   ids. Count lines that name the case's own ids.
 - **S-2 after every Role operation.** `WireDatabase.SpacesNotHoldingExactlyOneOwnerAsync` over the case's own Spaces - the
   class database is shared, and earlier cases leave Spaces with no Owner on purpose.
+- **The product-join helper has one copy per harness.** `ActiveSpaceEndpointTests.JoinedThroughTheProductAsync` (Slices,
+  `WireSession`), `IsolationCases.JoinedThroughTheProductAsync` and `RevocationCases.JoinOwnersSpaceAsync` (`ProductActor`,
+  which also hold each address, name and token as a secret for the row's log check). The shared parts are `InvitationWire`
+  and `MailDrop`; reuse the helper of the harness you are in rather than adding a fourth.
+- **The matrix is proven through the product** by one Slices theory,
+  `ActiveSpaceEndpointTests.Each_matrix_row_governs_Memberships_that_arrived_through_the_product`: one representative route
+  per capability some endpoint declares, an Owner who created the Space, an Admin, Member and Viewer who accepted
+  Invitations and a Member demoted to Viewer, on both surfaces, with the expectation read from `RoleCapabilityMatrix.Decide`.
+  `RefusalBoundaryGateTests.The_matrix_theory_covers_exactly_the_capabilities_endpoints_declare` reads the theory's route
+  table (`new MatrixRoute(Capability.X, ...)`, one per line): the first endpoint for a capability with none today fails it
+  until its route joins the table. `SpaceBoundaryPipelineTests` stays the fast, seeded pipeline-level proof.
+- **The Role header (`RoleHeader.HeaderName`) is the pipeline's.** It carries the judged Role on every `2xx` and `403`, never
+  on a `404`; `Exactly_one_production_type_writes_the_Role_header` holds the single writer. In the browser suite the fake
+  echoes `Roles[space]` in it on every Space-scoped answer, so a case changes `api.Roles[space]` and lets the tab make one
+  ordinary request to learn a drop; it never re-arrives to learn it. Order (narration before removal) is proven with a
+  `MutationObserver` log, never by waiting. Selectors in such a log carry no ancestor (`.task-card__actions`, not
+  `main .task-card__actions`): a removed node is detached by the time the observer reads it, so an ancestor never matches.
 
 ## EF Core migrations need a hand-editing pass
 

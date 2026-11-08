@@ -63,7 +63,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
     private const string InvalidAddressCopy = "Enter an email address.";
     private const string NoRoleCopy = "Choose a Role.";
     private const string RefusedRoleCopy = "Only Owners and Admins can issue or revoke Invitations.";
-    private const string ManageLabelsCopy = "Only Owners and Admins can manage Labels.";
+    private const string ForOwnersAndAdminsCopy = "Space settings is for Owners and Admins.";
     private const string NotSentCopy = "Not sent.";
     private const string NotAvailableCopy = "Not available.";
 
@@ -168,8 +168,8 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// AC1, AC10, UX-DR27 - a Member and a Viewer have no invite affordance: no Space settings link in the context bar, and
-    /// the settings address reached by hand renders no Invitations heading, no email field, no Role group and no "Send
-    /// invitation" - absent from the DOM, never disabled or hidden. Anchored in the same case: the Admin of the other
+    /// the settings address reached by hand takes them to Space home, told why, with no Invitations heading, no email
+    /// field, no Role group and no "Send invitation" - absent from the DOM, never disabled or hidden. Anchored in the same case: the Admin of the other
     /// Space, on the same page, has all of it. Plant 13: the section rendered for a Member turns this red.
     /// </summary>
     /// <param name="role">The lesser Role.</param>
@@ -199,7 +199,7 @@ public sealed class InvitationTests(ClientSurfaceFixture surface)
             Assert.Equal(0, await page.Locator(ContextBar).GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = SettingsLink, Exact = true }).CountAsync());
 
             await page.EvaluateAsync("path => Blazor.navigateTo(path)", $"/spaces/{Harbour:D}/settings");
-            await page.Locator("main").GetByText(ManageLabelsCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.Locator(".role-narration").GetByText(ForOwnersAndAdminsCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             Assert.Equal(0, await page.Locator(Section).CountAsync());
             Assert.Equal(0, await page.Locator("main").GetByRole(AriaRole.Heading, new LocatorGetByRoleOptions { Name = SectionHeading, Exact = true }).CountAsync());

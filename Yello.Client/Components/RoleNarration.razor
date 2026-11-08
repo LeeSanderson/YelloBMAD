@@ -1,0 +1,184 @@
+@using Yello.Client.Spaces
+@using Microsoft.JSInterop
+
+@inject RoleNarrator Narrator
+@inject ActiveSpaceState ActiveSpace
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject IJSRuntime JS
+
+@implements IAsyncDisposable
+
+@*
+    THE ROLE NARRATION, directly under the context bar on every authenticated surface. A Role that drops is said here
+    BEFORE the lower Role is applied, so the sentence renders before any affordance is removed: by the absence rule no
+    control is left to explain why the others went, so silence would be hostile. Assertive, never throttled or coalesced,
+    and it names a Role and what it permits, never a Space.
+
+    IN THE DOM FROM THE FIRST RENDER, EMPTY, AND FILLED LATER: a live region inserted already holding its sentence is not
+    announced by every screen reader.
+
+    FOCUS MOVES HERE ONLY when the focused control is about to be removed, or the surface is being left; otherwise an
+    assertive region is heard without taking focus. A programmatic target: tabindex="-1".
+*@
+
+<p class="role-narration" role="@(Narrator.Polite ? "status" : "alert")" tabindex="-1" @ref="_element">@_shown</p>
+
+@code {
+    private const string ModulePath = "./js/role-narration.js";
+
+    private ElementReference _element;
+    private IJSObjectReference? _module;
+    private IDisposable? _narrator;
+    private TaskCompletionSource? _rendered;
+    private bool _focusAlways;
+    private bool _recover;
+    private bool _hadFocus;
+    private bool _firstRendered;
+    private string? _shown;
+
+    /// <inheritdoc />
+    protected override void OnInitialized()
+    {
+        Narrator.Changed += OnNarratorChanged;
+        ActiveSpace.RoleRose += OnRoleRose;
+        _narrator = ActiveSpace.RegisterNarrator(NarrateAsync);
+    }
+
+    /// <inheritdoc />
+    public async ValueTask DisposeAsync()
+    {
+        Narrator.Changed -= OnNarratorChanged;
+        ActiveSpace.RoleRose -= OnRoleRose;
+        _narrator?.Dispose();
+        _rendered?.TrySetResult();
+
+        if (_module is not null)
+        {
+            try
+            {
+                await _module.DisposeAsync();
+            }
+            catch (JSDisconnectedException)
+            {
+                // The page is going away; there is nothing left to release.
+            }
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _firstRendered = true;
+
+            if (Narrator.Sentence is not null)
+            {
+                _shown = Narrator.Sentence;
+                StateHasChanged();
+            }
+
+            return;
+        }
+
+        if (_rendered is { } rendered)
+        {
+            _rendered = null;
+
+            try
+            {
+                await FocusBeforeRemovalAsync();
+            }
+            finally
+            {
+                rendered.TrySetResult();
+            }
+        }
+        else if (_recover)
+        {
+            _recover = false;
+            await InvokeModuleAsync("recoverFocus");
+        }
+        else
+        {
+            // Nothing about focus was asked of this render.
+        }
+    }
+
+    private async Task NarrateAsync(RoleDropEventArgs drop)
+    {
+        var rendered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        _rendered?.TrySetResult();
+        _rendered = rendered;
+        _focusAlways = drop.LeavesSurface;
+
+        Narrator.Say(drop.Sentence ?? Localizer[RoleCopy.NarrationKey(drop.To)], polite: false, survivesNextNavigation: drop.LeavesSurface);
+
+        await rendered.Task;
+
+        if (!drop.LeavesSurface && _hadFocus)
+        {
+            _ = RecoverAfterAsync(drop);
+        }
+    }
+
+    private async Task RecoverAfterAsync(RoleDropEventArgs drop)
+    {
+        await drop.Applied;
+
+        _recover = true;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task FocusBeforeRemovalAsync()
+    {
+        _hadFocus = false;
+
+        try
+        {
+            if (_focusAlways)
+            {
+                await _element.FocusAsync();
+                _hadFocus = true;
+                Narrator.Focused();
+            }
+            else
+            {
+                _module ??= await JS.InvokeAsync<IJSObjectReference>("import", ModulePath);
+                _hadFocus = await _module.InvokeAsync<bool>("focusIfGated", _element);
+            }
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or ObjectDisposedException or InvalidOperationException)
+        {
+            // Focus could not be moved; the assertive region is heard all the same.
+        }
+    }
+
+    private async Task InvokeModuleAsync(string function)
+    {
+        try
+        {
+            _module ??= await JS.InvokeAsync<IJSObjectReference>("import", ModulePath);
+            await _module.InvokeVoidAsync(function, _element);
+        }
+        catch (Exception exception) when (exception is JSException or JSDisconnectedException or ObjectDisposedException or InvalidOperationException)
+        {
+            // Focus could not be recovered; the narration has already been heard.
+        }
+    }
+
+    private void OnNarratorChanged(object? sender, EventArgs args)
+    {
+        // Written only once the element has rendered empty, so the region is changed rather than inserted full.
+        if (_firstRendered)
+        {
+            _shown = Narrator.Sentence;
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    // A rise makes a narrated drop stale; the context bar says the rise itself.
+    private void OnRoleRose(object? sender, EventArgs args) => Narrator.Forget();
+}

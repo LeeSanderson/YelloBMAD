@@ -45,7 +45,7 @@
 
         <ProjectList @key="SpaceId" SpaceId="@SpaceId" RoleCode="@arrival.Current.Role" OnSpaceRefused="arrival.Refuse" />
 
-        <LeaveSpaceSection SpaceId="@SpaceId" RoleCode="@arrival.Current.Role" OnSpaceRefused="arrival.Refuse" />
+        <LeaveSpaceSection @key="(nameof(LeaveSpaceSection), SpaceId)" SpaceId="@SpaceId" RoleCode="@arrival.Current.Role" OnSpaceRefused="arrival.Refuse" />
     </div>
 </SpaceArrival>
 

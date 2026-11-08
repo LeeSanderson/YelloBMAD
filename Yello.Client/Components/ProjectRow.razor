@@ -59,8 +59,8 @@
 
     @if (!Renaming && !Confirming && CanManage)
     {
-        <button type="button" class="button-secondary" @onclick="StartAsync">@Localizer["ProjectRename"]</button>
-        <button type="button" class="button-secondary" aria-busy="@(Counting ? "true" : null)" @onclick="AskToDeleteAsync" @ref="_delete">@Localizer["ProjectDelete"]</button>
+        <button type="button" class="button-secondary" data-role-gated @onclick="StartAsync">@Localizer["ProjectRename"]</button>
+        <button type="button" class="button-secondary" data-role-gated aria-busy="@(Counting ? "true" : null)" @onclick="AskToDeleteAsync" @ref="_delete">@Localizer["ProjectDelete"]</button>
     }
 
     @if (Refusal is { } refusal)

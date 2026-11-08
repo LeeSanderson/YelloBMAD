@@ -83,7 +83,7 @@
 
         @if (ActiveSpace.Current is { } settable && SpaceCapabilities.PermitsSpaceSettings(settable.Role))
         {
-            <a class="context-bar__settings" href="@ClientRoutes.SpaceSettings(settable.Id)">@Localizer["SpaceSettingsLink"]</a>
+            <a class="context-bar__settings" data-role-gated href="@ClientRoutes.SpaceSettings(settable.Id)">@Localizer["SpaceSettingsLink"]</a>
         }
     </div>
 
@@ -134,6 +134,7 @@
     {
         _arrivalsSeen = ActiveSpace.Arrivals;
         ActiveSpace.Changed += OnActiveSpaceChanged;
+        ActiveSpace.RoleRose += OnRoleRose;
         Navigation.LocationChanged += OnLocationChanged;
     }
 
@@ -141,6 +142,7 @@
     public void Dispose()
     {
         ActiveSpace.Changed -= OnActiveSpaceChanged;
+        ActiveSpace.RoleRose -= OnRoleRose;
         Navigation.LocationChanged -= OnLocationChanged;
     }
 
@@ -197,6 +199,21 @@
             // A redraw with nothing new to announce.
         }
 
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>
+    /// A rise is said politely here, where the Role chip it changes sits; nothing was taken away, so it needs no alert
+    /// and moves no focus. A drop is said once, by the Role narration, and never here.
+    /// </summary>
+    private void OnRoleRose(object? sender, EventArgs args)
+    {
+        if (ActiveSpace.Current is not { } current)
+        {
+            return;
+        }
+
+        _announcement = Localizer[RoleCopy.NarrationKey(current.Role)].Value;
         _ = InvokeAsync(StateHasChanged);
     }
 

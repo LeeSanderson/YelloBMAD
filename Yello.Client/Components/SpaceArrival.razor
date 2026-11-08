@@ -10,6 +10,7 @@
 @inject ActiveSpaceState ActiveSpace
 @inject NavigationManager Navigation
 @inject PageHeadingFocus HeadingFocus
+@inject RoleNarrator Narrator
 
 @implements IDisposable
 
@@ -43,6 +44,10 @@
     unmount the page: the Role is re-read from the server and applied in place, so a control a now-Viewer
     lacks disappears while an open form and its text survive. A different Space still starts again, and
     its purge has already run.
+
+    A ROLE LEARNED ANY OTHER WAY - off the Role header of any answer the page asked for - is applied through
+    ActiveSpaceState's one Role entry point, which narrates a drop first; this page then renders its content
+    again under the new Role.
 *@
 
 @if (_refused)
@@ -63,6 +68,7 @@
     private Guid? _arrivedIn;
     private string? _arrivedAt;
     private ProblemResponse? _problem;
+    private string? _renderedRole;
 
     /// <summary>
     /// The Space the route names.
@@ -79,10 +85,35 @@
     public RenderFragment<SpaceArrivalContext> ChildContent { get; set; } = _ => _ => { };
 
     /// <inheritdoc />
-    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        ActiveSpace.Changed += OnActiveSpaceChanged;
+    }
 
     /// <inheritdoc />
-    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        ActiveSpace.Changed -= OnActiveSpaceChanged;
+    }
+
+    /// <summary>
+    /// A Role applied in place, by whatever answer carried it: the page renders again under it.
+    /// </summary>
+    private void OnActiveSpaceChanged(object? sender, EventArgs args)
+    {
+        if (!_arrived || _refused || ActiveSpace.Current is not { } current || current.Id != _arrivedIn)
+        {
+            return;
+        }
+
+        if (!string.Equals(current.Role, _renderedRole, StringComparison.Ordinal))
+        {
+            _renderedRole = current.Role;
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
 
     /// <summary>
     /// A navigation to the address this page is already showing - the same Space chosen again in the
@@ -237,7 +268,19 @@
     {
         var answer = await response.Content.ReadFromJsonAsync<ActiveSpaceResponse>(JsonOptions, token);
 
-        if (answer is null || token.IsCancellationRequested || !ActiveSpace.Arrive(answer))
+        if (answer is null || token.IsCancellationRequested)
+        {
+            return;
+        }
+
+        // A re-arrival's Role goes through the one Role entry point, so an answer that carried no Role header is still
+        // narrated before it is applied.
+        if (!firstArrival)
+        {
+            await ActiveSpace.ReconcileAsync(answer.Id, answer.Role, token);
+        }
+
+        if (token.IsCancellationRequested || !ActiveSpace.Arrive(answer))
         {
             return;
         }
@@ -248,11 +291,13 @@
         _arrived = true;
         _arrivedIn = answer.Id;
         _arrivedAt = PathOf(Navigation.Uri);
+        _renderedRole = answer.Role;
 
         // A first arrival is a navigation, and its heading takes focus as FocusOnNavigate would have
-        // given it had the heading existed when that ran. After a switch the context bar takes it, and a
-        // re-arrival leaves focus where the person put it.
-        if (firstArrival && !ActiveSpace.LastArrivalWasSwitch)
+        // given it had the heading existed when that ran. After a switch the context bar takes it, a
+        // re-arrival leaves focus where the person put it, and a Role narration that took focus on the
+        // way here keeps it.
+        if (firstArrival && !ActiveSpace.LastArrivalWasSwitch && !Narrator.HoldsFocus)
         {
             HeadingFocus.RequestFocus();
         }

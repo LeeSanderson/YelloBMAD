@@ -124,7 +124,7 @@ public sealed class ViewerSpaceTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="role">The Role in Northwind.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - Q6 (a): the typed Space settings address still renders the manage-labels refusal")]
+    [Theory]
     [InlineData("member")]
     [InlineData("viewer")]
     [Trait("Requirement", "UX-DR29")]

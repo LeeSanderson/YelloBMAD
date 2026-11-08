@@ -29,7 +29,7 @@
     (AC14), and purges it with the Space.
 *@
 
-<form class="task-create" @onsubmit="CreateAsync" @onkeydown="KeyDownAsync" novalidate>
+<form class="task-create" data-role-gated @onsubmit="CreateAsync" @onkeydown="KeyDownAsync" novalidate>
     <FormField FieldId="task-create-title"
                FieldName="@_fieldName"
                Label="@Localizer["TaskTitleLabel"]"

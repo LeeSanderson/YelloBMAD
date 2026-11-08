@@ -37,7 +37,7 @@ namespace Yello.Client.Spaces;
 /// <list type="bullet">
 /// <item>Registered here: <c>BoardView</c> (its replicas, Labels, Status options, open Task, pending deletes and moves,
 /// held-out pages), <c>TaskListView</c> (its rows and <c>TaskListFilters</c>), <c>LabelSection</c>, <c>ProjectList</c>,
-/// and <c>SpaceNarration</c> (a pending announcement, registered by <c>Program</c>).</item>
+/// and <c>SpaceNarration</c> and <c>RoleNarrator</c> (pending announcements, registered by <c>Program</c>).</item>
 /// <item>Keyed and arrival-gated: <c>BoardView</c> and <c>TaskListView</c> (<c>@key</c> on the Space and Project), and
 /// <c>ProjectList</c>, <c>SpaceNameSection</c> and <c>LabelSection</c> (<c>@key</c> on the Space); their children
 /// (<c>TaskDetail</c>, <c>TaskCreate</c>, <c>MovePicker</c>, cards and rows) go with them.</item>
@@ -70,10 +70,25 @@ public sealed class ActiveSpaceState : IDisposable
 
     private bool _switching;
 
+    private Func<RoleDropEventArgs, Task>? _narrator;
+
+    private RoleDropEventArgs? _dropping;
+
     /// <summary>
     /// Raised after every purge and every arrival, so the context bar can redraw.
     /// </summary>
     public event EventHandler? Changed;
+
+    /// <summary>
+    /// Raised when the tab learns its Role in the active Space has dropped, before the narration renders and before the
+    /// lower Role is applied. A surface the lower Role cannot see says so on the drop (<see cref="RoleDropEventArgs.LeaveSurface"/>).
+    /// </summary>
+    public event EventHandler<RoleDropEventArgs>? RoleDropping;
+
+    /// <summary>
+    /// Raised after a higher Role has been applied to <see cref="Current"/>.
+    /// </summary>
+    public event EventHandler? RoleRose;
 
     /// <summary>
     /// The Space this tab is in or on its way into, or <c>null</c> on a route outside any Space.
@@ -214,6 +229,66 @@ public sealed class ActiveSpaceState : IDisposable
     }
 
     /// <summary>
+    /// Registers what narrates a drop: it completes once the narration has rendered, and focus has moved to it where the
+    /// focused control is about to go.
+    /// </summary>
+    /// <param name="narrator">The narration.</param>
+    /// <returns>A handle that unregisters it.</returns>
+    public IDisposable RegisterNarrator(Func<RoleDropEventArgs, Task> narrator)
+    {
+        ArgumentNullException.ThrowIfNull(narrator);
+
+        _narrator = narrator;
+
+        return new NarratorRegistration(this, narrator);
+    }
+
+    /// <summary>
+    /// The one way the tab learns its Role in the active Space has changed: from the Role an answer was judged under, and
+    /// later from the sync channel's push, which calls this too. A drop is narrated before the lower Role is applied, so
+    /// the narration renders before any affordance is removed; a rise is applied at once.
+    /// </summary>
+    /// <remarks>
+    /// Dropped for any Space but the active one, before the active Space has answered, after the request was cancelled
+    /// and for a Role code it does not know, so an answer that lands after a switch never speaks in the other Space.
+    /// </remarks>
+    /// <param name="spaceId">The Space the Role is held in.</param>
+    /// <param name="role">The Role's stable code.</param>
+    /// <param name="token">The cancellation token of the request that carried it.</param>
+    /// <returns>A task that completes once the Role is applied, or the call dropped.</returns>
+    public async Task ReconcileAsync(Guid spaceId, string role, CancellationToken token)
+    {
+        if (token.IsCancellationRequested || ChangeOf(spaceId, role) is not { } current)
+        {
+            return;
+        }
+
+        // Concurrent answers carrying the same drop narrate it once.
+        if (_dropping is { } dropping && string.Equals(dropping.To, role, StringComparison.Ordinal))
+        {
+            await dropping.Applied.ConfigureAwait(false);
+            return;
+        }
+
+        if (RoleRanks.RankOf(role) > RoleRanks.RankOf(current.Role))
+        {
+            Apply(current, role);
+            RoleRose?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        await DropAsync(current, role).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// <see cref="ReconcileAsync(Guid, string, CancellationToken)"/> for a Role learned other than on a request.
+    /// </summary>
+    /// <param name="spaceId">The Space the Role is held in.</param>
+    /// <param name="role">The Role's stable code.</param>
+    /// <returns>A task that completes once the Role is applied, or the call dropped.</returns>
+    public Task ReconcileAsync(Guid spaceId, string role) => ReconcileAsync(spaceId, role, CancellationToken.None);
+
+    /// <summary>
     /// Records the server's answer to a rename of the Space the tab is in (story 3.1, AC14, open question 7 (a)): the
     /// context bar redraws with the new name, and nothing else happens - it is not an arrival, so it does not count as a
     /// switch and moves no focus.
@@ -224,13 +299,16 @@ public sealed class ActiveSpaceState : IDisposable
     {
         ArgumentNullException.ThrowIfNull(answer);
 
-        if (answer.Id != SpaceId || Current is null)
+        if (answer.Id != SpaceId || Current is not { } held)
         {
             return false;
         }
 
-        Current = answer;
+        // The answer's Role reaches the tab through the one Role entry point, so a drop is narrated like any other.
+        Current = answer with { Role = held.Role };
         Changed?.Invoke(this, EventArgs.Empty);
+
+        _ = ReconcileAsync(answer.Id, answer.Role, Token);
 
         return true;
     }
@@ -282,6 +360,66 @@ public sealed class ActiveSpaceState : IDisposable
 
     /// <inheritdoc />
     public void Dispose() => _inFlight.Dispose();
+
+    /// <summary>
+    /// The answer held about the active Space, when <paramref name="role"/> is a known Role that changes it there.
+    /// </summary>
+    private ActiveSpaceResponse? ChangeOf(Guid spaceId, string role)
+    {
+        if (spaceId != SpaceId || Current is not { } current || current.Id != spaceId)
+        {
+            return null;
+        }
+
+        return string.Equals(current.Role, role, StringComparison.Ordinal) || RoleRanks.RankOf(role) < 0 ? null : current;
+    }
+
+    private async Task DropAsync(ActiveSpaceResponse current, string role)
+    {
+        var drop = new RoleDropEventArgs(current.Role, role);
+
+        _dropping = drop;
+
+        try
+        {
+            RoleDropping?.Invoke(this, drop);
+
+            if (_narrator is { } narrator)
+            {
+                await narrator(drop).ConfigureAwait(false);
+            }
+
+            drop.MarkNarrated();
+
+            // The tab may have left the Space while the narration rendered; the departed Space's Role is gone with it.
+            if (Current is { } still && still.Id == current.Id)
+            {
+                Apply(still, role);
+            }
+        }
+        finally
+        {
+            _dropping = null;
+            drop.MarkApplied();
+        }
+    }
+
+    private void Apply(ActiveSpaceResponse current, string role)
+    {
+        Current = current with { Role = role };
+        Changed?.Invoke(this, EventArgs.Empty);
+    }
+
+    private sealed class NarratorRegistration(ActiveSpaceState owner, Func<RoleDropEventArgs, Task> narrator) : IDisposable
+    {
+        public void Dispose()
+        {
+            if (owner._narrator == narrator)
+            {
+                owner._narrator = null;
+            }
+        }
+    }
 
     private sealed class Registration(ActiveSpaceState owner, Action purge) : IDisposable
     {

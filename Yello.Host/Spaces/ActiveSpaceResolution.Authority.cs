@@ -1,5 +1,7 @@
 using Yello.Application.Memberships;
 using Yello.Application.Spaces;
+using Yello.Contracts.Spaces;
+using Yello.Domain;
 using Yello.Domain.AccessRefusals;
 using Yello.Domain.Memberships;
 
@@ -38,6 +40,33 @@ internal static partial class ActiveSpaceResolution
         /// </summary>
         internal static bool Permits(Role role, Capability capability) =>
             RoleCapabilityMatrix.Decide(role, capability) != CapabilityDecision.Denied;
+
+        /// <summary>
+        /// Echoes the Role the request was judged under in <see cref="RoleHeader.HeaderName"/>, added when the answer starts
+        /// so the final status decides it.
+        /// </summary>
+        /// <remarks>
+        /// Only on a <c>2xx</c> or a <c>403</c>: every <c>403</c> after resolution is the capability refusal. A <c>404</c>, of
+        /// either kind, never carries it, so the header cannot tell an in-Space <c>404</c> from the boundary's. Added at
+        /// start rather than now, so an <c>Idempotency-Key</c> record never captures it and a replay carries the live Role.
+        /// </remarks>
+        internal static void EchoJudgedRole(HttpResponse response, Role role)
+        {
+            var code = StableCode.Of(role);
+
+            response.OnStarting(() =>
+            {
+                var status = response.StatusCode;
+
+                if (status == StatusCodes.Status403Forbidden
+                    || (status >= StatusCodes.Status200OK && status < StatusCodes.Status300MultipleChoices))
+                {
+                    response.Headers[RoleHeader.HeaderName] = code;
+                }
+
+                return Task.CompletedTask;
+            });
+        }
 
         /// <summary>
         /// Sets the request's acting authority from the Role read on it, serves the request, and turns a slice's
