@@ -1089,6 +1089,98 @@ public sealed class WireDatabase(string connectionString)
         return Convert.ToInt32(await command.ExecuteScalarAsync().ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture);
     }
 
+    /// <summary>
+    /// Every Ownership Offer in <paramref name="spaceId"/>, whatever its state, read under that Space's own key: the database's
+    /// view, independent of the Host's query filter. Reads <c>dbo.[OwnershipOffer]</c>, a table the offer migration adds.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>Its offers, oldest first.</returns>
+    public async Task<IReadOnlyList<OwnershipOfferRow>> OwnershipOffersInAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = """
+            SELECT Id, SpaceId, RecipientMembershipId, OfferedByMembershipId, OffererName, State, ExpiresAt, CreatedAt
+            FROM dbo.[OwnershipOffer] WHERE SpaceId = @space ORDER BY CreatedAt, Id
+            """;
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+
+        var rows = new List<OwnershipOfferRow>();
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            rows.Add(new OwnershipOfferRow(
+                reader.GetGuid(0),
+                reader.GetGuid(1),
+                reader.GetGuid(2),
+                reader.GetGuid(3),
+                reader.GetString(4),
+                reader.GetString(5),
+                await reader.GetFieldValueAsync<DateTimeOffset>(6).ConfigureAwait(false),
+                await reader.GetFieldValueAsync<DateTimeOffset>(7).ConfigureAwait(false)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// An Ownership Offer written directly, under its Space's own key: for a state or an expiry no request reaches (an offer
+    /// already past <c>ExpiresAt</c>, reached only by seeding the past; a terminal row a revoke must refuse) and for the schema
+    /// cases that prove the filtered unique index refuses, not the code.
+    /// </summary>
+    /// <remarks>
+    /// Satisfies the offer table as the story shapes it: <c>FK_OwnershipOffer_Space_SpaceId</c> (the Space must exist), the
+    /// <c>BLOCK AFTER INSERT</c> predicate (the connection carries the Space's key), <c>Id</c> supplied (no key is generated
+    /// by the database), <c>State</c> stored as the member's name, and <c>UX_OwnershipOffer_SpaceId_Pending</c> (at most one
+    /// <c>Pending</c> row per Space - a second one throws <see cref="SqlException"/> 2601, which the schema case expects). No
+    /// foreign key reaches <c>Membership</c> or <c>Account</c>, so the two Membership ids are whatever the case names.
+    /// <c>ExpiresAt</c> is named explicitly, overriding the column default.
+    /// </remarks>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="recipientMembershipId">The Membership the offer names.</param>
+    /// <param name="offeredByMembershipId">The offering Owner's Membership.</param>
+    /// <param name="offererName">The offerer's display name, as captured.</param>
+    /// <param name="state">The stored state: <c>Pending</c>, <c>Accepted</c>, <c>Declined</c>, <c>Revoked</c> or <c>Lapsed</c>.</param>
+    /// <param name="expiresAt">The expiry to store.</param>
+    /// <returns>The offer's id.</returns>
+    public async Task<Guid> AddOwnershipOfferAsync(
+        Guid spaceId,
+        Guid recipientMembershipId,
+        Guid offeredByMembershipId,
+        string offererName,
+        string state,
+        DateTimeOffset expiresAt)
+    {
+        var id = Guid.NewGuid();
+
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+
+        var added = await ExecuteAsync(
+            connection,
+            null,
+            """
+            INSERT dbo.[OwnershipOffer] (Id, SpaceId, RecipientMembershipId, OfferedByMembershipId, OffererName, State, ExpiresAt, CreatedAt)
+            VALUES (@id, @space, @recipient, @offeredBy, @offererName, @state, @expires, SYSDATETIMEOFFSET())
+            """,
+            ("@id", id),
+            ("@space", spaceId),
+            ("@recipient", recipientMembershipId),
+            ("@offeredBy", offeredByMembershipId),
+            ("@offererName", offererName),
+            ("@state", state),
+            ("@expires", expiresAt)).ConfigureAwait(false);
+
+        if (added != 1)
+        {
+            throw new InvalidOperationException($"Expected to add one Ownership Offer; added {added}.");
+        }
+
+        return id;
+    }
+
     private async Task<SqlConnection> OpenAsync()
     {
         var connection = new SqlConnection(connectionString);
@@ -1212,6 +1304,27 @@ public sealed record InvitationRow(
 /// <param name="Role">The stored Role: its name, for example <c>Owner</c> (<c>HasConversion&lt;string&gt;</c>).</param>
 /// <param name="CreatedAt">When it was created - the list's keyset leads with it.</param>
 public sealed record MembershipRow(Guid Id, Guid AccountId, string Role, DateTimeOffset CreatedAt);
+
+/// <summary>
+/// One <c>dbo.[OwnershipOffer]</c> row as the database holds it.
+/// </summary>
+/// <param name="Id">The offer.</param>
+/// <param name="SpaceId">The Space whose ownership is offered.</param>
+/// <param name="RecipientMembershipId">The Membership offered ownership; a plain column, no foreign key.</param>
+/// <param name="OfferedByMembershipId">The offering Owner's Membership; a plain column, no foreign key.</param>
+/// <param name="OffererName">The offerer's display name, captured when the offer was made.</param>
+/// <param name="State">The stored state: <c>Pending</c>, <c>Accepted</c>, <c>Declined</c>, <c>Revoked</c> or <c>Lapsed</c>.</param>
+/// <param name="ExpiresAt">When it stops being actionable, stamped from the database clock.</param>
+/// <param name="CreatedAt">When it was made.</param>
+public sealed record OwnershipOfferRow(
+    Guid Id,
+    Guid SpaceId,
+    Guid RecipientMembershipId,
+    Guid OfferedByMembershipId,
+    string OffererName,
+    string State,
+    DateTimeOffset ExpiresAt,
+    DateTimeOffset CreatedAt);
 
 /// <summary>
 /// One <c>dbo.[OutboxMessage]</c> row as Lee's Q6 shapes it: rendered at enqueue, no Space column, deleted on send.

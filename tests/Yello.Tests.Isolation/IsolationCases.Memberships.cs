@@ -173,6 +173,7 @@ internal static partial class IsolationCases
         .. RemovalCases(),
         .. AssignmentCases(),
         .. ViewerSpaceCases(),
+        .. OwnershipOfferCases(),
     ];
 
     private static IEnumerable<IsolationCase> RemovalCases() =>

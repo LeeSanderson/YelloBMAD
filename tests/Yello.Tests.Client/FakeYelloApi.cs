@@ -758,6 +758,13 @@ internal sealed partial class FakeYelloApi
             return assignee;
         }
 
+        // The Ownership Offer routes (FakeYelloApi.OwnershipOffers.cs). Each fell to the unmatched 404 before, and no earlier
+        // case sends one.
+        if (OwnershipOffer(request) is { } ownershipOffer)
+        {
+            return ownershipOffer;
+        }
+
         switch (request.Method, request.Path)
         {
             case ("OPTIONS", _):

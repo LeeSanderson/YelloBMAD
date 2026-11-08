@@ -240,7 +240,12 @@ AC1 to AC9 are reproduced **verbatim** from `epics.md:1932-1973` and numbered by
 ## Tasks / Subtasks
 
 - [ ] **Task 0: decisions** (before any code)
-  - [ ] Q1, Q2, Q4 and Q5 are marked **[LEE]** (authority, isolation or a security seam). If the orchestrator routes them to Lee, record the answers here under "Decided by Lee" before ATDD. Otherwise take each recommendation and record it as "Qn - (x)" with its cost in Completion Notes.
+  - [x] Q1, Q2, Q4 and Q5 are marked **[LEE]** (authority, isolation or a security seam). If the orchestrator routes them to Lee, record the answers here under "Decided by Lee" before ATDD. Otherwise take each recommendation and record it as "Qn - (x)" with its cost in Completion Notes.
+    - **Decided by Lee (2026-11-08):**
+      - Q1 - (a): a new offer's transaction, under the lock, writes `Lapsed` on this Space's `Pending` rows that fail the shared predicate, before its insert. No job and no timer. Dated notes go on AD-26/AD-27.
+      - Q2 - (a): `RecipientMembershipId` and `OfferedByMembershipId` are plain columns with no FK to `Membership` or `Account`. The only FK is to `Space`, with cascade. `OffererName` is captured at authoring time.
+      - Q4 - (a): `OwnershipOfferWrites.LapseNamingAsync` runs in `RemoveCoreAsync` and `LeaveAsync` before the guarded `DELETE`, and rolls back with the unassign. 5.4 calls the same method.
+      - Q5 - (a): one guarded insert under `TakeMembershipsAsync` Exclusive, and the revoke takes the same lock. Self-offer sub-question: `400 invalid-offer-recipient`.
   - [ ] Decide Q3 and Q6-Q12 the same way. Each recommendation is the default.
 - [ ] **Task 1: Domain** (AC1, AC4, AC5)
   - [ ] `Yello.Domain/Spaces/OwnershipOffer.cs`, `OwnershipOfferState.cs` (five states). Remarks quote FR-8 and AD-26 briefly; **no story ids** (CLAUDE.md).
@@ -454,6 +459,39 @@ Recent commits: `2251d84` close epic 4; `044b7b0`/`ae2d430` 4.7 (Role drop narra
 - `tests/TESTING-CONVENTIONS.md`: `:44-73`, `:87-207`, `:517-543`, `:545-580`, `:582-602`, `:604-672`, `:773-895`.
 - `deferred-work.md`: `:544`, `:664`, `:705`, `:744-746`, `:792`, `:807`, `:817`.
 - Prior stories: `4-5-remove-a-membership-or-leave-a-space.md` (Q10, the removal shape), `4-6-assign-a-task-and-be-told.md` (the email, `NotificationSend`, `SoleDispatcherWireAsync`), `4-7-a-viewers-space-and-a-role-that-drops-beneath-you.md` (C4, the mail-wait lesson), `4-1-invite-an-email-address-to-a-space-at-a-role.md` (outbox, expiry default), `4-2-see-and-revoke-pending-invitations.md` (guarded revoke).
+
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-5-1-offer-ownership-of-a-space-and-tell-the-recipient.md` (status-code comparison, seed constraints, findings for this phase).
+
+| File | Cases | ACs |
+|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.OfferOwnership.cs` | 10 methods, 15 cases, all skipped | AC1, AC2, AC3, AC6, AC10, AC13 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.OfferOwnershipOutbox.cs` | 5 methods, 7 cases, all skipped | AC7, AC8 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.OfferOwnershipRace.cs` | 3, all skipped | AC3, AC4, AC5, AC13 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.OwnershipOfferLapse.cs` | 5 methods, 6 cases, all skipped | AC5, AC11 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.OwnershipOfferSchema.cs` | 4, all skipped | AC3, AC10, AC11, AC12 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RevokeOwnershipOffer.cs` | 7 methods, 9 cases, all skipped | AC4, AC9, AC10, AC12 |
+| `tests/Yello.Tests.Isolation/IsolationCases.OwnershipOffers.cs` | 12 rows, `PendingUntil: "5.1"` (24 when live) | AC13 |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.OwnershipOffers.cs` | 12, all skipped | AC1, AC3-AC5, AC7-AC10, AC12 |
+| `tests/Yello.Tests.Client/OwnershipSectionTests.cs` | 9, all skipped | AC9 |
+
+Supporting, no cases: `tests/Yello.Tests.Shared/OwnershipOfferWire.cs` (route and problem-type stand-ins to swap for the contract members, then delete), `WireDatabase.OwnershipOffersInAsync` / `AddOwnershipOfferAsync`, `tests/Yello.Tests.Client/FakeYelloApi.OwnershipOffers.cs`.
+
+**Green today:** none. Every scaffold needs a route, table, type or component that does not exist yet.
+
+**Activation order:**
+
+1. Race 1, `An_offer_and_the_removal_of_its_recipient_held_on_the_Memberships_lock_end_in_a_serial_outcome` - the riskiest assumption: with no FK to `Membership` (Q2 (a)), "no `Pending` offer names a removed Membership" rests on the guarded insert and the written lapse sharing one lock (Q4 (a), Q5 (a)).
+2. The schema cases (`.OwnershipOfferSchema.cs`) and the EF-model gate, with the migration.
+3. The offer's AC1 cases, then AC3 (second offer `409`, the Q1 supersede), race 2, AC10, AC2, AC6, the idempotency case.
+4. The revoke and the read (`.RevokeOwnershipOffer.cs`), race 3.
+5. The lapse and Space-deletion cases (`.OwnershipOfferLapse.cs`).
+6. The email cases (`.OfferOwnershipOutbox.cs`).
+7. The remaining Architecture gates as each subject lands; the 12 isolation rows live (route-coverage gates go red once a route is mapped); the `MatrixRoute` and its probe.
+8. `OwnershipSectionTests`.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
 
 ## Dev Agent Record
 
