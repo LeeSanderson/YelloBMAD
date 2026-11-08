@@ -26,7 +26,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// <b>Seeding</b> is as in <c>.ListInvitations.cs</c>: live Invitations through 4.1's issue route, terminal and expired
 /// rows through <see cref="WireDatabase.AddInvitationAsync"/> and <see cref="WireDatabase.SetInvitationStateAsync"/>,
 /// the issuer's demotion through the product - joined as Admin through an Invitation accepted (4.3), demoted by the Owner's
-/// <c>PATCH .../memberships/{id}</c> (story 4.4, AC8) - and its removal the same way, by the Owner's
+/// <c>PATCH .../memberships/{id}</c> - and its removal the same way, by the Owner's
 /// <c>DELETE .../memberships/{id}</c>. The removal deletes a Membership only; the <c>Invitation</c> has no foreign key to <c>Membership</c>, and its <c>IssuedByAccountId</c> key to
 /// <c>Account</c> is untouched (AD-5).
 /// </para>

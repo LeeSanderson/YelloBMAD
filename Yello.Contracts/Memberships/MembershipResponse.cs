@@ -1,9 +1,9 @@
 namespace Yello.Contracts.Memberships;
 
 /// <summary>
-/// One Membership, as the Space's Membership list and the single-row read answer it to an Owner or Admin. Story 4.4, AC1,
-/// AC2; UX-DR14, UX-DR34, UX-DR36, AD-23. A Role change answers <see cref="MembershipRoleChangeResponse"/> instead, which
-/// carries no address (code review 2026-11-03, decided by Lee).
+/// One Membership, as the Space's Membership list and the single-row read answer it to an Owner or Admin. A Role
+/// change answers <see cref="MembershipRoleChangeResponse"/> instead, which carries no address, because the idempotency
+/// record stores that answer whole.
 /// </summary>
 /// <remarks>
 /// <para>

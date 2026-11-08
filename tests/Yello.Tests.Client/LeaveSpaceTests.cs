@@ -17,8 +17,8 @@ namespace Yello.Tests.Client;
 /// </para>
 /// <para>
 /// <b>Locators are assumptions</b> from the story's copy: a button "Leave this Space" in <c>main</c> on Space home, replaced
-/// in place by a <c>.destructive-confirm</c> holding the consequence, a <c>.button-danger</c> "Leave" and a "Cancel". A
-/// markup built differently is corrected here first and recorded in the Debug Log. Text is read with <c>textContent</c>.
+/// in place by a <c>.destructive-confirm</c> holding the consequence, a <c>.button-danger</c> "Leave" and a "Cancel". Markup
+/// built differently must be matched here too. Text is read with <c>textContent</c>.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Client")]

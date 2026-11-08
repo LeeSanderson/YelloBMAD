@@ -1368,8 +1368,8 @@
     <comment>The removal confirm's live state, read fresh when it opens: the person made a request in this Space within the presence window. {0} is the row's label.</comment>
   </data>
   <data name="MembershipRemoveNotInSpaceNow" xml:space="preserve">
-    <value>{0} has not been in this Space in the last 15 minutes.</value>
-    <comment>The removal confirm's live state when the person has no presence in this Space within the 15-minute window. {0} is the row's label.</comment>
+    <value>{0} has not been in this Space recently.</value>
+    <comment>The removal confirm's live state when the person has no live presence in this Space. No number of minutes: presence is rewritten only once half its window has gone, so it can lapse while the person's last request is well inside the window. {0} is the row's label.</comment>
   </data>
   <data name="MembershipRemoveConfirm" xml:space="preserve">
     <value>Remove</value>

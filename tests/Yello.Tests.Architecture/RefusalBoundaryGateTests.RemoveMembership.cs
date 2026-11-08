@@ -18,10 +18,10 @@ namespace Yello.Tests.Architecture;
 /// <remarks>
 /// <para>
 /// <b>Each gate finds its subject by name or by shape</b> (route pattern, reflection, the resource file, the Razor file), so
-/// a subject built under another name turns it red. The names are the story's: a public static method on
+/// a subject built under another name turns it red. The names are: a public static method on
 /// <c>RoleCapabilityMatrix</c> taking a <see cref="Role"/> whose answer has <c>Removable</c> and <c>HeldBy</c>;
 /// <c>MembershipCapabilities.Removable(viewerRole, targetRole, isYou)</c> in the client; <c>LeaveSpaceSection.razor</c>. A
-/// different name is corrected here first and recorded in the Debug Log.
+/// rename must be made here too.
 /// </para>
 /// <para>
 /// <b>Existing gates this work must keep green, unchanged:</b> <c>Only_the_pipeline_sets_the_acting_authority</c> (the

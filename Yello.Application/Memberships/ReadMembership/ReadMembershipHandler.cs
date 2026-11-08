@@ -2,7 +2,7 @@ namespace Yello.Application.Memberships.ReadMembership;
 
 /// <summary>
 /// Reads one Membership of the active Space with whether its Account is in the Space now: what the removal confirm states
-/// when it opens. UX-DR36, AD-23, AD-27.
+/// when it opens.
 /// </summary>
 /// <remarks>
 /// <b>Under the list's capability</b>, because the row carries the address the list does, and read fresh rather than taken

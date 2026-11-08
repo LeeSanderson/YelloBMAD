@@ -781,7 +781,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
             await RemoveButton(page, member).ClickAsync();
 
             var row = RowOf(page, member);
-            var live = inSpaceNow ? "Mo Member is in this Space now." : "Mo Member has not been in this Space in the last 15 minutes.";
+            var live = inSpaceNow ? "Mo Member is in this Space now." : "Mo Member has not been in this Space recently.";
 
             await row.GetByText(live).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 

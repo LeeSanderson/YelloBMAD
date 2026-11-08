@@ -2,7 +2,7 @@ namespace Yello.Client.Spaces;
 
 /// <summary>
 /// What the Members section of Space settings shows for a Role: whether it renders at all, which Roles each row's
-/// "Change Role" offers and which rows carry "Remove"; and whether Space home offers "Leave this Space". Story 4.4, AC1, AC4, AC10; FR-13; UX-DR11, UX-DR27; PRD section 12 #4.
+/// "Change Role" offers and which rows carry "Remove"; and whether Space home offers "Leave this Space".
 /// </summary>
 /// <remarks>
 /// <para>

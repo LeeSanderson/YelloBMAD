@@ -1,7 +1,7 @@
 namespace Yello.Application.Memberships.RemoveMembership;
 
 /// <summary>
-/// Removes a Membership from the active Space, within the acting Account's authority. FR-14, FR-36, AR-16/AD-9, AD-6.
+/// Removes a Membership from the active Space, within the acting Account's authority.
 /// </summary>
 /// <remarks>
 /// <para>

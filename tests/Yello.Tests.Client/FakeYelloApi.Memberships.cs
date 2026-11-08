@@ -33,7 +33,7 @@ namespace Yello.Tests.Client;
 /// <b>The removal, the leave and the single-row read</b> answer as the Host will: the removal through the pipeline (a Role
 /// other than Owner or Admin is the <c>403</c> naming <c>remove-membership</c>) and then the guarded statement; the leave by
 /// identity (the Owner is <c>409 ownership-held</c>, anyone else leaves and the Space goes from the switcher); the read with
-/// the row's presence from <see cref="MembershipPresence"/>. No earlier case sends any of them.
+/// the row's presence from <see cref="MembershipPresence"/>.
 /// </para>
 /// <para>
 /// <b>Contract constants, never literals</b> (4.1 review P13): the paths are <c>MembershipRoutes</c>' and the two new

@@ -10,7 +10,7 @@ using Yello.Host.Spaces;
 namespace Yello.Host.Endpoints;
 
 /// <summary>
-/// List the active Space's Memberships and read one. FR-13, UX-DR14, UX-DR34, UX-DR36. The Role change is
+/// List the active Space's Memberships and read one. The Role change is
 /// <see cref="MembershipRoleChangeEndpoints"/>; the removal and the leave are <see cref="MembershipRemovalEndpoints"/> - three
 /// classes only to keep each inside its dependency budget (S1200).
 /// </summary>
@@ -21,7 +21,7 @@ namespace Yello.Host.Endpoints;
 /// resolved the Space, checked <c>ChangeMembershipRole</c> (Owner Allowed, Admin Qualified; a Member or Viewer is its
 /// <c>403</c>, a non-member its boundary <c>404</c>), replayed a key it had already seen and set the acting authority before
 /// this code runs. Both routes sit under that one capability - the rows carry email addresses, which section 6.1 and
-/// AD-23 confine to Owners and Admins (Lee's Q4 (a)) - and both serve both surfaces (AD-4). The single row is what the
+/// AD-23 confine to Owners and Admins - and both serve both surfaces (AD-4). The single row is what the
 /// removal confirm states, its presence read fresh when the confirm opens.
 /// </para>
 /// </remarks>

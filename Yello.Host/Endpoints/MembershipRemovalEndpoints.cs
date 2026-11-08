@@ -10,7 +10,7 @@ using Yello.Host.Spaces;
 namespace Yello.Host.Endpoints;
 
 /// <summary>
-/// Remove a Membership from the active Space, or leave it. FR-14, FR-36, AR-16/AD-9.
+/// Remove a Membership from the active Space, or leave it.
 /// </summary>
 /// <remarks>
 /// <para>

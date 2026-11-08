@@ -8,8 +8,7 @@ namespace Yello.Infrastructure.Persistence;
 
 /// <summary>
 /// Lists and reads the resolved Space's Memberships, changes one's Role and removes one, inside the request's Space-scoped
-/// unit of work. FR-13,
-/// UX-DR14, UX-DR34, AR-12/AD-5, AR-16/AD-9; story 4.4, AC1, AC2, AC4-AC7; Lee's Q1 (a), Q2 (a), Q4 (a), Q5 (a).
+/// unit of work.
 /// </summary>
 /// <remarks>
 /// <para>

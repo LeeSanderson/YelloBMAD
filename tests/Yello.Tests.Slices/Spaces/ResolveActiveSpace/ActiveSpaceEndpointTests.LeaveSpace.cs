@@ -16,8 +16,8 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Every refusal is anchored</b> on a <c>204</c> from the same route first: today the path answers the boundary
-/// <c>404</c>.
+/// <b>Every refusal is anchored</b> on a <c>204</c> from the same route first, so a refusal asserted alone cannot
+/// pass against a route that answers the boundary <c>404</c> to everything.
 /// </para>
 /// <para>
 /// <b>The replay is the boundary <c>404</c></b>, not a replayed <c>204</c>: after a committed leave the caller has no

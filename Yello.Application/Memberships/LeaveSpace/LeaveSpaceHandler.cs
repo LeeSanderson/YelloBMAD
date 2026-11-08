@@ -1,7 +1,7 @@
 namespace Yello.Application.Memberships.LeaveSpace;
 
 /// <summary>
-/// The caller leaves the active Space: its own Membership is removed unless it holds ownership. FR-14, FR-36, AR-16/AD-9.
+/// The caller leaves the active Space: its own Membership is removed unless it holds ownership.
 /// </summary>
 /// <remarks>
 /// <para>

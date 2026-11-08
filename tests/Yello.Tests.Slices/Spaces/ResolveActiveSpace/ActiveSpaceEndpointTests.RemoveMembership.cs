@@ -25,9 +25,9 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Every refusal is anchored</b> on a <c>204</c> from the same route in the same case first: today every path under
-/// <c>/memberships/{id}</c> answers <c>DELETE</c> and <c>GET</c> with the boundary <c>404</c>, so a refusal or a not-found
-/// asserted alone would pass against a route that does not exist.
+/// <b>Every refusal is anchored</b> on a <c>204</c> from the same route in the same case first: an unmapped path
+/// answers the boundary <c>404</c>, so a refusal or a not-found asserted alone would pass against a route that does not
+/// exist.
 /// </para>
 /// <para>
 /// <b>Seeding.</b> Targets and actors whose Role is the point join through the product (an Invitation at that Role,

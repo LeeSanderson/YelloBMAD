@@ -9,7 +9,7 @@ using Yello.Host.Spaces;
 namespace Yello.Host.Endpoints;
 
 /// <summary>
-/// Change a Membership's Role in the active Space. FR-13, AR-12/AD-5, AR-16/AD-9.
+/// Change a Membership's Role in the active Space.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,7 +27,7 @@ namespace Yello.Host.Endpoints;
 public static class MembershipRoleChangeEndpoints
 {
     /// <summary>
-    /// Registers <c>PATCH /api/v1/spaces/{spaceId}/memberships/{membershipId}</c>: the Role change (AC4).
+    /// Registers <c>PATCH /api/v1/spaces/{spaceId}/memberships/{membershipId}</c>: the Role change.
     /// </summary>
     /// <param name="endpoints">The route builder.</param>
     /// <returns>The registered route, for further configuration.</returns>
@@ -57,7 +57,7 @@ public static class MembershipRoleChangeEndpoints
         var request = await JsonRequestBody.ReadAsync(httpContext.Request, typeof(ChangeMembershipRoleRequest), cancellationToken)
             .ConfigureAwait(false) as ChangeMembershipRoleRequest;
 
-        // Before anything is read (Q10 (a)): owner, an unknown code or none.
+        // Before anything is read: owner, an unknown code or none.
         if (!AssignableRoles.TryParse(request?.Role, out var proposed))
         {
             return Results.Problem(
@@ -88,13 +88,12 @@ public static class MembershipRoleChangeEndpoints
             // Not recorded: an in-Space not-found crossed no boundary (AD-20). The body is the boundary's.
             RoleChangeOutcome.NotFound => BoundaryProblems.NotAvailable(),
 
-            // A new outcome must be answered here, never fall into the boundary's 404 (story 4.1 code review P10).
+            // A new outcome must be answered here, never fall into the boundary's 404.
             _ => throw new InvalidOperationException($"Unanswered Role change outcome {result.Outcome}."),
         };
     }
 
-    // No address: the pipeline records this answer whole, and no idempotency record may hold one (AD-23; code review
-    // 2026-11-03, decided by Lee, option (b)).
+    // No address: the pipeline records this answer whole, and no idempotency record may hold one (AD-23).
     private static MembershipRoleChangeResponse ChangeResponse(ChangedMembership membership) =>
         new(membership.Id, membership.DisplayName, membership.RoleCode, membership.IsYou);
 }

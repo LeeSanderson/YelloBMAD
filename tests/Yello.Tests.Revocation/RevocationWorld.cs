@@ -20,7 +20,7 @@ namespace Yello.Tests.Revocation;
 /// <b>Raw SQL where the event is the schema's</b> - Membership removal, Space and Account deletion, a
 /// Role change - through <see cref="WireDatabase"/>, under the session keys the schema requires. Space deletion and
 /// Membership removal and leaving have endpoint-driven rows beside their raw-SQL ones; Account deletion's arrives with
-/// its endpoint (story 5.4).
+/// its endpoint.
 /// </para>
 /// </remarks>
 internal sealed class RevocationWorld : IAsyncDisposable
