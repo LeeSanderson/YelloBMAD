@@ -51,7 +51,7 @@ internal sealed class MembershipConfiguration(YelloDbContext context) : IEntityT
         builder.HasQueryFilter(membership =>
             membership.SpaceId == context.ScopedSpaceId || membership.AccountId == context.ScopedAccountId);
 
-        // AD-2's composite-key rule. A reference to a Membership from another Space-scoped row -
+        // The composite-key rule. A reference to a Membership from another Space-scoped row -
         // a Task's Assignee - has to be the pair (SpaceId, MembershipId) so that "same Space"
         // holds by construction, and a composite foreign key can only target a matching unique
         // key on the principal. The primary key is Id alone, so this is that key.

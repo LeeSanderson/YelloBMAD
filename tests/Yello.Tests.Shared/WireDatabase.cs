@@ -996,8 +996,7 @@ public sealed class WireDatabase(string connectionString)
 
     /// <summary>
     /// The Membership a Task is assigned to, read under the Task's own Space key, or <c>null</c> when it is unassigned.
-    /// Reads <c>dbo.[Task].AssigneeMembershipId</c>, a column only the assignment migration adds; only skipped scaffolds call
-    /// this until then.
+    /// Reads <c>dbo.[Task].AssigneeMembershipId</c>, a column the assignment migration adds.
     /// </summary>
     /// <param name="spaceId">The Task's Space.</param>
     /// <param name="taskId">The Task.</param>
@@ -1049,8 +1048,7 @@ public sealed class WireDatabase(string connectionString)
 
     /// <summary>
     /// The notification send records of <paramref name="spaceId"/>, read under that Space's own key: (kind, when). Reads
-    /// <c>dbo.[NotificationSend]</c>, a table only the assignment migration adds; only skipped scaffolds call this until
-    /// then.
+    /// <c>dbo.[NotificationSend]</c>, a table the assignment migration adds.
     /// </summary>
     /// <param name="spaceId">The Space.</param>
     /// <returns>Each record's kind and time, oldest first.</returns>

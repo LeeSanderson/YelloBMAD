@@ -107,7 +107,7 @@ public interface IMembershipStore
 }
 
 /// <summary>
-/// One Assignee candidate.
+/// A Membership offered as an Assignee: an id and a name to show, never an address or a Role.
 /// </summary>
 /// <param name="MembershipId">The Membership.</param>
 /// <param name="DisplayName">Its Account's display name, read live for a current Member.</param>

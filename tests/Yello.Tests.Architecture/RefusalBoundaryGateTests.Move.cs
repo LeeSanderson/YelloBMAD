@@ -111,9 +111,8 @@ public sealed partial class RefusalBoundaryGateTests
     }
 
     /// <summary>
-    /// ARCH-603 - AC9, FR-29, FR-41's boundary - under one Task the Host maps its read, edit and deletion on the item, its
-    /// move and its assignment, and nothing else: no route that moves a Task to another Project (6.5) or writes a
-    /// position key directly.
+    /// Under one Task the Host maps its read, edit and deletion on the item, its move and its assignment, and nothing else:
+    /// no route that moves a Task to another Project or writes a position key directly.
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-29")]

@@ -26,7 +26,7 @@ public static class TaskCapabilities
         roleCode is "owner" or "admin" or "member";
 
     /// <summary>
-    /// Whether a Role may assign Tasks (FR-16's <c>assign-task</c>), so a Viewer has no assign control. Held against the
+    /// Whether a Role may assign Tasks (the matrix's <c>assign-task</c>), so a Viewer has no assign control. Held against the
     /// matrix by its own gate: the matrix keeps assignment apart from editing, so this predicate does too.
     /// </summary>
     /// <param name="roleCode">The Role's stable code, from the active Space's answer.</param>

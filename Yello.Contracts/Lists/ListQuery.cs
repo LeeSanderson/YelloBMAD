@@ -1,7 +1,8 @@
 namespace Yello.Contracts.Lists;
 
 /// <summary>
-/// What a client asks a List View page for (story 2.10, open question 4 (a)): a sort and the filters, which combine. <see cref="ListRoutes.ListOf(Guid, Guid, ListQuery)"/> writes it as the route's query.
+/// What a client asks a List View page for: a sort and the filters, which combine.
+/// <see cref="ListRoutes.ListOf(Guid, Guid, ListQuery)"/> writes it as the route's query.
 /// </summary>
 /// <param name="Sort">A <see cref="ListSorts"/> code.</param>
 /// <param name="StatusIds">Statuses, any of which a listed Task is in; empty for every Status.</param>

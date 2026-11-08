@@ -3,7 +3,7 @@ baseline_commit: 4d23bf347622285bb2195854adbe6a22921d42d6
 ---
 # Story 4.6: Assign a Task, and be told
 
-Status: review
+Status: done
 
 Epic: 4 — Bring people into one piece of your work (the sixth story of the epic)
 Story key: `4-6-assign-a-task-and-be-told`
@@ -392,6 +392,32 @@ AC1 to AC7 are reproduced **verbatim** from `epics.md:1844-1875` and numbered by
     3. Iterate on the affected classes with `--filter-class "<full name>"`.
     4. Make **exactly one** full run, in the background, without the browser suite: `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1 -p:YelloSkipBrowserSuite=true`, logged to `artifacts/test-runs/4-6-assign-a-task-and-be-told-develop.log`. Record the totals.
     5. Rerun a failure once, alone, before calling it real.
+
+### Review Findings
+
+Code review 2026-11-08 (Blind Hunter, Edge Case Hunter, Acceptance Auditor; diff `973c482..HEAD`). 35 raw findings, 24 after de-duplication: 6 patched, 14 deferred as low, 1 deferred otherwise, 0 decisions, 3 dismissed (the Membership list's look-alike discriminators and the Assignee sort's order are Lee's Q7 and Q6; the enqueue that throws outside a Space is AC5's required behaviour).
+
+- [x] [Review][Patch] A failed candidates read (network, timeout, bad JSON) refused the whole Board and List View, though a missed read should only leave Assignees unnamed [Yello.Client/Spaces/SpaceAssignees.cs:46]
+- [x] [Review][Patch] An assigned Task whose Assignee this tab holds no candidate for read as "Unassigned" in the List row, the panel's button and the Viewer's attributes; it now shows nothing rather than an untrue "Unassigned" [Yello.Client/Components/TaskListRow.razor:47, Yello.Client/Components/TaskDetail.razor:234, :285]
+- [x] [Review][Patch] Comments the diff added or changed carry requirement, architecture, test-design and story ids and open-question references [35 files; e.g. Yello.Infrastructure/Persistence/Migrations/20261108094508_TaskAssignee.cs:9]
+- [x] [Review][Patch] ATDD-phase narrative left in test comments, now untrue ("the route does not exist yet", "only skipped scaffolds call this until then", "the dev phase ...") [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AssignTask.cs, tests/Yello.Tests.Shared/WireDatabase.cs, tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Assignment.cs, tests/Yello.Tests.Client/AssigneeTests.cs and siblings]
+- [x] [Review][Patch] XML docs that restate the member ("One Assignee candidate.", "Assigns the Task.", "Reads the candidates.", "What an assignment came to.") [Yello.Application/Tasks/AssignTask/AssignTaskHandler.cs, Yello.Application/Memberships/ListAssignees/ListAssigneesHandler.cs, Yello.Domain/Tasks/ITaskStore.cs]
+- [x] [Review][Patch] The avatar's comment and its resx comment say the List row names the avatar, but the row hides it beside the visible label [Yello.Client/Components/AssigneeAvatar.razor, Yello.Client/Localisation/ClientCopy.resx]
+- [x] [Review][Defer] Assignment email has no bound: a Member can toggle an assignment in a loop and send one email per toggle to a co-member, with a display name and Task title of its choosing; the send record grows with it [Yello.Host/Endpoints/TaskAssigneeEndpoints.cs] — deferred, medium: rate limiting is story 8.3's, and per-event email is the PRD's (`prd.md:841`); Lee's Q10 (a) re-owned the Invitation equivalent the same way
+- [x] [Review][Defer] Unknown Assignees are re-read only after the Board's cold load, never after an appended page, a Board re-read or in the List View [Yello.Client/Components/BoardView.razor:371] — deferred, low severity
+- [x] [Review][Defer] The Board's cold load awaits the unknown-Assignee re-read before it returns [Yello.Client/Components/BoardView.razor:371] — deferred, low severity
+- [x] [Review][Defer] `BoardSpaceLists.ReadAsync` writes its held lists without a generation or token check, so a superseded or purged read can leave the departed Space's names in the private fields (never shown) [Yello.Client/Components/BoardSpaceLists.cs:79] — deferred, low severity
+- [x] [Review][Defer] The Viewer's read-only Assignee row sits inside the `!CanManage` block, so a Role that could manage but not assign would see none (no such Role exists) [Yello.Client/Components/TaskDetail.razor:285] — deferred, low severity
+- [x] [Review][Defer] The assignment email carries an empty link when no client origin is configured [Yello.Application/Tasks/AssignTask/AssignmentLinks.cs] — deferred, low severity
+- [x] [Review][Defer] The look-alike fold upper-cases rune by rune (not case folding: "ß"/"SS", final sigma) and applies NFC before stripping `Cf`, so a zero-width character between a letter and its combining mark defeats composition [Yello.Contracts/Memberships/MembershipLabels.cs] — deferred, low severity
+- [x] [Review][Defer] `AssignmentNoticeAsync` finds the recipient by Membership id alone, relying on the query filter, where the assigner's read beside it states `SpaceId` [Yello.Infrastructure/Persistence/MembershipStore.Assignees.cs] — deferred, low severity
+- [x] [Review][Defer] An assignment queued behind its actor's removal or demotion commits after it, on the pipeline's earlier capability check, as a Task edit or move does [Yello.Infrastructure/Persistence/TaskAssignmentStore.cs:38] — deferred, low severity
+- [x] [Review][Defer] Opening the Assignee picker does not close an open Status or Labels picker [Yello.Client/Components/TaskDetail.razor] — deferred, low severity
+- [x] [Review][Defer] `WireDatabase.RemoveMembershipAsync` / `DeleteAccountAsync` fail `547` on a Membership a Task still names [tests/Yello.Tests.Shared/WireDatabase.cs] — deferred, low severity
+- [x] [Review][Defer] `HostPool.StopAsync` stops at the first Host whose dispose throws, leaving the rest running [tests/Yello.Tests.Shared/HostPool.cs:94] — deferred, low severity
+- [x] [Review][Defer] `MailDrop`'s timeout diagnostic reads the shared drop without catching an `IOException`, which can hide the timeout message [tests/Yello.Tests.Shared/MailDrop.cs:220] — deferred, low severity
+- [x] [Review][Defer] The avatar is sized by padding on the role-chip fill, not DESIGN's 1.25rem square on the avatar token (it follows the Membership row's avatar) [Yello.Client/wwwroot/css/components.css] — deferred, low severity
+- [x] [Review][Defer] The demotion case proves the assignment survives, not that the Role change issues no statement on `dbo.[Task]` (plant 10 holds the behaviour) [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AssignTask.cs] — deferred, low severity
 
 ## Dev Notes
 
@@ -927,3 +953,4 @@ All plants ran through a script that saved each file's text and wrote it back in
 
 - 2026-11-08: Story 4.6 created (bmad-create-story). Status ready-for-dev.
 - 2026-11-08: Implemented (bmad-dev-story): assignment route and candidates read, composite Assignee key, outbox email and send record, unassignment in removal and leave, List View Assignee filter and sort, client picker, avatar and List controls. Status review.
+- 2026-11-08: Code review (bmad-code-review): 6 patches applied (a failed candidates read no longer refuses the Board or the List; an Assignee with no candidate is no longer shown as "Unassigned"; the comment rule across the diff), 15 deferred, 3 dismissed. Full run with the browser suite: 2369 total, 2359 passed, 0 failed, 10 skipped (`artifacts/test-runs/4-6-assign-a-task-and-be-told-review.log`). Status done.

@@ -4,10 +4,10 @@
 @inject IStringLocalizer<ClientCopy> Localizer
 
 @*
-    AN ASSIGNEE'S AVATAR - UX-DR8, UX-DR34; DESIGN.md avatar. Squared monospace initials from the display name alone,
-    never interactive and never a tooltip: a title attribute would show a name to a pointer only, and an address must never
-    be one. On the card and in the List it carries its own accessible name, "Assigned to {label}"; beside a name that is
-    already read (the picker, the panel) it is decoration and hidden from assistive technology.
+    AN ASSIGNEE'S AVATAR - DESIGN.md avatar. Squared monospace initials from the display name alone, never interactive
+    and never a tooltip: a title attribute would show a name to a pointer only, and an address must never be one. On the
+    card, where no name is shown beside it, it carries its own accessible name, "Assigned to {label}"; beside a label that
+    is already read (the List row, the picker, the panel) it is decoration and hidden from assistive technology.
 *@
 
 @if (Named)

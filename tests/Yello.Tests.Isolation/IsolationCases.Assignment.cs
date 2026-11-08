@@ -10,20 +10,20 @@ namespace Yello.Tests.Isolation;
 
 /// <summary>
 /// Assigning a Task: the rows for <c>PUT /api/v1/spaces/{spaceId}/tasks/{taskId}/assignee</c> and
-/// <c>GET /api/v1/spaces/{spaceId}/assignees</c> (I-1, I-2, I-4, I-12, I-13, I-15, I-17; V-1), each stating both surfaces.
+/// <c>GET /api/v1/spaces/{spaceId}/assignees</c>, each stating both surfaces.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>Every row is live.</b> Both routes fail the route-coverage gate unless these rows are active.
 /// </para>
 /// <para>
-/// <b>I-15 is held twice:</b> by the composite key and the guarded statement (another Space's real Membership id in the
+/// <b>Same-Space assignment is held twice:</b> by the composite key and the guarded statement (another Space's real Membership id in the
 /// body is the same <c>400</c> as a random id, <c>ISO-ASSIGN-FOREIGN-MEMBERSHIP</c>), and by the candidates read and the List
 /// filter offering and matching only this Space's Memberships (<c>ISO-ASSIGNEES-ONLY-THIS-SPACE</c>,
 /// <c>ISO-LIST-FOREIGN-ASSIGNEE-FILTER</c>).
 /// </para>
 /// <para>
-/// <b>I-14 is proved in the Slices suite</b> (<c>The_assignment_email_names_this_Space_Project_and_Task_and_nothing_of_another_Space</c>),
+/// <b>The email's Space confinement is proved in the Slices suite</b> (<c>The_assignment_email_names_this_Space_Project_and_Task_and_nothing_of_another_Space</c>),
 /// which reads mail through <c>HostProcess</c> and a <see cref="MailDrop"/> of its own; this suite's world shares one Host and
 /// one mail drop across rows, so a row cannot own "the one email to this address".
 /// </para>
@@ -31,7 +31,7 @@ namespace Yello.Tests.Isolation;
 /// <b>Timing.</b> No row is added to <c>IsolationTimingTests</c>: both <c>400</c>s are one byte-identical body with no
 /// existence branch (the <c>EXISTS</c> clause does the same work for a random id and a foreign one, which the FILTER predicate
 /// hides), and the in-Space not-found is the floored boundary body (<c>NotAvailableFloor</c>), which
-/// <c>ISO-TIMING-IN-SPACE</c> already proves. The dev phase revisits this only if measurement says otherwise.
+/// <c>ISO-TIMING-IN-SPACE</c> already proves.
 /// </para>
 /// </remarks>
 internal static partial class IsolationCases
@@ -61,7 +61,7 @@ internal static partial class IsolationCases
             },
             Both(new BoundaryNotFound { Then = NoTaskIsAssignedInEitherSpaceAsync })),
 
-        // I-15, the ISO-APPLY-FOREIGN-LABEL template: B's real Membership id in the body of A's own Task's assignment answers
+        // The ISO-APPLY-FOREIGN-LABEL template: B's real Membership id in the body of A's own Task's assignment answers
         // byte for byte what a random id does, and nothing is assigned anywhere.
         new IsolationCase(
             "ISO-ASSIGN-FOREIGN-MEMBERSHIP", "I-2, I-13, I-15", IsolationVector.Write, HttpMethod.Put, TaskRoutes.Assignee,
@@ -101,7 +101,7 @@ internal static partial class IsolationCases
             },
             Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = NoTaskIsAssignedInEitherSpaceAsync })),
 
-        // I-15, aggregate: the host's Space holds a Member who also belongs to a second Space, whose Owner and other Member the
+        // Aggregate: the host's Space holds a Member who also belongs to a second Space, whose Owner and other Member the
         // host shares nothing with. The host's candidates are exactly its own Space's Memberships, by name only.
         new IsolationCase(
             "ISO-ASSIGNEES-ONLY-THIS-SPACE", "I-3, I-11, I-15", IsolationVector.Listing, HttpMethod.Get, AssigneeRoutes.List,
@@ -124,7 +124,7 @@ internal static partial class IsolationCases
             },
             Both(new Served(HttpStatusCode.OK, OffersExactlyTheHostsMembershipsAsync, "200, exactly the Space's Memberships by name; nothing of the shared Member's other Space, no address"))),
 
-        // I-15 on the List, the ISO-LIST-FOREIGN-FILTER-IN-OWN-SPACE template: B's real Membership id in A's own List's
+        // On the List, the ISO-LIST-FOREIGN-FILTER-IN-OWN-SPACE template: B's real Membership id in A's own List's
         // assignee filter matches nothing, with bytes identical to a random id's - never a refusal.
         new IsolationCase(
             "ISO-LIST-FOREIGN-ASSIGNEE-FILTER", "I-13, I-15", IsolationVector.DeepLink, HttpMethod.Get, ListRoute,
@@ -196,7 +196,7 @@ internal static partial class IsolationCases
     }
 
     /// <summary>
-    /// I-15 for the candidates: the host's read offers exactly its Space's Memberships (the host and the shared Member), each
+    /// For the candidates: the host's read offers exactly its Space's Memberships (the host and the shared Member), each
     /// as a Membership id and a display name only, and nothing of the shared Member's other Space - not that Space's Owner's
     /// or other Member's name, address or Membership id. Anchored both ways: both Spaces hold Members.
     /// </summary>

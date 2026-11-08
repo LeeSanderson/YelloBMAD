@@ -1433,7 +1433,7 @@
   </data>
   <data name="AssigneeAvatarName" xml:space="preserve">
     <value>Assigned to {0}</value>
-    <comment>The accessible name of an Assignee's avatar on a card or a List row. {0} is the person's label - their display name, with a short code when two names look alike. Never an address.</comment>
+    <comment>The accessible name of an Assignee's avatar on a card, where no name is shown beside it. {0} is the person's label - their display name, with a short code when two names look alike. Never an address.</comment>
   </data>
   <data name="AssigneeAssigned" xml:space="preserve">
     <value>Assigned to {0}.</value>

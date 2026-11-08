@@ -4,7 +4,7 @@ namespace Yello.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// Story 4.1's part of the model: the Invitation table, the outbox, and the database clock the shared actionable
-/// predicate compares against (AD-27); story 4.3's policy-free token index (Lee's Q1 (a)); and the notification send record
+/// predicate compares against; the policy-free token index; and the notification send record
 /// the outbox store writes beside each email. Named one by one, for the reason <see cref="YelloDbContext"/> gives.
 /// </summary>
 internal static class InvitationModel

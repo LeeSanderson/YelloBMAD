@@ -9,8 +9,7 @@
 @inject IJSRuntime JS
 
 @*
-    ONE PROJECT'S LIST VIEW - story 2.10. FR-30; AC1, AC7-AC9, AC11, AC16-AC20; UX-DR19,
-    UX-DR24, UX-DR26, UX-DR27, UX-DR31, UX-DR35, UX-DR38-UX-DR40, UX-DR42; AD-29.
+    ONE PROJECT'S LIST VIEW.
 
     THE SAME TASKS AS ROWS, read 50 at a time from the List route (open questions 1 (a), 2 (a)). Nothing in it writes, so
     every Role sees exactly the same view and no control in it is disabled for a Role (AC16, UX-DR27).
@@ -35,7 +34,7 @@
 
     PURGED WITH THE SPACE, synchronously, and never written to browser storage (AC17): the filters, the sort, the rows, the
     cursor, the Assignee candidates and the announcement all go. No Status, Label or person's name reaches the address or
-    the title (UX-DR33).
+    the title.
 *@
 
 <LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />

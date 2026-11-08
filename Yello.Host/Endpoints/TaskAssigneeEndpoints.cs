@@ -15,9 +15,8 @@ namespace Yello.Host.Endpoints;
 /// <remarks>
 /// <para>
 /// <b>No Membership check, no Role, no bound count, no idempotency and no refusal record here</b> - the reasons
-/// <see cref="ProjectEndpoints"/> gives (AR-3). The pipeline has resolved the Space, checked <c>AssignTask</c> - the matrix's
-/// own row, which no other route declares - and replayed a key it had already seen before this code runs. Both surfaces
-/// (AD-4).
+/// <see cref="ProjectEndpoints"/> gives. The pipeline has resolved the Space, checked <c>AssignTask</c> - the matrix's
+/// own row, which no other route declares - and replayed a key it had already seen before this code runs. Both surfaces.
 /// </para>
 /// <para>
 /// <b>The body is read as a document</b>, never bound: a bound record cannot tell a body that sets <c>membershipId</c> to
@@ -74,10 +73,10 @@ public static class TaskAssigneeEndpoints
             TaskAssignmentOutcome.Assigned => Results.Ok(TaskEndpoints.Response(result.Task!, result.LabelIds)),
 
             // Not recorded: a Membership that is not this Space's is a validation refusal, the same bytes for a random id and
-            // a foreign one (I-13). The unit of work rolls back.
+            // a foreign one. The unit of work rolls back.
             TaskAssignmentOutcome.InvalidAssignee => InvalidAssignee(),
 
-            // Not recorded: an in-Space not-found crossed no boundary (AD-20). The body is the boundary's.
+            // Not recorded: an in-Space not-found crossed no boundary. The body is the boundary's.
             TaskAssignmentOutcome.NotFound => BoundaryProblems.NotAvailable(),
 
             _ => throw new InvalidOperationException($"Unanswered assignment outcome {result.Outcome}."),

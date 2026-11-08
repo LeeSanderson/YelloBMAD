@@ -6,7 +6,7 @@ namespace Yello.Infrastructure.Persistence;
 
 /// <summary>
 /// Reads one Project's Tasks as a List View inside the request's Space-scoped unit of work: the filtered count, and a page
-/// under one of its sorts by pair keyset seek. Story 2.10; FR-30, AR-22, AD-29.
+/// under one of its sorts by pair keyset seek.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -23,7 +23,7 @@ namespace Yello.Infrastructure.Persistence;
 /// <c>ListPagingTests</c> LV-19).
 /// </para>
 /// <para>
-/// <b><c>NULL</c> last, explicitly</b> (AC5, AC13, open question 5 (a)): the due-date, Label and Assignee sorts read in two
+/// <b><c>NULL</c> last, explicitly</b>: the due-date, Label and Assignee sorts read in two
 /// segments - the valued Tasks, then, in the same page when they run out, the Tasks with none by <c>Id</c> - each its own
 /// bounded seek on the same index. SQL Server's default would put <c>NULL</c> first; neither segment leaves it to that.
 /// </para>

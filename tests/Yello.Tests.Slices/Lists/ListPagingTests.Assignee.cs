@@ -9,12 +9,12 @@ using static Yello.Tests.Slices.Tasks.TaskWire;
 namespace Yello.Tests.Slices.Lists;
 
 /// <summary>
-/// The List View's Assignee dimension, which completes FR-30: the Assignee sort (by <c>AssigneeMembershipId</c>, so
+/// The List View's Assignee dimension: the Assignee sort (by <c>AssigneeMembershipId</c>, so
 /// each person's Tasks are grouped, Unassigned fixed last, <c>TaskId</c> the tiebreaker) walked to its end with page
-/// boundaries inside runs of ties and across the Unassigned segment (P-3); the Assignee filter (repeatable <c>assignee</c>
-/// ids and an <c>unassigned</c> flag, the <c>dueNone</c> precedent) with its true total; and NFR-5 at 5,000 Tasks for the new
+/// boundaries inside runs of ties and across the Unassigned segment; the Assignee filter (repeatable <c>assignee</c>
+/// ids and an <c>unassigned</c> flag, the <c>dueNone</c> precedent) with its true total; and the 5,000-Task budget for the new
 /// sort, unfiltered and filtered - the last page reads no more than the first, and the page seeks the sort's own composite
-/// index without converting its column (P-4 at run time).
+/// index without converting its column.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -31,10 +31,6 @@ namespace Yello.Tests.Slices.Lists;
 /// <c>(SpaceId, AssigneeMembershipId) → Membership(SpaceId, Id)</c> admits every row. Seeding the 5,000 directly rather
 /// than through the product is the bulk exception <c>TESTING-CONVENTIONS.md</c> allows.
 /// </para>
-/// <para>
-/// <b>Existing cases the dev phase changes in the same commit</b>: LV-10's <c>[InlineData("sort=assignee")]</c> (now a
-/// <c>200</c>), and the cursor case that sends <c>sort=assignee&amp;after=garbage</c>.
-/// </para>
 /// </remarks>
 public sealed partial class ListPagingTests
 {
@@ -44,7 +40,7 @@ public sealed partial class ListPagingTests
 
 
     /// <summary>
-    /// P-3 for the Assignee sort: 155 Tasks, a quarter unassigned and the rest shared by three Members (runs of about 39), walk
+    /// The Assignee sort: 155 Tasks, a quarter unassigned and the rest shared by three Members (runs of about 39), walk
     /// grouped by Membership in SQL Server's <c>uniqueidentifier</c> order, then Unassigned, each run in <c>TaskId</c> order;
     /// boundaries at 50, 100 and 150 fall inside runs and across into the Unassigned segment; every Task appears once, every
     /// page states the true total, and the last cursor is <c>null</c>.
@@ -107,7 +103,7 @@ public sealed partial class ListPagingTests
     }
 
     /// <summary>
-    /// NFR-5 at 5,000 Tasks for the Assignee sort (the deterministic half of the List View's budget): the last page reads no more logical
+    /// The 5,000-Task budget for the Assignee sort (the deterministic half of the List View's budget): the last page reads no more logical
     /// pages than the first, within the tolerance of 5, unfiltered and under the Assignee filter.
     /// </summary>
     /// <param name="filtered">Whether under the Assignee filter (one Member and Unassigned).</param>
@@ -155,7 +151,7 @@ public sealed partial class ListPagingTests
     }
 
     /// <summary>
-    /// P-4 at run time (LV-19's sibling): the Assignee sort's pages are served by a seek on
+    /// At run time: the Assignee sort's pages are served by a seek on
     /// <c>IX_Task_SpaceId_ProjectId_AssigneeMembershipId_Id</c>, and no plan converts <c>AssigneeMembershipId</c> implicitly
     /// (the cursor's Membership id is bound as a <c>uniqueidentifier</c>).
     /// </summary>

@@ -27,7 +27,7 @@ internal sealed class NotificationSendConfiguration(YelloDbContext context) : IE
             .HasColumnName(SchemaNames.SpaceIdColumn)
             .IsRequired();
 
-        // AD-2's second layer, from application state. See MembershipConfiguration.
+        // The second isolation layer, from application state. See MembershipConfiguration.
         builder.HasQueryFilter(send => send.SpaceId == context.ScopedSpaceId);
 
         builder.Property(send => send.Kind)

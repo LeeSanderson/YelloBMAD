@@ -45,15 +45,25 @@ public static class SpaceAssignees
 
     private static async Task<IReadOnlyList<AssigneeChoice>?> ReadCoreAsync(HttpClient http, Guid spaceId, CancellationToken token)
     {
-        using var response = await http.GetAsync(new Uri(AssigneeRoutes.ListOf(spaceId), UriKind.Relative), token);
-
-        if (!response.IsSuccessStatusCode)
+        try
         {
+            using var response = await http.GetAsync(new Uri(AssigneeRoutes.ListOf(spaceId), UriKind.Relative), token);
+
+            if (!response.IsSuccessStatusCode)
+            {
+                return null;
+            }
+
+            return await response.Content.ReadFromJsonAsync<AssigneeListResponse>(JsonOptions, token) is { } list
+                ? Labelled(list.Assignees)
+                : null;
+        }
+        catch (Exception exception) when (exception is HttpRequestException or JsonException
+            || (exception is OperationCanceledException && !token.IsCancellationRequested))
+        {
+            // The candidates only name Assignees: a read that fails must not take the Board or the List down with it.
+            // A cancelled Space token still propagates, as the Labels read's does.
             return null;
         }
-
-        return await response.Content.ReadFromJsonAsync<AssigneeListResponse>(JsonOptions, token) is { } list
-            ? Labelled(list.Assignees)
-            : null;
     }
 }

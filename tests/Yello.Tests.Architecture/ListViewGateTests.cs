@@ -111,7 +111,7 @@ public sealed class ListViewGateTests
     }
 
     /// <summary>
-    /// P-4 for the Assignee sort, by name: the EF model holds an index on <c>Task</c> whose key columns are exactly
+    /// The Assignee sort, by name: the EF model holds an index on <c>Task</c> whose key columns are exactly
     /// <c>(SpaceId, ProjectId, AssigneeMembershipId, Id)</c>, which the generic index gate then finds for the
     /// <c>assignee</c> code.
     /// </summary>

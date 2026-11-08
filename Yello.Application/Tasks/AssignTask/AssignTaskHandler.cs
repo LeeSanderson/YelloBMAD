@@ -11,7 +11,7 @@ namespace Yello.Application.Tasks.AssignTask;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Everything cross-cutting happened before this ran</b> (AR-3): the pipeline resolved the Space, checked
+/// <b>Everything cross-cutting happened before this ran</b>: the pipeline resolved the Space, checked
 /// <c>AssignTask</c> against the matrix and replayed an <c>Idempotency-Key</c> it had already seen, so a replay never
 /// reaches this code and never sends a second email. This slice reads no Role and records nothing.
 /// </para>
@@ -22,7 +22,7 @@ namespace Yello.Application.Tasks.AssignTask;
 /// </para>
 /// <para>
 /// <b>One unit of work</b>: the assignment and its outbox row commit or roll back together, and the dispatcher sends only
-/// after the commit (AD-10).
+/// after the commit.
 /// </para>
 /// </remarks>
 /// <param name="assignments">Assigns the Task.</param>
@@ -40,7 +40,7 @@ public sealed class AssignTaskHandler(
     IOutbox outbox)
 {
     /// <summary>
-    /// Assigns the Task.
+    /// Writes the Assignee, then enqueues the email only when the Assignee changed to someone other than the actor.
     /// </summary>
     /// <param name="context">The active Space, as the pipeline resolved it on this request.</param>
     /// <param name="taskId">The Task, from the route.</param>

@@ -340,7 +340,7 @@
 
         try
         {
-            // The Space's Labels and Assignee candidates first (story 2.4): a card names the Labels and the Assignee it
+            // The Space's Labels and Assignee candidates first: a card names the Labels and the Assignee it
             // carries from them, so the Board is drawn only once they have answered.
             if (!await Lists.ReadAsync(SpaceId, problem => OnRefused.InvokeAsync(problem), token) || generation != _generation)
             {

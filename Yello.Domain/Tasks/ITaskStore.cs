@@ -104,7 +104,7 @@ public interface ITaskAssignments
 
 /// <summary>
 /// What an assignment came to. No "the Membership is in another Space": a foreign id and a random one are the same
-/// refusal (AD-3, I-13).
+/// refusal, so the answer never says where an id exists.
 /// </summary>
 /// <param name="Outcome">What happened.</param>
 /// <param name="Task">The Task as stored, when <see cref="Outcome"/> is <see cref="TaskAssignmentOutcome.Assigned"/>.</param>
@@ -131,7 +131,7 @@ public sealed record TaskAssignment(TaskAssignmentOutcome Outcome, TaskItem? Tas
 }
 
 /// <summary>
-/// What an assignment came to.
+/// The three ways an assignment ends; a foreign and a random Membership share one.
 /// </summary>
 public enum TaskAssignmentOutcome
 {

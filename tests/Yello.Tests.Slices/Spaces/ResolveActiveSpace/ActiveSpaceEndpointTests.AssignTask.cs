@@ -21,8 +21,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Every refusal is anchored</b> on a <c>200</c> from the same route in the same case first: the route does not exist yet,
-/// and an unmapped path answers the boundary <c>404</c>, so a refusal asserted alone would pass against nothing.
+/// <b>Every refusal is anchored</b> on a <c>200</c> from the same route in the same case first: an unmapped path answers the boundary <c>404</c>, so a refusal asserted alone would pass against nothing.
 /// </para>
 /// <para>
 /// <b>Seeding.</b> An assigner or Assignee whose Role is the point joins through the product (an Invitation at that Role,
@@ -49,7 +48,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
     /// <summary>
     /// An Owner, an Admin and a Member each assign a Task to a Member of the same Space: <c>200</c>, the body is the Task with
-    /// <c>assigneeMembershipId</c> appended to its earlier members and nothing else (AD-19), and the row holds the Membership.
+    /// <c>assigneeMembershipId</c> appended to its earlier members and nothing else, and the row holds the Membership.
     /// </summary>
     /// <param name="assignerRole">The assigner's Role.</param>
     /// <returns>A task.</returns>
@@ -97,7 +96,7 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
-    /// A Token assigns with no anti-forgery header (AD-4), and <c>null</c> unassigns: <c>200</c> with
+    /// A Token assigns with no anti-forgery header, and <c>null</c> unassigns: <c>200</c> with
     /// <c>assigneeMembershipId</c> present and <c>null</c>, and the row cleared.
     /// </summary>
     /// <returns>A task.</returns>
@@ -190,7 +189,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <summary>
     /// A random Membership id and another Space's real Membership id are each <c>400 invalid-assignee</c>, byte for byte the
     /// same answer, and the Task stays unassigned: the composite key and the guarded statement accept only this Space's
-    /// Memberships, and the refusal says nothing about whether the id exists elsewhere (I-13, I-15). Never a <c>404</c>: the
+    /// Memberships, and the refusal says nothing about whether the id exists elsewhere. Never a <c>404</c>: the
     /// Task exists. Anchor: a real Member of this Space is assigned to another Task on the same route first.
     /// </summary>
     /// <returns>A task.</returns>
@@ -243,7 +242,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Every Role reads the candidates (the picker, the card avatars and the List filter all need them): <c>200</c>, exactly
     /// <c>{ assignees }</c>, each candidate exactly <c>{ displayName, membershipId }</c>, every Membership of the Space once in
     /// join order <c>(CreatedAt, Id)</c>, the Viewer among them (a Viewer may be assigned), and no <c>@</c> anywhere in the
-    /// body: no address, no Role, no Account id (AD-23, UX-DR34).
+    /// body: no address, no Role, no Account id.
     /// </summary>
     /// <param name="readerRole">The reader's Role.</param>
     /// <returns>A task.</returns>
@@ -423,10 +422,10 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
-    /// I-14: the Assignee belongs to two Spaces, each with distinctively named Projects and Tasks. Assigned in this Space, it
+    /// The Assignee belongs to two Spaces, each with distinctively named Projects and Tasks. Assigned in this Space, it
     /// receives exactly one assignment email, which names the assigner, this Space, this Project and this Task, and none of
-    /// the other Space's names; it carries no address (neither the recipient's nor the assigner's), no password and no Token
-    /// (NFR-6), and its link carries no id.
+    /// the other Space's names; it carries no address (neither the recipient's nor the assigner's), no password and no Token,
+    /// and its link carries no id.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -607,7 +606,7 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
-    /// The enqueue and the send record are in the assignment's own transaction (AD-10): a failure after them (the idempotency
+    /// The enqueue and the send record are in the assignment's own transaction: a failure after them (the idempotency
     /// record's insert, forced) leaves the Task unassigned, no outbox row for the recipient, no <c>task-assigned</c> send
     /// record and no email. Anchor: once the plant is gone, another assignment to the same recipient is sent and recorded.
     /// </summary>
@@ -684,7 +683,7 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
-    /// FS-NFR-2, SM-C4: every notification leaves one send record in its Space - an Invitation issue one
+    /// Every notification leaves one send record in its Space - an Invitation issue one
     /// <c>invitation-issued</c>, an assignment one <c>task-assigned</c> - each stamped within the request's window by the
     /// database clock. The records are Space-scoped: under another Space's key none of them is visible.
     /// </summary>
@@ -740,7 +739,7 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
-    /// AD-18: the same <c>Idempotency-Key</c> after a committed assignment answers the original <c>200</c> byte for byte, sends
+    /// The same <c>Idempotency-Key</c> after a committed assignment answers the original <c>200</c> byte for byte, sends
     /// no second email and writes no second send record; the key on another body is <c>422 idempotency-key-reused</c>; a
     /// malformed key is <c>400 invalid-idempotency-key</c>.
     /// </summary>
@@ -800,7 +799,7 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
-    /// FR-21, AD-5: removing an assigned Member unassigns its Tasks inside the removal's own transaction and deletes none of
+    /// Removing an assigned Member unassigns its Tasks inside the removal's own transaction and deletes none of
     /// them. The removal answers <c>204</c>; the Space's Task count is unchanged; the removed Member's Tasks are unassigned;
     /// another Member's assignment is untouched; the candidates read no longer lists the removed Member; and the
     /// unassignment sends no email.
@@ -873,7 +872,7 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
-    /// FR-21, AD-5: an assigned Member that leaves is unassigned the same way, inside the leave's own transaction: the leave
+    /// An assigned Member that leaves is unassigned the same way, inside the leave's own transaction: the leave
     /// answers <c>204</c>, its Task survives unassigned, and another Member's assignment is untouched.
     /// </summary>
     /// <returns>A task.</returns>
@@ -968,7 +967,7 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
-    /// AR-8, AD-5: the Assignee key is NO ACTION, and Space deletion still works in one statement - SQL Server checks a NO
+    /// The Assignee key is NO ACTION, and Space deletion still works in one statement - SQL Server checks a NO
     /// ACTION constraint after every cascade of the statement, so deleting a Space that holds an assigned Task answers
     /// <c>204</c> and leaves no Task and no Membership of it.
     /// </summary>

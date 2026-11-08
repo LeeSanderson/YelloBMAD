@@ -20,12 +20,12 @@
     closes the picker. On close the Board returns focus to the card that opened it.
 
     ATTRIBUTES, THEN DELETE: title, Status, Move, due date, Labels and the Assignee, attributes above. No description
-    region, no heading for one, no placeholder (AC6; FR-31 is Epic 7).
+    region, no heading for one, no placeholder.
 
     THE ASSIGNEE: an "Assignee" control naming the person - initials and label, never an address - or "Unassigned", which
     opens a single-select listbox in the panel: "Unassigned" first, then every Member of the Space by initials and label.
-    The current choice is the selected option and nothing else is pre-selected (UX-DR11). Choosing commits at once, on its
-    own route, optimistically. For a Role that may not assign it is text - absent, never disabled (UX-DR27).
+    The current choice is the selected option and nothing else is pre-selected. Choosing commits at once, on its own
+    route, optimistically. For a Role that may not assign it is text - absent, never disabled.
 
     MOVE (story 2.6, AC1, AC14; open questions 5 (a) and 9): a secondary button directly after the Status control, for a
     Role that can move Tasks only. It opens the Move picker in place below it - never a second dialog - which names the
@@ -231,7 +231,7 @@
                     {
                         <AssigneeAvatar Choice="@assignee" />
                         @assignee.Label
-                    }@if (CurrentAssignee is null)
+                    }@if (Item.AssigneeMembershipId is null)
                     {
                         @Localizer["AssigneeUnassigned"]
                     }</button>
@@ -282,7 +282,8 @@
                     </dd>
                 }
 
-                @if (!CanAssign)
+                @* An Assignee this tab holds no candidate for is left out rather than called "Unassigned", which it is not. *@
+                @if (!CanAssign && (Item.AssigneeMembershipId is null || CurrentAssignee is not null))
                 {
                     <dt class="form-field__label">@Localizer["AssigneeLabel"]</dt>
                     <dd>@(CurrentAssignee?.Label ?? Localizer["AssigneeUnassigned"])</dd>

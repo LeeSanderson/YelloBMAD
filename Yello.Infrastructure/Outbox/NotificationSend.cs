@@ -2,7 +2,7 @@ namespace Yello.Infrastructure.Outbox;
 
 /// <summary>
 /// The record that a notification was sent: its Space, its kind and when. Kept so the share of writes that notify
-/// someone stays derivable after the outbox row, which holds the message, is deleted on send (FS-NFR-2, SM-C4).
+/// someone stays derivable after the outbox row, which holds the message, is deleted on send.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -19,7 +19,7 @@ namespace Yello.Infrastructure.Outbox;
 internal sealed class NotificationSend
 {
     /// <summary>
-    /// The row's identity, generated application-side (AR-34).
+    /// The row's identity, generated application-side.
     /// </summary>
     internal required Guid Id { get; init; }
 

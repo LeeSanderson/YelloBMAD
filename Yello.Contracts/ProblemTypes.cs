@@ -276,7 +276,7 @@ public static class ProblemTypes
     /// </summary>
     /// <remarks>
     /// <b>The same bytes for every cause</b>: a random id and another Space's real Membership id cannot be told apart, so the
-    /// answer says nothing about where an id exists (I-13). It is not a <c>404</c>: the Task is present.
+    /// answer says nothing about where an id exists. It is not a <c>404</c>: the Task is present.
     /// </remarks>
     public static string InvalidAssignee => "urn:yello:problem:invalid-assignee";
 
@@ -316,8 +316,7 @@ public static class ProblemTypes
     /// <summary>
     /// A List View query that is not one the route reads: a <c>sort</c> that is not an offered code, a <c>status</c>,
     /// <c>label</c> or <c>assignee</c> that is not an id, an <c>unassigned</c> that is not a boolean, a due bound that is
-    /// not an instant with an offset inside 2000-2100, or "No due date" together with a range. Answered <c>400</c>. Story
-    /// 2.10, AC12.
+    /// not an instant with an offset inside 2000-2100, or "No due date" together with a range. Answered <c>400</c>.
     /// </summary>
     /// <remarks>
     /// <b>Never a statement about a stored Status or Label</b>: it depends only on the query as sent. A well-formed id

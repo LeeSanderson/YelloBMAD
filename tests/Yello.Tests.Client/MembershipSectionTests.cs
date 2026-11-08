@@ -432,7 +432,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// UX-DR34 with Lee's folding rule: names that look the same at avatar size collide too - "Ann" and "Ann " (a trailing
+    /// With the look-alike folding rule, names that look the same at avatar size collide too - "Ann" and "Ann " (a trailing
     /// space), and "ann" and "Ann" - so each row of a look-alike pair carries a discriminator, the name is shown as its owner
     /// wrote it, and no label carries an <c>@</c>. "Ann" and "Anne" stay bare: the fold is not a similarity match.
     /// </summary>

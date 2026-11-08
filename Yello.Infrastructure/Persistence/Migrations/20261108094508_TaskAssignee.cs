@@ -6,7 +6,6 @@ namespace Yello.Infrastructure.Persistence.Migrations;
 
 /// <summary>
 /// A Task's Assignee, the List View's Assignee sort index, and the <c>NotificationSend</c> record under the Space policy.
-/// FR-21, FR-30, FS-NFR-2; AD-2, AD-29, AR-8.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -14,7 +13,7 @@ namespace Yello.Infrastructure.Persistence.Migrations;
 /// <see cref="InitialSchema"/> for why the scaffolded form cannot stand.
 /// </para>
 /// <para>
-/// <b>The Assignee carries its Space</b> (AR-8): <c>(SpaceId, AssigneeMembershipId)</c> references the Membership's
+/// <b>The Assignee carries its Space</b>: <c>(SpaceId, AssigneeMembershipId)</c> references the Membership's
 /// <c>(SpaceId, Id)</c>, so another Space's Membership cannot be stored. NO ACTION: <c>SET NULL</c> would null the
 /// <c>SpaceId</c> the key shares, and <c>CASCADE</c> would delete the Task and add a second cascade path from <c>Space</c>
 /// (1785). The removal and the leave unassign explicitly before their <c>DELETE</c>; the <c>(SpaceId,
@@ -33,7 +32,7 @@ namespace Yello.Infrastructure.Persistence.Migrations;
 /// <para>
 /// <b>Expand only.</b> A nullable column no earlier statement names, an index, a key every existing (unassigned) row
 /// satisfies, and a new table; nothing to backfill. <b>Literal names rather than <c>SchemaNames</c></b>, for the reason
-/// <see cref="InitialSchema"/> records. <b>No migration is applied at startup</b> (AR-36).
+/// <see cref="InitialSchema"/> records. <b>No migration is applied at startup</b>.
 /// </para>
 /// </remarks>
 public partial class TaskAssignee : Migration

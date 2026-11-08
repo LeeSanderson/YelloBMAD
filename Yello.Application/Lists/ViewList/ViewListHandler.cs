@@ -8,8 +8,7 @@ namespace Yello.Application.Lists.ViewList;
 
 /// <summary>
 /// Reads one page of a Project's List View: the Project's Tasks matching a filter, under a sort, after a cursor, with the
-/// true filtered total and the Project's effective Statuses. FR-30; story 2.10, AC1, AC3-AC5, AC10-AC15, open questions
-/// 1 (a), 4 (a) and 7 (a).
+/// true filtered total and the Project's effective Statuses.
 /// </summary>
 /// <remarks>
 /// <para>

@@ -514,8 +514,8 @@ public sealed partial class ListPagingTests(MigratedDatabaseFixture fixture) : I
     }
 
     /// <summary>
-    /// LV-10 (AC12, AC2, Task 4 (c); P1) - an unknown sort, a malformed Status, Label or Assignee id, a malformed
-    /// <c>unassigned</c> flag, and a malformed or out-of-window due bound (2.3's 2000-2100) are refused <c>400
+    /// An unknown sort, a malformed Status, Label or Assignee id, a malformed
+    /// <c>unassigned</c> flag, and a malformed or out-of-window due bound (2000-2100) are refused <c>400
     /// invalid-list-query</c>, recording nothing.
     /// </summary>
     /// <param name="query">The raw query string.</param>

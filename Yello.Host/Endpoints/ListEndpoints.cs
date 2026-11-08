@@ -8,8 +8,7 @@ using Yello.Host.Spaces;
 namespace Yello.Host.Endpoints;
 
 /// <summary>
-/// Read one page of a Project's List View. FR-30; story 2.10, AC1, AC3, AC11,
-/// AC12, AC15, AC16, AC22, open questions 1 (a) and 4 (a).
+/// Read one page of a Project's List View.
 /// </summary>
 /// <remarks>
 /// <para>

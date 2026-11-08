@@ -52,7 +52,7 @@ public sealed class MembershipLabelsTests
     }
 
     /// <summary>
-    /// AC3, the 4.1 Q3 normalisation family - names are compared after NFC: a composed and a decomposed "José" are one name
+    /// Names are compared after NFC: a composed and a decomposed "José" are one name
     /// (both suffixed). Case is folded too; the look-alike theory below holds that.
     /// </summary>
     [Fact]
@@ -157,8 +157,8 @@ public sealed class MembershipLabelsTests
     }
 
     /// <summary>
-    /// The fold is not a prefix or a similarity match: "Ann" and "Anne" are two names, and neither gets a discriminator. Green
-    /// today and after the fold; it keeps the widened key from over-reaching.
+    /// The fold is not a prefix or a similarity match: "Ann" and "Anne" are two names, and neither gets a discriminator. It
+    /// keeps the widened key from over-reaching.
     /// </summary>
     [Fact]
     [Trait("Requirement", "AD-23")]

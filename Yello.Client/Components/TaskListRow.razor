@@ -9,7 +9,8 @@
     ONE ROW OF THE LIST VIEW - story 2.10, AC18, AC20, open question 8 (a). The card's metadata, mirrored (UX-DR8,
     DESIGN.md:451): the title, the Status's name, the due date in the viewer's own locale and zone (or nothing when there is
     none), at most three Label chips in the server's order followed by "+N", and the Assignee by avatar and label, or
-    "Unassigned" - never an id, never an address. An Assignee this tab holds no candidate for reads as "Unassigned".
+    "Unassigned" - never an id, never an address. An Assignee this tab holds no candidate for leaves the cell empty: the
+    Task is assigned, so "Unassigned" would be untrue.
 
     ONE TASK FOR ITS LIFE: the list keys this row by its Task's id and never re-points it (AD-29). Its aria-rowindex is its
     true ordinal plus the header row (AC11, X-6). The title cell is the row's stop in the list's one roving tab stop
@@ -44,7 +45,7 @@
             @assignee.Label
         }
 
-        @if (Assignee is null)
+        @if (Item.AssigneeMembershipId is null)
         {
             @UnassignedText
         }

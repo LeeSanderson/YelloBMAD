@@ -22,11 +22,10 @@ namespace Yello.Tests.Architecture;
 /// <remarks>
 /// <para>
 /// <b>Each gate finds its subject by name or by shape</b> (route pattern, reflection, Cecil, the EF model, the resource
-/// file), so a subject built under another name turns it red. The names are the story's Project Structure Notes:
+/// file), so a subject built under another name turns it red. The names:
 /// <c>Yello.Contracts.Tasks.AssignTaskRequest</c>, <c>Yello.Contracts.Memberships.AssigneeResponse</c> and
 /// <c>AssigneeListResponse</c>, <c>TaskItem.AssigneeMembershipId</c>, <c>AssignmentEmail</c>, <c>NotificationSend</c>,
-/// <c>OutboxKinds.TaskAssigned</c>, and a client predicate named for <c>AssignTask</c>. A different name is corrected here
-/// first and recorded in the Debug Log.
+/// <c>OutboxKinds.TaskAssigned</c>, and a client predicate named for <c>AssignTask</c>.
 /// </para>
 /// <para>
 /// <b>Existing gates this work must keep green, unchanged:</b>
@@ -36,8 +35,8 @@ namespace Yello.Tests.Architecture;
 /// <c>The_leave_route_is_the_one_write_under_ReadProjectsAndTasks</c> (the candidates read is a <c>GET</c>),
 /// <c>The_Task_routes_declare_their_capability_serve_both_surfaces_and_consult_no_bound</c> (the PATCH is unchanged), both
 /// Role-read gates, <c>Every_reference_between_Space_scoped_entities_carries_SpaceId</c>, and
-/// <c>No_production_code_runs_on_a_timer_or_as_a_hosted_service</c>. Two existing gates are widened by exactly the Assignee
-/// when it lands: <c>The_due_date_is_a_nullable_DateTimeOffset_on_the_Task_and_its_response</c> and
+/// <c>No_production_code_runs_on_a_timer_or_as_a_hosted_service</c>. Two existing gates are widened by exactly the Assignee:
+/// <c>The_due_date_is_a_nullable_DateTimeOffset_on_the_Task_and_its_response</c> and
 /// <c>The_Task_response_gains_its_Label_ids_and_keeps_every_earlier_field</c>, which pin <c>TaskResponse</c>'s members.
 /// </para>
 /// </remarks>
@@ -50,7 +49,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <summary>
     /// The two assignment routes are exactly these, each with its one capability, neither Session-only, neither consulting a
     /// bound: <c>PUT .../tasks/{taskId}/assignee</c> under <c>AssignTask</c> and <c>GET .../assignees</c>
-    /// under <c>ReadProjectsAndTasks</c> (every Role reads the candidates). A Token reaches both (AD-4).
+    /// under <c>ReadProjectsAndTasks</c> (every Role reads the candidates). A Token reaches both.
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-21")]
@@ -83,7 +82,7 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// The matrix's "Assign a Task" row governs exactly one route: across every mapped endpoint, <c>AssignTask</c> is required
-    /// by the assignment route alone. It was transcribed and used by nothing until now; this keeps a second route from
+    /// by the assignment route alone. This keeps a second route from
     /// borrowing it and the assignment from being folded into the PATCH under another capability.
     /// </summary>
     [Fact]
@@ -101,7 +100,7 @@ public sealed partial class RefusalBoundaryGateTests
     }
 
     /// <summary>
-    /// AD-23, UX-DR34: the assignment contracts carry no address, Role, Account id or Space id. <c>AssignTaskRequest</c> is
+    /// The assignment contracts carry no address, Role, Account id or Space id. <c>AssignTaskRequest</c> is
     /// exactly <c>MembershipId</c>, a <c>Guid?</c> (<c>null</c> unassigns); <c>AssigneeResponse</c> is exactly
     /// <c>MembershipId</c> (a <c>Guid</c>) and <c>DisplayName</c> (a string); <c>AssigneeListResponse</c> is exactly
     /// <c>Assignees</c>, unpaged.
@@ -125,9 +124,8 @@ public sealed partial class RefusalBoundaryGateTests
     }
 
     /// <summary>
-    /// AD-19: <c>TaskResponse</c> gains <c>AssigneeMembershipId</c> as a <c>Guid?</c> and keeps every earlier field - a field
-    /// added, none removed or retyped - and still carries no name, address or <c>SpaceId</c>. The successor of 2.4's
-    /// response-shape gate.
+    /// <c>TaskResponse</c> gains <c>AssigneeMembershipId</c> as a <c>Guid?</c> and keeps every earlier field - a field
+    /// added, none removed or retyped - and still carries no name, address or <c>SpaceId</c>.
     /// </summary>
     [Fact]
     [Trait("Requirement", "AD-19")]
@@ -142,7 +140,7 @@ public sealed partial class RefusalBoundaryGateTests
     }
 
     /// <summary>
-    /// AR-8, AD-2, AD-5 in the EF model: <c>TaskItem.AssigneeMembershipId</c> is a <c>Guid?</c>, and its one reference to
+    /// In the EF model: <c>TaskItem.AssigneeMembershipId</c> is a <c>Guid?</c>, and its one reference to
     /// <c>Membership</c> is <c>(SpaceId, AssigneeMembershipId) → (SpaceId, Id)</c> with <c>DeleteBehavior.NoAction</c> - not
     /// SetNull (it would null <c>SpaceId</c>), not Cascade (it would delete the Task).
     /// </summary>
@@ -168,7 +166,7 @@ public sealed partial class RefusalBoundaryGateTests
     }
 
     /// <summary>
-    /// FR-40, I-14: the assignment email template's inputs are its content contract. Every public constructor and public
+    /// The assignment email template's inputs are its content contract. Every public constructor and public
     /// static method of the type named <c>AssignmentEmail</c> takes only strings and a URI - the assigner's name, the Space's,
     /// the Project's, the Task's title and the client's base URL - so no Domain type can be passed in and nothing of another
     /// Space can reach the email. Sibling of the Invitation template's gate.
@@ -197,7 +195,7 @@ public sealed partial class RefusalBoundaryGateTests
     }
 
     /// <summary>
-    /// FS-NFR-2 ("no product surface reads it"): only the outbox store that writes it, the entity, its configuration and the
+    /// No product surface reads the send record: only the outbox store that writes it, the entity, its configuration and the
     /// model that applies it refer to the send record type, so no slice, endpoint or client code can read it. Anchor: the
     /// store is among the dependents. Sibling of the outbox row's reader gate.
     /// </summary>
@@ -259,7 +257,7 @@ public sealed partial class RefusalBoundaryGateTests
     }
 
     /// <summary>
-    /// UX-DR27: the client's predicate for showing the assign control agrees with the capability matrix for every Role: shown
+    /// The client's predicate for showing the assign control agrees with the capability matrix for every Role: shown
     /// exactly where <c>AssignTask</c> is not denied (Owner, Admin, Member), absent for a Viewer. Sibling of
     /// <c>The_clients_Task_controls_predicate_agrees_with_the_capability_matrix</c>.
     /// </summary>

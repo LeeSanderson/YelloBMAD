@@ -13,7 +13,7 @@ namespace Yello.Client.Components;
 /// The Board's Task detail panel and its replica: the product's first optimistic writes. Story 2.3; AC1,
 /// AC12, AC14; AD-11, AD-18; open questions 1 (a), 6 (a) and 8. Story 2.4 adds the Labels as a fourth attribute
 /// (AC7): the same replica, queue, key and per-attribute revert, the whole set sent as <c>labelIds</c>. Story 2.6 adds the
-/// move (AC15): a Status and a position, sent as the Status attribute's change on the move route. The Assignee is a fifth
+/// move: a Status and a position, sent as the Status attribute's change on the move route. The Assignee is a fifth
 /// attribute on the same terms, sent alone to its own route as <c>PUT …/assignee</c>, because assigning is the matrix's own
 /// capability rather than an edit.
 /// </summary>
@@ -56,7 +56,7 @@ public sealed partial class BoardView
 
     private List<TaskStatusOption> _statusOptions = [];
 
-    // The Space's Labels (story 2.4) and Assignee candidates, which the cards and the panel name from. Purged with the
+    // The Space's Labels and Assignee candidates, which the cards and the panel name from. Purged with the
     // Board.
     private BoardSpaceLists? _lists;
     private Guid? _openTaskId;
@@ -782,7 +782,7 @@ public sealed partial class BoardView
 
         try
         {
-            // A move goes to its own route (story 2.6), and so does an assignment; every other change is a merge patch.
+            // A move goes to its own route, and so does an assignment; every other change is a merge patch.
             using var answer = await Writes.SendAsync(MethodOf(attribute, value), RouteOf(taskId, attribute, value), body, key, token);
 
             // A Task this tab deleted while the edit was out: its answer (a 404) is dropped - no refusal surface, no

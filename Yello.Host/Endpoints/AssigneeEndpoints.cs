@@ -11,7 +11,8 @@ namespace Yello.Host.Endpoints;
 /// <remarks>
 /// <b>Under the read capability every Role holds</b>: assigners need it for the picker, and every Role for the Assignees on
 /// the cards and in the List View's filter. It carries no address and no Role, so reading it discloses nothing the Membership
-/// list confines to Owners and Admins (AD-23). No Membership check, no Role and no record here (AR-3); both surfaces (AD-4).
+/// list confines to Owners and Admins. No Membership check, no Role and no record here: the pipeline did all three. Both
+/// surfaces.
 /// </remarks>
 public static class AssigneeEndpoints
 {

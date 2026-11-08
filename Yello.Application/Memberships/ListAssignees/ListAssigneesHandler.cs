@@ -6,7 +6,7 @@ namespace Yello.Application.Memberships.ListAssignees;
 /// <remarks>
 /// <para>
 /// <b>Open to every Role</b>: assigners need it for the picker, and every Role needs it to name the Assignees on the cards
-/// and in the List View's filter. So it carries no address and no Role (AD-23); the client labels the names itself, and a
+/// and in the List View's filter. So it carries no address and no Role; the client labels the names itself, and a
 /// collision between two names is found over the whole list, never a page of it.
 /// </para>
 /// <para>
@@ -17,7 +17,7 @@ namespace Yello.Application.Memberships.ListAssignees;
 public sealed class ListAssigneesHandler(IMembershipStore store)
 {
     /// <summary>
-    /// Reads the candidates.
+    /// Reads every candidate at once, so a name collision is judged over the whole Space.
     /// </summary>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>Every Membership of the Space, in join order.</returns>

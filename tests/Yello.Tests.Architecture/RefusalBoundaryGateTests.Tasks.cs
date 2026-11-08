@@ -121,7 +121,7 @@ public sealed partial class RefusalBoundaryGateTests
             .Where(type => type.Namespace == TaskContractsNamespace && type.Name.EndsWith("Request", StringComparison.Ordinal))
             .ToList();
 
-        // Widened by story 2.6 by exactly MoveTaskRequest, whose own property set ARCH-605 pins (no key, ever), and by exactly
+        // Widened by exactly MoveTaskRequest, whose own property set is pinned (no key, ever), and by exactly
         // AssignTaskRequest, pinned by The_assignment_contracts_carry_exactly_their_named_members.
         Assert.Equal(["AssignTaskRequest", "CreateTaskRequest", "EditTaskRequest", "MoveTaskRequest"], requests.Select(type => type.Name).Order(StringComparer.Ordinal));
 

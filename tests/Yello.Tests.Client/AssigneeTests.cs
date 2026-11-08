@@ -20,8 +20,7 @@ namespace Yello.Tests.Client;
 /// <c>assignee</c> sort and the <c>assignee</c> / <c>unassigned</c> filter.
 /// </para>
 /// <para>
-/// <b>The locators are assumptions</b>, to be corrected to the markup the dev phase builds and the correction recorded in the
-/// Debug Log: the attribute's control is a button named "Assignee" opening a <c>[role=listbox]</c> of <c>[role=option]</c>
+/// <b>The locators</b>: the attribute's control is a button named "Assignee" opening a <c>[role=listbox]</c> of <c>[role=option]</c>
 /// rows (the Status picker's pattern); the avatar is <c>.assignee-avatar</c> with the accessible name
 /// "Assigned to {label}"; the Viewer's read-only row is a <c>dt</c> "Assignee" with its <c>dd</c>; the List's filter is a
 /// fieldset named "Assignee" of checkboxes, its sort option "Assignee", its column header "Assignee". The copy is the story's,
@@ -59,7 +58,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     private static readonly Guid Beacon = Guid.NewGuid();
 
     /// <summary>
-    /// UX-DR11, UX-DR34: the picker offers "Unassigned" first and then every candidate, each with its initials and its name,
+    /// The picker offers "Unassigned" first and then every candidate, each with its initials and its name,
     /// and nothing in it carries an <c>@</c>. The Task is unassigned, so no candidate is marked chosen when it opens: there is
     /// no default selection where the choice is consequential.
     /// </summary>
@@ -181,7 +180,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// UX-DR27, a Viewer has no assign control - absent, not disabled - and reads the Assignee among the Task's
+    /// A Viewer has no assign control - absent, not disabled - and reads the Assignee among the Task's
     /// attributes as its label, or "Unassigned". Its card shows the avatar like anyone's.
     /// </summary>
     /// <returns>A task.</returns>
@@ -252,7 +251,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// UX-DR34 with Lee's folding rule: two candidates whose names look the same ("Ann" and "Ann " with a trailing space) are
+    /// With the look-alike folding rule, two candidates whose names look the same ("Ann" and "Ann " with a trailing space) are
     /// each offered with a Membership-scoped discriminator, never with an address.
     /// </summary>
     /// <returns>A task.</returns>
@@ -288,7 +287,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// FR-30, UX-DR19: the List View offers the Assignee dimension - a fieldset "Assignee" of checkboxes, "Unassigned" first
+    /// The List View offers the Assignee dimension - a fieldset "Assignee" of checkboxes, "Unassigned" first
     /// and then each candidate's label; an "Assignee" sort option; and an "Assignee" column showing the label or
     /// "Unassigned" - and no address anywhere on the page.
     /// </summary>
@@ -325,7 +324,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// FR-30: ticking one candidate in the Assignee filter sends its Membership id as <c>assignee</c> and shows only its
+    /// Ticking one candidate in the Assignee filter sends its Membership id as <c>assignee</c> and shows only its
     /// Tasks; ticking "Unassigned" too sends <c>unassigned=true</c> and adds the unassigned ones. Neither reaches the address
     /// bar or <c>document.title</c>.
     /// </summary>
@@ -363,7 +362,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// UX-DR31, the candidates are Space-scoped state. After a switch from a Space whose Board shows an Assignee, no
+    /// The candidates are Space-scoped state. After a switch from a Space whose Board shows an Assignee, no
     /// label or initials of the departed Space's candidates is anywhere in the DOM, and every candidates read after the switch
     /// names the new Space only.
     /// </summary>

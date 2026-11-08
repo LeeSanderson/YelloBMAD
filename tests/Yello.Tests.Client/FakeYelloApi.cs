@@ -2359,7 +2359,7 @@ internal sealed class FakeColumn(Guid statusId, string name, int total, List<Fak
 /// cleared).
 /// </param>
 /// <param name="AssigneeMembershipId">
-/// Its Assignee's Membership, or <c>null</c> - an appended field (AD-19). <c>null</c> is left out of the body, so every case
+/// Its Assignee's Membership, or <c>null</c> - an appended field. <c>null</c> is left out of the body, so every case
 /// written before assignment existed is served the bytes it always was.
 /// </param>
 internal sealed record FakeTask(

@@ -1,15 +1,15 @@
 namespace Yello.Domain.Lists;
 
 /// <summary>
-/// What a List View narrows a Project's Tasks to (FR-30; story 2.10, open question 4 (a)). The filters combine: a Task is
-/// listed when it matches every one that is set.
+/// What a List View narrows a Project's Tasks to. The filters combine: a Task is listed when it matches every one that is
+/// set.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b><c>null</c> means "not filtered"; an empty list means "matches nothing"</b>. A handler narrows the ids it was sent
 /// to this Project's effective Statuses and this Space's Labels before any read, so an id that names nothing here - a
 /// random one, another Space's real one, a Label deleted since it was chosen - simply drops out, and a filter left with
-/// none matches no Task (AC15). Never a refusal. Assignee ids are narrowed to this Space's Memberships the same way.
+/// none matches no Task. Never a refusal. Assignee ids are narrowed to this Space's Memberships the same way.
 /// </para>
 /// <para>
 /// <b>Assignee</b>: any of <see cref="AssigneeMembershipIds"/>, or unassigned when <see cref="Unassigned"/> is set - the two

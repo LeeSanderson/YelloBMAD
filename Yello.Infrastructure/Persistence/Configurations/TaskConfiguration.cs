@@ -14,7 +14,7 @@ namespace Yello.Infrastructure.Persistence.Configurations;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Every reference carries the Space</b> (AR-8): <c>(SpaceId, ProjectId)</c> to the Project,
+/// <b>Every reference carries the Space</b>: <c>(SpaceId, ProjectId)</c> to the Project,
 /// <c>(SpaceId, StatusId)</c> to the Status definition and <c>(SpaceId, AssigneeMembershipId)</c> to the Assignee's
 /// Membership, so a Task can never point at any of them in another Space.
 /// </para>
@@ -114,7 +114,7 @@ internal sealed class TaskConfiguration(YelloDbContext context) : IEntityTypeCon
 
         builder.Property(task => task.AssigneeMembershipId).IsRequired(false);
 
-        // The Assignee carries the Space (AR-8), so a Membership of another Space cannot be stored. NO ACTION, neither of
+        // The Assignee carries the Space, so a Membership of another Space cannot be stored. NO ACTION, neither of
         // the two a removal would seem to want: SET NULL would null SpaceId too, which the key shares and which may never
         // be null, and CASCADE would delete the Task with its Assignee - and add a second cascade path from Space (1785).
         // The removal and the leave unassign explicitly before their DELETE instead. A Space's deletion still works: the

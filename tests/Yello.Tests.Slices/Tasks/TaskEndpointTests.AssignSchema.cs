@@ -15,7 +15,7 @@ namespace Yello.Tests.Slices.Tasks;
 /// <remarks>
 /// <para>
 /// <b>Why NO ACTION and not SET NULL or CASCADE</b>: <c>SET NULL</c> would null the non-nullable <c>SpaceId</c> the key
-/// carries; <c>CASCADE</c> would delete the Task, which FR-21 forbids, and would add a second cascade path from
+/// carries; <c>CASCADE</c> would delete the Task, which must survive, and would add a second cascade path from
 /// <c>Space</c> (SQL Server 1785). The removal and the leave unassign explicitly instead.
 /// </para>
 /// <para>
@@ -33,7 +33,7 @@ public sealed partial class TaskEndpointTests
     private static readonly string[] AssigneeIndexColumns = ["SpaceId", "ProjectId", "AssigneeMembershipId", "Id"];
 
     /// <summary>
-    /// AR-8, AD-2: <c>Task.AssigneeMembershipId</c> is a nullable <c>uniqueidentifier</c>, and its only foreign key reaches
+    /// <c>Task.AssigneeMembershipId</c> is a nullable <c>uniqueidentifier</c>, and its only foreign key reaches
     /// <c>Membership</c> through <c>(SpaceId, AssigneeMembershipId) → (SpaceId, Id)</c>, in that column order, with
     /// <c>delete_referential_action</c> NO ACTION. The Task keeps its earlier keys to Project and Status.
     /// </summary>
@@ -60,7 +60,7 @@ public sealed partial class TaskEndpointTests
     }
 
     /// <summary>
-    /// AR-8 at the database: under one Space's key, setting a Task's Assignee to another Space's real Membership is refused
+    /// At the database: under one Space's key, setting a Task's Assignee to another Space's real Membership is refused
     /// by the composite key (547), with the application bypassed entirely. Anchor: the same connection may set it to the
     /// Task's own Space's Membership, and clear it again.
     /// </summary>
@@ -103,7 +103,7 @@ public sealed partial class TaskEndpointTests
     }
 
     /// <summary>
-    /// AD-29, P-4 at the database: the Assignee sort's index exists on <c>Task</c> with key columns exactly
+    /// At the database: the Assignee sort's index exists on <c>Task</c> with key columns exactly
     /// <c>(SpaceId, ProjectId, AssigneeMembershipId, Id)</c>, in that order.
     /// </summary>
     /// <returns>A task.</returns>
@@ -130,7 +130,7 @@ public sealed partial class TaskEndpointTests
     }
 
     /// <summary>
-    /// FS-NFR-2 ("never message content or recipient address"), AD-2, NFR-1: <c>NotificationSend</c> has exactly the columns
+    /// Never message content or recipient address: <c>NotificationSend</c> has exactly the columns
     /// <c>Id</c>, <c>SpaceId</c>, <c>Kind</c> and <c>RecordedAt</c>, none nullable, so no recipient, subject, body, Task or
     /// Account can be held; it sits under the Space policy with a FILTER predicate and BLOCK predicates after insert and after
     /// update; and it reaches <c>Space</c> with cascade, so a Space's erasure takes its records.

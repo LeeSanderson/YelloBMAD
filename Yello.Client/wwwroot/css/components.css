@@ -2179,7 +2179,7 @@
 }
 
 /*
-    AN ASSIGNEE'S AVATAR (UX-DR8, UX-DR34; DESIGN.md avatar): squared monospace initials, the default 3px corner, the role
+    AN ASSIGNEE'S AVATAR (DESIGN.md avatar): squared monospace initials, the default 3px corner, the role
     chip's fill and ink. Sized by its text and the spacing tokens, never a fixed or minimum size - it is not a target - so
     text spacing and zoom grow it. Never a control and never a tooltip. On a card it is pushed to the end of the metadata row, which still wraps at 320px. In a
     List row it sits inline in its cell: a cell given display: flex leaves table layout.
