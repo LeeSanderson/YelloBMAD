@@ -297,6 +297,10 @@ public sealed partial class ActiveSpaceEndpointTests
             {
                 statuses.Add((await IssueAsync(session, spaceId, invitee, "viewer")).StatusCode);
             }
+
+            // Sent before this Host stops: an outbox row left behind is dispatched by the next case's Host on the same
+            // database, into that case's drop.
+            _ = await mail.WaitForAsync(invitees.Length);
         });
 
         Assert.Equal(InvitationWire.EmailAddressMaxLength, longest.Length);
@@ -463,7 +467,8 @@ public sealed partial class ActiveSpaceEndpointTests
         var spaceId = Guid.NewGuid();
         WireResponse? toNobody = null;
         WireResponse? toAccount = null;
-        IReadOnlyList<DroppedEmail> emails = [];
+        DroppedEmail? first = null;
+        DroppedEmail? second = null;
 
         using var mail = new MailDrop();
 
@@ -478,7 +483,9 @@ public sealed partial class ActiveSpaceEndpointTests
             toNobody = await IssueAsync(session, spaceId, nobody, "member");
             toAccount = await IssueAsync(session, spaceId, registered, "member");
 
-            emails = await mail.WaitForAsync(2);
+            // By recipient, not by count: the drop can also hold mail an earlier case's Host left in the shared outbox.
+            first = await mail.WaitForEmailToAsync(nobody);
+            second = await mail.WaitForEmailToAsync(registered);
         });
 
         Assert.Equal(HttpStatusCode.NoContent, toNobody?.StatusCode);
@@ -487,9 +494,8 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal(toNobody.ContentType, toAccount.ContentType);
         Assert.Equal(toNobody.HeaderNames, toAccount.HeaderNames);
 
-        var first = Assert.Single(emails, email => email.To == nobody);
-        var second = Assert.Single(emails, email => email.To == registered);
-
+        Assert.NotNull(first);
+        Assert.NotNull(second);
         Assert.Equal(first.Subject, second.Subject);
         Assert.Equal(WithoutToken(first.PlainText), WithoutToken(second.PlainText));
     }
@@ -523,7 +529,7 @@ public sealed partial class ActiveSpaceEndpointTests
             first = await IssueAsync(session, spaceId, invitee, "member");
             again = await IssueAsync(session, spaceId, invitee.ToUpperInvariant(), "viewer");
 
-            _ = await mail.WaitForAsync(1);
+            _ = await mail.WaitForEmailToAsync(invitee);
         });
 
         Assert.Equal(HttpStatusCode.NoContent, first?.StatusCode);

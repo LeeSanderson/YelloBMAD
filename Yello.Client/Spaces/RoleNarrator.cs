@@ -18,14 +18,8 @@ public sealed class RoleNarrator
 {
     private bool _survivesNavigation;
 
-    /// <summary>
-    /// Raised whenever the sentence changes.
-    /// </summary>
     public event EventHandler? Changed;
 
-    /// <summary>
-    /// The sentence shown, or <c>null</c>.
-    /// </summary>
     public string? Sentence { get; private set; }
 
     /// <summary>
@@ -39,7 +33,7 @@ public sealed class RoleNarrator
     public bool HoldsFocus { get; private set; }
 
     /// <summary>
-    /// Shows a sentence.
+    /// Replaces the sentence shown, and with it any focus the narration held.
     /// </summary>
     /// <param name="sentence">The sentence, in the client's own words.</param>
     /// <param name="polite">Whether it is said politely.</param>

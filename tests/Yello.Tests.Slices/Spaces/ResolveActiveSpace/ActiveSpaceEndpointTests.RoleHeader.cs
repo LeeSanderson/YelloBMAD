@@ -94,7 +94,9 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>404</c> (an absent Space), the in-Space <c>404</c> (an id that matches nothing in the caller's own Space), the
     /// no-credential <c>401</c>, a malformed body's <c>400</c>, a reused key's <c>422</c> and the Owner's leave's
     /// <c>409 ownership-held</c>. The in-Space <c>404</c> keeps exactly the boundary <c>404</c>'s header names, so the header
-    /// can never tell the two apart. Anchor: the same Owner's read of its own Space carries it.
+    /// can never tell the two apart. On the Token surface the same holds for the boundary <c>404</c>, the in-Space
+    /// <c>404</c> and a Token bound to another of the Account's Spaces. Anchors: the same Owner's read of its own Space
+    /// carries it, by Session and by Token.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -127,9 +129,25 @@ public sealed partial class ActiveSpaceEndpointTests
 
             answers["422"] = await owner.SendWithHeadersAsync(HttpMethod.Post, ProjectRoutes.ListIn(spaceId), JsonContent.Create(new { name = "Other " + Suffix() }, options: JsonOptions), KeyHeaders(key));
             answers["409"] = await LeaveOverWireAsync(owner, spaceId);
+
+            // The Token surface: a Token bound to this Space is refused in another the same Account owns exactly as a
+            // non-member is, after its Membership there was read and discarded.
+            var otherSpaceId = CreatedSpace(await CreateSpaceAsync(owner, "Unechoed elsewhere " + Suffix())).Id;
+            var bearer = await BearerForAsync(owner, spaceId);
+
+            answers["anchor: Token"] = await owner.GetWithTokenAsync(SpaceRoutes.ActiveOf(spaceId), bearer);
+            answers["Token boundary 404"] = await owner.GetWithTokenAsync(TaskRoutes.TaskOf(Guid.NewGuid(), Guid.NewGuid()), bearer);
+            answers["Token bound elsewhere 404"] = await owner.GetWithTokenAsync(SpaceRoutes.ActiveOf(otherSpaceId), bearer);
+            answers["Token in-Space 404"] = await owner.GetWithTokenAsync(TaskRoutes.TaskOf(spaceId, Guid.NewGuid()), bearer);
         });
 
         Assert.Equal("owner", answers["anchor: own Space"].Header(RoleHeader.HeaderName));
+        Assert.Equal("owner", answers["anchor: Token"].Header(RoleHeader.HeaderName));
+        Assert.Equal(HttpStatusCode.NotFound, answers["Token boundary 404"].StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, answers["Token bound elsewhere 404"].StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, answers["Token in-Space 404"].StatusCode);
+        Assert.Equal(answers["Token boundary 404"].HeaderNames, answers["Token in-Space 404"].HeaderNames);
+        Assert.Equal(answers["Token boundary 404"].HeaderNames, answers["Token bound elsewhere 404"].HeaderNames);
         Assert.Equal(HttpStatusCode.NotFound, answers["boundary 404"].StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, answers["in-Space 404"].StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, answers["401"].StatusCode);

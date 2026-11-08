@@ -20,8 +20,9 @@ namespace Yello.Tests.Client;
 /// </para>
 /// <para>
 /// <b>Order is proven by a log, never by waiting.</b> <see cref="LogNarrationAndRemovals"/> installs a <c>MutationObserver</c>
-/// before the change that records, in order, each text the narration element takes and each affordance node removed; the
-/// deciding assertion is that the narration's text comes first.
+/// before the change that records, in order, each text the narration element takes and each affordance node removed, with
+/// the observer callback that saw it; the deciding assertion is that the narration's text reached the DOM in an earlier
+/// callback than the first removal, since a narration rendered in the same batch as the removal is not "before" it.
 /// </para>
 /// <para>
 /// <b>Locator assumptions</b> (correct here first if the markup differs, and record it): the narration element is
@@ -53,22 +54,27 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// Logs, in order, each non-empty text the narration element takes (<c>narration:...</c>) and each removal of an
-    /// affordance node (<c>removed:...</c>), in <c>window.__roleLog</c>. Installed before the change, so the first entry of
-    /// each kind is the first moment it happened.
+    /// affordance node (<c>removed:...</c>), in <c>window.__roleLog</c>, and the observer callback each came in, in
+    /// <c>window.__roleBatch</c>. Installed before the change, so the first entry of each kind is the first moment it
+    /// happened.
     /// </summary>
     private const string LogNarrationAndRemovals =
         """
         selectors => {
             window.__roleLog = [];
+            window.__roleBatch = [];
+            let batch = 0;
+            const push = entry => { window.__roleLog.push(entry); window.__roleBatch.push(batch); };
             const affordance = node => node.nodeType === 1 && selectors.some(s => node.matches(s) || node.querySelector(s));
             new MutationObserver(records => {
+                batch++;
                 for (const record of records) {
                     for (const node of record.removedNodes) {
-                        if (affordance(node)) window.__roleLog.push('removed:' + (node.className || node.tagName));
+                        if (affordance(node)) push('removed:' + (node.className || node.tagName));
                     }
                     const narration = document.querySelector('.role-narration');
                     const text = narration ? narration.textContent.trim() : '';
-                    if (text && window.__roleLog.at(-1) !== 'narration:' + text) window.__roleLog.push('narration:' + text);
+                    if (text && !window.__roleLog.includes('narration:' + text)) push('narration:' + text);
                 }
             }).observe(document.body, { childList: true, subtree: true, characterData: true });
         }
@@ -111,7 +117,7 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
     /// A Member on the Board becomes a Viewer; the next request (a same-page navigation's re-read) answers with the Viewer Role, and the
     /// narration "You're now a Viewer. Read only in this Space." is rendered <b>before</b> the first affordance - the add
     /// control, a card's actions, a drag handle - is removed. The narration names no Space, and afterwards no affordance is
-    /// left. Plant: apply the Role before raising the drop - the log's order inverts.
+    /// left. Plant: apply the Role before raising the drop - the removal lands in the narration's batch or before it.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -134,11 +140,7 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
             await page.Locator(Narration, new PageLocatorOptions { HasText = NowAViewer }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await page.Locator(".task-card__actions").First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
 
-            var log = await page.EvaluateAsync<string[]>("() => window.__roleLog");
-            var narrated = Array.FindIndex(log, entry => entry == "narration:" + NowAViewer);
-            var firstRemoval = Array.FindIndex(log, entry => entry.StartsWith("removed:", StringComparison.Ordinal));
-
-            Assert.True(narrated >= 0 && firstRemoval >= 0 && narrated < firstRemoval, "The narration did not come before the first removal: " + string.Join(" | ", log));
+            await AssertNarratedBeforeAnyRemovalAsync(page, NowAViewer);
             Assert.DoesNotContain(NorthwindName, await page.Locator(Narration).TextContentAsync() ?? string.Empty, StringComparison.Ordinal);
             Assert.Equal("alert", await page.Locator(Narration).GetAttributeAsync("role"));
 
@@ -242,11 +244,7 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
             await page.Locator(Narration, new PageLocatorOptions { HasText = NowAMember }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await page.Locator(SpaceHomeAffordances[0]).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
 
-            var log = await page.EvaluateAsync<string[]>("() => window.__roleLog");
-
-            Assert.True(
-                Array.FindIndex(log, entry => entry == "narration:" + NowAMember) < Array.FindIndex(log, entry => entry.StartsWith("removed:", StringComparison.Ordinal)),
-                "The settings link went before the narration: " + string.Join(" | ", log));
+            await AssertNarratedBeforeAnyRemovalAsync(page, NowAMember);
         }
     }
 
@@ -496,6 +494,18 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
             Assert.Equal(loaded, api.RequestCount);
             Assert.DoesNotContain(api.Requests.Skip(loaded), request => request.Path.StartsWith(SpaceRoutes.Directory, StringComparison.Ordinal));
         }
+    }
+
+    private static async Task AssertNarratedBeforeAnyRemovalAsync(IPage page, string sentence)
+    {
+        var log = await page.EvaluateAsync<string[]>("() => window.__roleLog");
+        var batches = await page.EvaluateAsync<int[]>("() => window.__roleBatch");
+        var narrated = Array.FindIndex(log, entry => entry == "narration:" + sentence);
+        var firstRemoval = Array.FindIndex(log, entry => entry.StartsWith("removed:", StringComparison.Ordinal));
+        var described = string.Join(" | ", log.Select((entry, index) => $"{batches[index]}:{entry}"));
+
+        Assert.True(narrated >= 0 && firstRemoval >= 0, "The log holds no narration or no removal: " + described);
+        Assert.True(batches[narrated] < batches[firstRemoval], "The narration did not reach the page before the first removal: " + described);
     }
 
     /// <summary>

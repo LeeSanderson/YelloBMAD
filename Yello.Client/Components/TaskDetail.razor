@@ -107,7 +107,7 @@
                 }
             </div>
 
-            <div class="task-detail__field">
+            <div class="task-detail__field" data-role-gated>
                 <span class="form-field__label" id="@StatusLabelId">@Localizer["TaskDetailStatusLabel"]</span>
                 <button type="button"
                         class="button-secondary task-detail__status"
@@ -136,7 +136,7 @@
                 }
             </div>
 
-            <div class="task-detail__field">
+            <div class="task-detail__field" data-role-gated>
                 <button type="button"
                         class="button-secondary task-detail__move"
                         aria-haspopup="listbox"
@@ -150,7 +150,7 @@
                 }
             </div>
 
-            <div class="task-detail__field">
+            <div class="task-detail__field" data-role-gated>
                 <label class="form-field__label" for="@DueDateId">@Localizer["TaskDetailDueDateLabel"]</label>
                 <div class="task-detail__due">
                     <input class="form-field__control task-detail__date"
@@ -167,7 +167,7 @@
                 </div>
             </div>
 
-            <div class="task-detail__field">
+            <div class="task-detail__field" data-role-gated>
                 <button type="button"
                         class="button-secondary task-detail__labels-control"
                         id="@LabelsButtonId"
@@ -218,7 +218,7 @@
 
         @if (!_confirming && CanAssign)
         {
-            <div class="task-detail__field">
+            <div class="task-detail__field" data-role-gated>
                 <span class="form-field__label" id="@AssigneeLabelId">@Localizer["AssigneeLabel"]</span>
                 <button type="button"
                         class="button-secondary task-detail__assignee"

@@ -446,7 +446,13 @@
 
         if (answer.StatusCode == HttpStatusCode.Forbidden)
         {
-            // The capability copy, in the section (AC9). Unreachable in practice: the section is absent for those Roles.
+            // A Role dropped below this section: the refusal carried the drop, and the page is already narrating it and
+            // routing away. Focus stays on the narration rather than coming back to a row about to be removed.
+            if (ActiveSpace.Current is not { } held || !InvitationCapabilities.PermitsIssueInvitations(held.Role))
+            {
+                return;
+            }
+
             _listRefusal = RefusalText.Of(Localizer, answer.Problem);
             FocusRevokeOf(invitationId);
             return;

@@ -364,7 +364,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// AC10, UX-DR29, UX-DR39 - an Admin whose own authority was lost meanwhile: the change answers <c>403</c> carrying the
+    /// An Admin whose own authority was lost meanwhile: the change answers <c>403</c> carrying the
     /// Member Role, and Space settings is no longer permitted, so the Role narration says "You're now a Member. Space
     /// settings is no longer available.", takes focus, and the page routes to Space home, where the narration keeps focus.
     /// The Admin-limit copy never appears. Anchor: as Admin the section and its control were shown. The capability-shaped
@@ -611,7 +611,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// Ledger <c>deferred-work.md:550</c>, Q15 (a), UX-DR29 - the Role narration under the context bar is in the first
+    /// The Role narration under the context bar is in the first
     /// rendered DOM <b>empty</b>, and holds the narrated sentence afterwards, so a screen reader announces it (the
     /// <c>BoardView</c> announcement-region pattern). Reached through the AC10 narrated exit. 3.2's purge behaviour is
     /// unchanged. Plant 17: the region rendered filled.

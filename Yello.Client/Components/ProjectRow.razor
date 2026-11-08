@@ -22,7 +22,7 @@
 <li class="project-list__row">
     @if (Confirming)
     {
-        <div class="destructive-confirm project-list__confirm" @onkeydown="ConfirmKeyDownAsync">
+        <div class="destructive-confirm project-list__confirm" data-role-gated @onkeydown="ConfirmKeyDownAsync">
             <p class="project-list__warning" id="@WarningId">
                 <span>@string.Format(CultureInfo.CurrentCulture, Localizer["DeleteQuestion"], Project.Name)</span>
                 <span>@CountSentence</span>
@@ -35,7 +35,7 @@
 
     @if (Renaming)
     {
-        <form class="project-rename" @onsubmit="CommitAsync" @onkeydown="KeyDownAsync" novalidate>
+        <form class="project-rename" data-role-gated @onsubmit="CommitAsync" @onkeydown="KeyDownAsync" novalidate>
             <FormField FieldId="@($"project-rename-{Project.Id:N}")"
                        FieldName="@FieldName"
                        Label="@Localizer["ProjectNameLabel"]"

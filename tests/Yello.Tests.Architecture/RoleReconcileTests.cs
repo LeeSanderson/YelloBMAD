@@ -161,6 +161,61 @@ public sealed class RoleReconcileTests
         Assert.Equal("member", state.Current?.Role);
     }
 
+    /// <summary>
+    /// A rise that lands while a drop is narrating is judged once the drop is applied, so the tab ends on the risen Role
+    /// rather than on the older drop applied over it.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    public async Task A_rise_during_a_drops_narration_is_applied_after_it_and_kept()
+    {
+        using var state = InSpace(Northwind, "admin");
+        var rendered = new TaskCompletionSource();
+
+        using var narrator = state.RegisterNarrator(_ => rendered.Task);
+
+        var dropping = state.ReconcileAsync(Northwind, "viewer", CancellationToken.None);
+        var rising = state.ReconcileAsync(Northwind, "owner", CancellationToken.None);
+
+        Assert.Equal("admin", state.Current?.Role);
+
+        rendered.SetResult();
+        await Task.WhenAll(dropping, rising);
+
+        Assert.Equal("owner", state.Current?.Role);
+    }
+
+    /// <summary>
+    /// A second, different drop waits for the first one's narration and Role: each is narrated in turn, from the Role the
+    /// one before it left, and neither Role is applied before its own narration has rendered.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    public async Task A_second_drop_waits_for_the_first_ones_narration()
+    {
+        using var state = InSpace(Northwind, "admin");
+        var first = new TaskCompletionSource();
+        var events = new List<string>();
+
+        using var narrator = state.RegisterNarrator(drop =>
+        {
+            events.Add($"narrating {drop.From}->{drop.To} while {state.Current?.Role}");
+
+            return events.Count == 1 ? first.Task : Task.CompletedTask;
+        });
+
+        var toMember = state.ReconcileAsync(Northwind, "member", CancellationToken.None);
+        var toViewer = state.ReconcileAsync(Northwind, "viewer", CancellationToken.None);
+
+        Assert.Equal(["narrating admin->member while admin"], events);
+
+        first.SetResult();
+        await Task.WhenAll(toMember, toViewer);
+
+        Assert.Equal(["narrating admin->member while admin", "narrating member->viewer while member"], events);
+        Assert.Equal("viewer", state.Current?.Role);
+    }
+
     private static ActiveSpaceState InSpace(Guid spaceId, string role)
     {
         var state = new ActiveSpaceState();

@@ -19,8 +19,5 @@ namespace Yello.Contracts.Spaces;
 /// </remarks>
 public static class RoleHeader
 {
-    /// <summary>
-    /// The response header.
-    /// </summary>
     public static string HeaderName => "Yello-Role";
 }

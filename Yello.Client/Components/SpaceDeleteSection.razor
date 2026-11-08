@@ -46,7 +46,7 @@
     confirm stays. A 403: the capability's words, in the section.
 *@
 
-<div class="space-delete-section">
+<div class="space-delete-section" data-role-gated>
     @if (Confirming && _summary is { } summary)
     {
         <div class="destructive-confirm space-delete-section__confirm" aria-busy="@(_deleting ? "true" : null)" @onkeydown="ConfirmKeyDownAsync">

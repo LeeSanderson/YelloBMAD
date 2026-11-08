@@ -133,7 +133,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// No client markup binds <c>disabled</c> or <c>aria-disabled</c> for any reason but the in-flight and data ones named
     /// in <see cref="PermittedDisabledBindings"/>, none of those names a capability predicate or a Role, no markup carries an
     /// <c>is-disabled</c> or <c>--disabled</c> class, and no client C# writes either attribute through a render tree. A
-    /// control a Role lacks is absent everywhere (UX-DR27).
+    /// control a Role lacks is absent everywhere.
     /// </summary>
     [Fact]
     [Trait("Requirement", "UX-DR27")]
@@ -175,7 +175,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <summary>
     /// The client reaches no channel shared between tabs - no <c>BroadcastChannel</c>, no <c>SharedWorker</c>, no
     /// <c>storage</c> event - in its C#, its markup or the files it serves. A permission change reaches only the tab whose
-    /// answer carried it; a broadcast would speak one Space's change in a tab showing another (UX-DR38).
+    /// answer carried it; a broadcast would speak one Space's change in a tab showing another.
     /// </summary>
     [Fact]
     [Trait("Requirement", "UX-DR38")]
@@ -211,7 +211,7 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// No file the client serves polls: no <c>setInterval</c> anywhere in its JavaScript, markup or C#. A permission change
-    /// is pushed or read off an answer the tab asked for anyway, never polled (AD-9, AD-10). The .NET timers are held by
+    /// is pushed or read off an answer the tab asked for anyway, never polled. The .NET timers are held by
     /// <see cref="No_production_code_runs_on_a_timer_or_as_a_hosted_service"/>, which scans the client assembly too.
     /// </summary>
     [Fact]

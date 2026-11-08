@@ -17,7 +17,7 @@ namespace Yello.Tests.Isolation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Live, and green when written.</b> The pipeline already refuses each of these by the matrix; the rows close a coverage
+/// <b>Regression gates.</b> The pipeline already refuses each of these by the matrix; the rows close a coverage
 /// gap (the earlier Viewer rows demote an Owner by raw SQL, or name a foreign Space), so they stand as regression gates.
 /// </para>
 /// <para>

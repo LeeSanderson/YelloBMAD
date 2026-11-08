@@ -23,7 +23,8 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The route table is read by a gate.</b> <c>RoleMatrixCoverageGateTests</c> in the Architecture suite reads
+/// <b>The route table is read by a gate.</b>
+/// <c>RefusalBoundaryGateTests.The_matrix_theory_covers_exactly_the_capabilities_endpoints_declare</c> in the Architecture suite reads
 /// <see cref="RoleMatrixRoutes"/> from this file's source and requires it to name exactly the capabilities some endpoint
 /// declares through <c>RequiresCapability</c>, so the first endpoint for a row that has none today fails that gate until it
 /// is added here. Keep each row on a line of its own, starting with its constructor.

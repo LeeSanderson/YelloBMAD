@@ -684,7 +684,7 @@ public sealed class LabelTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// AC14, UX-DR29, UX-DR37, UX-DR39 - a Role re-read lower (Owner to Member) while on Space settings is narrated in the
+    /// A Role re-read lower (Owner to Member) while on Space settings is narrated in the
     /// Role narration, which takes focus, then routed to Space home, where the narration keeps focus: it names what
     /// happened, and the define form is gone.
     /// </summary>

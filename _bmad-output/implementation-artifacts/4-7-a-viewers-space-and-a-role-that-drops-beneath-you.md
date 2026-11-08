@@ -3,7 +3,7 @@ baseline_commit: 11d0dad
 ---
 # Story 4.7: A Viewer's Space, and a Role that drops beneath you
 
-Status: review
+Status: done
 
 Epic: 4 — Bring people into one piece of your work (the seventh and last story of the epic)
 Story key: `4-7-a-viewers-space-and-a-role-that-drops-beneath-you`
@@ -264,6 +264,42 @@ AC1 to AC7 are reproduced **verbatim** from `epics.md:1885-1916` and numbered by
     3. Iterate on the affected classes with `--filter-class "<full name>"`.
     4. Make **exactly one** full run, in the background, without the browser suite: `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1 -p:YelloSkipBrowserSuite=true`, logged to `artifacts/test-runs/4-7-a-viewers-space-and-a-role-that-drops-beneath-you-develop.log`. Record the totals.
     5. Rerun a failure once, alone, before calling it real.
+
+### Review Findings
+
+Code review 2026-11-08 (Blind Hunter, Edge Case Hunter, Acceptance Auditor; commit range `01b26dc..HEAD`). 42 raw findings, plus one found by Review's own browser plant; after de-duplication, 8 patched (one of them the isolation bug the first full run exposed), 23 deferred as low (one of them the timing row the second full run tripped), 4 dismissed (the query-string Space id, which no route sends; the late-answer browser case, already in the ledger; `SpaceNameSection`'s opener focus after a `200`, which the AC5 browser case proves is not taken; and `RoleNarration`'s shared focus flags, made unreachable by the serialisation patch), no decision needed.
+
+- [x] [Review][Patch] Role changes were not serialised: a second drop cut the first one's narration short (its Role applied before its sentence rendered), and a rise landing during a drop's narration was overwritten by the older drop [Yello.Client/Spaces/ActiveSpaceState.cs:259] — `ReconcileAsync` now waits for a drop in flight and judges the next answer against the Role it left; two `RoleReconcileTests` cases hold it.
+- [x] [Review][Patch] The narration-before-removal browser case could not catch the Role applied before the narration: under that plant the narration and the removals render in one batch, reach the `MutationObserver` in one callback, and the log still lists the narration first. The log now records each entry's observer callback, and the narration must land in an earlier one [tests/Yello.Tests.Client/RoleDropTests.cs:59] — plant 10 re-run in the browser: green before the fix, red after (both order cases), restored in a `finally`.
+- [x] [Review][Patch] Found by the first full run, outside this diff: `The_answer_and_the_email_are_the_same_whether_or_not_the_address_has_an_Account` waited for "any two emails", and `Any_plausible_address_is_invited_...` stopped its Host before its four Invitation emails were sent, so the next Host on the class's database dispatched them into the other case's drop. The producer now waits for its own mail, and the two consumers wait by recipient [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.IssueInvitation.cs:303] — passed alone on rerun before the fix; a test-isolation bug, not a flake.
+- [x] [Review][Patch] Controls a drop removes carried no `data-role-gated` marker, so focus fell to `body` before the narration recovered it: the Task panel's Status, Move, Due date, Labels and Assignee fields, `ProjectRow`'s rename form and delete confirm, and `SpaceDeleteSection` on Owner to Admin [Yello.Client/Components/TaskDetail.razor:110]
+- [x] [Review][Patch] A revoke refused with `403` after the Admin was demoted pulled focus back to a row the leaving page was about to remove, stranding it on `body` [Yello.Client/Components/InvitationSection.razor:447]
+- [x] [Review][Patch] The header-absence case covered only the Session surface: added the Token surface's boundary `404`, in-Space `404` and bound-to-another-Space `404`, with an anchor and identical header names [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RoleHeader.cs:104]
+- [x] [Review][Patch] The matrix theory's remarks named a gate that does not exist (`RoleMatrixCoverageGateTests`) [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RoleMatrix.cs:26]
+- [x] [Review][Patch] Comments this diff added broke the comment rule: XML docs restating the member (`RoleHeader.HeaderName`, `RoleNarrator.Changed`, `Sentence`, `Say`), requirement and AC ids and ledger/Q references in test docs, and narrative history ("green when written", "Story 4.3 ... Lee's Q4 (a)") [Yello.Contracts/Spaces/RoleHeader.cs:21]
+- [x] [Review][Defer] Answers arriving out of order across requests can apply a stale Role until the next answer; nothing on the wire orders them [Yello.Client/Spaces/ActiveSpaceState.cs:259] — deferred, low severity
+- [x] [Review][Defer] An exception from a `RoleDropping` subscriber or the narrator escapes `YelloApiHandler.SendAsync` as a non-HTTP exception [Yello.Client/Sessions/YelloApiHandler.cs:90] — deferred, low severity
+- [x] [Review][Defer] The handler holds an answer until the narration renders (and its JS module loads), with no bound [Yello.Client/Components/RoleNarration.razor:113] — deferred, low severity
+- [x] [Review][Defer] Space settings routes to Space home after `drop.Narrated` (and after a typed address) without checking the tab is still in that Space [Yello.Client/Pages/SpaceSettings.razor:144] — deferred, low severity
+- [x] [Review][Defer] The narration element switches `role` between `status` and `alert` in the same render as its text [Yello.Client/Components/RoleNarration.razor:24] — deferred, low severity
+- [x] [Review][Defer] A drop learned on a first arrival into Space settings can mount sections under the old Role, or get the typed-address copy when `Arrive` carries it [Yello.Client/Pages/SpaceSettings.razor:121] — deferred, low severity
+- [x] [Review][Defer] `Arrive` accepts an unknown Role code, after which a real drop ranks as a rise [Yello.Client/Spaces/ActiveSpaceState.cs:378] — deferred, low severity
+- [x] [Review][Defer] A `2xx` that changes the caller's own Role echoes the Role from before the change [Yello.Host/Spaces/ActiveSpaceResolution.Authority.cs:53] — deferred, low severity
+- [x] [Review][Defer] `MembershipSection.ForbiddenAsync` re-reads even when the header confirmed the Role, its copy depends on whether `ViewerRole` re-rendered, and it does not re-check the row after the re-read [Yello.Client/Components/MembershipSection.razor:609] — deferred, low severity
+- [x] [Review][Defer] `LeaveSpaceSection`: a failure after the section was disposed within the same Space is never shown, a lost answer after a switch drops the kept key, and a sign-out mid-leave now says "Not sent." [Yello.Client/Components/LeaveSpaceSection.razor:180] — deferred, low severity
+- [x] [Review][Defer] The browser fake echoes `Roles[space]` independently of its own decision (a `2xx` under a lower Role) and only on an `insufficient-role` `403` [tests/Yello.Tests.Client/FakeYelloApi.RoleHeader.cs:1] — deferred, low severity
+- [x] [Review][Defer] The Host echoes the Role on any `403` after resolution; correctness rests on every such `403` being the capability refusal, which nothing enforces [Yello.Host/Spaces/ActiveSpaceResolution.Authority.cs:61] — deferred, low severity
+- [x] [Review][Defer] `_confirmingDelete` survives an Owner to Admin drop and reopens the confirm on a later rise [Yello.Client/Pages/SpaceSettings.razor:88] — deferred, low severity
+- [x] [Review][Defer] Most AC4 browser cases learn the drop from the re-arrival body rather than the header; no Board or List read carries a drop [tests/Yello.Tests.Client/RoleDropTests.cs:120] — deferred, low severity
+- [x] [Review][Defer] The typed Space settings address renders the page heading before routing away [Yello.Client/Pages/SpaceSettings.razor:42] — deferred, low severity
+- [x] [Review][Defer] The rewritten AC5 cases in `LabelTests` and `MembershipSectionTests` match the narration by substring and keep no frame log [tests/Yello.Tests.Client/LabelTests.cs:687] — deferred, low severity
+- [x] [Review][Defer] The new Isolation Viewer rows carry no in-row Member or Admin success anchor [tests/Yello.Tests.Isolation/IsolationCases.ViewerSpace.cs:20] — deferred, low severity
+- [x] [Review][Defer] The narration copy gate skips `RoleNarrationOwner` and the placeholder check on `SpaceSettingsForOwnersAndAdmins` [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.RoleDrop.cs:1] — deferred, low severity
+- [x] [Review][Defer] `SpaceNarration`'s remarks still say Space settings narrates a Role re-read through it [Yello.Client/Spaces/SpaceNarration.cs:4] — deferred, low severity
+- [x] [Review][Defer] `Renamed` reconciles fire-and-forget, so an exception from it goes unobserved [Yello.Client/Spaces/ActiveSpaceState.cs:311] — deferred, low severity
+- [x] [Review][Defer] No case proves the header absent on the `MembershipLost` `404` or the bound `409`s, which only the status filter keeps clean [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RoleHeader.cs:104] — deferred, low severity
+- [x] [Review][Defer] The Invitation not-valid timing row on the Token surface went over its tolerance once in a full run and passed alone [tests/Yello.Tests.Isolation/IsolationCases.InvitationAcceptance.cs:489] — deferred, low severity
+- [x] [Review][Defer] Develop's browser plants 2, 14, 15, 16, 17 and 18 are still unrun; Review ran plant 10 in the browser [_bmad-output/implementation-artifacts/4-7-a-viewers-space-and-a-role-that-drops-beneath-you.md:520] — deferred, low severity
 
 ## Dev Notes
 
@@ -602,3 +638,4 @@ Claude Opus 5.5 (bmad-dev-story, unattended story cycle), 2026-11-08.
 
 - 2026-11-08: story created (create-story).
 - 2026-11-08: developed (dev-story): the `Yello-Role` header, the client's one Role entry point and the Role narration, the Space settings exit and typed-address route, the stale-Role refusal copy, the leave across a switch; ledger dispositions and spine notes. Status to review.
+- 2026-11-08: code review (bmad-code-review): 8 patches (Role changes serialised, focus markers on the removed controls, the Invitation revoke under a dropped Role, the Token-surface header absence, the order case that could not catch its plant, the Invitation email isolation bug, two comment fixes), 23 low findings deferred. Two full runs with the browser suite. Status to done.

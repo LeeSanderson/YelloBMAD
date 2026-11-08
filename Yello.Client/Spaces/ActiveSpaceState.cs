@@ -258,15 +258,21 @@ public sealed class ActiveSpaceState : IDisposable
     /// <returns>A task that completes once the Role is applied, or the call dropped.</returns>
     public async Task ReconcileAsync(Guid spaceId, string role, CancellationToken token)
     {
-        if (token.IsCancellationRequested || ChangeOf(spaceId, role) is not { } current)
-        {
-            return;
-        }
-
+        // One change at a time: an answer that lands while a drop is narrating is judged against the Role that drop leaves,
+        // so a second drop never cuts the first one's narration short and a rise is never overwritten by the older drop.
         // Concurrent answers carrying the same drop narrate it once.
-        if (_dropping is { } dropping && string.Equals(dropping.To, role, StringComparison.Ordinal))
+        while (_dropping is { } dropping)
         {
             await dropping.Applied.ConfigureAwait(false);
+
+            if (string.Equals(dropping.To, role, StringComparison.Ordinal))
+            {
+                return;
+            }
+        }
+
+        if (token.IsCancellationRequested || ChangeOf(spaceId, role) is not { } current)
+        {
             return;
         }
 
