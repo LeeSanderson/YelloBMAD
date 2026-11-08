@@ -698,7 +698,8 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Session the boundary <c>404</c>, byte for byte the same route on a Space that does not exist, each recorded
     /// <c>CrossSpace</c>; by Token the no-credential <c>401</c>, because the Token died with the Membership. Sampled across
     /// the capability classes: a read (the Project list), a write (Project create), the Members list, and the leave route
-    /// itself. The target is an Admin, so every probe answered a success on both surfaces before (the anchor).
+    /// itself, whose Token probe is compared with a well-formed Token that never existed. The target is an Admin, so every
+    /// other probe answered a success on both surfaces before (the anchor).
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -763,6 +764,7 @@ public sealed partial class ActiveSpaceEndpointTests
             }
 
             after.Add(("leave / Session", await LeaveOverWireAsync(target, spaceId), await LeaveOverWireAsync(target, absentSpace)));
+            after.Add(("leave / ApiToken", await target.SendWithTokenAndHeadersAsync(HttpMethod.Delete, MembershipRoutes.OwnOf(spaceId), token, content: null, NoKey), await target.SendWithTokenAndHeadersAsync(HttpMethod.Delete, MembershipRoutes.OwnOf(spaceId), WellFormedUnknownToken(), content: null, NoKey)));
         });
 
         Assert.True(before.TrueForAll(line => line.Split(": ", 2)[1].StartsWith('2')), "Before the removal every probe should succeed on both surfaces:\n" + string.Join('\n', before));

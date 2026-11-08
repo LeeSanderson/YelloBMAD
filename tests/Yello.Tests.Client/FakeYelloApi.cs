@@ -667,7 +667,8 @@ internal sealed partial class FakeYelloApi
 
         var origin = headers.TryGetValue("origin", out var value) ? value : "*";
 
-        var (status, body) = await DecideAsync(seen).ConfigureAwait(false);
+        var (held, instead) = await AwaitSpaceReadHoldAsync(seen).ConfigureAwait(false);
+        var (status, body) = held && instead is { } given ? given : await DecideAsync(seen).ConfigureAwait(false);
 
         if (status == AbortConnection)
         {
@@ -689,21 +690,25 @@ internal sealed partial class FakeYelloApi
             return;
         }
 
+        var answerHeaders = new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["Access-Control-Allow-Origin"] = origin,
+            ["Access-Control-Allow-Credentials"] = "true",
+            // Story 4.3: the Invitation view's token header (Lee's Q4 (a)), which a cross-origin request may
+            // carry only once the preflight allows it - as the Host's CrossOriginPolicy must.
+            ["Access-Control-Allow-Headers"] = $"content-type, {Antiforgery.HeaderName}, {Idempotency.HeaderName}, {InvitationRoutes.TokenHeader}",
+            ["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE",
+            ["Vary"] = "Origin",
+        };
+
+        AddRoleHeader(answerHeaders, seen, status, body);
+
         await route.FulfillAsync(new RouteFulfillOptions
         {
             Status = status,
             ContentType = status >= 400 ? "application/problem+json" : "application/json",
             Body = body,
-            Headers = new Dictionary<string, string>(StringComparer.Ordinal)
-            {
-                ["Access-Control-Allow-Origin"] = origin,
-                ["Access-Control-Allow-Credentials"] = "true",
-                // Story 4.3: the Invitation view's token header (Lee's Q4 (a)), which a cross-origin request may
-                // carry only once the preflight allows it - as the Host's CrossOriginPolicy must.
-                ["Access-Control-Allow-Headers"] = $"content-type, {Antiforgery.HeaderName}, {Idempotency.HeaderName}, {InvitationRoutes.TokenHeader}",
-                ["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE",
-                ["Vary"] = "Origin",
-            },
+            Headers = answerHeaders,
         }).ConfigureAwait(false);
     }
 

@@ -333,6 +333,103 @@ public sealed class LeaveSpaceTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// A leave that commits after the tab has switched Space is not lost: the leave is held, the tab switches to Harbour,
+    /// and the held leave is answered <c>204</c>. The switcher stops listing Northwind, nothing is said in Harbour - no "You
+    /// left the Space.", which would speak of another Space - and Harbour's page is untouched. Plant: send the leave with the
+    /// Space's purge token - the answer is dropped and the switcher still lists Northwind.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC10 - a leave rides the Space's purge token, so a switch drops its answer")]
+    [Trait("Requirement", "UX-DR38")]
+    [Trait("Requirement", "UX-DR31")]
+    public async Task A_leave_answered_after_a_switch_drops_the_left_Space_and_says_nothing_in_the_other()
+    {
+        var api = TwoSpaces("member");
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenHomeAsync(api, page, Northwind);
+            await page.EvaluateAsync(RecordEverythingSaid);
+
+            var held = api.HoldLeaveAsync();
+
+            await ConfirmLeaveAsync(page);
+            await held.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+            await ChooseInSwitcherAsync(page, HarbourName);
+            await page.Locator(ContextBar, new PageLocatorOptions { HasText = HarbourName }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            api.ReleaseLeave();
+
+            await UntilSwitcherListsAsync(page, [HarbourName]);
+
+            Assert.DoesNotContain(await SaidAsync(page), sentence => sentence.Contains(LeftCopy, StringComparison.Ordinal));
+            Assert.EndsWith($"/spaces/{Harbour:D}", new Uri(page.Url).AbsolutePath, StringComparison.Ordinal);
+            Assert.Contains(HarbourName, await page.Locator(ContextBar).InnerTextAsync(), StringComparison.Ordinal);
+            Assert.Single(api.Leaves(Northwind));
+        }
+    }
+
+    /// <summary>
+    /// A leave whose answer is lost after the tab has switched Space changes nothing in the Space now shown: the switcher
+    /// still lists both Spaces, nothing is said, and no "Not sent." appears in Harbour.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC10 - activate with the Session-lifetime leave; confirm it is red against the old token first")]
+    [Trait("Requirement", "UX-DR38")]
+    public async Task A_leave_left_unanswered_after_a_switch_changes_nothing_in_the_other_Space()
+    {
+        var api = TwoSpaces("member");
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenHomeAsync(api, page, Northwind);
+            await page.EvaluateAsync(RecordEverythingSaid);
+
+            var held = api.HoldLeaveAsync();
+
+            await ConfirmLeaveAsync(page);
+            await held.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+            await ChooseInSwitcherAsync(page, HarbourName);
+            await page.Locator(ContextBar, new PageLocatorOptions { HasText = HarbourName }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            api.ReleaseLeaveAppliedButUnanswered();
+
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+            Assert.Equal([NorthwindName, HarbourName], await SwitcherNamesAsync(page));
+            Assert.Empty(await SaidAsync(page));
+            Assert.Equal(0, await page.Locator("main").GetByText(NotSentCopy).CountAsync());
+        }
+    }
+
+    /// <summary>
+    /// Reads the switcher's names until they are exactly <paramref name="expected"/>, or fails at the deadline with the
+    /// last names read.
+    /// </summary>
+    private static async Task UntilSwitcherListsAsync(IPage page, IReadOnlyList<string> expected)
+    {
+        var deadline = DateTimeOffset.UtcNow.AddMilliseconds(Timeout);
+        IReadOnlyList<string> names = [];
+
+        while (DateTimeOffset.UtcNow < deadline)
+        {
+            names = await SwitcherNamesAsync(page);
+
+            if (names.SequenceEqual(expected, StringComparer.Ordinal))
+            {
+                return;
+            }
+
+            await page.Keyboard.PressAsync("Escape");
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        }
+
+        Assert.Fail($"The switcher lists [{string.Join(", ", names)}]; expected [{string.Join(", ", expected)}].");
+    }
+
+    /// <summary>
     /// A signed-in Account holding <paramref name="northwindRole"/> in Northwind Redesign and Member of Harbour Ops, listed
     /// in that order.
     /// </summary>

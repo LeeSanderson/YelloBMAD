@@ -104,6 +104,11 @@ internal static class RevocationCases
             Assumption = "PRD-12-4",
         },
 
+        // A Member's Token narrows with a demotion made through the product: no reissue, the very next write is refused.
+        new(
+            "REV-DEMOTED-TO-VIEWER-BY-OWNER", "I-10, NFR-2, FR-16",
+            Both(new RevocationStep(MemberDemotedToViewerByTheOwnerAsync, new GovernedAsViewer()))),
+
         // The endpoint-driven twins of REV-MEMBERSHIP-REMOVED, which stays as the raw-SQL schema proof. The actor joins an
         // Owner's Space through an accepted Invitation, holds a Token bound there, and is then removed by an Admin of that
         // Space, or leaves. The next request on each surface is against the joined Space.
@@ -221,6 +226,32 @@ internal static class RevocationCases
 
         var membership = await world.Database.MembershipOfAsync(owner.SpaceId, actor.AccountId);
         var demoted = await owner.SendAsync(IsolationSurface.Session, HttpMethod.Patch, MembershipRoutes.MembershipOf(owner.SpaceId, membership.Id), MembershipWire.ChangeBody("member"), headers: null);
+
+        Assert.True(demoted.StatusCode == HttpStatusCode.OK, $"The Owner's demotion through the product: {demoted.StatusCode} {demoted.Body}");
+
+        Joined.AddOrUpdate(context, view);
+    }
+
+    /// <summary>
+    /// The row's actor joins a fresh Owner's Space as Member through the product and issues itself a Token bound there; both
+    /// surfaces create a Project there (<c>201</c>, the anchor: the Member held the capability, and the Token worked for a
+    /// write); then the Owner demotes it to Viewer through <c>PATCH .../memberships/{id}</c> (<c>200</c>).
+    /// </summary>
+    private static async Task MemberDemotedToViewerByTheOwnerAsync(RevocationContext context)
+    {
+        var (world, actor) = (context.World, context.Actor);
+        var owner = await world.NewActorAsync();
+        var view = await JoinOwnersSpaceAsync(world, owner, actor, "member", "rev-demoted");
+
+        foreach (var surface in Enum.GetValues<IsolationSurface>())
+        {
+            var anchor = await view.SendAsync(surface, HttpMethod.Post, ProjectRoutes.ListIn(owner.SpaceId));
+
+            Assert.True(anchor.StatusCode == HttpStatusCode.Created, $"As Member, {surface} creates a Project before the change: {anchor.StatusCode} {anchor.Body}");
+        }
+
+        var membership = await world.Database.MembershipOfAsync(owner.SpaceId, actor.AccountId);
+        var demoted = await owner.SendAsync(IsolationSurface.Session, HttpMethod.Patch, MembershipRoutes.MembershipOf(owner.SpaceId, membership.Id), MembershipWire.ChangeBody("viewer"), headers: null);
 
         Assert.True(demoted.StatusCode == HttpStatusCode.OK, $"The Owner's demotion through the product: {demoted.StatusCode} {demoted.Body}");
 
@@ -434,6 +465,33 @@ internal static class RevocationCases
             var written = await view.SendAsync(surface, HttpMethod.Post, ProjectRoutes.ListIn(view.SpaceId));
 
             Assert.True(written.StatusCode == HttpStatusCode.Created, $"{surface}: a Member's Project create answered {written.StatusCode} {written.Body}");
+        }
+    }
+
+    /// <summary>
+    /// After <see cref="MemberDemotedToViewerByTheOwnerAsync"/>, the very next request on the surface is a write, and it is
+    /// governed by the new Role: a Project create is <c>403 insufficient-role</c> naming <c>manage-projects</c>, and the Space
+    /// is still read, at <c>viewer</c>. On the Token surface this is the Token issued while a Member, never reissued.
+    /// </summary>
+    private sealed record GovernedAsViewer() : NextAnswer("403 manage-projects on the very next write, still read at viewer: governed as Viewer")
+    {
+        public override async Task VerifyAsync(RevocationContext context, IsolationSurface surface)
+        {
+            Assert.True(Joined.TryGetValue(context, out var view), "The event recorded no joined view of the Owner's Space.");
+
+            var refused = await view.SendAsync(surface, HttpMethod.Post, ProjectRoutes.ListIn(view.SpaceId));
+
+            Assert.True(refused.StatusCode == HttpStatusCode.Forbidden, $"{surface}: the very next write answered {refused.StatusCode} {refused.Body}");
+            Assert.Contains(ProblemTypes.InsufficientRole, refused.Body, StringComparison.Ordinal);
+            Assert.Contains("manage-projects", refused.Body, StringComparison.Ordinal);
+
+            var read = await view.SendAsync(surface, HttpMethod.Get, SpaceRoutes.ActiveOf(view.SpaceId));
+
+            Assert.True(read.StatusCode == HttpStatusCode.OK, $"{surface}: the Viewer's read answered {read.StatusCode} {read.Body}");
+
+            using var document = JsonDocument.Parse(read.Body);
+
+            Assert.Equal("viewer", document.RootElement.GetProperty("role").GetString());
         }
     }
 

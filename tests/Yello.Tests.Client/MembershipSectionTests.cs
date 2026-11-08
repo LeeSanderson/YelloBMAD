@@ -117,6 +117,8 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
         "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } "
         + "p { margin-block-end: 2em !important; }";
 
+    private static readonly string[] AdminLimits = [AdminLimitCopy, "Admins can remove Members and Viewers only."];
+
     private static readonly Guid Northwind = Guid.NewGuid();
     private static readonly Guid Harbour = Guid.NewGuid();
 
@@ -1040,6 +1042,94 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
             }
 
             Assert.Empty(await page.EvaluateAsync<string[]>(Reflow));
+        }
+    }
+
+    /// <summary>
+    /// An Admin demoted to Member meanwhile presses Remove on a Member's row; the confirm's fresh read answers
+    /// <c>403 insufficient-role</c> carrying <c>member</c>. The Role is reconciled before the refusal's copy is chosen, so
+    /// neither Admin-limit sentence ever enters the page: the narrated exit to Space home runs instead. Plant: choose the
+    /// copy from the stale Role first - the log then holds the Admin limit.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC9 - the section chooses the Admin-limit copy from the stale Role before the re-read")]
+    [Trait("Requirement", "UX-DR29")]
+    [Trait("Requirement", "NFR-2")]
+    public async Task A_demoted_Admins_refused_confirm_read_never_shows_the_Admin_limit()
+    {
+        var api = TwoSpaces("admin");
+        var member = Row("Mo Member", "member");
+
+        api.SpaceMemberships[Northwind] = [Row("Olu Owner", "owner"), Row("Ada Admin", "admin", isYou: true), member];
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSettingsAsync(api, page, Northwind);
+            await RemoveButton(page, member).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.EvaluateAsync(
+                """
+                limits => {
+                    window.__limits = [];
+                    new MutationObserver(() => {
+                        const text = document.body.textContent;
+                        for (const limit of limits) if (text.includes(limit)) window.__limits.push(limit);
+                    }).observe(document.body, { childList: true, subtree: true, characterData: true });
+                }
+                """,
+                AdminLimits);
+
+            api.Roles[Northwind] = "member";
+
+            await RemoveButton(page, member).ClickAsync();
+            await page.Locator(".role-narration", new PageLocatorOptions { HasText = "You're now a Member. Space settings is no longer available." })
+                .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.WaitForFunctionAsync("path => location.pathname === path", $"/spaces/{Northwind:D}", new PageWaitForFunctionOptions { Timeout = Timeout, PollingInterval = 50 });
+
+            Assert.Empty(await page.EvaluateAsync<string[]>("() => window.__limits"));
+        }
+    }
+
+    /// <summary>
+    /// A late refused confirm read for one row never closes another row's confirm: Remove on row A is pressed and its fresh
+    /// read held; Remove on row B opens B's confirm; then A's read is released as a <c>403</c> under the same Admin Role. B's
+    /// confirm is still open, and its Remove still there.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC9 - a late refused confirm read closes whichever confirm is open")]
+    [Trait("Requirement", "UX-DR36")]
+    public async Task A_late_refused_confirm_read_never_closes_another_rows_confirm()
+    {
+        var api = TwoSpaces("admin");
+        var (first, second) = (Row("Mo Member", "member"), Row("Vi Viewer", "viewer"));
+
+        api.SpaceMemberships[Northwind] = [Row("Olu Owner", "owner"), Row("Ada Admin", "admin", isYou: true), first, second];
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSettingsAsync(api, page, Northwind);
+            await RemoveButton(page, first).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var held = api.HoldSpaceReadAsync(Northwind, $"/memberships/{first.Id:D}");
+
+            await RemoveButton(page, first).ClickAsync();
+            await held.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+
+            await RemoveButton(page, second).ClickAsync();
+
+            var secondConfirm = RowOf(page, second).Locator(".destructive-confirm");
+
+            await secondConfirm.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            api.ReleaseSpaceRead((403, $$"""{"type":"{{ProblemTypes.InsufficientRole}}","capability":"{{MembershipWire.CapabilityCode}}"}"""));
+
+            await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+
+            Assert.True(await secondConfirm.IsVisibleAsync(), "A's late refusal closed B's confirm.");
+            Assert.Equal(1, await secondConfirm.Locator(".button-danger").CountAsync());
         }
     }
 

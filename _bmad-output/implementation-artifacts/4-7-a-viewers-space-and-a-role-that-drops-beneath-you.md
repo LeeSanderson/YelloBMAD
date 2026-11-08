@@ -231,7 +231,11 @@ AC1 to AC7 are reproduced **verbatim** from `epics.md:1885-1916` and numbered by
 ## Tasks / Subtasks
 
 - [ ] **Task 0: decisions** (before any code)
-  - [ ] Q1, Q4 and Q9 are marked **[LEE]**. If the orchestrator routes them to Lee, record the answers here under "Decided by Lee" before ATDD. Otherwise take each recommendation and record it as "Qn - (x)" with its cost in Completion Notes.
+  - [x] Q1, Q4 and Q9 are marked **[LEE]**. If the orchestrator routes them to Lee, record the answers here under "Decided by Lee" before ATDD. Otherwise take each recommendation and record it as "Qn - (x)" with its cost in Completion Notes.
+    - **Decided by Lee (2026-11-08):**
+      - Q1 - (a): the pipeline echoes the judged Role in a `Yello-Role` header on `2xx` and `403 insufficient-role` only, never on a `404`. The client reconciles through one entry point that 7.7's push will also call. "Pushed" is met on the request path until 7.7 (C1).
+      - Q4 - (a): one assertive `RoleNarration` element under the context bar. Focus moves to it only when the focused control is removed or the surface is left.
+      - Q9 - (a): fold `:823`, `:829`, `:824` and `:837`, and re-own the other unowned 4.5 entries to the sweep with a dated note. `:787` and `:814` (epic 4 retrospective) and `:528` (UX) keep their owners.
   - [ ] Decide Q2, Q3, Q5, Q6, Q7 and Q8 the same way. Each recommendation is the default.
 - [ ] **Task 1: Contracts** (AC4, AC8)
   - [ ] A `Yello.Contracts/Spaces/RoleHeader.cs` with `HeaderName => "Yello-Role"`, shaped like `Yello.Contracts/Idempotency.cs` (`HeaderName :26`, the one existing header contract), values from the existing Role code constants. Remarks: when it is present and why it is never on a `404`.
@@ -459,6 +463,34 @@ The cycle is: story; decisions recorded; ATDD scaffolds (`Skip = "red: ..."`, `a
 - `tests/TESTING-CONVENTIONS.md`: `:5-30`, `:87-200`, `:545-563`, `:756-877`.
 - `deferred-work.md`: `:528`, `:787`, `:814`, `:823-840`.
 - Story files: `4-6-assign-a-task-and-be-told.md` (template, review findings), `4-5-remove-a-membership-or-leave-a-space.md` (Q8 leave placement, Q12 `LostMembership`, `:58-59` the pushed narration deferred to 4.7/7.7), `4-4-manage-memberships-and-roles.md` (`:25`, `:52` pushed narration, chip update and per-tab filter are 4.7's; Q7 the publish seam; Q15 the narration region).
+
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-4-7-a-viewers-space-and-a-role-that-drops-beneath-you.md` (decisions, assumptions, discrepancies with this story's prose, findings).
+
+| File | Cases | ACs | State today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RoleMatrix.cs` | 1 theory, 11 rows | AC2, AC3, AC12 | **green, active** (standing gate) |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RoleHeader.cs` | 4 | AC4, AC8, AC9, AC12 | skipped |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RemoveMembership.cs` (Token leave probe added, `:837`) | 1 | AC2 | **green, active** |
+| `tests/Yello.Tests.Isolation/IsolationCases.ViewerSpace.cs` | 7 rows x 2 surfaces | AC2 | **green, active** |
+| `tests/Yello.Tests.Revocation/RevocationCases.cs` (`REV-DEMOTED-TO-VIEWER-BY-OWNER`) | 1 row x 2 surfaces | AC2, AC12 | **green, active** |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.RoleDrop.cs` | 11 | AC1, AC3, AC4, AC7, AC11 | 7 **green, active** (coverage, nesting, disabled + detector, shared channel + detector, interval); 4 skipped (client ranks, narration copy, header writer, CORS exposure) |
+| `tests/Yello.Tests.Client/ViewerSpaceTests.cs` | 3 (one a 2-row theory) | AC1 | the Viewer sweep and the Owner anchor **green, active**; the Q6 typed-URL theory skipped |
+| `tests/Yello.Tests.Client/RoleDropTests.cs` | 10 | AC4, AC5, AC6, AC7, AC11 | skipped |
+| `tests/Yello.Tests.Client/MembershipSectionTests.cs` (two added) | 2 | AC9 (`:823`, `:824`) | skipped |
+| `tests/Yello.Tests.Client/LeaveSpaceTests.cs` (two added) | 2 | AC10 (`:829`) | skipped |
+
+Support: `tests/Yello.Tests.Shared/RoleHeaderWire.cs` (stand-in for `RoleHeader.HeaderName`; swap and delete), `tests/Yello.Tests.Client/FakeYelloApi.RoleHeader.cs` (the fake echoes `Roles[space]` in the header on `2xx` / `403 insufficient-role`, exposes it cross-origin, and can hold any Space-scoped read).
+
+Activation order, riskiest assumption first:
+
+1. `RoleDropTests.A_drop_on_the_Board_is_narrated_before_any_affordance_is_removed` - Lee's Q1 (a) end to end: an ordinary answer's header, read cross-origin by the handler, narrates a drop before the surface settles.
+2. `RefusalBoundaryGateTests.The_cross_origin_policy_exposes_the_Role_header`, then the four `RoleHeader` cases (absence and in-Space-404 identity first, then the echo, the replay, the Admin-limit refusal), then `Exactly_one_production_type_writes_the_Role_header`.
+3. The rest of `RoleDropTests` (focus moved, focus kept, Admin on Space home, rise, chip and name, two tabs, late answer, idle), then `The_clients_Role_ranks_agree_with_the_matrix_nesting` and the narration copy gate.
+4. The AC5 settings exit (`RoleDropTests.The_demoted_Admin_in_Space_settings_...`), then the Q6 typed-URL theory, then AC9 (`MembershipSectionTests`) and AC10 (`LeaveSpaceTests`).
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
 
 ## Dev Agent Record
 
