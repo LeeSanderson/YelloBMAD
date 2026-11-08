@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Yello.Application.Invitations;
 using Yello.Application.Memberships;
+using Yello.Application.Spaces;
 using Yello.Domain.Boards;
 using Yello.Domain.Labels;
 using Yello.Domain.Lists;
@@ -18,7 +19,7 @@ internal static class SpaceContentStores
 {
     /// <summary>
     /// Adds the Project, Task and Label stores, the Board reader and the List reader (story 2.10), the Invitation store
-    /// (story 4.1) and the Membership store with its <c>MembershipChanged</c> publisher (story 4.4).
+    /// (story 4.1), the Membership store with its <c>MembershipChanged</c> publisher (story 4.4) and the Ownership Offer store.
     /// </summary>
     /// <param name="services">The container.</param>
     /// <returns>The same collection, for chaining.</returns>
@@ -52,6 +53,9 @@ internal static class SpaceContentStores
         services.AddScoped<IMembershipStore, MembershipStore>();
         services.AddScoped<MembershipChangePublisher>();
         services.AddScoped<IMembershipChanges>(provider => provider.GetRequiredService<MembershipChangePublisher>());
+
+        // The Space's Ownership Offer, on the request's unit of work under the same Memberships lock as a removal.
+        services.AddScoped<IOwnershipOfferStore, OwnershipOfferStore>();
 
         return services;
     }

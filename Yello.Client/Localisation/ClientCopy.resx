@@ -1463,4 +1463,84 @@
     <value>Unassigned.</value>
     <comment>Announced politely once a Task's Assignee is cleared.</comment>
   </data>
+  <data name="OwnershipHeading" xml:space="preserve">
+    <value>Ownership</value>
+    <comment>The Ownership section's heading in Space settings, shown to the Owner only.</comment>
+  </data>
+  <data name="OwnershipLoading" xml:space="preserve">
+    <value>Loading ownership.</value>
+    <comment>Read by a screen reader while the Ownership section reads the pending offer and the Space's Memberships.</comment>
+  </data>
+  <data name="OwnershipRecipientLegend" xml:space="preserve">
+    <value>Offer ownership to</value>
+    <comment>The legend of the Ownership section's recipient choice: one option per Membership other than the Owner's, by display name, never an address. Nothing is chosen until the Owner chooses.</comment>
+  </data>
+  <data name="OwnershipRecipientRequired" xml:space="preserve">
+    <value>Choose who to offer ownership to.</value>
+    <comment>Said beside the recipient choice when the Owner presses Offer ownership with no one chosen.</comment>
+  </data>
+  <data name="OwnershipOffer" xml:space="preserve">
+    <value>Offer ownership</value>
+    <comment>The Ownership section's action. It asks first, in place; nothing is sent until Offer.</comment>
+  </data>
+  <data name="OwnershipOfferQuestion" xml:space="preserve">
+    <value>Offer ownership of {0} to {1}? You stay the Owner until they accept. They will be emailed.</value>
+    <comment>The in-place confirm before an offer is sent. {0} is the Space's name; {1} is the recipient's label (display name, disambiguated), never an address.</comment>
+  </data>
+  <data name="OwnershipOfferConfirm" xml:space="preserve">
+    <value>Offer</value>
+    <comment>The offer confirm's action. Not pre-focused: focus opens on the confirm's text.</comment>
+  </data>
+  <data name="OwnershipOfferCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>The offer confirm's Cancel. Esc does the same; nothing is sent.</comment>
+  </data>
+  <data name="OwnershipOffering" xml:space="preserve">
+    <value>Offering.</value>
+    <comment>The offer confirm's status line while the offer is with the server. Not optimistic.</comment>
+  </data>
+  <data name="OwnershipOffered" xml:space="preserve">
+    <value>Ownership offered.</value>
+    <comment>Announced politely once an offer is answered 201. Names nobody.</comment>
+  </data>
+  <data name="OwnershipPending" xml:space="preserve">
+    <value>Ownership offered to {0}. Waiting for their answer.</value>
+    <comment>The pending offer, as the Owner sees it. {0} is the recipient's label, never an address.</comment>
+  </data>
+  <data name="OwnershipExpiresInDays" xml:space="preserve">
+    <value>Expires in {0} days</value>
+    <comment>How long the pending offer stays open, counted from the server's clock. {0} is a whole number of days, 2 or more; the absolute expiry follows.</comment>
+  </data>
+  <data name="OwnershipExpiresInOneDay" xml:space="preserve">
+    <value>Expires in 1 day</value>
+    <comment>How long the pending offer stays open when one whole day is left, counted from the server's clock.</comment>
+  </data>
+  <data name="OwnershipExpiresToday" xml:space="preserve">
+    <value>Expires today</value>
+    <comment>How long the pending offer stays open when less than a day is left, counted from the server's clock.</comment>
+  </data>
+  <data name="OwnershipRevoke" xml:space="preserve">
+    <value>Revoke</value>
+    <comment>Revokes the pending Ownership Offer, without asking first: a new offer undoes it. Every Membership and Role stays as it was.</comment>
+  </data>
+  <data name="OwnershipRevoking" xml:space="preserve">
+    <value>Revoking.</value>
+    <comment>The pending offer's status line while its revoke is with the server.</comment>
+  </data>
+  <data name="OwnershipOfferRevoked" xml:space="preserve">
+    <value>Ownership offer revoked.</value>
+    <comment>Announced politely once a revoke is answered 204. Names nobody.</comment>
+  </data>
+  <data name="ownership-offer-pending" xml:space="preserve">
+    <value>This Space already has a pending Ownership Offer. Revoke it to make another.</value>
+    <comment>The 409 ownership-offer-pending: another offer of the Space is still pending, made from another tab. The section then shows it. Names nobody.</comment>
+  </data>
+  <data name="ownership-offer-not-pending" xml:space="preserve">
+    <value>This offer is no longer open.</value>
+    <comment>The 409 ownership-offer-not-pending: the offer was revoked, lapsed, answered or expired before this transition. Names nobody.</comment>
+  </data>
+  <data name="invalid-offer-recipient" xml:space="preserve">
+    <value>Ownership can be offered only to another Membership of this Space.</value>
+    <comment>The 400 invalid-offer-recipient: the person chosen left the Space, or was removed, after the choice was drawn. The choice is drawn again. Names nobody.</comment>
+  </data>
 </root>

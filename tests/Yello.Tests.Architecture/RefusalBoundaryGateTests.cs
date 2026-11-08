@@ -140,6 +140,7 @@ public sealed partial class RefusalBoundaryGateTests
         "Yello.Domain.Projects.Project",
         "Yello.Domain.Labels.Label",
         "Yello.Domain.Invitations.Invitation",
+        "Yello.Domain.Spaces.OwnershipOffer",
     ];
 
     /// <summary>
@@ -453,6 +454,10 @@ public sealed partial class RefusalBoundaryGateTests
             // The notification send record's cascading foreign key to its Space, declared in the model and reading
             // nothing.
             "Yello.Infrastructure.Persistence.Configurations.NotificationSendConfiguration",
+
+            // The Ownership Offer's cascading foreign key to its Space, its only key, declared in the model and reading
+            // nothing.
+            "Yello.Infrastructure.Persistence.Configurations.OwnershipOfferConfiguration",
 
             // Story 3.1: the provisioning both registration and creation build a new Space through, its rows, and the
             // store that writes them and renames the resolved Space - which reads nothing, and whose one update is held

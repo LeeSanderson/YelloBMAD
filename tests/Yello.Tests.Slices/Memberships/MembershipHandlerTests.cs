@@ -284,5 +284,11 @@ public sealed class MembershipHandlerTests
 
         public Task<AssignmentNotice?> AssignmentNoticeAsync(Guid actorAccountId, Guid membershipId, Guid taskId, CancellationToken cancellationToken) =>
             throw new NotSupportedException("No Membership slice assigns a Task.");
+
+        public Task<OwnershipOfferNotice?> OwnershipOfferNoticeAsync(Guid actorAccountId, Guid recipientMembershipId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("No Membership slice offers ownership.");
+
+        public Task<string?> DisplayNameOfAsync(Guid membershipId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("No Membership slice offers ownership.");
     }
 }

@@ -160,6 +160,12 @@ public sealed class AssignTaskHandlerTests
         public Task<AssignmentNotice?> AssignmentNoticeAsync(Guid actorAccountId, Guid membershipId, Guid taskId, CancellationToken cancellationToken) =>
             Task.FromResult<AssignmentNotice?>(notice);
 
+        public Task<OwnershipOfferNotice?> OwnershipOfferNoticeAsync(Guid actorAccountId, Guid recipientMembershipId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("An assignment offers no ownership.");
+
+        public Task<string?> DisplayNameOfAsync(Guid membershipId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("An assignment offers no ownership.");
+
         public Task<IReadOnlyList<AssigneeCandidate>> ListAssigneesAsync(CancellationToken cancellationToken) =>
             throw new NotSupportedException("The assignment slice lists no candidates.");
 

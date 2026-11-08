@@ -104,7 +104,33 @@ public interface IMembershipStore
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>The facts, or <c>null</c> when any of them is not in the resolved Space.</returns>
     Task<AssignmentNotice?> AssignmentNoticeAsync(Guid actorAccountId, Guid membershipId, Guid taskId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// What an Ownership Offer needs from the people it names, read inside the offer's unit of work: the recipient's address
+    /// and display name, and the offering Account's display name as it stands now.
+    /// </summary>
+    /// <param name="actorAccountId">The offering Account.</param>
+    /// <param name="recipientMembershipId">The recipient's Membership.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The facts, or <c>null</c> when the recipient is not a Membership of the resolved Space.</returns>
+    Task<OwnershipOfferNotice?> OwnershipOfferNoticeAsync(Guid actorAccountId, Guid recipientMembershipId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The display name of one Membership's Account, read live for a current Member.
+    /// </summary>
+    /// <param name="membershipId">The Membership.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The name, or <c>null</c> when no Membership in this Space has the id.</returns>
+    Task<string?> DisplayNameOfAsync(Guid membershipId, CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// What an Ownership Offer is made and told from, beside the Space's name.
+/// </summary>
+/// <param name="RecipientAddress">The recipient's address, for the outbox alone - never answered or logged.</param>
+/// <param name="RecipientName">The recipient's display name.</param>
+/// <param name="OffererName">The offering Account's display name, or <c>null</c> when its Membership here is gone.</param>
+public sealed record OwnershipOfferNotice(string RecipientAddress, string RecipientName, string? OffererName);
 
 /// <summary>
 /// A Membership offered as an Assignee: an id and a name to show, never an address or a Role.

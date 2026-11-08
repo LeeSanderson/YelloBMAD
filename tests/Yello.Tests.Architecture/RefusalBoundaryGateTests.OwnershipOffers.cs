@@ -51,7 +51,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The offer routes are exactly <c>POST</c> on the collection, <c>GET</c> on the pending read and <c>DELETE</c> on one offer;
     /// each requires <c>OfferOwnershipTransfer</c>, none is Session-only and none consults a bound, so a Token reaches all three.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC4, AC9, AC12 - none of the three Ownership Offer routes is mapped yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-4")]
     [Trait("Requirement", "AD-1")]
@@ -75,7 +75,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The matrix's "Offer to transfer ownership" row governs exactly the three offer routes: no other route borrows it, and
     /// none of the three is folded under another capability.
     /// </summary>
-    [Fact(Skip = "red: AC12 - no endpoint requires Capability.OfferOwnershipTransfer yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-1")]
     public void OfferOwnershipTransfer_is_required_by_exactly_the_three_offer_routes()
@@ -96,7 +96,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>OwnershipOfferResponse</c> is exactly <c>Id</c>, <c>RecipientMembershipId</c>, <c>RecipientName</c>,
     /// <c>ExpiresAt</c> and <c>ReadAt</c>.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC9, AC12 - OfferOwnershipRequest and OwnershipOfferResponse are not declared yet")]
+    [Fact]
     [Trait("Requirement", "AD-23")]
     [Trait("Requirement", "FR-8")]
     public void The_ownership_offer_contracts_carry_exactly_their_named_members()
@@ -121,7 +121,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// name, the offerer's name, the link and the expiry. No Domain type can be passed in, so nothing of the Space's contents,
     /// its other Memberships or another Space can reach the email.
     /// </summary>
-    [Fact(Skip = "red: AC8 - OwnershipOfferEmail is not declared yet")]
+    [Fact]
     [Trait("Requirement", "FR-43")]
     [Trait("Requirement", "NFR-1")]
     public void The_ownership_offer_email_template_takes_the_Space_the_offerer_the_link_and_the_expiry_and_nothing_else()
@@ -148,7 +148,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The offer email's kind is a stable code beside the others: <c>OutboxKinds.OwnershipOffered</c> is
     /// <c>ownership-offered</c>, and the three kinds are distinct.
     /// </summary>
-    [Fact(Skip = "red: AC7 - OutboxKinds.OwnershipOffered is not declared yet")]
+    [Fact]
     [Trait("Requirement", "FR-43")]
     [Trait("Requirement", "AR-33")]
     public void The_ownership_offer_email_has_its_own_outbox_kind()
@@ -168,7 +168,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>OwnershipOffer.set_State</c>. Anchor: both types exist in <c>Yello.Infrastructure.Persistence</c>. The guarded insert,
     /// the supersede and the lapse may be SQL; their writers are these two types either way.
     /// </summary>
-    [Fact(Skip = "red: AC4, AC5, AC12 - OwnershipOffer, OwnershipOfferStore and OwnershipOfferWrites are not declared yet")]
+    [Fact]
     [Trait("Requirement", "AR-31")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AD-27")]
@@ -200,7 +200,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// outbox type, and no method of <c>OwnershipOfferWrites</c> takes one. Anchor: the handler exists and takes an offer port.
     /// Sibling of <c>The_revoke_handler_takes_no_outbox</c>.
     /// </summary>
-    [Fact(Skip = "red: AC7 - RevokeOwnershipOfferHandler and OwnershipOfferWrites are not declared yet")]
+    [Fact]
     [Trait("Requirement", "FR-43")]
     [Trait("Requirement", "AR-33")]
     public void The_ownership_offer_revoke_and_lapse_take_no_outbox()
@@ -223,7 +223,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// unique index <c>UX_OwnershipOffer_SpaceId_Pending</c> on <c>SpaceId</c> where the state is <c>Pending</c>; <c>State</c>
     /// stored as a string; and <c>ExpiresAt</c> generated on add from a SQL default on the database clock.
     /// </summary>
-    [Fact(Skip = "red: AC3, AC10, AC12 - OwnershipOffer and OwnershipOfferConfiguration are not declared yet (Lee's Q2 (a))")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AR-12")]
@@ -260,7 +260,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The offer's actionable predicate is the shared one, in the one file allowed to compare <c>ExpiresAt</c>:
     /// <c>OfferPredicates</c> declares a static member named <c>OwnershipOfferActionable</c> beside the Invitation's.
     /// </summary>
-    [Fact(Skip = "red: AC10 - OfferPredicates.OwnershipOfferActionable is not declared yet")]
+    [Fact]
     [Trait("Requirement", "AR-31")]
     [Trait("Requirement", "AD-27")]
     public void The_ownership_offer_actionable_predicate_lives_beside_the_Invitations()
@@ -277,7 +277,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>ownership-offer-pending</c>, <c>ownership-offer-not-pending</c> and <c>invalid-offer-recipient</c> are declared in
     /// <c>ProblemTypes</c>, and each has client copy of its own in <c>ClientCopy.resx</c> with a translator's comment.
     /// </summary>
-    [Fact(Skip = "red: AC12 - the three Ownership Offer problem types and their client copy are not declared yet")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-8")]
     public void The_ownership_offer_problem_types_are_declared_and_each_has_client_copy()
@@ -304,7 +304,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The client's predicate for showing the Ownership section agrees with the capability matrix for every Role: shown
     /// exactly where <c>OfferOwnershipTransfer</c> is not denied (the Owner), absent for an Admin, a Member and a Viewer.
     /// </summary>
-    [Fact(Skip = "red: AC9 - the client has no OfferOwnership predicate yet (OwnershipCapabilities.PermitsOfferOwnership)")]
+    [Fact]
     [Trait("Requirement", "UX-DR14")]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "AD-1")]
@@ -326,7 +326,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The Ownership section counts the days left from the server's own clock: its files exist and none of them reads a
     /// browser clock (<c>DateTime.Now</c>, <c>DateTimeOffset.Now</c>, <c>UtcNow</c> or <c>TimeProvider</c>).
     /// </summary>
-    [Fact(Skip = "red: AC9 - Yello.Client/Components/OwnershipSection.razor does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR14")]
     [Trait("Requirement", "AD-27")]
     public void The_Ownership_section_reads_no_browser_clock()

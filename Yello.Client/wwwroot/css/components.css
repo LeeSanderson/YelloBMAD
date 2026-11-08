@@ -2231,3 +2231,72 @@
     min-block-size: var(--target-min);
     min-inline-size: var(--target-min);
 }
+
+/*
+    THE OWNERSHIP SECTION OF SPACE SETTINGS (the Owner's alone): the recipient choice wraps like the invite form's Role
+    group, the confirm and the pending offer wrap onto as many lines as they need, and nothing scrolls sideways at 320px
+    (1.4.10) or under the text spacing overrides (1.4.12). Tokens and logical properties only; no icon, no transition.
+*/
+.ownership-section,
+.ownership-section__pending,
+.ownership-section__confirm {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+    min-inline-size: 0;
+}
+
+.ownership-section {
+    margin-block-start: var(--space-4);
+}
+
+.ownership-section__recipients {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
+    margin: 0;
+    padding: 0;
+    border: 0;
+    min-inline-size: 0;
+}
+
+.ownership-section__recipients > legend {
+    padding: 0;
+    margin-block-end: var(--space-1);
+}
+
+.ownership-section__recipients > .form-field__message {
+    flex-basis: 100%;
+    margin-block: 0;
+}
+
+.ownership-section__recipient {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-inline-size: var(--target-min);
+    min-block-size: var(--target-min);
+    overflow-wrap: anywhere;
+}
+
+.ownership-section__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.ownership-section__pending-text,
+.ownership-section__question,
+.ownership-section__expiry,
+.ownership-section__progress,
+.ownership-section__status {
+    margin-block: 0;
+    overflow-wrap: anywhere;
+}
+
+.ownership-section__progress,
+.ownership-section__status,
+.ownership-section__expiry {
+    color: var(--text-muted);
+}

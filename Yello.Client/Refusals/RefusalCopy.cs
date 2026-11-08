@@ -181,6 +181,21 @@ public static class RefusalCopy
     public static string OwnershipHeldKey => "ownership-held";
 
     /// <summary>
+    /// The copy key for <c>ownership-offer-pending</c>: another Ownership Offer of the Space is still pending.
+    /// </summary>
+    public static string OwnershipOfferPendingKey => "ownership-offer-pending";
+
+    /// <summary>
+    /// The copy key for <c>ownership-offer-not-pending</c>: the Ownership Offer is no longer open.
+    /// </summary>
+    public static string OwnershipOfferNotPendingKey => "ownership-offer-not-pending";
+
+    /// <summary>
+    /// The copy key for <c>400 invalid-offer-recipient</c>: the person chosen is not another Membership of this Space.
+    /// </summary>
+    public static string InvalidOfferRecipientKey => "invalid-offer-recipient";
+
+    /// <summary>
     /// The resource a refusal is rendered with.
     /// </summary>
     /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
@@ -264,6 +279,9 @@ public static class RefusalCopy
         [ProblemTypes.OwnerRoleFixed] = OwnerRoleFixedKey,
         [ProblemTypes.RoleNotAssignable] = RoleNotAssignableKey,
         [ProblemTypes.OwnershipHeld] = OwnershipHeldKey,
+        [ProblemTypes.OwnershipOfferPending] = OwnershipOfferPendingKey,
+        [ProblemTypes.OwnershipOfferNotPending] = OwnershipOfferNotPendingKey,
+        [ProblemTypes.InvalidOfferRecipient] = InvalidOfferRecipientKey,
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static string? OwnKey(string? type) =>

@@ -39,7 +39,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// new offer is <c>201</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the offer and revoke routes do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AR-12")]
@@ -86,7 +86,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="state">Which non-actionable offer.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC4, AC10 - the revoke route and its guarded statement (OwnershipOfferActionable) do not exist yet")]
+    [Theory]
     [MemberData(nameof(OffersNoLongerPending))]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-26")]
@@ -124,7 +124,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.True(anchor?.StatusCode == HttpStatusCode.NoContent, $"The anchor: {Described(anchor)}");
         Assert.True(refused?.StatusCode == HttpStatusCode.Conflict, $"Revoking the {state} offer: {Described(refused)}");
-        Assert.Equal(OwnershipOfferWire.OwnershipOfferNotPendingProblemType, ProblemType(refused));
+        Assert.Equal(ProblemTypes.OwnershipOfferNotPending, ProblemType(refused));
         Assert.DoesNotContain("@", refused.Body, StringComparison.Ordinal);
         Assert.DoesNotContain(await RefusalsOfAsync(database, ownerId), row => row.TargetSpaceId == spaceId);
         Assert.Equal(seeded, Assert.Single(await wire.OwnershipOffersInAsync(spaceId), row => row.Id == seeded!.Id));
@@ -137,7 +137,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>204</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the revoke route does not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "FR-8")]
@@ -190,7 +190,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// leaves its offer as it was.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the revoke route does not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "AD-26")]
     public async Task A_revoke_replays_under_its_key_and_a_new_key_is_refused_409_ownership_offer_not_pending()
@@ -222,7 +222,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal(answers["original"].StatusCode, answers["replay"].StatusCode);
         Assert.Equal(answers["original"].Body, answers["replay"].Body);
         Assert.True(answers["fresh"].StatusCode == HttpStatusCode.Conflict, $"A second revoke: {Described(answers["fresh"])}");
-        Assert.Equal(OwnershipOfferWire.OwnershipOfferNotPendingProblemType, ProblemType(answers["fresh"]));
+        Assert.Equal(ProblemTypes.OwnershipOfferNotPending, ProblemType(answers["fresh"]));
         Assert.True(answers["malformed"].StatusCode == HttpStatusCode.BadRequest, $"The malformed key: {Described(answers["malformed"])}");
         Assert.Equal(ProblemTypes.InvalidIdempotencyKey, ProblemType(answers["malformed"]));
         Assert.Equal(["Pending", "Revoked"], (await wire.OwnershipOffersInAsync(spaceId)).Select(row => row.State).Order(StringComparer.Ordinal));
@@ -234,7 +234,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// database clock during the request, from which the client counts the days left.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the pending read does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR14")]
     [Trait("Requirement", "AD-27")]
     [Trait("Requirement", "AD-23")]
@@ -281,7 +281,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Anchor: the same route answered <c>200</c> for a live offer in another Space of the same Owner.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9, AC10 - the pending read and OwnershipOfferActionable do not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR14")]
     [Trait("Requirement", "AD-27")]
     [Trait("Requirement", "AR-31")]
@@ -329,7 +329,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// and the offer stays <c>Pending</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9, AC12 - the pending read and the revoke route do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "UX-DR14")]
     [Trait("Requirement", "AD-1")]

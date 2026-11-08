@@ -33,7 +33,10 @@ using Yello.Application.Lists.ViewList;
 using Yello.Application.Spaces.CreateSpace;
 using Yello.Application.Spaces.DeleteSpace;
 using Yello.Application.Spaces.ListSpaces;
+using Yello.Application.Spaces.OfferOwnership;
+using Yello.Application.Spaces.ReadOwnershipOffer;
 using Yello.Application.Spaces.RenameSpace;
+using Yello.Application.Spaces.RevokeOwnershipOffer;
 using Yello.Application.Statuses.ListStatuses;
 using Yello.Application.Tasks.AssignTask;
 using Yello.Application.Tasks.CreateTask;
@@ -156,6 +159,9 @@ builder.Services.AddScoped<RemoveMembershipHandler>();
 builder.Services.AddScoped<LeaveSpaceHandler>();
 builder.Services.AddScoped<AssignTaskHandler>();
 builder.Services.AddScoped<ListAssigneesHandler>();
+builder.Services.AddScoped<OfferOwnershipHandler>();
+builder.Services.AddScoped<ReadOwnershipOfferHandler>();
+builder.Services.AddScoped<RevokeOwnershipOfferHandler>();
 builder.Services.AddScoped<ActingAuthority>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
@@ -205,6 +211,7 @@ builder.Services.AddSingleton(new InvitationLinks(usableClientOrigin));
 
 // The assignment email's link: the same origin, with nothing after it.
 builder.Services.AddSingleton(new AssignmentLinks(usableClientOrigin));
+builder.Services.AddSingleton(new OwnershipOfferLinks(usableClientOrigin));
 
 // THE EMAIL SENDER, CHOSEN BY CONFIGURATION, OR NO HOST AT ALL (story 4.1, AC11; Q13 (a)). Azure Communication
 // Services with ConnectionStrings:acs; otherwise the file drop with Email:DropFolder (Development's points at a folder
@@ -576,6 +583,18 @@ api.MapLeaveSpace();
 // under the read capability every Role holds, for the picker, the cards and the List View's Assignee filter.
 api.MapAssignTask();
 api.MapListAssignees();
+
+// Ownership Offers. POST /api/v1/spaces/{spaceId}/ownership-offers ({ membershipId }) offers the Space to another Membership
+// of it at any Role: 201 with the offer and a Location of the pending read, 400 invalid-offer-recipient (one body for a
+// missing, random, foreign or the Owner's own Membership), or 409 ownership-offer-pending. One guarded insert under the
+// Space's Memberships lock, after lapsing a pending offer past its expiry, and one email in the same unit of work. No Role
+// moves. GET .../ownership-offers/pending answers the actionable pending offer (200, with the database clock's reading) or
+// 204. DELETE .../ownership-offers/{offerId} revokes it - 204, 409 ownership-offer-not-pending, or the unrecorded boundary
+// 404 - and sends nothing. All three under OfferOwnershipTransfer (the Owner only) on both surfaces. A removal or leave of
+// the recipient lapses its offer in the same transaction.
+api.MapOfferOwnership();
+api.MapReadOwnershipOffer();
+api.MapRevokeOwnershipOffer();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

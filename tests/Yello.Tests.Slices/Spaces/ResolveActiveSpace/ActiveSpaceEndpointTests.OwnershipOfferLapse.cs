@@ -30,7 +30,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="removerRole">Who removes the recipient.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC5 - the offer route and the lapse inside RemoveCoreAsync (Lee's Q4 (a)) do not exist yet")]
+    [Theory]
     [InlineData("owner")]
     [InlineData("admin")]
     [Trait("Requirement", "FR-8")]
@@ -79,7 +79,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Membership, and the Space keeps one Owner.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the offer route and the lapse inside LeaveAsync (Lee's Q4 (a)) do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-5")]
@@ -117,7 +117,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// (<c>403</c>), so the recipient keeps its Membership and its Role and the offer stays <c>Pending</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the offer route does not exist yet, so no offer can be pending")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "FR-14")]
     [Trait("Assumption", "PRD-12-4")]
@@ -154,7 +154,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// recipient.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the offer route does not exist yet, so no offer can be pending")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "FR-14")]
     public async Task Removing_another_Member_leaves_the_offer_pending()
@@ -191,7 +191,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// and no Membership of it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the offer route and FK_OwnershipOffer_Space_SpaceId (cascade) do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-7")]
     [Trait("Requirement", "AD-5")]
     public async Task Deleting_a_Space_with_a_pending_offer_takes_the_offer_with_it()

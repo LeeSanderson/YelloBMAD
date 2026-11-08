@@ -9,17 +9,10 @@ namespace Yello.Tests.Shared;
 /// The test side of offering ownership of a Space: the offer (<c>POST /api/v1/spaces/{spaceId}/ownership-offers</c>, body
 /// <c>{ membershipId }</c>, answered <c>201</c> with the offer), the Owner's read of the pending offer
 /// (<c>GET .../ownership-offers/pending</c>, <c>200</c> or <c>204</c>), the revoke (<c>DELETE .../ownership-offers/{offerId}</c>,
-/// <c>204</c>), and the fixed values the suites assert against.
+/// <c>204</c>), and the fixed values the suites assert against. Routes and problem types are the contract's own
+/// (<c>OwnershipOfferRoutes</c>, <c>ProblemTypes</c>).
 /// </summary>
 /// <remarks>
-/// <para>
-/// <b>Temporary stand-ins</b>: <see cref="OffersRoute"/>, <see cref="PendingRoute"/>, <see cref="OfferRoute"/>, their
-/// <c>...Of</c> builders and the three problem types name members the contract does not declare yet
-/// (<c>OwnershipOfferRoutes.Offers</c> / <c>OffersOf</c>, <c>Pending</c> / <c>PendingOf</c>, <c>Offer</c> / <c>OfferOf</c>;
-/// <c>ProblemTypes.OwnershipOfferPending</c>, <c>OwnershipOfferNotPending</c>, <c>InvalidOfferRecipient</c>). When the contract
-/// declares them, every use is swapped for the contract member and the stand-in deleted. Everything else here is a lasting
-/// reading of the wire.
-/// </para>
 /// <para>
 /// <b>Bodies are JSON text or anonymous objects</b>, never a contract type, so a case can send what the route must refuse: an
 /// address instead of a Membership, no member at all, or a body that is not an object.
@@ -28,38 +21,6 @@ namespace Yello.Tests.Shared;
 public static partial class OwnershipOfferWire
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-    /// <summary>
-    /// The offer collection's pattern. Stand-in for <c>OwnershipOfferRoutes.Offers</c>.
-    /// </summary>
-    public static string OffersRoute => "/api/v1/spaces/{spaceId:guid}/ownership-offers";
-
-    /// <summary>
-    /// The pending-offer read's pattern. Stand-in for <c>OwnershipOfferRoutes.Pending</c>.
-    /// </summary>
-    public static string PendingRoute => "/api/v1/spaces/{spaceId:guid}/ownership-offers/pending";
-
-    /// <summary>
-    /// One offer's pattern, the revoke's. Stand-in for <c>OwnershipOfferRoutes.Offer</c>.
-    /// </summary>
-    public static string OfferRoute => "/api/v1/spaces/{spaceId:guid}/ownership-offers/{offerId:guid}";
-
-    /// <summary>
-    /// A second offer while one is pending. Stand-in for <c>ProblemTypes.OwnershipOfferPending</c>.
-    /// </summary>
-    public static string OwnershipOfferPendingProblemType => "urn:yello:problem:ownership-offer-pending";
-
-    /// <summary>
-    /// A transition of an offer that is no longer pending (revoked, lapsed, accepted, declined or expired). Stand-in for
-    /// <c>ProblemTypes.OwnershipOfferNotPending</c>.
-    /// </summary>
-    public static string OwnershipOfferNotPendingProblemType => "urn:yello:problem:ownership-offer-not-pending";
-
-    /// <summary>
-    /// A recipient that is not another Membership of this Space: unknown, another Space's, the Owner's own, or no
-    /// <c>membershipId</c> at all. One body for every one. Stand-in for <c>ProblemTypes.InvalidOfferRecipient</c>.
-    /// </summary>
-    public static string InvalidOfferRecipientProblemType => "urn:yello:problem:invalid-offer-recipient";
 
     /// <summary>
     /// The capability every offer route declares, as a <c>403</c> body names it: the matrix's "Offer to transfer ownership".
@@ -81,28 +42,6 @@ public static partial class OwnershipOfferWire
     /// ExpiresAt, ReadAt)</c>. Never an address, a Role, an Account id or a Space id.
     /// </summary>
     public static IReadOnlyList<string> ResponseMembers { get; } = ["expiresAt", "id", "readAt", "recipientMembershipId", "recipientName"];
-
-    /// <summary>
-    /// The offer collection of one Space. Stand-in for <c>OwnershipOfferRoutes.OffersOf</c>.
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <returns>The path.</returns>
-    public static string OffersOf(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}/ownership-offers";
-
-    /// <summary>
-    /// The pending-offer read of one Space. Stand-in for <c>OwnershipOfferRoutes.PendingOf</c>.
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <returns>The path.</returns>
-    public static string PendingOf(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}/ownership-offers/pending";
-
-    /// <summary>
-    /// One offer of one Space. Stand-in for <c>OwnershipOfferRoutes.OfferOf</c>.
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <param name="offerId">The offer.</param>
-    /// <returns>The path.</returns>
-    public static string OfferOf(Guid spaceId, Guid offerId) => $"/api/v1/spaces/{spaceId:D}/ownership-offers/{offerId:D}";
 
     /// <summary>
     /// The offer body: <c>{ membershipId }</c>.

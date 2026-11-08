@@ -1,0 +1,648 @@
+@using System.Globalization
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Spaces
+@using Yello.Contracts
+@using Yello.Contracts.Memberships
+@using Yello.Contracts.Spaces
+
+@implements IDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceWrites Writes
+
+@*
+    THE OWNERSHIP SECTION OF SPACE SETTINGS - FR-8, UX-DR14, UX-DR27.
+
+    THE OWNER'S ALONE. Space settings renders this only when OwnershipCapabilities.PermitsOfferOwnership; for an Admin, a
+    Member or a Viewer it is absent from the DOM, never disabled, and nothing is asked for.
+
+    NO OFFER: a radio group over the Space's Memberships other than the Owner's, each by its disambiguated label and never
+    its address, with NO option checked - the choice is consequential (EXPERIENCE.md:211). "Offer ownership" replaces the
+    form in place with a confirm naming the Space and the recipient; focus goes to its text, so neither choice is
+    pre-focused. One Idempotency-Key per deliberate Offer, kept for an identical resend after no answer.
+
+    PENDING: the recipient's label, and the days left counted as ExpiresAt minus ReadAt - both the server's clock - never
+    the browser's, with the absolute expiry in a time element. Revoke asks nothing first: it is undone by a new offer and is
+    not on the destructive ladder (EXPERIENCE.md:220). After a revoke the picker returns with nothing checked, the revoke is
+    announced with no name, and focus goes to the picker.
+
+    NOT OPTIMISTIC: the section changes only when the server answers. 409 ownership-offer-pending or
+    ownership-offer-not-pending reads the pending offer again; 400 invalid-offer-recipient says so and reads the picker
+    again; 403 asks the page to read the Role again; 404 is the Space refusal surface. PURGED WITH THE SPACE.
+*@
+
+<div class="ownership-section">
+    <h2 class="type-space-name">@Localizer["OwnershipHeading"]</h2>
+
+    <LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
+
+    @if (IsLoading)
+    {
+        <div class="ownership-section__loading" aria-busy="true">
+            <p class="visually-hidden">@Localizer["OwnershipLoading"]</p>
+        </div>
+    }
+
+    @if (_pending is { } pending)
+    {
+        <div class="ownership-section__pending">
+            <p class="ownership-section__pending-text" tabindex="-1" @ref="_pendingText">@PendingText(pending)</p>
+            <p class="ownership-section__expiry type-meta">
+                @Remaining(pending) · <time datetime="@MachineTime(pending)">@LocalTime(pending)</time>
+            </p>
+
+            @if (!_revoking)
+            {
+                <button type="button" class="button-secondary" @onclick="RevokeAsync">@Localizer["OwnershipRevoke"]</button>
+            }
+
+            @if (_revoking)
+            {
+                <p class="ownership-section__progress" role="status">@Localizer["OwnershipRevoking"]</p>
+            }
+        </div>
+    }
+
+    @if (ShowsPicker)
+    {
+        <fieldset class="ownership-section__recipients" tabindex="-1" aria-describedby="@(_recipientMessage is not null ? RecipientMessageId : null)" @ref="_picker">
+            <legend class="form-field__label">@Localizer["OwnershipRecipientLegend"]</legend>
+
+            @foreach (var (id, label) in _recipients ?? [])
+            {
+                <label class="ownership-section__recipient">
+                    <input type="radio" name="@_groupName" value="@id" checked="@(_chosen == id)" @onchange="() => Choose(id)" />
+                    @label
+                </label>
+            }
+
+            @if (_recipientMessage is { } recipientMessage)
+            {
+                <p class="form-field__message" id="@RecipientMessageId">@recipientMessage</p>
+            }
+        </fieldset>
+
+        <div class="ownership-section__actions">
+            <button type="button" class="button-secondary" @onclick="AskToOffer">@Localizer["OwnershipOffer"]</button>
+        </div>
+    }
+
+    @if (_confirming && _chosen is { } chosen)
+    {
+        <div class="ownership-section__confirm" @onkeydown="ConfirmKeyDown">
+            <p class="ownership-section__question" tabindex="-1" @ref="_question">@Question(chosen)</p>
+
+            @if (!_offering)
+            {
+                <div class="ownership-section__actions">
+                    <button type="button" class="button-primary" @onclick="OfferAsync">@Localizer["OwnershipOfferConfirm"]</button>
+                    <button type="button" class="button-secondary" @onclick="CancelOffer">@Localizer["OwnershipOfferCancel"]</button>
+                </div>
+            }
+
+            @if (_offering)
+            {
+                <p class="ownership-section__progress" role="status">@Localizer["OwnershipOffering"]</p>
+            }
+        </div>
+    }
+
+    @if (_status is { } status)
+    {
+        <p class="ownership-section__status" role="status">@status</p>
+    }
+</div>
+
+@code {
+    private const string RecipientMessageId = "ownership-recipient-message";
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    // A group name no browser's autofill would match to a saved value: random per render.
+    private readonly string _groupName = Guid.NewGuid().ToString("N");
+
+    private IDisposable? _purgeRegistration;
+
+    /// <summary>
+    /// Bumped by every purge and by disposal. An answer that started before one is dropped when it arrives.
+    /// </summary>
+    private int _generation;
+
+    private bool _pendingRead;
+    private OwnershipOfferResponse? _pending;
+    private List<(Guid Id, string Label)>? _recipients;
+    private Dictionary<Guid, string> _labels = [];
+    private Guid? _chosen;
+    private bool _confirming;
+    private bool _offering;
+    private bool _revoking;
+    private string? _recipientMessage;
+    private string? _status;
+    private string? _announcement;
+    private int _announcements;
+
+    // The key of the last Offer that got no answer, and the recipient it was for: an identical resend reuses it.
+    private (Guid Recipient, string Key)? _offerKey;
+
+    private ElementReference _question;
+    private ElementReference _pendingText;
+    private ElementReference _picker;
+    private bool _focusQuestion;
+    private bool _focusPending;
+    private bool _focusPicker;
+
+    /// <summary>The Space whose ownership is offered - the route's, which the pipeline resolves.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>The Space's name, as the confirm states it.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string SpaceName { get; set; } = string.Empty;
+
+    /// <summary>Raised when the server refuses the Space itself, so the page renders the one refusal surface.</summary>
+    [Parameter]
+    public EventCallback<ProblemResponse?> OnSpaceRefused { get; set; }
+
+    /// <summary>Raised on a 403: the Role held may have changed, so the page reads it again.</summary>
+    [Parameter]
+    public EventCallback OnRoleDoubted { get; set; }
+
+    private bool IsLoading => !_pendingRead || (_pending is null && _recipients is null);
+
+    private bool ShowsPicker => _pendingRead && _pending is null && _recipients is not null && !_confirming;
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _purgeRegistration = ActiveSpace.RegisterPurge(Purge);
+
+        var generation = _generation;
+
+        await Task.WhenAll(ReadPendingAsync(generation), ReadRecipientsAsync(generation));
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _generation++;
+        _purgeRegistration?.Dispose();
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusQuestion && _confirming)
+        {
+            _focusQuestion = false;
+            await _question.FocusAsync();
+        }
+
+        if (_focusPending && _pending is not null)
+        {
+            _focusPending = false;
+            await _pendingText.FocusAsync();
+        }
+
+        if (_focusPicker && ShowsPicker)
+        {
+            _focusPicker = false;
+            await _picker.FocusAsync();
+        }
+    }
+
+    /// <summary>
+    /// The Space is being left: the recipients, the pending offer and anything in flight go synchronously.
+    /// </summary>
+    private void Purge()
+    {
+        _generation++;
+        _pendingRead = false;
+        _pending = null;
+        _recipients = null;
+        _labels = [];
+        _chosen = null;
+        _confirming = false;
+        _offerKey = null;
+        _recipientMessage = null;
+        _status = null;
+        _announcement = null;
+        _announcements++;
+    }
+
+    /// <summary>
+    /// The days left, counted from the server's own reading of its clock - never the browser's.
+    /// </summary>
+    private string Remaining(OwnershipOfferResponse offer)
+    {
+        var days = (int)Math.Floor((offer.ExpiresAt - offer.ReadAt).TotalDays);
+
+        return days switch
+        {
+            < 1 => Localizer["OwnershipExpiresToday"],
+            1 => Localizer["OwnershipExpiresInOneDay"],
+            _ => string.Format(CultureInfo.CurrentCulture, Localizer["OwnershipExpiresInDays"], days),
+        };
+    }
+
+    private static string MachineTime(OwnershipOfferResponse offer) => offer.ExpiresAt.ToString("O", CultureInfo.InvariantCulture);
+
+    private static string LocalTime(OwnershipOfferResponse offer) => offer.ExpiresAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+
+    private string PendingText(OwnershipOfferResponse offer) =>
+        string.Format(CultureInfo.CurrentCulture, Localizer["OwnershipPending"], LabelOf(offer.RecipientMembershipId, offer.RecipientName));
+
+    private string Question(Guid recipient) =>
+        string.Format(CultureInfo.CurrentCulture, Localizer["OwnershipOfferQuestion"], SpaceName, LabelOf(recipient, string.Empty));
+
+    private string LabelOf(Guid membershipId, string fallback) =>
+        _labels.TryGetValue(membershipId, out var label) ? label : fallback;
+
+    private async Task ReadPendingAsync(int generation)
+    {
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(OwnershipOfferRoutes.PendingOf(SpaceId), UriKind.Relative), token);
+
+            if (generation != _generation || token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.NoContent)
+            {
+                _pending = null;
+                _pendingRead = true;
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                _pending = await response.Content.ReadFromJsonAsync<OwnershipOfferResponse>(JsonOptions, token);
+                _pendingRead = true;
+                return;
+            }
+
+            await RefusedReadAsync(response, token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended: both purges have run.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            if (generation == _generation && !_pendingRead)
+            {
+                await OnSpaceRefused.InvokeAsync(null);
+            }
+        }
+    }
+
+    /// <summary>
+    /// The Space's Memberships, every page, as labels: the Owner's own row is never a recipient.
+    /// </summary>
+    private async Task ReadRecipientsAsync(int generation)
+    {
+        var token = ActiveSpace.Token;
+        List<MembershipResponse>? rows;
+
+        try
+        {
+            rows = await ReadMembershipsAsync(generation, token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            return;
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            if (generation == _generation && _recipients is null)
+            {
+                await OnSpaceRefused.InvokeAsync(null);
+            }
+
+            return;
+        }
+
+        if (rows is null || generation != _generation)
+        {
+            return;
+        }
+
+        _labels = new Dictionary<Guid, string>(MembershipLabels.Disambiguate([.. rows.Select(row => (row.Id, row.DisplayName))]));
+        _recipients = [.. rows.Where(row => !row.IsYou && row.Role != "owner").Select(row => (row.Id, _labels[row.Id]))];
+
+        if (_chosen is { } chosen && !_recipients.Exists(recipient => recipient.Id == chosen))
+        {
+            _chosen = null;
+        }
+    }
+
+    /// <summary>
+    /// Every page of the Space's Memberships, or <c>null</c> when the read was refused or overtaken by a purge.
+    /// </summary>
+    private async Task<List<MembershipResponse>?> ReadMembershipsAsync(int generation, CancellationToken token)
+    {
+        var rows = new List<MembershipResponse>();
+        string? after = null;
+
+        do
+        {
+            using var response = await Http.GetAsync(new Uri(MembershipRoutes.MembershipsOf(SpaceId, after), UriKind.Relative), token);
+
+            if (generation != _generation || token.IsCancellationRequested)
+            {
+                return null;
+            }
+
+            if (!response.IsSuccessStatusCode)
+            {
+                await RefusedReadAsync(response, token);
+                return null;
+            }
+
+            var page = await response.Content.ReadFromJsonAsync<MembershipPageResponse>(JsonOptions, token);
+
+            rows.AddRange(page?.Memberships ?? []);
+            after = page?.NextAfter;
+        }
+        while (after is not null);
+
+        return rows;
+    }
+
+    /// <summary>
+    /// A refused read: a 404 is the Space refusal surface; a 403 asks the page to read the Role again. A 401 is
+    /// YelloApiHandler's.
+    /// </summary>
+    private async Task RefusedReadAsync(HttpResponseMessage response, CancellationToken token)
+    {
+        if (response.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            return;
+        }
+
+        var problem = await SpaceWrites.ProblemOfAsync(response, token);
+
+        if (response.StatusCode == HttpStatusCode.Forbidden)
+        {
+            _status = RefusalText.Of(Localizer, problem);
+            await OnRoleDoubted.InvokeAsync();
+            return;
+        }
+
+        await OnSpaceRefused.InvokeAsync(problem);
+    }
+
+    private void Choose(Guid membershipId)
+    {
+        _chosen = membershipId;
+        _recipientMessage = null;
+    }
+
+    private void AskToOffer()
+    {
+        _status = null;
+
+        if (_chosen is null)
+        {
+            _recipientMessage = Localizer["OwnershipRecipientRequired"];
+            return;
+        }
+
+        _recipientMessage = null;
+        _confirming = true;
+        _focusQuestion = true;
+    }
+
+    private void CancelOffer()
+    {
+        _confirming = false;
+        _focusPicker = true;
+    }
+
+    private void ConfirmKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape" && !_offering)
+        {
+            CancelOffer();
+        }
+    }
+
+    private async Task OfferAsync()
+    {
+        if (_offering || _chosen is not { } recipient)
+        {
+            return;
+        }
+
+        if (_offerKey is not { } kept || kept.Recipient != recipient)
+        {
+            _offerKey = (recipient, Guid.NewGuid().ToString("D"));
+        }
+
+        _offering = true;
+        _status = null;
+
+        var generation = _generation;
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var answer = await Writes.SendAsync(HttpMethod.Post, OwnershipOfferRoutes.OffersOf(SpaceId), new OfferOwnershipRequest(recipient), _offerKey.Value.Key, token);
+
+            if (generation == _generation)
+            {
+                await UseOfferAnswerAsync(answer, generation, token);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // No answer: the confirm stays, and the key is kept for the resend.
+            if (generation == _generation)
+            {
+                _status = Localizer["TaskEditNotSent"];
+            }
+        }
+        finally
+        {
+            if (generation == _generation)
+            {
+                _offering = false;
+            }
+        }
+    }
+
+    private async Task UseOfferAnswerAsync(SpaceWriteAnswer answer, int generation, CancellationToken token)
+    {
+        if (answer.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            return;
+        }
+
+        if (answer.StatusCode >= HttpStatusCode.InternalServerError)
+        {
+            // The outcome is not known: treated as no answer, so the key is kept.
+            _status = Localizer["TaskEditNotSent"];
+            return;
+        }
+
+        _offerKey = null;
+
+        if (answer.StatusCode == HttpStatusCode.Created)
+        {
+            _pending = await answer.Response.Content.ReadFromJsonAsync<OwnershipOfferResponse>(JsonOptions, token);
+            Settled();
+            _focusPending = true;
+            Say(Localizer["OwnershipOffered"]);
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.NotFound)
+        {
+            await OnSpaceRefused.InvokeAsync(answer.Problem);
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.Forbidden)
+        {
+            Settled();
+            _status = RefusalText.Of(Localizer, answer.Problem);
+            await OnRoleDoubted.InvokeAsync();
+            return;
+        }
+
+        var type = answer.Problem?.Type;
+
+        if (string.Equals(type, ProblemTypes.OwnershipOfferPending, StringComparison.Ordinal))
+        {
+            Settled();
+            await ReadPendingAsync(generation);
+            _focusPending = true;
+            return;
+        }
+
+        if (string.Equals(type, ProblemTypes.InvalidOfferRecipient, StringComparison.Ordinal))
+        {
+            Settled();
+            _chosen = null;
+            _status = RefusalText.Of(Localizer, answer.Problem);
+            await ReadRecipientsAsync(generation);
+            _focusPicker = true;
+            return;
+        }
+
+        _status = RefusalText.Of(Localizer, answer.Problem);
+    }
+
+    /// <summary>
+    /// The confirm closes and the choice is forgotten, whatever the answer was.
+    /// </summary>
+    private void Settled()
+    {
+        _confirming = false;
+        _chosen = null;
+    }
+
+    private async Task RevokeAsync()
+    {
+        if (_revoking || _pending is not { } pending)
+        {
+            return;
+        }
+
+        _revoking = true;
+        _status = null;
+
+        var generation = _generation;
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Delete, OwnershipOfferRoutes.OfferOf(SpaceId, pending.Id), Guid.NewGuid().ToString("D"), token);
+
+            if (generation == _generation)
+            {
+                await UseRevokeAnswerAsync(answer, generation);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            if (generation == _generation)
+            {
+                _status = Localizer["TaskEditNotSent"];
+            }
+        }
+        finally
+        {
+            if (generation == _generation)
+            {
+                _revoking = false;
+            }
+        }
+    }
+
+    private async Task UseRevokeAnswerAsync(SpaceWriteAnswer answer, int generation)
+    {
+        if (answer.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.NoContent)
+        {
+            _pending = null;
+            _focusPicker = true;
+            Say(Localizer["OwnershipOfferRevoked"]);
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.NotFound)
+        {
+            await OnSpaceRefused.InvokeAsync(answer.Problem);
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.Forbidden)
+        {
+            _status = RefusalText.Of(Localizer, answer.Problem);
+            await OnRoleDoubted.InvokeAsync();
+            return;
+        }
+
+        if (string.Equals(answer.Problem?.Type, ProblemTypes.OwnershipOfferNotPending, StringComparison.Ordinal))
+        {
+            await ReadPendingAsync(generation);
+            _status = RefusalText.Of(Localizer, answer.Problem);
+            _focusPicker = _pending is null;
+            _focusPending = _pending is not null;
+            return;
+        }
+
+        _status = RefusalText.Of(Localizer, answer.Problem);
+    }
+
+    /// <summary>
+    /// Says a sentence politely - the same one again included.
+    /// </summary>
+    private void Say(string words)
+    {
+        _announcement = words;
+        _announcements++;
+    }
+}

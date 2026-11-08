@@ -473,4 +473,34 @@ public static class ProblemTypes
     /// <see cref="InsufficientRole"/> instead.
     /// </remarks>
     public static string OwnershipHeld => "urn:yello:problem:ownership-held";
+
+    /// <summary>
+    /// An Ownership Offer while another offer of the Space is still pending. Answered <c>409</c>; nothing is written.
+    /// </summary>
+    /// <remarks>
+    /// <b>Disclosable</b>: only the Owner can make or see an offer. The body names neither the pending offer's recipient nor
+    /// any address. A unique index on the pending offer is the guarantee; this is its answer.
+    /// </remarks>
+    public static string OwnershipOfferPending => "urn:yello:problem:ownership-offer-pending";
+
+    /// <summary>
+    /// The Ownership Offer a transition named is no longer pending: revoked, lapsed, accepted, declined or expired. Answered
+    /// <c>409</c>; nothing is written.
+    /// </summary>
+    /// <remarks>
+    /// <b>Disclosable</b>: the caller could see the offer while it was pending (AD-26: a transition refused because the offer
+    /// left <c>Pending</c> is <c>409</c>, never <c>404</c>). One type for every reason; the body names neither the state nor
+    /// the recipient. An id that names no offer in this Space is the boundary's <c>404</c> instead.
+    /// </remarks>
+    public static string OwnershipOfferNotPending => "urn:yello:problem:ownership-offer-not-pending";
+
+    /// <summary>
+    /// An Ownership Offer whose body names no other Membership of the Space: no <c>membershipId</c>, an unknown id, another
+    /// Space's Membership, or the Owner's own. Answered <c>400</c>; nothing is written.
+    /// </summary>
+    /// <remarks>
+    /// <b>The same bytes for every cause</b>, so a random id and another Space's real Membership id cannot be told apart. It is
+    /// not a <c>404</c>: the Space is present.
+    /// </remarks>
+    public static string InvalidOfferRecipient => "urn:yello:problem:invalid-offer-recipient";
 }

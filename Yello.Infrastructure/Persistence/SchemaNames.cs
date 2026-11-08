@@ -223,6 +223,17 @@ public static class SchemaNames
     public static string MembershipOwnerUniqueIndex => "UX_Membership_SpaceId_Owner";
 
     /// <summary>
+    /// The Ownership Offer table. Space-scoped, with the same three predicates as the Invitation's.
+    /// </summary>
+    public static string OwnershipOfferTable => "OwnershipOffer";
+
+    /// <summary>
+    /// The filtered unique index that makes "at most one pending Ownership Offer per Space" a database fact, for the reason
+    /// <see cref="MembershipOwnerUniqueIndex"/> makes "one Owner" one: no application check holds under concurrency.
+    /// </summary>
+    public static string OwnershipOfferPendingUniqueIndex => "UX_OwnershipOffer_SpaceId_Pending";
+
+    /// <summary>
     /// The tables this story gives a row-level security policy, in the order the policy names
     /// them.
     /// </summary>
@@ -240,5 +251,5 @@ public static class SchemaNames
     /// reader would have acted on.
     /// </remarks>
     public static IReadOnlyList<string> SpaceScopedTables { get; } =
-        [MembershipTable, StatusDefinitionTable, SpacePresenceTable, ProjectTable, IdempotencyRecordTable, TaskTable, LabelTable, TaskLabelTable, InvitationTable, NotificationSendTable];
+        [MembershipTable, StatusDefinitionTable, SpacePresenceTable, ProjectTable, IdempotencyRecordTable, TaskTable, LabelTable, TaskLabelTable, InvitationTable, NotificationSendTable, OwnershipOfferTable];
 }

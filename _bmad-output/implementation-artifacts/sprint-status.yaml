@@ -121,7 +121,7 @@ development_status:
 
   # Epic 5: Hand a Space over and leave cleanly
   epic-5: in-progress
-  5-1-offer-ownership-of-a-space-and-tell-the-recipient: ready-for-dev
+  5-1-offer-ownership-of-a-space-and-tell-the-recipient: review
   5-2-accept-an-ownership-offer: backlog
   5-3-decline-revoke-lapse-and-the-states-that-are-no-longer-open: backlog
   5-4-delete-your-account: backlog

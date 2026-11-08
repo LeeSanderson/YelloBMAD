@@ -58,6 +58,7 @@ public sealed partial class ActiveSpaceEndpointTests
         new MatrixRoute(Capability.RemoveMembership, "DELETE", MembershipRoutes.Membership, HttpStatusCode.NoContent),
         new MatrixRoute(Capability.RenameSpace, "PATCH", SpaceRoutes.Active, HttpStatusCode.OK),
         new MatrixRoute(Capability.DeleteSpace, "DELETE", SpaceRoutes.Active, HttpStatusCode.NoContent),
+        new MatrixRoute(Capability.OfferOwnershipTransfer, "POST", OwnershipOfferRoutes.Offers, HttpStatusCode.Created),
         new MatrixRoute(Capability.IssueApiTokenForOneself, "POST", ApiTokenRoutes.Issue, HttpStatusCode.Created, SessionOnly: true),
     ];
 
@@ -266,6 +267,9 @@ public sealed partial class ActiveSpaceEndpointTests
                     SendAsAsync(actor, viaToken, HttpMethod.Delete, SpaceRoutes.ActiveOf(actor.Role == Role.Owner && !viaToken ? second : spaceId), body: null));
             }
 
+            case Capability.OfferOwnershipTransfer:
+                return OwnershipOfferProbe(spaceId, owner, world.Actors.Single(actor => actor.Role == Role.Admin));
+
             case Capability.IssueApiTokenForOneself:
                 return new MatrixProbe((actor, viaToken) => SendAsAsync(actor, viaToken, HttpMethod.Post, ApiTokenRoutes.IssueIn(spaceId), JsonContent.Create(new IssueApiTokenRequest("matrix " + Suffix()), options: JsonOptions)));
 
@@ -313,6 +317,25 @@ public sealed partial class ActiveSpaceEndpointTests
                 return SendAsAsync(actor, viaToken, HttpMethod.Delete, MembershipRoutes.MembershipOf(spaceId, target.MembershipId), body: null);
             },
             (actor, viaToken) => SendAsAsync(actor, viaToken, HttpMethod.Delete, MembershipRoutes.MembershipOf(spaceId, otherAdmin.MembershipId), body: null));
+
+    /// <summary>
+    /// The Ownership Offer: every Role offers ownership to <paramref name="recipient"/>. A success is revoked at once by the
+    /// Owner's Session, so the Space's one pending place is free for the next cell.
+    /// </summary>
+    private static MatrixProbe OwnershipOfferProbe(Guid spaceId, MatrixActor owner, MatrixActor recipient) =>
+        new(async (actor, viaToken) =>
+        {
+            var answer = await SendAsAsync(actor, viaToken, HttpMethod.Post, OwnershipOfferRoutes.OffersOf(spaceId), OwnershipOfferWire.Body(recipient.MembershipId));
+
+            if (answer.StatusCode == HttpStatusCode.Created)
+            {
+                var revoked = await SendAsAsync(owner, viaToken: false, HttpMethod.Delete, OwnershipOfferRoutes.OfferOf(spaceId, OwnershipOfferWire.Parse(answer.Body).Id), body: null);
+
+                Assert.True(revoked.StatusCode == HttpStatusCode.NoContent, $"Revoking the matrix's offer: {Described(revoked)}");
+            }
+
+            return answer;
+        });
 
     /// <summary>
     /// The request as the Session sends it (cookie and anti-forgery header) or as a script sends it (the actor's Token as a

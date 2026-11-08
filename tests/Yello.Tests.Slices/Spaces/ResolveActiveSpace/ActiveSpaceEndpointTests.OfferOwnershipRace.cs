@@ -2,6 +2,7 @@ using System.Net;
 using Xunit;
 using Yello.Tests.Shared;
 using TaskWire = Yello.Tests.Slices.Tasks.TaskWire;
+using Yello.Contracts;
 
 namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 
@@ -31,7 +32,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// recipient (<c>204</c>, <c>400 invalid-offer-recipient</c>, no offer). Either way M is gone and no pending offer names it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - the offer route, its Memberships lock (Lee's Q5 (a)) and the lapse do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-26")]
@@ -89,7 +90,7 @@ public sealed partial class ActiveSpaceEndpointTests
         }
         else
         {
-            Assert.Equal(OwnershipOfferWire.InvalidOfferRecipientProblemType, ProblemType(offered));
+            Assert.Equal(ProblemTypes.InvalidOfferRecipient, ProblemType(offered));
             Assert.Empty(offers);
         }
 
@@ -104,7 +105,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>Pending</c> row, naming the winner's recipient.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AC13 - the offer route, its lock and UX_OwnershipOffer_SpaceId_Pending do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AR-12")]
@@ -146,7 +147,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var winner = Assert.Single(raced, answer => answer.StatusCode == HttpStatusCode.Created);
         var loser = Assert.Single(raced, answer => answer.StatusCode == HttpStatusCode.Conflict);
 
-        Assert.Equal(OwnershipOfferWire.OwnershipOfferPendingProblemType, ProblemType(loser));
+        Assert.Equal(ProblemTypes.OwnershipOfferPending, ProblemType(loser));
 
         var pending = Assert.Single(await wire.OwnershipOffersInAsync(spaceId));
 
@@ -161,7 +162,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// one terminal state, and the recipient is gone.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4, AC5, AC13 - the revoke route, its lock and the lapse in LeaveAsync do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-26")]
@@ -219,7 +220,7 @@ public sealed partial class ActiveSpaceEndpointTests
         else
         {
             Assert.True(revoked.StatusCode == HttpStatusCode.Conflict, "The revoke answers 204 (first) or 409 (second). " + compared);
-            Assert.Equal(OwnershipOfferWire.OwnershipOfferNotPendingProblemType, ProblemType(revoked));
+            Assert.Equal(ProblemTypes.OwnershipOfferNotPending, ProblemType(revoked));
             Assert.True(state == "Lapsed", "The leave ran first, so the offer is Lapsed. " + compared);
         }
 

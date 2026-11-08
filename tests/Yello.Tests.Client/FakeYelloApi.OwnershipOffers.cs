@@ -25,8 +25,7 @@ namespace Yello.Tests.Client;
 /// </para>
 /// <para>
 /// <b>The fake's clock is the server's, never the browser's.</b> <see cref="ServerNow"/> is fixed by the case, so a case can
-/// set the browser clock somewhere else entirely and see which clock the page counts from. The routes are
-/// <see cref="OwnershipOfferWire"/>'s stand-ins until the contract declares <c>OwnershipOfferRoutes</c>.
+/// set the browser clock somewhere else entirely and see which clock the page counts from.
 /// </para>
 /// </remarks>
 internal sealed partial class FakeYelloApi
@@ -61,7 +60,7 @@ internal sealed partial class FakeYelloApi
     /// <param name="spaceId">The Space.</param>
     /// <returns>The requests.</returns>
     public IReadOnlyList<FakeRequest> OwnershipOffersSent(Guid spaceId) =>
-        [.. _requests.Where(request => request.Method == "POST" && request.Path == OwnershipOfferWire.OffersOf(spaceId))];
+        [.. _requests.Where(request => request.Method == "POST" && request.Path == OwnershipOfferRoutes.OffersOf(spaceId))];
 
     /// <summary>
     /// Every revoke sent in <paramref name="spaceId"/>, in order.
@@ -133,12 +132,12 @@ internal sealed partial class FakeYelloApi
 
         if (recipient is null)
         {
-            return (400, Problem(OwnershipOfferWire.InvalidOfferRecipientProblemType));
+            return (400, Problem(ProblemTypes.InvalidOfferRecipient));
         }
 
         if (PendingOffers.ContainsKey(spaceId))
         {
-            return (409, Problem(OwnershipOfferWire.OwnershipOfferPendingProblemType));
+            return (409, Problem(ProblemTypes.OwnershipOfferPending));
         }
 
         var offer = (Id: Guid.NewGuid(), RecipientMembershipId: recipient.Id, RecipientName: recipient.DisplayName, ExpiresAt: ServerNow + OfferLifetime, ReadAt: ServerNow);
@@ -164,7 +163,7 @@ internal sealed partial class FakeYelloApi
         }
 
         return _closedOffers.TryGetValue(spaceId, out var closed) && closed.Contains(offerId)
-            ? (409, Problem(OwnershipOfferWire.OwnershipOfferNotPendingProblemType))
+            ? (409, Problem(ProblemTypes.OwnershipOfferNotPending))
             : (404, Problem(ProblemTypes.NotAvailable));
     }
 

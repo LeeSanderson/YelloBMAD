@@ -56,7 +56,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>ApiToken</c> (no policy, keyed <c>BoundSpaceId</c>) and <c>AccessRefusal</c> (no policy, no FK) are read apart.
     /// </summary>
     private static readonly string[] SpaceScopedTables =
-        ["Membership", "Project", "Task", "TaskLabel", "Label", "StatusDefinition", "SpacePresence", "IdempotencyRecord"];
+        ["Membership", "Project", "Task", "TaskLabel", "Label", "StatusDefinition", "SpacePresence", "IdempotencyRecord", "OwnershipOffer"];
 
     /// <summary>
     /// AC1, AC4, AC10, FR-7, §6.2, V-3 - the Owner deletes a populated Space (two Projects, a Task on every Status, an
@@ -668,6 +668,15 @@ public sealed partial class ActiveSpaceEndpointTests
 
         _ = TaskWire.IdOf(await TaskWire.CreateTaskAsync(inSpace, spaceId, second, "In Beacon"));
 
+        // A pending Ownership Offer to the Member, made through the product: its only key is the cascade from Space.
+        var offered = await owner.Session.SendWithHeadersAsync(
+            HttpMethod.Post,
+            OwnershipOfferRoutes.OffersOf(spaceId),
+            OwnershipOfferWire.Body(await MembershipIdOfAsync(database, spaceId, member.AccountId)),
+            KeyHeaders(Guid.NewGuid().ToString("D")));
+
+        Assert.True(offered.StatusCode == HttpStatusCode.Created, $"Offering ownership in the populated Space: {Described(offered)}");
+
         var ownerToken = await TaskWire.IssueTokenAsync(owner, spaceId);
         var memberToken = await TaskWire.IssueTokenAsync(member, spaceId);
         var ownerKeptToken = await TaskWire.IssueTokenAsync(owner, owner.SpaceId);
@@ -703,6 +712,18 @@ public sealed partial class ActiveSpaceEndpointTests
             await CountAsync(unscoped, "SELECT COUNT(*) FROM dbo.[ApiToken] WHERE BoundSpaceId = @space", spaceId),
             await CountAsync(unscoped, "SELECT COUNT(*) FROM dbo.[Space] WHERE Id = @space", spaceId),
             await CountAsync(unscoped, "SELECT COUNT(*) FROM dbo.[AccessRefusal] WHERE TargetSpaceId = @space", spaceId));
+    }
+
+    private static async Task<Guid> MembershipIdOfAsync(RegistrationDatabase database, Guid spaceId, Guid accountId)
+    {
+        await using var scoped = await database.OpenForSpaceAsync(spaceId, TestContext.Current.CancellationToken);
+        await using var command = scoped.CreateCommand();
+
+        command.CommandText = "SELECT Id FROM dbo.[Membership] WHERE SpaceId = @space AND AccountId = @account";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+        command.Parameters.Add(new SqlParameter("@account", accountId));
+
+        return Assert.IsType<Guid>(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken));
     }
 
     private static async Task<int> CountAsync(SqlConnection connection, string sql, Guid spaceId)

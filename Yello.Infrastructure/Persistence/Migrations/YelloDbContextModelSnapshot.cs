@@ -284,6 +284,51 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.ToTable("Project", (string)null);
                 });
 
+            modelBuilder.Entity("Yello.Domain.Spaces.OwnershipOffer", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("DATEADD(day, 7, SYSDATETIMEOFFSET())");
+
+                    b.Property<Guid>("OfferedByMembershipId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("OffererName")
+                        .IsRequired()
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<Guid>("RecipientMembershipId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("SpaceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("SpaceId");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SpaceId")
+                        .IsUnique()
+                        .HasDatabaseName("UX_OwnershipOffer_SpaceId_Pending")
+                        .HasFilter("[State] = N'Pending'");
+
+                    b.HasIndex("SpaceId", "RecipientMembershipId");
+
+                    b.ToTable("OwnershipOffer", (string)null);
+                });
+
             modelBuilder.Entity("Yello.Domain.Spaces.Space", b =>
                 {
                     b.Property<Guid>("Id")
@@ -696,6 +741,15 @@ namespace Yello.Infrastructure.Persistence.Migrations
                 });
 
             modelBuilder.Entity("Yello.Domain.Projects.Project", b =>
+                {
+                    b.HasOne("Yello.Domain.Spaces.Space", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Yello.Domain.Spaces.OwnershipOffer", b =>
                 {
                     b.HasOne("Yello.Domain.Spaces.Space", null)
                         .WithMany()

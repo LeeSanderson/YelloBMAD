@@ -51,7 +51,9 @@ namespace Yello.Infrastructure.Persistence;
 /// deletes the Account's presence row here, so it stops counting toward the presence bound and a rejoin does not read as
 /// present. Invitations the removed Account issued are untouched: their issuer key references the Account, not the
 /// Membership. Before the <c>DELETE</c>, under the same lock and in the same transaction, every Task assigned to the
-/// Membership is unassigned - never deleted - because the Assignee key would refuse the <c>DELETE</c> otherwise.
+/// Membership is unassigned - never deleted - because the Assignee key would refuse the <c>DELETE</c> otherwise, and every
+/// pending Ownership Offer naming it is written <c>Lapsed</c> (<see cref="OwnershipOfferWrites"/>), because no key would
+/// stop the offer outliving it.
 /// </para>
 /// <para>
 /// <b>An actor whose own Membership is gone</b> when its statement runs - removed while it waited on the lock - is
@@ -189,6 +191,7 @@ internal sealed partial class MembershipStore(YelloDbContext dbContext, IMembers
         if (own is { Role: not Role.Owner })
         {
             await UnassignAsync(spaceId, own.Id, cancellationToken).ConfigureAwait(false);
+            await OwnershipOfferWrites.LapseNamingAsync(dbContext, spaceId, own.Id, cancellationToken).ConfigureAwait(false);
         }
 
         var left = await dbContext.Database.ExecuteSqlAsync(
@@ -236,6 +239,7 @@ internal sealed partial class MembershipStore(YelloDbContext dbContext, IMembers
         if (target is { Role: not Role.Owner })
         {
             await UnassignAsync(spaceId, membershipId, cancellationToken).ConfigureAwait(false);
+            await OwnershipOfferWrites.LapseNamingAsync(dbContext, spaceId, membershipId, cancellationToken).ConfigureAwait(false);
         }
 
         var removed = target is null

@@ -11,7 +11,7 @@ namespace Yello.Application.Outbox;
 public sealed record OutboxEmail(string Kind, string Recipient, string Subject, string Body);
 
 /// <summary>
-/// The kinds of message the outbox carries. A general mechanism keyed by kind: story 5.1's Ownership Offer reuses it.
+/// The kinds of message the outbox carries. A general mechanism keyed by kind.
 /// </summary>
 public static class OutboxKinds
 {
@@ -24,4 +24,9 @@ public static class OutboxKinds
     /// A Task was assigned to someone other than the Account that assigned it.
     /// </summary>
     public static string TaskAssigned => "task-assigned";
+
+    /// <summary>
+    /// An Owner offered ownership of a Space to one of its Memberships.
+    /// </summary>
+    public static string OwnershipOffered => "ownership-offered";
 }

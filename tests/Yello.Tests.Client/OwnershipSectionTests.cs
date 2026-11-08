@@ -102,7 +102,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// anywhere in the section.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - OwnershipSection.razor does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR11")]
     [Trait("Requirement", "AD-23")]
     public async Task The_Owner_sees_the_Ownership_section_with_a_recipient_picker_that_selects_no_one()
@@ -129,7 +129,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// Ownership heading, no section and no disabled control standing in for one.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - OwnershipSection.razor and its Owner-only predicate do not exist yet; the anchor needs the section to exist for the Owner")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     public async Task An_Admin_has_no_Ownership_section_at_all()
     {
@@ -154,7 +154,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// picker and sends nothing.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - OwnershipSection.razor and its in-place confirm do not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR11")]
     public async Task The_offer_asks_in_place_pre_focuses_neither_choice_and_Cancel_sends_nothing()
     {
@@ -194,7 +194,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// shows the pending offer by the recipient's label with a Revoke control.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - OwnershipSection.razor does not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     public async Task The_confirmed_offer_is_sent_once_with_one_key_and_shows_the_pending_offer()
     {
@@ -224,7 +224,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// says something else.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - OwnershipSection.razor and its server-clock expiry do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-27")]
     [Trait("Assumption", "PRD-12-3")]
     public async Task The_expiry_is_counted_from_the_server_clock_and_not_the_browsers()
@@ -254,7 +254,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// selected, says "Ownership offer revoked." with no name in it, and leaves focus on an element rather than the body.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - OwnershipSection.razor and its Revoke do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "UX-DR36")]
     public async Task Revoke_returns_to_the_picker_says_so_and_keeps_focus_off_the_body()
@@ -291,7 +291,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// the Space now holds, naming its recipient.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - OwnershipSection.razor and its 409 handling do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     public async Task An_offer_refused_because_one_is_pending_shows_the_pending_offer()
     {
@@ -318,7 +318,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// words and offers the picker again.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - OwnershipSection.razor and its 400 handling do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     public async Task An_offer_refused_for_its_recipient_says_why_and_offers_the_picker_again()
     {
@@ -346,7 +346,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// spacing overrides applied.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - OwnershipSection.razor does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR41")]
     [Trait("Requirement", "NFR-9")]
     public async Task The_Ownership_section_reflows_at_320_by_256_with_text_spacing()

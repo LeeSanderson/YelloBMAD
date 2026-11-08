@@ -6,6 +6,7 @@ using Yello.Contracts.Projects;
 using Yello.Domain.Memberships;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
+using Yello.Contracts.Spaces;
 
 namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 
@@ -62,7 +63,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="recipientRole">The recipient's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - the offer route, its table and its answer do not exist yet")]
+    [Theory]
     [MemberData(nameof(OwnershipRecipientRoles))]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-26")]
@@ -94,7 +95,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal(recipient.MembershipId, answer.RecipientMembershipId);
         Assert.Equal(recipientName, answer.RecipientName);
         Assert.True(offered.Headers.TryGetValue("Location", out var location), "The 201 carries no Location.");
-        Assert.EndsWith(OwnershipOfferWire.PendingOf(spaceId), Assert.Single(location), StringComparison.Ordinal);
+        Assert.EndsWith(OwnershipOfferRoutes.PendingOf(spaceId), Assert.Single(location), StringComparison.Ordinal);
 
         var row = Assert.Single(await wire.OwnershipOffersInAsync(spaceId));
 
@@ -110,7 +111,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// is named exactly as often as the Admin who joined the same way and was not offered anything.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the offer route does not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AR-12")]
     [Trait("Requirement", "AD-5")]
@@ -161,7 +162,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Anchor: the recipient's Membership id is then offered <c>201</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the offer route and its invalid-offer-recipient answer do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-23")]
     public async Task An_offer_to_an_address_an_Invitation_or_an_Account_is_the_400_a_random_id_gets()
@@ -203,7 +204,7 @@ public sealed partial class ActiveSpaceEndpointTests
         foreach (var refused in new[] { "random", "address", "invitation", "outsider", "account" })
         {
             Assert.True(answers[refused].StatusCode == HttpStatusCode.BadRequest, $"The {refused} body: {Described(answers[refused])}");
-            Assert.Equal(OwnershipOfferWire.InvalidOfferRecipientProblemType, ProblemType(answers[refused]));
+            Assert.Equal(ProblemTypes.InvalidOfferRecipient, ProblemType(answers[refused]));
             Assert.Equal(answers["random"].Body, answers[refused].Body);
         }
 
@@ -216,7 +217,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="body">The refused body.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - the offer route and its invalid-offer-recipient answer do not exist yet")]
+    [Theory]
     [MemberData(nameof(BodiesNamingNoMembership))]
     [Trait("Requirement", "FR-8")]
     public async Task A_body_that_names_no_Membership_is_400_invalid_offer_recipient(string body)
@@ -241,7 +242,7 @@ public sealed partial class ActiveSpaceEndpointTests
         });
 
         Assert.True(refused?.StatusCode == HttpStatusCode.BadRequest, $"The body {body}: {Described(refused)}");
-        Assert.Equal(OwnershipOfferWire.InvalidOfferRecipientProblemType, ProblemType(refused));
+        Assert.Equal(ProblemTypes.InvalidOfferRecipient, ProblemType(refused));
         Assert.Equal(0, storedBeforeAnchor);
         Assert.True(anchor?.StatusCode == HttpStatusCode.Created, $"The anchor: {Described(anchor)}");
     }
@@ -253,7 +254,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// whether the id exists elsewhere. Anchor: a real recipient is then offered <c>201</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the offer route and its guarded insert do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AD-20")]
@@ -289,7 +290,7 @@ public sealed partial class ActiveSpaceEndpointTests
         foreach (var refused in new[] { "random", "self", "foreign" })
         {
             Assert.True(answers[refused].StatusCode == HttpStatusCode.BadRequest, $"The {refused} recipient: {Described(answers[refused])}");
-            Assert.Equal(OwnershipOfferWire.InvalidOfferRecipientProblemType, ProblemType(answers[refused]));
+            Assert.Equal(ProblemTypes.InvalidOfferRecipient, ProblemType(answers[refused]));
             Assert.Equal(answers["random"].Body, answers[refused].Body);
         }
 
@@ -304,7 +305,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// recipient.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the offer route and UX_OwnershipOffer_SpaceId_Pending do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AR-12")]
@@ -329,7 +330,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.True(first?.StatusCode == HttpStatusCode.Created, $"The first offer: {Described(first)}");
         Assert.True(second?.StatusCode == HttpStatusCode.Conflict, $"The second offer: {Described(second)}");
-        Assert.Equal(OwnershipOfferWire.OwnershipOfferPendingProblemType, ProblemType(second));
+        Assert.Equal(ProblemTypes.OwnershipOfferPending, ProblemType(second));
         Assert.DoesNotContain("@", second.Body, StringComparison.Ordinal);
 
         var pending = Assert.Single(await wire.OwnershipOffersInAsync(spaceId));
@@ -345,7 +346,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// the offer <c>409</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the offer route and its supersede of a time-expired pending row (Lee's Q1 (a)) do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-27")]
     [Trait("Requirement", "AR-31")]
@@ -385,7 +386,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// its <c>ReadAt</c> lies between the two reads. No C# clock stamps either.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the offer route and the ExpiresAt column default do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-27")]
     [Trait("Requirement", "AR-31")]
     [Trait("Assumption", "PRD-12-3")]
@@ -424,7 +425,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// are each still <c>409 ownership-held</c>, the offer stays <c>Pending</c>, and the Space keeps its one Owner.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the offer route does not exist yet, so no offer can be pending")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-5")]
@@ -467,7 +468,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// invalid-idempotency-key</c>. One <c>Pending</c> row and one <c>ownership-offered</c> send record remain.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - the offer route does not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "FR-43")]
     public async Task A_replayed_offer_answers_its_original_201_and_stores_and_records_nothing_more()
@@ -558,26 +559,26 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>Idempotency-Key</c> when one is given.
     /// </summary>
     private static Task<WireResponse> OfferOverWireAsync(WireSession session, Guid spaceId, Guid? membershipId, string? key = null) =>
-        session.SendWithHeadersAsync(HttpMethod.Post, OwnershipOfferWire.OffersOf(spaceId), OwnershipOfferWire.Body(membershipId), KeyHeaders(key));
+        session.SendWithHeadersAsync(HttpMethod.Post, OwnershipOfferRoutes.OffersOf(spaceId), OwnershipOfferWire.Body(membershipId), KeyHeaders(key));
 
     /// <summary>
     /// The offer with a body of the case's own text.
     /// </summary>
     private static Task<WireResponse> RawOfferOverWireAsync(WireSession session, Guid spaceId, string json) =>
-        session.SendWithHeadersAsync(HttpMethod.Post, OwnershipOfferWire.OffersOf(spaceId), OwnershipOfferWire.RawBody(json), NoKey);
+        session.SendWithHeadersAsync(HttpMethod.Post, OwnershipOfferRoutes.OffersOf(spaceId), OwnershipOfferWire.RawBody(json), NoKey);
 
     /// <summary>
     /// The Owner's read of the pending offer: the Session's cookie, a <c>GET</c>.
     /// </summary>
     private static Task<WireResponse> PendingOfferOverWireAsync(WireSession session, Guid spaceId) =>
-        session.SendWithHeadersAsync(HttpMethod.Get, OwnershipOfferWire.PendingOf(spaceId), content: null, NoKey, withAntiforgeryToken: false);
+        session.SendWithHeadersAsync(HttpMethod.Get, OwnershipOfferRoutes.PendingOf(spaceId), content: null, NoKey, withAntiforgeryToken: false);
 
     /// <summary>
     /// The revoke as the browser sends it: the Session's cookie and anti-forgery header, no body, and an
     /// <c>Idempotency-Key</c> when one is given.
     /// </summary>
     private static Task<WireResponse> RevokeOfferOverWireAsync(WireSession session, Guid spaceId, Guid offerId, string? key = null) =>
-        session.SendWithHeadersAsync(HttpMethod.Delete, OwnershipOfferWire.OfferOf(spaceId, offerId), content: null, KeyHeaders(key));
+        session.SendWithHeadersAsync(HttpMethod.Delete, OwnershipOfferRoutes.OfferOf(spaceId, offerId), content: null, KeyHeaders(key));
 
     /// <summary>
     /// An offer made through the product, asserted <c>201</c>.

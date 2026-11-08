@@ -38,7 +38,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// key sends no second one. The send record holds one <c>ownership-offered</c> row.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the offer route, OutboxKinds.OwnershipOffered and OwnershipOfferEmail do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-43")]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-10")]
@@ -86,7 +86,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// password, a Token prefix or any GUID (read from the subject and both bodies; the envelope's To is the recipient's own); and no link in it carries an id or names the offer routes or an accept route.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - the offer route and OwnershipOfferEmail.Render do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-43")]
     [Trait("Requirement", "NFR-1")]
     [Trait("Requirement", "NFR-6")]
@@ -96,7 +96,9 @@ public sealed partial class ActiveSpaceEndpointTests
     {
         var database = Available();
         var (spaceId, otherSpaceId) = (Guid.NewGuid(), Guid.NewGuid());
-        var (spaceName, ownerName, thirdName) = ("Harbour " + Suffix(), DisplayName(), DisplayName());
+        // The offerer's name is in the email by design, so it carries no GUID-shaped part (DisplayName() does) that the
+        // no-GUID assertion would then read as an id.
+        var (spaceName, ownerName, thirdName) = ("Harbour " + Suffix(), "Olu Owner " + Suffix(), DisplayName());
         var (projectName, title, labelName) = ("Quayside " + Suffix(), "Paint the bollards " + Suffix(), "Urgent " + Suffix());
         var (otherSpaceName, otherProjectName) = ("Secret works " + Suffix(), "Hidden project " + Suffix());
         var invitee = InvitationWire.FreshAddress("offer-disclosure");
@@ -163,7 +165,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Anchor: once the plant is gone, an offer under another key is stored, recorded and sent.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the offer route and its enqueue do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-10")]
     [Trait("Requirement", "FR-43")]
@@ -219,7 +221,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="act">What follows the offer.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC7 - the offer and revoke routes and the lapse do not exist yet")]
+    [Theory]
     [MemberData(nameof(SilentAfterTheOffer))]
     [Trait("Requirement", "FR-43")]
     [Trait("Requirement", "AD-26")]
@@ -274,7 +276,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// served as asserted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8, AC12 - the offer, read and revoke routes do not exist yet")]
+    [Fact]
     [Trait("Requirement", "NFR-6")]
     [Trait("Requirement", "AD-23")]
     public async Task Neither_an_address_nor_a_display_name_reaches_the_Host_log_on_offer_read_or_revoke()

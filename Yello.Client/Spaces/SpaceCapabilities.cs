@@ -57,6 +57,7 @@ public static class SpaceCapabilities
         LabelCapabilities.PermitsManageLabels,
         MembershipCapabilities.PermitsManageMemberships,
         InvitationCapabilities.PermitsIssueInvitations,
+        OwnershipCapabilities.PermitsOfferOwnership,
         PermitsDeleteSpace,
     ];
 }

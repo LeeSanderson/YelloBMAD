@@ -25,7 +25,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>dbo.OwnershipOffer</c>, so an offer cannot be read, written or moved under another Space's key.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the OwnershipOffers migration and its RLS predicates do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AR-4")]
     public async Task The_OwnershipOffer_table_is_under_the_Space_policy_with_its_filter_and_both_block_predicates()
@@ -51,7 +51,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>Membership</c> or <c>Account</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11, AC12 - the OwnershipOffers migration does not exist yet (Lee's Q2 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-7")]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-5")]
@@ -75,7 +75,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Invitation's is.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the OwnershipOffers migration and its ExpiresAt default do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AR-31")]
     [Trait("Requirement", "AD-27")]
     [Trait("Assumption", "PRD-12-3")]
@@ -109,7 +109,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// it. A <c>Revoked</c> row and a <c>Pending</c> row coexist, and another Space's <c>Pending</c> row is unaffected.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the OwnershipOffers migration and UX_OwnershipOffer_SpaceId_Pending do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AR-12")]
