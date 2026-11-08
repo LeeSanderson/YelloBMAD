@@ -1,0 +1,55 @@
+@using Yello.Client.Spaces
+
+@*
+    ONE OPTION OF THE ASSIGNEE PICKER - UX-DR11, UX-DR34. A single-select listbox: the Task's current Assignee - or
+    "Unassigned" when it has none - is the selected option, and nothing else is ever pre-selected. Each person is offered
+    by initials and label, never an address. Choosing one - click, Enter or Space - commits it at once. One tab stop per
+    picker, as the Status picker's: only the Active option is in the tab order, and ↑/↓, Home and End move between options
+    (js/board-keys.js).
+*@
+
+<li class="picker__option assignee-option"
+    role="option"
+    tabindex="@(Active ? "0" : "-1")"
+    aria-selected="@(Selected ? "true" : "false")"
+    @onclick="ChooseAsync"
+    @onfocus="OnFocused"
+    @onkeydown="KeyDownAsync">@if (Choice is { } choice)
+    {
+        <AssigneeAvatar Choice="@choice" />
+        @choice.Label
+    }@if (Choice is null)
+    {
+        @UnassignedText
+    }</li>
+
+@code {
+    /// <summary>The person this option offers, or <c>null</c> for "Unassigned".</summary>
+    [Parameter]
+    public AssigneeChoice? Choice { get; set; }
+
+    /// <summary>The words for "Unassigned".</summary>
+    [Parameter]
+    public string UnassignedText { get; set; } = string.Empty;
+
+    /// <summary>Whether it is the Task's Assignee now.</summary>
+    [Parameter]
+    public bool Selected { get; set; }
+
+    /// <summary>Whether this option is its picker's one tab stop.</summary>
+    [Parameter]
+    public bool Active { get; set; }
+
+    /// <summary>Raised when the option takes focus, so its picker makes it the tab stop.</summary>
+    [Parameter]
+    public EventCallback OnFocused { get; set; }
+
+    /// <summary>Raised with the Membership's id, or <c>null</c> for "Unassigned", when it is chosen.</summary>
+    [Parameter]
+    public EventCallback<Guid?> OnChoose { get; set; }
+
+    private Task ChooseAsync() => OnChoose.InvokeAsync(Choice?.MembershipId);
+
+    private Task KeyDownAsync(KeyboardEventArgs args) =>
+        args.Key is "Enter" or " " ? ChooseAsync() : Task.CompletedTask;
+}

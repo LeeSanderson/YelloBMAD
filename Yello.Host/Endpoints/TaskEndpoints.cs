@@ -206,5 +206,9 @@ public static class TaskEndpoints
     /// <param name="labelIds">The Labels it carries, by name then id.</param>
     /// <returns>Its response.</returns>
     internal static TaskResponse Response(TaskItem task, IReadOnlyList<Guid> labelIds) =>
-        new(task.Id, task.Title, task.StatusId, task.PositionKey, task.CreatedAt, task.DueDate) { LabelIds = labelIds };
+        new(task.Id, task.Title, task.StatusId, task.PositionKey, task.CreatedAt, task.DueDate)
+        {
+            LabelIds = labelIds,
+            AssigneeMembershipId = task.AssigneeMembershipId,
+        };
 }

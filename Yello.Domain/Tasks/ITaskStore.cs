@@ -85,6 +85,73 @@ public interface ITaskStore
 }
 
 /// <summary>
+/// Assigns the Tasks of the Space the current unit of work is scoped to. Apart from <see cref="ITaskStore"/> because an
+/// assignment serialises against Membership changes, not against the Project's key placers.
+/// </summary>
+public interface ITaskAssignments
+{
+    /// <summary>
+    /// Assigns one Task of the resolved Space to a Membership of the same Space, or unassigns it, and saves it. The
+    /// Membership must still exist when the statement runs: a removal, a leave or a Role change of the Space is never
+    /// interleaved with it.
+    /// </summary>
+    /// <param name="taskId">The Task, from the route.</param>
+    /// <param name="membershipId">The Membership, or <c>null</c> to unassign.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>What the assignment came to.</returns>
+    Task<TaskAssignment> AssignAsync(Guid taskId, Guid? membershipId, CancellationToken cancellationToken);
+}
+
+/// <summary>
+/// What an assignment came to. No "the Membership is in another Space": a foreign id and a random one are the same
+/// refusal (AD-3, I-13).
+/// </summary>
+/// <param name="Outcome">What happened.</param>
+/// <param name="Task">The Task as stored, when <see cref="Outcome"/> is <see cref="TaskAssignmentOutcome.Assigned"/>.</param>
+/// <param name="Previous">The Membership the Task was assigned to before, or <c>null</c> when it was unassigned.</param>
+public sealed record TaskAssignment(TaskAssignmentOutcome Outcome, TaskItem? Task, Guid? Previous)
+{
+    /// <summary>
+    /// No Task in the resolved Space has the id.
+    /// </summary>
+    public static TaskAssignment NotFound { get; } = new(TaskAssignmentOutcome.NotFound, null, null);
+
+    /// <summary>
+    /// The Membership is not one of the resolved Space's. Nothing was written.
+    /// </summary>
+    public static TaskAssignment InvalidAssignee { get; } = new(TaskAssignmentOutcome.InvalidAssignee, null, null);
+
+    /// <summary>
+    /// The Task now holds the Assignee asked for.
+    /// </summary>
+    /// <param name="task">The Task as stored.</param>
+    /// <param name="previous">Its Assignee before the statement.</param>
+    /// <returns>The outcome.</returns>
+    public static TaskAssignment Assigned(TaskItem task, Guid? previous) => new(TaskAssignmentOutcome.Assigned, task, previous);
+}
+
+/// <summary>
+/// What an assignment came to.
+/// </summary>
+public enum TaskAssignmentOutcome
+{
+    /// <summary>
+    /// The Task holds the Assignee asked for - written, or already held and written again.
+    /// </summary>
+    Assigned,
+
+    /// <summary>
+    /// No Task in the resolved Space has the id, whether it never existed, was deleted, or is another Space's.
+    /// </summary>
+    NotFound,
+
+    /// <summary>
+    /// The Membership is missing, removed meanwhile, random or another Space's.
+    /// </summary>
+    InvalidAssignee,
+}
+
+/// <summary>
 /// What a Task move came to (story 2.6). No "the neighbour is in another Space": that would tell a caller an id exists
 /// elsewhere (AD-3, I-13).
 /// </summary>

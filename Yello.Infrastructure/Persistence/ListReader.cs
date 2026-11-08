@@ -6,7 +6,7 @@ namespace Yello.Infrastructure.Persistence;
 
 /// <summary>
 /// Reads one Project's Tasks as a List View inside the request's Space-scoped unit of work: the filtered count, and a page
-/// under one of three sorts by pair keyset seek. Story 2.10; FR-30, AR-22, AD-29.
+/// under one of its sorts by pair keyset seek. Story 2.10; FR-30, AR-22, AD-29.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -23,7 +23,7 @@ namespace Yello.Infrastructure.Persistence;
 /// <c>ListPagingTests</c> LV-19).
 /// </para>
 /// <para>
-/// <b><c>NULL</c> last, explicitly</b> (AC5, AC13, open question 5 (a)): the due-date and Label sorts read in two
+/// <b><c>NULL</c> last, explicitly</b> (AC5, AC13, open question 5 (a)): the due-date, Label and Assignee sorts read in two
 /// segments - the valued Tasks, then, in the same page when they run out, the Tasks with none by <c>Id</c> - each its own
 /// bounded seek on the same index. SQL Server's default would put <c>NULL</c> first; neither segment leaves it to that.
 /// </para>
@@ -34,7 +34,8 @@ namespace Yello.Infrastructure.Persistence;
 /// </para>
 /// <para>
 /// <b>Filters are residual predicates on the sort's index</b> (open question 4 (a)): a Status set (<c>IN</c>), any of a
-/// Label set (an <c>EXISTS</c> on <c>TaskLabel</c>'s primary key), a half-open due range or "no due date". The indexes
+/// Label set (an <c>EXISTS</c> on <c>TaskLabel</c>'s primary key), a half-open due range or "no due date", and any of an
+/// Assignee set or unassigned. The indexes
 /// <c>INCLUDE</c> the other filters' columns. The count is the same predicate with no order (AC11).
 /// </para>
 /// <para>
@@ -44,12 +45,14 @@ namespace Yello.Infrastructure.Persistence;
 /// <param name="dbContext">The request's unit of work.</param>
 internal sealed class ListReader(YelloDbContext dbContext) : IListReader
 {
-    // The three sorts' indexes, by EF's names (TaskConfiguration; ListSortColumns states each sort's column).
+    // The sorts' indexes, by EF's names (TaskConfiguration; ListSortColumns states each sort's column).
     private const string StatusSortIndex = "SELECT * FROM dbo.[Task] WITH (INDEX(IX_Task_SpaceId_ProjectId_StatusId_Id))";
 
     private const string DueDateSortIndex = "SELECT * FROM dbo.[Task] WITH (INDEX(IX_Task_SpaceId_ProjectId_DueDate_Id))";
 
     private const string LabelSortIndex = "SELECT * FROM dbo.[Task] WITH (INDEX(IX_Task_SpaceId_ProjectId_FirstLabelName_Id))";
+
+    private const string AssigneeSortIndex = "SELECT * FROM dbo.[Task] WITH (INDEX(IX_Task_SpaceId_ProjectId_AssigneeMembershipId_Id))";
 
     /// <inheritdoc />
     public async Task<IReadOnlyList<Guid>> VisibleLabelIdsAsync(IReadOnlyCollection<Guid> labelIds, CancellationToken cancellationToken) =>
@@ -59,6 +62,17 @@ internal sealed class ListReader(YelloDbContext dbContext) : IListReader
                 .AsNoTracking()
                 .Where(label => labelIds.Contains(label.Id))
                 .Select(label => label.Id)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<Guid>> VisibleMembershipIdsAsync(IReadOnlyCollection<Guid> membershipIds, CancellationToken cancellationToken) =>
+        membershipIds.Count == 0
+            ? []
+            : await dbContext.Memberships
+                .AsNoTracking()
+                .Where(membership => membershipIds.Contains(membership.Id))
+                .Select(membership => membership.Id)
                 .ToListAsync(cancellationToken)
                 .ConfigureAwait(false);
 
@@ -90,6 +104,7 @@ internal sealed class ListReader(YelloDbContext dbContext) : IListReader
             ListSort.Status => await ByStatusAsync(Matching(Seeking(StatusSortIndex), projectId, filter with { StatusIds = null }), statusOrder, after, take, cancellationToken).ConfigureAwait(false),
             ListSort.DueDate => await ByDueDateAsync(Matching(Seeking(DueDateSortIndex), projectId, filter), filter, after, take, cancellationToken).ConfigureAwait(false),
             ListSort.Label => await ByLabelAsync(Matching(Seeking(LabelSortIndex), projectId, filter), filter, after, take, cancellationToken).ConfigureAwait(false),
+            ListSort.Assignee => await ByAssigneeAsync(Matching(Seeking(AssigneeSortIndex), projectId, filter), filter, after, take, cancellationToken).ConfigureAwait(false),
             _ => throw new ArgumentOutOfRangeException(nameof(sort), sort, "Not an offered sort."),
         };
     }
@@ -212,6 +227,78 @@ internal sealed class ListReader(YelloDbContext dbContext) : IListReader
         return rows;
     }
 
+    private static async Task<IReadOnlyList<TaskItem>> ByAssigneeAsync(IQueryable<TaskItem> matching, ListFilter filter, ListCursor? after, int take, CancellationToken cancellationToken)
+    {
+        var rows = new List<TaskItem>(take);
+
+        // An Assignee filter without "Unassigned" admits no unassigned Task, and "Unassigned" alone no assigned one: a
+        // segment the filter empties is not read.
+        var readsAssigned = !filter.FiltersAssignee || filter.AssigneeMembershipIds is not null;
+        var readsUnassigned = !filter.FiltersAssignee || filter.Unassigned;
+
+        if (readsAssigned && (after is null || after.AssigneeMembershipId is not null))
+        {
+            rows.AddRange(await Assigned(matching, after)
+                .OrderBy(task => task.AssigneeMembershipId)
+                .ThenBy(task => task.Id)
+                .Take(take)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false));
+        }
+
+        // A cursor in the assigned segment precedes every unassigned Task, also when the filter left that segment unread.
+        if (after?.AssigneeMembershipId is not null)
+        {
+            after = null;
+        }
+
+        if (rows.Count < take && readsUnassigned)
+        {
+            rows.AddRange(await Unassigned(matching, after)
+                .OrderBy(task => task.Id)
+                .Take(take - rows.Count)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false));
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// The leading segment of the Assignee sort: assigned Tasks, after the cursor's pair when the cursor is in it.
+    /// </summary>
+    private static IQueryable<TaskItem> Assigned(IQueryable<TaskItem> matching, ListCursor? after)
+    {
+        var assigned = matching.Where(task => task.AssigneeMembershipId != null);
+
+        if (after?.AssigneeMembershipId is { } value)
+        {
+            var afterId = after.TaskId;
+
+            assigned = assigned.Where(task => task.AssigneeMembershipId!.Value.CompareTo(value) > 0
+                || (task.AssigneeMembershipId == value && task.Id.CompareTo(afterId) > 0));
+        }
+
+        return assigned;
+    }
+
+    /// <summary>
+    /// The trailing segment of the Assignee sort: unassigned Tasks, after the cursor's id when the cursor is in it.
+    /// </summary>
+    private static IQueryable<TaskItem> Unassigned(IQueryable<TaskItem> matching, ListCursor? after)
+    {
+        var unassigned = matching.Where(task => task.AssigneeMembershipId == null);
+
+        if (after is not null)
+        {
+            var afterId = after.TaskId;
+
+            unassigned = unassigned.Where(task => task.Id.CompareTo(afterId) > 0);
+        }
+
+        return unassigned;
+    }
+
     /// <summary>
     /// The leading segment of the due-date sort: dated Tasks, after the cursor's pair when the cursor is in it.
     /// </summary>
@@ -307,6 +394,18 @@ internal sealed class ListReader(YelloDbContext dbContext) : IListReader
     private IQueryable<TaskItem> Seeking(string indexHint) => dbContext.Tasks.FromSqlRaw(indexHint);
 
     /// <summary>
+    /// The Assignee filter: any of the Memberships, or unassigned when that is asked for too.
+    /// </summary>
+    private static IQueryable<TaskItem> MatchingAssignee(IQueryable<TaskItem> tasks, ListFilter filter) =>
+        (filter.AssigneeMembershipIds, filter.Unassigned) switch
+        {
+            ({ } membershipIds, true) => tasks.Where(task => task.AssigneeMembershipId == null || membershipIds.Contains(task.AssigneeMembershipId.Value)),
+            ({ } membershipIds, false) => tasks.Where(task => task.AssigneeMembershipId != null && membershipIds.Contains(task.AssigneeMembershipId.Value)),
+            (null, true) => tasks.Where(task => task.AssigneeMembershipId == null),
+            (null, false) => tasks,
+        };
+
+    /// <summary>
     /// The Project's Tasks matching <paramref name="filter"/> - the predicate both the count and every page read.
     /// </summary>
     private IQueryable<TaskItem> Matching(IQueryable<TaskItem> source, Guid projectId, ListFilter filter)
@@ -342,6 +441,6 @@ internal sealed class ListReader(YelloDbContext dbContext) : IListReader
             tasks = tasks.Where(task => task.DueDate < to);
         }
 
-        return tasks;
+        return MatchingAssignee(tasks, filter);
     }
 }

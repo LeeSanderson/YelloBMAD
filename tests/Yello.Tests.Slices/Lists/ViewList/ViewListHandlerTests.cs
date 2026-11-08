@@ -231,6 +231,9 @@ public sealed class ViewListHandlerTests
         public Task<IReadOnlyList<Guid>> VisibleLabelIdsAsync(IReadOnlyCollection<Guid> labelIds, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<Guid>>([.. labelIds.Where(Labels.Contains)]);
 
+        public Task<IReadOnlyList<Guid>> VisibleMembershipIdsAsync(IReadOnlyCollection<Guid> membershipIds, CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Guid>>([]);
+
         public Task<int> CountAsync(Guid projectId, ListFilter filter, CancellationToken cancellationToken)
         {
             LastFilter = filter;

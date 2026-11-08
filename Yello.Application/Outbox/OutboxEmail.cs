@@ -19,4 +19,9 @@ public static class OutboxKinds
     /// An Invitation was issued (story 4.1, FR-39).
     /// </summary>
     public static string InvitationIssued => "invitation-issued";
+
+    /// <summary>
+    /// A Task was assigned to someone other than the Account that assigned it.
+    /// </summary>
+    public static string TaskAssigned => "task-assigned";
 }

@@ -9,8 +9,9 @@
     ONE TASK ON THE BOARD - stories 2.2, 2.3 and 2.6; UX-DR8, UX-DR21, UX-DR24; DESIGN.md:137-144, :389-453.
 
     THE TITLE IS THE CARD'S CONTENT. A metadata row in monospace sits beneath it: the Task's Labels (story 2.4) -
-    at most three chips, in the server's order, then "+N" - and the due date when there is one (story 2.3), in the
-    viewer's own locale and zone (UX-DR42); the Assignee (4.6) and Presence (Epic 7) join it later. The row wraps
+    at most three chips, in the server's order, then "+N" - the due date when there is one (story 2.3), in the
+    viewer's own locale and zone (UX-DR42), and the Assignee's avatar pushed to the row's end, named "Assigned to
+    {label}" and carrying no tooltip; Presence (Epic 7) joins it later. An unassigned Task shows no avatar. The row wraps
     before it ever scrolls sideways (UX-DR8, UX-DR41). No placeholder, no count beyond "+N", no badge, no streak.
 
     "+N" IS TEXT, NOT A CONTROL (story 2.4, open question 5): the panel the title opens shows every Label. Its
@@ -91,6 +92,11 @@
         {
             <span class="task-card__due">@due</span>
         }
+
+        @if (Assignee is { } assignee)
+        {
+            <AssigneeAvatar Choice="@assignee" Named="true" />
+        }
     </div>
 
     @MenuContent
@@ -110,6 +116,10 @@
     /// <summary>The Space's Labels by id, so the card can name the ones it carries (story 2.4).</summary>
     [Parameter]
     public IReadOnlyDictionary<Guid, LabelResponse> Labels { get; set; } = new Dictionary<Guid, LabelResponse>();
+
+    /// <summary>The Task's Assignee as the Space's candidates name it, or <c>null</c>.</summary>
+    [Parameter]
+    public AssigneeChoice? Assignee { get; set; }
 
     /// <summary>Raised with the Task's id when the card is opened.</summary>
     [Parameter]
@@ -256,7 +266,7 @@
     protected override bool ShouldRender()
     {
         var inputs = new CardInputs(
-            Item, Labels, FocusRequest, FocusOnArrival, CanMove, MenuOpen, FocusActionsRequest, Moved, Lifted, Settling, Carried, Active, Position, SetSize);
+            Item, Labels, Assignee, FocusRequest, FocusOnArrival, CanMove, MenuOpen, FocusActionsRequest, Moved, Lifted, Settling, Carried, Active, Position, SetSize);
 
         if (MenuContent is null && inputs == _drawn)
         {
@@ -336,6 +346,7 @@
     private sealed record CardInputs(
         TaskResponse Item,
         IReadOnlyDictionary<Guid, LabelResponse> Labels,
+        AssigneeChoice? Assignee,
         int FocusRequest,
         bool FocusOnArrival,
         bool CanMove,

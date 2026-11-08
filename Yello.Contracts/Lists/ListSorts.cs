@@ -5,8 +5,7 @@ namespace Yello.Contracts.Lists;
 /// Stable strings: a code is never renamed or reused (AD-19).
 /// </summary>
 /// <remarks>
-/// <b>Exactly three, and no Assignee</b> (AC2): no Task holds an Assignee until FR-21, and story 4.6 adds that code with
-/// its composite index. Every code here must have its index (AC6) - <c>ListViewGateTests</c> fails the build otherwise.
+/// Every code here must have its composite index - <c>ListViewGateTests</c> fails the build otherwise.
 /// </remarks>
 public static class ListSorts
 {
@@ -25,4 +24,11 @@ public static class ListSorts
     /// question 3 (a)).
     /// </summary>
     public static string Label => "label";
+
+    /// <summary>
+    /// The Assignee, then the Task's id; unassigned Tasks last. Each person's Tasks are grouped together, but the order
+    /// between people is by Membership id - stable, not alphabetical - because a name key would have to be copied onto every
+    /// Task and rewritten whenever a name changed.
+    /// </summary>
+    public static string Assignee => "assignee";
 }

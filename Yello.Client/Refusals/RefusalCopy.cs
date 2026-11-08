@@ -96,6 +96,11 @@ public static class RefusalCopy
     public static string InvalidTaskLabelsKey => "InvalidTaskLabels";
 
     /// <summary>
+    /// The copy key for <c>400 invalid-assignee</c>: the person chosen is not a Member of this Space any more.
+    /// </summary>
+    public static string InvalidAssigneeKey => "invalid-assignee";
+
+    /// <summary>
     /// The copy key for <c>409 task-position-unavailable</c> (story 2.6, open question 3 (a)): the position chosen is no
     /// longer one.
     /// </summary>
@@ -243,6 +248,7 @@ public static class RefusalCopy
         [ProblemTypes.LabelNameTaken] = LabelNameTakenKey,
         [ProblemTypes.LabelInUse] = LabelInUseKey,
         [ProblemTypes.InvalidTaskLabels] = InvalidTaskLabelsKey,
+        [ProblemTypes.InvalidAssignee] = InvalidAssigneeKey,
         [ProblemTypes.TaskPositionUnavailable] = TaskPositionUnavailableKey,
         [ProblemTypes.TaskPositionFull] = TaskPositionFullKey,
         [ProblemTypes.InvalidListQuery] = InvalidListQueryKey,

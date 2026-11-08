@@ -3,7 +3,6 @@ using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using Xunit;
 using Yello.Contracts;
-using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -49,7 +48,6 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     private const string UnassignedCopy = "Unassigned";
     private const string NoLongerHereCopy = "That person is no longer in this Space.";
 
-    private const string PickerSkip = "red: AC6, AC10 - Task detail has no Assignee attribute and the client sends no assignment yet";
 
     private static readonly string[] StatusNames = ["Todo", "Doing", "Done"];
 
@@ -66,7 +64,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     /// no default selection where the choice is consequential.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = PickerSkip)]
+    [Fact]
     [Trait("Requirement", "UX-DR11")]
     public async Task The_picker_offers_Unassigned_then_each_candidate_by_initials_and_name_with_none_chosen()
     {
@@ -105,7 +103,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     /// <c>@</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = PickerSkip)]
+    [Fact]
     [Trait("Requirement", "UX-DR8")]
     [Trait("Requirement", "UX-DR38")]
     [Trait("Requirement", "AD-18")]
@@ -150,7 +148,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     /// is announced "Unassigned.", and takes the avatar off the card.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = PickerSkip)]
+    [Fact]
     [Trait("Requirement", "UX-DR38")]
     public async Task Choosing_Unassigned_clears_the_Assignee_and_the_avatar()
     {
@@ -187,7 +185,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     /// attributes as its label, or "Unassigned". Its card shows the avatar like anyone's.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the Viewer's read-only Task detail has no Assignee row yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     public async Task A_Viewer_reads_the_Assignee_and_has_no_assign_control()
     {
@@ -224,7 +222,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     /// re-reads the candidates, and says "That person is no longer in this Space."
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = PickerSkip)]
+    [Fact]
     [Trait("Requirement", "FR-21")]
     public async Task An_invalid_assignee_refusal_reverts_rereads_the_candidates_and_says_so()
     {
@@ -233,7 +231,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
         var gone = Guid.NewGuid();
 
         api.SpaceAssignees[Northwind] = [(gone, "Gone Soon")];
-        api.NextAssignmentRefusal = (400, AssignmentWire.InvalidAssigneeProblemType, null);
+        api.NextAssignmentRefusal = (400, ProblemTypes.InvalidAssignee, null);
 
         var (context, page) = await surface.OpenAsync(EnglishLocale);
 
@@ -258,7 +256,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     /// each offered with a Membership-scoped discriminator, never with an address.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - no picker yet, and MembershipLabels does not fold look-alike names (Q7 (a))")]
+    [Fact]
     [Trait("Requirement", "AD-23")]
     public async Task Look_alike_candidates_are_each_offered_with_a_discriminator()
     {
@@ -295,7 +293,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     /// "Unassigned" - and no address anywhere on the page.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the List View has no Assignee filter, sort or column yet")]
+    [Fact]
     [Trait("Requirement", "FR-30")]
     [Trait("Requirement", "UX-DR19")]
     public async Task The_List_offers_an_Assignee_filter_sort_and_column_with_no_address()
@@ -332,7 +330,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     /// bar or <c>document.title</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the List View has no Assignee filter yet")]
+    [Fact]
     [Trait("Requirement", "FR-30")]
     public async Task Filtering_the_List_by_an_Assignee_sends_its_id_and_shows_only_its_Tasks()
     {
@@ -354,12 +352,12 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
             await fieldset.GetByRole(AriaRole.Checkbox, new LocatorGetByRoleOptions { Name = "Sam Lee", Exact = true }).CheckAsync(new LocatorCheckOptions { Timeout = Timeout });
             await WaitForRowCountAsync(page, 1);
 
-            Assert.Contains($"{AssignmentWire.AssigneeParameter}={sam:D}", api.ListRequests[^1].Query, StringComparison.Ordinal);
+            Assert.Contains($"{Yello.Contracts.Lists.ListRoutes.AssigneeParameter}={sam:D}", api.ListRequests[^1].Query, StringComparison.Ordinal);
 
             await fieldset.GetByRole(AriaRole.Checkbox, new LocatorGetByRoleOptions { Name = UnassignedCopy, Exact = true }).CheckAsync(new LocatorCheckOptions { Timeout = Timeout });
             await WaitForRowCountAsync(page, 3);
 
-            Assert.Contains($"{AssignmentWire.UnassignedParameter}=true", api.ListRequests[^1].Query, StringComparison.Ordinal);
+            Assert.Contains($"{Yello.Contracts.Lists.ListRoutes.UnassignedParameter}=true", api.ListRequests[^1].Query, StringComparison.Ordinal);
             Assert.DoesNotContain("Sam", await page.EvaluateAsync<string>("() => location.href + ' ' + document.title"), StringComparison.Ordinal);
         }
     }
@@ -370,7 +368,7 @@ public sealed class AssigneeTests(ClientSurfaceFixture surface)
     /// names the new Space only.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the client holds no per-Space candidates yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR31")]
     [Trait("Requirement", "NFR-1")]
     public async Task Switching_Space_purges_the_departed_Spaces_candidates()

@@ -50,7 +50,8 @@ namespace Yello.Infrastructure.Persistence;
 /// an Owner row - the schema does not forbid deleting one, because a Space's deletion cascades it. A committed removal also
 /// deletes the Account's presence row here, so it stops counting toward the presence bound and a rejoin does not read as
 /// present. Invitations the removed Account issued are untouched: their issuer key references the Account, not the
-/// Membership.
+/// Membership. Before the <c>DELETE</c>, under the same lock and in the same transaction, every Task assigned to the
+/// Membership is unassigned - never deleted - because the Assignee key would refuse the <c>DELETE</c> otherwise.
 /// </para>
 /// <para>
 /// <b>An actor whose own Membership is gone</b> when its statement runs - removed while it waited on the lock - is
@@ -59,7 +60,7 @@ namespace Yello.Infrastructure.Persistence;
 /// </remarks>
 /// <param name="dbContext">The request's unit of work.</param>
 /// <param name="membershipChanges">Collects the committed change's <c>MembershipChanged</c>.</param>
-internal sealed class MembershipStore(YelloDbContext dbContext, IMembershipChanges membershipChanges) : IMembershipStore
+internal sealed partial class MembershipStore(YelloDbContext dbContext, IMembershipChanges membershipChanges) : IMembershipStore
 {
     private const int UniqueIndexViolationErrorNumber = 2601;
 
@@ -178,6 +179,18 @@ internal sealed class MembershipStore(YelloDbContext dbContext, IMembershipChang
 
         var spaceId = ScopedSpaceId();
 
+        var own = await dbContext.Memberships
+            .AsNoTracking()
+            .Where(membership => membership.SpaceId == spaceId && membership.AccountId == actorAccountId)
+            .Select(membership => new { membership.Id, membership.Role })
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (own is { Role: not Role.Owner })
+        {
+            await UnassignAsync(spaceId, own.Id, cancellationToken).ConfigureAwait(false);
+        }
+
         var left = await dbContext.Database.ExecuteSqlAsync(
             $"""
             DELETE FROM dbo.[Membership]
@@ -218,6 +231,12 @@ internal sealed class MembershipStore(YelloDbContext dbContext, IMembershipChang
 
         // Read before the delete for its Account, which a Membership never changes.
         var target = await TargetAsync(membershipId, cancellationToken).ConfigureAwait(false);
+
+        // A removal the guarded DELETE then refuses is answered as a refusal, which rolls this back with the unit of work.
+        if (target is { Role: not Role.Owner })
+        {
+            await UnassignAsync(spaceId, membershipId, cancellationToken).ConfigureAwait(false);
+        }
 
         var removed = target is null
             ? 0

@@ -1,3 +1,4 @@
+@using Yello.Client.Spaces
 @using Yello.Contracts.Labels
 @using Yello.Contracts.Tasks
 
@@ -79,6 +80,7 @@
                 <TaskCard @key="task.Id"
                           Item="@task"
                           Labels="@Labels"
+                          Assignee="@AssigneeOf(task)"
                           OnOpen="OnOpen"
                           FocusRequest="@(task.Id == FocusTaskId ? FocusRequest : 0)"
                           FocusOnArrival="@(task.Id == ArrivalTaskId)"
@@ -258,6 +260,10 @@
     [Parameter]
     public IReadOnlyDictionary<Guid, LabelResponse> Labels { get; set; } = new Dictionary<Guid, LabelResponse>();
 
+    /// <summary>The Space's Assignee candidates by Membership, so each card can name its Assignee.</summary>
+    [Parameter]
+    public IReadOnlyDictionary<Guid, AssigneeChoice> Assignees { get; set; } = new Dictionary<Guid, AssigneeChoice>();
+
     /// <summary>What sits between the head and the cards: the open creation field, in the first column.</summary>
     [Parameter]
     public RenderFragment? ChildContent { get; set; }
@@ -329,4 +335,8 @@
             await _add.FocusAsync();
         }
     }
+
+    // An Assignee this tab holds no candidate for draws no avatar: an id is never shown.
+    private AssigneeChoice? AssigneeOf(TaskResponse task) =>
+        task.AssigneeMembershipId is { } id ? Assignees.GetValueOrDefault(id) : null;
 }

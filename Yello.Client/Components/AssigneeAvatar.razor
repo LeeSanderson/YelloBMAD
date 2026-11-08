@@ -1,0 +1,32 @@
+@using System.Globalization
+@using Yello.Client.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    AN ASSIGNEE'S AVATAR - UX-DR8, UX-DR34; DESIGN.md avatar. Squared monospace initials from the display name alone,
+    never interactive and never a tooltip: a title attribute would show a name to a pointer only, and an address must never
+    be one. On the card and in the List it carries its own accessible name, "Assigned to {label}"; beside a name that is
+    already read (the picker, the panel) it is decoration and hidden from assistive technology.
+*@
+
+@if (Named)
+{
+    <span class="assignee-avatar" role="img" aria-label="@string.Format(CultureInfo.CurrentCulture, Localizer["AssigneeAvatarName"], Choice.Label)">@Choice.Initials</span>
+}
+
+@if (!Named)
+{
+    <span class="assignee-avatar" aria-hidden="true">@Choice.Initials</span>
+}
+
+@code {
+    /// <summary>The Assignee.</summary>
+    [Parameter]
+    [EditorRequired]
+    public AssigneeChoice Choice { get; set; } = new(Guid.Empty, string.Empty, string.Empty);
+
+    /// <summary>Whether the avatar names the Assignee itself, where no label beside it does.</summary>
+    [Parameter]
+    public bool Named { get; set; }
+}

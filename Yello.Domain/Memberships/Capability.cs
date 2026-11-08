@@ -49,6 +49,10 @@ public enum Capability
     /// <summary>
     /// Assign a Task. Owner, Admin, Member.
     /// </summary>
+    /// <remarks>
+    /// Required by the assignment route alone, never folded into the Task edit under <see cref="ManageTasks"/>, so this row
+    /// of the matrix governs assignment by itself. Being assigned grants nothing: a Viewer may be an Assignee.
+    /// </remarks>
     AssignTask,
 
     /// <summary>

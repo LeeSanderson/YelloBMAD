@@ -37,6 +37,8 @@ public sealed class MailDrop : IDisposable
 
     private readonly DirectoryInfo _folder;
 
+    private readonly DateTimeOffset _created = DateTimeOffset.UtcNow;
+
     /// <summary>
     /// Creates an empty folder of the case's own.
     /// </summary>
@@ -153,7 +155,8 @@ public sealed class MailDrop : IDisposable
     {
         var emails = await WaitForAsync(
             dropped => dropped.Any(email => string.Equals(email.To, recipient, StringComparison.Ordinal)),
-            $"an email to {recipient}").ConfigureAwait(false);
+            $"an email to {recipient}",
+            recipient).ConfigureAwait(false);
 
         return emails.Single(email => string.Equals(email.To, recipient, StringComparison.Ordinal));
     }
@@ -199,18 +202,45 @@ public sealed class MailDrop : IDisposable
         }
     }
 
+    /// <summary>
+    /// Names the mail to <paramref name="recipient"/> that another Host on the same database sent into <see cref="Unread"/>
+    /// while this case waited: the trace a pooled Host leaves when its dispatcher claims a row the case meant its own Host
+    /// to send. Without it the failure reads as a slow or stalled dispatcher.
+    /// </summary>
+    private string StrayedNote(string? recipient)
+    {
+        if (recipient is null || !Directory.Exists(Unread))
+        {
+            return string.Empty;
+        }
+
+        var strayed = new DirectoryInfo(Unread)
+            .EnumerateFiles("*.json")
+            .Where(file => file.LastWriteTimeUtc >= _created.UtcDateTime)
+            .Count(file => File.ReadAllText(file.FullName).Contains(recipient, StringComparison.Ordinal));
+
+        return strayed == 0
+            ? string.Empty
+            : $" {strayed} email(s) to {recipient} went to the shared {Unread} instead: another Host on this database (a pooled "
+                + "one?) sent the row. Stop the class's pool (HostPool.StopAsync) before seeding outbox rows.";
+    }
+
     private async Task<IReadOnlyList<DroppedEmail>> WaitForMatchingAsync(string recipient, Func<DroppedEmail, bool> matching, int count)
     {
         bool Counts(DroppedEmail email) => string.Equals(email.To, recipient, StringComparison.Ordinal) && matching(email);
 
         var emails = await WaitForAsync(
             dropped => dropped.Count(Counts) >= count,
-            $"{count} matching email(s) to {recipient}").ConfigureAwait(false);
+            $"{count} matching email(s) to {recipient}",
+            recipient).ConfigureAwait(false);
 
         return [.. emails.Where(Counts)];
     }
 
-    private async Task<IReadOnlyList<DroppedEmail>> WaitForAsync(Func<IReadOnlyList<DroppedEmail>, bool> arrived, string what)
+    private Task<IReadOnlyList<DroppedEmail>> WaitForAsync(Func<IReadOnlyList<DroppedEmail>, bool> arrived, string what) =>
+        WaitForAsync(arrived, what, recipient: null);
+
+    private async Task<IReadOnlyList<DroppedEmail>> WaitForAsync(Func<IReadOnlyList<DroppedEmail>, bool> arrived, string what, string? recipient)
     {
         using var deadline = new CancellationTokenSource(Window);
         using var watcher = new FileSystemWatcher(_folder.FullName, "*.json");
@@ -240,7 +270,8 @@ public sealed class MailDrop : IDisposable
             catch (OperationCanceledException)
             {
                 throw new InvalidOperationException(
-                    $"The Host did not drop {what} within {Window.TotalSeconds:F0}s; {emails.Count} email(s) were dropped.");
+                    $"The Host did not drop {what} within {Window.TotalSeconds:F0}s; {emails.Count} email(s) were dropped."
+                    + StrayedNote(recipient));
             }
 
             changed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

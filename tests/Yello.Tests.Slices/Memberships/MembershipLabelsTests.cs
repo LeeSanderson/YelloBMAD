@@ -52,16 +52,14 @@ public sealed class MembershipLabelsTests
     }
 
     /// <summary>
-    /// AC3, the 4.1 Q3 normalisation family - names are compared ordinally after NFC: "Sam Lee" and "sam lee" are two names
-    /// (no suffix), while a composed and a decomposed "José" are one name (both suffixed).
+    /// AC3, the 4.1 Q3 normalisation family - names are compared after NFC: a composed and a decomposed "José" are one name
+    /// (both suffixed). Case is folded too; the look-alike theory below holds that.
     /// </summary>
     [Fact]
-    public void Names_are_compared_ordinally_after_NFC()
+    public void Names_are_compared_after_NFC()
     {
-        var byCase = Disambiguate([(First, "Sam Lee"), (Second, "sam lee")]);
         var byForm = Disambiguate([(First, "José"), (Second, "José")]);
 
-        Assert.Equal(("Sam Lee", "sam lee"), (byCase[First], byCase[Second]));
         Assert.All(byForm.Values, label => Assert.Contains(" · ", label, StringComparison.Ordinal));
     }
 
@@ -126,7 +124,7 @@ public sealed class MembershipLabelsTests
     /// </summary>
     /// <param name="first">One display name.</param>
     /// <param name="second">A look-alike of it.</param>
-    [Theory(Skip = "red: AC6, AC14 - MembershipLabels still compares NFC ordinally; the widened collision key is not in place (Q7 (a))")]
+    [Theory]
     [InlineData("Ann", "Ann ")]
     [InlineData("Ann", " Ann")]
     [InlineData("Ann", "A​nn")]
@@ -148,7 +146,7 @@ public sealed class MembershipLabelsTests
     /// Only the comparison folds: a colliding name is shown exactly as its owner wrote it, case, spacing and all, followed by
     /// the discriminator.
     /// </summary>
-    [Fact(Skip = "red: AC6 - the widened collision key is not in place, so these two names do not collide yet (Q7 (a))")]
+    [Fact]
     [Trait("Requirement", "AD-23")]
     public void A_folded_collision_keeps_each_name_as_written()
     {

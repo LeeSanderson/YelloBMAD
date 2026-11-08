@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Memberships;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Tasks;
 using Yello.Domain.Memberships;
@@ -42,7 +43,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </remarks>
 public sealed partial class ActiveSpaceEndpointTests
 {
-    private const string AssignRouteSkip = "red: AC1, AC2 - the assignment route PUT .../tasks/{taskId}/assignee is not mapped and dbo.[Task] has no AssigneeMembershipId yet (Lee's Q1 (a))";
 
     private static readonly string[] AssignedTaskProperties =
         ["assigneeMembershipId", "createdAt", "dueDate", "id", "labelIds", "positionKey", "statusId", "title"];
@@ -53,7 +53,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="assignerRole">The assigner's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = AssignRouteSkip)]
+    [Theory]
     [InlineData("owner")]
     [InlineData("admin")]
     [InlineData("member")]
@@ -101,7 +101,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>assigneeMembershipId</c> present and <c>null</c>, and the row cleared.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = AssignRouteSkip)]
+    [Fact]
     [Trait("Requirement", "FR-21")]
     [Trait("Requirement", "AD-4")]
     public async Task A_Token_assigns_without_anti_forgery_and_null_unassigns()
@@ -130,9 +130,9 @@ public sealed partial class ActiveSpaceEndpointTests
 
             var token = await BearerForAsync(owner, spaceId);
 
-            assigned = await owner.SendWithTokenAndHeadersAsync(HttpMethod.Put, AssignmentWire.AssigneeOf(spaceId, taskId), token, AssignmentWire.Body(assigneeMembership), NoKey);
+            assigned = await owner.SendWithTokenAndHeadersAsync(HttpMethod.Put, TaskRoutes.AssigneeOf(spaceId, taskId), token, AssignmentWire.Body(assigneeMembership), NoKey);
             afterAssign = await wire.AssigneeOfAsync(spaceId, taskId);
-            unassigned = await owner.SendWithTokenAndHeadersAsync(HttpMethod.Put, AssignmentWire.AssigneeOf(spaceId, taskId), token, AssignmentWire.Body(null), NoKey);
+            unassigned = await owner.SendWithTokenAndHeadersAsync(HttpMethod.Put, TaskRoutes.AssigneeOf(spaceId, taskId), token, AssignmentWire.Body(null), NoKey);
         });
 
         Assert.True(assigned?.StatusCode == HttpStatusCode.OK, $"The Token's assignment: {Described(assigned)}");
@@ -149,7 +149,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="body">The refused body.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = AssignRouteSkip)]
+    [Theory]
     [InlineData("{}")]
     [InlineData("[]")]
     [InlineData("\"someone\"")]
@@ -178,12 +178,12 @@ public sealed partial class ActiveSpaceEndpointTests
 
             await owner.FetchAntiforgeryTokenAsync();
             anchor = await AssignOverWireAsync(owner, spaceId, taskId, assigneeMembership);
-            refused = await owner.SendWithHeadersAsync(HttpMethod.Put, AssignmentWire.AssigneeOf(spaceId, taskId), AssignmentWire.RawBody(body), NoKey);
+            refused = await owner.SendWithHeadersAsync(HttpMethod.Put, TaskRoutes.AssigneeOf(spaceId, taskId), AssignmentWire.RawBody(body), NoKey);
         });
 
         Assert.True(anchor?.StatusCode == HttpStatusCode.OK, $"The anchor: {Described(anchor)}");
         Assert.True(refused?.StatusCode == HttpStatusCode.BadRequest, $"The body {body}: {Described(refused)}");
-        Assert.Equal(AssignmentWire.InvalidAssigneeProblemType, ProblemType(refused));
+        Assert.Equal(ProblemTypes.InvalidAssignee, ProblemType(refused));
         Assert.Equal(assigneeMembership, await wire.AssigneeOfAsync(spaceId, taskId));
     }
 
@@ -194,7 +194,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Task exists. Anchor: a real Member of this Space is assigned to another Task on the same route first.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = AssignRouteSkip)]
+    [Fact]
     [Trait("Requirement", "FR-21")]
     [Trait("Requirement", "AR-8")]
     [Trait("Requirement", "AD-23")]
@@ -232,7 +232,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.True(anchor?.StatusCode == HttpStatusCode.OK, $"The anchor: {Described(anchor)}");
         Assert.True(random?.StatusCode == HttpStatusCode.BadRequest, $"A random id: {Described(random)}");
-        Assert.Equal(AssignmentWire.InvalidAssigneeProblemType, ProblemType(random));
+        Assert.Equal(ProblemTypes.InvalidAssignee, ProblemType(random));
         Assert.True(foreign?.StatusCode == HttpStatusCode.BadRequest, $"Another Space's Membership: {Described(foreign)}");
         Assert.Equal(random.Body, foreign.Body);
         Assert.Null(await wire.AssigneeOfAsync(spaceId, taskId));
@@ -247,7 +247,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="readerRole">The reader's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1, AC6 - the candidates read GET .../assignees is not mapped yet (Q2 (a))")]
+    [Theory]
     [InlineData("owner")]
     [InlineData("admin")]
     [InlineData("member")]
@@ -311,7 +311,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="assignerRole">The assigner's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC3 - the assignment route is not mapped yet, so no Viewer can be assigned")]
+    [Theory]
     [InlineData("owner")]
     [InlineData("admin")]
     [InlineData("member")]
@@ -381,7 +381,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// separable. Every one of its Tasks keeps its <c>AssigneeMembershipId</c> after the <c>200</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the assignment route is not mapped yet, so there is no Assignee to demote")]
+    [Fact]
     [Trait("Requirement", "FR-21")]
     [Trait("Requirement", "FR-13")]
     public async Task Demoting_an_Assignee_to_Viewer_keeps_every_assignment()
@@ -429,7 +429,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// (NFR-6), and its link carries no id.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - nothing enqueues an assignment email yet (OutboxKinds.TaskAssigned, AssignmentEmail)")]
+    [Fact]
     [Trait("Requirement", "FR-40")]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-10")]
@@ -495,7 +495,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// naming the second Task and not the first.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - nothing enqueues an assignment email yet, so the anchor never arrives")]
+    [Fact]
     [Trait("Requirement", "FR-40")]
     [Trait("Assumption", "PRD-12-10")]
     public async Task Assigning_oneself_sends_no_email_and_an_assignment_by_someone_else_does()
@@ -549,7 +549,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// assigning A a second Task then emails A. A ends with exactly two assignment emails (one per Task) and B with one.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - nothing enqueues an assignment email yet")]
+    [Fact]
     [Trait("Requirement", "FR-40")]
     [Trait("Assumption", "PRD-12-10")]
     public async Task Only_a_change_to_another_Accounts_Membership_sends_an_email()
@@ -612,7 +612,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// record and no email. Anchor: once the plant is gone, another assignment to the same recipient is sent and recorded.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4, AC5 - the assignment route, its enqueue and the send record do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AR-33")]
     [Trait("Requirement", "AD-10")]
     [Trait("Requirement", "FS-NFR-2")]
@@ -689,7 +689,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// database clock. The records are Space-scoped: under another Space's key none of them is visible.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - dbo.[NotificationSend] does not exist and OutboxStore writes no record yet (Lee's Q4 (a))")]
+    [Fact]
     [Trait("Requirement", "FS-NFR-2")]
     [Trait("Requirement", "NFR-1")]
     [Trait("Assumption", "PRD-12-10")]
@@ -745,7 +745,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// malformed key is <c>400 invalid-idempotency-key</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = AssignRouteSkip)]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "FR-40")]
     [Trait("Assumption", "PRD-12-10")]
@@ -806,7 +806,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// unassignment sends no email.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - the assignment route is not mapped yet, and the removal does not unassign (the DELETE would fail 547)")]
+    [Fact]
     [Trait("Requirement", "FR-21")]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-5")]
@@ -877,7 +877,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// answers <c>204</c>, its Task survives unassigned, and another Member's assignment is untouched.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - the assignment route is not mapped yet, and the leave does not unassign (the DELETE would fail 547)")]
+    [Fact]
     [Trait("Requirement", "FR-21")]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-5")]
@@ -929,7 +929,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// authority) is rolled back whole, so the target Admin keeps its Membership and its Task stays assigned.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - the assignment route is not mapped yet, so there is no assignment to keep")]
+    [Fact]
     [Trait("Requirement", "FR-21")]
     [Trait("Requirement", "FR-14")]
     [Trait("Assumption", "PRD-12-4")]
@@ -973,7 +973,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>204</c> and leaves no Task and no Membership of it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the assignment route and its composite key do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AR-8")]
     [Trait("Requirement", "AD-5")]
     public async Task Deleting_a_Space_that_holds_an_assigned_Task_answers_204_and_leaves_no_row()
@@ -1011,13 +1011,13 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>Idempotency-Key</c> when one is given.
     /// </summary>
     private static Task<WireResponse> AssignOverWireAsync(WireSession session, Guid spaceId, Guid taskId, Guid? membershipId, string? key = null) =>
-        session.SendWithHeadersAsync(HttpMethod.Put, AssignmentWire.AssigneeOf(spaceId, taskId), AssignmentWire.Body(membershipId), KeyHeaders(key));
+        session.SendWithHeadersAsync(HttpMethod.Put, TaskRoutes.AssigneeOf(spaceId, taskId), AssignmentWire.Body(membershipId), KeyHeaders(key));
 
     /// <summary>
     /// The candidates read as the browser sends it: the Session's cookie, a <c>GET</c>.
     /// </summary>
     private static Task<WireResponse> CandidatesOverWireAsync(WireSession session, Guid spaceId) =>
-        session.SendWithHeadersAsync(HttpMethod.Get, AssignmentWire.AssigneesOf(spaceId), content: null, NoKey, withAntiforgeryToken: false);
+        session.SendWithHeadersAsync(HttpMethod.Get, AssigneeRoutes.ListOf(spaceId), content: null, NoKey, withAntiforgeryToken: false);
 
     /// <summary>
     /// A named Space with its Owner and one Status, so a Task can be created in it: a seeded Space carries no Statuses.

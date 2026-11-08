@@ -5,21 +5,11 @@ using System.Text.Json;
 namespace Yello.Tests.Shared;
 
 /// <summary>
-/// The test side of assigning a Task: the assignment route (<c>PUT /api/v1/spaces/{spaceId}/tasks/{taskId}/assignee</c>,
-/// body <c>{ membershipId }</c>, <c>null</c> unassigns, answered <c>200</c> with the Task), the candidates read
-/// (<c>GET /api/v1/spaces/{spaceId}/assignees</c>, answered <c>{ assignees: [{ membershipId, displayName }] }</c>), the List
-/// View's Assignee sort and filter parameters, and the fixed values the suites assert against.
+/// The test side of assigning a Task: the assignment body (<c>{ membershipId }</c>, <c>null</c> unassigns), readings of the
+/// Task answer and of the candidates read (<c>{ assignees: [{ membershipId, displayName }] }</c>), and the fixed values the
+/// suites assert against. The routes, the problem type and the List parameters are the contract's own.
 /// </summary>
 /// <remarks>
-/// <para>
-/// <b>Temporary stand-ins</b>, the 4.4 and 4.5 precedent: <see cref="AssigneeRoute"/>, <see cref="AssigneeOf"/>,
-/// <see cref="AssigneesRoute"/>, <see cref="AssigneesOf"/>, <see cref="InvalidAssigneeProblemType"/>,
-/// <see cref="SortAssignee"/>, <see cref="AssigneeParameter"/> and <see cref="UnassignedParameter"/> name members the
-/// contract does not declare yet (<c>TaskRoutes.Assignee</c> / <c>AssigneeOf</c>, <c>AssigneeRoutes.List</c> /
-/// <c>ListOf</c>, <c>ProblemTypes.InvalidAssignee</c>, <c>ListSorts.Assignee</c>, the <c>ListRoutes</c> parameters). When the
-/// contract declares them, every use is swapped for the contract member and the stand-in deleted. Everything else here is
-/// a lasting reading of the wire.
-/// </para>
 /// <para>
 /// <b>Bodies are JSON text or anonymous objects</b>, never a contract type, so a case can send what the route
 /// distinguishes: a <c>membershipId</c> set to a value, set to <c>null</c> (unassign), or absent (refused).
@@ -28,22 +18,6 @@ namespace Yello.Tests.Shared;
 public static class AssignmentWire
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-    /// <summary>
-    /// The assignment route's pattern. Stand-in for <c>TaskRoutes.Assignee</c>.
-    /// </summary>
-    public static string AssigneeRoute => "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/assignee";
-
-    /// <summary>
-    /// The candidates read's pattern. Stand-in for <c>AssigneeRoutes.List</c>.
-    /// </summary>
-    public static string AssigneesRoute => "/api/v1/spaces/{spaceId:guid}/assignees";
-
-    /// <summary>
-    /// The refusal of a missing, malformed, random, foreign or just-removed Membership id: byte-identical for every one.
-    /// Stand-in for <c>ProblemTypes.InvalidAssignee</c>.
-    /// </summary>
-    public static string InvalidAssigneeProblemType => "urn:yello:problem:invalid-assignee";
 
     /// <summary>
     /// The capability the assignment route declares, as its <c>403</c> body names it: the matrix's own "Assign a Task" row.
@@ -66,21 +40,6 @@ public static class AssignmentWire
     public static string InvitationIssuedKind => "invitation-issued";
 
     /// <summary>
-    /// The Assignee sort's code. Stand-in for <c>ListSorts.Assignee</c>.
-    /// </summary>
-    public static string SortAssignee => "assignee";
-
-    /// <summary>
-    /// The List filter's repeatable Membership-id parameter. Stand-in for the <c>ListRoutes</c> member.
-    /// </summary>
-    public static string AssigneeParameter => "assignee";
-
-    /// <summary>
-    /// The List filter's "no Assignee" flag, the <c>dueNone</c> precedent. Stand-in for the <c>ListRoutes</c> member.
-    /// </summary>
-    public static string UnassignedParameter => "unassigned";
-
-    /// <summary>
     /// The candidates read's JSON members, in ordinal order: <c>AssigneeListResponse(Assignees)</c>.
     /// </summary>
     public static IReadOnlyList<string> ListMembers { get; } = ["assignees"];
@@ -90,21 +49,6 @@ public static class AssignmentWire
     /// address, a Role, an Account id or a Space id.
     /// </summary>
     public static IReadOnlyList<string> CandidateMembers { get; } = ["displayName", "membershipId"];
-
-    /// <summary>
-    /// The assignment path of one Task. Stand-in for <c>TaskRoutes.AssigneeOf</c>.
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <param name="taskId">The Task.</param>
-    /// <returns>The path.</returns>
-    public static string AssigneeOf(Guid spaceId, Guid taskId) => $"/api/v1/spaces/{spaceId:D}/tasks/{taskId:D}/assignee";
-
-    /// <summary>
-    /// The candidates path of one Space. Stand-in for <c>AssigneeRoutes.ListOf</c>.
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <returns>The path.</returns>
-    public static string AssigneesOf(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}/assignees";
 
     /// <summary>
     /// The assignment body: <c>{ membershipId }</c>, written as JSON <c>null</c> when <paramref name="membershipId"/> is

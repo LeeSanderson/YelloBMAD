@@ -65,6 +65,46 @@ public sealed class HostPool : IAsyncDisposable
         return RunCoreAsync(connectionString, settings, work);
     }
 
+    /// <summary>
+    /// Kills every pooled Host connected to <paramref name="connectionString"/> and waits for it to exit. A later
+    /// <see cref="RunAsync(string, Func{HttpClient, Task})"/> starts a fresh one.
+    /// </summary>
+    /// <remarks>
+    /// A pooled Host is an outbox dispatcher on the class's database: any authenticated request it serves, or a sweep a
+    /// previous case kicked, can claim and send a row the current case seeded, into the default drop rather than the
+    /// case's <see cref="MailDrop"/>. A case that seeds outbox rows for a Host of its own to send stops the pool first.
+    /// </remarks>
+    /// <param name="connectionString">The database whose Hosts are stopped.</param>
+    /// <returns>A task.</returns>
+    public Task StopAsync(string connectionString)
+    {
+        ArgumentNullException.ThrowIfNull(connectionString);
+
+        return StopCoreAsync(connectionString);
+    }
+
+    private async Task StopCoreAsync(string connectionString)
+    {
+        await _gate.WaitAsync().ConfigureAwait(false);
+
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            foreach (var key in _hosts.Keys.Where(key => IsFor(key, connectionString)).ToList())
+            {
+                var host = _hosts[key];
+
+                _hosts.Remove(key);
+                await host.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _gate.Release();
+        }
+    }
+
     /// <inheritdoc />
     public async ValueTask DisposeAsync()
     {
@@ -112,6 +152,11 @@ public sealed class HostPool : IAsyncDisposable
         string.Join(
             '\n',
             settings.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => pair.Key + "=" + pair.Value).Prepend(connectionString));
+
+    private static bool IsFor(string key, string connectionString) =>
+        key.Length >= connectionString.Length
+        && key.StartsWith(connectionString, StringComparison.Ordinal)
+        && (key.Length == connectionString.Length || key[connectionString.Length] == '\n');
 
     private async Task RunCoreAsync(string connectionString, IReadOnlyDictionary<string, string> settings, Func<HttpClient, Task> work)
     {

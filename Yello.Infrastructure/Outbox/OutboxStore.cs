@@ -17,6 +17,11 @@ namespace Yello.Infrastructure.Outbox;
 /// <b>Sent only after the commit.</b> It marks the request's <see cref="OutboxCommitSignal"/>; the unit of work kicks the
 /// dispatcher once its commit has succeeded, and never on a rollback.
 /// </para>
+/// <para>
+/// <b>Records the send beside the row</b>: a <see cref="NotificationSend"/> holding the request's Space, the kind and the
+/// time, saved in the same change, so it commits or rolls back with the email. Every enqueue runs in a Space-scoped request;
+/// one that did not would have no Space to record, and is refused rather than recorded without one.
+/// </para>
 /// </remarks>
 /// <param name="dbContext">The request's unit of work.</param>
 /// <param name="identifiers">Produces the row's identity (AR-34).</param>
@@ -38,6 +43,16 @@ internal sealed class OutboxStore(
 
     private async Task EnqueueCoreAsync(OutboxEmail email, CancellationToken cancellationToken)
     {
+        var spaceId = dbContext.ScopedSpaceId
+            ?? throw new InvalidOperationException("An email is enqueued only inside a Space-scoped unit of work, which its send record names.");
+
+        dbContext.Set<NotificationSend>().Add(new NotificationSend
+        {
+            Id = identifiers.Next(),
+            SpaceId = spaceId,
+            Kind = email.Kind,
+        });
+
         dbContext.Set<OutboxMessage>().Add(new OutboxMessage
         {
             Id = identifiers.Next(),

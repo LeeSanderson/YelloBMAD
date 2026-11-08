@@ -11,8 +11,9 @@ namespace Yello.Contracts.Lists;
 /// <para>
 /// <b>One route answers every page</b> with a <see cref="ListPageResponse"/>. The query: <c>sort</c> (a
 /// <see cref="ListSorts"/> code), <c>status</c> and <c>label</c> (repeatable ids; any of them), <c>dueFrom</c> and
-/// <c>dueTo</c> (instants with an offset, a half-open range), <c>dueNone</c> (<c>true</c> for "No due date"), and
-/// <c>after</c> (a cursor the route issued for the same sort).
+/// <c>dueTo</c> (instants with an offset, a half-open range), <c>dueNone</c> (<c>true</c> for "No due date"),
+/// <c>assignee</c> (repeatable Membership ids) and <c>unassigned</c> (<c>true</c> for "Unassigned"; a Task matching any of
+/// these is listed), and <c>after</c> (a cursor the route issued for the same sort).
 /// </para>
 /// <para>
 /// <b>No size parameter</b> (AC12): the server owns the page size, because a client-chosen size is a lever on an
@@ -57,6 +58,16 @@ public static class ListRoutes
     public static string DueNoneParameter => "dueNone";
 
     /// <summary>
+    /// The repeatable query parameter naming a Membership whose Tasks to list.
+    /// </summary>
+    public static string AssigneeParameter => "assignee";
+
+    /// <summary>
+    /// The query parameter asking for unassigned Tasks as well - alone, unassigned Tasks only.
+    /// </summary>
+    public static string UnassignedParameter => "unassigned";
+
+    /// <summary>
     /// The query parameter holding the cursor.
     /// </summary>
     public static string AfterParameter => "after";
@@ -99,6 +110,16 @@ public static class ListRoutes
         if (query.DueNone)
         {
             path.Append(CultureInfo.InvariantCulture, $"&{DueNoneParameter}=true");
+        }
+
+        foreach (var membershipId in query.AssigneeMembershipIds)
+        {
+            path.Append(CultureInfo.InvariantCulture, $"&{AssigneeParameter}={membershipId:D}");
+        }
+
+        if (query.Unassigned)
+        {
+            path.Append(CultureInfo.InvariantCulture, $"&{UnassignedParameter}=true");
         }
 
         return path.ToString();

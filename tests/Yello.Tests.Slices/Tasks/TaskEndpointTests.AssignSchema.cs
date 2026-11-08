@@ -38,7 +38,7 @@ public sealed partial class TaskEndpointTests
     /// <c>delete_referential_action</c> NO ACTION. The Task keeps its earlier keys to Project and Status.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the TaskAssignee migration has not added AssigneeMembershipId or its composite key")]
+    [Fact]
     [Trait("Requirement", "AR-8")]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "FR-21")]
@@ -65,7 +65,7 @@ public sealed partial class TaskEndpointTests
     /// Task's own Space's Membership, and clear it again.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - dbo.[Task] has no AssigneeMembershipId column yet")]
+    [Fact]
     [Trait("Requirement", "AR-8")]
     [Trait("Requirement", "AD-2")]
     public async Task The_database_refuses_an_Assignee_from_another_Space()
@@ -107,7 +107,7 @@ public sealed partial class TaskEndpointTests
     /// <c>(SpaceId, ProjectId, AssigneeMembershipId, Id)</c>, in that order.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the TaskAssignee migration has not added the Assignee sort's index")]
+    [Fact]
     [Trait("Requirement", "AD-29")]
     [Trait("Requirement", "AR-22")]
     [Trait("Requirement", "FR-30")]
@@ -136,7 +136,7 @@ public sealed partial class TaskEndpointTests
     /// update; and it reaches <c>Space</c> with cascade, so a Space's erasure takes its records.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - dbo.[NotificationSend] does not exist yet (Lee's Q4 (a))")]
+    [Fact]
     [Trait("Requirement", "FS-NFR-2")]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "NFR-1")]

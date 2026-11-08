@@ -84,7 +84,50 @@ public interface IMembershipStore
     /// <returns>What the leave came to: <see cref="RemovalOutcome.Removed"/>,
     /// <see cref="RemovalOutcome.OwnershipHeld"/> or <see cref="RemovalOutcome.LostMembership"/>.</returns>
     Task<RemovalOutcome> LeaveAsync(Guid actorAccountId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Every Membership of the resolved Space as an Assignee candidate - its id and its Account's display name, never an
+    /// address or a Role - in join order (<c>CreatedAt</c>, then <c>Id</c>), unpaged.
+    /// </summary>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The candidates.</returns>
+    Task<IReadOnlyList<AssigneeCandidate>> ListAssigneesAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// What an assignment email needs from the people and the work, read inside the assignment's unit of work: the
+    /// Assignee's Account and address, the assigner's display name as it stands now, and the names of the Task's Project and
+    /// the Task.
+    /// </summary>
+    /// <param name="actorAccountId">The assigning Account.</param>
+    /// <param name="membershipId">The Assignee's Membership.</param>
+    /// <param name="taskId">The assigned Task.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The facts, or <c>null</c> when any of them is not in the resolved Space.</returns>
+    Task<AssignmentNotice?> AssignmentNoticeAsync(Guid actorAccountId, Guid membershipId, Guid taskId, CancellationToken cancellationToken);
 }
+
+/// <summary>
+/// One Assignee candidate.
+/// </summary>
+/// <param name="MembershipId">The Membership.</param>
+/// <param name="DisplayName">Its Account's display name, read live for a current Member.</param>
+public sealed record AssigneeCandidate(Guid MembershipId, string DisplayName);
+
+/// <summary>
+/// What an assignment email is rendered from, beside the Space's name. Every name is the resolved Space's own, read under its
+/// key.
+/// </summary>
+/// <param name="RecipientAccountId">The Assignee's Account, compared with the assigner's so no one is told of their own action.</param>
+/// <param name="RecipientAddress">The Assignee's address, for the outbox alone - never answered or logged.</param>
+/// <param name="AssignerName">The assigner's display name.</param>
+/// <param name="ProjectName">The Task's Project's name.</param>
+/// <param name="TaskTitle">The Task's title.</param>
+public sealed record AssignmentNotice(
+    Guid RecipientAccountId,
+    string RecipientAddress,
+    string AssignerName,
+    string ProjectName,
+    string TaskTitle);
 
 /// <summary>
 /// One Membership as the list reads it. Story 4.4, AC1, AC2, AC7.

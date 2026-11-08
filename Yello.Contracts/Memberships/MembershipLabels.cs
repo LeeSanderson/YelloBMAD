@@ -21,9 +21,12 @@ namespace Yello.Contracts.Memberships;
 /// someone leaves, so a reader's "Sam Lee (2)" would silently become someone else.
 /// </para>
 /// <para>
-/// <b>Names compare ordinally after NFC</b> (the 4.1 Q3 normalisation family): "Sam Lee" and "sam lee" are two names, while
-/// a composed and a decomposed "José" are one. Shared by the client and the server, so the Assignee picker (4.6) and
-/// Presence (7.5) label people the way the Membership list does.
+/// <b>Names collide when they look alike, not only when they are equal.</b> The collision key is the name after NFC, with
+/// format characters (Unicode category <c>Cf</c>, the zero-width space among them) removed, trimmed, with each run of
+/// whitespace collapsed to one space, compared ignoring case: "Sam Lee", "sam lee", "Sam  Lee " and a composed and a
+/// decomposed "José" each read as one name at avatar size. Only the comparison folds - a name is shown as its owner wrote
+/// it. Confusable letters from other scripts are not folded. Shared by the client and the server, so the Membership list,
+/// the Assignee picker, the cards and the List View label people the same way.
 /// </para>
 /// </remarks>
 public static class MembershipLabels
@@ -82,7 +85,35 @@ public static class MembershipLabels
     private static string FirstLetter(string word) =>
         StringInfo.GetNextTextElement(word).ToUpper(CultureInfo.InvariantCulture);
 
-    private static string Normalised(string displayName) => displayName.Normalize(NormalizationForm.FormC);
+    private static string Normalised(string displayName)
+    {
+        var folded = new StringBuilder(displayName.Length);
+        var inWhitespace = false;
+
+        foreach (var rune in displayName.Normalize(NormalizationForm.FormC).EnumerateRunes())
+        {
+            if (Rune.GetUnicodeCategory(rune) == UnicodeCategory.Format)
+            {
+                continue;
+            }
+
+            if (Rune.IsWhiteSpace(rune))
+            {
+                inWhitespace = true;
+                continue;
+            }
+
+            if (inWhitespace && folded.Length > 0)
+            {
+                folded.Append(' ');
+            }
+
+            inWhitespace = false;
+            folded.Append(Rune.ToUpperInvariant(rune).ToString());
+        }
+
+        return folded.ToString();
+    }
 
     private static string Discriminator(Guid membershipId) =>
         Convert.ToHexString(SHA256.HashData(membershipId.ToByteArray()))[..DiscriminatorLength];

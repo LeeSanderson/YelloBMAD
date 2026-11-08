@@ -15,6 +15,7 @@ using Yello.Application.Invitations.ViewInvitation;
 using Yello.Application.Memberships;
 using Yello.Application.Memberships.ChangeMembershipRole;
 using Yello.Application.Memberships.LeaveSpace;
+using Yello.Application.Memberships.ListAssignees;
 using Yello.Application.Memberships.ListMemberships;
 using Yello.Application.Memberships.ReadMembership;
 using Yello.Application.Memberships.RemoveMembership;
@@ -34,6 +35,7 @@ using Yello.Application.Spaces.DeleteSpace;
 using Yello.Application.Spaces.ListSpaces;
 using Yello.Application.Spaces.RenameSpace;
 using Yello.Application.Statuses.ListStatuses;
+using Yello.Application.Tasks.AssignTask;
 using Yello.Application.Tasks.CreateTask;
 using Yello.Application.Tasks.DeleteTask;
 using Yello.Application.Tasks.EditTaskAttributes;
@@ -150,6 +152,8 @@ builder.Services.AddScoped<ChangeMembershipRoleHandler>();
 builder.Services.AddScoped<ReadMembershipHandler>();
 builder.Services.AddScoped<RemoveMembershipHandler>();
 builder.Services.AddScoped<LeaveSpaceHandler>();
+builder.Services.AddScoped<AssignTaskHandler>();
+builder.Services.AddScoped<ListAssigneesHandler>();
 builder.Services.AddScoped<ActingAuthority>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
@@ -191,10 +195,14 @@ builder.Services.AddCors(options => CrossOriginPolicy.Configure(options, clientO
 
 // THE INVITATION LINK'S ORIGIN (story 4.1, AC7): the same configured client origin, so the link an email carries opens
 // the client CORS admits. Without a usable origin the link is origin-less - see InvitationLinks.
-builder.Services.AddSingleton(new InvitationLinks(
-    CrossOriginPolicy.Describe(clientOrigin ?? string.Empty) is null && Uri.TryCreate(clientOrigin, UriKind.Absolute, out var origin)
-        ? origin
-        : null));
+var usableClientOrigin = CrossOriginPolicy.Describe(clientOrigin ?? string.Empty) is null && Uri.TryCreate(clientOrigin, UriKind.Absolute, out var origin)
+    ? origin
+    : null;
+
+builder.Services.AddSingleton(new InvitationLinks(usableClientOrigin));
+
+// The assignment email's link: the same origin, with nothing after it.
+builder.Services.AddSingleton(new AssignmentLinks(usableClientOrigin));
 
 // THE EMAIL SENDER, CHOSEN BY CONFIGURATION, OR NO HOST AT ALL (story 4.1, AC11; Q13 (a)). Azure Communication
 // Services with ConnectionStrings:acs; otherwise the file drop with Email:DropFolder (Development's points at a folder
@@ -556,6 +564,16 @@ api.MapChangeMembershipRole();
 api.MapReadMembership();
 api.MapRemoveMembership();
 api.MapLeaveSpace();
+
+// Assignment. PUT /api/v1/spaces/{spaceId}/tasks/{taskId}/assignee assigns a Task to a Membership of the Space ({ membershipId })
+// or unassigns it (null), under AssignTask - the matrix's own row, which no other route declares - on both surfaces: 200 with
+// the Task, 400 invalid-assignee (one body for a missing, random, foreign or just-removed Membership), or the unrecorded
+// boundary 404 for a Task id that names nothing here. It takes the Space's Memberships lock Shared, so it never interleaves
+// with a removal, a leave or a Role change; a change to someone other than the actor enqueues one email in the same unit of
+// work. GET /api/v1/spaces/{spaceId}/assignees lists every Membership as its id and display name - no address, no Role -
+// under the read capability every Role holds, for the picker, the cards and the List View's Assignee filter.
+api.MapAssignTask();
+api.MapListAssignees();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

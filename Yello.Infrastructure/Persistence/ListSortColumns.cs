@@ -24,5 +24,6 @@ public static class ListSortColumns
         [ListSortCodes.Of(ListSort.Status)] = nameof(TaskItem.StatusId),
         [ListSortCodes.Of(ListSort.DueDate)] = nameof(TaskItem.DueDate),
         [ListSortCodes.Of(ListSort.Label)] = nameof(TaskItem.FirstLabelName),
+        [ListSortCodes.Of(ListSort.Assignee)] = nameof(TaskItem.AssigneeMembershipId),
     };
 }

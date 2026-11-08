@@ -271,6 +271,16 @@ public static class ProblemTypes
     public static string InvalidTaskLabels => "urn:yello:problem:invalid-task-labels";
 
     /// <summary>
+    /// An assignment whose body names no Membership, or a Membership that is not one of the Space's - unknown, another
+    /// Space's, or removed while the assignment waited. Answered <c>400</c>; nothing is written.
+    /// </summary>
+    /// <remarks>
+    /// <b>The same bytes for every cause</b>: a random id and another Space's real Membership id cannot be told apart, so the
+    /// answer says nothing about where an id exists (I-13). It is not a <c>404</c>: the Task is present.
+    /// </remarks>
+    public static string InvalidAssignee => "urn:yello:problem:invalid-assignee";
+
+    /// <summary>
     /// A move whose position is not one: the Task to land after is not a Task in the destination column of the moved
     /// Task's Project - absent, deleted, moved away, in another Project or column, another Space's, or the moved Task
     /// itself - or no position key fits between it and its successor. Answered <c>409</c>; nothing is written. Story 2.6,
@@ -304,9 +314,10 @@ public static class ProblemTypes
     public static string InvalidBoardCursor => "urn:yello:problem:invalid-board-cursor";
 
     /// <summary>
-    /// A List View query that is not one the route reads: a <c>sort</c> that is not an offered code (the Assignee among
-    /// them, until story 4.6), a <c>status</c> or <c>label</c> that is not an id, a due bound that is not an instant with
-    /// an offset inside 2000-2100, or "No due date" together with a range. Answered <c>400</c>. Story 2.10, AC12.
+    /// A List View query that is not one the route reads: a <c>sort</c> that is not an offered code, a <c>status</c>,
+    /// <c>label</c> or <c>assignee</c> that is not an id, an <c>unassigned</c> that is not a boolean, a due bound that is
+    /// not an instant with an offset inside 2000-2100, or "No due date" together with a range. Answered <c>400</c>. Story
+    /// 2.10, AC12.
     /// </summary>
     /// <remarks>
     /// <b>Never a statement about a stored Status or Label</b>: it depends only on the query as sent. A well-formed id

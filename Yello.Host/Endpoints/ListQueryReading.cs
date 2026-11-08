@@ -16,8 +16,9 @@ namespace Yello.Host.Endpoints;
 /// <para>
 /// <b>The query</b>: exactly one <c>sort</c> naming an offered code; every <c>status</c> and <c>label</c> an id (at most
 /// <see cref="MostFilterIds"/> of each); each due bound at most once, an instant that states its offset, inside story 2.3's
-/// 2000-2100 window; <c>dueNone</c> a boolean, never together with a bound. Anything else the query holds is ignored -
-/// there is no size parameter to honour.
+/// 2000-2100 window; <c>dueNone</c> a boolean, never together with a bound; every <c>assignee</c> an id (at most
+/// <see cref="MostFilterIds"/>) and <c>unassigned</c> a boolean. Anything else the query holds is ignored - there is no
+/// size parameter to honour.
 /// </para>
 /// <para>
 /// <b>The cursor</b>: at most one, and one this route issued for the requested sort (<see cref="ListCursorText"/>).
@@ -60,7 +61,16 @@ internal static partial class ListQueryReading
             return false;
         }
 
-        filter = new ListFilter(statusIds, labelIds, dueFrom, dueTo, dueNone);
+        if (!TryIds(query[ListRoutes.AssigneeParameter], out var assigneeIds) || !TryFlag(query[ListRoutes.UnassignedParameter], out var unassigned))
+        {
+            return false;
+        }
+
+        filter = new ListFilter(statusIds, labelIds, dueFrom, dueTo, dueNone)
+        {
+            AssigneeMembershipIds = assigneeIds,
+            Unassigned = unassigned,
+        };
 
         return true;
     }
@@ -94,7 +104,7 @@ internal static partial class ListQueryReading
             return false;
         }
 
-        if (!TryDueNone(query[ListRoutes.DueNoneParameter], out dueNone))
+        if (!TryFlag(query[ListRoutes.DueNoneParameter], out dueNone))
         {
             return false;
         }
@@ -168,16 +178,19 @@ internal static partial class ListQueryReading
             && TaskDueDate.TryNormalise(parsed, out bound);
     }
 
-    private static bool TryDueNone(StringValues values, out bool dueNone)
+    /// <summary>
+    /// A boolean sent at most once; <c>false</c> when absent.
+    /// </summary>
+    private static bool TryFlag(StringValues values, out bool flag)
     {
-        dueNone = false;
+        flag = false;
 
         if (values.Count == 0)
         {
             return true;
         }
 
-        return TrySingle(values, out var text) && bool.TryParse(text, out dueNone);
+        return TrySingle(values, out var text) && bool.TryParse(text, out flag);
     }
 
     [GeneratedRegex(@"(?:[Zz]|[+-][0-9]{2}:[0-9]{2})\z", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 100)]

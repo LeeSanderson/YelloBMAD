@@ -2177,3 +2177,43 @@
     align-items: center;
     gap: var(--space-3);
 }
+
+/*
+    AN ASSIGNEE'S AVATAR (UX-DR8, UX-DR34; DESIGN.md avatar): squared monospace initials, the default 3px corner, the role
+    chip's fill and ink. Sized by its text and the spacing tokens, never a fixed or minimum size - it is not a target - so
+    text spacing and zoom grow it. Never a control and never a tooltip. On a card it is pushed to the end of the metadata row, which still wraps at 320px. In a
+    List row it sits inline in its cell: a cell given display: flex leaves table layout.
+*/
+.assignee-avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    padding-inline: var(--space-1);
+    border-radius: var(--radius-default);
+    background: var(--role-chip);
+    color: var(--role-chip-on);
+    font-family: var(--type-meta-family);
+    font-size: var(--type-meta-size);
+    font-weight: var(--type-meta-weight);
+    line-height: var(--type-meta-line-height);
+}
+
+.task-card__meta .assignee-avatar {
+    margin-inline-start: auto;
+}
+
+.assignee-option,
+.task-detail__assignee {
+    display: flex;
+    align-items: center;
+    gap: var(--space-1);
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+}
+
+.task-detail__assignee {
+    align-self: flex-start;
+    min-block-size: var(--target-min);
+    min-inline-size: var(--target-min);
+}

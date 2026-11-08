@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Net;
 using Microsoft.Data.SqlClient;
 using Xunit;
+using Yello.Contracts;
 using Yello.Tests.Shared;
 using TaskWire = Yello.Tests.Slices.Tasks.TaskWire;
 
@@ -39,7 +40,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// removal and failed it, or met the key as a <c>547</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the assignment route and its Shared hold on the Memberships lock do not exist yet (Q3 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-21")]
     [Trait("Requirement", "AD-5")]
     [Trait("Requirement", "AR-8")]
@@ -89,7 +90,7 @@ public sealed partial class ActiveSpaceEndpointTests
         });
 
         Assert.True(queued?.StatusCode == HttpStatusCode.BadRequest, $"The queued assignment: {Described(queued)}");
-        Assert.Equal(AssignmentWire.InvalidAssigneeProblemType, ProblemType(queued));
+        Assert.Equal(ProblemTypes.InvalidAssignee, ProblemType(queued));
         Assert.Null(await wire.AssigneeOfAsync(spaceId, taskId));
         Assert.Empty(toTarget);
     }
@@ -101,7 +102,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// deletes: <c>204</c>, the Task survives unassigned, no <c>547</c>. A removal without its unassign fails here.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8, AC9 - the removal neither unassigns nor waits on a Shared holder yet; AssigneeMembershipId does not exist")]
+    [Fact]
     [Trait("Requirement", "FR-21")]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-5")]
@@ -156,7 +157,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// wait.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the assignment route is not mapped yet (Q3 (a): the lock is Shared)")]
+    [Fact]
     [Trait("Requirement", "FR-21")]
     public async Task Two_assignments_in_one_Space_do_not_wait_on_each_other()
     {

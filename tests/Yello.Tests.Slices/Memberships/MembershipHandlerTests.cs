@@ -278,5 +278,11 @@ public sealed class MembershipHandlerTests
 
             return Task.FromResult(RemovalOutcome.Removed);
         }
+
+        public Task<IReadOnlyList<AssigneeCandidate>> ListAssigneesAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<AssigneeCandidate>>([.. rows.Select(row => new AssigneeCandidate(row.Id, row.DisplayName))]);
+
+        public Task<AssignmentNotice?> AssignmentNoticeAsync(Guid actorAccountId, Guid membershipId, Guid taskId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("No Membership slice assigns a Task.");
     }
 }

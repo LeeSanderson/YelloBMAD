@@ -94,26 +94,11 @@ public sealed class ListViewGateTests
     }
 
     /// <summary>
-    /// AC2 (AR-22's staging; FR-30 completes in 4.6) - the sorts offered are exactly Status, due date and Label: three
-    /// stable codes, and none names the Assignee, which no Task holds until Epic 4.
-    /// </summary>
-    [Fact]
-    public void The_offered_sorts_are_exactly_three_and_none_is_the_Assignee()
-    {
-        var sorts = SortCodes();
-
-        Assert.Equal(3, sorts.Count);
-        Assert.Equal(sorts.Count, sorts.Distinct(StringComparer.Ordinal).Count());
-        Assert.DoesNotContain(sorts, code => code.Contains("assignee", StringComparison.OrdinalIgnoreCase));
-    }
-
-    /// <summary>
     /// The sorts offered are exactly four distinct stable codes - Status, due date, Label and Assignee - and
     /// the Assignee's is <c>assignee</c>, mapped to <c>AssigneeMembershipId</c> (grouped by Membership, Unassigned
-    /// last). Replaces <see cref="The_offered_sorts_are_exactly_three_and_none_is_the_Assignee"/> in the commit that adds the
-    /// sort; that gate goes red at that moment, as designed.
+    /// last). It replaced 2.10's "exactly three, and none is the Assignee" gate when the sort was added.
     /// </summary>
-    [Fact(Skip = "red: AC7 - ListSorts offers no Assignee sort and ListSortColumns has no assignee entry yet (Q6 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-30")]
     public void The_offered_sorts_are_exactly_four_and_the_Assignee_is_among_them()
     {
@@ -130,7 +115,7 @@ public sealed class ListViewGateTests
     /// <c>(SpaceId, ProjectId, AssigneeMembershipId, Id)</c>, which the generic index gate then finds for the
     /// <c>assignee</c> code.
     /// </summary>
-    [Fact(Skip = "red: AC7 - the Assignee sort's composite index is not in the model yet")]
+    [Fact]
     [Trait("Requirement", "FR-30")]
     public void The_Assignee_sort_has_its_composite_index_in_the_model()
     {

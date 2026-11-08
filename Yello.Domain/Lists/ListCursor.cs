@@ -12,15 +12,16 @@ namespace Yello.Domain.Lists;
 /// still holds that value, so nothing is skipped or repeated when the Task is deleted or edited between pages (AC12).
 /// </para>
 /// <para>
-/// <b>The sort value for the cursor's sort is the only one that matters</b>; for the due-date and Label sorts a
-/// <c>null</c> value means the cursor is in the trailing segment of Tasks with none (AC5, AC13).
+/// <b>The sort value for the cursor's sort is the only one that matters</b>; for the due-date, Label and Assignee sorts a
+/// <c>null</c> value means the cursor is in the trailing segment of Tasks with none.
 /// </para>
 /// </remarks>
 /// <param name="TaskId">The last served Task's id - the tiebreaker, compared in SQL Server's <c>uniqueidentifier</c> order.</param>
 /// <param name="StatusId">Its Status, under <see cref="ListSort.Status"/>.</param>
 /// <param name="DueDate">Its due date, under <see cref="ListSort.DueDate"/>; <c>null</c> in the undated segment.</param>
 /// <param name="FirstLabelName">Its first Label's name, under <see cref="ListSort.Label"/>; <c>null</c> in the unlabelled segment.</param>
-public sealed record ListCursor(Guid TaskId, Guid? StatusId = null, DateTimeOffset? DueDate = null, string? FirstLabelName = null)
+/// <param name="AssigneeMembershipId">Its Assignee, under <see cref="ListSort.Assignee"/>; <c>null</c> in the unassigned segment.</param>
+public sealed record ListCursor(Guid TaskId, Guid? StatusId = null, DateTimeOffset? DueDate = null, string? FirstLabelName = null, Guid? AssigneeMembershipId = null)
 {
     /// <summary>
     /// The cursor after <paramref name="task"/>: its pair under every sort, so one value serves whichever is in use.
@@ -31,6 +32,6 @@ public sealed record ListCursor(Guid TaskId, Guid? StatusId = null, DateTimeOffs
     {
         ArgumentNullException.ThrowIfNull(task);
 
-        return new ListCursor(task.Id, task.StatusId, task.DueDate, task.FirstLabelName);
+        return new ListCursor(task.Id, task.StatusId, task.DueDate, task.FirstLabelName, task.AssigneeMembershipId);
     }
 }

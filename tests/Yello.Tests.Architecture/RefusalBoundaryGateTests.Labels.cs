@@ -127,6 +127,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <summary>
     /// AC7, AD-19, FR-37 - <c>TaskResponse</c> gains <c>LabelIds</c> as <c>IReadOnlyList&lt;Guid&gt;</c> and keeps every
     /// field 2.2 and 2.3 shipped: a field added, none removed or retyped. The successor of 2.3's response-shape assert.
+    /// <c>AssigneeMembershipId</c> is appended on the same terms.
     /// </summary>
     [Fact]
     [Trait("Requirement", "AD-19")]
@@ -135,7 +136,7 @@ public sealed partial class RefusalBoundaryGateTests
     {
         var response = typeof(Yello.Contracts.Tasks.TaskResponse);
 
-        Assert.Equal(["CreatedAt", "DueDate", "Id", "LabelIds", "PositionKey", "StatusId", "Title"], PropertyNames(response));
+        Assert.Equal(["AssigneeMembershipId", "CreatedAt", "DueDate", "Id", "LabelIds", "PositionKey", "StatusId", "Title"], PropertyNames(response));
         Assert.Equal(typeof(IReadOnlyList<Guid>), response.GetProperty("LabelIds")?.PropertyType);
         Assert.Equal(typeof(DateTimeOffset?), response.GetProperty("DueDate")?.PropertyType);
     }

@@ -437,7 +437,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// wrote it, and no label carries an <c>@</c>. "Ann" and "Anne" stay bare: the fold is not a similarity match.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - MembershipLabels' collision key is still NFC plus ordinal (Q7 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR34")]
     [Trait("Requirement", "AD-23")]
     public async Task Look_alike_names_in_the_Members_list_each_carry_a_discriminator()

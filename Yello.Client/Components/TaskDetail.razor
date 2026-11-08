@@ -19,8 +19,13 @@
     in a title field holding an uncommitted change reverts the field first, and Esc in the open picker
     closes the picker. On close the Board returns focus to the card that opened it.
 
-    ATTRIBUTES, THEN DELETE: title, Status, Move, due date and - since story 2.4 - Labels, attributes above. No
-    description region, no heading for one, no placeholder (AC6; FR-31 is Epic 7). No Assignee (4.6).
+    ATTRIBUTES, THEN DELETE: title, Status, Move, due date, Labels and the Assignee, attributes above. No description
+    region, no heading for one, no placeholder (AC6; FR-31 is Epic 7).
+
+    THE ASSIGNEE: an "Assignee" control naming the person - initials and label, never an address - or "Unassigned", which
+    opens a single-select listbox in the panel: "Unassigned" first, then every Member of the Space by initials and label.
+    The current choice is the selected option and nothing else is pre-selected (UX-DR11). Choosing commits at once, on its
+    own route, optimistically. For a Role that may not assign it is text - absent, never disabled (UX-DR27).
 
     MOVE (story 2.6, AC1, AC14; open questions 5 (a) and 9): a secondary button directly after the Status control, for a
     Role that can move Tasks only. It opens the Move picker in place below it - never a second dialog - which names the
@@ -211,6 +216,49 @@
             </div>
         }
 
+        @if (!_confirming && CanAssign)
+        {
+            <div class="task-detail__field">
+                <span class="form-field__label" id="@AssigneeLabelId">@Localizer["AssigneeLabel"]</span>
+                <button type="button"
+                        class="button-secondary task-detail__assignee"
+                        id="@AssigneeButtonId"
+                        aria-haspopup="listbox"
+                        aria-expanded="@(_assigneePickerOpen ? "true" : "false")"
+                        aria-labelledby="@($"{AssigneeLabelId} {AssigneeButtonId}")"
+                        @onclick="ToggleAssigneePicker"
+                        @ref="_assigneeButton">@if (CurrentAssignee is { } assignee)
+                    {
+                        <AssigneeAvatar Choice="@assignee" />
+                        @assignee.Label
+                    }@if (CurrentAssignee is null)
+                    {
+                        @Localizer["AssigneeUnassigned"]
+                    }</button>
+
+                @if (_assigneePickerOpen)
+                {
+                    <ul class="picker" role="listbox" aria-labelledby="@AssigneeLabelId">
+                        <AssigneeOption @key="Guid.Empty"
+                                        UnassignedText="@Localizer["AssigneeUnassigned"]"
+                                        Selected="@(Item.AssigneeMembershipId is null)"
+                                        Active="@(AssigneeStop == Guid.Empty)"
+                                        OnFocused="() => _activeAssignee = Guid.Empty"
+                                        OnChoose="ChooseAssigneeAsync" />
+                        @foreach (var candidate in Assignees)
+                        {
+                            <AssigneeOption @key="candidate.MembershipId"
+                                            Choice="@candidate"
+                                            Selected="@(Item.AssigneeMembershipId == candidate.MembershipId)"
+                                            Active="@(AssigneeStop == candidate.MembershipId)"
+                                            OnFocused="() => _activeAssignee = candidate.MembershipId"
+                                            OnChoose="ChooseAssigneeAsync" />
+                        }
+                    </ul>
+                }
+            </div>
+        }
+
         @if (!_confirming && !CanManage)
         {
             <dl class="task-detail__attributes">
@@ -232,6 +280,12 @@
                             <LabelChip @key="label.Id" Name="@label.Name" Colour="@label.Colour" />
                         }
                     </dd>
+                }
+
+                @if (!CanAssign)
+                {
+                    <dt class="form-field__label">@Localizer["AssigneeLabel"]</dt>
+                    <dd>@(CurrentAssignee?.Label ?? Localizer["AssigneeUnassigned"])</dd>
                 }
             </dl>
         }
@@ -264,6 +318,7 @@
     private ElementReference _clear;
     private ElementReference _labelsButton;
     private ElementReference _moveButton;
+    private ElementReference _assigneeButton;
     private ElementReference _delete;
     private ElementReference _danger;
     private ElementReference _cancel;
@@ -282,10 +337,13 @@
     private bool _focusDelete;
     private bool _moveOpen;
     private bool _focusMoveButton;
+    private bool _assigneePickerOpen;
+    private bool _focusAssigneeButton;
 
     // Each picker's one tab stop (story 2.8, AC15): the option focus was last on, or the first.
     private Guid? _activeStatus;
     private Guid? _activeLabel;
+    private Guid? _activeAssignee;
 
     /// <summary>The Task, as the Board's replica shows it now.</summary>
     [Parameter]
@@ -312,6 +370,18 @@
     /// <summary>Whether the Role held may edit the Task; otherwise its attributes render as text.</summary>
     [Parameter]
     public bool CanManage { get; set; }
+
+    /// <summary>Whether the Role held may assign the Task; otherwise its Assignee renders as text.</summary>
+    [Parameter]
+    public bool CanAssign { get; set; }
+
+    /// <summary>The Space's Assignee candidates, labelled over the whole list, in join order.</summary>
+    [Parameter]
+    public IReadOnlyList<AssigneeChoice> Assignees { get; set; } = [];
+
+    /// <summary>Raised with a newly chosen Assignee's Membership, or <c>null</c> to unassign.</summary>
+    [Parameter]
+    public EventCallback<Guid?> OnAssignee { get; set; }
 
     /// <summary>The words for the last refused edit, or <c>null</c>.</summary>
     [Parameter]
@@ -381,6 +451,18 @@
 
     private string LabelsButtonId => "task-detail-labels-" + _id;
 
+    private string AssigneeLabelId => "task-detail-assignee-label-" + _id;
+
+    private string AssigneeButtonId => "task-detail-assignee-" + _id;
+
+    // An Assignee this tab holds no candidate for is named as nobody rather than by an id.
+    private AssigneeChoice? CurrentAssignee =>
+        Item.AssigneeMembershipId is { } id ? Assignees.FirstOrDefault(candidate => candidate.MembershipId == id) : null;
+
+    // "Unassigned" is the option keyed by the empty id, and the first.
+    private Guid AssigneeStop =>
+        _activeAssignee is { } active && (active == Guid.Empty || Assignees.Any(candidate => candidate.MembershipId == active)) ? active : Guid.Empty;
+
     // The Labels the Task carries, in its own (server) order; an id this tab holds no Label for is not drawn.
     private List<LabelResponse> AppliedLabels =>
         [.. Item.LabelIds.Select(id => SpaceLabels.FirstOrDefault(label => label.Id == id)).OfType<LabelResponse>()];
@@ -411,6 +493,11 @@
             _moveOpen = false;
             _titleMessage = null;
             _confirming = false;
+        }
+
+        if (!CanAssign)
+        {
+            _assigneePickerOpen = false;
         }
     }
 
@@ -497,6 +584,16 @@
                 await _moveButton.FocusAsync();
             }
         }
+
+        if (_focusAssigneeButton)
+        {
+            _focusAssigneeButton = false;
+
+            if (!_confirming && CanAssign)
+            {
+                await _assigneeButton.FocusAsync();
+            }
+        }
     }
 
     private Task CloseAsync() => OnClose.InvokeAsync();
@@ -535,6 +632,13 @@
         {
             _labelPickerOpen = false;
             _focusLabelsButton = true;
+            return Task.CompletedTask;
+        }
+
+        if (_assigneePickerOpen)
+        {
+            _assigneePickerOpen = false;
+            _focusAssigneeButton = true;
             return Task.CompletedTask;
         }
 
@@ -578,6 +682,7 @@
         _pickerOpen = false;
         _labelPickerOpen = false;
         _moveOpen = false;
+        _assigneePickerOpen = false;
         _confirming = true;
         _focusCancel = true;
 
@@ -677,6 +782,24 @@
         _moveOpen = !_moveOpen;
         _pickerOpen = false;
         _labelPickerOpen = false;
+        _assigneePickerOpen = false;
+    }
+
+    private void ToggleAssigneePicker()
+    {
+        _assigneePickerOpen = !_assigneePickerOpen;
+        _moveOpen = false;
+    }
+
+    /// <summary>
+    /// The picker closes, focus returns to its control, and a different choice is committed.
+    /// </summary>
+    private Task ChooseAssigneeAsync(Guid? membershipId)
+    {
+        _assigneePickerOpen = false;
+        _focusAssigneeButton = true;
+
+        return membershipId == Item.AssigneeMembershipId ? Task.CompletedTask : OnAssignee.InvokeAsync(membershipId);
     }
 
     /// <summary>Esc out of the Move picker: nothing is moved, and focus returns to Move (open question 9).</summary>

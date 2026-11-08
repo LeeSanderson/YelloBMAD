@@ -30,6 +30,7 @@ internal static class SpaceContentStores
     {
         services.AddScoped<IProjectStore, ProjectStore>();
         services.AddScoped<ITaskStore, TaskStore>();
+        services.AddScoped<ITaskAssignments, TaskAssignmentStore>();
         services.AddScoped<IBoardReader, BoardReader>();
         services.AddScoped<IListReader, ListReader>();
         services.AddScoped<ILabelStore, LabelStore>();

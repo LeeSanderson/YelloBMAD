@@ -1,6 +1,9 @@
 using System.Net;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Lists;
+using Yello.Contracts.Memberships;
+using Yello.Contracts.Tasks;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Isolation;
@@ -11,10 +14,7 @@ namespace Yello.Tests.Isolation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Pending until the assignment story's dev phase</b>, which makes every row live before review (GATE-003). The routes are
-/// <see cref="AssignmentWire"/>'s stand-ins; the dev phase swaps them for <c>TaskRoutes.Assignee</c> /
-/// <c>AssigneeOf</c> and <c>AssigneeRoutes.List</c> / <c>ListOf</c>, and <see cref="AssignmentWire.InvalidAssigneeProblemType"/> for
-/// <c>ProblemTypes.InvalidAssignee</c>. Both routes fail the route-coverage gate unless these rows are active.
+/// <b>Every row is live.</b> Both routes fail the route-coverage gate unless these rows are active.
 /// </para>
 /// <para>
 /// <b>I-15 is held twice:</b> by the composite key and the guarded statement (another Space's real Membership id in the
@@ -36,45 +36,41 @@ namespace Yello.Tests.Isolation;
 /// </remarks>
 internal static partial class IsolationCases
 {
-    private const string AssignmentPending = "The assignment routes are not mapped until the assignment story's dev phase.";
-
     private static IEnumerable<IsolationCase> AssignmentCases() =>
     [
         new IsolationCase(
-            "ISO-ASSIGNEES-FOREIGN-SPACE", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, AssignmentWire.AssigneesRoute,
-            world => ForeignAsync(world, AssignmentWire.AssigneesOf),
-            Both(new BoundaryNotFound()),
-            PendingUntil: "4.6",
-            PendingReason: AssignmentPending),
+            "ISO-ASSIGNEES-FOREIGN-SPACE", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, AssigneeRoutes.List,
+            world => ForeignAsync(world, AssigneeRoutes.ListOf),
+            Both(new BoundaryNotFound())),
 
         // B's Task, assigned to B's own Owner Membership in the body: a write that leaked would land in B's Space.
         new IsolationCase(
-            "ISO-ASSIGN-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Put, AssignmentWire.AssigneeRoute,
+            "ISO-ASSIGN-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Put, TaskRoutes.Assignee,
             async world =>
             {
-                var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
+                var (_, foreign) = await AnyProjectWithTaskAsync(world, world.B);
+                _ = await AnyProjectWithTaskAsync(world, world.A);
                 var theirOwner = await world.Database.MembershipOfAsync(world.B.SpaceId, world.B.AccountId);
 
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Put,
-                    [new(AssignmentWire.AssigneeOf(world.B.SpaceId, foreign), AssignmentWire.AssigneeOf(Guid.NewGuid(), foreign))],
+                    [new(TaskRoutes.AssigneeOf(world.B.SpaceId, foreign), TaskRoutes.AssigneeOf(Guid.NewGuid(), foreign))],
                     world.B.SpaceId,
                     Body: () => AssignmentWire.Body(theirOwner.Id));
             },
-            Both(new BoundaryNotFound { Then = NoTaskIsAssignedInEitherSpaceAsync }),
-            PendingUntil: "4.6",
-            PendingReason: AssignmentPending),
+            Both(new BoundaryNotFound { Then = NoTaskIsAssignedInEitherSpaceAsync })),
 
         // I-15, the ISO-APPLY-FOREIGN-LABEL template: B's real Membership id in the body of A's own Task's assignment answers
         // byte for byte what a random id does, and nothing is assigned anywhere.
         new IsolationCase(
-            "ISO-ASSIGN-FOREIGN-MEMBERSHIP", "I-2, I-13, I-15", IsolationVector.Write, HttpMethod.Put, AssignmentWire.AssigneeRoute,
+            "ISO-ASSIGN-FOREIGN-MEMBERSHIP", "I-2, I-13, I-15", IsolationVector.Write, HttpMethod.Put, TaskRoutes.Assignee,
             async world =>
             {
-                var (_, own) = await SeedProjectWithTaskAsync(world.A);
+                var (_, own) = await AnyProjectWithTaskAsync(world, world.A);
+                _ = await AnyProjectWithTaskAsync(world, world.B);
                 var foreign = await world.Database.MembershipOfAsync(world.B.SpaceId, world.B.AccountId);
-                var path = AssignmentWire.AssigneeOf(world.A.SpaceId, own);
+                var path = TaskRoutes.AssigneeOf(world.A.SpaceId, own);
 
                 return new CaseRequest(
                     world.A,
@@ -84,34 +80,31 @@ internal static partial class IsolationCases
                     Body: () => AssignmentWire.Body(foreign.Id),
                     AnchorBody: () => AssignmentWire.Body(Guid.NewGuid()));
             },
-            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: AssignmentWire.InvalidAssigneeProblemType) { Then = NoTaskIsAssignedInEitherSpaceAsync }),
-            PendingUntil: "4.6",
-            PendingReason: AssignmentPending),
+            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidAssignee) { Then = NoTaskIsAssignedInEitherSpaceAsync })),
 
         // B's Task id under A's own Space answers as a Task that never existed there: the unrecorded in-Space not-found,
         // byte-identical to the boundary. The body names A's own Owner Membership, so a leak would assign B's Task.
         new IsolationCase(
-            "ISO-ASSIGN-FOREIGN-TASK-IN-OWN-SPACE", "I-1, I-4, I-13", IsolationVector.DeepLink, HttpMethod.Put, AssignmentWire.AssigneeRoute,
+            "ISO-ASSIGN-FOREIGN-TASK-IN-OWN-SPACE", "I-1, I-4, I-13", IsolationVector.DeepLink, HttpMethod.Put, TaskRoutes.Assignee,
             async world =>
             {
-                var (_, foreign) = await SeedProjectWithTaskAsync(world.B);
+                var (_, foreign) = await AnyProjectWithTaskAsync(world, world.B);
+                _ = await AnyProjectWithTaskAsync(world, world.A);
                 var own = await world.Database.MembershipOfAsync(world.A.SpaceId, world.A.AccountId);
 
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Put,
-                    [new(AssignmentWire.AssigneeOf(world.A.SpaceId, foreign), AssignmentWire.AssigneeOf(world.A.SpaceId, Guid.NewGuid()))],
+                    [new(TaskRoutes.AssigneeOf(world.A.SpaceId, foreign), TaskRoutes.AssigneeOf(world.A.SpaceId, Guid.NewGuid()))],
                     TargetSpaceId: null,
                     Body: () => AssignmentWire.Body(own.Id));
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = NoTaskIsAssignedInEitherSpaceAsync }),
-            PendingUntil: "4.6",
-            PendingReason: AssignmentPending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = NoTaskIsAssignedInEitherSpaceAsync })),
 
         // I-15, aggregate: the host's Space holds a Member who also belongs to a second Space, whose Owner and other Member the
         // host shares nothing with. The host's candidates are exactly its own Space's Memberships, by name only.
         new IsolationCase(
-            "ISO-ASSIGNEES-ONLY-THIS-SPACE", "I-3, I-11, I-15", IsolationVector.Listing, HttpMethod.Get, AssignmentWire.AssigneesRoute,
+            "ISO-ASSIGNEES-ONLY-THIS-SPACE", "I-3, I-11, I-15", IsolationVector.Listing, HttpMethod.Get, AssigneeRoutes.List,
             async world =>
             {
                 var host = await world.NewActorAsync("Ah");
@@ -125,13 +118,11 @@ internal static partial class IsolationCases
                 HoldsIdentity(host);
                 HoldsIdentity(elsewhere);
 
-                var path = AssignmentWire.AssigneesOf(host.SpaceId);
+                var path = AssigneeRoutes.ListOf(host.SpaceId);
 
                 return new CaseRequest(host, HttpMethod.Get, [new(path, path)], TargetSpaceId: null, Other: stranger);
             },
-            Both(new Served(HttpStatusCode.OK, OffersExactlyTheHostsMembershipsAsync, "200, exactly the Space's Memberships by name; nothing of the shared Member's other Space, no address")),
-            PendingUntil: "4.6",
-            PendingReason: AssignmentPending),
+            Both(new Served(HttpStatusCode.OK, OffersExactlyTheHostsMembershipsAsync, "200, exactly the Space's Memberships by name; nothing of the shared Member's other Space, no address"))),
 
         // I-15 on the List, the ISO-LIST-FOREIGN-FILTER-IN-OWN-SPACE template: B's real Membership id in A's own List's
         // assignee filter matches nothing, with bytes identical to a random id's - never a refusal.
@@ -146,33 +137,21 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Get,
-                    [new($"{path}&{AssignmentWire.AssigneeParameter}={foreign.Id:D}", $"{path}&{AssignmentWire.AssigneeParameter}={Guid.NewGuid():D}")],
+                    [new($"{path}&{ListRoutes.AssigneeParameter}={foreign.Id:D}", $"{path}&{ListRoutes.AssigneeParameter}={Guid.NewGuid():D}")],
                     TargetSpaceId: null);
             },
-            Both(new SameAsAnchor(HttpStatusCode.OK)),
-            PendingUntil: "4.6",
-            PendingReason: AssignmentPending),
+            Both(new SameAsAnchor(HttpStatusCode.OK))),
 
         new IsolationCase(
-            "ISO-RECORD-KIND-ASSIGN-VIEWER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Put, AssignmentWire.AssigneeRoute,
+            "ISO-RECORD-KIND-ASSIGN-VIEWER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Put, TaskRoutes.Assignee,
             ViewerAssignsATaskAsync,
-            Both(new RoleRefused(AssignmentWire.AssignCapabilityCode) { Then = NoTaskIsAssignedInTheActorsSpaceAsync }),
-            PendingUntil: "4.6",
-            PendingReason: AssignmentPending),
+            Both(new RoleRefused(AssignmentWire.AssignCapabilityCode) { Then = NoTaskIsAssignedInTheActorsSpaceAsync })),
 
         // The 3.4 gate: one row per Space-scoped route a Token reaches. By Session the Account unassigns an unassigned Task of
         // its second Space (a no-op 200) and reads that Space's candidates; by the first Space's Token each is a non-member's.
-        TokenOwnOtherSpace("ASSIGN", HttpMethod.Put, AssignmentWire.AssigneeRoute, HttpStatusCode.OK, sa2 => AssignmentWire.AssigneeOf(sa2.SpaceId, sa2.TaskIds[0]), () => AssignmentWire.Body(null)) with
-        {
-            PendingUntil = "4.6",
-            PendingReason = AssignmentPending,
-        },
+        TokenOwnOtherSpace("ASSIGN", HttpMethod.Put, TaskRoutes.Assignee, HttpStatusCode.OK, sa2 => TaskRoutes.AssigneeOf(sa2.SpaceId, sa2.TaskIds[0]), () => AssignmentWire.Body(null)),
 
-        TokenOwnOtherSpace("ASSIGNEES", HttpMethod.Get, AssignmentWire.AssigneesRoute, HttpStatusCode.OK, sa2 => AssignmentWire.AssigneesOf(sa2.SpaceId)) with
-        {
-            PendingUntil = "4.6",
-            PendingReason = AssignmentPending,
-        },
+        TokenOwnOtherSpace("ASSIGNEES", HttpMethod.Get, AssigneeRoutes.List, HttpStatusCode.OK, sa2 => AssigneeRoutes.ListOf(sa2.SpaceId)),
     ];
 
     /// <summary>
@@ -187,7 +166,7 @@ internal static partial class IsolationCases
 
         await world.Database.ChangeRoleAsync(viewer.SpaceId, viewer.AccountId, "viewer");
 
-        var path = AssignmentWire.AssigneeOf(viewer.SpaceId, taskId);
+        var path = TaskRoutes.AssigneeOf(viewer.SpaceId, taskId);
 
         return new CaseRequest(viewer, HttpMethod.Put, [new(path, path)], viewer.SpaceId, Body: () => AssignmentWire.Body(own.Id));
     }

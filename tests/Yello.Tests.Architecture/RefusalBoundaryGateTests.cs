@@ -450,6 +450,10 @@ public sealed partial class RefusalBoundaryGateTests
             // nothing.
             "Yello.Infrastructure.Persistence.Configurations.InvitationConfiguration",
 
+            // The notification send record's cascading foreign key to its Space, declared in the model and reading
+            // nothing.
+            "Yello.Infrastructure.Persistence.Configurations.NotificationSendConfiguration",
+
             // Story 3.1: the provisioning both registration and creation build a new Space through, its rows, and the
             // store that writes them and renames the resolved Space - which reads nothing, and whose one update is held
             // to the resolved Space's id by The_only_update_of_a_Space_is_the_rename_of_the_resolved_Space.

@@ -28,6 +28,11 @@ namespace Yello.Infrastructure.Persistence;
 /// way. Released when the request's transaction ends.
 /// </para>
 /// <para>
+/// <b>Exclusive, except an assignment's hold on the Memberships lock</b>, which is Shared: the writers that can make a
+/// Membership id stop naming a Membership - a removal, a leave, a Role change - take it Exclusive, so an assignment never
+/// interleaves with one of them, while two assignments in one Space never wait on each other.
+/// </para>
+/// <para>
 /// <b>Both carry the request's Space.</b> An application lock is a name, not a row: the security policy does not narrow it.
 /// The Tasks-per-Project count takes the Project's lock from the route before anything has checked that the Project is the
 /// caller's, so a name of the Project alone would let a request in Space B that names Space A's Project queue behind A's
@@ -38,6 +43,10 @@ namespace Yello.Infrastructure.Persistence;
 /// </remarks>
 internal static class ApplicationLocks
 {
+    private const string ExclusiveMode = "Exclusive";
+
+    private const string SharedMode = "Shared";
+
     /// <summary>
     /// The lock one Space's Project creations (the Projects-per-Space count) and Project deletions take.
     /// </summary>
@@ -119,6 +128,21 @@ internal static class ApplicationLocks
     }
 
     /// <summary>
+    /// Takes the request's Space's Memberships lock in Shared mode: compatible with every other Shared holder, and waiting
+    /// while a removal, a leave or a Role change holds it.
+    /// </summary>
+    /// <param name="dbContext">The request's unit of work, scoped to a Space and inside its transaction.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>A task.</returns>
+    internal static Task TakeMembershipsSharedAsync(YelloDbContext dbContext, CancellationToken cancellationToken)
+    {
+        var spaceId = dbContext.ScopedSpaceId
+            ?? throw new InvalidOperationException("The Memberships lock is taken only inside a Space-scoped unit of work.");
+
+        return TakeAsync(dbContext, MembershipsOf(spaceId), cancellationToken, SharedMode);
+    }
+
+    /// <summary>
     /// Takes the request's Space's Invitations lock.
     /// </summary>
     /// <param name="dbContext">The request's unit of work, scoped to a Space and inside its transaction.</param>
@@ -191,14 +215,15 @@ internal static class ApplicationLocks
     }
 
     /// <summary>
-    /// Takes a lock exclusively, owned by the current transaction - waiting while another transaction holds it. Throws when
-    /// it cannot be granted (a deadlock victim), so the request fails rather than going on unserialised.
+    /// Takes a lock in <paramref name="mode"/>, exclusively by default, owned by the current transaction - waiting while
+    /// another transaction holds it incompatibly. Throws when it cannot be granted (a deadlock victim), so the request fails
+    /// rather than going on unserialised.
     /// </summary>
-    private static Task TakeAsync(YelloDbContext dbContext, string resource, CancellationToken cancellationToken) =>
+    private static Task TakeAsync(YelloDbContext dbContext, string resource, CancellationToken cancellationToken, string mode = ExclusiveMode) =>
         dbContext.Database.ExecuteSqlAsync(
             $"""
             DECLARE @granted int;
-            EXEC @granted = sp_getapplock @Resource = {resource}, @LockMode = 'Exclusive', @LockOwner = 'Transaction';
+            EXEC @granted = sp_getapplock @Resource = {resource}, @LockMode = {mode}, @LockOwner = 'Transaction';
             IF @granted < 0 THROW 51000, 'An application lock was not granted.', 1;
             """,
             cancellationToken);

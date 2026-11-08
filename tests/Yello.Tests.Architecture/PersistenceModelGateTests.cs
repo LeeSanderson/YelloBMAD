@@ -261,13 +261,13 @@ public sealed class PersistenceModelGateTests
     /// <para>
     /// AD-2: "cross-entity references inside a Space use composite foreign keys carrying
     /// <c>SpaceId</c>, so a same-Space constraint holds by construction rather than by validation."
-    /// A single-column reference to a Membership - <c>AssigneeId → Membership.Id</c> - lets a Task in
-    /// Space A name a Membership in Space B, and nothing in the database refuses it. The composite
-    /// <c>(SpaceId, AssigneeId) → Membership(SpaceId, Id)</c> makes that row impossible to write.
+    /// A single-column reference to a Membership - <c>AssigneeMembershipId → Membership.Id</c> - lets a
+    /// Task in Space A name a Membership in Space B, and nothing in the database refuses it. The
+    /// composite <c>(SpaceId, AssigneeMembershipId) → Membership(SpaceId, Id)</c> makes that row
+    /// impossible to write.
     /// </para>
     /// <para>
-    /// <b>No such reference exists yet</b> - the first is FR-21's Assignee in story 4.6 - so this
-    /// passes today by having nothing to inspect. A reference to
+    /// <b>The Task's Assignee is the first such reference.</b> A reference to
     /// <c>Space</c> itself is outside it: <c>Space</c> is the Space, and its key already is the
     /// <c>SpaceId</c>. Held against a single-column reference and a mis-paired composite one before
     /// it was trusted.

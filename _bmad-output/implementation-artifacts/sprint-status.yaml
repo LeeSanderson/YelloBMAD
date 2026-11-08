@@ -50,7 +50,7 @@
 # ===========================================================
 # Readiness report issue 4 (MEDIUM) is assigned to sprint planning. Four FRs finish in a later
 # epic than the one they are mapped to. An epic reaching 'done' does NOT complete these:
-#   - FR-30 — Assignee filter/sort completes in story 4.6 (mapped epic 2)
+#   - FR-30 — Assignee filter/sort completes in story 4.6 (mapped epic 2) — COMPLETED by story 4.6 (2026-11-08)
 #   - FR-23 — "deleting a Task terminates any active editing session" completes in story 7.4 (mapped epic 2)
 #   - FR-13 — live-session clause completes in stories 7.7 / 7.8 (mapped epic 4; request-path clause done in epic 4)
 #   - FR-14 — live-session clause completes in stories 7.7 / 7.8 (mapped epic 4; request-path clause done in epic 4)
@@ -115,7 +115,7 @@ development_status:
   4-3-accept-an-invitation: done
   4-4-manage-memberships-and-roles: done
   4-5-remove-a-membership-or-leave-a-space: done
-  4-6-assign-a-task-and-be-told: ready-for-dev
+  4-6-assign-a-task-and-be-told: review
   4-7-a-viewers-space-and-a-role-that-drops-beneath-you: backlog
   epic-4-retrospective: optional
 

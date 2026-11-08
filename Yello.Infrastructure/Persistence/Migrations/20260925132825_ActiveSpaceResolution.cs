@@ -33,7 +33,7 @@ public partial class ActiveSpaceResolution : Migration
     protected override void Up(MigrationBuilder migrationBuilder)
     {
         // AD-2's composite foreign keys, enabled. A reference to a Membership from another
-        // Space-scoped row - FR-21's Assignee, story 4.6, is the first - must be the pair
+        // Space-scoped row - FR-21's Assignee is the first - must be the pair
         // (SpaceId, MembershipId) so that "same Space" holds by construction. A composite foreign
         // key needs a matching unique key on the principal, and Membership's primary key is Id
         // alone.

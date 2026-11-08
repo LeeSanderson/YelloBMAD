@@ -9,7 +9,7 @@
 @inject IJSRuntime JS
 
 @*
-    ONE PROJECT'S LIST VIEW - story 2.10. FR-30 (partial: no Assignee until 4.6); AC1, AC7-AC9, AC11, AC16-AC20; UX-DR19,
+    ONE PROJECT'S LIST VIEW - story 2.10. FR-30; AC1, AC7-AC9, AC11, AC16-AC20; UX-DR19,
     UX-DR24, UX-DR26, UX-DR27, UX-DR31, UX-DR35, UX-DR38-UX-DR40, UX-DR42; AD-29.
 
     THE SAME TASKS AS ROWS, read 50 at a time from the List route (open questions 1 (a), 2 (a)). Nothing in it writes, so
@@ -19,7 +19,8 @@
     aria-busy; completion is said politely once, "List loaded.", and nothing else is said on loading or paging (AC19).
 
     FILTERS AND SORT (open questions 4 (a), 5 (a), 7 (a)) are native controls with visible labels: any of the effective
-    Statuses, any of the Space's Labels, a due-date choice, and the sort - Status preselected as the view's initial order. A
+    Statuses, any of the Space's Labels, any of its Assignees or "Unassigned", a due-date choice, and the sort - Status
+    preselected as the view's initial order. A
     sort is a view order, not a consequential choice, so the pickers' no-default rule (EXPERIENCE.md:211) does not apply. A
     change to any of them is a new list: the old rows are removed, never re-pointed (the body is keyed on the read), the
     first page is read, and once it settles its true total is said once (AC9) - a superseded answer is dropped.
@@ -33,7 +34,8 @@
     js/list-keys.js, ListTraversal).
 
     PURGED WITH THE SPACE, synchronously, and never written to browser storage (AC17): the filters, the sort, the rows, the
-    cursor and the announcement all go. No Status or Label name reaches the address or the title (UX-DR33).
+    cursor, the Assignee candidates and the announcement all go. No Status, Label or person's name reaches the address or
+    the title (UX-DR33).
 *@
 
 <LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
@@ -73,6 +75,15 @@
                 </fieldset>
             }
 
+            <fieldset class="task-list__filter">
+                <legend class="type-meta">@Localizer["AssigneeLabel"]</legend>
+                <TaskListChoice Id="@Guid.Empty" Name="@Localizer["AssigneeUnassigned"]" Checked="@_filters.Unassigned" OnToggle="_ => ToggleUnassignedAsync()" />
+                @foreach (var (membershipId, label) in _filters.AssigneeOptions)
+                {
+                    <TaskListChoice @key="membershipId" Id="@membershipId" Name="@label" Checked="@_filters.Assignees.Contains(membershipId)" OnToggle="ToggleAssigneeAsync" />
+                }
+            </fieldset>
+
             <div class="task-list__field">
                 <label class="type-meta" for="@DueId">@Localizer["ListFilterDue"]</label>
                 <select id="@DueId" value="@_filters.Due" @onchange="ChangeDueAsync">
@@ -100,6 +111,7 @@
                     <option value="@ListSorts.Status">@Localizer["ListSortStatus"]</option>
                     <option value="@ListSorts.DueDate">@Localizer["ListSortDueDate"]</option>
                     <option value="@ListSorts.Label">@Localizer["ListSortLabel"]</option>
+                    <option value="@ListSorts.Assignee">@Localizer["AssigneeLabel"]</option>
                 </select>
             </div>
         </div>
@@ -127,12 +139,13 @@
                         <th scope="col">@Localizer["ListColumnStatus"]</th>
                         <th scope="col">@Localizer["ListColumnDue"]</th>
                         <th scope="col">@Localizer["ListColumnLabels"]</th>
+                        <th scope="col">@Localizer["AssigneeLabel"]</th>
                     </tr>
                 </thead>
                 <tbody @key="_read">
                     @foreach (var (row, rowIndex) in TaskListRow.Indexed(rows))
                     {
-                        <TaskListRow @key="row.Id" Item="@row" RowIndex="@rowIndex" StatusName="@StatusName(row.StatusId)" Labels="@_labelsById" Active="@(row.Id == ActiveTaskId)" />
+                        <TaskListRow @key="row.Id" Item="@row" RowIndex="@rowIndex" StatusName="@StatusName(row.StatusId)" Labels="@_labelsById" Filters="@_filters" UnassignedText="@Localizer["AssigneeUnassigned"]" Active="@(row.Id == ActiveTaskId)" />
                     }
                 </tbody>
             </table>

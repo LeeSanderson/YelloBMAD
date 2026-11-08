@@ -8,9 +8,15 @@ namespace Yello.Client.Components;
 /// tab's state only, never the URL's and never browser storage, and cleared with the Space (AC17, UX-DR31, UX-DR33).
 /// </summary>
 /// <remarks>
+/// <para>
+/// <b>It holds the Space's Assignee candidates</b> the Assignee filter offers and the rows are named from, labelled over the
+/// whole list, and forgets them with the rest on <see cref="Clear"/>.
+/// </para>
+/// <para>
 /// <b>A due range is two days chosen in the viewer's zone</b>, sent as the start of the first and the start of the day
 /// after the second - each an instant with its offset, story 2.3's rule - so the range is the whole of both days. A bound
 /// left empty is not sent.
+/// </para>
 /// </remarks>
 public sealed class TaskListFilters
 {
@@ -33,6 +39,8 @@ public sealed class TaskListFilters
 
     private const int LatestYear = 2100;
 
+    private IReadOnlyList<AssigneeChoice> _candidates = [];
+
     /// <summary>
     /// The chosen Statuses; any of them.
     /// </summary>
@@ -42,6 +50,16 @@ public sealed class TaskListFilters
     /// The chosen Labels; any of them.
     /// </summary>
     public HashSet<Guid> Labels { get; } = [];
+
+    /// <summary>
+    /// The chosen Assignees; any of them, or unassigned when <see cref="Unassigned"/> is chosen too.
+    /// </summary>
+    public HashSet<Guid> Assignees { get; } = [];
+
+    /// <summary>
+    /// Whether unassigned Tasks are chosen.
+    /// </summary>
+    public bool Unassigned { get; set; }
 
     /// <summary>
     /// The sort code; Status is the view's initial order.
@@ -69,14 +87,21 @@ public sealed class TaskListFilters
     /// <remarks>
     /// "Between dates" with neither day chosen sends no bound, so it filters nothing.
     /// </remarks>
-    public bool Filtered => Statuses.Count > 0 || Labels.Count > 0 || DueFiltered;
+    public bool Filtered => Statuses.Count > 0 || Labels.Count > 0 || AssigneeFiltered || DueFiltered;
+
+    /// <summary>
+    /// The Assignee filter's choices after "Unassigned": each candidate's id and label.
+    /// </summary>
+    public IReadOnlyList<(Guid Id, string Label)> AssigneeOptions => [.. _candidates.Select(candidate => (candidate.MembershipId, candidate.Label))];
+
+    private bool AssigneeFiltered => Assignees.Count > 0 || Unassigned;
 
     private bool DueFiltered => Due == DueNone || (Due == DueRange && ToQuery() is { DueFrom: not null } or { DueTo: not null });
 
     /// <summary>
     /// Adds <paramref name="id"/> to <paramref name="chosen"/>, or takes it out if it is there.
     /// </summary>
-    /// <param name="chosen">The Statuses or the Labels.</param>
+    /// <param name="chosen">The Statuses, the Labels or the Assignees.</param>
     /// <param name="id">The one toggled.</param>
     public static void Toggle(HashSet<Guid> chosen, Guid id)
     {
@@ -95,11 +120,40 @@ public sealed class TaskListFilters
     {
         Statuses.Clear();
         Labels.Clear();
+        Assignees.Clear();
+        Unassigned = false;
+        _candidates = [];
         Sort = ListSorts.Status;
         Due = DueAny;
         DueFrom = string.Empty;
         DueTo = string.Empty;
     }
+
+    /// <summary>
+    /// Reads the Space's Assignee candidates. A read that is not answered leaves none, so the rows name no Assignee; one
+    /// answered after the Space was left is dropped.
+    /// </summary>
+    /// <param name="http">The API client.</param>
+    /// <param name="spaceId">The active Space.</param>
+    /// <param name="token">The active Space's token, cancelled when the Space is left.</param>
+    /// <returns>A task.</returns>
+    public async Task ReadAssigneesAsync(HttpClient http, Guid spaceId, CancellationToken token)
+    {
+        var candidates = await SpaceAssignees.ReadAsync(http, spaceId, token) ?? [];
+
+        if (!token.IsCancellationRequested)
+        {
+            _candidates = candidates;
+        }
+    }
+
+    /// <summary>
+    /// The candidate a Task is assigned to, or <c>null</c> when it is unassigned or this tab holds no candidate for it.
+    /// </summary>
+    /// <param name="membershipId">The Task's Assignee.</param>
+    /// <returns>The candidate.</returns>
+    public AssigneeChoice? AssigneeOf(Guid? membershipId) =>
+        membershipId is { } id ? _candidates.FirstOrDefault(candidate => candidate.MembershipId == id) : null;
 
     /// <summary>
     /// The sort and filters as the List route reads them.
@@ -116,7 +170,11 @@ public sealed class TaskListFilters
             to = DayAfter(DueTo);
         }
 
-        return new ListQuery(Sort, [.. Statuses], [.. Labels], from, to, Due == DueNone);
+        return new ListQuery(Sort, [.. Statuses], [.. Labels], from, to, Due == DueNone)
+        {
+            AssigneeMembershipIds = [.. Assignees],
+            Unassigned = Unassigned,
+        };
     }
 
     /// <summary>

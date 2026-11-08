@@ -252,8 +252,6 @@ namespace Yello.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasAlternateKey("SpaceId", "Id");
-
                     b.HasIndex("AccountId");
 
                     b.HasIndex("SpaceId")
@@ -354,6 +352,9 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.Property<Guid>("Id")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<Guid?>("AssigneeMembershipId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
@@ -388,7 +389,13 @@ namespace Yello.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("SpaceId", "AssigneeMembershipId");
+
                     b.HasIndex("SpaceId", "StatusId");
+
+                    b.HasIndex("SpaceId", "ProjectId", "AssigneeMembershipId", "Id");
+
+                    SqlServerIndexBuilderExtensions.IncludeProperties(b.HasIndex("SpaceId", "ProjectId", "AssigneeMembershipId", "Id"), new[] { "StatusId", "DueDate" });
 
                     b.HasIndex("SpaceId", "ProjectId", "DueDate", "Id");
 
@@ -406,6 +413,32 @@ namespace Yello.Infrastructure.Persistence.Migrations
                         .IsUnique();
 
                     b.ToTable("Task", (string)null);
+                });
+
+            modelBuilder.Entity("Yello.Infrastructure.Outbox.NotificationSend", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("datetimeoffset")
+                        .HasDefaultValueSql("SWITCHOFFSET(SYSDATETIMEOFFSET(), '+00:00')");
+
+                    b.Property<Guid>("SpaceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("SpaceId");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SpaceId");
+
+                    b.ToTable("NotificationSend", (string)null);
                 });
 
             modelBuilder.Entity("Yello.Infrastructure.Outbox.OutboxMessage", b =>
@@ -691,6 +724,12 @@ namespace Yello.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Yello.Domain.Tasks.TaskItem", b =>
                 {
+                    b.HasOne("Yello.Domain.Memberships.Membership", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId", "AssigneeMembershipId")
+                        .HasPrincipalKey("SpaceId", "Id")
+                        .OnDelete(DeleteBehavior.NoAction);
+
                     b.HasOne("Yello.Domain.Projects.Project", null)
                         .WithMany()
                         .HasForeignKey("SpaceId", "ProjectId")
@@ -703,6 +742,15 @@ namespace Yello.Infrastructure.Persistence.Migrations
                         .HasForeignKey("SpaceId", "StatusId")
                         .HasPrincipalKey("SpaceId", "Id")
                         .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Yello.Infrastructure.Outbox.NotificationSend", b =>
+                {
+                    b.HasOne("Yello.Domain.Spaces.Space", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

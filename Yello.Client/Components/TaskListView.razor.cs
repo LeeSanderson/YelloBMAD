@@ -161,7 +161,8 @@ public sealed partial class TaskListView
     }
 
     /// <summary>
-    /// The cold load: the Space's Labels first - a row names the Labels it carries from them - then the first page.
+    /// The cold load: the Space's Labels and Assignee candidates first - a row names the Labels and the Assignee it carries
+    /// from them - then the first page. A candidates read that is not answered leaves the rows naming no Assignee.
     /// </summary>
     private async Task LoadAsync(int generation)
     {
@@ -169,20 +170,10 @@ public sealed partial class TaskListView
 
         try
         {
-            using var labels = await Http.GetAsync(new Uri(LabelRoutes.LabelsOf(SpaceId), UriKind.Relative), token);
-
-            if (generation != _generation || token.IsCancellationRequested)
+            if (await ReadSpaceListsAsync(generation, token) is not { } spaceLabels)
             {
                 return;
             }
-
-            if (!labels.IsSuccessStatusCode)
-            {
-                await RefuseAsync(labels, token);
-                return;
-            }
-
-            var spaceLabels = await labels.Content.ReadFromJsonAsync<List<LabelResponse>>(token) ?? [];
 
             if (await ReadPageAsync(generation, _read, after: null, token) is not { } page || !ActiveSpace.ShowProject(SpaceId, page.Project.Name))
             {
@@ -206,6 +197,32 @@ public sealed partial class TaskListView
         {
             await RefuseUnlessLeftAsync(generation);
         }
+    }
+
+    /// <summary>
+    /// The Space's Labels and its Assignee candidates, or <c>null</c> when the Labels read was refused (the refusal surface
+    /// has been raised) or the tab has left.
+    /// </summary>
+    private async Task<List<LabelResponse>?> ReadSpaceListsAsync(int generation, CancellationToken token)
+    {
+        using var labels = await Http.GetAsync(new Uri(LabelRoutes.LabelsOf(SpaceId), UriKind.Relative), token);
+
+        if (generation != _generation || token.IsCancellationRequested)
+        {
+            return null;
+        }
+
+        if (!labels.IsSuccessStatusCode)
+        {
+            await RefuseAsync(labels, token);
+            return null;
+        }
+
+        var spaceLabels = await labels.Content.ReadFromJsonAsync<List<LabelResponse>>(token) ?? [];
+
+        await _filters.ReadAssigneesAsync(Http, SpaceId, token);
+
+        return generation == _generation ? spaceLabels : null;
     }
 
     /// <summary>
@@ -381,6 +398,20 @@ public sealed partial class TaskListView
     private Task ToggleStatusAsync(Guid statusId)
     {
         TaskListFilters.Toggle(_filters.Statuses, statusId);
+
+        return RereadAsync();
+    }
+
+    private Task ToggleAssigneeAsync(Guid membershipId)
+    {
+        TaskListFilters.Toggle(_filters.Assignees, membershipId);
+
+        return RereadAsync();
+    }
+
+    private Task ToggleUnassignedAsync()
+    {
+        _filters.Unassigned = !_filters.Unassigned;
 
         return RereadAsync();
     }

@@ -60,13 +60,7 @@ public static class ListCursorText
     {
         ArgumentNullException.ThrowIfNull(cursor);
 
-        var value = sort switch
-        {
-            ListSort.Status => cursor.StatusId?.ToString("D"),
-            ListSort.DueDate => cursor.DueDate?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
-            ListSort.Label => cursor.FirstLabelName,
-            _ => throw new ArgumentOutOfRangeException(nameof(sort), sort, "Not an offered sort."),
-        };
+        var value = ValueOf(sort, cursor);
 
         var text = string.Join(
             Separator,
@@ -78,6 +72,15 @@ public static class ListCursorText
 
         return Base64Url.EncodeToString(Encoding.UTF8.GetBytes(text));
     }
+
+    private static string? ValueOf(ListSort sort, ListCursor cursor) => sort switch
+    {
+        ListSort.Status => cursor.StatusId?.ToString("D"),
+        ListSort.DueDate => cursor.DueDate?.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+        ListSort.Label => cursor.FirstLabelName,
+        ListSort.Assignee => cursor.AssigneeMembershipId?.ToString("D"),
+        _ => throw new ArgumentOutOfRangeException(nameof(sort), sort, "Not an offered sort."),
+    };
 
     /// <summary>
     /// Reads a cursor sent with a page request under <paramref name="sort"/> - <c>false</c> for anything the route did not
@@ -157,6 +160,7 @@ public static class ListCursorText
         ListSort.Status when Guid.TryParseExact(value, "D", out var statusId) => new ListCursor(taskId, StatusId: statusId),
         ListSort.DueDate when DateTimeOffset.TryParseExact(value, "O", CultureInfo.InvariantCulture, DateTimeStyles.None, out var due) => new ListCursor(taskId, DueDate: due),
         ListSort.Label when value.Length >= 1 && value.Length <= LabelName.MaxLength => new ListCursor(taskId, FirstLabelName: value),
+        ListSort.Assignee when Guid.TryParseExact(value, "D", out var assignee) => new ListCursor(taskId, AssigneeMembershipId: assignee),
         _ => null,
     };
 }

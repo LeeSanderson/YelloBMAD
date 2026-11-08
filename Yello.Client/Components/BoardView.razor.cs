@@ -5,7 +5,6 @@ using System.Text.Json;
 using Yello.Client.Refusals;
 using Yello.Client.Spaces;
 using Yello.Contracts;
-using Yello.Contracts.Labels;
 using Yello.Contracts.Tasks;
 
 namespace Yello.Client.Components;
@@ -14,7 +13,9 @@ namespace Yello.Client.Components;
 /// The Board's Task detail panel and its replica: the product's first optimistic writes. Story 2.3; AC1,
 /// AC12, AC14; AD-11, AD-18; open questions 1 (a), 6 (a) and 8. Story 2.4 adds the Labels as a fourth attribute
 /// (AC7): the same replica, queue, key and per-attribute revert, the whole set sent as <c>labelIds</c>. Story 2.6 adds the
-/// move (AC15): a Status and a position, sent as the Status attribute's change on the move route.
+/// move (AC15): a Status and a position, sent as the Status attribute's change on the move route. The Assignee is a fifth
+/// attribute on the same terms, sent alone to its own route as <c>PUT …/assignee</c>, because assigning is the matrix's own
+/// capability rather than an edit.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -55,9 +56,9 @@ public sealed partial class BoardView
 
     private List<TaskStatusOption> _statusOptions = [];
 
-    // The Space's Labels, in the server's order, and by id for the cards (story 2.4). Purged with the Board.
-    private IReadOnlyList<LabelResponse> _labels = [];
-    private IReadOnlyDictionary<Guid, LabelResponse> _labelsById = new Dictionary<Guid, LabelResponse>();
+    // The Space's Labels (story 2.4) and Assignee candidates, which the cards and the panel name from. Purged with the
+    // Board.
+    private BoardSpaceLists? _lists;
     private Guid? _openTaskId;
     private string? _panelRefusal;
 
@@ -92,7 +93,7 @@ public sealed partial class BoardView
     private bool _rereadBoard;
 
     /// <summary>
-    /// The four attributes a Task edit can change.
+    /// The attributes a change from the panel can write: the edit's four, and the Assignee.
     /// </summary>
     private enum TaskAttribute
     {
@@ -100,6 +101,7 @@ public sealed partial class BoardView
         Status,
         DueDate,
         Labels,
+        Assignee,
     }
 
     /// <summary>
@@ -217,8 +219,7 @@ public sealed partial class BoardView
         }
 
         _replicas.Clear();
-        _labels = [];
-        _labelsById = new Dictionary<Guid, LabelResponse>();
+        _lists?.Clear();
         _statusOptions = [];
         _openTaskId = null;
         _panelRefusal = null;
@@ -603,11 +604,7 @@ public sealed partial class BoardView
 
     private void UseStatuses(IEnumerable<TaskStatusOption> statuses) => _statusOptions = [.. statuses];
 
-    private void UseLabels(IReadOnlyList<LabelResponse> labels)
-    {
-        _labels = labels;
-        _labelsById = labels.ToDictionary(label => label.Id);
-    }
+    private BoardSpaceLists Lists => _lists ??= new BoardSpaceLists(Http);
 
     /// <summary>
     /// One change from the panel: rendered at once, then sent - or queued behind an edit of the same attribute
@@ -615,7 +612,7 @@ public sealed partial class BoardView
     /// </summary>
     private async Task EditAsync(Guid taskId, TaskAttribute attribute, object? value)
     {
-        if (!_canManage || ReplicaOf(taskId) is not { } replica)
+        if (!(attribute == TaskAttribute.Assignee ? _canAssign : _canManage) || ReplicaOf(taskId) is not { } replica)
         {
             return;
         }
@@ -706,6 +703,11 @@ public sealed partial class BoardView
 
         Place(taskId, replica);
 
+        if (attribute == TaskAttribute.Assignee && outcome == EditOutcome.Admitted)
+        {
+            SayAssignee(replica.Admitted.AssigneeMembershipId);
+        }
+
         if (attribute != TaskAttribute.Status)
         {
             return;
@@ -780,10 +782,8 @@ public sealed partial class BoardView
 
         try
         {
-            // A move goes to its own route (story 2.6); every other change is a merge patch of the Task.
-            using var answer = value is MoveChoice
-                ? await Writes.SendAsync(HttpMethod.Post, TaskRoutes.MoveOf(SpaceId, taskId), body, key, token)
-                : await Writes.SendAsync(HttpMethod.Patch, TaskRoutes.TaskOf(SpaceId, taskId), body, key, token);
+            // A move goes to its own route (story 2.6), and so does an assignment; every other change is a merge patch.
+            using var answer = await Writes.SendAsync(MethodOf(attribute, value), RouteOf(taskId, attribute, value), body, key, token);
 
             // A Task this tab deleted while the edit was out: its answer (a 404) is dropped - no refusal surface, no
             // revert, no words (story 2.5, open question 7).
@@ -888,7 +888,13 @@ public sealed partial class BoardView
     {
         if (problemType == ProblemTypes.InvalidTaskLabels)
         {
-            await RefreshLabelsAsync(generation, token);
+            await Lists.RefreshLabelsAsync(SpaceId, () => generation == _generation, token);
+        }
+
+        // The person chosen has left the Space: the picker stops offering them.
+        if (problemType == ProblemTypes.InvalidAssignee)
+        {
+            await Lists.RefreshAssigneesAsync(SpaceId, () => generation == _generation, token);
         }
 
         // A full gap (story 2.9, AC18) is read again too: the picker offers what the server holds now.
@@ -924,29 +930,21 @@ public sealed partial class BoardView
     }
 
     /// <summary>
-    /// After <c>invalid-task-labels</c> the Space's Label list is read again: a Label in it has been deleted since the
-    /// Board loaded, and the picker must stop offering it. A read that fails leaves the list as it was - the refusal
-    /// has already been said, and the next Board load reads the list anyway.
+    /// Says an admitted assignment: the person by label, or that the Task is unassigned. Never an address or a Space name.
     /// </summary>
-    private async Task RefreshLabelsAsync(int generation, CancellationToken token)
+    private void SayAssignee(Guid? membershipId)
     {
-        try
+        if (membershipId is null)
         {
-            using var response = await Http.GetAsync(new Uri(LabelRoutes.LabelsOf(SpaceId), UriKind.Relative), token);
-
-            if (!response.IsSuccessStatusCode || generation != _generation || token.IsCancellationRequested)
-            {
-                return;
-            }
-
-            if (await response.Content.ReadFromJsonAsync<List<LabelResponse>>(JsonOptions, token) is { } labels && generation == _generation)
-            {
-                UseLabels(labels);
-            }
+            Say(Localizer["AssigneeCleared"]);
         }
-        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        else if (Lists.LabelOf(membershipId.Value) is { } label)
         {
-            // Left as it was; see above.
+            Say(string.Format(CultureInfo.CurrentCulture, Localizer["AssigneeAssigned"], label));
+        }
+        else
+        {
+            // A Membership this tab holds no candidate for is never named by an id.
         }
     }
 
@@ -1221,6 +1219,20 @@ public sealed partial class BoardView
     /// (<c>MoveChoice.ToRequest</c>), the destination Status and the neighbour, never a key (story 2.6, open
     /// question 2 (a)).
     /// </summary>
+    private static HttpMethod MethodOf(TaskAttribute attribute, object? value) => attribute switch
+    {
+        TaskAttribute.Assignee => HttpMethod.Put,
+        _ when value is MoveChoice => HttpMethod.Post,
+        _ => HttpMethod.Patch,
+    };
+
+    private string RouteOf(Guid taskId, TaskAttribute attribute, object? value) => attribute switch
+    {
+        TaskAttribute.Assignee => TaskRoutes.AssigneeOf(SpaceId, taskId),
+        _ when value is MoveChoice => TaskRoutes.MoveOf(SpaceId, taskId),
+        _ => TaskRoutes.TaskOf(SpaceId, taskId),
+    };
+
     private static object BodyOf(TaskAttribute attribute, object? value) =>
         value is MoveChoice move
             ? move.ToRequest()
@@ -1231,6 +1243,7 @@ public sealed partial class BoardView
         TaskAttribute.Title => "title",
         TaskAttribute.Status => "statusId",
         TaskAttribute.Labels => "labelIds",
+        TaskAttribute.Assignee => "membershipId",
         _ => "dueDate",
     };
 
@@ -1239,6 +1252,7 @@ public sealed partial class BoardView
         TaskAttribute.Title => task.Title,
         TaskAttribute.Status => task.StatusId,
         TaskAttribute.Labels => task.LabelIds,
+        TaskAttribute.Assignee => task.AssigneeMembershipId,
         _ => task.DueDate,
     };
 
@@ -1249,6 +1263,7 @@ public sealed partial class BoardView
         TaskAttribute.Status when value is MoveChoice move => task with { StatusId = move.StatusId },
         TaskAttribute.DueDate => task with { DueDate = value as DateTimeOffset? },
         TaskAttribute.Labels when value is IReadOnlyList<Guid> labelIds => task with { LabelIds = labelIds },
+        TaskAttribute.Assignee => task with { AssigneeMembershipId = value as Guid? },
         _ => task,
     };
 
@@ -1261,6 +1276,7 @@ public sealed partial class BoardView
         TaskAttribute.Title => admitted with { Title = stored.Title },
         TaskAttribute.Status => admitted with { StatusId = stored.StatusId, PositionKey = stored.PositionKey },
         TaskAttribute.Labels => admitted with { LabelIds = stored.LabelIds },
+        TaskAttribute.Assignee => admitted with { AssigneeMembershipId = stored.AssigneeMembershipId },
         _ => admitted with { DueDate = stored.DueDate },
     };
 

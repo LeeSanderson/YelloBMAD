@@ -52,7 +52,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// bound: <c>PUT .../tasks/{taskId}/assignee</c> under <c>AssignTask</c> and <c>GET .../assignees</c>
     /// under <c>ReadProjectsAndTasks</c> (every Role reads the candidates). A Token reaches both (AD-4).
     /// </summary>
-    [Fact(Skip = "red: AC1, AC13 - neither assignment route is mapped yet (Lee's Q1 (a), Q2 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-21")]
     [Trait("Requirement", "AD-4")]
     [Trait("Requirement", "AD-1")]
@@ -86,7 +86,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// by the assignment route alone. It was transcribed and used by nothing until now; this keeps a second route from
     /// borrowing it and the assignment from being folded into the PATCH under another capability.
     /// </summary>
-    [Fact(Skip = "red: AC13 - no endpoint requires Capability.AssignTask yet")]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "AD-1")]
     public void AssignTask_is_required_by_exactly_the_assignment_route()
@@ -106,7 +106,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>MembershipId</c> (a <c>Guid</c>) and <c>DisplayName</c> (a string); <c>AssigneeListResponse</c> is exactly
     /// <c>Assignees</c>, unpaged.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC6 - AssignTaskRequest, AssigneeResponse and AssigneeListResponse are not declared yet")]
+    [Fact]
     [Trait("Requirement", "AD-23")]
     [Trait("Requirement", "UX-DR34")]
     public void The_assignment_contracts_carry_exactly_their_named_members()
@@ -129,7 +129,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// added, none removed or retyped - and still carries no name, address or <c>SpaceId</c>. The successor of 2.4's
     /// response-shape gate.
     /// </summary>
-    [Fact(Skip = "red: AC10 - TaskResponse has no AssigneeMembershipId yet")]
+    [Fact]
     [Trait("Requirement", "AD-19")]
     [Trait("Requirement", "FR-21")]
     public void The_Task_response_gains_its_Assignee_and_keeps_every_earlier_field()
@@ -146,7 +146,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>Membership</c> is <c>(SpaceId, AssigneeMembershipId) → (SpaceId, Id)</c> with <c>DeleteBehavior.NoAction</c> - not
     /// SetNull (it would null <c>SpaceId</c>), not Cascade (it would delete the Task).
     /// </summary>
-    [Fact(Skip = "red: AC2 - TaskItem has no AssigneeMembershipId and the model no Assignee key yet")]
+    [Fact]
     [Trait("Requirement", "AR-8")]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AD-5")]
@@ -173,7 +173,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// the Project's, the Task's title and the client's base URL - so no Domain type can be passed in and nothing of another
     /// Space can reach the email. Sibling of the Invitation template's gate.
     /// </summary>
-    [Fact(Skip = "red: AC4, AC13 - AssignmentEmail is not declared yet (Q8 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-40")]
     [Trait("Requirement", "NFR-1")]
     public void The_assignment_email_template_takes_strings_and_a_URI_and_nothing_else()
@@ -198,10 +198,10 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// FS-NFR-2 ("no product surface reads it"): only the outbox store that writes it, the entity, its configuration and the
-    /// context refer to the send record type, so no slice, endpoint or client code can read it. Anchor: the store is among the
-    /// dependents. Sibling of the outbox row's reader gate.
+    /// model that applies it refer to the send record type, so no slice, endpoint or client code can read it. Anchor: the
+    /// store is among the dependents. Sibling of the outbox row's reader gate.
     /// </summary>
-    [Fact(Skip = "red: AC5 - NotificationSend is not declared yet (Lee's Q4 (a))")]
+    [Fact]
     [Trait("Requirement", "FS-NFR-2")]
     [Trait("Requirement", "AD-2")]
     public void Only_the_outbox_store_and_its_configuration_refer_to_the_send_record()
@@ -209,7 +209,8 @@ public sealed partial class RefusalBoundaryGateTests
         var record = Assert.Single(ProductionAssemblies.All.SelectMany(assembly => assembly.GetTypes()), type => type.Name == "NotificationSend");
         var dependents = DependentsOf(record.FullName!);
 
-        string[] named = ["OutboxStore", "NotificationSendConfiguration", "YelloDbContext", "NotificationSend"];
+        // InvitationModel applies the configuration, as it does the outbox row's: YelloDbContext is at S1200's limit.
+        string[] named = ["OutboxStore", "NotificationSendConfiguration", "InvitationModel", "YelloDbContext", "NotificationSend"];
 
         Assert.Contains(dependents, dependent => dependent.EndsWith(".OutboxStore", StringComparison.Ordinal));
 
@@ -222,7 +223,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The assignment email's kind is a stable code beside the Invitation's: <c>OutboxKinds.TaskAssigned</c> is
     /// <c>task-assigned</c>, the value the send record stores.
     /// </summary>
-    [Fact(Skip = "red: AC4 - OutboxKinds.TaskAssigned is not declared yet")]
+    [Fact]
     [Trait("Requirement", "FR-40")]
     [Trait("Requirement", "FS-NFR-2")]
     public void The_assignment_email_has_its_own_outbox_kind()
@@ -237,7 +238,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>invalid-assignee</c> is declared in <c>ProblemTypes</c> and has client copy of its own in <c>ClientCopy.resx</c>, with
     /// a translator's comment.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC10 - ProblemTypes.InvalidAssignee and its client copy are not declared yet")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-21")]
     public void The_invalid_assignee_problem_type_is_declared_and_has_client_copy()
@@ -262,7 +263,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// exactly where <c>AssignTask</c> is not denied (Owner, Admin, Member), absent for a Viewer. Sibling of
     /// <c>The_clients_Task_controls_predicate_agrees_with_the_capability_matrix</c>.
     /// </summary>
-    [Fact(Skip = "red: AC6 - the client has no AssignTask predicate yet (TaskCapabilities.PermitsAssignTask)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "AD-1")]
     public void The_clients_assign_control_predicate_agrees_with_the_capability_matrix()

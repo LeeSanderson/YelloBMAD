@@ -14,7 +14,6 @@ using Yello.Contracts.Labels;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
 using Yello.Contracts.Tasks;
-using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -2223,8 +2222,8 @@ internal sealed record FakeListQuery(
             string.Equals(Single("dueNone"), "true", StringComparison.OrdinalIgnoreCase),
             Single("after"))
         {
-            AssigneeIds = Ids(AssignmentWire.AssigneeParameter),
-            Unassigned = string.Equals(Single(AssignmentWire.UnassignedParameter), "true", StringComparison.OrdinalIgnoreCase),
+            AssigneeIds = Ids(Yello.Contracts.Lists.ListRoutes.AssigneeParameter),
+            Unassigned = string.Equals(Single(Yello.Contracts.Lists.ListRoutes.UnassignedParameter), "true", StringComparison.OrdinalIgnoreCase),
         };
     }
 

@@ -24,4 +24,13 @@ public static class TaskCapabilities
     /// <returns><c>true</c> for Owner, Admin and Member; <c>false</c> for Viewer and anything unknown.</returns>
     public static bool PermitsManageTasks(string roleCode) =>
         roleCode is "owner" or "admin" or "member";
+
+    /// <summary>
+    /// Whether a Role may assign Tasks (FR-16's <c>assign-task</c>), so a Viewer has no assign control. Held against the
+    /// matrix by its own gate: the matrix keeps assignment apart from editing, so this predicate does too.
+    /// </summary>
+    /// <param name="roleCode">The Role's stable code, from the active Space's answer.</param>
+    /// <returns><c>true</c> for Owner, Admin and Member; <c>false</c> for Viewer and anything unknown.</returns>
+    public static bool PermitsAssignTask(string roleCode) =>
+        roleCode is "owner" or "admin" or "member";
 }

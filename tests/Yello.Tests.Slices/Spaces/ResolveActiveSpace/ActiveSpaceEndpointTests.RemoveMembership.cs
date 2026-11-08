@@ -642,8 +642,8 @@ public sealed partial class ActiveSpaceEndpointTests
 
     /// <summary>
     /// Removal deletes a Membership and nothing a Member made: a Project and a Task the removed Member created through the
-    /// product are still there afterwards, with the Space's counts unchanged. No Task carries an Assignee yet, so "Tasks it
-    /// was Assignee of become unassigned" has nothing to act on; what holds now is that nothing is deleted.
+    /// product are still there afterwards, with the Space's counts unchanged. That Tasks it was Assignee of become unassigned
+    /// is <c>An_assigned_Member_is_removed_and_its_Tasks_are_unassigned_and_survive</c>'s; this holds that nothing is deleted.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]

@@ -111,7 +111,8 @@ public sealed partial class TaskEndpointTests
     /// <summary>
     /// AR-8, AD-2 - <c>Task</c> references its Project through <c>(SpaceId, ProjectId)</c> → <c>Project
     /// (SpaceId, Id)</c> with cascade, and its Status through <c>(SpaceId, StatusId)</c> →
-    /// <c>StatusDefinition (SpaceId, Id)</c> with no action; and there is no separate foreign key from
+    /// <c>StatusDefinition (SpaceId, Id)</c> with no action, and its Assignee through <c>(SpaceId, AssigneeMembershipId)</c> →
+    /// <c>Membership (SpaceId, Id)</c> with no action; and there is no separate foreign key from
     /// <c>Task</c> to <c>Space</c>, which would be a second cascade path (SQL Server error 1785).
     /// </summary>
     /// <returns>A task.</returns>
@@ -138,6 +139,7 @@ public sealed partial class TaskEndpointTests
 
         Assert.Equal(
             [
+                "Membership|NO_ACTION|SpaceId>SpaceId,AssigneeMembershipId>Id",
                 "Project|CASCADE|SpaceId>SpaceId,ProjectId>Id",
                 "StatusDefinition|NO_ACTION|SpaceId>SpaceId,StatusId>Id",
             ],

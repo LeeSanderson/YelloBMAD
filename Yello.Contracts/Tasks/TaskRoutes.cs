@@ -64,4 +64,20 @@ public static class TaskRoutes
     /// <param name="taskId">The Task.</param>
     /// <returns>The path.</returns>
     public static string MoveOf(Guid spaceId, Guid taskId) => $"/api/v1/spaces/{spaceId:D}/tasks/{taskId:D}/move";
+
+    /// <summary>
+    /// <c>PUT</c> an <see cref="AssignTaskRequest"/> here: <c>200</c> with the <see cref="TaskResponse"/> as stored;
+    /// <c>400 invalid-assignee</c> for a body that names no Membership or one that is not this Space's; <c>403</c> for a Role
+    /// that may not assign. Its own route rather than a member of the edit, so it is governed by the matrix's "Assign a
+    /// Task" row alone.
+    /// </summary>
+    public static string Assignee => "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/assignee";
+
+    /// <summary>
+    /// One Task's assignment path, as a client calls it.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="taskId">The Task.</param>
+    /// <returns>The path.</returns>
+    public static string AssigneeOf(Guid spaceId, Guid taskId) => $"/api/v1/spaces/{spaceId:D}/tasks/{taskId:D}/assignee";
 }

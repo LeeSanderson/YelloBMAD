@@ -8,8 +8,8 @@ namespace Yello.Application.Lists.ViewList;
 
 /// <summary>
 /// Reads one page of a Project's List View: the Project's Tasks matching a filter, under a sort, after a cursor, with the
-/// true filtered total and the Project's effective Statuses. FR-30 (partial: no Assignee until 4.6); story 2.10, AC1,
-/// AC3-AC5, AC10-AC15, open questions 1 (a), 4 (a) and 7 (a).
+/// true filtered total and the Project's effective Statuses. FR-30; story 2.10, AC1, AC3-AC5, AC10-AC15, open questions
+/// 1 (a), 4 (a) and 7 (a).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -18,7 +18,7 @@ namespace Yello.Application.Lists.ViewList;
 /// </para>
 /// <para>
 /// <b>Filter ids are narrowed before any read, never refused</b> (AC15, open question 4 (a)): Status ids to the Project's
-/// effective set, Label ids to the Space's Labels. An id outside them - random, another Space's real one, deleted since it
+/// effective set, Label ids to the Space's Labels, Assignee ids to the Space's Memberships. An id outside them - random, another Space's real one, deleted since it
 /// was chosen - drops out, and a filter left with none matches nothing. So a random id and another Space's real id answer
 /// the same bytes, and a stale Label never breaks a filter.
 /// </para>
@@ -71,6 +71,9 @@ public sealed class ViewListHandler(IBoardReader boards, IListReader reader, ISt
             LabelIds = filter.LabelIds is { Count: > 0 } labelIds
                 ? await reader.VisibleLabelIdsAsync([.. labelIds.Distinct()], cancellationToken).ConfigureAwait(false)
                 : filter.LabelIds,
+            AssigneeMembershipIds = filter.AssigneeMembershipIds is { Count: > 0 } membershipIds
+                ? await reader.VisibleMembershipIdsAsync([.. membershipIds.Distinct()], cancellationToken).ConfigureAwait(false)
+                : filter.AssigneeMembershipIds,
         };
 
         var statusOrder = effective

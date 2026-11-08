@@ -56,7 +56,7 @@ public sealed partial class ListPagingTests(MigratedDatabaseFixture fixture) : I
 
     private static readonly string[] PageProperties = ["nextAfter", "project", "statuses", "tasks", "total"];
 
-    private static readonly string[] TaskProperties = ["createdAt", "dueDate", "id", "labelIds", "positionKey", "statusId", "title"];
+    private static readonly string[] TaskProperties = ["assigneeMembershipId", "createdAt", "dueDate", "id", "labelIds", "positionKey", "statusId", "title"];
 
     private static readonly string[] IdAndName = ["id", "name"];
 
@@ -514,14 +514,15 @@ public sealed partial class ListPagingTests(MigratedDatabaseFixture fixture) : I
     }
 
     /// <summary>
-    /// LV-10 (AC12, AC2, Task 4 (c); P1) - an unknown sort (Assignee among them: AC2, not offered until 4.6), a malformed
-    /// Status or Label id, and a malformed or out-of-window due bound (2.3's 2000-2100) are refused <c>400
+    /// LV-10 (AC12, AC2, Task 4 (c); P1) - an unknown sort, a malformed Status, Label or Assignee id, a malformed
+    /// <c>unassigned</c> flag, and a malformed or out-of-window due bound (2.3's 2000-2100) are refused <c>400
     /// invalid-list-query</c>, recording nothing.
     /// </summary>
     /// <param name="query">The raw query string.</param>
     /// <returns>A task.</returns>
     [Theory]
-    [InlineData("sort=assignee")]
+    [InlineData("sort=assignee&assignee=not-a-guid")]
+    [InlineData("sort=assignee&unassigned=maybe")]
     [InlineData("sort=")]
     [InlineData("sort=title")]
     [InlineData("sort=status&status=not-a-guid")]
@@ -569,7 +570,7 @@ public sealed partial class ListPagingTests(MigratedDatabaseFixture fixture) : I
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Checked in order");
 
-            both = await owner.Session.GetAsync($"/api/v1/spaces/{owner.SpaceId:D}/projects/{projectId:D}/list?sort=assignee&after=garbage");
+            both = await owner.Session.GetAsync($"/api/v1/spaces/{owner.SpaceId:D}/projects/{projectId:D}/list?sort=title&after=garbage");
             cursorOnUnknownProject = await PageAsync(owner, owner.SpaceId, Guid.NewGuid(), ListQuery.By(SortStatus), "garbage");
         });
 

@@ -3,7 +3,7 @@ baseline_commit: 4d23bf347622285bb2195854adbe6a22921d42d6
 ---
 # Story 4.6: Assign a Task, and be told
 
-Status: ready-for-dev
+Status: review
 
 Epic: 4 — Bring people into one piece of your work (the sixth story of the epic)
 Story key: `4-6-assign-a-task-and-be-told`
@@ -326,46 +326,46 @@ AC1 to AC7 are reproduced **verbatim** from `epics.md:1844-1875` and numbered by
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0: decisions** (before any code)
+- [x] **Task 0: decisions** (before any code)
   - [x] Q1, Q4, Q7 and Q10 are marked **[LEE]**. If the orchestrator routes them to Lee, record the answers here under "Decided by Lee" before ATDD. Otherwise take each recommendation and record it as "Qn - (x)" with its cost in Completion Notes.
     - **Decided by Lee (2026-11-08):**
       - Q1 - (a): a separate `PUT .../tasks/{taskId}/assignee` route under `Capability.AssignTask`, answering `200 TaskResponse`. The PATCH and its gates stay unchanged.
       - Q4 - (a): a Space-scoped `NotificationSend` table under the policy, written by `OutboxStore` at enqueue in the request's transaction, for every kind. Retention sub-question: (a), cascade with the Space.
       - Q7 - (a): the collision key is NFC, then strip `Cf` code points, trim, collapse whitespace, and compare ordinal-ignore-case. Confusables return to the ledger, owned by Lee/UX.
       - Q10 - (a): no Invitation rate limit in this story. The ledger entry is re-owned to Lee/PM.
-  - [ ] Decide Q2, Q3, Q5, Q6, Q8, Q9 and Q11 the same way. Each recommendation is the default.
-- [ ] **Task 1: Domain** (AC2, AC3)
-  - [ ] `TaskItem.AssigneeMembershipId` (`Guid?`). `ITaskStore` (or a new `ITaskAssignments` port, if S1200 or cohesion argue for it) gains `AssignAsync(taskId, membershipId?) → AssignOutcome(Assigned(previous), NoSuchTask, InvalidAssignee)`.
-  - [ ] Update `Capability.AssignTask`'s summary to say what uses it. **No story ids in new comments** (CLAUDE.md).
-- [ ] **Task 2: Contracts** (AC1, AC5, AC7, AC10)
-  - [ ] `TaskRoutes.Assignee` / `AssigneeOf`; `AssignTaskRequest(Guid? MembershipId)`; `TaskResponse.AssigneeMembershipId` (appended).
-  - [ ] `AssigneeRoutes.List` / `ListOf`; `AssigneeListResponse`, `AssigneeResponse(MembershipId, DisplayName)`.
-  - [ ] `ProblemTypes.InvalidAssignee`, with remarks on its status and its non-disclosure.
-  - [ ] `ListSorts.Assignee`; `ListRoutes` `assignee` and `unassigned` parameters and `ListOf`; `ListQuery` members.
-  - [ ] `MembershipLabels`: the widened collision key (Q7), with its remarks updated.
-- [ ] **Task 3: Application** (AC1, AC4, AC9)
-  - [ ] `Yello.Application/Tasks/AssignTask/AssignTaskHandler.cs`:
+  - [x] Decide Q2, Q3, Q5, Q6, Q8, Q9 and Q11 the same way. Each recommendation is the default.
+- [x] **Task 1: Domain** (AC2, AC3)
+  - [x] `TaskItem.AssigneeMembershipId` (`Guid?`). `ITaskStore` (or a new `ITaskAssignments` port, if S1200 or cohesion argue for it) gains `AssignAsync(taskId, membershipId?) → AssignOutcome(Assigned(previous), NoSuchTask, InvalidAssignee)`.
+  - [x] Update `Capability.AssignTask`'s summary to say what uses it. **No story ids in new comments** (CLAUDE.md).
+- [x] **Task 2: Contracts** (AC1, AC5, AC7, AC10)
+  - [x] `TaskRoutes.Assignee` / `AssigneeOf`; `AssignTaskRequest(Guid? MembershipId)`; `TaskResponse.AssigneeMembershipId` (appended).
+  - [x] `AssigneeRoutes.List` / `ListOf`; `AssigneeListResponse`, `AssigneeResponse(MembershipId, DisplayName)`.
+  - [x] `ProblemTypes.InvalidAssignee`, with remarks on its status and its non-disclosure.
+  - [x] `ListSorts.Assignee`; `ListRoutes` `assignee` and `unassigned` parameters and `ListOf`; `ListQuery` members.
+  - [x] `MembershipLabels`: the widened collision key (Q7), with its remarks updated.
+- [x] **Task 3: Application** (AC1, AC4, AC9)
+  - [x] `Yello.Application/Tasks/AssignTask/AssignTaskHandler.cs`:
     1. Assign through the store.
     2. On `Assigned(previous)` where previous differs from new and new is non-null, read the notification facts (the recipient's AccountId and address, the actor's name, and the Space, Project and Task names) through one port method on `IMembershipStore` (implemented in `MembershipStore`; Q8).
     3. If the recipient Account is not the actor, render `AssignmentEmail` and enqueue `OutboxKinds.TaskAssigned`.
     4. Return the Task.
 
     The handler reads no Role, counts nothing and records nothing (AR-3).
-  - [ ] `Yello.Application/Tasks/AssignTask/AssignmentEmail.cs`, the `OutboxKinds.TaskAssigned` constant, and `Yello.Application/Memberships/ListAssignees/ListAssigneesHandler.cs`.
-  - [ ] `ViewListHandler`: narrow Assignee ids to visible Memberships. Update `ListFilter`, `ListCursor`, `ListSort`, `ListSortCodes` and `ListCursorText`.
-- [ ] **Task 4: Infrastructure** (AC2, AC5, AC7, AC8, AC9)
-  - [ ] `TaskConfiguration`: the column, the composite FK (NoAction) and the Assignee list index. Remarks give the why.
-  - [ ] `NotificationSend` entity and configuration (query filter, FK to Space cascade), `OutboxStore` writes it, and `SchemaNames.SpaceScopedTables` gains it (Q4 (a)).
-  - [ ] `ApplicationLocks.MembershipsShared` taking `TakeMembershipsSharedAsync` (`@LockMode = 'Shared'`). Generalise `TakeAsync` to take a mode. Update the class remarks.
-  - [ ] The guarded assign `UPDATE ... OUTPUT` plus its disambiguation read. The 547 mapping (AC1).
-  - [ ] `MembershipStore`: `ListAssigneesAsync`, the notification-facts read, and the unassign in `RemoveCoreAsync` and `LeaveAsync` (AC8). Watch S1200, and split by port if it fires (4.5 split the endpoints the same way).
-  - [ ] `ListSortColumns`, `ListReader.ByAssigneeAsync`, the index hint, and `Matching`.
-  - [ ] One migration `TaskAssignee`: the column, the FK, the index, the `NotificationSend` table and its three predicates. Expand-only. Update the snapshot and `MigrationBundleEquivalenceTests`.
-- [ ] **Task 5: Host** (AC1, AC12, AC13)
-  - [ ] `TaskAssigneeEndpoints.MapAssignTask` (`PUT`, `AssignTask`) with a body reader that rejects a non-object body and a missing `membershipId` (`invalid-assignee`), and an explicit outcome switch. `AssigneeEndpoints.MapListAssignees` (`GET`, `ReadProjectsAndTasks`). Map both in `Program.cs` beside the Task and Membership routes, and update the route comment block.
-  - [ ] `ListQueryReading`: the `assignee` and `unassigned` parameters.
-- [ ] **Task 6: Client** (AC6, AC7, AC10, AC11)
-  - [ ] Files:
+  - [x] `Yello.Application/Tasks/AssignTask/AssignmentEmail.cs`, the `OutboxKinds.TaskAssigned` constant, and `Yello.Application/Memberships/ListAssignees/ListAssigneesHandler.cs`.
+  - [x] `ViewListHandler`: narrow Assignee ids to visible Memberships. Update `ListFilter`, `ListCursor`, `ListSort`, `ListSortCodes` and `ListCursorText`.
+- [x] **Task 4: Infrastructure** (AC2, AC5, AC7, AC8, AC9)
+  - [x] `TaskConfiguration`: the column, the composite FK (NoAction) and the Assignee list index. Remarks give the why.
+  - [x] `NotificationSend` entity and configuration (query filter, FK to Space cascade), `OutboxStore` writes it, and `SchemaNames.SpaceScopedTables` gains it (Q4 (a)).
+  - [x] `ApplicationLocks.MembershipsShared` taking `TakeMembershipsSharedAsync` (`@LockMode = 'Shared'`). Generalise `TakeAsync` to take a mode. Update the class remarks.
+  - [x] The guarded assign `UPDATE ... OUTPUT` plus its disambiguation read. The 547 mapping (AC1).
+  - [x] `MembershipStore`: `ListAssigneesAsync`, the notification-facts read, and the unassign in `RemoveCoreAsync` and `LeaveAsync` (AC8). Watch S1200, and split by port if it fires (4.5 split the endpoints the same way).
+  - [x] `ListSortColumns`, `ListReader.ByAssigneeAsync`, the index hint, and `Matching`.
+  - [x] One migration `TaskAssignee`: the column, the FK, the index, the `NotificationSend` table and its three predicates. Expand-only. Update the snapshot and `MigrationBundleEquivalenceTests`.
+- [x] **Task 5: Host** (AC1, AC12, AC13)
+  - [x] `TaskAssigneeEndpoints.MapAssignTask` (`PUT`, `AssignTask`) with a body reader that rejects a non-object body and a missing `membershipId` (`invalid-assignee`), and an explicit outcome switch. `AssigneeEndpoints.MapListAssignees` (`GET`, `ReadProjectsAndTasks`). Map both in `Program.cs` beside the Task and Membership routes, and update the route comment block.
+  - [x] `ListQueryReading`: the `assignee` and `unassigned` parameters.
+- [x] **Task 6: Client** (AC6, AC7, AC10, AC11)
+  - [x] Files:
     - `TaskDetail.razor` (the Assignee attribute and picker, the Viewer row);
     - a new `AssigneeAvatar.razor` (shared by card, detail, List row and picker);
     - `TaskCard.razor` (`CardInputs`);
@@ -376,17 +376,17 @@ AC1 to AC7 are reproduced **verbatim** from `epics.md:1844-1875` and numbered by
     - `RefusalCopy.cs` (`invalid-assignee`);
     - `ClientCopy.resx` (each string with a `<comment>`);
     - `components.css` (logical properties, no px or colour literals, avatar per `DESIGN.md:188-193`).
-  - [ ] Copy (Q11): see the open question.
-- [ ] **Task 7: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log.
-- [ ] **Task 8: ledger, docs, verification**
-  - [ ] Apply the ledger dispositions below: one line per CLOSED or UPDATED note, no TAB or FORM FEED, and keep the final newline.
-  - [ ] Dated notes in `ARCHITECTURE-SPINE.md`:
+  - [x] Copy (Q11): see the open question.
+- [x] **Task 7: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log.
+- [x] **Task 8: ledger, docs, verification**
+  - [x] Apply the ledger dispositions below: one line per CLOSED or UPDATED note, no TAB or FORM FEED, and keep the final newline.
+  - [x] Dated notes in `ARCHITECTURE-SPINE.md`:
     - AD-5: the unassignment runs explicitly inside the removal and the leave, under the Memberships lock, because `SET NULL` cannot apply to a composite key carrying `SpaceId`;
     - AD-10: the send record is written at enqueue, Space-scoped (Q4);
     - AD-29: the Assignee sort groups by Membership with Unassigned last (Q6).
-  - [ ] Rewrite comments that predict "4.6" so they say what exists: `MembershipConfiguration.cs:59`, `MembershipLabels.cs` remarks, `ListSorts.cs`, `TaskCard.razor:13`, `TaskDetail.razor:23`, `TaskListView.razor:12`, `TaskListPage.razor:4`, `ActiveSpaceEndpointTests.RemoveMembership.cs:643-647`, and `PersistenceModelGateTests.cs:264-270` if it reads as a prediction.
-  - [ ] `sprint-status.yaml`: this story goes to `review` at the end of dev, and `epic-4` stays `in-progress`. In the header's staged-FR block, mark FR-30 as completed by 4.6, keeping the line for history.
-  - [ ] Verification follows CLAUDE.md's policy:
+  - [x] Rewrite comments that predict "4.6" so they say what exists: `MembershipConfiguration.cs:59`, `MembershipLabels.cs` remarks, `ListSorts.cs`, `TaskCard.razor:13`, `TaskDetail.razor:23`, `TaskListView.razor:12`, `TaskListPage.razor:4`, `ActiveSpaceEndpointTests.RemoveMembership.cs:643-647`, and `PersistenceModelGateTests.cs:264-270` if it reads as a prediction.
+  - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev, and `epic-4` stays `in-progress`. In the header's staged-FR block, mark FR-30 as completed by 4.6, keeping the line for history.
+  - [x] Verification follows CLAUDE.md's policy:
     1. `docker info --format '{{.ServerVersion}}'`.
     2. `dotnet build Yello.slnx` (0 warnings, 0 errors).
     3. Iterate on the affected classes with `--filter-class "<full name>"`.
@@ -736,14 +736,194 @@ correction recorded in the Debug Log, not deleted.
 
 ### Agent Model Used
 
+Claude Opus 5.5 (bmad-dev-story, unattended story cycle), 2026-11-08.
+
 ### Debug Log References
+
+- Logs: `artifacts/test-runs/4-6-iter-slices.log` (34 activated Slices cases, all green), `artifacts/test-runs/4-6-iter-client.log` (AssigneeTests + MembershipSectionTests, 38 green), `artifacts/test-runs/4-6-iter-isolation.log`, and the full run `artifacts/test-runs/4-6-assign-a-task-and-be-told-develop.log`.
+- **Activation order.** Production code for Tasks 1-5 was written first, then every Slices scaffold was activated together and run (34/34 green on the first run); the red step for each was taken by the plants below rather than by a pre-implementation run. Race 2 (the riskiest assumption) and the schema cases ran first, alone: 5/5 green.
+- **Active tests updated deliberately (red by design when the Assignee landed):**
+  - `TaskResponse` member pins widened by exactly `assigneeMembershipId` / `AssigneeMembershipId`: `TaskEndpointTests.TaskProperties`, `TaskEndpointTests.Edit.cs` `EditedTaskProperties`, `BoardEndpointTests.TaskProperties`, `BoardPagingTests:245`, `ListPagingTests.TaskProperties`, and the Architecture gates `The_due_date_is_a_nullable_DateTimeOffset_on_the_Task_and_its_response` and `The_Task_response_gains_its_Label_ids_and_keeps_every_earlier_field`.
+  - `ListViewGateTests.The_offered_sorts_are_exactly_three_and_none_is_the_Assignee` deleted; its successor `The_offered_sorts_are_exactly_four_and_the_Assignee_is_among_them` is active.
+  - `ListPagingTests` LV-10: `[InlineData("sort=assignee")]` (now a valid query) replaced by `sort=assignee&assignee=not-a-guid` and `sort=assignee&unassigned=maybe`, so the theory still proves the malformed Assignee parameters are `400 invalid-list-query`. The `200` for `sort=assignee` is held by `ListPagingTests.Assignee.cs`.
+  - `ListPagingTests` LV-11 (`The_query_is_checked_before_the_cursor_and_both_before_the_Project`): its "bad query" was `sort=assignee`; now `sort=title`, still an unknown sort.
+  - `MembershipLabelsTests.Names_are_compared_ordinally_after_NFC` renamed `Names_are_compared_after_NFC`; its "Sam Lee"/"sam lee" are-two-names clause dropped (Lee's Q7 (a) reverses it; the look-alike theory holds the fold).
+  - `TaskEndpointTests.Schema.cs` `Task_reaches_its_Project_and_Status_only_through_keys_that_carry_SpaceId` widened by exactly `Membership|NO_ACTION|SpaceId>SpaceId,AssigneeMembershipId>Id`. Missed by the ATDD checklist and by iteration; the first full run caught it (1862 total, 1 failed, 1854 passed, 7 skipped; kept as `artifacts/test-runs/4-6-assign-a-task-and-be-told-develop-run1.log`). After the fix `TaskEndpointTests` ran 180/180 and a second full run was made: 1862 total, 1854 passed, 1 failed, 7 skipped (two migration-bundle cases without `YELLO_MIGRATION_BUNDLE`, five Nightly-tier timing and load cases). Its one failure, `ActiveSpaceEndpointTests.A_stale_claim_is_claimed_again_and_a_fresh_claim_is_left_alone` (an Invitation outbox case this story did not touch; a 30s mail wait timed out), passed in the first full run and passed alone on rerun (`artifacts/test-runs/4-6-stale-claim-rerun.log`), so it is recorded as a load flake in the ledger (owner: sweep) rather than a third full run.
+  - Further gates widened by exactly the assignment: `The_Task_creation_request_carries_a_title_and_nothing_else` and `The_Task_edit_request_carries_its_editable_attributes_and_nothing_else` (the Task request set gains `AssignTaskRequest`), `The_routes_under_a_Task_are_its_read_edit_deletion_and_move` (gains `PUT .../assignee`), `Space_is_read_only_where_named` (gains `NotificationSendConfiguration`, the Space foreign key only), `SpaceIsolationSchemaTests.TablesThatCannotMove` (gains `NotificationSend`).
+- **Scaffolds corrected:**
+  - `RefusalBoundaryGateTests.Only_the_outbox_store_and_its_configuration_refer_to_the_send_record`: `InvitationModel` added to the named dependents. `YelloDbContext` is at S1200's limit (31 > 30 with the configuration applied there), so the configuration is applied in `InvitationModel`, exactly as the outbox row's is (the sibling gate already names it).
+  - `RefusalBoundaryGateTests.The_invalid_assignee_problem_type_is_declared_and_has_client_copy` needed no change: the resource key is the type code `invalid-assignee`, the 4.5 `ownership-held` convention.
+  - `IsolationCases.Assignment.cs`: the three rows that seeded a fresh Project per row now reuse one (`AnyProjectWithTaskAsync`) for both Spaces. Seeding per row pushed the shared world past the 50 Projects-per-Space bound and broke four existing rows (`ISO-BOARD-AGGREGATE-PAGED`, `ISO-EDIT-TASK-FOREIGN-SPACE`, `ISO-DELETE-TASK-FOREIGN-SPACE`, and the new `ISO-ASSIGN-FOREIGN-TASK-IN-OWN-SPACE`), and left `NoTaskIsAssignedInEitherSpaceAsync`'s anchor with no Task in A.
+  - `ProductActor.SendAsync` (the body-less overload) gained `PUT` on both surfaces, sending an unassignment: `ISO-TOKEN-OWN-OTHER-SPACE-ASSIGN` failed "Session PUT is not a surface request this harness sends".
+  - `AssignmentWire` stand-ins (`AssigneeRoute`, `AssigneeOf`, `AssigneesRoute`, `AssigneesOf`, `InvalidAssigneeProblemType`, `SortAssignee`, `AssigneeParameter`, `UnassignedParameter`) replaced in Slices, Isolation and the Client fake by `TaskRoutes.Assignee` / `AssigneeOf`, `AssigneeRoutes.List` / `ListOf`, `ProblemTypes.InvalidAssignee`, `ListSorts.Assignee`, `ListRoutes.AssigneeParameter` / `UnassignedParameter`, and deleted. The lasting readings stay.
+  - Client scaffolds (`AssigneeTests`, the `MembershipSectionTests` look-alike case): the assumed locators matched the markup built; no correction.
+- **S1200 splits** (record): `TaskStore` reached 33 with the assignment, so the assignment is its own port `ITaskAssignments` / `TaskAssignmentStore` (the story allowed it). `BoardView` reached 32 with the candidates, so the Board's Labels and candidates moved into `BoardSpaceLists` (Labels behaviour unchanged: read before the Board, shown with it, refreshed after `invalid-task-labels`). `TaskListView` reached 32, so the List's candidates live in `TaskListFilters` (which already owns the filters) and the row reads them through it.
+- **The Space's name in the email** comes from the existing `IActiveSpaceNameReader`, not `MembershipStore`: a Space read in `MembershipStore` failed `Space_is_read_only_where_named`, and the reader already exists for the Invitation email.
+- **The stale-claim failure (develop re-run): a test-isolation defect, not load.** `A_stale_claim_is_claimed_again_and_a_fresh_claim_is_left_alone` failed in both full runs and the orchestrator's. Its missing email was in the shared default drop `%TEMP%/yello-mail-drop/unread`, sent by a Host with no `MailDrop`: the class's pooled Host (`HostPool`, since the shared-Host change), which shares the class's database and runs an outbox dispatcher of its own. It claimed the seeded stale row before the case's Host started. The class alone reproduced it (`ActiveSpaceEndpointTests`, 256 cases, 1 failed: this one); the product's dispatcher was right to send a stale claim. Fix in the tests: `HostPool.StopAsync(connectionString)` kills the pooled Hosts for a database; the four outbox-seeding cases (process-start sweep, piggyback sweep, stale claim, permanent/tenth/transient) take their wire through `SoleDispatcherWireAsync`, which stops the pool first. Guard: `MailDrop`'s timeout now counts mail to the awaited recipient that reached the shared drop and names the pooled Host as the cause. Class rerun after the fix: 256/256 (`artifacts/test-runs/4-6-stale-claim-class.log`). Full run without the browser suite: 1862 total, 1855 passed, 0 failed, 7 skipped (`artifacts/test-runs/4-6-assign-a-task-and-be-told-develop.log`).
+- **The 547 mapping** (AC1): the `EXISTS` clause runs after the Shared Memberships lock, and every Membership deleter but Space deletion takes that lock Exclusive, so the key's `547` is unreachable in practice; it is still caught in `TaskAssignmentStore` and answered `invalid-assignee`. Plant 2 shows it is the path a dropped `EXISTS` falls to.
+
+| Plant | Expected red | Seen |
+|---|---|---|
+| 1 A single-column FK `AssigneeMembershipId -> Membership.Id` (model) | the two model gates | red: `Every_reference_between_Space_scoped_entities_carries_SpaceId`, `The_Assignee_is_a_composite_no_action_reference_to_Membership_in_the_model`. The schema case was not re-planted (it would need a planted migration); the model gates hold the key that generates it. |
+| 2 The guarded `UPDATE` drops its `EXISTS` clause | `A_random_or_another_Spaces_..._400_invalid_assignee...` | **masked** (green): the composite key refuses both ids with `547`, which `TaskAssignmentStore` maps to the same `invalid-assignee`. Recorded: the key is the second, independent layer, as the story foresaw. |
+| 3 `invalid-assignee` answers differently per id (the id in its title) | the random-vs-foreign byte comparison | red: `A_random_or_another_Spaces_Membership_id_is_the_same_400_invalid_assignee_and_nothing_is_stored` (also the shape `ISO-ASSIGN-FOREIGN-MEMBERSHIP`'s `SameAsAnchor` holds). |
+| 4 Email enqueued for a self-assignment | the not-for-one's-own-action case | red: `AssignTaskHandlerTests.No_email_for_an_unassignment_a_no_op_a_self_assignment_or_a_refusal` (the unit sibling of the wire case `Assigning_oneself_sends_no_email_...`, which was not re-run under the plant). |
+| 5 Email on every assignment, a no-op included | the no-op case | red: the same handler case. |
+| 6 The email names another Space (a read without the Space key) | the I-14 case | not planted: under both isolation layers no read in the request can name another Space, so the plant would have to bypass RLS; the template gate (strings and `Uri` only) and the I-14 wire case stand. |
+| 7 A reader of the send record in a slice (`ListReader`) | the no-reader gate | red: `Only_the_outbox_store_and_its_configuration_refer_to_the_send_record`. The `Recipient` column variant was not planted (it needs a migration); the `INFORMATION_SCHEMA` columns case holds it. |
+| 8 The removal's unassign removed | the removed-Member case; race 2 | red: `An_assigned_Member_is_removed_and_its_Tasks_are_unassigned_and_survive`, `A_removal_queued_behind_an_assignment_of_its_target_unassigns_and_answers_204`. |
+| 9 The unassign unguarded on a refused removal, with no rollback | the refused-removal case | not planted: the guard is the pipeline's rollback of every non-success answer (`UnitOfWorkResults.IsFailure`); planting "no rollback" means committing a refused unit of work, a pipeline change outside this story. `A_refused_removal_leaves_the_targets_Tasks_assigned` is green with the unassign running before the refused `DELETE`, which is itself the proof that the rollback takes it. |
+| 10 The Role change unassigns on demotion | the demotion case | red: `Demoting_an_Assignee_to_Viewer_keeps_every_assignment`. |
+| 11 Assignment skips the Memberships lock | race 1 | red: `An_assignment_queued_behind_the_removal_of_its_target_is_400_invalid_assignee_and_sends_nothing`. |
+| 12 Assignment takes the lock Exclusive | race 3 | red: `Two_assignments_in_one_Space_do_not_wait_on_each_other`. |
+| 13 The candidates read carries `EmailAddress` | the contract gates | red: `The_assignment_contracts_carry_exactly_their_named_members`, `Only_the_Membership_list_and_the_Invitation_list_carry_an_email_address`. The no-`@` client case was not re-run under it. |
+| 14 The assign control permitted for a Viewer | the agreement gate | red: `The_clients_assign_control_predicate_agrees_with_the_capability_matrix`. The browser absence case was not re-run under it. |
+| 15 `ListSortColumns` loses the Assignee entry | `ListViewGateTests` (P-4) | red: `Every_offered_sort_has_a_composite_index_on_SpaceId_ProjectId_its_column_and_Id`, `The_offered_sorts_are_exactly_four_and_the_Assignee_is_among_them`. |
+| 16 The Assignee filter refuses a foreign id | `ISO-LIST-FOREIGN-ASSIGNEE-FILTER` | not planted (a three-minute isolation run per plant); the narrowing mirrors the Label filter's, whose plant 2.10 recorded. |
+| 17 The candidates survive a Space switch | the switch-purge browser case | not planted (browser run); the purge is the Board's and the List's existing one, which clears them beside the Labels. |
+| 18 The collision key reverts to NFC plus ordinal | the look-alike unit cases | red: all 6 `Look_alike_names_collide_and_both_get_a_discriminator` rows and `A_folded_collision_keeps_each_name_as_written`; `Different_names_that_share_a_prefix_do_not_collide` stayed green. |
+| 19 `CardInputs` omits the Assignee | the card-redraws browser case | not planted (browser run). |
+
+All plants ran through a script that saved each file's text and wrote it back in a `finally` (`artifacts/test-runs/4-6-plants.log`); a grep for every plant marker after the run found none, and the solution rebuilt with 0 warnings and 0 errors.
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created (create-story, 2026-11-08). Eleven open questions with recommendations; Q1, Q4, Q7 and Q10 are marked [LEE] (Q6 and Q7 also touch UX).
+- **Decided by Lee (Task 0):** Q1 (a), Q4 (a) with retention (a), Q7 (a), Q10 (a), implemented as recorded.
+- **Reversible decisions taken here (each the story's recommendation; cut any line to reopen it):**
+  - Q2 - (a): `GET /api/v1/spaces/{spaceId}/assignees` under `ReadProjectsAndTasks`, `{ assignees: [{ membershipId, displayName }] }`, unpaged, join order, read in `MembershipStore`. Cost: every Role sees the Space's roster by name (sanctioned, `review-isolation.md:52`).
+  - Q3 - (a): assignment takes `Yello/Memberships/{spaceId}` Shared; removal, leave and Role change keep it Exclusive. Cost: an assignment waits behind a Membership change in its Space.
+  - Q5 - (a): an explicit unassign `UPDATE` in `RemoveCoreAsync` and `LeaveAsync`, after the lock and before the guarded `DELETE`, skipped for an Owner target; a refused removal rolls it back with the unit of work. Cost: the refusal path relies on the pipeline's rollback (plant 9).
+  - Q6 - (a): the Assignee sort keys on `AssigneeMembershipId` (Unassigned last, `TaskId` tiebreak) on `(SpaceId, ProjectId, AssigneeMembershipId, Id) INCLUDE (StatusId, DueDate)`; the filter is `assignee` ids plus an `unassigned` flag. Cost: the order between people is not alphabetical (ledger, owner UX).
+  - Q8 - (a): the email names the assigner, the Space, the Project and the Task, links to the client origin with no id; subject "{Assigner} assigned you a Task in {Space}". Cost: none beyond the copy.
+  - Q9 - (a): email only when the Assignee changes to a Membership whose Account is not the actor's. Cost: the previous Assignee is not told.
+  - Q11 - (a): the copy as listed ("Assignee", "Unassigned", "Assigned to {label}", "Assigned to {label}.", "Unassigned.", "That person is no longer in this Space.").
+  - Column name `AssigneeMembershipId` (AD-5's), not the ledger's `AssigneeId` (C5).
+  - P-3's "5 sorts" (C6): the List offers four (Status, due date, Label, Assignee); the fifth in the test design is the Board's position order.
+  - The candidates are not a scoped service: the Board (`BoardSpaceLists`) and the List (`TaskListFilters`) hold them as Space-scoped state of their own and clear them in their existing purge, as they do the Labels; `Yello.Client/Spaces/SpaceAssignees.cs` is the stateless reader and labeller. Cost: each view reads them once per load.
+  - The Board's candidates read not being answered draws no avatars rather than refusing the Board; an Assignee id the Board holds no candidate for triggers one re-read after a load, and is never shown as an id.
+  - The send record's time is the database clock in UTC (`SWITCHOFFSET(SYSDATETIMEOFFSET(), '+00:00')`), so it is comparable with `DatabaseNowAsync` and independent of the Host's clock.
+  - An enqueue with no Space resolved throws rather than writing a record with no Space (`OutboxSendRecordTests`).
+  - Timing (AC12): no `IsolationTimingTests` row - both `400`s are one body with no existence branch, the `EXISTS` does the same work for a random and a foreign id, and the in-Space `404` is the floored boundary body.
+  - I-14 is proved in Slices (`The_assignment_email_names_this_Space_Project_and_Task_and_nothing_of_another_Space`), not the isolation suite, whose world shares one mail drop.
+- **What was built:** FR-21 (assignment within the Space, Viewer assignable, demotion keeps it, removal and leave unassign), FR-40 (one email per change to someone else, through the outbox in the same transaction), FR-30 completed (the Assignee filter and sort with their index), FS-NFR-2 (the send record), AR-8/AD-2 (the composite NO ACTION key), AD-10, AD-23, AD-29, UX-DR8/11/19/27/31/34/38 (picker, avatar, List controls, Viewer text, purge, no address, announcements).
+- **Ledger:** `:628` CLOSED, `:736` CLOSED, `:754` UPDATED (re-owned to Lee/PM), `:802` UPDATED (fold applied; confusables to Lee/UX), `:811` CLOSED; four new entries (5.4, 6.5, Lee, UX) and one for this story's review.
+- **Develop re-run:** the stale-claim full-run failure was the class's pooled Host's outbox dispatcher sending a seeded row into the shared drop; fixed in the tests (`HostPool.StopAsync`, `SoleDispatcherWireAsync`, and a `MailDrop` timeout that names stray mail). The ledger's "flaky stale-claim case -> sweep" entry is CLOSED with the cause.
+- **Planning document changed:** `ARCHITECTURE-SPINE.md` - dated 2026-11-08 notes on AD-5, AD-10 and AD-29.
 
 ### File List
+
+- `Yello.Application/Lists/ListCursorText.cs`
+- `Yello.Application/Lists/ViewList/ViewListHandler.cs`
+- `Yello.Application/Memberships/IMembershipStore.cs`
+- `Yello.Application/Memberships/ListAssignees/ListAssigneesHandler.cs`
+- `Yello.Application/Outbox/OutboxEmail.cs`
+- `Yello.Application/Tasks/AssignTask/AssignTaskHandler.cs`
+- `Yello.Application/Tasks/AssignTask/AssignmentEmail.cs`
+- `Yello.Application/Tasks/AssignTask/AssignmentLinks.cs`
+- `Yello.Client/Components/AssigneeAvatar.razor`
+- `Yello.Client/Components/AssigneeOption.razor`
+- `Yello.Client/Components/BoardColumn.razor`
+- `Yello.Client/Components/BoardSpaceLists.cs`
+- `Yello.Client/Components/BoardView.razor`
+- `Yello.Client/Components/BoardView.razor.cs`
+- `Yello.Client/Components/TaskCard.razor`
+- `Yello.Client/Components/TaskDetail.razor`
+- `Yello.Client/Components/TaskListFilters.cs`
+- `Yello.Client/Components/TaskListRow.razor`
+- `Yello.Client/Components/TaskListView.razor`
+- `Yello.Client/Components/TaskListView.razor.cs`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Pages/TaskListPage.razor`
+- `Yello.Client/Refusals/RefusalCopy.cs`
+- `Yello.Client/Spaces/AssigneeChoice.cs`
+- `Yello.Client/Spaces/SpaceAssignees.cs`
+- `Yello.Client/Spaces/TaskCapabilities.cs`
+- `Yello.Client/wwwroot/css/components.css`
+- `Yello.Contracts/Lists/ListQuery.cs`
+- `Yello.Contracts/Lists/ListRoutes.cs`
+- `Yello.Contracts/Lists/ListSorts.cs`
+- `Yello.Contracts/Memberships/AssigneeListResponse.cs`
+- `Yello.Contracts/Memberships/AssigneeResponse.cs`
+- `Yello.Contracts/Memberships/AssigneeRoutes.cs`
+- `Yello.Contracts/Memberships/MembershipLabels.cs`
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Contracts/Tasks/AssignTaskRequest.cs`
+- `Yello.Contracts/Tasks/TaskResponse.cs`
+- `Yello.Contracts/Tasks/TaskRoutes.cs`
+- `Yello.Domain/Lists/IListReader.cs`
+- `Yello.Domain/Lists/ListCursor.cs`
+- `Yello.Domain/Lists/ListFilter.cs`
+- `Yello.Domain/Lists/ListSort.cs`
+- `Yello.Domain/Lists/ListSortCodes.cs`
+- `Yello.Domain/Memberships/Capability.cs`
+- `Yello.Domain/Tasks/ITaskStore.cs`
+- `Yello.Domain/Tasks/TaskItem.cs`
+- `Yello.Host/Endpoints/AssigneeEndpoints.cs`
+- `Yello.Host/Endpoints/ListEndpoints.cs`
+- `Yello.Host/Endpoints/ListQueryReading.cs`
+- `Yello.Host/Endpoints/TaskAssigneeEndpoints.cs`
+- `Yello.Host/Endpoints/TaskEndpoints.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Infrastructure/Outbox/NotificationSend.cs`
+- `Yello.Infrastructure/Outbox/OutboxStore.cs`
+- `Yello.Infrastructure/Persistence/ApplicationLocks.cs`
+- `Yello.Infrastructure/Persistence/Configurations/InvitationModel.cs`
+- `Yello.Infrastructure/Persistence/Configurations/MembershipConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Configurations/NotificationSendConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Configurations/TaskConfiguration.cs`
+- `Yello.Infrastructure/Persistence/ListReader.cs`
+- `Yello.Infrastructure/Persistence/ListSortColumns.cs`
+- `Yello.Infrastructure/Persistence/MembershipStore.Assignees.cs`
+- `Yello.Infrastructure/Persistence/MembershipStore.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20260925132825_ActiveSpaceResolution.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261108094508_TaskAssignee.Designer.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261108094508_TaskAssignee.cs`
+- `Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs`
+- `Yello.Infrastructure/Persistence/SchemaNames.cs`
+- `Yello.Infrastructure/Persistence/TaskAssignmentStore.cs`
+- `Yello.Infrastructure/SpaceContentStores.cs`
+- `_bmad-output/implementation-artifacts/4-6-assign-a-task-and-be-told.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md`
+- `tests/Yello.Tests.Architecture/ListViewGateTests.cs`
+- `tests/Yello.Tests.Architecture/PersistenceModelGateTests.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Assignment.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Labels.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Move.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.TaskEdit.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Tasks.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs`
+- `tests/Yello.Tests.Client/AssigneeTests.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.Assignees.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.cs`
+- `tests/Yello.Tests.Client/MembershipSectionTests.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.Assignment.cs`
+- `tests/Yello.Tests.Shared/AssignmentWire.cs`
+- `tests/Yello.Tests.Shared/HostPool.cs`
+- `tests/Yello.Tests.Shared/MailDrop.cs`
+- `tests/Yello.Tests.Shared/ProductActor.cs`
+- `tests/Yello.Tests.Slices/Accounts/RegisterAccount/SpaceIsolationSchemaTests.cs`
+- `tests/Yello.Tests.Slices/Boards/BoardEndpointTests.cs`
+- `tests/Yello.Tests.Slices/Boards/BoardPagingTests.cs`
+- `tests/Yello.Tests.Slices/Invitations/IssueInvitation/OutboxSendRecordTests.cs`
+- `tests/Yello.Tests.Slices/Lists/ListPagingTests.Assignee.cs`
+- `tests/Yello.Tests.Slices/Lists/ListPagingTests.cs`
+- `tests/Yello.Tests.Slices/Lists/ViewList/ViewListHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Memberships/MembershipHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Memberships/MembershipLabelsTests.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AssignTask.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AssignTaskRace.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.IssueInvitationOutbox.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RemoveMembership.cs`
+- `tests/Yello.Tests.Slices/Tasks/AssignTask/AssignTaskHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.AssignSchema.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Edit.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Schema.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.cs`
 
 ## Change Log
 
 - 2026-11-08: Story 4.6 created (bmad-create-story). Status ready-for-dev.
+- 2026-11-08: Implemented (bmad-dev-story): assignment route and candidates read, composite Assignee key, outbox email and send record, unassignment in removal and leave, List View Assignee filter and sort, client picker, avatar and List controls. Status review.

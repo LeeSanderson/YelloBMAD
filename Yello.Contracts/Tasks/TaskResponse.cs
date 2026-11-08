@@ -11,6 +11,7 @@ namespace Yello.Contracts.Tasks;
 /// <b><see cref="DueDate"/> was appended by story 2.3</b> - adding a field is legal in v1 (AD-19, FR-37);
 /// removing or retyping one is not. <see cref="LabelIds"/> was appended by story 2.4 on the same terms, as a member
 /// that defaults to empty, so every earlier construction still states a Task with no Labels.
+/// <see cref="AssigneeMembershipId"/> is appended on the same terms, defaulting to unassigned.
 /// </para>
 /// </remarks>
 /// <param name="Id">Its id.</param>
@@ -32,4 +33,10 @@ public sealed record TaskResponse(
     /// 12) - so a card's first three are the same on every read. Empty when it carries none.
     /// </summary>
     public IReadOnlyList<Guid> LabelIds { get; init; } = [];
+
+    /// <summary>
+    /// The Membership the Task is assigned to, one of its Space's, or <c>null</c> when it is unassigned. An id only: the
+    /// person is named from the Space's Assignee candidates, never by an address.
+    /// </summary>
+    public Guid? AssigneeMembershipId { get; init; }
 }

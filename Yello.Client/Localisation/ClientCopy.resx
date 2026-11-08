@@ -1419,4 +1419,28 @@
     <value>You left the Space.</value>
     <comment>Announced politely once, by the page the tab lands on after leaving. Names no Space.</comment>
   </data>
+  <data name="invalid-assignee" xml:space="preserve">
+    <value>That person is no longer in this Space.</value>
+    <comment>The 400 invalid-assignee, inline in the Task detail panel: the person chosen left the Space, or was removed, after the picker was drawn. The assignment reverts and the candidates are read again. Names nobody.</comment>
+  </data>
+  <data name="AssigneeLabel" xml:space="preserve">
+    <value>Assignee</value>
+    <comment>The Task detail panel's Assignee control, which opens the Assignee picker, and the Assignee attribute's name for a Viewer; also the List View's Assignee filter, sort option and column.</comment>
+  </data>
+  <data name="AssigneeUnassigned" xml:space="preserve">
+    <value>Unassigned</value>
+    <comment>The Assignee picker's first option, which clears the Assignee; a Task with no Assignee, read as text; and the List View's filter choice for Tasks with no Assignee.</comment>
+  </data>
+  <data name="AssigneeAvatarName" xml:space="preserve">
+    <value>Assigned to {0}</value>
+    <comment>The accessible name of an Assignee's avatar on a card or a List row. {0} is the person's label - their display name, with a short code when two names look alike. Never an address.</comment>
+  </data>
+  <data name="AssigneeAssigned" xml:space="preserve">
+    <value>Assigned to {0}.</value>
+    <comment>Announced politely once an assignment is admitted. {0} is the person's label. No address and no Space name.</comment>
+  </data>
+  <data name="AssigneeCleared" xml:space="preserve">
+    <value>Unassigned.</value>
+    <comment>Announced politely once a Task's Assignee is cleared.</comment>
+  </data>
 </root>

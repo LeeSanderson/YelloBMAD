@@ -42,7 +42,6 @@ public sealed partial class ListPagingTests
 
     private const string AssigneeIndex = "IX_Task_SpaceId_ProjectId_AssigneeMembershipId_Id";
 
-    private const string AssigneeSortSkip = "red: AC7 - the List offers no Assignee sort and dbo.[Task] has no AssigneeMembershipId yet (Q6 (a))";
 
     /// <summary>
     /// P-3 for the Assignee sort: 155 Tasks, a quarter unassigned and the rest shared by three Members (runs of about 39), walk
@@ -51,7 +50,7 @@ public sealed partial class ListPagingTests
     /// page states the true total, and the last cursor is <c>null</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = AssigneeSortSkip)]
+    [Fact]
     [Trait("Requirement", "FR-30")]
     [Trait("Requirement", "AD-29")]
     public async Task Sorted_by_Assignee_each_persons_Tasks_are_grouped_Unassigned_last_and_none_skipped_or_repeated()
@@ -81,7 +80,7 @@ public sealed partial class ListPagingTests
     /// sort serves every Task.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the List reads no assignee or unassigned parameter yet (Q6 (a) sub-question)")]
+    [Fact]
     [Trait("Requirement", "FR-30")]
     public async Task Filtering_by_an_Assignee_and_Unassigned_serves_exactly_their_Tasks_and_their_true_total()
     {
@@ -95,7 +94,7 @@ public sealed partial class ListPagingTests
             var owner = await RegisterAsync(client, database);
             var projectId = await CreateProjectAsync(owner, "Filtered by person");
             var members = await SeedAssignedAsync(client, database, owner, projectId, count: 90);
-            var path = PathOf(owner.SpaceId, projectId, ListQuery.By(SortAssignee)) + $"&{AssignmentWire.AssigneeParameter}={members[0]:D}&{AssignmentWire.UnassignedParameter}=true";
+            var path = PathOf(owner.SpaceId, projectId, ListQuery.By(SortAssignee)) + $"&{Yello.Contracts.Lists.ListRoutes.AssigneeParameter}={members[0]:D}&{Yello.Contracts.Lists.ListRoutes.UnassignedParameter}=true";
 
             total = PageOf(await PageAsync(owner, owner.SpaceId, projectId, ListQuery.By(SortAssignee))).Total;
             pages = await WalkPathAsync(owner, path);
@@ -113,7 +112,7 @@ public sealed partial class ListPagingTests
     /// </summary>
     /// <param name="filtered">Whether under the Assignee filter (one Member and Unassigned).</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = AssigneeSortSkip)]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "NFR-5")]
@@ -133,7 +132,7 @@ public sealed partial class ListPagingTests
             var projectId = await CreateProjectAsync(owner, "Five thousand, by person");
             var members = await SeedAssignedAsync(client, database, owner, projectId, count: Scale);
             var path = PathOf(owner.SpaceId, projectId, ListQuery.By(SortAssignee))
-                + (filtered ? $"&{AssignmentWire.AssigneeParameter}={members[0]:D}&{AssignmentWire.UnassignedParameter}=true" : string.Empty);
+                + (filtered ? $"&{Yello.Contracts.Lists.ListRoutes.AssigneeParameter}={members[0]:D}&{Yello.Contracts.Lists.ListRoutes.UnassignedParameter}=true" : string.Empty);
 
             var walked = await WalkPathAsync(owner, path);
 
@@ -161,7 +160,7 @@ public sealed partial class ListPagingTests
     /// (the cursor's Membership id is bound as a <c>uniqueidentifier</c>).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = AssigneeSortSkip)]
+    [Fact]
     [Trait("Requirement", "AR-22")]
     [Trait("Requirement", "AD-29")]
     public async Task The_Assignee_sort_seeks_its_own_composite_index_and_never_converts_its_column()

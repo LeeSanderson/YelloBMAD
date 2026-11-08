@@ -113,6 +113,12 @@ public static class SchemaNames
     public static string OutboxMessageTable => "OutboxMessage";
 
     /// <summary>
+    /// The notification send record: Space-scoped, with the same three predicates. Its Space, kind and time only - see
+    /// <c>NotificationSend</c>.
+    /// </summary>
+    public static string NotificationSendTable => "NotificationSend";
+
+    /// <summary>
     /// The idempotency record (story 2.1, AD-18). Space-scoped: a stored response holds Space content.
     /// </summary>
     public static string IdempotencyRecordTable => "IdempotencyRecord";
@@ -234,5 +240,5 @@ public static class SchemaNames
     /// reader would have acted on.
     /// </remarks>
     public static IReadOnlyList<string> SpaceScopedTables { get; } =
-        [MembershipTable, StatusDefinitionTable, SpacePresenceTable, ProjectTable, IdempotencyRecordTable, TaskTable, LabelTable, TaskLabelTable, InvitationTable];
+        [MembershipTable, StatusDefinitionTable, SpacePresenceTable, ProjectTable, IdempotencyRecordTable, TaskTable, LabelTable, TaskLabelTable, InvitationTable, NotificationSendTable];
 }

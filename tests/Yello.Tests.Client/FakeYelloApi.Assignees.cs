@@ -1,7 +1,9 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Yello.Contracts;
+using Yello.Contracts.Memberships;
 using Yello.Contracts.Spaces;
+using Yello.Contracts.Tasks;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
@@ -24,10 +26,6 @@ namespace Yello.Tests.Client;
 /// <para>
 /// <b>Hooks</b>, following the Task edit's: <see cref="HoldAssignmentAsync"/> holds the next assignment until
 /// <see cref="ReleaseAssignment"/>; <see cref="NextAssignmentRefusal"/> refuses the next one.
-/// </para>
-/// <para>
-/// <b>Routes and the problem type are <see cref="AssignmentWire"/>'s stand-ins</b> until the contract declares them; the dev
-/// phase swaps them for the contract members.
 /// </para>
 /// </remarks>
 internal sealed partial class FakeYelloApi
@@ -188,7 +186,7 @@ internal sealed partial class FakeYelloApi
     {
         if (!TryMembershipId(body, out var membershipId) || (membershipId is { } named && !CandidatesOf(spaceId).Exists(candidate => candidate.MembershipId == named)))
         {
-            return (400, Problem(AssignmentWire.InvalidAssigneeProblemType));
+            return (400, Problem(ProblemTypes.InvalidAssignee));
         }
 
         if (FindTaskIn(spaceId, taskId) is not { } found)
@@ -255,7 +253,7 @@ internal sealed partial class FakeYelloApi
 
         return segments is [var space, "assignees"]
             && Guid.TryParse(space, out spaceId)
-            && path == AssignmentWire.AssigneesOf(spaceId);
+            && path == AssigneeRoutes.ListOf(spaceId);
     }
 
     /// <summary>
@@ -272,6 +270,6 @@ internal sealed partial class FakeYelloApi
         return segments is [var space, "tasks", var task, "assignee"]
             && Guid.TryParse(space, out spaceId)
             && Guid.TryParse(task, out taskId)
-            && path == AssignmentWire.AssigneeOf(spaceId, taskId);
+            && path == TaskRoutes.AssigneeOf(spaceId, taskId);
     }
 }

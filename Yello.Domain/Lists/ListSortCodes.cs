@@ -12,6 +12,8 @@ public static class ListSortCodes
 
     private const string LabelCode = "label";
 
+    private const string AssigneeCode = "assignee";
+
     /// <summary>
     /// The code of <paramref name="sort"/>.
     /// </summary>
@@ -22,6 +24,7 @@ public static class ListSortCodes
         ListSort.Status => StatusCode,
         ListSort.DueDate => DueDateCode,
         ListSort.Label => LabelCode,
+        ListSort.Assignee => AssigneeCode,
         _ => throw new ArgumentOutOfRangeException(nameof(sort), sort, "Not an offered sort."),
     };
 
@@ -43,6 +46,9 @@ public static class ListSortCodes
                 return true;
             case LabelCode:
                 sort = ListSort.Label;
+                return true;
+            case AssigneeCode:
+                sort = ListSort.Assignee;
                 return true;
             default:
                 sort = default;

@@ -151,7 +151,7 @@ public sealed partial class ActiveSpaceEndpointTests
     public async Task The_process_start_sweep_sends_a_row_a_crash_left_unsent()
     {
         _ = Available();
-        var wire = Wire();
+        var wire = await SoleDispatcherWireAsync();
         var recipient = InvitationWire.FreshAddress("crashed");
         var (subject, body) = ("Left behind " + Suffix(), "Rendered before the crash " + Suffix());
         DroppedEmail? email = null;
@@ -183,7 +183,7 @@ public sealed partial class ActiveSpaceEndpointTests
     public async Task The_piggyback_sweep_sends_a_row_on_the_next_authenticated_request()
     {
         var database = Available();
-        var wire = Wire();
+        var wire = await SoleDispatcherWireAsync();
         var address = RandomAddress();
         var recipient = InvitationWire.FreshAddress("piggyback");
         var (subject, body) = ("Waiting " + Suffix(), "Unsent until traffic " + Suffix());
@@ -219,7 +219,7 @@ public sealed partial class ActiveSpaceEndpointTests
     public async Task A_stale_claim_is_claimed_again_and_a_fresh_claim_is_left_alone()
     {
         _ = Available();
-        var wire = Wire();
+        var wire = await SoleDispatcherWireAsync();
         var (stale, fresh) = (InvitationWire.FreshAddress("stale"), InvitationWire.FreshAddress("fresh"));
         IReadOnlyList<DroppedEmail> emails = [];
         IReadOnlyList<OutboxRow> left = [];
@@ -376,7 +376,7 @@ public sealed partial class ActiveSpaceEndpointTests
     public async Task A_permanently_refused_or_tenth_attempt_message_is_deleted_and_a_transient_one_is_kept()
     {
         _ = Available();
-        var wire = Wire();
+        var wire = await SoleDispatcherWireAsync();
         var (permanent, exhausted, transient) =
             (InvitationWire.FreshAddress("permanent"), InvitationWire.FreshAddress("exhausted"), InvitationWire.FreshAddress("transient"));
 
@@ -471,6 +471,19 @@ public sealed partial class ActiveSpaceEndpointTests
         await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
 
         return name;
+    }
+
+    /// <summary>
+    /// The wire for a case that seeds outbox rows and expects one dispatcher of its choosing to send them. The class's
+    /// pooled Hosts share its database and each runs a dispatcher; one kicked by an earlier case, or by traffic, would
+    /// claim a seeded row and send it into the shared drop, so they are stopped first. The case must not use the pool
+    /// again afterwards: that restarts a Host, and its process-start sweep would claim the rows.
+    /// </summary>
+    private async Task<WireDatabase> SoleDispatcherWireAsync()
+    {
+        await fixture.Hosts.StopAsync(fixture.ConnectionString!);
+
+        return Wire();
     }
 
     /// <summary>

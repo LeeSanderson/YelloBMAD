@@ -242,7 +242,7 @@ public sealed partial class BoardPagingTests(MigratedDatabaseFixture fixture) : 
         using var document = JsonDocument.Parse(page!.Body);
 
         Assert.Equal(PageProperties, Names(document.RootElement));
-        Assert.Equal(["createdAt", "dueDate", "id", "labelIds", "positionKey", "statusId", "title"], Names(Assert.Single(document.RootElement.GetProperty("tasks").EnumerateArray())));
+        Assert.Equal(["assigneeMembershipId", "createdAt", "dueDate", "id", "labelIds", "positionKey", "statusId", "title"], Names(Assert.Single(document.RootElement.GetProperty("tasks").EnumerateArray())));
         Assert.DoesNotContain(owner!.SpaceId.ToString("D"), page.Body, StringComparison.OrdinalIgnoreCase);
     }
 

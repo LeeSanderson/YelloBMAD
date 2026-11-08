@@ -80,4 +80,15 @@ public sealed class TaskItem
     /// an index can serve until one is chosen (AC6: a sort without its composite index is a defect).
     /// </remarks>
     public string? FirstLabelName { get; set; }
+
+    /// <summary>
+    /// The Membership of the Task's own Space the Task is assigned to, or <c>null</c> when it is unassigned.
+    /// </summary>
+    /// <remarks>
+    /// The schema holds it as the pair <c>(SpaceId, AssigneeMembershipId)</c> referencing the Membership's
+    /// <c>(SpaceId, Id)</c>, so it can never name another Space's Membership. Removing the Membership unassigns the Task and
+    /// never deletes it. A Membership, not an Account: assigning is within one Space, and the person is named by that
+    /// Membership's display name, never by an address.
+    /// </remarks>
+    public Guid? AssigneeMembershipId { get; set; }
 }

@@ -32,6 +32,15 @@ public interface IListReader
     Task<IReadOnlyList<Guid>> VisibleLabelIdsAsync(IReadOnlyCollection<Guid> labelIds, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Which of <paramref name="membershipIds"/> name a Membership of the resolved Space - the handler's narrowing of an
+    /// Assignee filter, as for Labels.
+    /// </summary>
+    /// <param name="membershipIds">The Membership ids a filter was sent.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The visible ones; never another Space's.</returns>
+    Task<IReadOnlyList<Guid>> VisibleMembershipIdsAsync(IReadOnlyCollection<Guid> membershipIds, CancellationToken cancellationToken);
+
+    /// <summary>
     /// How many of the Project's Tasks match <paramref name="filter"/>, counted by the database.
     /// </summary>
     /// <param name="projectId">The Project.</param>

@@ -326,14 +326,15 @@ public sealed class ProductActor
     /// Sends as this actor on <paramref name="surface"/>.
     /// </summary>
     /// <param name="surface">Which surface.</param>
-    /// <param name="method">GET, POST, PATCH or DELETE.</param>
+    /// <param name="method">GET, POST, PATCH, PUT or DELETE.</param>
     /// <param name="path">The route.</param>
     /// <returns>The answer.</returns>
     /// <remarks>
     /// A POST or PATCH carries a body valid on every write route a case names - <c>name</c> for a Token
     /// issue and a Project create or rename (story 2.1), <c>title</c> for a Task create (story 2.2); each
     /// endpoint ignores the property it does not read - so a refusal is the boundary's and never the
-    /// body's.
+    /// body's. A PUT carries an unassignment (<c>{ membershipId: null }</c>), the one PUT route's body that every Task
+    /// accepts.
     /// </remarks>
     public Task<WireResponse> SendAsync(IsolationSurface surface, HttpMethod method, string path)
     {
@@ -345,10 +346,12 @@ public sealed class ProductActor
             (IsolationSurface.Session, "POST") => Session.PostAsync(path, ValidBody()),
             (IsolationSurface.Session, "DELETE") => Session.DeleteAsync(path),
             (IsolationSurface.Session, "PATCH") => Session.SendWithHeadersAsync(HttpMethod.Patch, path, ValidBody(), NoHeaders),
+            (IsolationSurface.Session, "PUT") => Session.SendWithHeadersAsync(HttpMethod.Put, path, AssignmentWire.Body(null), NoHeaders),
             (IsolationSurface.ApiToken, "GET") => _script.GetWithTokenAsync(path, TokenPlaintext),
             (IsolationSurface.ApiToken, "POST") => _script.PostWithTokenAsync(path, ValidBody(), TokenPlaintext),
             (IsolationSurface.ApiToken, "DELETE") => _script.DeleteWithTokenAsync(path, TokenPlaintext),
             (IsolationSurface.ApiToken, "PATCH") => _script.SendWithTokenAndHeadersAsync(HttpMethod.Patch, path, TokenPlaintext, ValidBody(), NoHeaders),
+            (IsolationSurface.ApiToken, "PUT") => _script.SendWithTokenAndHeadersAsync(HttpMethod.Put, path, TokenPlaintext, AssignmentWire.Body(null), NoHeaders),
             _ => throw new ArgumentOutOfRangeException(nameof(method), $"{surface} {method} is not a surface request this harness sends."),
         };
     }
