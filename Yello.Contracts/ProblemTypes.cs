@@ -488,7 +488,7 @@ public static class ProblemTypes
     /// <c>409</c>; nothing is written.
     /// </summary>
     /// <remarks>
-    /// <b>Disclosable</b>: the caller could see the offer while it was pending (AD-26: a transition refused because the offer
+    /// <b>Disclosable</b>: the caller could see the offer while it was pending (a transition refused because the offer
     /// left <c>Pending</c> is <c>409</c>, never <c>404</c>). One type for every reason; the body names neither the state nor
     /// the recipient. An id that names no offer in this Space is the boundary's <c>404</c> instead.
     /// </remarks>

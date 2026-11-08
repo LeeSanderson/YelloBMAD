@@ -5,7 +5,7 @@ namespace Yello.Infrastructure.Persistence;
 
 /// <summary>
 /// The Ownership Offer writes another store makes inside its own transaction: the lapse <i>by event</i>, when a Membership an
-/// offer names stops existing. FR-8, AD-5, AD-27.
+/// offer names stops existing.
 /// </summary>
 /// <remarks>
 /// <para>

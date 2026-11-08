@@ -350,15 +350,24 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
             Assert.Equal(MembershipWire.PageSize, await page.Locator(Rows).CountAsync());
             Assert.Contains("100 of 100", await page.Locator(Section).TextContentAsync() ?? string.Empty, StringComparison.Ordinal);
 
+            // The Owner's Ownership section reads the same list, every page, for its picker. Wait for it to finish so that the
+            // reads counted below are this section's alone.
+            await page.Locator("main .ownership-section").GetByRole(AriaRole.Radio, new LocatorGetByRoleOptions { Name = "Member 099", Exact = true })
+                .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var readsBefore = api.MembershipListReads(Northwind).Count;
+
             await ChangeRoleButton(RowOf(page, rows[10])).FocusAsync();
             await page.EvaluateAsync("() => { window.__kept = document.activeElement; }");
             await page.Locator(Section).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = ShowMore, Exact = true }).ClickAsync();
             await RowOf(page, rows[99]).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
+            var reads = api.MembershipListReads(Northwind);
+
             Assert.Equal(100, await page.Locator(Rows).CountAsync());
             Assert.True(await page.EvaluateAsync<bool>("() => document.contains(window.__kept)"), "A row shown before Show more was replaced rather than kept.");
-            Assert.Equal(2, api.MembershipListReads(Northwind).Count);
-            Assert.Contains("after=", api.MembershipListReads(Northwind)[1].Query, StringComparison.Ordinal);
+            Assert.Equal(readsBefore + 1, reads.Count);
+            Assert.Contains("after=", reads[^1].Query, StringComparison.Ordinal);
             Assert.Equal(0, await page.Locator(Section).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = ShowMore, Exact = true }).CountAsync());
         }
     }

@@ -2,7 +2,7 @@ namespace Yello.Domain.Spaces;
 
 /// <summary>
 /// An Owner's offer to hand its Space to one existing Membership of that Space. Making it moves nothing: the Owner stays the
-/// Owner until the recipient accepts (FR-8, AD-26).
+/// Owner until the recipient accepts.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -30,12 +30,12 @@ public sealed class OwnershipOffer
     public static int OffererNameMaxLength => LongestOffererName;
 
     /// <summary>
-    /// The offer's identity, generated application-side (AR-34).
+    /// The offer's identity, generated application-side.
     /// </summary>
     public required Guid Id { get; init; }
 
     /// <summary>
-    /// The Space offered. Non-nullable (AD-2), and set once.
+    /// The Space offered. Non-nullable, and set once.
     /// </summary>
     public required Guid SpaceId { get; init; }
 

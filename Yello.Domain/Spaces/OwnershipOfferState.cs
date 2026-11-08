@@ -4,7 +4,7 @@ namespace Yello.Domain.Spaces;
 /// The stored states of an <see cref="OwnershipOffer"/>. Stored as the member's name.
 /// </summary>
 /// <remarks>
-/// <b>"Expired" is not one of them</b> (AD-27): an offer is expired when it is <see cref="Pending"/> and its <c>ExpiresAt</c>
+/// <b>"Expired" is not one of them</b>: an offer is expired when it is <see cref="Pending"/> and its <c>ExpiresAt</c>
 /// has passed by the database clock, derived on read. <see cref="Lapsed"/> is only ever written by an event inside the
 /// transaction that caused it.
 /// </remarks>

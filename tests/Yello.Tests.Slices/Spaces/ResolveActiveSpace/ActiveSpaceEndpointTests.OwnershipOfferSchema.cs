@@ -13,8 +13,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// code.
 /// </summary>
 /// <remarks>
-/// <b>Catalogue cases read the database only</b>; no Host starts. Until the migration exists each catalogue query returns no
-/// rows. The index case writes two rows directly under the Space's key in a Space seeded with its Owner, whose Account is
+/// <b>Catalogue cases read the database only</b>; no Host starts. The index case writes two rows directly under the Space's key in a Space seeded with its Owner, whose Account is
 /// registered through the pooled Host first (<c>FK_Membership_Account_AccountId</c>); the offer rows name that Space
 /// (<c>FK_OwnershipOffer_Space_SpaceId</c>) and Membership ids no key checks.
 /// </remarks>

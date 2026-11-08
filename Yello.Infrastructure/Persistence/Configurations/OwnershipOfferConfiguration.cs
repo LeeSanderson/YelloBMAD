@@ -6,7 +6,7 @@ namespace Yello.Infrastructure.Persistence.Configurations;
 
 /// <summary>
 /// The Ownership Offer table. Space-scoped: covered by the row-level security policy - FILTER, and BLOCK after insert and
-/// after update - and by a query filter on the request's Space. FR-8, AD-26, AD-27.
+/// after update - and by a query filter on the request's Space.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -21,8 +21,8 @@ namespace Yello.Infrastructure.Persistence.Configurations;
 /// past its expiry still holds that place until the next offer lapses it in its own transaction.
 /// </para>
 /// <para>
-/// <b>The expiry is the database's</b>: a column default seven days after <c>SYSDATETIMEOFFSET()</c> - PRD section 12
-/// assumption 3, unconfirmed - so no C# clock stamps it.
+/// <b>The expiry is the database's</b>: a column default seven days after <c>SYSDATETIMEOFFSET()</c>, so
+/// no C# clock stamps it.
 /// </para>
 /// </remarks>
 /// <param name="context">The context whose request-scoped Space the query filter closes over.</param>
@@ -44,14 +44,14 @@ internal sealed class OwnershipOfferConfiguration(YelloDbContext context) : IEnt
 
         builder.HasKey(offer => offer.Id);
 
-        // Never store-generated: the id comes from the sequential identifier port (AR-34).
+        // Never store-generated: the id comes from the sequential identifier port.
         builder.Property(offer => offer.Id).ValueGeneratedNever();
 
         builder.Property(offer => offer.SpaceId)
             .HasColumnName(SchemaNames.SpaceIdColumn)
             .IsRequired();
 
-        // AD-2's second layer, from application state. See MembershipConfiguration.
+        // The second isolation layer, from application state. See MembershipConfiguration.
         builder.HasQueryFilter(offer => offer.SpaceId == context.ScopedSpaceId);
 
         builder.Property(offer => offer.RecipientMembershipId).IsRequired();

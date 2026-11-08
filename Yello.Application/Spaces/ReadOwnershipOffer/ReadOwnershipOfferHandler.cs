@@ -4,7 +4,7 @@ namespace Yello.Application.Spaces.ReadOwnershipOffer;
 
 /// <summary>
 /// Reads the active Space's actionable pending Ownership Offer for its Owner: the recipient by id and current display name,
-/// the expiry, and the database clock's reading, from which the client counts the days left. UX-DR14, AD-27.
+/// the expiry, and the database clock's reading, from which the client counts the days left.
 /// </summary>
 /// <remarks>
 /// <b>Writes nothing.</b> A pending offer past its expiry reads as none, by the shared actionable predicate in the store's

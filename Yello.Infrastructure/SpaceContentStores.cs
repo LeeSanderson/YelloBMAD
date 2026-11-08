@@ -18,8 +18,8 @@ namespace Yello.Infrastructure;
 internal static class SpaceContentStores
 {
     /// <summary>
-    /// Adds the Project, Task and Label stores, the Board reader and the List reader (story 2.10), the Invitation store
-    /// (story 4.1), the Membership store with its <c>MembershipChanged</c> publisher (story 4.4) and the Ownership Offer store.
+    /// Adds the Project, Task and Label stores, the Board reader and the List reader, the Invitation store,
+    /// the Membership store with its <c>MembershipChanged</c> publisher and the Ownership Offer store.
     /// </summary>
     /// <param name="services">The container.</param>
     /// <returns>The same collection, for chaining.</returns>

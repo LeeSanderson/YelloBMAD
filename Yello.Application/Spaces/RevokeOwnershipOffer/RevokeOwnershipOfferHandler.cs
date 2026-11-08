@@ -1,11 +1,11 @@
 namespace Yello.Application.Spaces.RevokeOwnershipOffer;
 
 /// <summary>
-/// Revokes the active Space's pending Ownership Offer. FR-8, AD-26, AD-27.
+/// Revokes the active Space's pending Ownership Offer.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Everything cross-cutting happened before this ran</b> (AR-3): the pipeline resolved the Space, checked
+/// <b>Everything cross-cutting happened before this ran</b>: the pipeline resolved the Space, checked
 /// <c>OfferOwnershipTransfer</c> - the Owner's alone - and replayed a key it had already seen. This slice reads no Role.
 /// </para>
 /// <para>

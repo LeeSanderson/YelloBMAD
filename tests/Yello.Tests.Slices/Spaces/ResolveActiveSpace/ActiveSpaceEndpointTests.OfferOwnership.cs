@@ -39,7 +39,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// <b>Seed constraints checked.</b> <c>FK_Membership_Account_AccountId</c> (Restrict): every Membership names an Account
 /// registered through the product first. <c>AK_Membership_SpaceId_AccountId</c> and <c>UX_Membership_SpaceId_Owner</c>: one
 /// Membership per Account per Space, one Owner per seeded Space; the other Memberships are written by the accept. The offer
-/// table's only key is <c>FK_OwnershipOffer_Space_SpaceId</c> (no key to <c>Membership</c> or <c>Account</c>, Lee's Q2), and a
+/// table's only key is <c>FK_OwnershipOffer_Space_SpaceId</c> (no key to <c>Membership</c> or <c>Account</c>), and a
 /// seeded row is written under its own Space's key so <c>BLOCK AFTER INSERT</c> admits it; at most one seeded row per Space is
 /// <c>Pending</c> (<c>UX_OwnershipOffer_SpaceId_Pending</c>).
 /// </para>

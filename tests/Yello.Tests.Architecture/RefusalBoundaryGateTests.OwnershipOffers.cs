@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.RegularExpressions;
 using System.Xml.Linq;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
@@ -21,12 +22,11 @@ namespace Yello.Tests.Architecture;
 /// <remarks>
 /// <para>
 /// <b>Each gate finds its subject by name or by shape</b> (route pattern, reflection, Cecil, the EF model, the resource file,
-/// the source tree), so a subject built under another name turns it red. The names are the story's Project Structure Notes:
+/// the source tree), so a subject built under another name turns it red. The names:
 /// <c>Yello.Contracts.Spaces.OfferOwnershipRequest</c> and <c>OwnershipOfferResponse</c>, <c>OwnershipOfferEmail</c>,
 /// <c>OutboxKinds.OwnershipOffered</c>, <c>RevokeOwnershipOfferHandler</c>, <c>OwnershipOfferStore</c> and
 /// <c>OwnershipOfferWrites</c>, <c>OfferPredicates.OwnershipOfferActionable</c>, the entity <c>OwnershipOffer</c>,
-/// <c>Yello.Client/Components/OwnershipSection.razor</c> and a client predicate named <c>PermitsOfferOwnership</c>. A
-/// different name is corrected here first and recorded in the Debug Log.
+/// <c>Yello.Client/Components/OwnershipSection.razor</c> and a client predicate named <c>PermitsOfferOwnership</c>.
 /// </para>
 /// <para>
 /// <b>Existing gates this work widens deliberately, not here:</b> <c>SpaceScopedEntities</c> gains the entity,
@@ -165,8 +165,8 @@ public sealed partial class RefusalBoundaryGateTests
     /// Only the offer's persistence writes an offer's state: no <c>ExecuteDelete</c> on <c>OwnershipOffer</c> exists anywhere
     /// (offers are retained; a Space's deletion takes them by cascade), the only bulk update generic over it is
     /// <c>OwnershipOfferStore</c>'s (the revoke), and only <c>OwnershipOfferStore</c> and <c>OwnershipOfferWrites</c> call
-    /// <c>OwnershipOffer.set_State</c>. Anchor: both types exist in <c>Yello.Infrastructure.Persistence</c>. The guarded insert,
-    /// the supersede and the lapse may be SQL; their writers are these two types either way.
+    /// <c>OwnershipOffer.set_State</c>, and only these two write to the table in SQL. Anchor: both types exist in
+    /// <c>Yello.Infrastructure.Persistence</c>, and the SQL scan finds both.
     /// </summary>
     [Fact]
     [Trait("Requirement", "AR-31")]
@@ -193,7 +193,46 @@ public sealed partial class RefusalBoundaryGateTests
         Assert.DoesNotContain(bulkWrites, write => write.EndsWith(".ExecuteDelete", StringComparison.Ordinal) || write.EndsWith(".ExecuteDeleteAsync", StringComparison.Ordinal));
         Assert.Subset(new HashSet<string>([$"{writers[0]}.ExecuteUpdateAsync"], StringComparer.Ordinal), bulkWrites);
         Assert.Subset(writers.ToHashSet(StringComparer.Ordinal), stateSetters);
+
+        // The insert and the lapse are raw SQL, which no method reference shows, so the SQL text is read too. Both writers
+        // must be found by it, or the scan would pass on finding nothing.
+        var sqlWriters = OwnershipOfferSqlWriters();
+
+        Assert.Equal(writers.ToHashSet(StringComparer.Ordinal), sqlWriters);
     }
+
+    /// <summary>
+    /// The outermost type of every production method whose string literals write to <c>OwnershipOffer</c> in SQL.
+    /// </summary>
+    private static HashSet<string> OwnershipOfferSqlWriters()
+    {
+        var callers = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var assembly in RuntimeAssemblies())
+        {
+            using var module = Mono.Cecil.ModuleDefinition.ReadModule(assembly.Location);
+
+            foreach (var type in module.GetTypes())
+            {
+                var writes = type.Methods
+                    .Where(method => method.HasBody)
+                    .SelectMany(method => method.Body.Instructions)
+                    .Any(instruction => instruction.OpCode == Mono.Cecil.Cil.OpCodes.Ldstr
+                        && instruction.Operand is string text
+                        && OwnershipOfferSqlWrite.IsMatch(text));
+
+                if (writes)
+                {
+                    callers.Add(OutermostName(type));
+                }
+            }
+        }
+
+        return callers;
+    }
+
+    [GeneratedRegex(@"(?i)\b(UPDATE|INSERT\s+INTO|DELETE\s+FROM|DELETE|MERGE(\s+INTO)?)\s+(dbo\.)?\[?OwnershipOffer\]?(\s|$|\W)", RegexOptions.None, 1000)]
+    private static partial Regex OwnershipOfferSqlWrite { get; }
 
     /// <summary>
     /// Nothing is emitted on revoke or lapse because neither can: <c>RevokeOwnershipOfferHandler</c>'s constructors name no

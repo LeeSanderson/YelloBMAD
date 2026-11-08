@@ -8,8 +8,7 @@ using Yello.Domain.Spaces;
 namespace Yello.Infrastructure.Persistence;
 
 /// <summary>
-/// Makes, reads and revokes the resolved Space's Ownership Offer inside the request's Space-scoped unit of work. FR-8, AD-26,
-/// AD-27.
+/// Makes, reads and revokes the resolved Space's Ownership Offer inside the request's Space-scoped unit of work.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -41,7 +40,7 @@ namespace Yello.Infrastructure.Persistence;
 /// </para>
 /// </remarks>
 /// <param name="dbContext">The request's unit of work.</param>
-/// <param name="identifiers">Produces the offer's identity (AR-34).</param>
+/// <param name="identifiers">Produces the offer's identity.</param>
 /// <param name="clock">Stamps the offer's instant.</param>
 internal sealed class OwnershipOfferStore(YelloDbContext dbContext, IIdentifierGenerator identifiers, TimeProvider clock) : IOwnershipOfferStore
 {

@@ -2,7 +2,7 @@ namespace Yello.Client.Spaces;
 
 /// <summary>
 /// Whether the Role held in the active Space may offer its ownership - so the Ownership section is absent rather than
-/// disabled for every other Role (UX-DR27).
+/// disabled for every other Role.
 /// </summary>
 /// <remarks>
 /// <b>A presentation decision, never an authorisation one.</b> The server checks <c>OfferOwnershipTransfer</c> against the

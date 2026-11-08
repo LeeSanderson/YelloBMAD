@@ -4,8 +4,8 @@ namespace Yello.Contracts.Spaces;
 /// The Ownership Offer endpoints' paths, stated once for the client that calls them and the Host that serves them.
 /// </summary>
 /// <remarks>
-/// <b><c>{spaceId}</c> first after the version</b> (AR-9), so the pipeline resolves the route because of its shape. All three
-/// declare <c>OfferOwnershipTransfer</c>, which only the Owner holds, and are served on both surfaces (AD-4).
+/// <b><c>{spaceId}</c> first after the version</b>, so the pipeline resolves the route because of its shape. All three
+/// declare <c>OfferOwnershipTransfer</c>, which only the Owner holds, and are served on both surfaces.
 /// </remarks>
 public static class OwnershipOfferRoutes
 {

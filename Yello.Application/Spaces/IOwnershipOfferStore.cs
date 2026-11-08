@@ -1,7 +1,7 @@
 namespace Yello.Application.Spaces;
 
 /// <summary>
-/// Makes, reads and revokes the Ownership Offer of the Space the current unit of work is scoped to. FR-8, AD-26, AD-27.
+/// Makes, reads and revokes the Ownership Offer of the Space the current unit of work is scoped to.
 /// </summary>
 /// <remarks>
 /// <para>

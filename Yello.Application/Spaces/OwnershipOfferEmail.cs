@@ -4,7 +4,7 @@ using Yello.Application.Invitations;
 namespace Yello.Application.Spaces;
 
 /// <summary>
-/// The Ownership Offer email's template: the one notification the recipient of an offer receives. FR-43, I-14.
+/// The Ownership Offer email's template: the one notification the recipient of an offer receives.
 /// </summary>
 /// <remarks>
 /// <para>

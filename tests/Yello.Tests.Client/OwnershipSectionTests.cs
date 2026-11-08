@@ -19,12 +19,11 @@ namespace Yello.Tests.Client;
 /// assignment candidates, so either read the section is built on finds them.
 /// </para>
 /// <para>
-/// <b>Locators are assumptions</b> written from the story's copy and the Role picker's shape: the section is
+/// <b>Locators</b> follow the section's copy and the Role picker's shape: the section is
 /// <c>main .ownership-section</c> under a heading "Ownership"; the recipients are radios named by each Membership's label
 /// inside it; the action is a button "Offer ownership"; the confirm's buttons are "Offer" and "Cancel"; the pending state
 /// shows "Ownership offered to {label}. Waiting for their answer.", "Expires in {n} days" with a <c>time</c> element, and a
-/// button "Revoke". Text is read with <c>textContent</c>. A markup built differently is corrected here first and recorded in
-/// the Debug Log.
+/// button "Revoke". Text is read with <c>textContent</c>.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Client")]

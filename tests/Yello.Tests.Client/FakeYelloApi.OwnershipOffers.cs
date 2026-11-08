@@ -9,8 +9,7 @@ namespace Yello.Tests.Client;
 /// <summary>
 /// The Ownership Offer routes on the fake: the offer, <c>POST /api/v1/spaces/{id}/ownership-offers</c> with
 /// <c>{ membershipId }</c>; the Owner's read, <c>GET .../ownership-offers/pending</c>; and the revoke,
-/// <c>DELETE .../ownership-offers/{offerId}</c>. No case written before the offer existed sends any of them, so every earlier
-/// case is served the bytes it always was (each fell to the unmatched <c>404</c>).
+/// <c>DELETE .../ownership-offers/{offerId}</c>.
 /// </summary>
 /// <remarks>
 /// <para>

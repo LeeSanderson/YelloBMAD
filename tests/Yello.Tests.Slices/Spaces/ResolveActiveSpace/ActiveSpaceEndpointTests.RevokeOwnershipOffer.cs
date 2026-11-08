@@ -18,7 +18,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// <b>Status codes follow the comparable endpoints:</b> the revoke answers as the Invitation revoke does (<c>204</c>,
 /// <c>409</c> with a stable type for a row no longer pending, the boundary <c>404</c> for an unknown id). The read's <c>204</c>
 /// for "nothing pending" has no Space-scoped precedent (the Session check, <c>GET /api/v1/session</c>, is the one other
-/// bodiless <c>GET</c>); it is the story's choice and named in the ATDD checklist.
+/// bodiless <c>GET</c>).
 /// </para>
 /// <para>
 /// <b>Seeding</b> is as in <c>.OfferOwnership.cs</c>. Terminal and time-expired offers are written directly

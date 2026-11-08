@@ -33,7 +33,7 @@ public static partial class OwnershipOfferWire
     public static string OwnershipOfferedKind => "ownership-offered";
 
     /// <summary>
-    /// The days an offer stays open, stamped by the database clock. PRD section 12 assumption 3, unconfirmed.
+    /// The days an offer stays open, stamped by the database clock. An unconfirmed product assumption.
     /// </summary>
     public static int ExpiryDays => 7;
 

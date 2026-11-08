@@ -5,7 +5,7 @@
 namespace Yello.Infrastructure.Persistence.Migrations;
 
 /// <summary>
-/// The <c>OwnershipOffer</c> table, under the Space policy with three predicates. FR-8; AD-2, AD-26, AD-27.
+/// The <c>OwnershipOffer</c> table, under the Space policy with three predicates.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -20,7 +20,7 @@ namespace Yello.Infrastructure.Persistence.Migrations;
 /// </para>
 /// <para>
 /// <b><c>UX_OwnershipOffer_SpaceId_Pending</c></b> lets a Space hold at most one <c>Pending</c> offer. Its expiry is the
-/// database clock's: the column default is seven days after <c>SYSDATETIMEOFFSET()</c> - PRD section 12 assumption 3.
+/// database clock's: the column default is seven days after <c>SYSDATETIMEOFFSET()</c>.
 /// </para>
 /// <para>
 /// <b>Expand only.</b> A new table breaks nothing the previous revision runs. <b>Literal names rather than

@@ -3,7 +3,7 @@ baseline_commit: 2251d84
 ---
 # Story 5.1: Offer ownership of a Space, and tell the recipient
 
-Status: review
+Status: done
 
 Epic: 5 — Hand a Space over and leave cleanly (the first story of the epic)
 Story key: `5-1-offer-ownership-of-a-space-and-tell-the-recipient`
@@ -278,6 +278,33 @@ AC1 to AC9 are reproduced **verbatim** from `epics.md:1932-1973` and numbered by
   - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-5` stays `in-progress`.
   - [x] Verification follows CLAUDE.md. `docker info --format '{{.ServerVersion}}'`, `dotnet build Yello.slnx` (0/0), iterate with `--filter-class`, then **exactly one** full run in the background without the browser suite: `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1 -p:YelloSkipBrowserSuite=true`, logged to `artifacts/test-runs/5-1-dev.log`. Record totals. Rerun a failure once, alone, before calling it real.
 
+### Review Findings
+
+Code review 2026-11-08 (Blind Hunter, Edge Case Hunter, Acceptance Auditor over `e5bf109..HEAD`): 36 raw findings, 27 after merging. 5 patched, 17 deferred as low, 6 dismissed, no decisions.
+
+- [x] [Review][Patch] `Purge` left `_offering`, `_revoking` and the focus flags set, so a purge during an offer or revoke hid Offer and Revoke for good [Yello.Client/Components/OwnershipSection.razor:222]
+- [x] [Review][Patch] The state-writer gate saw only `ExecuteUpdate`/`ExecuteDelete` and `set_State`; the raw-SQL insert and lapse (and any other raw `UPDATE`/`DELETE`/`INSERT` on the table) were invisible. It now reads SQL string literals too and must find exactly the two sanctioned writers [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.OwnershipOffers.cs:175]
+- [x] [Review][Patch] Comments added by this diff carried requirement and AD ids, story numbers, Lee's Q references and ATDD narrative ("until the dev phase", "recorded in the Debug Log", "fell to the unmatched 404 before"); stripped across 29 files [multiple]
+- [x] [Review][Patch] The review's full run (the first with the browser suite) failed `MembershipSectionTests.Two_pages_load_and_the_second_appends_without_replacing_focused_rows`: 4 Membership list reads, not 2, because the Owner's new Ownership section pages the same list for its picker. The case now waits for the picker and counts its own Show-more read [tests/Yello.Tests.Client/MembershipSectionTests.cs:356]
+- [x] [Review][Patch] Plants 2, 6, 7, 8 and a raw-SQL writer plant for the gate had not been seen red; all five were run and went red, files restored in a `finally` [Debug Log]
+- [x] [Review][Defer] The handler reads the recipient and offerer before the store takes the Memberships lock (AC7 orders store first); a caller removed mid-request who names an unknown id gets `400` rather than the boundary `404` [Yello.Application/Spaces/OfferOwnership/OfferOwnershipHandler.cs:54] — deferred, low severity
+- [x] [Review][Defer] A caller who still has a Membership but is no longer the Owner gets `400 invalid-offer-recipient`, not a Role re-read; reachable only once 5.2's swap exists [Yello.Infrastructure/Persistence/OwnershipOfferStore.cs:102] — deferred, low severity
+- [x] [Review][Defer] The pending read answers `204` when the recipient's name cannot be read, which would leave a live Pending offer unrevocable from the UI; unreachable while removal and leave are the only Membership deletes [Yello.Application/Spaces/ReadOwnershipOffer/ReadOwnershipOfferHandler.cs:29] — deferred, low severity
+- [x] [Review][Defer] The handler uses whatever pending offer it reads back without comparing it with `made.OfferId` [Yello.Application/Spaces/OfferOwnership/OfferOwnershipHandler.cs:73] — deferred, low severity
+- [x] [Review][Defer] The days-left text is computed once and never refreshed; under 24 hours it reads "today" even when the expiry is tomorrow [Yello.Client/Components/OwnershipSection.razor:241] — deferred, low severity
+- [x] [Review][Defer] If the pending read is `204` and the Memberships read is refused, the section shows its loading state beside the refusal [Yello.Client/Components/OwnershipSection.razor:176] — deferred, low severity
+- [x] [Review][Defer] A revoke retried after no answer uses a fresh Idempotency-Key, so a revoke that landed reads "no longer open" [Yello.Client/Components/OwnershipSection.razor:573] — deferred, low severity
+- [x] [Review][Defer] The Ownership section's "not sent" copy reuses `TaskEditNotSent` [Yello.Client/Components/OwnershipSection.razor:475] — deferred, low severity
+- [x] [Review][Defer] The recipient list and `PermitsOfferOwnership` compare against the literal `"owner"` [Yello.Client/Components/OwnershipSection.razor:340] — deferred, low severity
+- [x] [Review][Defer] The offer body reader catches only `JsonException`; a `BadHttpRequestException` or `IOException` mid-body is a `500`, and the member name is case-sensitive [Yello.Host/Endpoints/OwnershipOfferEndpoints.cs:171] — deferred, low severity
+- [x] [Review][Defer] `2627` (a primary-key collision) is answered `AlreadyPending` along with the index's `2601` [Yello.Infrastructure/Persistence/OwnershipOfferStore.cs:92] — deferred, low severity
+- [x] [Review][Defer] A `201` whose body cannot be read shows "not sent" before the 409 path recovers [Yello.Client/Components/OwnershipSection.razor:536] — deferred, low severity
+- [x] [Review][Defer] The recipient paging loop has no guard against a repeated cursor [Yello.Client/Components/OwnershipSection.razor:330] — deferred, low severity
+- [x] [Review][Defer] `OwnershipOfferPendingButExpired` restates the shared predicate instead of composing its negation [Yello.Infrastructure/Persistence/OfferPredicates.cs:47] — deferred, low severity
+- [x] [Review][Defer] `PopulateSpaceAsync` now makes an offer, so six DeleteSpace cases on pooled Hosts enqueue offer mail into a shared drop [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteSpace.cs] — deferred, low severity
+- [x] [Review][Defer] Six offer, lapse and race cases skip the S-2 one-Owner check [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.OfferOwnership.cs] — deferred, low severity
+- [x] [Review][Defer] Task 7's text has the Debug Log pasted into it, and the dev Change Log line still says the status stays in-progress [this file:271] — deferred, low severity
+
 ## Dev Notes
 
 ### The shape of the story in one paragraph
@@ -518,6 +545,11 @@ Claude Opus 5.5 (bmad-dev-story, unattended story cycle).
 | 5 Supersede skipped | the time-expired-row case | RED (`409 ownership-offer-pending`) |
 | 2 | the race-2 loser `500` | NOT SEEN: the build broke while the batch ran (a test file was being added). |
 | 6-12, 14-18 | per the story's table | NOT RUN: the session's low-memory reaper killed the plant batch during plant 6. Its edit was restored by hand and checked against a checksum taken before the batch. Ledgered to review. |
+| 2 (review) `2601` catch disabled | race 2's loser | RED (`Two_offers_held_on_the_Memberships_lock...`: no `409`) |
+| 6 (review) Removal lapses `Guid.Empty` instead of the recipient | the removal-lapses case | RED (both remover Roles: still `Pending`) |
+| 7 (review) Leave lapses `Guid.Empty` instead of its own Membership | the leave-lapses case | RED |
+| 8 (review) Revoke without the actionable predicate | the revoke-twice case | RED (Revoked, Expired, Lapsed) |
+| G (review) A raw `UPDATE dbo.[OwnershipOffer]` in `MembershipStore` | `Only_the_offer_store_writes_an_OwnershipOffer_state` | RED (writer sets differ) |
 
 ### Completion Notes List
 
@@ -602,3 +634,5 @@ Claude Opus 5.5 (bmad-dev-story, unattended story cycle).
 
 - 2026-11-08: Story created (bmad-create-story). Status ready-for-dev.
 - 2026-11-08: Implemented (bmad-dev-story): the OwnershipOffer table; the offer, read and revoke routes; the written lapse on removal and leave; the offer email; the Owner-only Ownership section. Scaffolds activated; ledger entries and AD-5/AD-26/AD-27 notes written. Status stays in-progress: the full run failed on one Isolation timing row (4.3's invitation not-valid timing), which also failed in two Isolation-only reruns.
+- 2026-11-08: Code review (bmad-code-review): 5 patches (the Members paging case counts its own reads beside the Ownership picker; Ownership section purge resets its in-flight flags; the state-writer gate reads raw SQL; comment-rule cleanup; plants 2, 6, 7, 8 and a gate plant seen red), 17 low findings deferred. Status done.
+- 2026-11-08: Review full runs (browser suite included), `artifacts/test-runs/5-1-offer-ownership-of-a-space-and-tell-the-recipient-review.log`: run 1 2532 total, 2521 passed, 1 failed (the Members paging read count), 10 skipped; after the fix, run 2 2532 total, 2522 passed, 0 failed, 10 skipped.

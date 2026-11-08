@@ -8,15 +8,12 @@ namespace Yello.Tests.Isolation;
 
 /// <summary>
 /// Offering ownership of a Space: the rows for <c>POST /api/v1/spaces/{spaceId}/ownership-offers</c>,
-/// <c>GET .../ownership-offers/pending</c> and <c>DELETE .../ownership-offers/{offerId}</c> (I-1, I-2, I-4, I-12, I-13, I-17;
-/// V-1), each stating both surfaces.
+/// <c>GET .../ownership-offers/pending</c> and <c>DELETE .../ownership-offers/{offerId}</c>,
+/// each stating both surfaces.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Pending until the offer story's dev phase</b>, which makes every row live before review (GATE-003). The routes are
-/// <see cref="OwnershipOfferWire"/>'s stand-ins; the dev phase swaps them for the <c>OwnershipOfferRoutes</c> members, and
-/// <see cref="ProblemTypes.InvalidOfferRecipient"/> for <c>ProblemTypes.InvalidOfferRecipient</c>. The three
-/// routes fail the route-coverage gate unless these rows are active.
+/// <b>Every row is active</b>: the three routes fail the route-coverage gate otherwise.
 /// </para>
 /// <para>
 /// <b>Seeding through the product.</b> Lesser Roles join a fresh host's Space through an accepted Invitation and hold a Token
@@ -24,7 +21,7 @@ namespace Yello.Tests.Isolation;
 /// <c>world.A</c> and <c>world.B</c> are never given new Members or offers: other rows rely on their Spaces as they are.
 /// </para>
 /// <para>
-/// <b>The email's confinement (I-14) is proved in the Slices suite</b>
+/// <b>The email's confinement is proved in the Slices suite</b>
 /// (<c>The_offer_email_names_the_Space_and_the_offerer_and_discloses_nothing_else</c>), which reads mail through a Host and a
 /// <see cref="MailDrop"/> of its own; this suite's world shares one Host and one drop across rows.
 /// </para>
@@ -140,7 +137,7 @@ internal static partial class IsolationCases
             },
             Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheOthersOfferIsStillPendingAsync })),
 
-        // The 3.4 gate, one row per route a Token reaches. The Account owns both Spaces and its Token is bound to the first. By
+        // The Token-bound-to-another-Space gate, one row per route a Token reaches. The Account owns both Spaces and its Token is bound to the first. By
         // Session it offers a Member of the second ownership; by the first Space's Token the same request is a non-member's.
         new IsolationCase(
             "ISO-TOKEN-OWN-OTHER-SPACE-OFFER-OWNERSHIP", "I-12", IsolationVector.TokenOwnOtherSpace, HttpMethod.Post, OwnershipOfferRoutes.Offers,

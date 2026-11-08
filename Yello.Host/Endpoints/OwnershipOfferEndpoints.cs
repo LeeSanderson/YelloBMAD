@@ -149,7 +149,7 @@ public static class OwnershipOfferEndpoints
                 type: ProblemTypes.OwnershipOfferNotPending,
                 title: "This offer is no longer open."),
 
-            // Not recorded: an in-Space not-found crossed no boundary (AD-20). The body is the boundary's.
+            // Not recorded: an in-Space not-found crossed no boundary. The body is the boundary's.
             OwnershipOfferRevocation.NotFound => BoundaryProblems.NotAvailable(),
 
             _ => throw new InvalidOperationException($"Unanswered revoke outcome {outcome}."),

@@ -4,11 +4,11 @@ using Yello.Application.Outbox;
 namespace Yello.Application.Spaces.OfferOwnership;
 
 /// <summary>
-/// Offers ownership of the active Space to one of its Memberships, and tells the recipient by email. FR-8, FR-43, AD-26.
+/// Offers ownership of the active Space to one of its Memberships, and tells the recipient by email.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Everything cross-cutting happened before this ran</b> (AR-3): the pipeline resolved the Space, checked
+/// <b>Everything cross-cutting happened before this ran</b>: the pipeline resolved the Space, checked
 /// <c>OfferOwnershipTransfer</c> and replayed an <c>Idempotency-Key</c> it had already seen, so a replay never reaches this
 /// code and never sends a second email. This slice reads no Role: the store's guarded statement proves the caller is the
 /// Owner and the recipient another Membership of this Space.
