@@ -33,15 +33,12 @@ namespace Yello.Tests.Isolation;
 /// phase revisits this only if its in-Space not-found does work the boundary does not (AC9's last clause).
 /// </para>
 /// <para>
-/// <b>Removal, leaving and the single-row read</b> (<see cref="RemovalCases"/>) follow the same row kinds. They are pending
-/// until their routes are mapped, and need no timing row for the same reason: the removal's in-Space not-found is the
-/// floored boundary body.
+/// <b>Removal, leaving and the single-row read</b> (<see cref="RemovalCases"/>) follow the same row kinds, and need no
+/// timing row for the same reason: the in-Space not-found is the floored boundary body.
 /// </para>
 /// </remarks>
 internal static partial class IsolationCases
 {
-    private const string RemovalPending =
-        "the removal (DELETE on the Membership), the leave route and the single-row read are not mapped yet; the leave route and the ownership-held problem type are MembershipWire stand-ins until the contract declares them";
 
     private static IEnumerable<IsolationCase> MembershipCases() =>
     [
@@ -190,16 +187,12 @@ internal static partial class IsolationCases
                     [new(MembershipRoutes.MembershipOf(world.B.SpaceId, foreign.Id), MembershipRoutes.MembershipOf(Guid.NewGuid(), foreign.Id))],
                     world.B.SpaceId);
             },
-            Both(new BoundaryNotFound { Then = BStillOwnsItsSpaceAsync }),
-            PendingUntil: "4.5",
-            PendingReason: RemovalPending),
+            Both(new BoundaryNotFound { Then = BStillOwnsItsSpaceAsync })),
 
         new IsolationCase(
-            "ISO-LEAVE-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Delete, MembershipWire.LeaveRoute,
-            world => ForeignAsync(world, MembershipWire.LeaveOf, HttpMethod.Delete),
-            Both(new BoundaryNotFound { Then = BStillOwnsItsSpaceAsync }),
-            PendingUntil: "4.5",
-            PendingReason: RemovalPending),
+            "ISO-LEAVE-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Delete, MembershipRoutes.Own,
+            world => ForeignAsync(world, MembershipRoutes.OwnOf, HttpMethod.Delete),
+            Both(new BoundaryNotFound { Then = BStillOwnsItsSpaceAsync })),
 
         new IsolationCase(
             "ISO-READ-MEMBERSHIP-FOREIGN-SPACE", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, MembershipRoutes.Membership,
@@ -213,23 +206,17 @@ internal static partial class IsolationCases
                     [new(MembershipRoutes.MembershipOf(world.B.SpaceId, foreign.Id), MembershipRoutes.MembershipOf(Guid.NewGuid(), foreign.Id))],
                     world.B.SpaceId);
             },
-            Both(new BoundaryNotFound()),
-            PendingUntil: "4.5",
-            PendingReason: RemovalPending),
+            Both(new BoundaryNotFound())),
 
         new IsolationCase(
             "ISO-RECORD-KIND-REMOVE-MEMBERSHIP-MEMBER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Delete, MembershipRoutes.Membership,
             world => LesserRoleRemovesTheOwnerAsync(world, "member"),
-            Both(new RoleRefused(MembershipWire.RemoveCapabilityCode) { Then = TheOtherKeepsItsRole("Owner") }),
-            PendingUntil: "4.5",
-            PendingReason: RemovalPending),
+            Both(new RoleRefused(MembershipWire.RemoveCapabilityCode) { Then = TheOtherKeepsItsRole("Owner") })),
 
         new IsolationCase(
             "ISO-RECORD-KIND-REMOVE-MEMBERSHIP-VIEWER", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Delete, MembershipRoutes.Membership,
             world => LesserRoleRemovesTheOwnerAsync(world, "viewer"),
-            Both(new RoleRefused(MembershipWire.RemoveCapabilityCode) { Then = TheOtherKeepsItsRole("Owner") }),
-            PendingUntil: "4.5",
-            PendingReason: RemovalPending),
+            Both(new RoleRefused(MembershipWire.RemoveCapabilityCode) { Then = TheOtherKeepsItsRole("Owner") })),
 
         // The Qualified seam's row: the pipeline admits the Admin (Qualified), the guarded DELETE finds another Admin outside
         // the Admin's removable set, and the pipeline - not the slice - answers and records the 403.
@@ -245,9 +232,7 @@ internal static partial class IsolationCases
 
                 return new CaseRequest(admin, HttpMethod.Delete, [new(path, path)], host.SpaceId, Other: other);
             },
-            Both(new RoleRefused(MembershipWire.RemoveCapabilityCode) { Then = TheOtherKeepsItsRole("Admin") }),
-            PendingUntil: "4.5",
-            PendingReason: RemovalPending) with
+            Both(new RoleRefused(MembershipWire.RemoveCapabilityCode) { Then = TheOtherKeepsItsRole("Admin") })) with
         {
             Assumption = "PRD-12-4",
         },
@@ -266,9 +251,7 @@ internal static partial class IsolationCases
                     [new(MembershipRoutes.MembershipOf(world.A.SpaceId, foreign.Id), MembershipRoutes.MembershipOf(world.A.SpaceId, Guid.NewGuid()))],
                     TargetSpaceId: null);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = BStillOwnsItsSpaceAsync }),
-            PendingUntil: "4.5",
-            PendingReason: RemovalPending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = BStillOwnsItsSpaceAsync })),
 
         new IsolationCase(
             "ISO-READ-MEMBERSHIP-FOREIGN-ID-IN-OWN-SPACE", "I-4, I-13", IsolationVector.DeepLink, HttpMethod.Get, MembershipRoutes.Membership,
@@ -282,9 +265,7 @@ internal static partial class IsolationCases
                     [new(MembershipRoutes.MembershipOf(world.A.SpaceId, foreign.Id), MembershipRoutes.MembershipOf(world.A.SpaceId, Guid.NewGuid()))],
                     TargetSpaceId: null);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable)),
-            PendingUntil: "4.5",
-            PendingReason: RemovalPending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable))),
 
         // The Account owns both Spaces, and its Token is bound to the first. By Session the Owner removes a Member of the
         // second, and by the first Space's Token the same request is a non-member's.
@@ -303,20 +284,18 @@ internal static partial class IsolationCases
             {
                 [IsolationSurface.Session] = new Served(HttpStatusCode.NoContent, (_, _, _) => Task.CompletedTask, "204 - a Session carries no Space (FR-2); the Account owns SA2") { Then = TheOtherHoldsNoMembershipAsync },
                 [IsolationSurface.ApiToken] = new SameAsNonMember { Then = TheOtherKeepsItsRole("Member") },
-            },
-            PendingUntil: "4.5",
-            PendingReason: RemovalPending),
+            }),
 
         // The leaver is a Member of the host's Space, and its own Token is bound to its Personal Space. By Session it leaves,
         // and by that Token the same request is a non-member's, so it stays.
         new IsolationCase(
-            "ISO-TOKEN-OWN-OTHER-SPACE-LEAVE", "I-12", IsolationVector.TokenOwnOtherSpace, HttpMethod.Delete, MembershipWire.LeaveRoute,
+            "ISO-TOKEN-OWN-OTHER-SPACE-LEAVE", "I-12", IsolationVector.TokenOwnOtherSpace, HttpMethod.Delete, MembershipRoutes.Own,
             async world =>
             {
                 var host = await world.NewActorAsync("Tv");
                 var leaver = await world.NewActorAsync("Tw");
                 var joined = await JoinedThroughTheProductAsync(world, host, leaver, "member");
-                var path = MembershipWire.LeaveOf(host.SpaceId);
+                var path = MembershipRoutes.OwnOf(host.SpaceId);
 
                 return new CaseRequest(leaver, HttpMethod.Delete, [new(path, path)], host.SpaceId, Other: joined);
             },
@@ -324,9 +303,7 @@ internal static partial class IsolationCases
             {
                 [IsolationSurface.Session] = new Served(HttpStatusCode.NoContent, (_, _, _) => Task.CompletedTask, "204 - a Session carries no Space (FR-2); the Account is a Member there") { Then = TheOtherHoldsNoMembershipAsync },
                 [IsolationSurface.ApiToken] = new SameAsNonMember { Then = TheOtherKeepsItsRole("Member") },
-            },
-            PendingUntil: "4.5",
-            PendingReason: RemovalPending),
+            }),
 
         new IsolationCase(
             "ISO-TOKEN-OWN-OTHER-SPACE-READ-MEMBERSHIP", "I-12", IsolationVector.TokenOwnOtherSpace, HttpMethod.Get, MembershipRoutes.Membership,
@@ -342,9 +319,7 @@ internal static partial class IsolationCases
             {
                 [IsolationSurface.Session] = new Served(HttpStatusCode.OK, (_, _, _) => Task.CompletedTask, "200 - a Session carries no Space (FR-2); the Account owns SA2"),
                 [IsolationSurface.ApiToken] = new SameAsNonMember(),
-            },
-            PendingUntil: "4.5",
-            PendingReason: RemovalPending),
+            }),
     ];
 
     /// <summary>

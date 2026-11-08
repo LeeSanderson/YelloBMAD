@@ -78,7 +78,7 @@ internal static partial class ActiveSpaceResolution
                     throw;
                 }
 
-                SpaceLog.SpaceDeletedUnderRequest(request.Logger, request.SpaceId);
+                SpaceLog.LostUnderRequest(request.Logger, request.SpaceId);
                 await RecordAsync(request, AccessRefusalKind.CrossSpace).ConfigureAwait(false);
 
                 return BoundaryProblems.NotAvailable();

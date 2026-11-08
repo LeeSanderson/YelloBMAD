@@ -171,6 +171,11 @@ public static class RefusalCopy
     public static string RoleNotAssignableKey => "role-not-assignable";
 
     /// <summary>
+    /// The copy key for <c>ownership-held</c>: the Owner removing its own Membership or leaving.
+    /// </summary>
+    public static string OwnershipHeldKey => "ownership-held";
+
+    /// <summary>
     /// The resource a refusal is rendered with.
     /// </summary>
     /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
@@ -252,6 +257,7 @@ public static class RefusalCopy
         [ProblemTypes.InvitationForAnotherAccount] = InvitationForAnotherAccountKey,
         [ProblemTypes.OwnerRoleFixed] = OwnerRoleFixedKey,
         [ProblemTypes.RoleNotAssignable] = RoleNotAssignableKey,
+        [ProblemTypes.OwnershipHeld] = OwnershipHeldKey,
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static string? OwnKey(string? type) =>

@@ -1,8 +1,8 @@
 namespace Yello.Client.Spaces;
 
 /// <summary>
-/// What the Members section of Space settings shows for a Role: whether it renders at all, and which Roles each row's
-/// "Change Role" offers. Story 4.4, AC1, AC4, AC10; FR-13; UX-DR11, UX-DR27; PRD section 12 #4.
+/// What the Members section of Space settings shows for a Role: whether it renders at all, which Roles each row's
+/// "Change Role" offers and which rows carry "Remove"; and whether Space home offers "Leave this Space". Story 4.4, AC1, AC4, AC10; FR-13; UX-DR11, UX-DR27; PRD section 12 #4.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -68,4 +68,24 @@ public static class MembershipCapabilities
         (Admin, Member or Viewer) => BetweenMemberAndViewer,
         _ => [],
     };
+
+    /// <summary>
+    /// Whether a row carries Remove: the viewer's removal rule for the row's Role. The Owner removes every other row; an
+    /// Admin removes Member and Viewer rows; nobody's own row carries Remove - leaving is Space home's "Leave this Space" -
+    /// and the Owner's row carries it for no one.
+    /// </summary>
+    /// <param name="viewerRole">The viewer's Role, as its stable code.</param>
+    /// <param name="targetRole">The row's Role, as its stable code.</param>
+    /// <param name="isYou">Whether the row is the viewer's own.</param>
+    /// <returns><c>true</c> where the server's removal rule admits the row.</returns>
+    public static bool Removable(string viewerRole, string targetRole, bool isYou) =>
+        !isYou && (viewerRole, targetRole) is (Owner, Admin or Member or Viewer) or (Admin, Member or Viewer);
+
+    /// <summary>
+    /// Whether "Leave this Space" is offered: every Role but the Owner, who leaves only by an accepted Ownership Offer or by
+    /// deleting the Space.
+    /// </summary>
+    /// <param name="roleCode">The viewer's Role, as its stable code.</param>
+    /// <returns><c>true</c> for Admin, Member and Viewer.</returns>
+    public static bool MayLeave(string roleCode) => roleCode is Admin or Member or Viewer;
 }

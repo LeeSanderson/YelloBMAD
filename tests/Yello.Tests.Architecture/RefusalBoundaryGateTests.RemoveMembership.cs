@@ -29,9 +29,8 @@ namespace Yello.Tests.Architecture;
 /// <c>A_Qualified_cell_reaches_no_endpoint_without_its_target_rule</c> (it now finds <c>RemoveMembership</c>, so the
 /// removal slice's name must contain it), both Role-read gates, <c>Only_the_deletion_route_carries_the_marker_that_it_destroys_its_own_Space</c>
 /// (the leave route is not marked), and <c>No_production_code_introduces_a_cache</c>.
-/// <c>The_Membership_routes_require_ChangeMembershipRole_and_serve_both_surfaces</c> turns red the moment the new routes are
-/// mapped; <see cref="The_Membership_routes_declare_one_capability_each_and_serve_both_surfaces"/> replaces it, and the old
-/// gate is deleted then.
+/// <see cref="The_Membership_routes_declare_one_capability_each_and_serve_both_surfaces"/> replaced the gate that held every
+/// Membership route to <c>ChangeMembershipRole</c>.
 /// </para>
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
@@ -45,7 +44,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>ReadProjectsAndTasks</c>, because leaving is decided by the caller's identity and every Role may do it. A Token
     /// reaches every one of them.
     /// </summary>
-    [Fact(Skip = "red: AC1 - the removal, the leave and the single-row read are not mapped")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-4")]
     [Trait("Requirement", "AD-23")]
@@ -66,6 +65,7 @@ public sealed partial class RefusalBoundaryGateTests
             .ToDictionary(route => route.Key, route => route.Endpoint, StringComparer.Ordinal);
 
         Assert.Equal(expected.Keys.Order(StringComparer.Ordinal), routes.Keys.Order(StringComparer.Ordinal));
+        Assert.Equal(Enum.GetValues<Capability>().Length, Enum.GetNames<Capability>().Distinct(StringComparer.Ordinal).Count());
 
         foreach (var (key, endpoint) in routes)
         {
@@ -83,7 +83,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// identity, not Role, and the statement can only delete the caller's own non-Owner row), and a second write slipping
     /// under it would hand every Viewer a write. Anchor: the leave route is found.
     /// </summary>
-    [Fact(Skip = "red: AC3 - the leave route is not mapped, so the anchor finds no write under ReadProjectsAndTasks")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-20")]
     public void The_leave_route_is_the_one_write_under_ReadProjectsAndTasks()
@@ -105,7 +105,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>Removable</c> set for any actor.</b> Found by shape: a public static method on <c>RoleCapabilityMatrix</c> taking a
     /// <see cref="Role"/> whose answer has <c>Removable</c> and <c>HeldBy</c> collections of <see cref="Role"/>.
     /// </summary>
-    [Fact(Skip = "red: AC1 - RoleCapabilityMatrix declares no removal authority")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AR-12")]
     [Trait("Assumption", "PRD-12-4")]
@@ -137,7 +137,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Leave control): an Admin sees Remove on Member and Viewer rows only, the Owner on every row but its own, a Member and
     /// a Viewer on none. The Owner's row carries no Remove for anyone.
     /// </summary>
-    [Fact(Skip = "red: AC8 - the client declares no MembershipCapabilities.Removable")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "FR-14")]
     [Trait("Assumption", "PRD-12-4")]
@@ -167,7 +167,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The list row and the single-row read carry <c>InSpaceNow</c> (a bool) beside the five members they had, and nothing
     /// else; the Role change's answer stays exactly its four members, with no address and no presence.
     /// </summary>
-    [Fact(Skip = "red: AC6 - MembershipResponse carries no InSpaceNow")]
+    [Fact]
     [Trait("Requirement", "UX-DR36")]
     [Trait("Requirement", "AD-23")]
     public void The_Membership_row_carries_InSpaceNow_and_the_Role_change_answer_does_not()
@@ -186,7 +186,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// a comment, saying the Owner leaves by an accepted Ownership Offer or by deleting the Space - no third exit. The Remove
     /// and Leave copy the client shows have entries too.
     /// </summary>
-    [Fact(Skip = "red: AC2 - ProblemTypes declares no ownership-held and the client has no copy for it")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-14")]
     public void The_ownership_held_problem_type_is_declared_and_has_client_copy()
@@ -213,7 +213,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The Remove and Leave controls an Account lacks are absent, never disabled: neither the Membership row and section nor
     /// the Leave section carries a <c>disabled</c> or <c>aria-disabled</c> attribute.
     /// </summary>
-    [Fact(Skip = "red: AC8 - LeaveSpaceSection.razor does not exist")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     public void No_Remove_or_Leave_control_is_disabled()
     {

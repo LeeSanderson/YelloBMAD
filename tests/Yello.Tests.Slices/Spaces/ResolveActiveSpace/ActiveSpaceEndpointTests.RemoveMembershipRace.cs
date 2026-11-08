@@ -39,7 +39,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// both waited on the held lock.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - no removal route, so nothing but the Role change queues on the Memberships lock")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AR-12")]
     [Trait("Assumption", "PRD-12-4")]
@@ -66,6 +66,8 @@ public sealed partial class ActiveSpaceEndpointTests
 
             await MadePresentAsync(owner, spaceId);
             await MadePresentAsync(admin, spaceId);
+            await owner.FetchAntiforgeryTokenAsync();
+            await admin.FetchAntiforgeryTokenAsync();
 
             var cancellationToken = TestContext.Current.CancellationToken;
 
@@ -106,7 +108,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// removal answers <c>204</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - no removal route and no actor-still-holds-its-Role clause on a removal")]
+    [Fact]
     [Trait("Requirement", "NFR-2")]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-20")]
@@ -134,6 +136,7 @@ public sealed partial class ActiveSpaceEndpointTests
             var (adminRow, target) = (await wire.MembershipOfAsync(spaceId, adminId), await wire.MembershipOfAsync(spaceId, targetId));
 
             await MadePresentAsync(admin, spaceId);
+            await admin.FetchAntiforgeryTokenAsync();
 
             var cancellationToken = TestContext.Current.CancellationToken;
 
@@ -166,7 +169,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>MembershipChanged</c>, naming the Member.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - neither the leave route nor the removal route exists")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AR-16")]
     public async Task A_leave_and_a_removal_of_one_Membership_held_on_the_lock_commit_once_and_publish_once()
@@ -190,6 +193,8 @@ public sealed partial class ActiveSpaceEndpointTests
 
             await MadePresentAsync(owner, spaceId);
             await MadePresentAsync(member, spaceId);
+            await owner.FetchAntiforgeryTokenAsync();
+            await member.FetchAntiforgeryTokenAsync();
 
             var cancellationToken = TestContext.Current.CancellationToken;
 
@@ -228,7 +233,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="action">What the Admin was doing.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC10 - the store judges a missing actor as lost authority (403 InsufficientRole); no LostMembership outcome exists")]
+    [Theory]
     [InlineData("change")]
     [InlineData("removal")]
     [Trait("Requirement", "AD-3")]
@@ -260,6 +265,7 @@ public sealed partial class ActiveSpaceEndpointTests
             before = await wire.MembershipOfAsync(spaceId, targetId);
 
             await MadePresentAsync(admin, spaceId);
+            await admin.FetchAntiforgeryTokenAsync();
 
             var cancellationToken = TestContext.Current.CancellationToken;
 

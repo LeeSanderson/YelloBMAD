@@ -688,7 +688,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// none. The control is named for the row's label.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - MembershipRow renders no Remove control")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "UX-DR27")]
     public async Task The_Owner_sees_Remove_on_every_row_but_its_own()
@@ -720,7 +720,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// <c>aria-disabled</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - MembershipRow renders no Remove control")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Assumption", "PRD-12-4")]
@@ -759,7 +759,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="inSpaceNow">What the single-row read answers.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC6 - no Remove control, no removal confirm and no single-row read in the client")]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     [Trait("Requirement", "UX-DR36")]
@@ -810,7 +810,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// control, never to <c>body</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - no Remove control in the client")]
+    [Fact]
     [Trait("Requirement", "UX-DR38")]
     [Trait("Requirement", "UX-DR39")]
     [Trait("Requirement", "AD-29")]
@@ -858,7 +858,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// stays.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - no Remove control in the client")]
+    [Fact]
     [Trait("Requirement", "UX-DR29")]
     [Trait("Assumption", "PRD-12-4")]
     public async Task A_removal_refused_403_to_an_Admin_still_holding_Admin_says_what_Admins_may_remove()
@@ -890,7 +890,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// comes from the fresh read, "That Membership no longer exists." is announced, and focus is not on <c>body</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - a row action answered 404 re-reads page 1 and replaces the rows, dropping appended pages")]
+    [Fact]
     [Trait("Requirement", "AD-29")]
     [Trait("Requirement", "UX-DR39")]
     public async Task A_row_on_the_second_page_answered_404_is_dropped_and_the_appended_page_stays()
@@ -935,7 +935,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// serialises them on its own lock.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - a section-wide in-flight gate drops a second row's action; and no Remove control exists")]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     public async Task A_second_rows_action_proceeds_while_another_rows_is_in_flight()
     {
@@ -975,7 +975,7 @@ public sealed class MembershipSectionTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="spaced">Whether the text-spacing override is applied.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC8 - no removal confirm in the client")]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "NFR-9")]

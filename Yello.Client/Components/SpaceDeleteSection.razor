@@ -11,8 +11,7 @@
 @inject ActiveSpaceState ActiveSpace
 @inject SpaceDirectory Directory
 @inject SpaceWrites Writes
-@inject DepartureNarration Departure
-@inject NavigationManager Navigation
+@inject SpaceExit Exit
 
 @*
     THE DELETE SECTION OF SPACE SETTINGS - story 3.3: AC1-AC3, AC7, AC8, AC12, AC16; FR-7, PRD §6.2; UX-DR12, UX-DR27,
@@ -363,16 +362,6 @@
     private void Leave(string? sentence)
     {
         _key = null;
-        Directory.Removed(SpaceId);
-
-        if (sentence is not null)
-        {
-            Departure.Say(sentence);
-        }
-
-        // The tab leaves the deleted Space before it navigates, as the location-changing hook would have it leave, so the
-        // purge runs now and the entry point starts outside any Space - where it lands is then a first arrival (AC12)
-        ActiveSpace.Navigating(target: null);
-        Navigation.GoTo(ActiveSpace, ClientRoutes.Home, replace: true);
+        Exit.Leave(SpaceId, sentence);
     }
 }

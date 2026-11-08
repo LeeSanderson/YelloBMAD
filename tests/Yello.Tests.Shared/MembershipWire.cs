@@ -15,8 +15,8 @@ namespace Yello.Tests.Shared;
 /// declared them. Everything here is the test's reading of the wire.
 /// </para>
 /// <para>
-/// <b>Removal and leaving</b> use the same item route with <c>DELETE</c>, and a leave route for the caller's own Membership.
-/// The leave route and the Owner's problem type are stand-ins below until the contract declares them.
+/// <b>Removal and leaving</b> use the same item route with <c>DELETE</c>, and the contract's leave route
+/// (<c>MembershipRoutes.Own</c>) for the caller's own Membership.
 /// </para>
 /// </remarks>
 public static class MembershipWire
@@ -47,10 +47,11 @@ public static class MembershipWire
     public static IReadOnlyList<string> PageMembers { get; } = ["memberships", "nextAfter", "total"];
 
     /// <summary>
-    /// A row's JSON members, in ordinal order: <c>MembershipResponse(Id, DisplayName, EmailAddress, Role, IsYou)</c>. Never
-    /// the Account id, the normalised address, the Space or the join date (AC1, AD-23).
+    /// A row's JSON members, in ordinal order: <c>MembershipResponse(Id, DisplayName, EmailAddress, Role, IsYou,
+    /// InSpaceNow)</c>, on the list and the single-row read alike. Never the Account id, the normalised address, the Space or
+    /// the join date (AC1, AD-23).
     /// </summary>
-    public static IReadOnlyList<string> RowMembers { get; } = ["displayName", "emailAddress", "id", "isYou", "role"];
+    public static IReadOnlyList<string> RowMembers { get; } = ["displayName", "emailAddress", "id", "inSpaceNow", "isYou", "role"];
 
     /// <summary>
     /// The Role change's body: exactly <c>role</c>, the stable code.
@@ -123,53 +124,16 @@ public static class MembershipWire
     public static string LeaveCapabilityCode => "read-projects-and-tasks";
 
     /// <summary>
-    /// A single row's JSON members once it carries presence, in ordinal order: the list row's five and <c>inSpaceNow</c>.
-    /// Kept apart from <see cref="RowMembers"/> so the list's shape gate keeps holding today's five.
-    /// </summary>
-    public static IReadOnlyList<string> PresentRowMembers { get; } = ["displayName", "emailAddress", "id", "inSpaceNow", "isYou", "role"];
-
-    /// <summary>
-    /// Stand-in for the leave route's pattern, which the contract does not declare yet. The implementation replaces every
-    /// use with the contract's own member and deletes this one.
-    /// </summary>
-    public static string LeaveRoute => "/api/v1/spaces/{spaceId:guid}/membership";
-
-    /// <summary>
-    /// Stand-in for the problem type the Owner meets on its own row, which the contract does not declare yet. Replaced and
-    /// deleted as <see cref="LeaveRoute"/> is.
-    /// </summary>
-    public static string OwnershipHeldProblemType => "urn:yello:problem:ownership-held";
-
-    /// <summary>
-    /// The caller's own Membership in a Space, as a client calls it. Replaced and deleted as <see cref="LeaveRoute"/> is.
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <returns>The path.</returns>
-    public static string LeaveOf(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}/membership";
-
-    /// <summary>
-    /// Reads a single row read with its presence.
+    /// Reads the single-row read's body.
     /// </summary>
     /// <param name="body">The body.</param>
     /// <returns>The row.</returns>
-    public static PresentMembership ParsePresentRow(string body) =>
-        JsonSerializer.Deserialize<PresentMembership>(body, JsonOptions) ?? throw new InvalidOperationException("The read answered no row.");
+    public static ListedMembership ParseReadRow(string body) =>
+        JsonSerializer.Deserialize<ListedMembership>(body, JsonOptions) ?? throw new InvalidOperationException("The read answered no row.");
 
     private static IReadOnlyList<string> NamesOf(JsonElement row) =>
         [.. row.EnumerateObject().Select(member => member.Name).Order(StringComparer.Ordinal)];
 }
-
-/// <summary>
-/// One Membership read on its own, with whether its Account has made a request in this Space within the presence window.
-/// Restated independently of the contract so a change to either is seen.
-/// </summary>
-/// <param name="Id">The Membership's id.</param>
-/// <param name="DisplayName">The display name.</param>
-/// <param name="EmailAddress">The address as typed.</param>
-/// <param name="Role">The Role's stable code.</param>
-/// <param name="IsYou">Whether it is the caller's own row.</param>
-/// <param name="InSpaceNow">Whether an unexpired presence row exists for this Account in this Space.</param>
-public sealed record PresentMembership(Guid Id, string DisplayName, string EmailAddress, string Role, bool IsYou, bool InSpaceNow);
 
 /// <summary>
 /// Story 4.4's list page as the test reads it: <c>MembershipPageResponse</c>'s shape (Q8 (a), Q9 (a)), restated independently
@@ -189,7 +153,8 @@ public sealed record MembershipPage(int Total, IReadOnlyList<ListedMembership> M
 /// <param name="EmailAddress">The Account's address as typed at registration, never the normalised form (Lee's Q4 (a)).</param>
 /// <param name="Role">The Role's stable code: <c>owner</c>, <c>admin</c>, <c>member</c> or <c>viewer</c>.</param>
 /// <param name="IsYou">Whether the row is the caller's own Membership.</param>
-public sealed record ListedMembership(Guid Id, string DisplayName, string EmailAddress, string Role, bool IsYou);
+/// <param name="InSpaceNow">Whether an unexpired presence row exists for this Account in this Space.</param>
+public sealed record ListedMembership(Guid Id, string DisplayName, string EmailAddress, string Role, bool IsYou, bool InSpaceNow = false);
 
 /// <summary>
 /// The row a Role change answers, as the test reads it: <c>MembershipRoleChangeResponse</c>'s shape, no address (code review

@@ -150,14 +150,17 @@ internal static partial class SpaceLog
     internal static partial void SpaceDeleted(ILogger logger, Guid spaceId);
 
     /// <summary>
-    /// A Space-scoped request whose Space was deleted between its resolution and its write (story 3.3, open question
-    /// 4 (a)); it was answered as the boundary refuses.
+    /// A Space-scoped request that lost what it was resolved on between its resolution and its write - the Space was
+    /// deleted, or the caller's own Membership in it was removed - and was answered as the boundary refuses.
     /// </summary>
+    /// <remarks>
+    /// One message for both causes, as the answer is one: the caller's next request would meet the same refusal either way.
+    /// </remarks>
     /// <param name="logger">The logger.</param>
     /// <param name="spaceId">The Space.</param>
     [LoggerMessage(
         EventId = 1040,
         Level = LogLevel.Information,
-        Message = "Space {SpaceId} was deleted under a request resolved in it; the request was refused.")]
-    internal static partial void SpaceDeletedUnderRequest(ILogger logger, Guid spaceId);
+        Message = "Space {SpaceId} was deleted, or the caller lost its Membership in it, under a request resolved there; the request was refused.")]
+    internal static partial void LostUnderRequest(ILogger logger, Guid spaceId);
 }

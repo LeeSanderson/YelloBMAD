@@ -14,8 +14,8 @@
 @inject SpaceWrites Writes
 
 @*
-    THE MEMBERS SECTION OF SPACE SETTINGS - story 4.4: AC1, AC2, AC3, AC4, AC10; FR-13; UX-DR11, UX-DR14, UX-DR26,
-    UX-DR27, UX-DR29, UX-DR31, UX-DR34, UX-DR38, UX-DR39.
+    THE MEMBERS SECTION OF SPACE SETTINGS. FR-13, FR-14; UX-DR11, UX-DR14, UX-DR26, UX-DR27, UX-DR29, UX-DR31, UX-DR34,
+    UX-DR36, UX-DR38, UX-DR39.
 
     OWNER AND ADMIN ONLY. Space settings renders this only when MembershipCapabilities.PermitsManageMemberships (the Roles
     change-membership-role admits); for a Member or a Viewer it is absent from the DOM and the list is never asked for.
@@ -33,8 +33,21 @@
     {Role}." is announced, and focus returns to the row's "Change Role". 403: the Role is asked again (the authority may
     have been lost meanwhile); a Role that no longer permits Space settings follows the page's narrated exit (UX-DR29), and
     otherwise the capability-shaped copy is said on the row. 409 owner-role-fixed: "Ownership moves only by an Ownership
-    Offer." 404: the list is read again (Q16 (a)) - "That Membership no longer exists." if it answers, the Space refusal
-    surface if it does not. No answer or a 5xx: "Not sent.", the key kept.
+    Offer." No answer or a 5xx: "Not sent.", the key kept.
+
+    A REMOVAL (MembershipRow's Remove) opens the row's in-place confirm and reads that one row afresh, so the confirm says
+    whether the person is in this Space now as of that moment, never as of the list. "Remove" sends it once with an
+    Idempotency-Key kept for the identical resend, never optimistic. 204: the row is dropped from the rows shown - nothing
+    re-read, no other row recycled - the shown total falls by one, "{label} was removed." is said, and focus goes to the next
+    row's first control, else the previous row's, else the heading. 403: the Role is asked again, as for a change, and an
+    Admin still holding Admin is told what Admins may remove. 409 ownership-held: how the Owner leaves.
+
+    A ROW ACTION ANSWERED 404 reads the first page again only to learn whether the Space still answers. If it does, that one
+    row is dropped from the rows shown - every appended page stays - the total is the fresh read's, and "That Membership no
+    longer exists." is said; if it does not, the read raises the Space refusal surface.
+
+    ROW ACTIONS ARE PER ROW: one row's change or removal in flight never holds back another row's. The server serialises
+    them on its own lock.
 *@
 
 <section class="membership-section" aria-labelledby="membership-section-heading">
@@ -73,12 +86,18 @@
                                Label="@LabelOf(membership)"
                                ViewerRole="@ViewerRole"
                                Picking="@(_picking == membership.Id)"
-                               Changing="@(_changing == membership.Id)"
+                               Changing="@_changing.Contains(membership.Id)"
+                               ConfirmingRemoval="@(_confirmingRemoval == membership.Id)"
+                               InSpaceNow="@(_confirmingRemoval == membership.Id ? _inSpaceNow : null)"
+                               Removing="@_removing.Contains(membership.Id)"
                                Refusal="@(_rowRefusal?.MembershipId == membership.Id ? _rowRefusal.Value.Text : null)"
                                FocusRequest="@(_focusControlOf == membership.Id ? _focusRequests : 0)"
                                OnAsk="AskToChange"
                                OnChange="ChangeAsync"
-                               OnCancel="CancelChange" />
+                               OnCancel="CancelChange"
+                               OnAskToRemove="AskToRemoveAsync"
+                               OnRemove="RemoveAsync"
+                               OnCancelRemoval="CancelRemoval" />
             }
         </ul>
     }
@@ -125,9 +144,14 @@
     private bool _focusHeading;
     private string? _listRefusal;
     private Guid? _picking;
-    private Guid? _changing;
+    private readonly HashSet<Guid> _changing = [];
+    private Guid? _confirmingRemoval;
+    private bool? _inSpaceNow;
+    private int _presenceReads;
+    private readonly HashSet<Guid> _removing = [];
     private (Guid MembershipId, string Text)? _rowRefusal;
-    private (Guid MembershipId, string Role, string Key)? _changeKey;
+    private readonly Dictionary<Guid, (string Role, string Key)> _changeKeys = [];
+    private readonly Dictionary<Guid, string> _removalKeys = [];
     private Guid? _focusControlOf;
     private int _focusRequests;
     private string? _announcement;
@@ -225,9 +249,13 @@
         _loadingMore = false;
         _listRefusal = null;
         _picking = null;
-        _changing = null;
+        _changing.Clear();
+        _confirmingRemoval = null;
+        _inSpaceNow = null;
+        _removing.Clear();
         _rowRefusal = null;
-        _changeKey = null;
+        _changeKeys.Clear();
+        _removalKeys.Clear();
         _focusControlOf = null;
         _focusHeading = false;
         _focusMoreProgress = false;
@@ -240,8 +268,10 @@
     /// screen until it answers. A first read that gets no answer is the Space refusal surface; a read again that gets no
     /// answer, or a 5xx, keeps the rows already shown.
     /// </summary>
+    /// <param name="generation">The purge generation the read belongs to.</param>
+    /// <param name="totalOnly">Whether only the total is taken from the answer, leaving every row shown as it is.</param>
     /// <returns><c>true</c> when the list answered.</returns>
-    private async Task<bool> LoadAsync(int generation)
+    private async Task<bool> LoadAsync(int generation, bool totalOnly = false)
     {
         var token = ActiveSpace.Token;
         var read = ++_reads;
@@ -258,7 +288,7 @@
 
             if (response.IsSuccessStatusCode)
             {
-                return await UseFirstPageAsync(response, read, generation, token);
+                return await UseFirstPageAsync(response, read, generation, totalOnly, token);
             }
 
             if (rereading && response.StatusCode >= HttpStatusCode.InternalServerError)
@@ -288,13 +318,19 @@
     /// <summary>
     /// A first page: the rows, the true total and the cursor - unless a later read or a purge came first.
     /// </summary>
-    private async Task<bool> UseFirstPageAsync(HttpResponseMessage response, int read, int generation, CancellationToken token)
+    private async Task<bool> UseFirstPageAsync(HttpResponseMessage response, int read, int generation, bool totalOnly, CancellationToken token)
     {
         var page = await response.Content.ReadFromJsonAsync<MembershipPageResponse>(JsonOptions, token);
 
         if (page is null || !IsLatestRead(read, generation))
         {
             return false;
+        }
+
+        if (totalOnly)
+        {
+            _total = page.Total;
+            return true;
         }
 
         _memberships = [.. page.Memberships];
@@ -422,7 +458,7 @@
         _nextAfter = page.NextAfter;
         _listRefusal = null;
 
-        var focusable = added.Find(membership => MembershipCapabilities.OfferableRoles(ViewerRole, membership.Role).Count > 0 && !membership.IsYou);
+        var focusable = added.Find(HasControl);
 
         if (focusable is not null)
         {
@@ -452,6 +488,7 @@
     private void AskToChange(Guid membershipId)
     {
         _picking = membershipId;
+        _confirmingRemoval = null;
         _rowRefusal = null;
     }
 
@@ -462,33 +499,35 @@
     /// </summary>
     private async Task ChangeAsync((Guid MembershipId, string Role) change)
     {
-        if (_changing is not null)
+        var (membershipId, role) = change;
+
+        if (_changing.Contains(membershipId))
         {
             return;
         }
 
-        var (membershipId, role) = change;
-
         // A fresh key per deliberate change; the key of an attempt that got no answer is kept for its identical resend.
-        if (_changeKey is not { } kept || kept.MembershipId != membershipId || kept.Role != role)
+        if (!_changeKeys.TryGetValue(membershipId, out var kept) || kept.Role != role)
         {
-            _changeKey = (membershipId, role, Guid.NewGuid().ToString("D"));
+            _changeKeys[membershipId] = (role, Guid.NewGuid().ToString("D"));
         }
+
+        var key = _changeKeys[membershipId].Key;
 
         _picking = null;
         _rowRefusal = null;
-        _changing = membershipId;
+        _changing.Add(membershipId);
 
         var generation = _generation;
         var token = ActiveSpace.Token;
 
         try
         {
-            using var answer = await Writes.SendAsync(HttpMethod.Patch, MembershipRoutes.MembershipOf(SpaceId, membershipId), new ChangeMembershipRoleRequest(role), _changeKey.Value.Key, token);
+            using var answer = await Writes.SendAsync(HttpMethod.Patch, MembershipRoutes.MembershipOf(SpaceId, membershipId), new ChangeMembershipRoleRequest(role), key, token);
 
             if (generation == _generation)
             {
-                _changing = null;
+                _changing.Remove(membershipId);
                 await UseChangeAnswerAsync(membershipId, answer, generation, token);
             }
         }
@@ -508,7 +547,7 @@
         {
             if (generation == _generation)
             {
-                _changing = null;
+                _changing.Remove(membershipId);
             }
         }
     }
@@ -531,7 +570,7 @@
         // (code review 2026-11-03; as every other section does).
         if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
         {
-            _changeKey = null;
+            _changeKeys.Remove(membershipId);
         }
 
         if (answer.StatusCode == HttpStatusCode.OK)
@@ -552,7 +591,7 @@
 
         if (answer.StatusCode == HttpStatusCode.Forbidden)
         {
-            await ForbiddenAsync(membershipId, answer.Problem);
+            await ForbiddenAsync(membershipId, answer.Problem, "MembershipAdminLimit");
             return;
         }
 
@@ -565,9 +604,9 @@
     /// longer permits Space settings follows the page's narrated exit. For an Admin it is the Admin's limit, said on the row;
     /// for any other Role the refusal's own copy (code review 2026-11-03).
     /// </summary>
-    private async Task ForbiddenAsync(Guid membershipId, ProblemResponse? problem)
+    private async Task ForbiddenAsync(Guid membershipId, ProblemResponse? problem, string adminLimitKey)
     {
-        _rowRefusal = (membershipId, MembershipCapabilities.IsLimitedToMemberAndViewer(ViewerRole) ? Localizer["MembershipAdminLimit"] : RefusalText.Of(Localizer, problem));
+        _rowRefusal = (membershipId, MembershipCapabilities.IsLimitedToMemberAndViewer(ViewerRole) ? Localizer[adminLimitKey] : RefusalText.Of(Localizer, problem));
         FocusControlOrHeading(membershipId);
         await OnRoleDoubted.InvokeAsync();
     }
@@ -600,12 +639,13 @@
     }
 
     /// <summary>
-    /// A <c>404</c> (Q16 (a)): the list as the server now holds it. If it answers without the row, the row is gone and
-    /// that is said; if the Space itself is refused, the read raises the refusal surface.
+    /// A row action answered <c>404</c>: the first page is read again only to learn whether the Space still answers. If it
+    /// does, the row is gone - dropped from the rows shown, every appended page kept, the total the fresh read's - and that
+    /// is said; if the Space itself is refused, the read raises the refusal surface.
     /// </summary>
     private async Task GoneAsync(Guid membershipId, ProblemResponse? problem, int generation)
     {
-        var answered = await LoadAsync(generation);
+        var answered = await LoadAsync(generation, totalOnly: true);
 
         if (generation != _generation)
         {
@@ -619,14 +659,242 @@
             return;
         }
 
-        if (_memberships?.Exists(membership => membership.Id == membershipId) == true)
+        Drop(membershipId);
+        Say(Localizer["MembershipGone"]);
+    }
+
+    /// <summary>
+    /// Opens a row's removal confirm and reads that row afresh, so the confirm states whether the person is in this Space
+    /// now as of this moment. A read that finds the row gone is a <c>404</c> like any row action's; any other failure leaves
+    /// the confirm without the sentence, and the removal can still be sent.
+    /// </summary>
+    private async Task AskToRemoveAsync(Guid membershipId)
+    {
+        _picking = null;
+        _rowRefusal = null;
+        _confirmingRemoval = membershipId;
+        _inSpaceNow = null;
+
+        var generation = _generation;
+        var read = ++_presenceReads;
+        var token = ActiveSpace.Token;
+
+        try
         {
-            FocusControlOrHeading(membershipId);
+            using var response = await Http.GetAsync(new Uri(MembershipRoutes.MembershipOf(SpaceId, membershipId), UriKind.Relative), token);
+
+            if (generation != _generation || read != _presenceReads || token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                await UseConfirmReadAsync(membershipId, response, generation, read, token);
+                return;
+            }
+
+            await UseConfirmReadRefusalAsync(membershipId, response, generation, token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // No fresh read: the confirm says nothing about whether the person is here rather than something stale.
+        }
+    }
+
+    private async Task UseConfirmReadAsync(Guid membershipId, HttpResponseMessage response, int generation, int read, CancellationToken token)
+    {
+        var row = await response.Content.ReadFromJsonAsync<MembershipResponse>(JsonOptions, token);
+
+        // Only for the confirm still open on this row, from the latest read: never another row's, never a stale answer.
+        if (row is not null && generation == _generation && read == _presenceReads && _confirmingRemoval == membershipId)
+        {
+            _inSpaceNow = row.InSpaceNow;
+        }
+    }
+
+    private async Task UseConfirmReadRefusalAsync(Guid membershipId, HttpResponseMessage response, int generation, CancellationToken token)
+    {
+        if (response.StatusCode is not (HttpStatusCode.NotFound or HttpStatusCode.Forbidden))
+        {
             return;
         }
 
-        _focusHeading = true;
-        Say(Localizer["MembershipGone"]);
+        var problem = await SpaceWrites.ProblemOfAsync(response, token);
+
+        _confirmingRemoval = null;
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            await GoneAsync(membershipId, problem, generation);
+            return;
+        }
+
+        await ForbiddenAsync(membershipId, problem, "MembershipRemoveAdminLimit");
+    }
+
+    private void CancelRemoval()
+    {
+        _confirmingRemoval = null;
+        _inSpaceNow = null;
+    }
+
+    /// <summary>
+    /// Sends the removal the confirm asked for - once, never optimistic.
+    /// </summary>
+    private async Task RemoveAsync(Guid membershipId)
+    {
+        if (_removing.Contains(membershipId))
+        {
+            return;
+        }
+
+        // A fresh key per deliberate removal; the key of an attempt that got no answer is kept for its identical resend.
+        if (!_removalKeys.TryGetValue(membershipId, out var key))
+        {
+            key = Guid.NewGuid().ToString("D");
+            _removalKeys[membershipId] = key;
+        }
+
+        _confirmingRemoval = null;
+        _inSpaceNow = null;
+        _rowRefusal = null;
+        _removing.Add(membershipId);
+
+        var generation = _generation;
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Delete, MembershipRoutes.MembershipOf(SpaceId, membershipId), key, token);
+
+            if (generation == _generation)
+            {
+                _removing.Remove(membershipId);
+                await UseRemovalAnswerAsync(membershipId, answer, generation);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // No answer - a timeout included: the row says it was not sent, and the key is kept for the resend.
+            if (generation == _generation)
+            {
+                _removing.Remove(membershipId);
+                NotSent(membershipId);
+            }
+        }
+        finally
+        {
+            if (generation == _generation)
+            {
+                _removing.Remove(membershipId);
+            }
+        }
+    }
+
+    private async Task UseRemovalAnswerAsync(Guid membershipId, SpaceWriteAnswer answer, int generation)
+    {
+        if (answer.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            return;
+        }
+
+        if (answer.StatusCode >= HttpStatusCode.InternalServerError)
+        {
+            // The outcome is not known: treated as no answer, so the key is kept.
+            NotSent(membershipId);
+            return;
+        }
+
+        // A first use of the key still finishing - the removal may have committed: the key is kept for the resend.
+        if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
+        {
+            _removalKeys.Remove(membershipId);
+        }
+
+        if (answer.StatusCode == HttpStatusCode.NoContent)
+        {
+            Removed(membershipId);
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.NotFound)
+        {
+            await GoneAsync(membershipId, answer.Problem, generation);
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.Forbidden)
+        {
+            await ForbiddenAsync(membershipId, answer.Problem, "MembershipRemoveAdminLimit");
+            return;
+        }
+
+        _rowRefusal = (membershipId, RefusalText.Of(Localizer, answer.Problem));
+        FocusControlOrHeading(membershipId);
+    }
+
+    /// <summary>
+    /// The server removed the row: it is dropped from the rows shown and the total falls by one, the removal is said by the
+    /// row's label - never the address - and focus moves on.
+    /// </summary>
+    private void Removed(Guid membershipId)
+    {
+        var said = _memberships?.Find(membership => membership.Id == membershipId) is { } row ? LabelOf(row) : null;
+
+        if (Drop(membershipId) && _total is { } total)
+        {
+            _total = Math.Max(0, total - 1);
+        }
+
+        if (said is not null)
+        {
+            Say(string.Format(CultureInfo.CurrentCulture, Localizer["MembershipRemoved"], said));
+        }
+    }
+
+    /// <summary>
+    /// Drops one row from the rows shown, recycling no other, and moves focus to the next row's first control, else the
+    /// previous row's, else the heading - never body.
+    /// </summary>
+    /// <returns><c>true</c> when the row was shown.</returns>
+    private bool Drop(Guid membershipId)
+    {
+        var at = _memberships?.FindIndex(membership => membership.Id == membershipId) ?? -1;
+
+        if (_memberships is not { } memberships || at < 0)
+        {
+            _focusHeading = true;
+            return false;
+        }
+
+        memberships.RemoveAt(at);
+        _labels = null;
+
+        if (_rowRefusal?.MembershipId == membershipId)
+        {
+            _rowRefusal = null;
+        }
+
+        var next = memberships.Skip(at).FirstOrDefault(HasControl)
+            ?? memberships.Take(at).LastOrDefault(HasControl);
+
+        if (next is null)
+        {
+            _focusHeading = true;
+            return true;
+        }
+
+        FocusControlOf(next.Id);
+        return true;
     }
 
     private void NotSent(Guid membershipId)
@@ -636,13 +904,13 @@
     }
 
     /// <summary>
-    /// The row's Change Role when it still offers one, else the section heading - never body (UX-DR39).
+    /// The row's first control when it still offers one, else the section heading - never body (UX-DR39).
     /// </summary>
     private void FocusControlOrHeading(Guid membershipId)
     {
         var row = _memberships?.Find(membership => membership.Id == membershipId);
 
-        if (row is not null && !row.IsYou && MembershipCapabilities.OfferableRoles(ViewerRole, row.Role).Count > 0)
+        if (row is not null && HasControl(row))
         {
             FocusControlOf(membershipId);
             return;
@@ -650,6 +918,13 @@
 
         _focusHeading = true;
     }
+
+    /// <summary>
+    /// Whether a row offers the viewer any control: Change Role or Remove.
+    /// </summary>
+    private bool HasControl(MembershipResponse row) =>
+        (!row.IsYou && MembershipCapabilities.OfferableRoles(ViewerRole, row.Role).Count > 0)
+        || MembershipCapabilities.Removable(ViewerRole, row.Role, row.IsYou);
 
     private void FocusControlOf(Guid membershipId)
     {

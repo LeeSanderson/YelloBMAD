@@ -2,7 +2,6 @@ using System.Collections;
 using System.Reflection;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
-using Microsoft.AspNetCore.Routing;
 using Mono.Cecil;
 using Xunit;
 using Yello.Contracts;
@@ -94,36 +93,11 @@ public sealed partial class RefusalBoundaryGateTests
     ];
 
     /// <summary>
-    /// AC1, AC4, AD-4, Lee's Q4 (a) [SECURITY] - the Membership routes are exactly <c>GET</c> on the collection and
-    /// <c>PATCH</c> on the item; both require <c>ChangeMembershipRole</c> (the list carries addresses, section 6.1 and AD-23;
-    /// never <c>ReadProjectsAndTasks</c>, and no new matrix row), neither is Session-only (a Token reaches both, AD-4 parity)
-    /// and neither consults a bound. Sibling of <c>The_Invitation_routes_all_require_IssueAndRevokeInvitations_and_serve_both_surfaces</c>.
-    /// </summary>
-    [Fact]
-    [Trait("Requirement", "FR-13")]
-    [Trait("Requirement", "AD-4")]
-    [Trait("Requirement", "AD-23")]
-    public void The_Membership_routes_require_ChangeMembershipRole_and_serve_both_surfaces()
-    {
-        var routes = RouteTable()
-            .Where(endpoint => endpoint.RoutePattern.RawText is MembershipsPattern or MembershipPattern)
-            .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? [])
-                .Select(method => (Key: $"{method} {endpoint.RoutePattern.RawText}", Endpoint: endpoint)))
-            .ToDictionary(route => route.Key, route => route.Endpoint, StringComparer.Ordinal);
-
-        Assert.Equal([$"GET {MembershipsPattern}", $"PATCH {MembershipPattern}"], routes.Keys.Order(StringComparer.Ordinal));
-        Assert.All(routes.Values, endpoint => Assert.Equal(Capability.ChangeMembershipRole, endpoint.Metadata.GetMetadata<RequiredCapability>()?.Capability));
-        Assert.All(routes.Values, endpoint => Assert.DoesNotContain(endpoint.Metadata, metadata => metadata.GetType().Name == "SessionOnlyEndpoint"));
-        Assert.All(routes.Values, endpoint => Assert.Null(endpoint.Metadata.GetMetadata<RequiredBound>()));
-        Assert.Equal(Enum.GetValues<Capability>().Length, Enum.GetNames<Capability>().Distinct(StringComparer.Ordinal).Count());
-    }
-
-    /// <summary>
     /// AC1, AD-23 - the list's contract: <c>MembershipResponse</c> carries exactly <c>Id</c> (a Guid), <c>DisplayName</c>,
-    /// <c>EmailAddress</c> and <c>Role</c> (strings) and <c>IsYou</c> (a bool) - never the Account id, the normalised address,
+    /// <c>EmailAddress</c> and <c>Role</c> (strings), and <c>IsYou</c> and <c>InSpaceNow</c> (bools) - never the Account id, the normalised address,
     /// the Space or the join date; <c>MembershipPageResponse</c> carries exactly <c>Total</c> (an int), <c>Memberships</c> and
     /// <c>NextAfter</c> (a nullable string); <c>ChangeMembershipRoleRequest</c> carries exactly <c>Role</c>. Plant 11's
-    /// sibling: a sixth property.
+    /// sibling: a seventh property.
     /// </summary>
     [Fact]
     [Trait("Requirement", "UX-DR14")]
@@ -136,9 +110,10 @@ public sealed partial class RefusalBoundaryGateTests
         var request = ProductionAssemblies.Contracts.GetType("Yello.Contracts.Memberships.ChangeMembershipRoleRequest");
 
         Assert.True(response is not null && page is not null && request is not null, "MembershipResponse, MembershipPageResponse or ChangeMembershipRoleRequest is not declared in Yello.Contracts.Memberships.");
-        Assert.Equal(["DisplayName", "EmailAddress", "Id", "IsYou", "Role"], PropertyNames(response));
+        Assert.Equal(["DisplayName", "EmailAddress", "Id", "InSpaceNow", "IsYou", "Role"], PropertyNames(response));
         Assert.Equal(typeof(Guid), response.GetProperty("Id")?.PropertyType);
         Assert.Equal(typeof(bool), response.GetProperty("IsYou")?.PropertyType);
+        Assert.Equal(typeof(bool), response.GetProperty("InSpaceNow")?.PropertyType);
         Assert.All(StringMembers, name => Assert.Equal(typeof(string), response.GetProperty(name)?.PropertyType));
         Assert.Equal(["Memberships", "NextAfter", "Total"], PropertyNames(page));
         Assert.Equal(typeof(int), page.GetProperty("Total")?.PropertyType);
@@ -312,8 +287,7 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// AC4, Lee's Q1 (a), ledger <c>:329</c> - a Qualified cell reaches no endpoint without its target rule: every mapped route
-    /// whose declared capability is Qualified for some Role (today <c>ChangeMembershipRole</c>; 4.5's <c>RemoveMembership</c>
-    /// joins it) is served by an endpoint class that depends on the acting-authority holder, through the slice it calls. A
+    /// whose declared capability is Qualified for some Role (<c>ChangeMembershipRole</c> and <c>RemoveMembership</c>) is served by an endpoint class that depends on the acting-authority holder, through the slice it calls. A
     /// Qualified route added without consuming the authority would let an Admin act on the Admin's whole column. Anchor: at
     /// least one such route is mapped.
     /// </summary>
@@ -338,8 +312,8 @@ public sealed partial class RefusalBoundaryGateTests
 
         foreach (var capability in routes.Select(endpoint => endpoint.Metadata.GetMetadata<RequiredCapability>()!.Capability).Distinct())
         {
-            // The capability's whole name (code review 2026-11-03): a stripped stem such as "Membership" would let 4.5's
-            // RemoveMembership pass on ChangeMembershipRoleHandler's dependency alone.
+            // The capability's whole name: a stripped stem such as "Membership" would let RemoveMembership pass on
+            // ChangeMembershipRoleHandler's dependency alone.
             Assert.True(
                 consumers.Any(consumer => consumer.Contains(capability.ToString(), StringComparison.Ordinal)),
                 $"No slice for the Qualified capability {capability} depends on {holder.FullName}. Its dependents: {string.Join(", ", consumers)}.");

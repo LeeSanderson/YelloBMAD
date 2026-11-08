@@ -1347,4 +1347,76 @@
     <value>Revoking.</value>
     <comment>Story 4.4 (ledger :762, Q14 (a)): an API Token row's status line while its revoke is in flight; it takes focus so focus never falls to body.</comment>
   </data>
+  <data name="ownership-held" xml:space="preserve">
+    <value>The Owner leaves by having an Ownership Offer accepted, or by deleting the Space.</value>
+    <comment>The 409 ownership-held: the Owner tried to remove its own Membership or leave. Names the two exits and no third (EXPERIENCE.md:271). Unreachable from the interface, which offers the Owner neither control.</comment>
+  </data>
+  <data name="MembershipRemove" xml:space="preserve">
+    <value>Remove</value>
+    <comment>A Members row's Remove control, offered only where the viewer may remove that row. Its accessible name is MembershipRemoveName.</comment>
+  </data>
+  <data name="MembershipRemoveName" xml:space="preserve">
+    <value>Remove {0}</value>
+    <comment>The accessible name of a row's Remove control. {0} is the row's label (the display name, disambiguated), never the address.</comment>
+  </data>
+  <data name="MembershipRemoveQuestion" xml:space="preserve">
+    <value>Remove {0} from this Space? They lose access to everything in it at once.</value>
+    <comment>The in-place removal confirm's question and consequence. {0} is the row's label, never the address.</comment>
+  </data>
+  <data name="MembershipRemoveInSpaceNow" xml:space="preserve">
+    <value>{0} is in this Space now.</value>
+    <comment>The removal confirm's live state, read fresh when it opens: the person made a request in this Space within the presence window. {0} is the row's label.</comment>
+  </data>
+  <data name="MembershipRemoveNotInSpaceNow" xml:space="preserve">
+    <value>{0} has not been in this Space in the last 15 minutes.</value>
+    <comment>The removal confirm's live state when the person has no presence in this Space within the 15-minute window. {0} is the row's label.</comment>
+  </data>
+  <data name="MembershipRemoveConfirm" xml:space="preserve">
+    <value>Remove</value>
+    <comment>The removal confirm's danger action. Not the default: focus opens on the confirm's text.</comment>
+  </data>
+  <data name="MembershipRemoveCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>The removal confirm's Cancel. Esc does the same, and focus returns to the row's Remove.</comment>
+  </data>
+  <data name="MembershipRemoving" xml:space="preserve">
+    <value>Removing.</value>
+    <comment>A row's status line while its removal is in flight; it takes focus so focus never falls to body. Not optimistic: the row stays until the server answers.</comment>
+  </data>
+  <data name="MembershipRemoved" xml:space="preserve">
+    <value>{0} was removed.</value>
+    <comment>Announced politely once a removal is answered 204. {0} is the row's label, never the address.</comment>
+  </data>
+  <data name="MembershipRemoveAdminLimit" xml:space="preserve">
+    <value>Admins can remove Members and Viewers only.</value>
+    <comment>Said on the row when an Admin's removal is refused 403 and the Role, asked again, still permits the section. Capability-shaped.</comment>
+  </data>
+  <data name="MembershipInSpaceNow" xml:space="preserve">
+    <value>In this Space now</value>
+    <comment>A row's tag when the person made a request in this Space within the presence window. Request recency, not an open editor.</comment>
+  </data>
+  <data name="LeaveSpace" xml:space="preserve">
+    <value>Leave this Space</value>
+    <comment>The control at the foot of Space home for every Role but the Owner, whose exits are an accepted Ownership Offer or deleting the Space.</comment>
+  </data>
+  <data name="LeaveSpaceQuestion" xml:space="preserve">
+    <value>Leave this Space? You lose access to everything in it at once. To come back, someone must invite you again.</value>
+    <comment>The in-place leave confirm. Names no Space: the context bar already does.</comment>
+  </data>
+  <data name="LeaveSpaceConfirm" xml:space="preserve">
+    <value>Leave</value>
+    <comment>The leave confirm's danger action. Not the default: focus opens on the confirm's text.</comment>
+  </data>
+  <data name="LeaveSpaceCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>The leave confirm's Cancel. Esc does the same, and focus returns to Leave this Space.</comment>
+  </data>
+  <data name="LeaveSpaceLeaving" xml:space="preserve">
+    <value>Leaving.</value>
+    <comment>The leave confirm's status line while the leave is in flight. Not optimistic: the page stays until the server answers.</comment>
+  </data>
+  <data name="SpaceLeft" xml:space="preserve">
+    <value>You left the Space.</value>
+    <comment>Announced politely once, by the page the tab lands on after leaving. Names no Space.</comment>
+  </data>
 </root>

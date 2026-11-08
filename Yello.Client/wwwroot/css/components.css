@@ -1996,6 +1996,62 @@
     gap: var(--space-3);
 }
 
+/* "In this Space now": request recency, said as meta beside the Role chip. */
+.membership-row__present {
+    min-inline-size: 0;
+    color: var(--text-muted);
+}
+
+/*
+    The removal confirm: the Membership rung of the destructive-confirm ladder, between a Task's and a Project's. It takes
+    the row's whole width in place of its controls, its sentences stacked above its two actions, and wraps rather than
+    scroll at 320px.
+*/
+.membership-row__confirm {
+    flex-basis: 100%;
+    min-inline-size: 0;
+}
+
+.membership-row__confirm-text {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    min-inline-size: 0;
+}
+
+/*
+    "Leave this Space" at the foot of Space home, for every Role but the Owner. Its confirm replaces it in place: the
+    sentence, then the two actions, wrapping at 320px.
+*/
+.leave-space-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    margin-block-start: var(--space-5);
+    min-inline-size: 0;
+}
+
+.leave-space-section__confirm {
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+}
+
+.leave-space-section__question {
+    min-inline-size: 0;
+}
+
+.leave-space-section__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+.leave-space-section__status {
+    flex-basis: 100%;
+    color: var(--text-muted);
+}
+
 /* Story 4.4 (ledger :762): the in-flight lines of the Label and API Token rows, as the Invitation row's. */
 .label-list__progress,
 .api-token-list__progress {

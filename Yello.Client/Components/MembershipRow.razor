@@ -5,8 +5,8 @@
 @inject IStringLocalizer<ClientCopy> Localizer
 
 @*
-    ONE MEMBERSHIP IN SPACE SETTINGS' MEMBERS SECTION - story 4.4: AC2, AC3, AC4, AC10; FR-13; UX-DR11, UX-DR14, UX-DR27,
-    UX-DR34, UX-DR39.
+    ONE MEMBERSHIP IN SPACE SETTINGS' MEMBERS SECTION. FR-13, FR-14; UX-DR11, UX-DR14, UX-DR27, UX-DR34, UX-DR36,
+    UX-DR39.
 
     Its initials avatar (monospace, from the display name alone), its label - the display name, with a Membership-scoped
     discriminator only when another Membership here carries the same name (MembershipLabels; AC3) - "· You" on one's own
@@ -22,6 +22,17 @@
 
     IN FLIGHT, the status line replaces the control and takes focus, so focus never falls to body (ledger :762, Q14 (a)).
     Not optimistic: the chip keeps the current Role until the server answers.
+
+    "REMOVE" ONLY WHERE THE VIEWER MAY REMOVE THE ROW (MembershipCapabilities.Removable): every other row for the Owner;
+    Member and Viewer rows for an Admin; never one's own row (leaving is Space home's) and never the Owner's. Elsewhere it
+    is absent from the DOM. Its accessible name carries the row's label, so several are not identical controls.
+
+    THE REMOVAL CONFIRM is the Membership rung of the destructive-confirm ladder: above a Task's (which names the Task and
+    says it cannot be undone) because it ends someone's access to everything in the Space at once, below a Project's (which
+    names its Task count). It replaces the row's controls in place - never a dialog - names the person by the row's label,
+    never the address, states the consequence and whether they are in this Space now (read fresh by the section when the
+    confirm opens; the sentence appears once that read answers), then "Remove" and "Cancel". Neither is a default: focus
+    opens on the confirm's text. No typed confirmation - that rung is the Space's. Esc or Cancel restores Remove, focused.
 *@
 
 <li class="membership-row">
@@ -35,6 +46,11 @@
 
     <span class="membership-row__address">@Membership.EmailAddress</span>
     <RoleChip Role="@Membership.Role" />
+
+    @if (Membership.InSpaceNow)
+    {
+        <span class="membership-row__present type-meta">@Localizer["MembershipInSpaceNow"]</span>
+    }
 
     @if (Picking)
     {
@@ -71,6 +87,33 @@
         <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="AskAsync" @ref="_control">@Localizer["MembershipChangeRole"]</button>
     }
 
+    @if (ShowsRemove)
+    {
+        <button type="button" class="button-secondary" aria-label="@RemoveName" @onclick="AskToRemoveAsync" @ref="_remove">@Localizer["MembershipRemove"]</button>
+    }
+
+    @if (ConfirmingRemoval)
+    {
+        <span class="destructive-confirm membership-row__confirm" @onkeydown="ConfirmKeyDownAsync">
+            <span class="membership-row__confirm-text" tabindex="-1" @ref="_confirmText">
+                <span>@RemoveQuestion</span>
+                @if (LiveSentence is { } live)
+                {
+                    <span>@live</span>
+                }
+            </span>
+            <span class="membership-row__actions">
+                <button type="button" class="button-danger" aria-describedby="@NameId" @onclick="RemoveAsync">@Localizer["MembershipRemoveConfirm"]</button>
+                <button type="button" class="button-secondary" @onclick="CancelRemovalAsync">@Localizer["MembershipRemoveCancel"]</button>
+            </span>
+        </span>
+    }
+
+    @if (Removing)
+    {
+        <span class="membership-row__progress" role="status" tabindex="-1" @ref="_removing">@Localizer["MembershipRemoving"]</span>
+    }
+
     @if (Refusal is { } refusal)
     {
         <p class="membership-row__refusal" role="status">@refusal</p>
@@ -83,6 +126,14 @@
 
     private ElementReference _control;
     private ElementReference _progress;
+    private ElementReference _remove;
+    private ElementReference _confirmText;
+    private ElementReference _removing;
+    private bool _wasConfirming;
+    private bool _wasRemoving;
+    private bool _focusConfirm;
+    private bool _focusRemoving;
+    private bool _focusRemove;
     // One per offerable Role at most (Admin, Member, Viewer); the first takes focus when the picker opens.
     private readonly ElementReference[] _options = new ElementReference[3];
     private string? _chosen;
@@ -97,7 +148,7 @@
     /// <summary>The Membership, as the list answered it.</summary>
     [Parameter]
     [EditorRequired]
-    public MembershipResponse Membership { get; set; } = new(Guid.Empty, string.Empty, string.Empty, string.Empty, IsYou: false);
+    public MembershipResponse Membership { get; set; } = new(Guid.Empty, string.Empty, string.Empty, string.Empty, IsYou: false, InSpaceNow: false);
 
     /// <summary>Its label: the display name, with a discriminator on a collision (AC3).</summary>
     [Parameter]
@@ -137,11 +188,51 @@
     [Parameter]
     public EventCallback OnCancel { get; set; }
 
+    /// <summary>Whether its removal is being confirmed.</summary>
+    [Parameter]
+    public bool ConfirmingRemoval { get; set; }
+
+    /// <summary>Whether the person is in this Space now, as the confirm's fresh read answered; <c>null</c> until it has.</summary>
+    [Parameter]
+    public bool? InSpaceNow { get; set; }
+
+    /// <summary>Whether its removal is with the server.</summary>
+    [Parameter]
+    public bool Removing { get; set; }
+
+    /// <summary>Raised by Remove, with the Membership's id: the section opens the confirm and reads the row afresh.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnAskToRemove { get; set; }
+
+    /// <summary>Raised by the confirm's Remove, with the Membership's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnRemove { get; set; }
+
+    /// <summary>Raised by the confirm's Cancel, or by Esc in it.</summary>
+    [Parameter]
+    public EventCallback OnCancelRemoval { get; set; }
+
     private IReadOnlyList<string> Offered => MembershipCapabilities.OfferableRoles(ViewerRole, Membership.Role);
 
     private IEnumerable<(string RoleCode, int At)> Options => Offered.Select((roleCode, at) => (roleCode, at));
 
-    private bool ShowsControl => !Picking && !Changing && Offered.Count > 0 && !Membership.IsYou;
+    // Something already replaces the row's controls: the picker, the confirm, or a change or removal in flight.
+    private bool Busy => Picking || Changing || ConfirmingRemoval || Removing;
+
+    private bool ShowsControl => !Busy && Offered.Count > 0 && !Membership.IsYou;
+
+    private bool ShowsRemove => !Busy && MembershipCapabilities.Removable(ViewerRole, Membership.Role, Membership.IsYou);
+
+    private string RemoveName => string.Format(CultureInfo.CurrentCulture, Localizer["MembershipRemoveName"], Label);
+
+    private string RemoveQuestion => string.Format(CultureInfo.CurrentCulture, Localizer["MembershipRemoveQuestion"], Label);
+
+    private string? LiveSentence => InSpaceNow switch
+    {
+        true => string.Format(CultureInfo.CurrentCulture, Localizer["MembershipRemoveInSpaceNow"], Label),
+        false => string.Format(CultureInfo.CurrentCulture, Localizer["MembershipRemoveNotInSpaceNow"], Label),
+        null => null,
+    };
 
     private string NameId => $"membership-{Membership.Id:N}";
 
@@ -169,8 +260,20 @@
             _focusProgress = true;
         }
 
+        if (ConfirmingRemoval && !_wasConfirming)
+        {
+            _focusConfirm = true;
+        }
+
+        if (Removing && !_wasRemoving)
+        {
+            _focusRemoving = true;
+        }
+
         _wasPicking = Picking;
         _wasChanging = Changing;
+        _wasConfirming = ConfirmingRemoval;
+        _wasRemoving = Removing;
 
         if (FocusRequest != _focusRequestsSeen)
         {
@@ -181,6 +284,19 @@
 
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await FocusChangeAsync();
+        await FocusRemovalAsync();
+
+        // Spent on the first render it could apply to, so a stale request cannot pull focus on a later, unrelated render.
+        if (_focusControl && !Busy)
+        {
+            _focusControl = false;
+            await FocusFirstControlAsync();
+        }
+    }
+
+    private async Task FocusChangeAsync()
     {
         if (_focusProgress && Changing)
         {
@@ -193,16 +309,47 @@
             _focusOption = false;
             await _options[0].FocusAsync();
         }
+    }
 
-        // Spent on the first render it could apply to, so a stale request cannot pull focus on a later, unrelated render.
-        if (_focusControl && !Picking && !Changing)
+    private async Task FocusRemovalAsync()
+    {
+        if (_focusRemoving && Removing)
         {
-            _focusControl = false;
+            _focusRemoving = false;
+            await _removing.FocusAsync();
+        }
 
-            if (ShowsControl)
+        if (_focusConfirm && ConfirmingRemoval)
+        {
+            _focusConfirm = false;
+            await _confirmText.FocusAsync();
+        }
+
+        if (_focusRemove && !Busy)
+        {
+            _focusRemove = false;
+
+            if (ShowsRemove)
             {
-                await _control.FocusAsync();
+                await _remove.FocusAsync();
             }
+        }
+    }
+
+    /// <summary>
+    /// The row's first control: Change Role where it offers one, else Remove; nothing when it offers neither.
+    /// </summary>
+    private async Task FocusFirstControlAsync()
+    {
+        if (ShowsControl)
+        {
+            await _control.FocusAsync();
+            return;
+        }
+
+        if (ShowsRemove)
+        {
+            await _remove.FocusAsync();
         }
     }
 
@@ -235,4 +382,19 @@
 
     private Task PickerKeyDownAsync(KeyboardEventArgs args) =>
         args.Key == "Escape" ? CancelAsync() : Task.CompletedTask;
+
+    private Task AskToRemoveAsync() => OnAskToRemove.InvokeAsync(Membership.Id);
+
+    private Task RemoveAsync() => Removing ? Task.CompletedTask : OnRemove.InvokeAsync(Membership.Id);
+
+    /// <summary>Cancel, or Esc in the confirm: nothing is sent, and focus returns to the row's Remove.</summary>
+    private Task CancelRemovalAsync()
+    {
+        _focusRemove = true;
+
+        return OnCancelRemoval.InvokeAsync();
+    }
+
+    private Task ConfirmKeyDownAsync(KeyboardEventArgs args) =>
+        args.Key == "Escape" ? CancelRemovalAsync() : Task.CompletedTask;
 }

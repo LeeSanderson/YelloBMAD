@@ -97,8 +97,8 @@ internal static class ApplicationLocks
     /// <remarks>
     /// Named for the request's Space only, so no Space ever waits on a name another Space takes. Independent of
     /// <see cref="InvitationsOf"/>: an acceptance inserts a Membership a Role change cannot yet name, so the two never need
-    /// to meet, and a Role change never queues behind an issue or an accept. Story 4.5's removal and story 5.2's ownership
-    /// swap take this lock too, so no Role change interleaves with either (<c>deferred-work.md</c>).
+    /// to meet, and a Role change never queues behind an issue or an accept. The removal and the leave take this lock too,
+    /// so no Role change interleaves with either; story 5.2's ownership swap must take it as well (<c>deferred-work.md</c>).
     /// </remarks>
     /// <param name="spaceId">The request's Space.</param>
     /// <returns>The resource name.</returns>

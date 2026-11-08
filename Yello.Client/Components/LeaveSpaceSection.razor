@@ -1,0 +1,234 @@
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Spaces
+@using Yello.Contracts
+@using Yello.Contracts.Memberships
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceWrites Writes
+@inject SpaceExit Exit
+
+@*
+    "LEAVE THIS SPACE", AT THE FOOT OF SPACE HOME. FR-14; UX-DR11, UX-DR27, UX-DR36, UX-DR38.
+
+    EVERY ROLE BUT THE OWNER (MembershipCapabilities.MayLeave). The Owner's exits are an accepted Ownership Offer or
+    deleting the Space, so for the Owner this renders nothing at all (UX-DR27). Space settings is the Owner's and
+    Admins' only, so Space home is where a Member or a Viewer can reach it; an Admin uses the same control.
+
+    THE CONFIRM REPLACES THE CONTROL IN PLACE - never a dialog - stating what leaving does, then "Leave" and "Cancel".
+    Neither is a default: focus opens on the confirm's text. Esc or Cancel restores the control, focused, and sends nothing.
+
+    NOT OPTIMISTIC. One Idempotency-Key per leave, kept after an attempt that got no answer. On 204 the tab leaves the Space
+    as after a deletion (SpaceExit): out of the switcher, the purge, the entry point, and "You left the Space." with no Space
+    name. A resend under a kept key that meets 404 is the same: the first attempt committed and took the Membership, so the
+    Host no longer resolves the Space for this Account. A first attempt's 404 is the Space refused, rendered as such. No
+    answer or a 5xx: "Not sent.", the confirm stays and the key is kept. Anything else: its own copy, in the confirm.
+*@
+
+@if (MembershipCapabilities.MayLeave(RoleCode))
+{
+    <div class="leave-space-section">
+        @if (_confirming)
+        {
+            <span class="destructive-confirm leave-space-section__confirm" aria-busy="@(_leaving ? "true" : null)" @onkeydown="ConfirmKeyDownAsync">
+                <span class="leave-space-section__question" tabindex="-1" @ref="_question">@Localizer["LeaveSpaceQuestion"]</span>
+                <span class="leave-space-section__actions">
+                    <button type="button" class="button-danger" @onclick="LeaveAsync">@Localizer["LeaveSpaceConfirm"]</button>
+                    <button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["LeaveSpaceCancel"]</button>
+                </span>
+
+                @if (_leaving)
+                {
+                    <span class="leave-space-section__status" role="status">@Localizer["LeaveSpaceLeaving"]</span>
+                }
+
+                @if (_status is { } status)
+                {
+                    <span class="leave-space-section__status" role="status">@status</span>
+                }
+            </span>
+        }
+
+        @if (!_confirming)
+        {
+            <button type="button" class="button-secondary" @onclick="Ask" @ref="_opener">@Localizer["LeaveSpace"]</button>
+        }
+    </div>
+}
+
+@code {
+    private ElementReference _opener;
+    private ElementReference _question;
+    private bool _confirming;
+    private bool _leaving;
+    private bool _focusQuestion;
+    private bool _focusOpener;
+    private bool _unanswered;
+    private string? _key;
+    private string? _status;
+    private Guid _shownFor;
+
+    /// <summary>The Space this leaves - the route's, which the pipeline resolves.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>The viewer's Role in this Space, as its stable code.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string RoleCode { get; set; } = string.Empty;
+
+    /// <summary>Raised when the server refuses the Space itself, so the page renders the one refusal surface.</summary>
+    [Parameter]
+    public EventCallback<ProblemResponse?> OnSpaceRefused { get; set; }
+
+    /// <summary>
+    /// Space home is reused when the switcher moves to another Space, and so is this section: a confirm opened, a key kept
+    /// or a sentence said about one Space never carries into another's.
+    /// </summary>
+    protected override void OnParametersSet()
+    {
+        if (SpaceId == _shownFor)
+        {
+            return;
+        }
+
+        _shownFor = SpaceId;
+        _confirming = false;
+        _key = null;
+        _unanswered = false;
+        _status = null;
+        _focusQuestion = false;
+        _focusOpener = false;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusQuestion && _confirming)
+        {
+            _focusQuestion = false;
+            await _question.FocusAsync();
+        }
+
+        if (_focusOpener && !_confirming)
+        {
+            _focusOpener = false;
+            await _opener.FocusAsync();
+        }
+    }
+
+    private void Ask()
+    {
+        _confirming = true;
+        _focusQuestion = true;
+        _status = null;
+    }
+
+    private Task CancelAsync()
+    {
+        if (_leaving)
+        {
+            return Task.CompletedTask;
+        }
+
+        _confirming = false;
+        _status = null;
+        _focusOpener = true;
+
+        return Task.CompletedTask;
+    }
+
+    private Task ConfirmKeyDownAsync(KeyboardEventArgs args) =>
+        args.Key == "Escape" ? CancelAsync() : Task.CompletedTask;
+
+    private async Task LeaveAsync()
+    {
+        if (_leaving)
+        {
+            return;
+        }
+
+        var resent = _unanswered && _key is not null;
+
+        _key ??= Guid.NewGuid().ToString("D");
+        _leaving = true;
+        _status = null;
+
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Delete, MembershipRoutes.OwnOf(SpaceId), _key, token);
+
+            if (!token.IsCancellationRequested)
+            {
+                await UseAnswerAsync(answer, resent);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            NotSent();
+        }
+        finally
+        {
+            _leaving = false;
+        }
+    }
+
+    private async Task UseAnswerAsync(SpaceWriteAnswer answer, bool resent)
+    {
+        switch (answer.StatusCode)
+        {
+            case HttpStatusCode.NoContent:
+            case HttpStatusCode.NotFound when resent:
+                Left();
+                return;
+
+            case HttpStatusCode.NotFound:
+                _key = null;
+                await OnSpaceRefused.InvokeAsync(answer.Problem);
+                return;
+
+            case HttpStatusCode.Unauthorized:
+                return;
+
+            case >= HttpStatusCode.InternalServerError:
+                // The outcome is not known: treated as no answer, so the key is kept.
+                NotSent();
+                return;
+
+            default:
+                // A first use of the key still finishing may have committed: the key is kept, and a resend that meets 404
+                // is read as left.
+                _unanswered = answer.Problem?.Type == ProblemTypes.IdempotencyKeyInFlight;
+
+                if (!_unanswered)
+                {
+                    _key = null;
+                }
+
+                _status = RefusalText.Of(Localizer, answer.Problem);
+                return;
+        }
+    }
+
+    private void NotSent()
+    {
+        _unanswered = true;
+        _status = Localizer["TaskEditNotSent"];
+    }
+
+    private void Left()
+    {
+        _key = null;
+        _unanswered = false;
+        Exit.Leave(SpaceId, Localizer["SpaceLeft"]);
+    }
+}

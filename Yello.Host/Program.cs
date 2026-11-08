@@ -14,7 +14,10 @@ using Yello.Application.Invitations.RevokeInvitation;
 using Yello.Application.Invitations.ViewInvitation;
 using Yello.Application.Memberships;
 using Yello.Application.Memberships.ChangeMembershipRole;
+using Yello.Application.Memberships.LeaveSpace;
 using Yello.Application.Memberships.ListMemberships;
+using Yello.Application.Memberships.ReadMembership;
+using Yello.Application.Memberships.RemoveMembership;
 using Yello.Application.Outbox;
 using Yello.Application.Projects.CreateProject;
 using Yello.Application.Projects.DeleteProject;
@@ -144,6 +147,9 @@ builder.Services.AddScoped<AcceptInvitationHandler>();
 builder.Services.AddScoped<InvitationRequest>();
 builder.Services.AddScoped<ListMembershipsHandler>();
 builder.Services.AddScoped<ChangeMembershipRoleHandler>();
+builder.Services.AddScoped<ReadMembershipHandler>();
+builder.Services.AddScoped<RemoveMembershipHandler>();
+builder.Services.AddScoped<LeaveSpaceHandler>();
 builder.Services.AddScoped<ActingAuthority>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
@@ -537,8 +543,19 @@ api.MapAcceptInvitation();
 // row, the pipeline's recorded 403 beyond the caller's authority (an Admin moves Members and Viewers only), or the
 // unrecorded boundary 404 for an id that names nothing here. Both under ChangeMembershipRole (Owner, Admin) on both
 // surfaces. The pipeline sets the acting authority's Role sets, and a committed change publishes MembershipChanged.
+// GET on the item reads one row with InSpaceNow (an unexpired presence here, by the database clock) under
+// ChangeMembershipRole: what the removal confirm states. DELETE on the item removes it under RemoveMembership: 204,
+// 409 ownership-held for the Owner's own row, the pipeline's recorded 403 beyond the caller's authority (an Admin removes
+// Members and Viewers only; anyone may remove its own non-Owner row), or the unrecorded boundary 404. DELETE
+// /api/v1/spaces/{spaceId}/membership is the caller leaving: 204, or 409 ownership-held for the Owner. It declares
+// ReadProjectsAndTasks because leaving is decided by identity, not Role - the one write under that capability. A removal
+// or a leave deletes the row (the Account's Tokens for the Space cascade with it) and its presence, and publishes
+// MembershipChanged; an actor whose own Membership went while it waited meets the pipeline's recorded boundary 404.
 api.MapListMemberships();
 api.MapChangeMembershipRole();
+api.MapReadMembership();
+api.MapRemoveMembership();
+api.MapLeaveSpace();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

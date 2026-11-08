@@ -1,6 +1,9 @@
+---
+baseline_commit: f400fa85e564b1d3a23ca7fa9b796095ee352f41
+---
 # Story 4.5: Remove a Membership, or leave a Space
 
-Status: ready-for-dev
+Status: review
 
 Epic: 4 — Bring people into one piece of your work (the fifth story of the epic)
 Story key: `4-5-remove-a-membership-or-leave-a-space`
@@ -267,42 +270,42 @@ AC1 to AC7 are reproduced **verbatim** from `epics.md:1802-1834` and numbered by
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0: decisions** (before any code)
+- [x] **Task 0: decisions** (before any code)
   - [x] Q1, Q2, Q8 and Q12 are marked **[LEE]** (authority, isolation or a security seam). If the orchestrator routes them to Lee, record the answers here under "Decided by Lee" before ATDD. Otherwise take each recommendation and record it as "Qn - (x)" with its cost in Completion Notes.
     - **Decided by Lee (2026-11-07):**
       - Q1 - (a): a separate leave route under `ReadProjectsAndTasks`, decided by identity, pinned by a gate as the one write under that capability. Token parity: yes.
       - Q2 - (a): `RemovalAuthority(Removable, HeldBy)` on `ActingAuthority.Removals`, set by the pipeline only. Owner is in no set. Self-target sub-question: (a), so the actor's own non-Owner row is removable on the `{id}` route.
       - Q8 - (a): "Leave this Space" at the foot of Space home for every non-Owner Role, absent for the Owner, and set aside in the empty-state case.
       - Q12 - (a): a typed `LostMembership` outcome, answered as the boundary `404` and recorded `CrossSpace`.
-  - [ ] Decide Q3-Q7, Q9-Q11 and Q13-Q16 the same way. Each recommendation is the default.
-- [ ] **Task 1: Domain** (AC1, AC2)
-  - [ ] `RemovalAuthority` (sets `Removable`, `HeldBy`; `None`; `Judge`) beside `RoleChangeAuthority`, and `RoleCapabilityMatrix.RemovalAuthorityOf`. Owner is in no `Removable` set. Remarks quote FR-14 and the matrix's boundary. **No story ids in new comments** (CLAUDE.md).
-  - [ ] Update `Capability.RemoveMembership`'s summary to say what exists, without story numbers.
-- [ ] **Task 2: Contracts** (AC1, AC3, AC6)
-  - [ ] `MembershipRoutes`: the `DELETE` on `Membership`, the leave route (`Own`, `OwnOf`), and the single-row `GET` if Q5 (a). Update the remarks.
-  - [ ] `MembershipResponse` gains `InSpaceNow` (Q5).
-  - [ ] `ProblemTypes.OwnershipHeld` (`urn:yello:problem:ownership-held`, Q6), with remarks on status and disclosure.
-- [ ] **Task 3: Application** (AC1, AC3, AC4, AC10)
-  - [ ] `Yello.Application/Memberships/RemoveMembership/RemoveMembershipHandler.cs` and `Yello.Application/Memberships/LeaveSpace/LeaveSpaceHandler.cs`. The removal slice's name must contain `RemoveMembership` (the Qualified-cell gate).
-  - [ ] `ActingAuthority.Removals`. `IMembershipStore.RemoveAsync`, `LeaveAsync` and `ReadAsync` (Q5), plus their result types. Add a `LostMembership` outcome to both the Role change and the removal (Q12).
-  - [ ] Handlers read no Role, count nothing and record nothing (AR-3).
-- [ ] **Task 4: Infrastructure** (AC1-AC4, AC6, AC10)
-  - [ ] `MembershipStore`: the guarded removal `DELETE`, the leave `DELETE`, each under `TakeMembershipsAsync`; the presence delete; the disambiguation read; `Record` after a delete of one row; `InSpaceNow` from `SpacePresence` with `ExpiresAt > SYSUTCDATETIME()` (the database clock, AD-27), in the list and the single read.
-  - [ ] Watch S1200, and split by port if it fires.
-  - [ ] No migration is expected: `Membership`'s FILTER predicate narrows a `DELETE` to the Space under the Space-scoped unit of work. Prove it with a schema case: under Space A's key, a raw `DELETE` of a Space B Membership id deletes 0 rows. If Q7 chooses a `BLOCK BEFORE DELETE`, read `TESTING-CONVENTIONS.md:565-586` first.
-- [ ] **Task 5: Host** (AC1, AC3, AC10)
-  - [ ] `QualifiedAuthority` sets `Removals`. The pipeline turns `MembershipLost` into the recorded `CrossSpace` `404` (nested, as `QualifiedRefusal` is).
-  - [ ] Event 1040's message (Q12).
-  - [ ] `MembershipEndpoints`: `MapRemoveMembership`, `MapLeaveSpace` and `MapReadMembership` (Q5), each with an explicit outcome switch and **no `_ =>` arm** that falls into a success or a `404` (4.1 P10). Map them in `Program.cs` beside the Membership routes, and update the route comment block.
-- [ ] **Task 6: Client** (AC6-AC8)
-  - [ ] Files: `MembershipRow.razor` (Remove, confirm), `MembershipSection.razor` (per-row in-flight, `:789`, `:791`), `MembershipCapabilities.Removable`, `SpaceHome.razor` plus a new `LeaveSpaceSection.razor` (Q8), the shared purge-and-route helper with `SpaceDeleteSection`, `RefusalCopy`, `ClientCopy.resx`, `components.css`, `FakeYelloApi.Memberships.cs`.
-- [ ] **Task 7: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log.
-- [ ] **Task 8: ledger, docs, verification**
-  - [ ] Apply the ledger dispositions below: one line per CLOSED/UPDATED note, no TAB or FORM FEED, keep the final newline.
-  - [ ] Add a dated note to AD-5 (or AD-1) in `ARCHITECTURE-SPINE.md` naming the removal authority and the leave route's identity rule (Q1, Q2). Add one to AD-6 naming the presence delete beside the Token cascade.
-  - [ ] Rewrite comments that predict "4.5" (for example `Capability.cs` `RemoveMembership`, `ActingAuthority.cs` remarks, `RefusalBoundaryGateTests.Memberships.cs:315`, `ActiveSpaceEndpointTests.RevokeInvitation.cs:29`, `MembershipRow.razor` "leaves room") so they say what exists.
-  - [ ] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-4` stays `in-progress`. FR-14 stays staged (7.7, 7.8).
-  - [ ] Verification follows CLAUDE.md's policy. Run `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0/0). Iterate on the affected classes with `--filter-class`. Then make **exactly one** full run, in the background, without the browser suite: `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1 -p:YelloSkipBrowserSuite=true`, logged to `artifacts/test-runs/4-5-dev.log`. Record totals. Rerun a failure once, alone, before calling it real.
+  - [x] Decide Q3-Q7, Q9-Q11 and Q13-Q16 the same way. Each recommendation is the default.
+- [x] **Task 1: Domain** (AC1, AC2)
+  - [x] `RemovalAuthority` (sets `Removable`, `HeldBy`; `None`; `Judge`) beside `RoleChangeAuthority`, and `RoleCapabilityMatrix.RemovalAuthorityOf`. Owner is in no `Removable` set. Remarks quote FR-14 and the matrix's boundary. **No story ids in new comments** (CLAUDE.md).
+  - [x] Update `Capability.RemoveMembership`'s summary to say what exists, without story numbers.
+- [x] **Task 2: Contracts** (AC1, AC3, AC6)
+  - [x] `MembershipRoutes`: the `DELETE` on `Membership`, the leave route (`Own`, `OwnOf`), and the single-row `GET` if Q5 (a). Update the remarks.
+  - [x] `MembershipResponse` gains `InSpaceNow` (Q5).
+  - [x] `ProblemTypes.OwnershipHeld` (`urn:yello:problem:ownership-held`, Q6), with remarks on status and disclosure.
+- [x] **Task 3: Application** (AC1, AC3, AC4, AC10)
+  - [x] `Yello.Application/Memberships/RemoveMembership/RemoveMembershipHandler.cs` and `Yello.Application/Memberships/LeaveSpace/LeaveSpaceHandler.cs`. The removal slice's name must contain `RemoveMembership` (the Qualified-cell gate).
+  - [x] `ActingAuthority.Removals`. `IMembershipStore.RemoveAsync`, `LeaveAsync` and `ReadAsync` (Q5), plus their result types. Add a `LostMembership` outcome to both the Role change and the removal (Q12).
+  - [x] Handlers read no Role, count nothing and record nothing (AR-3).
+- [x] **Task 4: Infrastructure** (AC1-AC4, AC6, AC10)
+  - [x] `MembershipStore`: the guarded removal `DELETE`, the leave `DELETE`, each under `TakeMembershipsAsync`; the presence delete; the disambiguation read; `Record` after a delete of one row; `InSpaceNow` from `SpacePresence` with `ExpiresAt > SYSUTCDATETIME()` (the database clock, AD-27), in the list and the single read.
+  - [x] Watch S1200, and split by port if it fires.
+  - [x] No migration is expected: `Membership`'s FILTER predicate narrows a `DELETE` to the Space under the Space-scoped unit of work. Prove it with a schema case: under Space A's key, a raw `DELETE` of a Space B Membership id deletes 0 rows. If Q7 chooses a `BLOCK BEFORE DELETE`, read `TESTING-CONVENTIONS.md:565-586` first.
+- [x] **Task 5: Host** (AC1, AC3, AC10)
+  - [x] `QualifiedAuthority` sets `Removals`. The pipeline turns `MembershipLost` into the recorded `CrossSpace` `404` (nested, as `QualifiedRefusal` is).
+  - [x] Event 1040's message (Q12).
+  - [x] `MembershipEndpoints`: `MapRemoveMembership`, `MapLeaveSpace` and `MapReadMembership` (Q5), each with an explicit outcome switch and **no `_ =>` arm** that falls into a success or a `404` (4.1 P10). Map them in `Program.cs` beside the Membership routes, and update the route comment block.
+- [x] **Task 6: Client** (AC6-AC8)
+  - [x] Files: `MembershipRow.razor` (Remove, confirm), `MembershipSection.razor` (per-row in-flight, `:789`, `:791`), `MembershipCapabilities.Removable`, `SpaceHome.razor` plus a new `LeaveSpaceSection.razor` (Q8), the shared purge-and-route helper with `SpaceDeleteSection`, `RefusalCopy`, `ClientCopy.resx`, `components.css`, `FakeYelloApi.Memberships.cs`.
+- [x] **Task 7: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** `git checkout --`, `git restore` or `git reset`. Record `| Plant | Expected red | Seen |` in the Debug Log.
+- [x] **Task 8: ledger, docs, verification**
+  - [x] Apply the ledger dispositions below: one line per CLOSED/UPDATED note, no TAB or FORM FEED, keep the final newline.
+  - [x] Add a dated note to AD-5 (or AD-1) in `ARCHITECTURE-SPINE.md` naming the removal authority and the leave route's identity rule (Q1, Q2). Add one to AD-6 naming the presence delete beside the Token cascade.
+  - [x] Rewrite comments that predict "4.5" (for example `Capability.cs` `RemoveMembership`, `ActingAuthority.cs` remarks, `RefusalBoundaryGateTests.Memberships.cs:315`, `ActiveSpaceEndpointTests.RevokeInvitation.cs:29`, `MembershipRow.razor` "leaves room") so they say what exists.
+  - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-4` stays `in-progress`. FR-14 stays staged (7.7, 7.8).
+  - [x] Verification follows CLAUDE.md's policy. Run `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0/0). Iterate on the affected classes with `--filter-class`. Then make **exactly one** full run, in the background, without the browser suite: `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1 -p:YelloSkipBrowserSuite=true`, logged to `artifacts/test-runs/4-5-dev.log`. Record totals. Rerun a failure once, alone, before calling it real.
 
 ## Dev Notes
 
@@ -642,10 +645,127 @@ the correction recorded in the Debug Log, not deleted.
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended story cycle.
+
 ### Debug Log References
+
+- **Accept is `200`, not `201` (AC11).** The existing accept endpoint answers `200 { spaceId }` (`ActiveSpaceEndpointTests.AcceptInvitation.cs:73`, `AcceptInvitationBound.cs:108`, Program.cs route comment). The ATDD scaffold `A_removal_in_a_full_Space_frees_the_slot_a_pending_acceptance_then_takes` asserts `200`, which is right; AC11's "`201`" is a slip in the story text. Scaffold kept, code unchanged.
+- **Scaffolds corrected:**
+  - `ActiveSpaceEndpointTests.RemoveMembershipRace.cs` (four races): the participants sent their writes without fetching an anti-forgery token after sign-in (the token is bound to the signed-in identity), so every write answered `400` at once and `WaitUntilBlockedOnALockAsync` failed "answered without waiting". Added `FetchAntiforgeryTokenAsync()` after `MadePresentAsync`, as 4.4's race file does. All four then waited on the lock and passed.
+  - `MembershipWire`: the stand-ins `LeaveRoute`, `LeaveOf` and `OwnershipHeldProblemType` are deleted; every use now names `MembershipRoutes.Own`, `MembershipRoutes.OwnOf` and `ProblemTypes.OwnershipHeld`. `PresentRowMembers` and `PresentMembership` are folded into `RowMembers` (now six members, the list carries `inSpaceNow` too) and the harness `ListedMembership` (`InSpaceNow = false` by default); the single-row parser is `ParseReadRow`.
+  - `RefusalBoundaryGateTests.The_Membership_routes_require_ChangeMembershipRole_and_serve_both_surfaces` deleted, replaced by the scaffolded per-route gate (which also keeps its distinct-capability-names check). `The_Membership_contracts_carry_exactly_their_named_members` widened to six members.
+  - AC5: the raw-SQL `An_Invitation_whose_issuer_was_removed_stays_listed_and_revocable` deleted once its twin was green; the twin took the name `An_Invitation_whose_issuer_was_removed_stays_listed_revocable_and_acceptable`.
+  - `SpaceHomeProjectsTests.An_empty_Space_states_no_Projects_yet_and_offers_one_action_to_create_one` sets aside "Leave this Space" (Q8).
+- **Red-green, honestly stated.** The scaffolds' skip reasons at `f400fa8` were the observed red (each answered the boundary `404`, or the gate found no subject). The server side was then implemented in one pass and the scaffolds activated together, rather than one by one; the red for each mechanism was re-established afterwards by the plants below.
+- **Two defects found by the first runs:** `MembershipEndpoints` hit S1200 (split into `MembershipEndpoints` - list and single-row read -, `MembershipRoleChangeEndpoints` and `MembershipRemovalEndpoints`); the first client run put Blazor's error UI up on every Space home, because `LeaveSpaceSection` carried `@key="SpaceId"` beside `ProjectList`'s identical sibling key. The key is gone; the section resets its state in `OnParametersSet` when the Space changes.
+- `Only_the_shared_actionable_predicate_compares_ExpiresAt` refused the presence comparison in `MembershipStore`; the predicate is declared once as `SpacePresenceRegister.Live` (the allow-listed file) and composed by the store.
+- **Plants** (each original held in memory and written back in a `finally`; never `git checkout`/`restore`/`reset`). Batches A and B ran Architecture plus the named Slices cases, batch C Architecture plus the named browser cases; every file was restored and rebuilt after each batch.
+
+| Plant | Expected red | Seen |
+|---|---|---|
+| 1. Admin's `Removable` gains Admin | Admin-removes-Admin case; transcription gate | Red: `The_removal_rules_agree_with_the_matrix_transcription` ("Admin may remove [Admin, Member, Viewer]") and `An_Admin_removing_another_Admin_or_the_Owner...(other-admin)` (`204`). The isolation row was not run under the plant. |
+| 2. Owner added to the Owner's `Removable` | own-row case; S-2; transcription gate | Transcription gate red. **Masked** on the wire: the guarded `DELETE` also carries `Role <> 'Owner'`, so the own-row case stayed `409` and S-2 held. Recorded, kept as defence in depth. |
+| 3. Leave statement loses `Role <> 'Owner'` | Owner leave case; S-2 | Red: `The_Owner_leaving_is_refused_409...` (the Owner's leave answered `204`). |
+| 4. Removal's actor clause removed | Race 2 | Red: `An_Admin_demoted_while_its_removal_is_queued...` (`204`). Also turned the removal arm of the removed-actor race `204`. |
+| 5. Removal skips the Memberships lock | Race 1's deciding assertion | Red: `A_removal_and_a_Role_change_of_one_target...` ("Fewer than 2 ... ever waited"). |
+| 6. `UPDATE ... SET Role = 'Viewer'` instead of `DELETE` | Token `401` case | Red: `Removal_kills_the_removed_Accounts_Tokens...` (the Token read `200` as a Viewer). |
+| 7. Presence row not deleted | presence case | Red: `Removal_deletes_the_removed_Accounts_presence_in_this_Space_only` (expected 0). |
+| 8. `MembershipChanged` recorded before the `DELETE` on every attempt | no-publish cases | **Masked**: `Refusals_not_founds_and_replays_of_a_removal_publish_nothing` stayed green - the unit of work publishes only after commit, and every refused attempt rolls back, so an early record never reaches the log. The commit gate (4.4's `IMembershipChanges`) is what holds it. |
+| 9. `LostMembership` mapped to `QualifiedRefusal` | removed-actor race (`403`) | Red on the change arm (`403 insufficient-role`); the removal arm was red through plant 4 in the same batch. |
+| 10. Removal slice reads `ActiveSpaceContext.Role` | Role-read gate | Red: `Nothing_but_the_pipeline_reads_the_Role_off_the_active_Space_context`. |
+| 11. A second writer of `ActingAuthority.Set` | `Only_the_pipeline_sets_the_acting_authority` | Red. |
+| 12. A second write route under `ReadProjectsAndTasks` | `The_leave_route_is_the_one_write_under_ReadProjectsAndTasks` | Red. |
+| 13. Remove rendered for an Admin on an Admin row | client absence case; agreement gate | Red: `The_clients_Remove_control_agrees...` and `An_Admin_sees_Remove_on_Member_and_Viewer_rows_only...`. |
+| 14. A `disabled` attribute on the Leave control | `No_Remove_or_Leave_control_is_disabled` | Red. |
+| 15. The confirm focuses its Remove | no-default client case | Red, both arms ("A button holds focus as the confirm's default"). |
+| 16. `GoneAsync` re-reads and replaces the rows | `:789` case | Red (50 rows shown, expected 99). |
+| 17. Section-wide in-flight gate | `:791` case | Red (the second row's removal never sent; timed out). |
+| 18. Address added to the removal announcement | no-`@` client case | Red (`"Mo Member was removed. planted@example.test"`). |
+| 19. `InSpaceNow` without the `SpaceId` clause | other-Space presence case | **Masked**: the single-row read stayed correct, because `SpacePresence`'s FILTER predicate and query filter already narrow it to the request's Space. The clause stays (AD-2). The app-clock variant was not planted: presence rows are written with the app clock, so the two clocks agree within the test and the case cannot tell them apart. |
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created (create-story, 2026-11-07). Sixteen open questions with recommendations; Q1, Q2, Q8 and Q12 are marked [LEE].
+- **Implemented (FR-14, AR-16/AD-9, AD-6, UX-DR36; V-2, V-3).** `DELETE .../memberships/{id}` under `RemoveMembership` (one guarded `DELETE` under the Memberships lock, composing `ActingAuthority.Removals`, `Role <> 'Owner'` and the actor-still-holds clause), `DELETE .../membership` (the leave) under `ReadProjectsAndTasks`, and `GET .../memberships/{id}` (the row with `InSpaceNow`, by the database clock) under `ChangeMembershipRole`. A committed removal or leave deletes the row (the Token cascade), the presence row, and records one `MembershipChanged`. The Role change and the removal answer a typed `LostMembership` that the pipeline records `CrossSpace` and answers as the boundary `404`; event 1040 covers both causes. Client: Remove and its in-place confirm in `MembershipRow`, per-row in-flight state and the keep-appended-pages `404` in `MembershipSection`, `LeaveSpaceSection` on Space home, and `SpaceExit` shared with `SpaceDeleteSection`.
+- **Decided by Lee:** Q1 (a), Q2 (a) with self-target (a), Q8 (a), Q12 (a) - as recorded under Task 0.
+- **Reversible decisions (each the story's recommendation; cut any line to reopen it):**
+  - Q3 - (a) hard delete: the cascade takes the Tokens; a soft delete would break AD-6.
+  - Q4 - (a) routes: `DELETE` on the item (`204`), `DELETE .../membership` (`204`), `GET` on the item (`200 MembershipResponse`). Cost: one more route and its isolation rows.
+  - Q5 - (a) "live session" is an unexpired `SpacePresence` row in this Space, read fresh when the confirm opens and carried on list rows; the removal deletes the target's presence row. Cost: the copy says "in this Space now", not "editing" (ledgered to 7.5).
+  - Q6 - (a) `409 ownership-held` for the Owner on its own row through either route; an Admin on the Owner's row is `403`.
+  - Q7 - (a) no schema guard on deleting an Owner row; guarded statements plus S-2 (AD-5 note). Cost: plant 2 is masked by the statement's own `Role <> 'Owner'`.
+  - Q9 - (a) unassignment met vacuously (no Assignee yet); "Tasks survive" proved; the `SET NULL` trap ledgered to 4.6.
+  - Q10 - (a) the offer-lapse clause ledgered to 5.1/5.3.
+  - Q11 - (a) both the removal and the leave take `Yello/Memberships/{spaceId}`.
+  - Q13 - (a) the leave keeps its idempotency record; a replay after a committed leave is the boundary `404` (AD-18's recorded variance); the client reads a `404` on a same-key resend as "left". Not marked `DestroysItsSpace`.
+  - Q14 - (a) a row action's `404` re-reads page 1 only for the Space's answer and the total, then drops the one row.
+  - Q15 - (a) per-row in-flight state; the server's lock serialises.
+  - Q16 - (a) the copy as listed in the story, in `ClientCopy.resx`.
+  - Isolation timing: no `IsolationTimingTests` row - the in-Space not-found is the boundary body through `NotAvailableFloor`, as `ISO-TIMING-IN-SPACE` proves.
+  - The removed-actor check runs before the not-found check in the store, so an actor whose own Membership is gone is always the recorded boundary `404`, even when the target is gone too.
+- **Endpoint classes split for S1200:** `MembershipEndpoints` (list, single-row read), `MembershipRoleChangeEndpoints`, `MembershipRemovalEndpoints`. Purely structural.
+- **Ledger:** `:329`, `:380`, `:398`, `:711`, `:758`, `:789`, `:790`, `:791` closed; `:390`, `:783` updated; four new entries (4.6 Assignee FK, 5.1/5.3 offer lapse, Lee's leave-route note, 7.5 live session).
+- **Verification:** `docker info` 29.5.3; `dotnet build Yello.slnx` 0 warnings, 0 errors. Iteration: Slices whole once (935/5 failed - the four race scaffolds missing their anti-forgery fetch - then 7/7 filtered after the fix), Architecture whole (457/457), Client classes LeaveSpace, MembershipSection, SpaceHomeProjects, SpaceDelete, RefusalSurface (71/71, after one run broken by the duplicate sibling key), Isolation (353/353), Revocation (26/26). **One full run**, without the browser suite: 1782 total, 1775 passed, 0 failed, 7 skipped - `artifacts/test-runs/4-5-remove-a-membership-or-leave-a-space-develop.log`.
 
 ### File List
+
+- `Yello.Application/Memberships/ActingAuthority.cs`
+- `Yello.Application/Memberships/IMembershipStore.cs`
+- `Yello.Application/Memberships/LeaveSpace/LeaveSpaceHandler.cs`
+- `Yello.Application/Memberships/ReadMembership/ReadMembershipHandler.cs`
+- `Yello.Application/Memberships/RemoveMembership/RemoveMembershipHandler.cs`
+- `Yello.Client/Components/LeaveSpaceSection.razor`
+- `Yello.Client/Components/MembershipRow.razor`
+- `Yello.Client/Components/MembershipSection.razor`
+- `Yello.Client/Components/SpaceDeleteSection.razor`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Pages/Home.razor`
+- `Yello.Client/Pages/SpaceHome.razor`
+- `Yello.Client/Program.cs`
+- `Yello.Client/Refusals/RefusalCopy.cs`
+- `Yello.Client/Spaces/MembershipCapabilities.cs`
+- `Yello.Client/Spaces/SpaceExit.cs`
+- `Yello.Client/wwwroot/css/components.css`
+- `Yello.Contracts/Memberships/MembershipResponse.cs`
+- `Yello.Contracts/Memberships/MembershipRoutes.cs`
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Domain/Memberships/Capability.cs`
+- `Yello.Domain/Memberships/CapabilityDecision.cs`
+- `Yello.Domain/Memberships/RemovalAuthority.cs`
+- `Yello.Domain/Memberships/RoleCapabilityMatrix.cs`
+- `Yello.Host/Endpoints/MembershipEndpoints.cs`
+- `Yello.Host/Endpoints/MembershipRemovalEndpoints.cs`
+- `Yello.Host/Endpoints/MembershipRoleChangeEndpoints.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Host/SpaceLog.cs`
+- `Yello.Host/Spaces/ActiveSpaceResolution.Authority.cs`
+- `Yello.Host/Spaces/ActiveSpaceResolution.Deletion.cs`
+- `Yello.Infrastructure/Persistence/ApplicationLocks.cs`
+- `Yello.Infrastructure/Persistence/Configurations/InvitationConfiguration.cs`
+- `Yello.Infrastructure/Persistence/MembershipStore.cs`
+- `Yello.Infrastructure/Persistence/SpacePresenceRegister.cs`
+- `_bmad-output/implementation-artifacts/4-5-remove-a-membership-or-leave-a-space.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Memberships.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.RemoveMembership.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.Memberships.cs`
+- `tests/Yello.Tests.Client/LeaveSpaceTests.cs`
+- `tests/Yello.Tests.Client/MembershipSectionTests.cs`
+- `tests/Yello.Tests.Client/SpaceHomeProjectsTests.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.Memberships.cs`
+- `tests/Yello.Tests.Revocation/RevocationCases.cs`
+- `tests/Yello.Tests.Revocation/RevocationWorld.cs`
+- `tests/Yello.Tests.Shared/MembershipWire.cs`
+- `tests/Yello.Tests.Shared/WireDatabase.cs`
+- `tests/Yello.Tests.Slices/Memberships/MembershipHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.LeaveSpace.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RemoveMembership.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RemoveMembershipRace.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RevokeInvitation.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/SpaceBoundaryPipelineTests.cs`
+
+## Change Log
+
+- 2026-11-08: Story 4.5 implemented - Membership removal, leaving a Space, the single-row read with presence, `LostMembership`, the client's Remove and Leave, ledger and architecture notes. Status to review.

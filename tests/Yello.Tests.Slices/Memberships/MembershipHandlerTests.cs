@@ -1,7 +1,9 @@
 using Xunit;
 using Yello.Application.Memberships;
 using Yello.Application.Memberships.ChangeMembershipRole;
+using Yello.Application.Memberships.LeaveSpace;
 using Yello.Application.Memberships.ListMemberships;
+using Yello.Application.Memberships.RemoveMembership;
 using Yello.Domain.Memberships;
 
 namespace Yello.Tests.Slices.Memberships;
@@ -68,7 +70,7 @@ public sealed class MembershipHandlerTests
         var sets = RoleCapabilityMatrix.RoleChangeAuthorityOf(Role.Admin);
         var (actor, target) = (Guid.NewGuid(), Guid.NewGuid());
 
-        authority.Set(sets);
+        authority.Set(sets, RoleCapabilityMatrix.RemovalAuthorityOf(Role.Admin));
 
         _ = await new ChangeMembershipRoleHandler(store, authority).HandleAsync(actor, target, Role.Viewer, TestContext.Current.CancellationToken);
 
@@ -79,8 +81,86 @@ public sealed class MembershipHandlerTests
     /// AC4 - an acting authority the pipeline never set fails closed: reading it throws, so no change runs on a default.
     /// </summary>
     [Fact]
-    public void An_unset_acting_authority_fails_closed() =>
+    public void An_unset_acting_authority_fails_closed()
+    {
         Assert.Throws<InvalidOperationException>(() => new ActingAuthority().RoleChanges);
+        Assert.Throws<InvalidOperationException>(() => new ActingAuthority().Removals);
+    }
+
+    /// <summary>
+    /// The removal hands the store exactly the removal sets the pipeline set, the actor and the target - never a Role, and
+    /// never the Role change's sets.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AR-3")]
+    [Trait("Requirement", "FR-14")]
+    public async Task The_removal_hands_the_store_the_acting_authoritys_removal_sets()
+    {
+        var store = new RecordingStore([]);
+        var authority = new ActingAuthority();
+        var sets = RoleCapabilityMatrix.RemovalAuthorityOf(Role.Admin);
+        var (actor, target) = (Guid.NewGuid(), Guid.NewGuid());
+
+        authority.Set(RoleCapabilityMatrix.RoleChangeAuthorityOf(Role.Admin), sets);
+
+        _ = await new RemoveMembershipHandler(store, authority).HandleAsync(actor, target, TestContext.Current.CancellationToken);
+
+        Assert.Equal((actor, target, sets), Assert.Single(store.Removals));
+    }
+
+    /// <summary>
+    /// The leave hands the store only the caller: leaving is decided by identity, so no authority is read.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-14")]
+    public async Task The_leave_hands_the_store_only_the_caller()
+    {
+        var store = new RecordingStore([]);
+        var actor = Guid.NewGuid();
+
+        _ = await new LeaveSpaceHandler(store).HandleAsync(actor, TestContext.Current.CancellationToken);
+
+        Assert.Equal(actor, Assert.Single(store.Leaves));
+    }
+
+    /// <summary>
+    /// Why a removal the guarded statement did not write was not written: the Owner's own row is ownership held; the Owner's
+    /// row by anyone else, an Admin's row by an Admin, and anything by an actor that no longer holds its authority are
+    /// beyond it.
+    /// </summary>
+    /// <param name="actor">The acting Role the authority was computed from.</param>
+    /// <param name="target">The target's Role now.</param>
+    /// <param name="targetIsActor">Whether the target is the actor's own row.</param>
+    /// <param name="actorNow">The actor's Role now.</param>
+    /// <param name="expected">The refusal.</param>
+    [Theory]
+    [InlineData(Role.Owner, Role.Owner, true, Role.Owner, RemovalRefusal.OwnershipHeld)]
+    [InlineData(Role.Admin, Role.Owner, false, Role.Admin, RemovalRefusal.BeyondAuthority)]
+    [InlineData(Role.Admin, Role.Admin, false, Role.Admin, RemovalRefusal.BeyondAuthority)]
+    [InlineData(Role.Admin, Role.Member, false, Role.Member, RemovalRefusal.BeyondAuthority)]
+    [InlineData(Role.Admin, Role.Viewer, false, Role.Viewer, RemovalRefusal.BeyondAuthority)]
+    [InlineData(Role.Member, Role.Viewer, false, Role.Member, RemovalRefusal.BeyondAuthority)]
+    [Trait("Requirement", "FR-14")]
+    [Trait("Assumption", "PRD-12-4")]
+    public void The_removal_rule_judges_a_removal_that_was_not_written(Role actor, Role target, bool targetIsActor, Role actorNow, RemovalRefusal expected) =>
+        Assert.Equal(expected, RoleCapabilityMatrix.RemovalAuthorityOf(actor).Judge(target, targetIsActor, actorNow));
+
+    /// <summary>
+    /// A Role the matrix denies the removal gets no authority: nothing removable, nothing that holds it.
+    /// </summary>
+    /// <param name="role">The denied Role.</param>
+    [Theory]
+    [InlineData(Role.Member)]
+    [InlineData(Role.Viewer)]
+    [Trait("Requirement", "FR-14")]
+    public void A_denied_Role_has_no_removal_authority(Role role)
+    {
+        Assert.Same(RemovalAuthority.None, RoleCapabilityMatrix.RemovalAuthorityOf(role));
+        Assert.Empty(RemovalAuthority.None.Removable);
+        Assert.Empty(RemovalAuthority.None.HeldBy);
+    }
 
     /// <summary>
     /// AC4, AC5, Q10 (a), Q11 (a) - why a change the guarded statement did not write was not written, decided from the
@@ -156,7 +236,7 @@ public sealed class MembershipHandlerTests
         Assert.Equal(reads, AssignableRoles.TryParse(code, out _));
 
     private static ListedMembership Row(int index) =>
-        new(Guid.NewGuid(), $"Member {index}", $"member-{index}@example.test", "member", IsYou: false, DateTimeOffset.UnixEpoch.AddMinutes(index));
+        new(Guid.NewGuid(), $"Member {index}", $"member-{index}@example.test", "member", IsYou: false, DateTimeOffset.UnixEpoch.AddMinutes(index), InSpaceNow: false);
 
     private sealed class RecordingStore(List<ListedMembership> rows) : IMembershipStore
     {
@@ -176,6 +256,27 @@ public sealed class MembershipHandlerTests
             Changes.Add((actorAccountId, membershipId, proposed, authority));
 
             return Task.FromResult(new RoleChangeResult(RoleChangeOutcome.NotFound, null));
+        }
+
+        public List<(Guid Actor, Guid Target, RemovalAuthority Authority)> Removals { get; } = [];
+
+        public List<Guid> Leaves { get; } = [];
+
+        public Task<ListedMembership?> ReadAsync(Guid callerAccountId, Guid membershipId, CancellationToken cancellationToken) =>
+            Task.FromResult<ListedMembership?>(null);
+
+        public Task<RemovalOutcome> RemoveAsync(Guid actorAccountId, Guid membershipId, RemovalAuthority authority, CancellationToken cancellationToken)
+        {
+            Removals.Add((actorAccountId, membershipId, authority));
+
+            return Task.FromResult(RemovalOutcome.NotFound);
+        }
+
+        public Task<RemovalOutcome> LeaveAsync(Guid actorAccountId, CancellationToken cancellationToken)
+        {
+            Leaves.Add(actorAccountId);
+
+            return Task.FromResult(RemovalOutcome.Removed);
         }
     }
 }

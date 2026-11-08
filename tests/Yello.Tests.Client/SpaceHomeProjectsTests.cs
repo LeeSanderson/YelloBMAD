@@ -73,7 +73,11 @@ public sealed class SpaceHomeProjectsTests(ClientSurfaceFixture surface)
 
             Assert.Equal(1, await settings.CountAsync());
             Assert.Equal(0, await main.GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = "Space settings", Exact = true }).CountAsync());
-            Assert.Equal(1, await main.GetByRole(AriaRole.Button).CountAsync() + await main.GetByRole(AriaRole.Link).CountAsync());
+            // "Leave this Space" at the foot of Space home is set aside deliberately: every Role but the Owner is offered it
+            // there, because Space settings is not theirs. Any other control still fails the count.
+            var leave = await main.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Leave this Space", Exact = true }).CountAsync();
+
+            Assert.Equal(1, await main.GetByRole(AriaRole.Button).CountAsync() + await main.GetByRole(AriaRole.Link).CountAsync() - leave);
             Assert.Equal(1, await main.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = CreateAction }).CountAsync());
             Assert.DoesNotContain("Status", text, StringComparison.OrdinalIgnoreCase);
             Assert.DoesNotContain("column", text, StringComparison.OrdinalIgnoreCase);

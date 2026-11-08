@@ -82,7 +82,7 @@ public sealed class SpaceBoundaryPipelineTests(MigratedDatabaseFixture fixture)
     /// <param name="allowed">Whether <c>role-capability-matrix.md</c> lets that Role through.</param>
     /// <remarks>
     /// The Admin rows marked "Member and Viewer only" are allowed at the Role gate; the target
-    /// constraint is stories 4.4 and 4.5's, so <c>ChangeMembershipRole</c> passes here for Admin.
+    /// constraint is the acting authority's, so <c>ChangeMembershipRole</c> passes here for Admin.
     /// </remarks>
     [Theory]
     [InlineData(Role.Owner, "ReadProjectsAndTasks", true)]

@@ -2,6 +2,7 @@ using System.Net;
 using System.Text.Json;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Memberships;
 using Yello.Contracts.Spaces;
 using Yello.Domain.Memberships;
 using Yello.Tests.Shared;
@@ -32,7 +33,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="role">The leaver's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC3 - DELETE .../membership is not mapped; today it answers the boundary 404")]
+    [Theory]
     [InlineData("admin")]
     [InlineData("member")]
     [InlineData("viewer")]
@@ -114,7 +115,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Member leaving on the same route, answers <c>204</c> first.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - no leave route and no ownership-held problem type")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-5")]
     public async Task The_Owner_leaving_is_refused_409_ownership_held_and_keeps_the_Space()
@@ -145,7 +146,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.True(anchor?.StatusCode == HttpStatusCode.NoContent, $"The Member's anchor: {Described(anchor)}");
         Assert.True(refused?.StatusCode == HttpStatusCode.Conflict, $"The Owner's leave: {Described(refused)}; the anchor was {Described(anchor)}");
-        Assert.Equal(MembershipWire.OwnershipHeldProblemType, ProblemType(refused));
+        Assert.Equal(ProblemTypes.OwnershipHeld, ProblemType(refused));
         Assert.DoesNotContain("@", refused.Body, StringComparison.Ordinal);
         Assert.Equal("Owner", (await wire.MembershipOfAsync(spaceId, ownerId)).Role);
         Assert.DoesNotContain(await RefusalsOfAsync(database, ownerId), row => row.TargetSpaceId == spaceId);
@@ -158,7 +159,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// all, and the same Account's Session meets the boundary <c>404</c> there.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - no leave route; the Token's leave is the boundary 404 today")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AD-4")]
@@ -184,7 +185,7 @@ public sealed partial class ActiveSpaceEndpointTests
             var token = await BearerForAsync(member, spaceId);
 
             answers["before"] = await member.GetWithTokenAsync(SpaceRoutes.ActiveOf(spaceId), token);
-            answers["leave"] = await member.SendWithTokenAndHeadersAsync(HttpMethod.Delete, MembershipWire.LeaveOf(spaceId), token, content: null, NoKey);
+            answers["leave"] = await member.SendWithTokenAndHeadersAsync(HttpMethod.Delete, MembershipRoutes.OwnOf(spaceId), token, content: null, NoKey);
             answers["token next"] = await member.GetWithTokenAsync(SpaceRoutes.ActiveOf(spaceId), token);
             answers["no credential"] = await new WireSession(client).GetAnonymouslyAsync(SpaceRoutes.ActiveOf(spaceId));
             answers["session next"] = await member.GetAsync(SpaceRoutes.ActiveOf(spaceId));
@@ -207,7 +208,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>404</c> on a same-key resend of a leave as "left".
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - no leave route; the original is the boundary 404 today")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "AD-20")]
     public async Task A_leave_replayed_under_its_key_after_it_committed_is_the_boundary_404_and_recorded()
@@ -250,7 +251,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// leave publishes nothing: the run holds exactly one publish line. Seeded directly, so no accept's publish is counted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - no leave route, so nothing records a MembershipChanged for a leave")]
+    [Fact]
     [Trait("Requirement", "AR-16")]
     [Trait("Requirement", "AD-9")]
     public async Task A_committed_leave_logs_one_MembershipChanged_and_a_refused_leave_none()
@@ -290,5 +291,5 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>Idempotency-Key</c> when one is given.
     /// </summary>
     private static Task<WireResponse> LeaveOverWireAsync(WireSession session, Guid spaceId, string? key = null) =>
-        session.SendWithHeadersAsync(HttpMethod.Delete, MembershipWire.LeaveOf(spaceId), content: null, KeyHeaders(key));
+        session.SendWithHeadersAsync(HttpMethod.Delete, MembershipRoutes.OwnOf(spaceId), content: null, KeyHeaders(key));
 }

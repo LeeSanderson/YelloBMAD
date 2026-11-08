@@ -5,9 +5,16 @@ namespace Yello.Contracts.Memberships;
 /// UX-DR14; story 4.4, AC1, AC4, Q9 (a).
 /// </summary>
 /// <remarks>
+/// <para>
 /// <b><c>{spaceId}</c> first after the version</b> (AR-9), so the pipeline resolves the route because of its shape, checks
-/// <c>ChangeMembershipRole</c> (Owner Allowed, Admin Qualified; Lee's Q4 (a)) and records a boundary refusal. Served on both
-/// surfaces (AD-4, FR-35).
+/// the route's one capability and records a boundary refusal. Served on both surfaces (AD-4, FR-35).
+/// </para>
+/// <para>
+/// <b>Each route's capability:</b> the list, the single-row read and the Role change declare <c>ChangeMembershipRole</c>
+/// (the rows carry addresses, which only Owners and Admins see); the removal declares <c>RemoveMembership</c>; and the leave
+/// (<see cref="Own"/>) declares the read capability every Role holds, because leaving is decided by the caller's identity,
+/// not its Role.
+/// </para>
 /// </remarks>
 public static class MembershipRoutes
 {
@@ -28,12 +35,30 @@ public static class MembershipRoutes
     public static string MembershipIdParameter => "membershipId";
 
     /// <summary>
-    /// <c>PATCH</c> a <see cref="ChangeMembershipRoleRequest"/> here: <c>200</c> with the updated
+    /// <c>GET</c> here: <c>200</c> with the one <see cref="MembershipResponse"/>, its presence read fresh - what the removal
+    /// confirm states. <c>DELETE</c> here removes the Membership: <c>204</c> with no body; <c>403 insufficient-role</c> beyond
+    /// the caller's authority; <c>409 ownership-held</c> for the Owner's own row; the boundary's <c>404</c> for an id that
+    /// names nothing in this Space. <c>PATCH</c> a <see cref="ChangeMembershipRoleRequest"/> here: <c>200</c> with the updated
     /// <see cref="MembershipRoleChangeResponse"/> (no address); <c>400 role-not-assignable</c> for <c>owner</c> or an unknown code;
     /// <c>403 insufficient-role</c> beyond the caller's authority; <c>409 owner-role-fixed</c> for the Owner's own row; the
     /// boundary's <c>404</c> for an id that names nothing in this Space (AC4, Q10 (a), Q11 (a)).
     /// </summary>
     public static string Membership => "/api/v1/spaces/{spaceId:guid}/memberships/{membershipId:guid}";
+
+    /// <summary>
+    /// <c>DELETE</c> here: the caller leaves the Space, removing its own Membership. <c>204</c> with no body;
+    /// <c>409 ownership-held</c> for the Owner, who leaves only by an accepted Ownership Offer or by deleting the Space. A
+    /// replay after a committed leave finds no Membership, so it is the boundary's <c>404</c>, which a client resending the
+    /// same key reads as "left".
+    /// </summary>
+    public static string Own => "/api/v1/spaces/{spaceId:guid}/membership";
+
+    /// <summary>
+    /// The caller's own Membership in a Space - the leave - as a client calls it.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The path.</returns>
+    public static string OwnOf(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}/membership";
 
     /// <summary>
     /// The Space's Memberships path - the first page - as a client calls it.

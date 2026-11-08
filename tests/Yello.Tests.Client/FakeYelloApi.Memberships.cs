@@ -76,7 +76,7 @@ internal sealed partial class FakeYelloApi
     /// </summary>
     /// <param name="spaceId">The Space.</param>
     /// <returns>The path.</returns>
-    public static string LeavePathOf(Guid spaceId) => MembershipWire.LeaveOf(spaceId);
+    public static string LeavePathOf(Guid spaceId) => MembershipRoutes.OwnOf(spaceId);
 
     /// <summary>
     /// Every removal in <paramref name="spaceId"/> the page sent, in order.
@@ -424,7 +424,7 @@ internal sealed partial class FakeYelloApi
             return row is null
                 ? (404, Problem(ProblemTypes.NotAvailable))
                 : (200, JsonSerializer.Serialize(
-                    new PresentMembership(row.Id, row.DisplayName, row.EmailAddress, row.Role, row.IsYou, MembershipPresence.TryGetValue(row.Id, out var present) && present),
+                    row with { InSpaceNow = MembershipPresence.TryGetValue(row.Id, out var present) && present },
                     JsonOptions));
         }
     }
@@ -509,7 +509,7 @@ internal sealed partial class FakeYelloApi
 
             if (target.Role == "owner")
             {
-                return viewer == "owner" ? (409, Problem(MembershipWire.OwnershipHeldProblemType)) : insufficient;
+                return viewer == "owner" ? (409, Problem(ProblemTypes.OwnershipHeld)) : insufficient;
             }
 
             if (viewer == "admin" && target.Role == "admin" && !target.IsYou)
@@ -561,7 +561,7 @@ internal sealed partial class FakeYelloApi
 
         if (role == "owner")
         {
-            return (409, Problem(MembershipWire.OwnershipHeldProblemType));
+            return (409, Problem(ProblemTypes.OwnershipHeld));
         }
 
         ForgetSpace(spaceId);

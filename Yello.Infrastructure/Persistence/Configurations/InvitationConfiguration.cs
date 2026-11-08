@@ -16,7 +16,7 @@ namespace Yello.Infrastructure.Persistence.Configurations;
 /// statement. <b>References its issuer's Account with no action</b> (FR-12, AD-5): an Invitation survives its issuer's
 /// demotion and removal, and Account deletion tombstones (story 5.4). <b>There is no reference to <c>Membership</c></b>:
 /// a composite <c>(SpaceId, MembershipId)</c> with <c>SET NULL</c> would null the Space too, and with no action it would
-/// block 4.5's removals. <c>Account</c> is not Space-scoped, so <c>IssuedByAccountId</c> is a deliberate
+/// block a Membership's removal. <c>Account</c> is not Space-scoped, so <c>IssuedByAccountId</c> is a deliberate
 /// non-Membership reference outside the rule that Space-scoped references carry the Space.
 /// </para>
 /// <para>

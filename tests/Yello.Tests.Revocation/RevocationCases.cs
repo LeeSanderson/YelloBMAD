@@ -113,10 +113,7 @@ internal static class RevocationCases
             {
                 [IsolationSurface.Session] = new(MemberRemovedByAnAdminAsync, new JoinedSpaceNotFound()),
                 [IsolationSurface.ApiToken] = new(MemberRemovedByAnAdminAsync, new JoinedTokenDead()),
-            })
-        {
-            Skip = "red: AC4 - DELETE .../memberships/{membershipId} is not mapped; the Admin's removal is the boundary 404 today",
-        },
+            }),
 
         new(
             "REV-LEFT-THE-SPACE", "V-2, V-3, NFR-2",
@@ -124,10 +121,7 @@ internal static class RevocationCases
             {
                 [IsolationSurface.Session] = new(MemberLeavesAsync, new JoinedSpaceNotFound()),
                 [IsolationSurface.ApiToken] = new(MemberLeavesAsync, new JoinedTokenDead()),
-            })
-        {
-            Skip = "red: AC4 - DELETE .../membership (the leave route) is not mapped; the leave is the boundary 404 today",
-        },
+            }),
 
         new(
             "REV-ROLLED-BACK-REMOVAL", "V-3 (negative anchor)",
@@ -271,7 +265,7 @@ internal static class RevocationCases
 
         await AnchorBothSurfacesAsync(view);
 
-        var left = await view.SendAsync(IsolationSurface.Session, HttpMethod.Delete, MembershipWire.LeaveOf(owner.SpaceId));
+        var left = await view.SendAsync(IsolationSurface.Session, HttpMethod.Delete, MembershipRoutes.OwnOf(owner.SpaceId));
 
         Assert.True(left.StatusCode == HttpStatusCode.NoContent, $"The leave through the product: {left.StatusCode} {left.Body}");
 

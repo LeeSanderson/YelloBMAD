@@ -451,4 +451,16 @@ public static class ProblemTypes
     /// A statement about the request alone, so it names neither the Membership nor its current Role.
     /// </remarks>
     public static string RoleNotAssignable => "urn:yello:problem:role-not-assignable";
+
+    /// <summary>
+    /// The Owner tried to remove its own Membership, on the removal route or the leave route. Answered <c>409</c>; nothing
+    /// is written, and it is not recorded as an access refusal - the Owner holds full authority, so "insufficient Role" would
+    /// be untrue.
+    /// </summary>
+    /// <remarks>
+    /// <b>Disclosable</b>: the caller is the Owner, and the answer is about its own row. The Owner's exits are an accepted
+    /// Ownership Offer or deleting the Space; the copy names those two and no third. An Admin targeting the Owner's row is
+    /// <see cref="InsufficientRole"/> instead.
+    /// </remarks>
+    public static string OwnershipHeld => "urn:yello:problem:ownership-held";
 }

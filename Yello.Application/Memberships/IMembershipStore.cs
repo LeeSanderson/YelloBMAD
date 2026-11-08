@@ -50,6 +50,40 @@ public interface IMembershipStore
         Role proposed,
         RoleChangeAuthority authority,
         CancellationToken cancellationToken);
+
+    /// <summary>
+    /// One Membership of the resolved Space, as the list reads it, with whether its Account is present in this Space now.
+    /// </summary>
+    /// <param name="callerAccountId">The acting Account, which marks its own row.</param>
+    /// <param name="membershipId">The Membership, from the route.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The row, or <c>null</c> when no Membership in this Space has the id.</returns>
+    Task<ListedMembership?> ReadAsync(Guid callerAccountId, Guid membershipId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Removes a Membership within the actor's authority, or the actor's own non-Owner Membership. A committed removal
+    /// deletes the row - which takes the removed Account's Tokens for this Space with it - and its presence here, and
+    /// records the removed Account for a <c>MembershipChanged</c> publish after commit.
+    /// </summary>
+    /// <param name="actorAccountId">The acting Account.</param>
+    /// <param name="membershipId">The target, from the route.</param>
+    /// <param name="authority">The acting authority's removal sets, from the pipeline.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>What the removal came to.</returns>
+    Task<RemovalOutcome> RemoveAsync(
+        Guid actorAccountId,
+        Guid membershipId,
+        RemovalAuthority authority,
+        CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Removes the actor's own Membership unless it is the Owner's, with the same effects as a removal.
+    /// </summary>
+    /// <param name="actorAccountId">The acting Account, which leaves.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>What the leave came to: <see cref="RemovalOutcome.Removed"/>,
+    /// <see cref="RemovalOutcome.OwnershipHeld"/> or <see cref="RemovalOutcome.LostMembership"/>.</returns>
+    Task<RemovalOutcome> LeaveAsync(Guid actorAccountId, CancellationToken cancellationToken);
 }
 
 /// <summary>
@@ -61,7 +95,8 @@ public interface IMembershipStore
 /// <param name="RoleCode">The Role's stable code - read by the store, so the slice reads no Role.</param>
 /// <param name="IsYou">Whether it is the acting Account's own Membership.</param>
 /// <param name="CreatedAt">When it was created - the keyset's first column, never answered.</param>
-public sealed record ListedMembership(Guid Id, string DisplayName, string EmailAddress, string RoleCode, bool IsYou, DateTimeOffset CreatedAt);
+/// <param name="InSpaceNow">Whether the Account has an unexpired presence in this Space, by the database clock.</param>
+public sealed record ListedMembership(Guid Id, string DisplayName, string EmailAddress, string RoleCode, bool IsYou, DateTimeOffset CreatedAt, bool InSpaceNow);
 
 /// <summary>
 /// The keyset position a page follows: the last served row's <c>(CreatedAt, Id)</c>. Story 4.4, Q8 (a).
@@ -121,4 +156,42 @@ public enum RoleChangeOutcome
     /// Outside the acting authority: the pipeline's recorded <c>403 insufficient-role</c> (AD-20).
     /// </summary>
     BeyondAuthority,
+
+    /// <summary>
+    /// The actor's own Membership was gone by the time the change was written: the pipeline answers the boundary's
+    /// <c>404</c> and records it <c>CrossSpace</c>, exactly what the actor's next request would meet.
+    /// </summary>
+    LostMembership,
+}
+
+/// <summary>
+/// What a removal or a leave came to.
+/// </summary>
+public enum RemovalOutcome
+{
+    /// <summary>
+    /// Deleted and committed with the request: <c>204</c>.
+    /// </summary>
+    Removed,
+
+    /// <summary>
+    /// The id names no Membership in this Space: the boundary's <c>404</c>, unrecorded.
+    /// </summary>
+    NotFound,
+
+    /// <summary>
+    /// The Owner's own Membership, by the Owner: <c>409 ownership-held</c>.
+    /// </summary>
+    OwnershipHeld,
+
+    /// <summary>
+    /// Outside the acting authority: the pipeline's recorded <c>403 insufficient-role</c>.
+    /// </summary>
+    BeyondAuthority,
+
+    /// <summary>
+    /// The actor's own Membership was gone by the time the removal was written: the pipeline's recorded boundary
+    /// <c>404</c>.
+    /// </summary>
+    LostMembership,
 }

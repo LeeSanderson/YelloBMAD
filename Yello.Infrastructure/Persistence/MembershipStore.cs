@@ -7,7 +7,8 @@ using Yello.Domain.Memberships;
 namespace Yello.Infrastructure.Persistence;
 
 /// <summary>
-/// Lists the resolved Space's Memberships and changes one's Role, inside the request's Space-scoped unit of work. FR-13,
+/// Lists and reads the resolved Space's Memberships, changes one's Role and removes one, inside the request's Space-scoped
+/// unit of work. FR-13,
 /// UX-DR14, UX-DR34, AR-12/AD-5, AR-16/AD-9; story 4.4, AC1, AC2, AC4-AC7; Lee's Q1 (a), Q2 (a), Q4 (a), Q5 (a).
 /// </summary>
 /// <remarks>
@@ -43,6 +44,19 @@ namespace Yello.Infrastructure.Persistence;
 /// <c>MembershipChanged</c> publish after commit (AC6); a refusal or a no-op records nothing. Raw SQL tracks nothing, so the
 /// pipeline's idempotency record saves cleanly after it.
 /// </para>
+/// <para>
+/// <b>The removal and the leave delete the row</b>, never mark it: the composite foreign key from <c>ApiToken</c> to
+/// <c>Membership(SpaceId, AccountId)</c> cascades, so the same statement takes every Token the Account holds for this
+/// Space. Each runs under the same Memberships lock as the Role change, as one guarded <c>DELETE</c> that can never match
+/// an Owner row - the schema does not forbid deleting one, because a Space's deletion cascades it. A committed removal also
+/// deletes the Account's presence row here, so it stops counting toward the presence bound and a rejoin does not read as
+/// present. Invitations the removed Account issued are untouched: their issuer key references the Account, not the
+/// Membership.
+/// </para>
+/// <para>
+/// <b>An actor whose own Membership is gone</b> when its statement runs - removed while it waited on the lock - is
+/// <c>LostMembership</c>, never a lost authority: the pipeline answers it as the actor's next request would be answered.
+/// </para>
 /// </remarks>
 /// <param name="dbContext">The request's unit of work.</param>
 /// <param name="membershipChanges">Collects the committed change's <c>MembershipChanged</c>.</param>
@@ -52,6 +66,8 @@ internal sealed class MembershipStore(YelloDbContext dbContext, IMembershipChang
 
     private const int UniqueConstraintViolationErrorNumber = 2627;
 
+    private const string OwnerRole = nameof(Role.Owner);
+
     /// <inheritdoc />
     public async Task<(IReadOnlyList<ListedMembership> Rows, int Total)> ListAsync(
         Guid callerAccountId,
@@ -60,6 +76,7 @@ internal sealed class MembershipStore(YelloDbContext dbContext, IMembershipChang
         CancellationToken cancellationToken)
     {
         var total = await dbContext.Memberships.AsNoTracking().CountAsync(cancellationToken).ConfigureAwait(false);
+        var live = SpacePresenceRegister.Live;
 
         var memberships = dbContext.Memberships.AsNoTracking();
 
@@ -86,13 +103,46 @@ internal sealed class MembershipStore(YelloDbContext dbContext, IMembershipChang
                     IsYou = membership.AccountId == callerAccountId,
                     account.DisplayName,
                     account.EmailAddress,
+                    InSpaceNow = dbContext.SpacePresences.Where(live).Any(presence =>
+                        presence.SpaceId == membership.SpaceId && presence.AccountId == membership.AccountId),
                 })
             .OrderBy(row => row.CreatedAt)
             .ThenBy(row => row.Id)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        return (rows.Select(row => new ListedMembership(row.Id, row.DisplayName, row.EmailAddress, StableCode.Of(row.Role), row.IsYou, row.CreatedAt)).ToList(), total);
+        return (rows.Select(row => new ListedMembership(row.Id, row.DisplayName, row.EmailAddress, StableCode.Of(row.Role), row.IsYou, row.CreatedAt, row.InSpaceNow)).ToList(), total);
+    }
+
+    /// <inheritdoc />
+    public async Task<ListedMembership?> ReadAsync(Guid callerAccountId, Guid membershipId, CancellationToken cancellationToken)
+    {
+        var live = SpacePresenceRegister.Live;
+
+        var row = await dbContext.Memberships
+            .AsNoTracking()
+            .Where(membership => membership.Id == membershipId)
+            .Join(
+                dbContext.Accounts,
+                membership => membership.AccountId,
+                account => account.Id,
+                (membership, account) => new
+                {
+                    membership.Id,
+                    membership.Role,
+                    membership.CreatedAt,
+                    IsYou = membership.AccountId == callerAccountId,
+                    account.DisplayName,
+                    account.EmailAddress,
+                    InSpaceNow = dbContext.SpacePresences.Where(live).Any(presence =>
+                        presence.SpaceId == membership.SpaceId && presence.AccountId == membership.AccountId),
+                })
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return row is null
+            ? null
+            : new ListedMembership(row.Id, row.DisplayName, row.EmailAddress, StableCode.Of(row.Role), row.IsYou, row.CreatedAt, row.InSpaceNow);
     }
 
     /// <inheritdoc />
@@ -109,7 +159,157 @@ internal sealed class MembershipStore(YelloDbContext dbContext, IMembershipChang
         return ChangeRoleCoreAsync(actorAccountId, membershipId, proposed, authority, cancellationToken);
     }
 
+    /// <inheritdoc />
+    public Task<RemovalOutcome> RemoveAsync(
+        Guid actorAccountId,
+        Guid membershipId,
+        RemovalAuthority authority,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(authority);
+
+        // Split for S4457.
+        return RemoveCoreAsync(actorAccountId, membershipId, authority, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public async Task<RemovalOutcome> LeaveAsync(Guid actorAccountId, CancellationToken cancellationToken)
+    {
+        await ApplicationLocks.TakeMembershipsAsync(dbContext, cancellationToken).ConfigureAwait(false);
+
+        var spaceId = ScopedSpaceId();
+
+        var left = await dbContext.Database.ExecuteSqlAsync(
+            $"""
+            DELETE FROM dbo.[Membership]
+            WHERE SpaceId = {spaceId}
+              AND AccountId = {actorAccountId}
+              AND Role <> {OwnerRole};
+            """,
+            cancellationToken).ConfigureAwait(false);
+
+        if (left == 1)
+        {
+            await RemovedAsync(spaceId, actorAccountId, cancellationToken).ConfigureAwait(false);
+
+            return RemovalOutcome.Removed;
+        }
+
+        var actor = await ActorAsync(actorAccountId, cancellationToken).ConfigureAwait(false);
+
+        // Not deleted and still there can only be the Owner's row; gone means another removal or leave committed first.
+        return actor is null ? RemovalOutcome.LostMembership : RemovalOutcome.OwnershipHeld;
+    }
+
     private static string Names(IReadOnlySet<Role> roles) => string.Join(',', roles.Select(role => role.ToString()));
+
+    private Guid ScopedSpaceId() =>
+        dbContext.ScopedSpaceId
+            ?? throw new InvalidOperationException("A Membership is changed only inside a Space-scoped unit of work.");
+
+    private async Task<RemovalOutcome> RemoveCoreAsync(
+        Guid actorAccountId,
+        Guid membershipId,
+        RemovalAuthority authority,
+        CancellationToken cancellationToken)
+    {
+        await ApplicationLocks.TakeMembershipsAsync(dbContext, cancellationToken).ConfigureAwait(false);
+
+        var spaceId = ScopedSpaceId();
+
+        // Read before the delete for its Account, which a Membership never changes.
+        var target = await TargetAsync(membershipId, cancellationToken).ConfigureAwait(false);
+
+        var removed = target is null
+            ? 0
+            : await GuardedDeleteAsync(spaceId, actorAccountId, membershipId, authority, cancellationToken).ConfigureAwait(false);
+
+        if (removed == 1)
+        {
+            await RemovedAsync(spaceId, target!.AccountId, cancellationToken).ConfigureAwait(false);
+
+            return RemovalOutcome.Removed;
+        }
+
+        var actor = await ActorAsync(actorAccountId, cancellationToken).ConfigureAwait(false);
+
+        if (actor is null)
+        {
+            return RemovalOutcome.LostMembership;
+        }
+
+        if (target is null)
+        {
+            return RemovalOutcome.NotFound;
+        }
+
+        var refusal = authority.Judge(target.Role, target.AccountId == actorAccountId, actor.Role);
+
+        return refusal switch
+        {
+            RemovalRefusal.OwnershipHeld => RemovalOutcome.OwnershipHeld,
+            RemovalRefusal.BeyondAuthority => RemovalOutcome.BeyondAuthority,
+            _ => throw new InvalidOperationException($"Unanswered removal refusal {refusal}."),
+        };
+    }
+
+    /// <summary>
+    /// The one guarded removal. The target must hold a Role the authority may remove, or be the actor's own row - "any
+    /// Account can remove its own" - and never the Owner's, whoever asks; the actor must still hold its authority when the
+    /// statement runs.
+    /// </summary>
+    private Task<int> GuardedDeleteAsync(
+        Guid spaceId,
+        Guid actorAccountId,
+        Guid membershipId,
+        RemovalAuthority authority,
+        CancellationToken cancellationToken)
+    {
+        var removable = Names(authority.Removable);
+        var heldBy = Names(authority.HeldBy);
+
+        return dbContext.Database.ExecuteSqlAsync(
+            $"""
+            DELETE FROM dbo.[Membership]
+            WHERE Id = {membershipId}
+              AND SpaceId = {spaceId}
+              AND Role <> {OwnerRole}
+              AND (Role IN (SELECT value FROM STRING_SPLIT({removable}, ',')) OR AccountId = {actorAccountId})
+              AND EXISTS (
+                  SELECT 1 FROM dbo.[Membership] AS actor WITH (READCOMMITTEDLOCK)
+                  WHERE actor.SpaceId = {spaceId}
+                    AND actor.AccountId = {actorAccountId}
+                    AND actor.Role IN (SELECT value FROM STRING_SPLIT({heldBy}, ',')));
+            """,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// What a committed removal or leave does beside deleting the row: the Account's presence here goes with it, and its
+    /// <c>MembershipChanged</c> is recorded to publish once the request commits.
+    /// </summary>
+    private async Task RemovedAsync(Guid spaceId, Guid removedAccountId, CancellationToken cancellationToken)
+    {
+        await dbContext.Database.ExecuteSqlAsync(
+            $"""
+            DELETE FROM dbo.[SpacePresence]
+            WHERE SpaceId = {spaceId}
+              AND AccountId = {removedAccountId};
+            """,
+            cancellationToken).ConfigureAwait(false);
+
+        membershipChanges.Record(removedAccountId, spaceId);
+    }
+
+    /// <summary>
+    /// The actor's own Membership as both isolation layers show it, or <c>null</c> once it is gone.
+    /// </summary>
+    private Task<TargetMembership?> ActorAsync(Guid actorAccountId, CancellationToken cancellationToken) =>
+        dbContext.Memberships
+            .AsNoTracking()
+            .Where(membership => membership.AccountId == actorAccountId)
+            .Select(membership => new TargetMembership(membership.Role, membership.AccountId))
+            .SingleOrDefaultAsync(cancellationToken);
 
     private async Task<RoleChangeResult> ChangeRoleCoreAsync(
         Guid actorAccountId,
@@ -120,8 +320,7 @@ internal sealed class MembershipStore(YelloDbContext dbContext, IMembershipChang
     {
         await ApplicationLocks.TakeMembershipsAsync(dbContext, cancellationToken).ConfigureAwait(false);
 
-        var spaceId = dbContext.ScopedSpaceId
-            ?? throw new InvalidOperationException("A Role is changed only inside a Space-scoped unit of work.");
+        var spaceId = ScopedSpaceId();
 
         int changed;
 
@@ -146,19 +345,19 @@ internal sealed class MembershipStore(YelloDbContext dbContext, IMembershipChang
             return new RoleChangeResult(RoleChangeOutcome.Changed, await RowAsync(actorAccountId, membershipId, cancellationToken).ConfigureAwait(false));
         }
 
+        var actor = await ActorAsync(actorAccountId, cancellationToken).ConfigureAwait(false);
+
+        if (actor is null)
+        {
+            return new RoleChangeResult(RoleChangeOutcome.LostMembership, null);
+        }
+
         if (target is null)
         {
             return new RoleChangeResult(RoleChangeOutcome.NotFound, null);
         }
 
-        var actor = await dbContext.Memberships
-            .AsNoTracking()
-            .Where(membership => membership.AccountId == actorAccountId)
-            .Select(membership => new TargetMembership(membership.Role, membership.AccountId))
-            .SingleOrDefaultAsync(cancellationToken)
-            .ConfigureAwait(false);
-
-        var refusal = authority.Judge(target.Role, proposed, actor is not null && authority.HeldBy.Contains(actor.Role));
+        var refusal = authority.Judge(target.Role, proposed, authority.HeldBy.Contains(actor.Role));
 
         return refusal switch
         {

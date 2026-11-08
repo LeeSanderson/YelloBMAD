@@ -1,3 +1,4 @@
+using System.Linq.Expressions;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Yello.Application.Spaces;
@@ -53,6 +54,17 @@ internal sealed class SpacePresenceRegister(YelloDbContext dbContext, TimeProvid
     /// A present Account's row is rewritten only once less than this remains: half the window.
     /// </summary>
     internal static TimeSpan RefreshBelow { get; } = TimeSpan.FromMinutes(7.5);
+
+    /// <summary>
+    /// A presence that still counts, by the database clock: what a reader outside the request's own entry - the Membership
+    /// list's "in this Space now" - composes into its statement.
+    /// </summary>
+    /// <remarks>
+    /// Declared beside the register so presence expiry is compared in this file only. The register itself compares with the
+    /// request's clock because it must decide before it writes; a reader states it with the database's, inside its own
+    /// statement.
+    /// </remarks>
+    internal static Expression<Func<SpacePresence, bool>> Live { get; } = presence => presence.ExpiresAt > DatabaseClock.Now();
 
     /// <inheritdoc />
     public async Task<bool> TryEnterAsync(Guid accountId, Guid spaceId, int limit, CancellationToken cancellationToken)

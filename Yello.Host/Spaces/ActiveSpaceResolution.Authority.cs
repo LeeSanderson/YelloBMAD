@@ -49,10 +49,22 @@ internal static partial class ActiveSpaceResolution
             IActiveSpaceUnitOfWork unitOfWork,
             BoundaryRequest request)
         {
+            var role = unitOfWork.Context.Role;
+
             request.Services.GetRequiredService<ActingAuthority>()
-                .Set(RoleCapabilityMatrix.RoleChangeAuthorityOf(unitOfWork.Context.Role));
+                .Set(RoleCapabilityMatrix.RoleChangeAuthorityOf(role), RoleCapabilityMatrix.RemovalAuthorityOf(role));
 
             var result = await LostSpace.ServeOrRefuseAsync(context, next, unitOfWork, request).ConfigureAwait(false);
+
+            if (result is MembershipLost)
+            {
+                // The actor's own Membership went while its request waited: answered and recorded exactly as its next
+                // request would be, never as a 403 that would tell it it still reached the Space's authority check.
+                SpaceLog.LostUnderRequest(request.Logger, request.SpaceId);
+                await RecordAsync(request, AccessRefusalKind.CrossSpace).ConfigureAwait(false);
+
+                return BoundaryProblems.NotAvailable();
+            }
 
             if (result is not QualifiedRefusal)
             {
@@ -87,4 +99,22 @@ internal sealed class QualifiedRefusal(Capability capability) : IResult, IStatus
 
     /// <inheritdoc />
     public Task ExecuteAsync(HttpContext httpContext) => BoundaryProblems.InsufficientRole(capability).ExecuteAsync(httpContext);
+}
+
+/// <summary>
+/// A slice's answer that the acting Account's own Membership was gone by the time its change was written - removed while
+/// the request waited on the Memberships lock. The pipeline records it <c>CrossSpace</c> and answers the boundary's
+/// <c>404</c>; an endpoint never answers it itself.
+/// </summary>
+/// <remarks>
+/// A failure status, so the unit of work rolls back and no <c>Idempotency-Key</c> records it. Executed only if it escaped the
+/// pipeline, as the same boundary body - unrecorded, which the removed-actor race's record assertion would catch.
+/// </remarks>
+internal sealed class MembershipLost : IResult, IStatusCodeHttpResult
+{
+    /// <inheritdoc />
+    public int? StatusCode => StatusCodes.Status404NotFound;
+
+    /// <inheritdoc />
+    public Task ExecuteAsync(HttpContext httpContext) => BoundaryProblems.NotAvailable().ExecuteAsync(httpContext);
 }

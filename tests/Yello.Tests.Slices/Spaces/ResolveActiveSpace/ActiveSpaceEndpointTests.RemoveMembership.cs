@@ -47,7 +47,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="role">The target's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - DELETE .../memberships/{membershipId} is not mapped; today it answers the boundary 404")]
+    [Theory]
     [InlineData("admin")]
     [InlineData("member")]
     [InlineData("viewer")]
@@ -91,7 +91,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="role">The target's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - DELETE .../memberships/{membershipId} is not mapped and no removal authority exists")]
+    [Theory]
     [InlineData("member")]
     [InlineData("viewer")]
     [Trait("Requirement", "FR-14")]
@@ -133,7 +133,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="attempt">Whose row the Admin targets.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - no removal route or removal authority; the Admin's anchor removal is the boundary 404 today")]
+    [Theory]
     [InlineData("other-admin")]
     [InlineData("owner")]
     [Trait("Requirement", "FR-14")]
@@ -189,7 +189,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// boundary <c>404</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - no removal route; the self-target clause of the guarded DELETE does not exist")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     public async Task An_Admin_removing_its_own_row_on_the_item_route_answers_204_and_is_out()
     {
@@ -229,7 +229,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// route, answers <c>204</c> first.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - no removal route and no ownership-held problem type")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-5")]
     public async Task The_Owner_removing_its_own_row_is_refused_409_ownership_held_and_nothing_changes()
@@ -258,7 +258,7 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.True(anchor?.StatusCode == HttpStatusCode.NoContent, $"The Owner's anchor: {Described(anchor)}");
         Assert.True(refused?.StatusCode == HttpStatusCode.Conflict, $"The Owner's own row: {Described(refused)}; the anchor was {Described(anchor)}");
-        Assert.Equal(MembershipWire.OwnershipHeldProblemType, ProblemType(refused));
+        Assert.Equal(ProblemTypes.OwnershipHeld, ProblemType(refused));
         Assert.DoesNotContain("@", refused.Body, StringComparison.Ordinal);
         Assert.Equal("Owner", (await wire.MembershipOfAsync(spaceId, ownerId)).Role);
         Assert.DoesNotContain(await RefusalsOfAsync(database, ownerId), row => row.TargetSpaceId == spaceId);
@@ -272,7 +272,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="lesser">The actor's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - no removal route; the Owner's anchor removal is the boundary 404 today")]
+    [Theory]
     [InlineData("member")]
     [InlineData("viewer")]
     [Trait("Requirement", "FR-14")]
@@ -330,7 +330,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// seeded directly: the caller is no member there.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - no removal route; the anchor removal is the boundary 404 today")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "FR-14")]
@@ -391,7 +391,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// red.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - no removal route, so nothing deletes the Membership row the Token cascade hangs from")]
+    [Fact]
     [Trait("Requirement", "FR-36")]
     [Trait("Requirement", "AD-6")]
     [Trait("Requirement", "FR-14")]
@@ -450,7 +450,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// written by the Account's own requests.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - no removal route, and nothing deletes the presence row with the Membership")]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "FR-14")]
     public async Task Removal_deletes_the_removed_Accounts_presence_in_this_Space_only()
@@ -493,7 +493,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// seeded directly, so no accept's own publish is in the count.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - no removal route, so nothing records a MembershipChanged for a removal")]
+    [Fact]
     [Trait("Requirement", "AR-16")]
     [Trait("Requirement", "AD-9")]
     public async Task A_committed_removal_logs_exactly_one_MembershipChanged_for_the_removed_Account()
@@ -533,7 +533,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Recording before the <c>DELETE</c>, or on every attempt, turns the count above one.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - no removal route; the committed arm is the boundary 404 today")]
+    [Fact]
     [Trait("Requirement", "AR-16")]
     [Trait("Requirement", "AD-9")]
     [Trait("Requirement", "AD-18")]
@@ -598,7 +598,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// target is <c>422 idempotency-key-reused</c> and removes nothing; a malformed key is <c>400 invalid-idempotency-key</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - no removal route; the original is the boundary 404 today")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "AR-25")]
     public async Task A_removal_replays_under_its_key_a_reused_key_on_another_target_is_422_and_a_malformed_key_400()
@@ -646,7 +646,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// was Assignee of become unassigned" has nothing to act on; what holds now is that nothing is deleted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - no removal route; the removal is the boundary 404 today")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     public async Task What_the_removed_Member_created_survives_the_removal()
     {
@@ -701,7 +701,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// itself. The target is an Admin, so every probe answered a success on both surfaces before (the anchor).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - no removal route; the removal itself is the boundary 404 today")]
+    [Fact]
     [Trait("Requirement", "NFR-2")]
     [Trait("Requirement", "FR-15")]
     [Trait("Requirement", "AD-3")]
@@ -790,7 +790,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>200</c> with its body, as it does everywhere else. Bulk-seeded under the Space's key.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - no removal route; the removal is the boundary 404 today")]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "AR-30")]
     public async Task A_removal_in_a_full_Space_frees_the_slot_a_pending_acceptance_then_takes()
@@ -836,7 +836,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// directly, so no accept makes them present.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - GET .../memberships/{membershipId} is not mapped and no row carries inSpaceNow")]
+    [Fact]
     [Trait("Requirement", "UX-DR36")]
     [Trait("Requirement", "AD-27")]
     [Trait("Requirement", "AD-23")]
@@ -885,8 +885,8 @@ public sealed partial class ActiveSpaceEndpointTests
         foreach (var (name, inSpaceNow) in new[] { ("present", true), ("expired", false), ("elsewhere", false) })
         {
             Assert.True(read[name].StatusCode == HttpStatusCode.OK, $"The Owner's read of the {name} row: {Described(read[name])}");
-            Assert.Equal(MembershipWire.PresentRowMembers, MembershipWire.ObjectMemberNames(read[name].Body));
-            Assert.True(MembershipWire.ParsePresentRow(read[name].Body).InSpaceNow == inSpaceNow, $"The {name} row should say inSpaceNow: {inSpaceNow}: {read[name].Body}");
+            Assert.Equal(MembershipWire.RowMembers, MembershipWire.ObjectMemberNames(read[name].Body));
+            Assert.True(MembershipWire.ParseReadRow(read[name].Body).InSpaceNow == inSpaceNow, $"The {name} row should say inSpaceNow: {inSpaceNow}: {read[name].Body}");
         }
 
         Assert.True(list?.StatusCode == HttpStatusCode.OK, $"The list: {Described(list)}");

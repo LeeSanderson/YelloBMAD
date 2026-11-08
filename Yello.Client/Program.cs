@@ -122,6 +122,7 @@ builder.Services.AddScoped<SpaceNarration>();
 // Story 3.3 (AC12, open question 6 (a)): the sentence said after a deletion, held across the purge of the Space it is
 // about and taken by the entry point. Dropped with the Session, below.
 builder.Services.AddScoped<DepartureNarration>();
+builder.Services.AddScoped<SpaceExit>();
 builder.Services.AddScoped<PageHeadingFocus>();
 
 // Story 4.3: the Invitation view's requests - the view, the accept, and the unchanged registration and sign-in it chains.

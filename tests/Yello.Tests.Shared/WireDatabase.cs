@@ -13,8 +13,8 @@ namespace Yello.Tests.Shared;
 /// <para>
 /// <b>Raw SQL only where no endpoint exists</b> (story 1.9 Task 3). Seeding is through the product -
 /// <see cref="ProductActor"/> registers, signs in and issues a Token over HTTP. The events here arrive
-/// as endpoints in stories 3.3 (Space deletion, which has one now), 4.5 and 5.4; until then the schema and the very next request's answer
-/// are what these statements let a case prove. They mirror
+/// as endpoints - Space deletion and Membership removal have theirs, Account deletion's is story 5.4's; the schema and the
+/// very next request's answer are what these statements let a case prove. They mirror
 /// <c>ActiveSpaceEndpointTests.Tokens.cs</c>'s helpers, under the same session keys.
 /// </para>
 /// <para>

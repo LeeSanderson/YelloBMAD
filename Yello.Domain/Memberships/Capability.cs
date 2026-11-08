@@ -78,8 +78,9 @@ public enum Capability
     ChangeMembershipRole,
 
     /// <summary>
-    /// Remove a Membership. Owner; Admin only for Members and Viewers, a target rule story 4.5 declares
-    /// beside the Role change's.
+    /// Remove a Membership. Owner; Admin only for Members and Viewers - the target rule
+    /// <see cref="RoleCapabilityMatrix.RemovalAuthorityOf"/> declares and the pipeline hands the slice. Leaving one's own
+    /// Membership is decided by identity, not by this row.
     /// </summary>
     RemoveMembership,
 

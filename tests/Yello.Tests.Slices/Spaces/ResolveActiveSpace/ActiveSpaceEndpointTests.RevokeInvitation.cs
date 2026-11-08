@@ -26,9 +26,8 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// <b>Seeding</b> is as in <c>.ListInvitations.cs</c>: live Invitations through 4.1's issue route, terminal and expired
 /// rows through <see cref="WireDatabase.AddInvitationAsync"/> and <see cref="WireDatabase.SetInvitationStateAsync"/>,
 /// the issuer's demotion through the product - joined as Admin through an Invitation accepted (4.3), demoted by the Owner's
-/// <c>PATCH .../memberships/{id}</c> (story 4.4, AC8) - and its removal through <see cref="WireDatabase.RemoveMembershipAsync"/>
-/// (Q12 (a): story 4.5 builds that path). The removal deletes
-/// a Membership only; the <c>Invitation</c> has no foreign key to <c>Membership</c>, and its <c>IssuedByAccountId</c> key to
+/// <c>PATCH .../memberships/{id}</c> (story 4.4, AC8) - and its removal the same way, by the Owner's
+/// <c>DELETE .../memberships/{id}</c>. The removal deletes a Membership only; the <c>Invitation</c> has no foreign key to <c>Membership</c>, and its <c>IssuedByAccountId</c> key to
 /// <c>Account</c> is untouched (AD-5).
 /// </para>
 /// <para>
@@ -189,7 +188,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <remarks>
     /// Written as a red-phase scaffold by the story 4.4 ATDD run beside 4.2's raw-SQL case; the dev phase deleted that case
-    /// once this one passed, and this one took its name. The removal arm below stays raw SQL until story 4.5.
+    /// once this one passed, and this one took its name. The removal arm below runs through the product the same way.
     /// </remarks>
     /// <returns>A task.</returns>
     [Fact]
@@ -248,72 +247,18 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
-    /// AC3, FR-12, AD-5, Q12 (a), the removal arm - an Admin issues, and their Membership is then removed: the Invitation row
-    /// is untouched by the removal, the Owner still lists it with the captured issuer name, and revokes it (<c>204</c>).
-    /// </summary>
-    /// <returns>A task.</returns>
-    [Fact]
-    [Trait("Requirement", "FR-12")]
-    [Trait("Requirement", "AD-5")]
-    public async Task An_Invitation_whose_issuer_was_removed_stays_listed_and_revocable()
-    {
-        var database = Available();
-        var wire = Wire();
-        var (ownerAddress, issuerAddress) = (RandomAddress(), RandomAddress());
-        var issuerName = DisplayName();
-        var invitee = InvitationWire.FreshAddress("removed");
-        var spaceId = Guid.NewGuid();
-        InvitationRow? beforeRemoval = null;
-        InvitationRow? afterRemoval = null;
-        WireResponse? listed = null;
-        WireResponse? revoked = null;
-
-        using var mail = new MailDrop();
-
-        await HostProcess.RunAsync(fixture.ConnectionString!, mail.With(Configured), async client =>
-        {
-            var owner = await SignedInAsync(client, ownerAddress);
-            await SeedNamedSpaceAsync(database, spaceId, "Removed " + Suffix(), await AccountIdOfAsync(database, ownerAddress), Role.Owner);
-
-            var issuer = await RegisteredAndSignedInAsync(client, issuerAddress, issuerName);
-            var issuerId = await AccountIdOfAsync(database, issuerAddress);
-            await wire.AddMembershipAsync(spaceId, issuerId, "admin");
-
-            await issuer.FetchAntiforgeryTokenAsync();
-            Assert.Equal(HttpStatusCode.NoContent, (await IssueAsync(issuer, spaceId, invitee, "member")).StatusCode);
-
-            beforeRemoval = Assert.Single(await wire.InvitationsInAsync(spaceId));
-            await wire.RemoveMembershipAsync(spaceId, issuerId, commit: true);
-            afterRemoval = Assert.Single(await wire.InvitationsInAsync(spaceId));
-
-            listed = await ListInvitationsAsync(owner, spaceId);
-
-            await owner.FetchAntiforgeryTokenAsync();
-            revoked = await RevokeAsync(owner, spaceId, afterRemoval.Id);
-        });
-
-        Assert.Equal(beforeRemoval! with { TokenHash = afterRemoval!.TokenHash }, afterRemoval);
-        Assert.Equal(beforeRemoval.TokenHash, afterRemoval.TokenHash);
-        Assert.True(listed?.StatusCode == HttpStatusCode.OK, $"{listed?.StatusCode} {listed?.Body}");
-        Assert.Equal([(invitee, issuerName)], InvitationWire.ParseList(listed!.Body).Select(row => (row.EmailAddress, row.IssuerName)));
-        Assert.True(revoked?.StatusCode == HttpStatusCode.NoContent, $"{revoked?.StatusCode} {revoked?.Body}");
-        Assert.Equal("Revoked", Assert.Single(await wire.InvitationsInAsync(spaceId)).State);
-    }
-
-    /// <summary>
     /// Removing a Membership does not withdraw the offers it legitimately made. An Admin joins through an accepted
     /// Invitation, issues two, and is then removed by the Owner through the product's <c>DELETE</c>. Both Invitation rows
     /// are untouched by the removal (the issuer key references the Account, not the Membership); the Owner still lists them
     /// with the issuer name captured at issue and revokes one (<c>204</c>); the other's invitee accepts it (<c>200</c>) and
-    /// becomes a Member. This is the product-route twin of the raw-SQL case above, which is deleted once this one is green,
-    /// and this one then takes its name.
+    /// becomes a Member.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the issuer cannot be removed through the product yet; DELETE .../memberships/{membershipId} is not mapped")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-5")]
-    public async Task An_Invitation_whose_issuer_was_removed_through_the_product_stays_listed_revocable_and_acceptable()
+    public async Task An_Invitation_whose_issuer_was_removed_stays_listed_revocable_and_acceptable()
     {
         var database = Available();
         var wire = Wire();

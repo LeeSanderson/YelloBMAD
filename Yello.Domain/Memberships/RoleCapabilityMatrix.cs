@@ -95,6 +95,44 @@ public static class RoleCapabilityMatrix
     };
 
     /// <summary>
+    /// The Owner's target rule for <see cref="Capability.RemoveMembership"/>: every Role but Owner.
+    /// </summary>
+    private static readonly RemovalAuthority OwnerRemovals = new(
+        new HashSet<Role> { Role.Admin, Role.Member, Role.Viewer },
+        new HashSet<Role> { Role.Owner });
+
+    /// <summary>
+    /// The Admin's target rule for <see cref="Capability.RemoveMembership"/>: "Members and Viewers only".
+    /// </summary>
+    private static readonly RemovalAuthority AdminRemovals = new(
+        new HashSet<Role> { Role.Member, Role.Viewer },
+        new HashSet<Role> { Role.Owner, Role.Admin });
+
+    /// <summary>
+    /// The Qualified cells' target rule for removing a Membership: the Roles <paramref name="actor"/> may remove, and the
+    /// Roles it must still hold for that.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>FR-14</b>: "An Admin can remove Members and Viewers only. An Admin cannot remove the Owner or another Admin" - the
+    /// latter is PRD section 12 assumption #4, still unconfirmed. "The Owner's Membership cannot be removed by anyone, the
+    /// Owner included, while it holds ownership", so <see cref="Role.Owner"/> is in no removable set.
+    /// </para>
+    /// <para>
+    /// <b>Asked by the pipeline only</b>, beside <see cref="RoleChangeAuthorityOf"/>. A Role the matrix denies the
+    /// capability gets <see cref="RemovalAuthority.None"/>.
+    /// </para>
+    /// </remarks>
+    /// <param name="actor">The Role the acting Account's Membership carries, read on this request.</param>
+    /// <returns>The target rule.</returns>
+    public static RemovalAuthority RemovalAuthorityOf(Role actor) => actor switch
+    {
+        Role.Owner => OwnerRemovals,
+        Role.Admin => AdminRemovals,
+        _ => RemovalAuthority.None,
+    };
+
+    /// <summary>
     /// What the matrix says about a Role and a capability.
     /// </summary>
     /// <param name="role">The Role the acting Account's Membership carries, read on this request.</param>

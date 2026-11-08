@@ -1,7 +1,6 @@
 using Microsoft.Playwright;
 using Xunit;
 using Yello.Contracts;
-using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -101,7 +100,7 @@ public sealed class LeaveSpaceTests(ClientSurfaceFixture surface)
     /// <param name="role">The viewer's Role in Northwind.</param>
     /// <param name="offered">Whether the control is offered.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC8 - Space home renders no Leave control")]
+    [Theory]
     [InlineData("owner", false)]
     [InlineData("admin", true)]
     [InlineData("member", true)]
@@ -127,7 +126,7 @@ public sealed class LeaveSpaceTests(ClientSurfaceFixture surface)
     /// "Cancel" and neither focused as the default. Cancel restores the control, focused, and nothing is sent.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - Space home renders no Leave control or confirm")]
+    [Fact]
     [Trait("Requirement", "UX-DR11")]
     [Trait("Requirement", "UX-DR36")]
     public async Task The_leave_confirm_opens_in_place_with_no_default_and_Cancel_sends_nothing()
@@ -166,7 +165,7 @@ public sealed class LeaveSpaceTests(ClientSurfaceFixture surface)
     /// the switcher no longer lists it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - no Leave control, so nothing sends the leave or purges and routes home")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     [Trait("Requirement", "UX-DR38")]
     public async Task A_leave_is_sent_once_with_a_key_then_purges_the_Space_and_routes_home()
@@ -207,7 +206,7 @@ public sealed class LeaveSpaceTests(ClientSurfaceFixture surface)
     /// purge, the route home and "You left the Space.".
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - no Leave control, so no resend under the kept key and no 404-as-left reading")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "UX-DR38")]
     public async Task A_leave_resent_under_its_key_that_meets_404_is_read_as_left()
@@ -245,7 +244,7 @@ public sealed class LeaveSpaceTests(ClientSurfaceFixture surface)
     /// how the Owner leaves, naming no third exit, and stays on the Space.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - no Leave control and no ownership-held copy in the client")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     public async Task A_leave_answered_409_ownership_held_says_how_the_Owner_leaves()
     {
@@ -256,7 +255,7 @@ public sealed class LeaveSpaceTests(ClientSurfaceFixture surface)
         {
             await OpenHomeAsync(api, page, Northwind);
 
-            api.NextLeaveRefusal = (409, MembershipWire.OwnershipHeldProblemType, null);
+            api.NextLeaveRefusal = (409, ProblemTypes.OwnershipHeld, null);
 
             await ConfirmLeaveAsync(page);
             await page.Locator("main").GetByText(OwnerExitsCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
@@ -271,7 +270,7 @@ public sealed class LeaveSpaceTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="spaced">Whether the text-spacing override is applied.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC8 - no Leave control or confirm")]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "NFR-9")]
