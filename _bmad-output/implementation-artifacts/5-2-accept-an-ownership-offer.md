@@ -320,6 +320,10 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1983-2022` and numbered by
 
 - [ ] **Task 0: decisions** (before any code)
   - [ ] Q1, Q3 and Q5 are marked **[LEE]**. If the orchestrator routes them to Lee, record his answers here under "Decided by Lee" before ATDD. Otherwise take each recommendation and record it as "Qn - (x)", with its cost, in Completion Notes.
+    - **Decided by Lee (2026-11-09):**
+      - Q1 - (a): the identity-decided routes declare `ReadProjectsAndTasks`, as the leave route does. The leave-only write gate becomes an explicit allow-list of identity-decided writes. No new `Capability` member.
+      - Q3 - (a): build the decline route and button in 5.2. Decline writes `Declined`, with no Role change, no publish and no email. 5.3 keeps telling the Owner, the settled-state proofs and A-10.
+      - Q5 - (a): the indicator updates on every answer this tab gets (arrival, re-read, Space switch, opening the dialog, the accept's own answer). No polling. Live updates are ledgered to 7.7.
   - [ ] Decide Q2, Q4 and Q6-Q10 the same way. Each recommendation is the default.
 - [ ] **Task 1: Contracts** (AC1, AC4)
   - [ ] Add `OwnershipOfferRoutes.Mine`/`MineOf(spaceId)` and `Acceptance`/`AcceptanceOf(spaceId, offerId)` (plus `Decline`/`DeclineOf` under Q3 (a)).
@@ -596,6 +600,36 @@ The cycle: story, then decisions recorded, then ATDD scaffolds (`Skip = "red: ..
 - `tests/TESTING-CONVENTIONS.md`: `:44-86`, `:87-207`, `:209-437`, `:517-543`, `:545-580`, `:604-673`, `:773-895`.
 - `deferred-work.md`: `:38-40`, `:664`, `:744`, `:792-793`, `:807`, `:908-909`, `:915`, `:929`.
 - Prior stories: `5-1-offer-ownership-of-a-space-and-tell-the-recipient.md` (whole), `4-7-a-viewers-space-and-a-role-that-drops-beneath-you.md` (Role header, narration), `4-5-remove-a-membership-or-leave-a-space.md` (identity-decided leave), `4-4-manage-memberships-and-roles.md` (guarded Role statement, `owner-role-fixed`).
+
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-5-2-accept-an-ownership-offer.md` (decisions, status-code table, the ten assumptions this run made, seed constraints checked, findings for develop).
+
+| File | Methods / rows (cases when active) | ACs |
+|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AcceptOwnershipOffer.cs` | 11 (16) | AC4, AC5, AC6, AC7, AC8, AC10, AC11 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AcceptOwnershipOfferRace.cs` | 5 (5) | AC9, AC10 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ReadMyOwnershipOffer.cs` | 2 (2) | AC1 |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeclineOwnershipOffer.cs` | 3 (3) | AC3 (Q3 a), AC4, AC10 |
+| `tests/Yello.Tests.Isolation/IsolationCases.OwnershipOfferAnswers.cs` | 10 rows, `PendingUntil: "5.2"` (20) | AC12 |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.AcceptOwnershipOffer.cs` | 5 (5) | AC4, AC5, AC6, AC11, AC12 |
+| `tests/Yello.Tests.Architecture/DesignFoundationGateTests.OfferIndicator.cs` | 4 (4) | AC1, AC2 |
+| `tests/Yello.Tests.Client/OwnershipOfferTests.cs` | 17 (20) | AC1, AC2, AC3, AC7, AC12 |
+
+Supporting, no cases: `tests/Yello.Tests.Shared/OwnershipOfferWire.Recipient.cs` (route stand-ins `MineOf`/`AcceptanceOf`/`DeclineOf` to swap for the contract members, then delete), `WireDatabase.AllSpaceIdsAsync`, `tests/Yello.Tests.Client/FakeYelloApi.OwnershipOfferAnswers.cs` (plus three dispatch lines in `FakeYelloApi.OwnershipOffers.cs` and one call in `FakeYelloApi.DecideAsync`).
+
+**Green today:** none. Every scaffold is skipped `red: AC<n> - ...` or pending until 5.2. The active gate `The_leave_route_is_the_one_write_under_ReadProjectsAndTasks` goes red by design when the acceptance is mapped; replace it with `Only_the_identity_decided_writes_sit_under_ReadProjectsAndTasks`.
+
+**Activation order:**
+1. `A_named_recipient_of_any_Role_accepts_and_becomes_the_sole_Owner_while_the_offerer_becomes_an_Admin` - the riskiest assumption: two `ExecuteUpdate` statements, demote then promote, inside the Space-scoped unit of work move ownership without a `2601`; the Viewer row proves identity over Role.
+2. `A_promote_that_meets_a_second_Owner_is_409_owner_role_fixed_and_rolls_back_everything`.
+3. `An_offer_whose_offerer_is_no_longer_the_Owner_is_409_and_rolls_back`, then the A-14 gate.
+4. The not-named, no-longer-open and recipient's-read cases; races 1-4 and the AC9 race.
+5. Publishes, idempotency, no email, the every-Space invariant, the former Owner's access, the new Owner bound.
+6. The decline cases; the route, allow-list, contract and no-outbox gates; the isolation rows made live.
+7. The design gates and the browser cases.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
 
 ## Dev Agent Record
 

@@ -745,6 +745,29 @@ public sealed class WireDatabase(string connectionString)
         return SpacesNotHoldingExactlyOneOwnerCoreAsync(spaceIds);
     }
 
+    /// <summary>
+    /// Every Space id in the database. <c>Space</c> carries no policy, so it is read without a key.
+    /// </summary>
+    /// <returns>The ids.</returns>
+    public async Task<IReadOnlyList<Guid>> AllSpaceIdsAsync()
+    {
+        await using var connection = await OpenAsync().ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT Id FROM dbo.[Space]";
+
+        var ids = new List<Guid>();
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            ids.Add(reader.GetGuid(0));
+        }
+
+        return ids;
+    }
+
     private async Task<IReadOnlyList<string>> SpacesNotHoldingExactlyOneOwnerCoreAsync(IEnumerable<Guid> spaceIds)
     {
         var broken = new List<string>();

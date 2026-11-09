@@ -179,6 +179,8 @@ internal static partial class IsolationCases
                 [IsolationSurface.Session] = new Served(HttpStatusCode.NoContent, (_, _, _) => Task.CompletedTask, "204 - a Session carries no Space (FR-2); the Account owns SA2") { Then = TheOthersSpaceHoldsNoPendingOfferAsync },
                 [IsolationSurface.ApiToken] = new SameAsNonMember { Then = TheOthersSpaceHoldsOnePendingOfferAsync },
             }),
+
+        .. OwnershipOfferAnswerCases(),
     ];
 
     /// <summary>

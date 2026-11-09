@@ -716,6 +716,9 @@ internal sealed partial class FakeYelloApi
     {
         const int noContent = 204;
 
+        // The Role an Ownership Offer's acceptance moved applies from the request after its answer (FakeYelloApi.OwnershipOfferAnswers.cs).
+        ApplyAnsweredOfferRoles();
+
         if (SessionEnded
             && !string.Equals(request.Method, "OPTIONS", StringComparison.Ordinal)
             && !string.Equals(request.Path, SessionRoutes.AntiforgeryToken, StringComparison.Ordinal)

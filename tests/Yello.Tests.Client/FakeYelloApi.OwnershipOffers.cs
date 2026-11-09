@@ -82,6 +82,9 @@ internal sealed partial class FakeYelloApi
         return (request.Method, segments) switch
         {
             ("POST", [_, _]) => Offer(spaceId, request),
+            ("GET", [_, _, "mine"]) => ReadMine(spaceId),
+            ("POST", [_, _, var offer, "acceptance"]) when Guid.TryParse(offer, out var acceptedId) => AnswerOffer(spaceId, acceptedId, request, accept: true),
+            ("POST", [_, _, var offer, "decline"]) when Guid.TryParse(offer, out var declinedId) => AnswerOffer(spaceId, declinedId, request, accept: false),
             ("GET", [_, _, "pending"]) => RefusedOutsideTheOwner(spaceId) ?? ReadPending(spaceId),
             ("DELETE", [_, _, var offer]) when Guid.TryParse(offer, out var offerId) => RefusedOutsideTheOwner(spaceId) ?? Revoke(spaceId, offerId),
             _ => null,
