@@ -8,10 +8,8 @@ namespace Yello.Tests.Architecture;
 /// takes the 2px chip radius and is never hidden at a breakpoint; the dialog takes the 6px dialog radius.
 /// </summary>
 /// <remarks>
-/// <b>Red-phase scaffolds.</b> Each gate is anchored on a rule that selects its component, so each is skipped until the
-/// component's CSS exists. The class names are <c>.offer-indicator</c> (the story's markup) and
-/// <c>.ownership-offer-dialog</c> (this run's assumption for the dialog's root; the develop phase renames the constant if it
-/// chooses another).
+/// Each gate is anchored on a rule that selects its component: <c>.offer-indicator</c> and the dialog's root,
+/// <c>.ownership-offer-dialog</c>.
 /// </remarks>
 public sealed partial class DesignFoundationGateTests
 {
@@ -25,7 +23,7 @@ public sealed partial class DesignFoundationGateTests
     /// <c>--accent</c> or <c>--accent-on</c> unless it selects <c>.offer-indicator</c>. Anchor: the indicator itself takes
     /// the accent. Plant 11 (a second accent element in the bar) turns it red.
     /// </summary>
-    [Fact(Skip = "red: AC1 - the Offer indicator's CSS does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR9")]
     public void The_Offer_indicator_is_the_only_accent_element_in_the_context_bar()
     {
@@ -47,14 +45,14 @@ public sealed partial class DesignFoundationGateTests
     /// <summary>
     /// The Offer indicator takes the 2px chip radius (<c>deferred-work.md:40</c>).
     /// </summary>
-    [Fact(Skip = "red: AC1 - the Offer indicator's CSS does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR9")]
     public void The_Offer_indicator_takes_the_2px_radius() => AssertRadius(OfferIndicatorClass, 2, "var(--radius-sm)");
 
     /// <summary>
     /// The offer dialog takes the 6px dialog radius (<c>deferred-work.md:40</c>).
     /// </summary>
-    [Fact(Skip = "red: AC2 - the offer dialog's CSS does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR12")]
     public void The_ownership_offer_dialog_takes_the_6px_radius() => AssertRadius(OwnershipOfferDialogClass, 6, "var(--radius-lg)");
 
@@ -64,7 +62,7 @@ public sealed partial class DesignFoundationGateTests
     /// are already covered by <see cref="The_Role_chip_is_never_hidden_at_any_breakpoint"/>. Anchor: a rule selects the
     /// indicator. Plant 12 (the indicator hidden by a media query) turns it red.
     /// </summary>
-    [Fact(Skip = "red: AC1 - the Offer indicator's CSS does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR41")]
     public void The_Offer_indicator_is_never_hidden_at_any_breakpoint()
     {

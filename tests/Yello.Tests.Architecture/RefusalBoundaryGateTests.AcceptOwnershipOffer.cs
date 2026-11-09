@@ -15,15 +15,14 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds.</b> Every gate here is skipped until its subject exists. Each finds its subject by name or by shape:
-/// the route patterns, <c>Yello.Infrastructure.Persistence.OwnershipOfferStore.AcceptAsync</c>,
+/// Each gate finds its subject by name or by shape: the route patterns,
+/// <c>Yello.Infrastructure.Persistence.OwnershipOfferStore.AcceptAsync</c>,
 /// <c>Yello.Contracts.Spaces.OwnershipOfferForRecipientResponse</c>, and the handlers <c>AcceptOwnershipOfferHandler</c> and
 /// <c>DeclineOwnershipOfferHandler</c>.
 /// </para>
 /// <para>
-/// <b>Existing gates this work changes deliberately:</b> <c>The_leave_route_is_the_one_write_under_ReadProjectsAndTasks</c>
-/// goes red the moment the acceptance is mapped, and is replaced by
-/// <see cref="Only_the_identity_decided_writes_sit_under_ReadProjectsAndTasks"/> (Lee's Q1 (a)). <b>Kept green unchanged:</b>
+/// <see cref="Only_the_identity_decided_writes_sit_under_ReadProjectsAndTasks"/> is the allow-list that replaced the gate
+/// holding the leave as the one write under the read capability. <b>Kept green unchanged:</b>
 /// <c>Only_the_offer_store_writes_an_OwnershipOffer_state</c> (its writer list stays exactly as it is), both Role-read gates,
 /// the two <c>Assert.Single</c> gates over Application types named for "Authority", the capability vocabulary gates (no
 /// <c>Capability</c> member is added) and <c>The_ownership_offer_problem_types_are_declared_and_each_has_client_copy</c>.
@@ -46,7 +45,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// decline; each declares <c>ReadProjectsAndTasks</c>, which every Role holds, because identity - not Role - decides them
     /// inside the store; none is Session-only and none consults a bound, so a Token reaches all three.
     /// </summary>
-    [Fact(Skip = "red: AC4, AC12 - the recipient's read, the acceptance and the decline are not mapped yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AR-13")]
     [Trait("Requirement", "AD-26")]
@@ -71,9 +70,9 @@ public sealed partial class RefusalBoundaryGateTests
     /// The writes under <c>ReadProjectsAndTasks</c> are an explicit allow-list of identity-decided writes: leaving a Space,
     /// accepting an offer and declining one. Every other route declaring the read capability is a <c>GET</c>. Each of the three
     /// is guarded by identity in its own statement; a fourth write slipping under the read capability would hand every Viewer a
-    /// write. Replaces <c>The_leave_route_is_the_one_write_under_ReadProjectsAndTasks</c> once the acceptance is mapped.
+    /// write.
     /// </summary>
-    [Fact(Skip = "red: AC4 (Q1 a) - the acceptance and the decline are not mapped yet; today the leave is the one write")]
+    [Fact]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-5")]
@@ -109,7 +108,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// in a variable defeats it, and the gate then fails rather than passing; the swapped-order plant is also caught at
     /// runtime by the acceptance cases (<c>409 owner-role-fixed</c>).
     /// </remarks>
-    [Fact(Skip = "red: AC5, AC6 - OwnershipOfferStore.AcceptAsync does not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AR-13")]
     [Trait("Requirement", "AD-5")]
@@ -158,7 +157,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The recipient's answer carries exactly <c>Id</c>, <c>OffererName</c>, <c>ExpiresAt</c> and <c>ReadAt</c>: no recipient
     /// id, no address, no Role and no other Membership.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC12 - OwnershipOfferForRecipientResponse does not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-23")]
     [Trait("Requirement", "FR-42")]
     public void The_recipients_offer_contract_carries_exactly_its_four_members()
@@ -178,7 +177,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// and <c>DeclineOwnershipOfferHandler</c> name no outbox type. Anchor: each exists and takes an offer port. Sibling of
     /// <c>The_ownership_offer_revoke_and_lapse_take_no_outbox</c>. Plant 10 (an <c>IOutbox</c> parameter) turns it red.
     /// </summary>
-    [Fact(Skip = "red: AC11 - the acceptance and decline handlers do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-43")]
     [Trait("Requirement", "AR-33")]
     public void The_ownership_acceptance_and_decline_take_no_outbox()

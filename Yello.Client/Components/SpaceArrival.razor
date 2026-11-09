@@ -89,6 +89,7 @@
     {
         Navigation.LocationChanged += OnLocationChanged;
         ActiveSpace.Changed += OnActiveSpaceChanged;
+        ActiveSpace.RereadRequested += OnRereadRequested;
     }
 
     /// <inheritdoc />
@@ -96,6 +97,7 @@
     {
         Navigation.LocationChanged -= OnLocationChanged;
         ActiveSpace.Changed -= OnActiveSpaceChanged;
+        ActiveSpace.RereadRequested -= OnRereadRequested;
     }
 
     /// <summary>
@@ -114,6 +116,16 @@
             _ = InvokeAsync(StateHasChanged);
         }
     }
+
+    /// <summary>
+    /// A re-read asked for from outside the page - the context bar, after an answer that moved the Role - is a re-arrival.
+    /// </summary>
+    private void OnRereadRequested(object? sender, EventArgs args) =>
+        _ = InvokeAsync(async () =>
+        {
+            await RereadAsync();
+            StateHasChanged();
+        });
 
     /// <summary>
     /// A navigation to the address this page is already showing - the same Space chosen again in the

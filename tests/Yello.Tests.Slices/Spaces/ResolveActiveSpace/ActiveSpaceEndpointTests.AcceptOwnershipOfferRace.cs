@@ -16,9 +16,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds.</b> Every case is skipped until the acceptance exists.
-/// </para>
-/// <para>
 /// <b>Seeding.</b> Participants join through the product and the offer is made through the offer route; then every racing
 /// Account is made present in the Space and holds its anti-forgery token before the lock is taken, so nothing but the
 /// application lock orders the pair.
@@ -38,7 +35,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Owner in exactly one publish.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the acceptance and its Memberships lock do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AR-12")]
@@ -100,14 +97,13 @@ public sealed partial class ActiveSpaceEndpointTests
 
     /// <summary>
     /// The recipient's acceptance and the Owner's revoke of the same offer, held on the Memberships lock until both are
-    /// blocked. Serial outcomes only: acceptance first - <c>204</c>, then the revoke is refused (<c>409
-    /// ownership-offer-not-pending</c>, or the recorded <c>403</c> naming <c>offer-ownership-transfer</c> when its
-    /// actor-still-Owner clause sees the swap; the dev phase records which), the offer <c>Accepted</c>, the recipient Owner.
+    /// blocked. Serial outcomes only: acceptance first - <c>204</c>, then the revoke's actor-still-Owner clause sees the swap
+    /// and it is the recorded <c>403</c> naming <c>offer-ownership-transfer</c>, the offer <c>Accepted</c>, the recipient Owner.
     /// Revoke first - <c>204</c>, then the acceptance <c>409 ownership-offer-not-pending</c>, the offer <c>Revoked</c>, every
     /// Role as it was. Never both written.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9, AC10 - the acceptance and the revoke's actor-still-Owner clause do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AD-1")]
@@ -162,8 +158,9 @@ public sealed partial class ActiveSpaceEndpointTests
 
         if (accepted.StatusCode == HttpStatusCode.NoContent)
         {
-            Assert.True(revoked.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.Forbidden, "The revoke after the swap is 409 or the recorded 403. " + compared);
-            Assert.Equal(revoked.StatusCode == HttpStatusCode.Conflict ? ProblemTypes.OwnershipOfferNotPending : ProblemTypes.InsufficientRole, ProblemType(revoked));
+            Assert.True(revoked.StatusCode == HttpStatusCode.Forbidden, "The revoke after the swap finds its actor no longer the Owner: the recorded 403. " + compared);
+            Assert.Equal(ProblemTypes.InsufficientRole, ProblemType(revoked));
+            Assert.Equal(OwnershipOfferWire.CapabilityCode, CapabilityOf(revoked));
             Assert.True(state == "Accepted", "The acceptance ran first. " + compared);
             Assert.Equal("Owner", (await wire.MembershipOfAsync(spaceId, recipientAccount)).Role);
             Assert.Equal("Admin", (await wire.MembershipOfAsync(spaceId, ownerAccount)).Role);
@@ -188,7 +185,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// holding <c>Owner</c>, never zero Owners, and no <c>Pending</c> offer names a Membership that is gone.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the acceptance and its LostMembership answer do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-26")]
@@ -266,7 +263,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// then the former Owner, now an Admin, leaves <c>204</c>. Either way the recipient is the one Owner.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the acceptance does not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AD-26")]
@@ -341,7 +338,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// the acceptance <c>204</c>. Plant 9 (<c>NoLongerOwner</c> removed) turns the first order's <c>403</c> into <c>400</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - the acceptance and the offer's NoLongerOwner answer do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-1")]

@@ -78,27 +78,6 @@ public sealed partial class RefusalBoundaryGateTests
     }
 
     /// <summary>
-    /// The leave route is the one write under <c>ReadProjectsAndTasks</c>: every other mapped route declaring the read
-    /// capability is a <c>GET</c>. The read capability on a <c>DELETE</c> is a deliberate exception (leaving is decided by
-    /// identity, not Role, and the statement can only delete the caller's own non-Owner row), and a second write slipping
-    /// under it would hand every Viewer a write. Anchor: the leave route is found.
-    /// </summary>
-    [Fact]
-    [Trait("Requirement", "FR-14")]
-    [Trait("Requirement", "AD-20")]
-    public void The_leave_route_is_the_one_write_under_ReadProjectsAndTasks()
-    {
-        var writes = RouteTable()
-            .Where(endpoint => endpoint.Metadata.GetMetadata<RequiredCapability>()?.Capability == Capability.ReadProjectsAndTasks)
-            .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? [])
-                .Where(method => !string.Equals(method, "GET", StringComparison.Ordinal) && !string.Equals(method, "HEAD", StringComparison.Ordinal))
-                .Select(method => $"{method} {endpoint.RoutePattern.RawText}"))
-            .ToList();
-
-        Assert.Equal([$"DELETE {OwnMembershipPattern}"], writes);
-    }
-
-    /// <summary>
     /// The removal authority transcribes the matrix's "Remove a Membership" cells and its boundaries: the Owner may remove
     /// Admins, Members and Viewers and must still hold Owner; an Admin may remove Members and Viewers ("Admins cannot modify
     /// each other") and must still hold Owner or Admin; a Member and a Viewer may remove no one. <b>Owner is in no

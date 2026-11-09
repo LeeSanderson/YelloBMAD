@@ -1,5 +1,6 @@
 using System.Net;
 using Xunit;
+using Yello.Contracts.Spaces;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
@@ -11,10 +12,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// gets <c>200</c>: it cannot be named.
 /// </summary>
 /// <remarks>
-/// <para>
-/// <b>Red-phase scaffolds.</b> Both cases are skipped until the read exists; the route is
-/// <see cref="OwnershipOfferWire.MineOf"/>'s stand-in.
-/// </para>
 /// <para>
 /// <b>The offerer's name is the one captured when the offer was made</b>, never a live Account read: the case renames the
 /// offering Owner after the offer and expects the captured name.
@@ -28,7 +25,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// and a <c>ReadAt</c> from the database clock during the request; no <c>@</c> and no recipient id anywhere.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the recipient's read does not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "UX-DR9")]
     [Trait("Requirement", "AD-26")]
@@ -80,7 +77,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// read of the live offer answers <c>200</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the recipient's read does not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "UX-DR9")]
     [Trait("Requirement", "AD-26")]
@@ -131,5 +128,5 @@ public sealed partial class ActiveSpaceEndpointTests
     /// The recipient's read: the Session's cookie, a <c>GET</c>.
     /// </summary>
     private static Task<WireResponse> MineOverWireAsync(WireSession session, Guid spaceId) =>
-        session.SendWithHeadersAsync(HttpMethod.Get, OwnershipOfferWire.MineOf(spaceId), content: null, NoKey, withAntiforgeryToken: false);
+        session.SendWithHeadersAsync(HttpMethod.Get, OwnershipOfferRoutes.MineOf(spaceId), content: null, NoKey, withAntiforgeryToken: false);
 }

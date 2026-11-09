@@ -16,8 +16,9 @@ namespace Yello.Host.Endpoints;
 /// <remarks>
 /// <para>
 /// <b>No Membership check, no Role, no idempotency and no refusal record here</b> - the reasons
-/// <see cref="ProjectEndpoints"/> gives. All three declare <c>OfferOwnershipTransfer</c>, which only the Owner holds, so an
-/// Admin, a Member or a Viewer meets the pipeline's recorded <c>403</c> before this code runs. Both surfaces.
+/// <see cref="ProjectEndpoints"/> gives. The offer, the Owner's read and the revoke declare <c>OfferOwnershipTransfer</c>,
+/// which only the Owner holds, so an Admin, a Member or a Viewer meets the pipeline's recorded <c>403</c> before this code
+/// runs. Both surfaces.
 /// </para>
 /// <para>
 /// <b>The offer's body is read as a document</b>, never bound, so a body that names no Membership - or names an address
@@ -64,7 +65,8 @@ public static class OwnershipOfferEndpoints
     /// <returns>
     /// <c>201</c> with the offer and a <c>Location</c> of the pending read; <c>400 invalid-offer-recipient</c> - one body for
     /// every cause - for a body naming no other Membership of this Space; <c>409 ownership-offer-pending</c> while another
-    /// offer is pending; or the pipeline's recorded boundary <c>404</c> when the caller's own Membership went first.
+    /// offer is pending; the pipeline's recorded <c>403</c> when ownership moved while the offer waited; or the pipeline's
+    /// recorded boundary <c>404</c> when the caller's own Membership went first.
     /// </returns>
     public static async Task<IResult> OfferAsync(
         OfferOwnershipHandler handler,
@@ -103,6 +105,10 @@ public static class OwnershipOfferEndpoints
             case OwnershipOfferOutcome.LostMembership:
                 return new MembershipLost();
 
+            // The pipeline records it and answers the 403 the caller's next request would get.
+            case OwnershipOfferOutcome.NoLongerOwner:
+                return new QualifiedRefusal(Capability.OfferOwnershipTransfer);
+
             // Not recorded: the Space went after the pipeline resolved it. The body is the boundary's.
             case OwnershipOfferOutcome.SpaceGone:
                 return BoundaryProblems.NotAvailable();
@@ -131,26 +137,34 @@ public static class OwnershipOfferEndpoints
     /// </summary>
     /// <param name="offerId">The offer, from the route.</param>
     /// <param name="handler">The slice.</param>
+    /// <param name="httpContext">The request: its services hold the resolved context.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>
-    /// <c>204</c>; <c>409 ownership-offer-not-pending</c> for an offer of this Space that is no longer actionable; or the
-    /// boundary's <c>404 not-available</c> - byte for byte, and not recorded - for an id that names no offer here.
+    /// <c>204</c>; <c>409 ownership-offer-not-pending</c> for an offer of this Space that is no longer actionable; the
+    /// pipeline's recorded <c>403</c> when ownership moved while the revoke waited; or the boundary's <c>404
+    /// not-available</c> - byte for byte, and not recorded - for an id that names no offer here.
     /// </returns>
-    public static async Task<IResult> RevokeAsync(Guid offerId, RevokeOwnershipOfferHandler handler, CancellationToken cancellationToken)
+    public static async Task<IResult> RevokeAsync(
+        Guid offerId,
+        RevokeOwnershipOfferHandler handler,
+        HttpContext httpContext,
+        CancellationToken cancellationToken)
     {
-        var outcome = await handler.HandleAsync(offerId, cancellationToken).ConfigureAwait(false);
+        var context = httpContext.RequestServices.GetRequiredService<ActiveSpaceContext>();
+
+        var outcome = await handler.HandleAsync(context.AccountId, offerId, cancellationToken).ConfigureAwait(false);
 
         return outcome switch
         {
             OwnershipOfferRevocation.Revoked => Results.NoContent(),
 
-            OwnershipOfferRevocation.NotPending => Results.Problem(
-                statusCode: StatusCodes.Status409Conflict,
-                type: ProblemTypes.OwnershipOfferNotPending,
-                title: "This offer is no longer open."),
+            OwnershipOfferRevocation.NotPending => NotPending(),
 
             // Not recorded: an in-Space not-found crossed no boundary. The body is the boundary's.
             OwnershipOfferRevocation.NotFound => BoundaryProblems.NotAvailable(),
+
+            // The pipeline records it and answers the 403 the caller's next request would get.
+            OwnershipOfferRevocation.NoLongerOwner => new QualifiedRefusal(Capability.OfferOwnershipTransfer),
 
             _ => throw new InvalidOperationException($"Unanswered revoke outcome {outcome}."),
         };
@@ -158,6 +172,12 @@ public static class OwnershipOfferEndpoints
 
     private static OwnershipOfferResponse Response(OwnershipOfferView offer) =>
         new(offer.Id, offer.RecipientMembershipId, offer.RecipientName, offer.ExpiresAt, offer.ReadAt);
+
+    internal static IResult NotPending() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status409Conflict,
+            type: ProblemTypes.OwnershipOfferNotPending,
+            title: "This offer is no longer open.");
 
     private static IResult InvalidOfferRecipient() =>
         Results.Problem(

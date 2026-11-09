@@ -62,7 +62,7 @@ public sealed class OfferOwnershipHandlerTests
 
     /// <summary>
     /// Nothing is enqueued when the store refuses the offer (another is pending, the recipient is not one, the caller's
-    /// Membership is gone) or when the recipient is not a Membership of this Space at all. Anchor: a made offer enqueues.
+    /// Membership is gone, ownership moved while it waited) or when the recipient is not a Membership of this Space at all. Anchor: a made offer enqueues.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -70,7 +70,7 @@ public sealed class OfferOwnershipHandlerTests
     {
         var token = TestContext.Current.CancellationToken;
 
-        foreach (var outcome in new[] { OwnershipOfferOutcome.AlreadyPending, OwnershipOfferOutcome.InvalidRecipient, OwnershipOfferOutcome.LostMembership })
+        foreach (var outcome in new[] { OwnershipOfferOutcome.AlreadyPending, OwnershipOfferOutcome.InvalidRecipient, OwnershipOfferOutcome.LostMembership, OwnershipOfferOutcome.NoLongerOwner })
         {
             var (refused, outbox) = Handler(new OwnershipOfferMade(outcome, null), null);
 
@@ -101,7 +101,7 @@ public sealed class OfferOwnershipHandlerTests
         var offerId = Guid.NewGuid();
         var store = new FixedOffers(new OwnershipOfferMade(OwnershipOfferOutcome.Offered, offerId), null);
 
-        Assert.Equal(OwnershipOfferRevocation.Revoked, await new RevokeOwnershipOfferHandler(store).HandleAsync(offerId, TestContext.Current.CancellationToken));
+        Assert.Equal(OwnershipOfferRevocation.Revoked, await new RevokeOwnershipOfferHandler(store).HandleAsync(Guid.NewGuid(), offerId, TestContext.Current.CancellationToken));
         Assert.Equal(offerId, store.Revoked);
     }
 
@@ -137,12 +137,21 @@ public sealed class OfferOwnershipHandlerTests
 
         public Task<PendingOwnershipOffer?> ReadPendingAsync(CancellationToken cancellationToken) => Task.FromResult(pending);
 
-        public Task<OwnershipOfferRevocation> RevokeAsync(Guid offerId, CancellationToken cancellationToken)
+        public Task<OwnershipOfferRevocation> RevokeAsync(Guid actorAccountId, Guid offerId, CancellationToken cancellationToken)
         {
             Revoked = offerId;
 
             return Task.FromResult(OwnershipOfferRevocation.Revoked);
         }
+
+        public Task<OwnershipOfferForRecipient?> ReadMineAsync(Guid actorAccountId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("An offer reads no recipient's offer.");
+
+        public Task<OwnershipOfferAcceptance> AcceptAsync(Guid actorAccountId, Guid offerId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("An offer accepts nothing.");
+
+        public Task<OwnershipOfferDecline> DeclineAsync(Guid actorAccountId, Guid offerId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("An offer declines nothing.");
     }
 
     private sealed class FixedName(string? name) : IActiveSpaceNameReader

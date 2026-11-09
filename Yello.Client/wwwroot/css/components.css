@@ -310,6 +310,25 @@
 }
 
 /*
+    THE OFFER INDICATOR (DESIGN.md:456; UX-DR9). The accent fill is the only accent element in chrome, because it is the
+    only one that is a proposition rather than a statement; a gate holds that. A button, because pressing it opens the
+    offer's dialog. radius-sm, the chip radius; its type and uppercase come from `.type-role-label`, as the Role chip's do.
+    Like the Role chip, no breakpoint hides it (UX-DR41).
+*/
+.offer-indicator {
+    display: inline-flex;
+    align-items: center;
+    appearance: none;
+    background-color: var(--accent);
+    color: var(--accent-on);
+    border: var(--border-hairline-width) solid var(--accent);
+    border-radius: var(--radius-sm);
+    padding-block: 0;
+    padding-inline: var(--space-2);
+    cursor: pointer;
+}
+
+/*
     THE SPACE SWITCHER'S LIST - a row per Space, the name and nothing else. It opens as a full-width
     row of the bar, under the controls, rather than as a floating panel: nothing to position, nothing
     to clip at 320px. Each row's link meets the 24px target floor in both axes, which `a` does not
@@ -2299,4 +2318,74 @@
 .ownership-section__status,
 .ownership-section__expiry {
     color: var(--text-muted);
+}
+
+/*
+    THE OWNERSHIP OFFER DIALOG ({components.dialog}; DESIGN.md:175-179). A modal over the whole page, opened from the
+    context bar's Offer indicator: the layer is the page surface itself, so nothing behind it can be clicked and pull focus
+    out of the trap. surface-card on a hairline border at the 6px dialog radius, spacing.5 inside, and no shadow. No fixed
+    height: the layer scrolls vertically, so text spacing and zoom grow the dialog rather than clipping it.
+*/
+.ownership-offer-dialog-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    box-sizing: border-box;
+    padding: var(--space-4);
+    overflow-y: auto;
+    background-color: var(--surface-page);
+}
+
+.ownership-offer-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    box-sizing: border-box;
+    inline-size: min(36rem, 100%);
+    padding: var(--space-5);
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    box-shadow: none;
+    overflow-wrap: anywhere;
+}
+
+.ownership-offer-dialog__heading,
+.ownership-offer-dialog__explanation,
+.ownership-offer-dialog__explanation p {
+    margin-block: 0;
+}
+
+.ownership-offer-dialog__explanation {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.ownership-offer-dialog__commitments {
+    margin-block: 0;
+    padding-inline-start: var(--space-5);
+}
+
+.ownership-offer-dialog__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+.ownership-offer-dialog__status {
+    margin-block: 0;
+    color: var(--text-muted);
+}
+
+/* An empty live region stays in the accessibility tree, so its next text is announced, but takes no room. */
+.ownership-offer-dialog__status:empty,
+.ownership-offer-dialog__sentinel {
+    position: absolute;
+    overflow: hidden;
+    clip-path: inset(50%);
 }

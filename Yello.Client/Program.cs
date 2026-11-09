@@ -119,6 +119,7 @@ builder.Services.AddScoped<ActiveSpaceState>();
 builder.Services.AddScoped<SpaceWrites>();
 builder.Services.AddScoped<SpaceNarration>();
 builder.Services.AddScoped<RoleNarrator>();
+builder.Services.AddScoped<OwnershipOfferState>();
 
 // Story 3.3 (AC12, open question 6 (a)): the sentence said after a deletion, held across the purge of the Space it is
 // about and taken by the entry point. Dropped with the Session, below.
@@ -182,6 +183,10 @@ _ = activeSpace.RegisterPurge(spaceNarration.Forget);
 
 var roleNarrator = host.Services.GetRequiredService<RoleNarrator>();
 _ = activeSpace.RegisterPurge(roleNarrator.Forget);
+
+// THE OFFER NAMING THIS ACCOUNT, read on every arrival in a Space and purged with it. Resolved here, before anything renders,
+// so it sees the first arrival whichever component asks for it first.
+_ = host.Services.GetRequiredService<OwnershipOfferState>();
 
 // THE SYNCHRONOUS PURGE ON LEAVING A SPACE (story 1.7, AC7). A location-changing handler runs BEFORE
 // the router renders the new location - for a link and for browser Back or Forward - so the departed

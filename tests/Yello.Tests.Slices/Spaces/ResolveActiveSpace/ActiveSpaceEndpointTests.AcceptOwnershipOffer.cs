@@ -18,10 +18,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds.</b> Every case is skipped until the acceptance exists. The routes are
-/// <see cref="OwnershipOfferWire"/>'s stand-ins until <c>OwnershipOfferRoutes</c> declares them.
-/// </para>
-/// <para>
 /// <b>Answers, by Lee's Q1 (a) and the story's Q7 (a) and Q8 (a):</b> a named recipient on an actionable offer gets
 /// <c>204</c>; the named recipient on an offer no longer actionable gets <c>409 ownership-offer-not-pending</c>; anyone else
 /// (another Member, an Admin, the Owner itself), an unknown id and another Space's id all get the in-Space not-found, byte for
@@ -68,7 +64,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="role">The recipient's Role when it accepts.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC4, AC5, AC7 - the acceptance route and the store's ordered swap do not exist yet")]
+    [Theory]
     [MemberData(nameof(AcceptingRoles))]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-26")]
@@ -121,7 +117,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Role-shaped <c>403</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the acceptance route and its identity clause do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AD-3")]
@@ -188,7 +184,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// </summary>
     /// <param name="state">Which offer.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC4, AC10 - the acceptance route and its guarded transition do not exist yet")]
+    [Theory]
     [MemberData(nameof(OffersNoLongerOpenToTheRecipient))]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-26")]
@@ -246,7 +242,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Plant 7 (the demote's exact-1 check removed) turns this red.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the demote's exact-1 check and the OfferStale answer do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AR-12")]
@@ -299,7 +295,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// dropped in a <c>finally</c>.
     /// </remarks>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the promote's 2601 catch and the acceptance route do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AD-5")]
@@ -361,11 +357,11 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <summary>
     /// The previous Owner keeps its access, as an Admin: after the acceptance its next Space read answers <c>200</c> with
     /// <c>Yello-Role: admin</c>; it can still do an Admin thing (list the Members, <c>200</c>); it is refused the Owner-only
-    /// things - renaming the Space and offering ownership - each with a recorded <c>403 insufficient-role</c>; its row is
+    /// things - deleting the Space and offering ownership - each with a recorded <c>403 insufficient-role</c>; its row is
     /// <c>Admin</c> and every other Membership but the recipient's is unchanged.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the acceptance route does not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-9")]
     [Trait("Requirement", "AR-12")]
@@ -399,7 +395,7 @@ public sealed partial class ActiveSpaceEndpointTests
             answers["members"] = await space.Owner.GetAsync(MembershipRoutes.MembershipsOf(spaceId));
 
             await space.Owner.FetchAntiforgeryTokenAsync();
-            answers["rename"] = await RenameSpaceAsync(space.Owner, spaceId, "Renamed " + Suffix());
+            answers["delete"] = await DeleteSpaceOverWireAsync(space.Owner, spaceId, null);
             answers["offer"] = await OfferOverWireAsync(space.Owner, spaceId, space.Members["bystander"].MembershipId);
         });
 
@@ -408,7 +404,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal("admin", answers["read"].Header(RoleHeader.HeaderName));
         Assert.True(answers["members"].StatusCode == HttpStatusCode.OK, $"The former Owner lists the Members: {Described(answers["members"])}");
 
-        foreach (var name in new[] { "rename", "offer" })
+        foreach (var name in new[] { "delete", "offer" })
         {
             Assert.True(answers[name].StatusCode == HttpStatusCode.Forbidden, $"The former Owner's {name}: {Described(answers[name])}");
             Assert.Equal(ProblemTypes.InsufficientRole, ProblemType(answers[name]));
@@ -419,6 +415,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal(2, refusals.Count);
         Assert.All(refusals, refusal => Assert.Equal("InsufficientRole", refusal.Kind));
         Assert.Contains(refusals, refusal => refusal.Capability == nameof(Capability.OfferOwnershipTransfer));
+        Assert.Contains(refusals, refusal => refusal.Capability == nameof(Capability.DeleteSpace));
 
         var expected = Swapped(before, ownerMembership, recipientMembership);
 
@@ -430,13 +427,12 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <summary>
     /// The new Owner is bound as any Owner is. After the acceptance: its leave is <c>409 ownership-held</c>; the former Owner
     /// (now an Admin) removing it is the recorded <c>403 insufficient-role</c> an Admin gets on the Owner's row; the former
-    /// Owner changing its Role is refused (<c>403</c> or <c>409 owner-role-fixed</c>, whichever the Role change answers today;
-    /// the dev phase records which); the new Owner offering ownership onward to the former Owner is <c>201</c>; and the former
+    /// Owner changing its Role is the recorded <c>403 insufficient-role</c> an Admin gets on the Owner's row; the new Owner offering ownership onward to the former Owner is <c>201</c>; and the former
     /// Owner then leaving is <c>204</c>, the end of the hand-over. The Space holds one Owner after each. Account deletion does
     /// not exist yet; that half is met vacuously and owned by the deletion story.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - the acceptance route does not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "FR-14")]
     [Trait("Requirement", "AR-12")]
@@ -491,9 +487,8 @@ public sealed partial class ActiveSpaceEndpointTests
 
         var change = answers["former Owner changes the new Owner's Role"];
 
-        Assert.True(
-            change.StatusCode is HttpStatusCode.Forbidden or HttpStatusCode.Conflict,
-            $"The former Owner changing the new Owner's Role is refused 403 or 409: {Described(change)}");
+        Assert.True(change.StatusCode == HttpStatusCode.Forbidden, $"The former Owner changing the new Owner's Role: {Described(change)}");
+        Assert.Equal(ProblemTypes.InsufficientRole, ProblemType(change));
         Assert.True(answers["new Owner offers onward"].StatusCode == HttpStatusCode.Created, $"The onward offer: {Described(answers["new Owner offers onward"])}");
         Assert.True(answers["former Owner leaves"].StatusCode == HttpStatusCode.NoContent, $"The former Owner's leave: {Described(answers["former Owner leaves"])}");
         Assert.DoesNotContain(await wire.MembershipRowsInAsync(spaceId), row => row.AccountId == formerOwnerAccount);
@@ -511,7 +506,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// record holds only the offer's <c>ownership-offered</c> row.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the acceptance route does not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-43")]
     [Trait("Requirement", "AR-33")]
     public async Task An_acceptance_sends_no_email_to_either_party()
@@ -566,7 +561,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// the key publish nothing more. Plant 6 (the former Owner's <c>Record</c> dropped) turns this red.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the acceptance and its two Records do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AR-16")]
     [Trait("Requirement", "AD-9")]
     [Trait("Requirement", "AD-18")]
@@ -622,7 +617,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>Accepted</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the acceptance route does not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "AD-26")]
     public async Task An_acceptance_replays_under_its_key_and_a_new_key_is_refused_409_ownership_offer_not_pending()
@@ -678,7 +673,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// no other case having run.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the acceptance route does not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AR-12")]
     [Trait("Requirement", "AD-5")]
@@ -741,7 +736,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>Idempotency-Key</c> when one is given.
     /// </summary>
     private static Task<WireResponse> AcceptOverWireAsync(WireSession session, Guid spaceId, Guid offerId, string? key = null) =>
-        session.SendWithHeadersAsync(HttpMethod.Post, OwnershipOfferWire.AcceptanceOf(spaceId, offerId), content: null, KeyHeaders(key));
+        session.SendWithHeadersAsync(HttpMethod.Post, OwnershipOfferRoutes.AcceptanceOf(spaceId, offerId), content: null, KeyHeaders(key));
 
     /// <summary>
     /// <paramref name="before"/> as a committed acceptance leaves it: the offering Owner's row <c>Admin</c>, the recipient's

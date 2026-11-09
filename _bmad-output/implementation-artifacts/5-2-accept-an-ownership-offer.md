@@ -1,6 +1,10 @@
+---
+baseline_commit: 2f3faf669e2ef71db5ba65f8551e8637bbf08483
+---
+
 # Story 5.2: Accept an Ownership Offer
 
-Status: ready-for-dev
+Status: review
 
 Epic: 5 — Hand a Space over and leave cleanly (second story)
 Story key: `5-2-accept-an-ownership-offer`
@@ -318,45 +322,45 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1983-2022` and numbered by
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0: decisions** (before any code)
-  - [ ] Q1, Q3 and Q5 are marked **[LEE]**. If the orchestrator routes them to Lee, record his answers here under "Decided by Lee" before ATDD. Otherwise take each recommendation and record it as "Qn - (x)", with its cost, in Completion Notes.
+- [x] **Task 0: decisions** (before any code)
+  - [x] Q1, Q3 and Q5 are marked **[LEE]**. If the orchestrator routes them to Lee, record his answers here under "Decided by Lee" before ATDD. Otherwise take each recommendation and record it as "Qn - (x)", with its cost, in Completion Notes.
     - **Decided by Lee (2026-11-09):**
       - Q1 - (a): the identity-decided routes declare `ReadProjectsAndTasks`, as the leave route does. The leave-only write gate becomes an explicit allow-list of identity-decided writes. No new `Capability` member.
       - Q3 - (a): build the decline route and button in 5.2. Decline writes `Declined`, with no Role change, no publish and no email. 5.3 keeps telling the Owner, the settled-state proofs and A-10.
       - Q5 - (a): the indicator updates on every answer this tab gets (arrival, re-read, Space switch, opening the dialog, the accept's own answer). No polling. Live updates are ledgered to 7.7.
-  - [ ] Decide Q2, Q4 and Q6-Q10 the same way. Each recommendation is the default.
-- [ ] **Task 1: Contracts** (AC1, AC4)
-  - [ ] Add `OwnershipOfferRoutes.Mine`/`MineOf(spaceId)` and `Acceptance`/`AcceptanceOf(spaceId, offerId)` (plus `Decline`/`DeclineOf` under Q3 (a)).
-  - [ ] Add `OwnershipOfferForRecipientResponse(Guid Id, string OffererName, DateTimeOffset ExpiresAt, DateTimeOffset ReadAt)`.
-  - [ ] Rewrite remarks that predict 5.2 so they say what exists (`ProblemTypes.OwnerRoleFixed` `:450-452`, `RoleChangeAuthority.cs:14-18`, `AssignableRoles.cs:8`, the `OwnershipOfferRoutes` remark that all routes are `OfferOwnershipTransfer`), with no story numbers.
-- [ ] **Task 2: Application** (AC4, AC5, AC9, AC11)
-  - [ ] Add `IOwnershipOfferStore.ReadMineAsync` and `AcceptAsync`, with outcome enum `OwnershipOfferAcceptance { Accepted, NotPending, NotFound, LostMembership, OfferStale, OwnerRoleFixed }` (map `OfferStale` → `409 ownership-offer-not-pending`).
-  - [ ] Add `NoLongerOwner` to `OwnershipOfferOutcome` and to `OwnershipOfferRevocation` (AC9).
-  - [ ] Add `Yello.Application/Spaces/AcceptOwnershipOffer/AcceptOwnershipOfferHandler.cs` (the spine's slice name, `ARCHITECTURE-SPINE.md:413`) and `ReadMyOwnershipOffer/ReadMyOwnershipOfferHandler.cs`. No `IOutbox`, no Role read, no recording. **No type named `...Authority...`.**
-- [ ] **Task 3: Infrastructure** (AC4-AC7, AC9, AC10)
-  - [ ] `OwnershipOfferStore.AcceptAsync`: lock → guarded transition → demote (exactly 1) → promote (exactly 1, `2601/2627` → `OwnerRoleFixed`) → two `Record`s. `ExecuteUpdateAsync` only. Add the `<remarks>` giving the reason.
-  - [ ] `OwnershipOfferStore.ReadMineAsync` (a projection; `ReadAt` from the database).
-  - [ ] `OfferAsync`/`RevokeAsync`: the `NoLongerOwner` branch, and the revoke's actor-still-Owner clause.
-  - [ ] Inject `IMembershipChanges` into `OwnershipOfferStore` (DI in `SpaceContentStores.cs`). Check that `SpaceBoundaryPipelineTests`/`ActiveSpaceUnitOfWorkTests` need no new registration (4.4's lesson).
-  - [ ] Widen the `OfferPredicates.cs` remark (`:13-15`) that lists the predicate's users.
-  - [ ] **No migration.** `Accepted` already exists in the enum and the column holds strings. Confirm with `dotnet ef migrations has-pending-model-changes` (or an empty `add`, which is then removed).
-- [ ] **Task 4: Host** (AC4, AC9, AC12)
-  - [ ] `OwnershipOfferEndpoints`: `MapReadMyOwnershipOffer` and `MapAcceptOwnershipOffer`, each `.RequiresCapability(Capability.ReadProjectsAndTasks)`, with explicit outcome switches ending `_ => throw`. Map `LostMembership` → `new MembershipLost()`, `NotFound` → `BoundaryProblems.NotAvailable()`, `NotPending`/`OfferStale` → `409 ownership-offer-not-pending`, `OwnerRoleFixed` → `409 owner-role-fixed`, `NoLongerOwner` → `QualifiedRefusal` (the recorded `403`).
-  - [ ] Register the handlers and map them in `Program.cs` beside the 5.1 routes, extending the route comment block (`:587-597`).
-- [ ] **Task 5: the decline route** (only under Q3 (a))
-  - [ ] Same identity guard and same disambiguation, writing `Declined`. No Role change, no publish, no email. 5.3 adds telling the Owner.
-- [ ] **Task 6: Client** (AC1-AC3, AC7, AC12)
-  - [ ] `OwnershipOfferState` (scoped, purged on a Space switch and on sign-out). Update the indicator in `ContextBar.razor`. Add `OwnershipOfferDialog.razor`, `ClientCopy.resx` keys (`OfferIndicator`, `OfferIndicatorName`, the dialog copy, `OwnershipOfferAccept`, `OwnershipOfferDecline`, `OwnershipOfferNoLongerOpenDetail`, `OwnershipOfferClose`, `OwnershipOfferNotSent`), `components.css` (`.offer-indicator`, the dialog layer), and `RefusalCopy` mappings where needed.
-  - [ ] `FakeYelloApi.OwnershipOffers.cs`: the `mine` read, the accept (counting accepts and keys), the decline under Q3 (a), and a Role header change after an accept for the reread.
-- [ ] **Task 7: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** use `git checkout --`, `git restore` or `git reset`. Record plants in the Debug Log as a table. After any killed run, grep for plant markers.
-- [ ] **Task 8: ledger, docs, verification**
-  - [ ] Apply the ledger dispositions below: one line per CLOSED/UPDATED/RE-OWNED note, no TAB or FORM FEED, keep the final newline.
-  - [ ] Dated notes in `ARCHITECTURE-SPINE.md`:
+  - [x] Decide Q2, Q4 and Q6-Q10 the same way. Each recommendation is the default.
+- [x] **Task 1: Contracts** (AC1, AC4)
+  - [x] Add `OwnershipOfferRoutes.Mine`/`MineOf(spaceId)` and `Acceptance`/`AcceptanceOf(spaceId, offerId)` (plus `Decline`/`DeclineOf` under Q3 (a)).
+  - [x] Add `OwnershipOfferForRecipientResponse(Guid Id, string OffererName, DateTimeOffset ExpiresAt, DateTimeOffset ReadAt)`.
+  - [x] Rewrite remarks that predict 5.2 so they say what exists (`ProblemTypes.OwnerRoleFixed` `:450-452`, `RoleChangeAuthority.cs:14-18`, `AssignableRoles.cs:8`, the `OwnershipOfferRoutes` remark that all routes are `OfferOwnershipTransfer`), with no story numbers.
+- [x] **Task 2: Application** (AC4, AC5, AC9, AC11)
+  - [x] Add `IOwnershipOfferStore.ReadMineAsync` and `AcceptAsync`, with outcome enum `OwnershipOfferAcceptance { Accepted, NotPending, NotFound, LostMembership, OfferStale, OwnerRoleFixed }` (map `OfferStale` → `409 ownership-offer-not-pending`).
+  - [x] Add `NoLongerOwner` to `OwnershipOfferOutcome` and to `OwnershipOfferRevocation` (AC9).
+  - [x] Add `Yello.Application/Spaces/AcceptOwnershipOffer/AcceptOwnershipOfferHandler.cs` (the spine's slice name, `ARCHITECTURE-SPINE.md:413`) and `ReadMyOwnershipOffer/ReadMyOwnershipOfferHandler.cs`. No `IOutbox`, no Role read, no recording. **No type named `...Authority...`.**
+- [x] **Task 3: Infrastructure** (AC4-AC7, AC9, AC10)
+  - [x] `OwnershipOfferStore.AcceptAsync`: lock → guarded transition → demote (exactly 1) → promote (exactly 1, `2601/2627` → `OwnerRoleFixed`) → two `Record`s. `ExecuteUpdateAsync` only. Add the `<remarks>` giving the reason.
+  - [x] `OwnershipOfferStore.ReadMineAsync` (a projection; `ReadAt` from the database).
+  - [x] `OfferAsync`/`RevokeAsync`: the `NoLongerOwner` branch, and the revoke's actor-still-Owner clause.
+  - [x] Inject `IMembershipChanges` into `OwnershipOfferStore` (DI in `SpaceContentStores.cs`). Check that `SpaceBoundaryPipelineTests`/`ActiveSpaceUnitOfWorkTests` need no new registration (4.4's lesson).
+  - [x] Widen the `OfferPredicates.cs` remark (`:13-15`) that lists the predicate's users.
+  - [x] **No migration.** `Accepted` already exists in the enum and the column holds strings. Confirm with `dotnet ef migrations has-pending-model-changes` (or an empty `add`, which is then removed).
+- [x] **Task 4: Host** (AC4, AC9, AC12)
+  - [x] `OwnershipOfferEndpoints`: `MapReadMyOwnershipOffer` and `MapAcceptOwnershipOffer`, each `.RequiresCapability(Capability.ReadProjectsAndTasks)`, with explicit outcome switches ending `_ => throw`. Map `LostMembership` → `new MembershipLost()`, `NotFound` → `BoundaryProblems.NotAvailable()`, `NotPending`/`OfferStale` → `409 ownership-offer-not-pending`, `OwnerRoleFixed` → `409 owner-role-fixed`, `NoLongerOwner` → `QualifiedRefusal` (the recorded `403`).
+  - [x] Register the handlers and map them in `Program.cs` beside the 5.1 routes, extending the route comment block (`:587-597`).
+- [x] **Task 5: the decline route** (only under Q3 (a))
+  - [x] Same identity guard and same disambiguation, writing `Declined`. No Role change, no publish, no email. 5.3 adds telling the Owner.
+- [x] **Task 6: Client** (AC1-AC3, AC7, AC12)
+  - [x] `OwnershipOfferState` (scoped, purged on a Space switch and on sign-out). Update the indicator in `ContextBar.razor`. Add `OwnershipOfferDialog.razor`, `ClientCopy.resx` keys (`OfferIndicator`, `OfferIndicatorName`, the dialog copy, `OwnershipOfferAccept`, `OwnershipOfferDecline`, `OwnershipOfferNoLongerOpenDetail`, `OwnershipOfferClose`, `OwnershipOfferNotSent`), `components.css` (`.offer-indicator`, the dialog layer), and `RefusalCopy` mappings where needed.
+  - [x] `FakeYelloApi.OwnershipOffers.cs`: the `mine` read, the accept (counting accepts and keys), the decline under Q3 (a), and a Role header change after an accept for the reread.
+- [x] **Task 7: tests and plants** (all ACs). See Testing requirements. Save each original in memory and restore it in a `finally`. **Never** use `git checkout --`, `git restore` or `git reset`. Record plants in the Debug Log as a table. After any killed run, grep for plant markers.
+- [x] **Task 8: ledger, docs, verification**
+  - [x] Apply the ledger dispositions below: one line per CLOSED/UPDATED/RE-OWNED note, no TAB or FORM FEED, keep the final newline.
+  - [x] Dated notes in `ARCHITECTURE-SPINE.md`:
     - AD-26: the routes, `ReadProjectsAndTasks` as the identity carrier (Q1), the in-Space `404` for a non-recipient (Q7), the demote targeting `OfferedByMembershipId`, and `OfferStale`.
     - AD-5: the identity-write allow-list now holds leave and accept (and decline).
     - AD-9: two `Record`s per accept, and the accept's header echoes the pre-swap Role while the client re-reads.
-  - [ ] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-5` stays `in-progress`.
-  - [ ] Verification follows CLAUDE.md:
+  - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-5` stays `in-progress`.
+  - [x] Verification follows CLAUDE.md:
     - `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0 warnings, 0 errors), then iterate with `--filter-class`.
     - Then **exactly one** full run in the background without the browser suite: `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1 -p:YelloSkipBrowserSuite=true`, logged to `artifacts/test-runs/5-2-accept-an-ownership-offer-develop.log`.
     - Record the totals. Rerun a failure once, alone, before calling it real.
@@ -635,14 +639,114 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (bmad-dev-story, unattended story cycle).
+
 ### Debug Log References
+
+- Iteration logs: `artifacts/test-runs/5-2-iter-slices.log`, `5-2-iter-client*.log`, `5-2-iter-isolation.log`; plant logs `artifacts/test-runs/5-2-plant-{A..F}.log`; the full run `artifacts/test-runs/5-2-accept-an-ownership-offer-develop.log`.
+- **Activation order.** The store, the routes and the slices were written before the Slices scaffolds were unskipped, so the scaffolds did not show their own "route does not exist" red. The red-green step for each was taken instead by the plants below, each seen red against the scaffold it names, and then green with the plant restored.
+- **Scaffolds corrected (4):**
+  1. `The_former_Owner_keeps_its_access_as_an_Admin_after_the_acceptance` asserted renaming the Space as an Owner-only refusal. The matrix gives `RenameSpace` to Admins too (`RoleCapabilityMatrix.cs:49`), so the case got `200`. Replaced with deleting the Space (`DeleteSpace`, Owner-only), alongside the offer; both refusals are recorded and asserted by capability.
+  2. `The_new_Owner_is_bound_as_any_Owner_is_and_the_former_Owner_can_leave` accepted `403` or `409` for the former Owner changing the new Owner's Role. Observed: the recorded `403 insufficient-role` (an Admin on the Owner's row). Narrowed to it.
+  3. `An_acceptance_and_the_Owners_revoke_held_on_the_Memberships_lock_end_in_a_serial_outcome` accepted `409` or `403` for the revoke after the swap. Observed: the recorded `403` naming `offer-ownership-transfer` (the revoke's actor-still-Owner clause, checked before "not pending"). Narrowed to it, with the capability asserted.
+  4. `OwnershipOfferTests.Accept_sends_once_with_one_key_rereads_and_narrates_the_new_Owner_politely` waited for the rise in `.role-narration`. 4.7 says a rise in the context bar's polite status and keeps `.role-narration` for drops (`RoleNarration.razor` forgets on a rise). Corrected the locator to `nav.context-bar [role='status']`; the `polite:`/not-`alert:` assertions are unchanged.
+- **Stand-ins removed.** `OwnershipOfferWire.MineOf/AcceptanceOf/DeclineOf` and the three route stand-ins were deleted; Slices, Isolation and the browser fake use `OwnershipOfferRoutes`. The leave-only write gate was deleted and `Only_the_identity_decided_writes_sit_under_ReadProjectsAndTasks` is active. The ten isolation rows are live (no `PendingUntil`).
+- **Plants** (each saved in memory and restored in a `finally`; never git). One batch was killed by the low-memory reaper mid-run (group C left planted); it was restored by hand and every file was grepped for the `PLANT-5.2` marker afterwards - none remain. The first group-A attempt did not compile (an analyzer error), so its "green" ran stale binaries and is discarded; the plant script now stops when the planted build fails.
+
+| # | Plant | Result |
+|---|---|---|
+| 1 | Promote before demote (the two statements' targets and values swapped) | Red: gate (iii) `Expected [1, 0] Actual [0, 1]`; the accept theory answers `500` for all three Roles (the promote now runs outside the `2601` catch), nothing committed |
+| 2 | `SaveChangesAsync` added to the accept path | Red: the A-14 gate |
+| 3 | Identity clause removed from the accept/decline transition | Red: the not-named accept answers `409` (the promote's own identity guard then fails, so `OfferStale`), and a non-named Member's decline answers `204` |
+| 4 | Actionable predicate removed from the accept | Red: all four no-longer-open rows answer `204`. Masked in the idempotency case's fresh-key accept, because the demote then finds no Owner and answers `OfferStale` |
+| 5 | Accept skips the Memberships lock | Red: race 1's "both waited" (`WaitUntilBlockedOnALockAsync` times out) |
+| 6 | Former Owner's `Record` dropped | Red: the publishes case (no line names the former Owner) |
+| 7 | Demote's exact-1 check removed | Red: the `OfferStale` case answers `409 owner-role-fixed` (the promote meets the still-Owner offerer) |
+| 8 | `2601` catch on the promote removed | Red: the trigger case answers `500` |
+| 9 | `NoLongerOwner` removed from the offer | Red: the AC9 race answers `400 invalid-offer-recipient` (accept ran first) |
+| 10 | An `IOutbox` on `AcceptOwnershipOfferHandler` | Red: `The_ownership_acceptance_and_decline_take_no_outbox` |
+| 11 | A second accent element in the context bar (`.context-bar__settings`) | Red: the accent gate |
+| 12 | The indicator hidden by a media query | Red: the no-hide gate |
+| 13 | Accept focused on open (a literal `autofocus` is inert on Blazor-inserted markup, so the plant moves focus there) | Red: `Neither_choice_is_focused_and_Enter_sends_no_acceptance` |
+| 14 | Days from `DateTimeOffset.Now` | Caught at build: `RS0030` (banned symbol) and `S6354`; never reaches the browser case or the clock gate |
+| 15 | No re-read after the `204` | Red: the accept browser case (no arrival read, no narration) |
+| 16 | The mine read without its recipient clause | Red: another Member reads `200` |
+
+- **Flake, rerun once.** `RealHostBrowserTests.A_Session_ended_on_the_server_lands_the_client_on_sign_in_with_the_reason` failed once (the Host's 401 landed on the shown Space's `/projects` read rather than the navigated Space); it passed alone and in a whole-class rerun.
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created.
+- **Implemented:** the recipient's read (`GET .../ownership-offers/mine`), the acceptance and the decline (`POST .../{offerId}/acceptance`, `.../decline`), all under `ReadProjectsAndTasks` on both surfaces, decided by row identity in each guarded statement. `OwnershipOfferStore.AcceptAsync` takes the Memberships lock, writes the offer `Accepted` (actionable + names the caller), then demotes the offerer (exactly one row, else `OfferStale`) and promotes the caller (exactly one row; `2601/2627` -> `OwnerRoleFixed`) by two `ExecuteUpdate` statements, then records two `MembershipChanged`. The offer and the revoke answer a former Owner `NoLongerOwner` -> the recorded `403`. Client: `OwnershipOfferState` (read on every arrival, purged with the Space), the accent indicator before the Role chip, `OwnershipOfferDialog` (full explanation, server-clock expiry, no default, focus trap, no-longer-open state, Not sent with key reuse), and `ActiveSpaceState.RequestReread` so the arrived page re-reads after an accept.
+- **Decided by Lee (2026-11-09), applied:** Q1 (a), Q3 (a), Q5 (a), as recorded under Task 0.
+- **Q2 - (a)** routes by offer id (`/mine`, `/{offerId}/acceptance`, `/{offerId}/decline`). Why: a stale dialog cannot accept an offer it never showed. Reversible: the routes live in `OwnershipOfferRoutes` only.
+- **Q4 - (a)** the mockup's copy with "their" and "commitments", the third line kept, no "What Owners can do" link (no target exists). Ledgered to UX. Reversible: copy keys only.
+- **Q6 - (a)** both surfaces; isolation rows prove both. Reversible: add `SessionOnly` metadata.
+- **Q7 - (a)** a non-recipient (the Owner included) gets the unrecorded in-Space `404`, byte-identical; the `409` goes only to the named recipient. Why: discloses nothing about whom an offer names.
+- **Q8 - (a)** the demote targets `OfferedByMembershipId AND Role = Owner`, exactly one row, else `409 ownership-offer-not-pending` with a rollback.
+- **Q9 - (a)** the rise stays polite (4.7's choice; a rise removes nothing); the drop stays assertive.
+- **Q10 - (a)** the `2601` proof is the test-only `AFTER UPDATE` trigger case; no plant left in the tree.
+- **Decision (cut if unwanted):** the acceptance's `409 owner-role-fixed` shows the same no-longer-open state and then re-reads, rather than the `owner-role-fixed` refusal sentence.
+- **Decision (cut if unwanted):** the dialog's layer is the opaque page surface, not a translucent scrim - no scrim token exists. Ledgered to UX.
+- **Decision (cut if unwanted):** the Membership updates live in `OwnershipOfferStore` (a `SwapAsync` helper in `OwnershipOfferStore.Answers.cs`), not in `MembershipStore`, so the offer's state and the Role swap sit in one method the A-14 gate walks.
+- **Decision (cut if unwanted):** the recipient's routes sit in a new `OwnershipOfferAnswerEndpoints` class; adding them to `OwnershipOfferEndpoints` broke S1200's 30-type coupling limit.
+- **Decision (cut if unwanted):** the revoke's actor-still-Owner clause is a LINQ `Any` rather than raw SQL with `READCOMMITTEDLOCK`. Every Role write takes the lock the revoke holds, so the statement's RCSI snapshot, taken after the lock, already sees a committed swap. The race case proves it (`403`).
+- **Decision (cut if unwanted):** the indicator is read on arrivals (first, re-arrival, re-read, switch), on dialog open and from the answer itself, not separately on `RoleRose`: every rise this story causes arrives through a re-read.
+- **AC11:** the accept's own `204` carries `Yello-Role` with the pre-swap Role, by the header's contract; the pipeline's header writer is unchanged. The client re-reads.
+- **AC8:** Account deletion does not exist; the FR-3 half is met vacuously and owned by 5.4's existing AC.
+- **Ledger:** `:664`, `:792-793`, `:807`, `:915`, `:929` CLOSED; `:40` UPDATED; four new entries (7.7, UX x2, 5.3).
+- **Full run (develop):** 2055 total, 2048 passed, 0 failed, 7 skipped (the environment-gated migration-bundle, timing and envelope cases), browser suite excluded; one full run. Affected browser classes run filtered: OwnershipOfferTests 20/20 and 228 more across 16 classes, green (one real-host flake passed on rerun).
+- **No migration** (`dotnet ef migrations has-pending-model-changes`: no changes). No new package or project.
 
 ### File List
+
+- Yello.Contracts/Spaces/OwnershipOfferForRecipientResponse.cs (new)
+- Yello.Contracts/Spaces/OwnershipOfferRoutes.cs
+- Yello.Contracts/ProblemTypes.cs
+- Yello.Domain/Memberships/AssignableRoles.cs
+- Yello.Domain/Memberships/RoleChangeAuthority.cs
+- Yello.Application/Spaces/IOwnershipOfferStore.cs
+- Yello.Application/Spaces/AcceptOwnershipOffer/AcceptOwnershipOfferHandler.cs (new)
+- Yello.Application/Spaces/DeclineOwnershipOffer/DeclineOwnershipOfferHandler.cs (new)
+- Yello.Application/Spaces/ReadMyOwnershipOffer/ReadMyOwnershipOfferHandler.cs (new)
+- Yello.Application/Spaces/RevokeOwnershipOffer/RevokeOwnershipOfferHandler.cs
+- Yello.Infrastructure/Persistence/OwnershipOfferStore.cs
+- Yello.Infrastructure/Persistence/OwnershipOfferStore.Answers.cs (new)
+- Yello.Infrastructure/Persistence/OfferPredicates.cs
+- Yello.Host/Endpoints/OwnershipOfferEndpoints.cs
+- Yello.Host/Endpoints/OwnershipOfferAnswerEndpoints.cs (new)
+- Yello.Host/Program.cs
+- Yello.Client/Components/ContextBar.razor
+- Yello.Client/Components/OwnershipOfferDialog.razor (new)
+- Yello.Client/Components/SpaceArrival.razor
+- Yello.Client/Spaces/OwnershipOfferState.cs (new)
+- Yello.Client/Spaces/ActiveSpaceState.cs
+- Yello.Client/Program.cs
+- Yello.Client/Localisation/ClientCopy.resx
+- Yello.Client/wwwroot/css/components.css
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.AcceptOwnershipOffer.cs
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.OwnershipOffers.cs
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.RemoveMembership.cs
+- tests/Yello.Tests.Architecture/DesignFoundationGateTests.OfferIndicator.cs
+- tests/Yello.Tests.Client/OwnershipOfferTests.cs
+- tests/Yello.Tests.Client/FakeYelloApi.OwnershipOfferAnswers.cs
+- tests/Yello.Tests.Isolation/IsolationCases.OwnershipOfferAnswers.cs
+- tests/Yello.Tests.Shared/OwnershipOfferWire.Recipient.cs
+- tests/Yello.Tests.Slices/Spaces/AcceptOwnershipOffer/AcceptOwnershipOfferHandlerTests.cs (new)
+- tests/Yello.Tests.Slices/Spaces/OfferOwnership/OfferOwnershipHandlerTests.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AcceptOwnershipOffer.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AcceptOwnershipOfferRace.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeclineOwnershipOffer.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.ReadMyOwnershipOffer.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.OfferOwnership.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.OfferOwnershipRace.cs
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.OwnershipOfferLapse.cs
+- _bmad-output/implementation-artifacts/5-2-accept-an-ownership-offer.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- _bmad-output/implementation-artifacts/deferred-work.md
+- _bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md
 
 ## Change Log
 
 - 2026-11-08: Story created (bmad-create-story). Status ready-for-dev.
+- 2026-11-09: Developed (bmad-dev-story): the recipient's read, acceptance and decline; the ordered swap; `NoLongerOwner` on the offer and revoke; the Offer indicator and dialog; ledger and spine notes. Status review.

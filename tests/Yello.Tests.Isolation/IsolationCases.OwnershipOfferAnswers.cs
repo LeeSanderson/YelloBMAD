@@ -1,6 +1,7 @@
 using System.Net;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Spaces;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Isolation;
@@ -12,9 +13,7 @@ namespace Yello.Tests.Isolation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Pending until the acceptance story's dev phase</b>, which makes every row live before review (GATE-003). The routes are
-/// <see cref="OwnershipOfferWire"/>'s stand-ins; the dev phase swaps them for the <c>OwnershipOfferRoutes</c> members. The
-/// three routes fail the route-coverage gate unless these rows are active.
+/// <b>Every row is live</b>: the three routes fail the route-coverage gate unless these rows are active.
 /// </para>
 /// <para>
 /// <b>Identity-decided, so no record-kind rows.</b> The three routes declare <c>ReadProjectsAndTasks</c>, which every Role
@@ -30,14 +29,13 @@ namespace Yello.Tests.Isolation;
 /// </remarks>
 internal static partial class IsolationCases
 {
-    private const string AnswerPending = "The routes that answer an Ownership Offer are not mapped until the acceptance story's dev phase.";
 
     private static IEnumerable<IsolationCase> OwnershipOfferAnswerCases() =>
     [
         // A fresh host's pending offer, accepted by world.A through the host's Space: the offer must stay Pending and the host
         // must stay the Owner.
         new IsolationCase(
-            "ISO-ACCEPT-OWNERSHIP-OFFER-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, OwnershipOfferWire.AcceptanceRoute,
+            "ISO-ACCEPT-OWNERSHIP-OFFER-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, OwnershipOfferRoutes.Acceptance,
             async world =>
             {
                 var (host, offerId) = await HostWithAPendingOfferAsync(world, "Ah", "Ar");
@@ -45,16 +43,14 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Post,
-                    [new(OwnershipOfferWire.AcceptanceOf(host.SpaceId, offerId), OwnershipOfferWire.AcceptanceOf(Guid.NewGuid(), offerId))],
+                    [new(OwnershipOfferRoutes.AcceptanceOf(host.SpaceId, offerId), OwnershipOfferRoutes.AcceptanceOf(Guid.NewGuid(), offerId))],
                     host.SpaceId,
                     Other: host);
             },
-            Both(new BoundaryNotFound { Then = TheOthersOfferIsStillPendingAndItStillOwnsAsync }),
-            PendingUntil: "5.2",
-            PendingReason: AnswerPending),
+            Both(new BoundaryNotFound { Then = TheOthersOfferIsStillPendingAndItStillOwnsAsync })),
 
         new IsolationCase(
-            "ISO-DECLINE-OWNERSHIP-OFFER-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, OwnershipOfferWire.DeclineRoute,
+            "ISO-DECLINE-OWNERSHIP-OFFER-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, OwnershipOfferRoutes.Decline,
             async world =>
             {
                 var (host, offerId) = await HostWithAPendingOfferAsync(world, "Dh", "Dr");
@@ -62,26 +58,22 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Post,
-                    [new(OwnershipOfferWire.DeclineOf(host.SpaceId, offerId), OwnershipOfferWire.DeclineOf(Guid.NewGuid(), offerId))],
+                    [new(OwnershipOfferRoutes.DeclineOf(host.SpaceId, offerId), OwnershipOfferRoutes.DeclineOf(Guid.NewGuid(), offerId))],
                     host.SpaceId,
                     Other: host);
             },
-            Both(new BoundaryNotFound { Then = TheOthersOfferIsStillPendingAndItStillOwnsAsync }),
-            PendingUntil: "5.2",
-            PendingReason: AnswerPending),
+            Both(new BoundaryNotFound { Then = TheOthersOfferIsStillPendingAndItStillOwnsAsync })),
 
         new IsolationCase(
-            "ISO-READ-MY-OWNERSHIP-OFFER-FOREIGN-SPACE", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, OwnershipOfferWire.MineRoute,
-            world => ForeignAsync(world, OwnershipOfferWire.MineOf),
-            Both(new BoundaryNotFound()),
-            PendingUntil: "5.2",
-            PendingReason: AnswerPending),
+            "ISO-READ-MY-OWNERSHIP-OFFER-FOREIGN-SPACE", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, OwnershipOfferRoutes.Mine,
+            world => ForeignAsync(world, OwnershipOfferRoutes.MineOf),
+            Both(new BoundaryNotFound())),
 
         // The recipient's own Personal Space with the offer id of the host's Space, an offer that names the recipient there: it
         // answers as an offer that never existed in its own Space - the unrecorded in-Space not-found, byte-identical to a
         // random id - and the host's offer stays Pending.
         new IsolationCase(
-            "ISO-ACCEPT-FOREIGN-OFFER-ID-IN-OWN-SPACE", "I-4, I-13", IsolationVector.DeepLink, HttpMethod.Post, OwnershipOfferWire.AcceptanceRoute,
+            "ISO-ACCEPT-FOREIGN-OFFER-ID-IN-OWN-SPACE", "I-4, I-13", IsolationVector.DeepLink, HttpMethod.Post, OwnershipOfferRoutes.Acceptance,
             async world =>
             {
                 var (host, recipient, _, offerId) = await HostWithAnOfferToAFreshAccountAsync(world, "Gh", "Gr");
@@ -89,16 +81,14 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     recipient,
                     HttpMethod.Post,
-                    [new(OwnershipOfferWire.AcceptanceOf(recipient.SpaceId, offerId), OwnershipOfferWire.AcceptanceOf(recipient.SpaceId, Guid.NewGuid()))],
+                    [new(OwnershipOfferRoutes.AcceptanceOf(recipient.SpaceId, offerId), OwnershipOfferRoutes.AcceptanceOf(recipient.SpaceId, Guid.NewGuid()))],
                     TargetSpaceId: null,
                     Other: host);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheOthersOfferIsStillPendingAndItStillOwnsAsync }),
-            PendingUntil: "5.2",
-            PendingReason: AnswerPending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheOthersOfferIsStillPendingAndItStillOwnsAsync })),
 
         new IsolationCase(
-            "ISO-DECLINE-FOREIGN-OFFER-ID-IN-OWN-SPACE", "I-4, I-13", IsolationVector.DeepLink, HttpMethod.Post, OwnershipOfferWire.DeclineRoute,
+            "ISO-DECLINE-FOREIGN-OFFER-ID-IN-OWN-SPACE", "I-4, I-13", IsolationVector.DeepLink, HttpMethod.Post, OwnershipOfferRoutes.Decline,
             async world =>
             {
                 var (host, recipient, _, offerId) = await HostWithAnOfferToAFreshAccountAsync(world, "Hh", "Hr");
@@ -106,18 +96,16 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     recipient,
                     HttpMethod.Post,
-                    [new(OwnershipOfferWire.DeclineOf(recipient.SpaceId, offerId), OwnershipOfferWire.DeclineOf(recipient.SpaceId, Guid.NewGuid()))],
+                    [new(OwnershipOfferRoutes.DeclineOf(recipient.SpaceId, offerId), OwnershipOfferRoutes.DeclineOf(recipient.SpaceId, Guid.NewGuid()))],
                     TargetSpaceId: null,
                     Other: host);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheOthersOfferIsStillPendingAndItStillOwnsAsync }),
-            PendingUntil: "5.2",
-            PendingReason: AnswerPending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheOthersOfferIsStillPendingAndItStillOwnsAsync })),
 
         // Another Member of the host's Space, on the offer's real id: identical to a random id, unrecorded, nothing written. A
         // non-recipient learns nothing about whom the offer names, and is never given a Role-shaped 403.
         new IsolationCase(
-            "ISO-ACCEPT-OFFER-NAMING-ANOTHER-MEMBERSHIP", "I-13", IsolationVector.DeepLink, HttpMethod.Post, OwnershipOfferWire.AcceptanceRoute,
+            "ISO-ACCEPT-OFFER-NAMING-ANOTHER-MEMBERSHIP", "I-13", IsolationVector.DeepLink, HttpMethod.Post, OwnershipOfferRoutes.Acceptance,
             async world =>
             {
                 var (host, offerId) = await HostWithAPendingOfferAsync(world, "Nh", "Nr");
@@ -126,16 +114,14 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     other,
                     HttpMethod.Post,
-                    [new(OwnershipOfferWire.AcceptanceOf(host.SpaceId, offerId), OwnershipOfferWire.AcceptanceOf(host.SpaceId, Guid.NewGuid()))],
+                    [new(OwnershipOfferRoutes.AcceptanceOf(host.SpaceId, offerId), OwnershipOfferRoutes.AcceptanceOf(host.SpaceId, Guid.NewGuid()))],
                     TargetSpaceId: null,
                     Other: host);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheOthersOfferIsStillPendingAndItStillOwnsAsync }),
-            PendingUntil: "5.2",
-            PendingReason: AnswerPending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheOthersOfferIsStillPendingAndItStillOwnsAsync })),
 
         new IsolationCase(
-            "ISO-DECLINE-OFFER-NAMING-ANOTHER-MEMBERSHIP", "I-13", IsolationVector.DeepLink, HttpMethod.Post, OwnershipOfferWire.DeclineRoute,
+            "ISO-DECLINE-OFFER-NAMING-ANOTHER-MEMBERSHIP", "I-13", IsolationVector.DeepLink, HttpMethod.Post, OwnershipOfferRoutes.Decline,
             async world =>
             {
                 var (host, offerId) = await HostWithAPendingOfferAsync(world, "Oh", "Or");
@@ -144,23 +130,21 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     other,
                     HttpMethod.Post,
-                    [new(OwnershipOfferWire.DeclineOf(host.SpaceId, offerId), OwnershipOfferWire.DeclineOf(host.SpaceId, Guid.NewGuid()))],
+                    [new(OwnershipOfferRoutes.DeclineOf(host.SpaceId, offerId), OwnershipOfferRoutes.DeclineOf(host.SpaceId, Guid.NewGuid()))],
                     TargetSpaceId: null,
                     Other: host);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheOthersOfferIsStillPendingAndItStillOwnsAsync }),
-            PendingUntil: "5.2",
-            PendingReason: AnswerPending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheOthersOfferIsStillPendingAndItStillOwnsAsync })),
 
         // The Token-bound-to-another-Space gate, one row per route a Token reaches. The recipient is a Member of the host's
         // Space and its own Token is bound to its Personal Space. By Session it accepts; by that Token the same request is a
         // non-member's, so the offer stays Pending.
         new IsolationCase(
-            "ISO-TOKEN-OWN-OTHER-SPACE-ACCEPT-OWNERSHIP-OFFER", "I-12", IsolationVector.TokenOwnOtherSpace, HttpMethod.Post, OwnershipOfferWire.AcceptanceRoute,
+            "ISO-TOKEN-OWN-OTHER-SPACE-ACCEPT-OWNERSHIP-OFFER", "I-12", IsolationVector.TokenOwnOtherSpace, HttpMethod.Post, OwnershipOfferRoutes.Acceptance,
             async world =>
             {
                 var (host, recipient, joined, offerId) = await HostWithAnOfferToAFreshAccountAsync(world, "Ta", "Tb");
-                var path = OwnershipOfferWire.AcceptanceOf(host.SpaceId, offerId);
+                var path = OwnershipOfferRoutes.AcceptanceOf(host.SpaceId, offerId);
 
                 return new CaseRequest(recipient, HttpMethod.Post, [new(path, path)], host.SpaceId, Other: joined);
             },
@@ -168,16 +152,14 @@ internal static partial class IsolationCases
             {
                 [IsolationSurface.Session] = new Served(HttpStatusCode.NoContent, (_, _, _) => Task.CompletedTask, "204 - a Session carries no Space (FR-2); the Account is the offer's recipient there") { Then = TheOtherHoldsOwnerAsync },
                 [IsolationSurface.ApiToken] = new SameAsNonMember { Then = TheOthersOfferIsStillPendingAsync },
-            },
-            PendingUntil: "5.2",
-            PendingReason: AnswerPending),
+            }),
 
         new IsolationCase(
-            "ISO-TOKEN-OWN-OTHER-SPACE-DECLINE-OWNERSHIP-OFFER", "I-12", IsolationVector.TokenOwnOtherSpace, HttpMethod.Post, OwnershipOfferWire.DeclineRoute,
+            "ISO-TOKEN-OWN-OTHER-SPACE-DECLINE-OWNERSHIP-OFFER", "I-12", IsolationVector.TokenOwnOtherSpace, HttpMethod.Post, OwnershipOfferRoutes.Decline,
             async world =>
             {
                 var (host, recipient, joined, offerId) = await HostWithAnOfferToAFreshAccountAsync(world, "Tc", "Td");
-                var path = OwnershipOfferWire.DeclineOf(host.SpaceId, offerId);
+                var path = OwnershipOfferRoutes.DeclineOf(host.SpaceId, offerId);
 
                 return new CaseRequest(recipient, HttpMethod.Post, [new(path, path)], host.SpaceId, Other: joined);
             },
@@ -185,16 +167,12 @@ internal static partial class IsolationCases
             {
                 [IsolationSurface.Session] = new Served(HttpStatusCode.NoContent, (_, _, _) => Task.CompletedTask, "204 - a Session carries no Space (FR-2); the Account is the offer's recipient there") { Then = TheOthersOfferIsDeclinedAsync },
                 [IsolationSurface.ApiToken] = new SameAsNonMember { Then = TheOthersOfferIsStillPendingAsync },
-            },
-            PendingUntil: "5.2",
-            PendingReason: AnswerPending),
+            }),
 
-        TokenOwnOtherSpace("READ-MY-OWNERSHIP-OFFER", HttpMethod.Get, OwnershipOfferWire.MineRoute, HttpStatusCode.NoContent, second => OwnershipOfferWire.MineOf(second.SpaceId))
+        TokenOwnOtherSpace("READ-MY-OWNERSHIP-OFFER", HttpMethod.Get, OwnershipOfferRoutes.Mine, HttpStatusCode.NoContent, second => OwnershipOfferRoutes.MineOf(second.SpaceId))
             with
         {
             TestDesignId = "I-12",
-            PendingUntil = "5.2",
-            PendingReason = AnswerPending,
         },
     ];
 

@@ -1,0 +1,342 @@
+@using System.Globalization
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Spaces
+@using Yello.Contracts
+@using Yello.Contracts.Spaces
+
+@implements IDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject ActiveSpaceState ActiveSpace
+@inject OwnershipOfferState Offers
+@inject SpaceWrites Writes
+
+@*
+    THE OWNERSHIP OFFER DIALOG, opened from the context bar's Offer indicator.
+
+    ONE OF THE TWO PLACES THE PRODUCT'S TERSENESS IS DELIBERATELY OVERRIDDEN: it explains in full what accepting commits
+    the recipient to, because nobody should agree to that from a one-line dialog.
+
+    A MODAL DIALOG, ONE LEVEL DEEP AND NEVER STACKED, labelled by its heading and described by its explanation. Focus goes
+    to the heading on open - neither Accept nor Decline is pre-focused or a default, and there is no form to submit on Enter,
+    because a mis-hit Enter must not transfer a Space. Focus is trapped by a sentinel at each end; Esc closes.
+
+    OPENING RE-READS THE OFFER. An offer that closed meanwhile - or an answer saying so - replaces the body in place with
+    the designed no-longer-open state, which names neither the reason nor who acted, and offers only Close.
+
+    THE EXPIRY IS COUNTED FROM THE SERVER'S CLOCK, ExpiresAt minus ReadAt, never the browser's.
+
+    ONE IDEMPOTENCY-KEY PER DELIBERATE ACCEPT OR DECLINE, kept for a resend after no answer.
+*@
+
+<div class="ownership-offer-dialog-layer">
+    <div class="ownership-offer-dialog" role="dialog" aria-modal="true" aria-labelledby="@HeadingId" aria-describedby="@ExplanationId" tabindex="-1" @onkeydown="KeyDownAsync">
+        <div class="ownership-offer-dialog__sentinel" tabindex="0" @onfocus="FocusLastAsync"></div>
+
+        @if (_offer is { } offer && !_noLongerOpen)
+        {
+            <h2 class="type-dialog-title ownership-offer-dialog__heading" id="@HeadingId" tabindex="-1" @ref="_heading">@Heading(offer)</h2>
+
+            <div class="ownership-offer-dialog__explanation" id="@ExplanationId">
+                <p>@Format("OwnershipOfferAccepting", offer.OffererName)</p>
+                <p>@Localizer["OwnershipOfferCommitmentsLead"]</p>
+                <ul class="ownership-offer-dialog__commitments">
+                    <li>@Localizer["OwnershipOfferCommitmentMembership"]</li>
+                    <li>@Localizer["OwnershipOfferCommitmentAccount"]</li>
+                    <li>@Localizer["OwnershipOfferCommitmentAgreement"]</li>
+                </ul>
+                <p class="type-meta">@Remaining(offer) · <time datetime="@MachineTime(offer)">@LocalTime(offer)</time></p>
+            </div>
+
+            <div class="ownership-offer-dialog__actions">
+                <button type="button" class="button-primary" @onclick="AcceptAsync" @ref="_accept">@Localizer["OwnershipOfferAccept"]</button>
+                <button type="button" class="button-secondary" @onclick="DeclineAsync" @ref="_decline">@Localizer["OwnershipOfferDecline"]</button>
+            </div>
+
+            <p class="ownership-offer-dialog__status" role="status">@_status</p>
+        }
+
+        @if (_noLongerOpen)
+        {
+            <h2 class="type-dialog-title ownership-offer-dialog__heading" id="@HeadingId" tabindex="-1" @ref="_heading">@Localizer[RefusalCopy.OwnershipOfferNotPendingKey]</h2>
+
+            <p class="ownership-offer-dialog__explanation" id="@ExplanationId">@Localizer["OwnershipOfferNoLongerOpenDetail"]</p>
+
+            <div class="ownership-offer-dialog__actions">
+                <button type="button" class="button-secondary" @onclick="CloseAsync" @ref="_close">@Localizer["OwnershipOfferClose"]</button>
+            </div>
+        }
+
+        @if (_offer is null && !_noLongerOpen)
+        {
+            <h2 class="visually-hidden" id="@HeadingId" tabindex="-1" @ref="_heading">@Localizer["OfferIndicator"]</h2>
+            <p class="visually-hidden" id="@ExplanationId" aria-busy="true">@Localizer["OwnershipLoading"]</p>
+        }
+
+        <div class="ownership-offer-dialog__sentinel" tabindex="0" @onfocus="FocusFirstAsync"></div>
+    </div>
+</div>
+
+@code {
+    private const string HeadingId = "ownership-offer-dialog-heading";
+    private const string ExplanationId = "ownership-offer-dialog-explanation";
+
+    private ElementReference _heading;
+    private ElementReference _accept;
+    private ElementReference _decline;
+    private ElementReference _close;
+
+    private OwnershipOfferForRecipientResponse? _offer;
+    private bool _noLongerOpen;
+    private bool _focusHeading;
+    private bool _busy;
+    private bool _disposed;
+    private string? _status;
+
+    // The key of the last Accept or Decline that got no answer: a resend of the same choice reuses it.
+    private (bool Accept, string Key)? _key;
+
+    /// <summary>The Space whose ownership is offered: the active one.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>The Space's name, as the heading states it.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string SpaceName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Raised when the dialog closes, with whether the offer may still be open - so focus returns to the indicator - or not,
+    /// so it goes to the context bar, the nearest container that survives.
+    /// </summary>
+    [Parameter]
+    public EventCallback<bool> OnClosed { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _offer = Offers.Offer;
+        _focusHeading = true;
+
+        var answered = await Offers.RefreshAsync();
+
+        if (_disposed)
+        {
+            return;
+        }
+
+        if (Offers.Offer is { } fresh)
+        {
+            _offer = fresh;
+        }
+        else if (answered)
+        {
+            _noLongerOpen = true;
+        }
+        else if (_offer is null)
+        {
+            // No answer and nothing held: there is no offer to show, and saying it closed would be untrue.
+            await OnClosed.InvokeAsync(true);
+            return;
+        }
+        else
+        {
+            // No answer: the offer last read is shown, and the server decides on Accept.
+        }
+
+        _focusHeading = true;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusHeading)
+        {
+            _focusHeading = false;
+            await _heading.FocusAsync();
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose() => _disposed = true;
+
+    private string Heading(OwnershipOfferForRecipientResponse offer) =>
+        string.Format(CultureInfo.CurrentCulture, Localizer["OwnershipOfferHeading"], offer.OffererName, SpaceName);
+
+    private string Format(string key, string argument) => string.Format(CultureInfo.CurrentCulture, Localizer[key], argument);
+
+    /// <summary>
+    /// The days left, counted from the server's own reading of its clock - never the browser's.
+    /// </summary>
+    private string Remaining(OwnershipOfferForRecipientResponse offer)
+    {
+        var days = (int)Math.Floor((offer.ExpiresAt - offer.ReadAt).TotalDays);
+
+        return days switch
+        {
+            < 1 => Localizer["OwnershipExpiresToday"],
+            1 => Localizer["OwnershipExpiresInOneDay"],
+            _ => string.Format(CultureInfo.CurrentCulture, Localizer["OwnershipExpiresInDays"], days),
+        };
+    }
+
+    private static string MachineTime(OwnershipOfferForRecipientResponse offer) => offer.ExpiresAt.ToString("O", CultureInfo.InvariantCulture);
+
+    private static string LocalTime(OwnershipOfferForRecipientResponse offer) => offer.ExpiresAt.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+
+    private async Task FocusFirstAsync()
+    {
+        if (_noLongerOpen)
+        {
+            await _close.FocusAsync();
+        }
+        else if (_offer is not null)
+        {
+            await _accept.FocusAsync();
+        }
+        else
+        {
+            await _heading.FocusAsync();
+        }
+    }
+
+    private async Task FocusLastAsync()
+    {
+        if (_noLongerOpen)
+        {
+            await _close.FocusAsync();
+        }
+        else if (_offer is not null)
+        {
+            await _decline.FocusAsync();
+        }
+        else
+        {
+            await _heading.FocusAsync();
+        }
+    }
+
+    private async Task KeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape" && !_busy)
+        {
+            await CloseAsync();
+        }
+    }
+
+    private Task CloseAsync() => OnClosed.InvokeAsync(!_noLongerOpen);
+
+    private Task AcceptAsync() => AnswerAsync(accept: true);
+
+    private Task DeclineAsync() => AnswerAsync(accept: false);
+
+    private async Task AnswerAsync(bool accept)
+    {
+        if (_busy || _offer is not { } offer)
+        {
+            return;
+        }
+
+        if (_key is not { } kept || kept.Accept != accept)
+        {
+            _key = (accept, Guid.NewGuid().ToString("D"));
+        }
+
+        _busy = true;
+        _status = null;
+
+        var token = ActiveSpace.Token;
+        var path = accept ? OwnershipOfferRoutes.AcceptanceOf(SpaceId, offer.Id) : OwnershipOfferRoutes.DeclineOf(SpaceId, offer.Id);
+
+        try
+        {
+            using var answer = await Writes.SendWithoutBodyAsync(HttpMethod.Post, path, _key.Value.Key, token);
+
+            if (!token.IsCancellationRequested && !_disposed)
+            {
+                await UseAnswerAsync(answer, accept);
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // No answer: the dialog stays, and the key is kept for the resend.
+            _status = Localizer["OwnershipOfferNotSent"];
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    private async Task UseAnswerAsync(SpaceWriteAnswer answer, bool accept)
+    {
+        if (answer.StatusCode == HttpStatusCode.Unauthorized)
+        {
+            return;
+        }
+
+        if (answer.StatusCode >= HttpStatusCode.InternalServerError)
+        {
+            // The outcome is not known: treated as no answer, so the key is kept.
+            _status = Localizer["OwnershipOfferNotSent"];
+            return;
+        }
+
+        _key = null;
+
+        if (answer.Response.IsSuccessStatusCode)
+        {
+            Offers.Closed();
+            await OnClosed.InvokeAsync(false);
+
+            // The answer's Role header is the one judged before the swap; the Space is read again for the Role it moved to.
+            if (accept)
+            {
+                ActiveSpace.RequestReread();
+            }
+
+            return;
+        }
+
+        var type = answer.Problem?.Type;
+
+        if (string.Equals(type, ProblemTypes.OwnershipOfferNotPending, StringComparison.Ordinal)
+            || string.Equals(type, ProblemTypes.OwnerRoleFixed, StringComparison.Ordinal))
+        {
+            ShowNoLongerOpen();
+
+            if (string.Equals(type, ProblemTypes.OwnerRoleFixed, StringComparison.Ordinal))
+            {
+                ActiveSpace.RequestReread();
+            }
+
+            return;
+        }
+
+        if (answer.StatusCode == HttpStatusCode.NotFound)
+        {
+            // The Space itself refused: the page reads it again and renders the one refusal surface.
+            Offers.Closed();
+            await OnClosed.InvokeAsync(false);
+            ActiveSpace.RequestReread();
+            return;
+        }
+
+        _status = RefusalText.Of(Localizer, answer.Problem);
+    }
+
+    private void ShowNoLongerOpen()
+    {
+        Offers.Closed();
+        _noLongerOpen = true;
+        _status = null;
+        _focusHeading = true;
+    }
+}

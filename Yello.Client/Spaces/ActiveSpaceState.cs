@@ -91,6 +91,12 @@ public sealed class ActiveSpaceState : IDisposable
     public event EventHandler? RoleRose;
 
     /// <summary>
+    /// Raised when something outside the arrived page asks for the active Space to be read again - the context bar, after
+    /// an answer that moved this Account's Role. The arrived page re-reads it as a re-arrival does.
+    /// </summary>
+    public event EventHandler? RereadRequested;
+
+    /// <summary>
     /// The Space this tab is in or on its way into, or <c>null</c> on a route outside any Space.
     /// </summary>
     public Guid? SpaceId { get; private set; }
@@ -318,6 +324,11 @@ public sealed class ActiveSpaceState : IDisposable
 
         return true;
     }
+
+    /// <summary>
+    /// Asks the arrived page to read the active Space again, and with it the Role held there.
+    /// </summary>
+    public void RequestReread() => RereadRequested?.Invoke(this, EventArgs.Empty);
 
     /// <summary>
     /// The tab is about to land in a Space it has just created (story 3.1, AC13): the arrival counts as a switch, so focus

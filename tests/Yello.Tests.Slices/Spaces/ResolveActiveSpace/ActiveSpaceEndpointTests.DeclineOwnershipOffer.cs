@@ -1,6 +1,7 @@
 using System.Net;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Spaces;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
@@ -12,8 +13,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// emailed. Telling the offering Owner, and the proofs across every settled state, stay with the later story.
 /// </summary>
 /// <remarks>
-/// <b>Red-phase scaffolds.</b> Every case is skipped until the decline exists; the route is
-/// <see cref="OwnershipOfferWire.DeclineOf"/>'s stand-in. Seeding is as in <c>.AcceptOwnershipOffer.cs</c>.
+/// Seeding is as in <c>.AcceptOwnershipOffer.cs</c>.
 /// </remarks>
 public sealed partial class ActiveSpaceEndpointTests
 {
@@ -24,7 +24,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>204</c>; and a declined offer cannot afterwards be accepted (<c>409 ownership-offer-not-pending</c>).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 (Q3 a) - the decline route does not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AR-12")]
@@ -75,7 +75,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// offer stays <c>Pending</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 (Q3 a), AC4 - the decline route and its identity clause do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AD-3")]
@@ -135,7 +135,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// key is <c>409 ownership-offer-not-pending</c>; a malformed key is <c>400 invalid-idempotency-key</c>. One row, <c>Declined</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 (Q3 a), AC10 - the decline route does not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "AD-26")]
     public async Task A_decline_replays_under_its_key_and_a_new_key_is_refused_409_ownership_offer_not_pending()
@@ -177,5 +177,5 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>Idempotency-Key</c> when one is given.
     /// </summary>
     private static Task<WireResponse> DeclineOverWireAsync(WireSession session, Guid spaceId, Guid offerId, string? key = null) =>
-        session.SendWithHeadersAsync(HttpMethod.Post, OwnershipOfferWire.DeclineOf(spaceId, offerId), content: null, KeyHeaders(key));
+        session.SendWithHeadersAsync(HttpMethod.Post, OwnershipOfferRoutes.DeclineOf(spaceId, offerId), content: null, KeyHeaders(key));
 }

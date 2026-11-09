@@ -13,7 +13,8 @@ namespace Yello.Domain.Memberships;
 /// </para>
 /// <para>
 /// <b>Owner is in no set, for any actor.</b> FR-13: "No Role change can produce a second Owner or remove the sole Owner.
-/// Ownership moves only by an Ownership Offer" (FR-42, story 5.2). So the one guarded statement that composes these sets
+/// Ownership moves only by an Ownership Offer" - its acceptance, which the offer store writes as its own demote and promote.
+/// So the one guarded statement that composes these sets
 /// can neither read an Owner row as its target nor write <c>Owner</c>: the filtered unique index carries "at most one
 /// Owner", and this rule, with the S-2 invariant test, carries "at least one" (Lee's Q2 (a)).
 /// </para>

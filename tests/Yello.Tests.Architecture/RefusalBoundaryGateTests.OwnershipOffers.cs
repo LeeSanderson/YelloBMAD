@@ -163,8 +163,9 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// Only the offer's persistence writes an offer's state: no <c>ExecuteDelete</c> on <c>OwnershipOffer</c> exists anywhere
-    /// (offers are retained; a Space's deletion takes them by cascade), the only bulk update generic over it is
-    /// <c>OwnershipOfferStore</c>'s (the revoke), and only <c>OwnershipOfferStore</c> and <c>OwnershipOfferWrites</c> call
+    /// (offers are retained; a Space's deletion takes them by cascade), the only bulk updates generic over it are
+    /// <c>OwnershipOfferStore</c>'s (the revoke, the acceptance and the decline - the three sanctioned transitions a request
+    /// names), and only <c>OwnershipOfferStore</c> and <c>OwnershipOfferWrites</c> call
     /// <c>OwnershipOffer.set_State</c>, and only these two write to the table in SQL. Anchor: both types exist in
     /// <c>Yello.Infrastructure.Persistence</c>, and the SQL scan finds both.
     /// </summary>

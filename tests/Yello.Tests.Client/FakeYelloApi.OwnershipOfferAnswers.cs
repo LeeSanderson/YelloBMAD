@@ -2,7 +2,6 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using Yello.Contracts;
 using Yello.Contracts.Spaces;
-using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -24,9 +23,6 @@ namespace Yello.Tests.Client;
 /// <c>204</c> echoes the Role judged at request start, so the fake makes the Account the Owner only from the next request
 /// on (<see cref="ApplyAnsweredOfferRoles"/>, called first in <c>DecideAsync</c>). With no acceptance it does nothing, so
 /// every earlier case is served the bytes it always was.
-/// </para>
-/// <para>
-/// The routes are <see cref="OwnershipOfferWire"/>'s stand-ins until <c>OwnershipOfferRoutes</c> declares them.
 /// </para>
 /// </remarks>
 internal sealed partial class FakeYelloApi
@@ -60,7 +56,7 @@ internal sealed partial class FakeYelloApi
     /// <param name="spaceId">The Space.</param>
     /// <returns>The requests.</returns>
     public IReadOnlyList<FakeRequest> MyOfferReads(Guid spaceId) =>
-        [.. _requests.Where(request => request.Method == "GET" && request.Path == OwnershipOfferWire.MineOf(spaceId))];
+        [.. _requests.Where(request => request.Method == "GET" && request.Path == OwnershipOfferRoutes.MineOf(spaceId))];
 
     /// <summary>
     /// Every acceptance sent in <paramref name="spaceId"/>, in order.

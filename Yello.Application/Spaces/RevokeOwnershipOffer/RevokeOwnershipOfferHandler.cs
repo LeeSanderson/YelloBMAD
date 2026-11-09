@@ -19,9 +19,10 @@ public sealed class RevokeOwnershipOfferHandler(IOwnershipOfferStore offers)
     /// <summary>
     /// Revokes the offer.
     /// </summary>
+    /// <param name="actorAccountId">The revoking Account, as the pipeline resolved it.</param>
     /// <param name="offerId">The offer, from the route.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>What happened.</returns>
-    public Task<OwnershipOfferRevocation> HandleAsync(Guid offerId, CancellationToken cancellationToken) =>
-        offers.RevokeAsync(offerId, cancellationToken);
+    public Task<OwnershipOfferRevocation> HandleAsync(Guid actorAccountId, Guid offerId, CancellationToken cancellationToken) =>
+        offers.RevokeAsync(actorAccountId, offerId, cancellationToken);
 }

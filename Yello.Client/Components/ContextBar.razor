@@ -12,6 +12,7 @@
 @inject AntiforgeryTokenSource Antiforgery
 @inject HttpClient Http
 @inject NavigationManager Navigation
+@inject OwnershipOfferState Offers
 
 @*
     THE CONTEXT BAR. AC4, AC5, AC6, AC11; UX-DR9, UX-DR28, UX-DR39; DESIGN.md:162-168, :454;
@@ -51,6 +52,11 @@
     SpaceCapabilities.PermitsSpaceSettings admits - Owner and Admin - and absent for the others (UX-DR27). It is its own
     link and never the Role chip, which stays display-only (UX-DR28). Space home no longer links there.
 
+    THE OFFER INDICATOR: an accent "Ownership offered" button before the Role chip, rendered only while an Ownership Offer
+    names this Account in the active Space (OwnershipOfferState) and absent otherwise. The only accent element in chrome,
+    because it is the only one that is a proposition rather than a statement. It opens the offer dialog; on close focus
+    returns to it, or to the bar when the offer has gone. Like the Role chip, no breakpoint hides it.
+
     SIGN OUT asks the server to end the Session (which refuses every copy of the cookie from then
     on), then runs the same purge an expired Session does and lands on sign-in with no reason.
 *@
@@ -74,6 +80,11 @@
         @if (ActiveSpace.Current is not null && ActiveSpace.ProjectName is { } project)
         {
             <span class="type-meta context-bar__project">@project</span>
+        }
+
+        @if (ActiveSpace.Current is { } offeredIn && Offers.Offer is not null && Offers.SpaceId == offeredIn.Id)
+        {
+            <button type="button" class="offer-indicator type-role-label" aria-label="@IndicatorName(offeredIn.Name)" @onclick="OpenOffer" @ref="_indicator">@Localizer["OfferIndicator"]</button>
         }
 
         @if (ActiveSpace.Current is { } held)
@@ -103,6 +114,11 @@
                        OnDismissed="Dismiss" />
     }
 
+    @if (_offerOpen && ActiveSpace.Current is { } offering)
+    {
+        <OwnershipOfferDialog SpaceId="@offering.Id" SpaceName="@offering.Name" OnClosed="OfferClosed" />
+    }
+
     <p class="visually-hidden" role="status">@_announcement</p>
 </nav>
 
@@ -111,9 +127,12 @@
 
     private ElementReference _bar;
     private ElementReference _trigger;
+    private ElementReference _indicator;
     private SpaceSwitcher? _switcher;
 
     private bool _open;
+    private bool _offerOpen;
+    private bool _focusIndicator;
     private bool _focusBar;
     private bool _focusTrigger;
     private bool _focusFirstRow;
@@ -136,6 +155,7 @@
         ActiveSpace.Changed += OnActiveSpaceChanged;
         ActiveSpace.RoleRose += OnRoleRose;
         Navigation.LocationChanged += OnLocationChanged;
+        Offers.Changed += OnOffersChanged;
     }
 
     /// <inheritdoc />
@@ -144,12 +164,18 @@
         ActiveSpace.Changed -= OnActiveSpaceChanged;
         ActiveSpace.RoleRose -= OnRoleRose;
         Navigation.LocationChanged -= OnLocationChanged;
+        Offers.Changed -= OnOffersChanged;
     }
 
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_focusBar)
+        if (_focusIndicator)
+        {
+            _focusIndicator = false;
+            await _indicator.FocusAsync();
+        }
+        else if (_focusBar)
         {
             _focusBar = false;
             await _bar.FocusAsync();
@@ -175,6 +201,44 @@
     }
 
     private string Copy(string key) => Localizer[key].Value;
+
+    private string IndicatorName(string spaceName) =>
+        string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer["OfferIndicatorName"], spaceName);
+
+    private void OnOffersChanged(object? sender, EventArgs args)
+    {
+        // A purge, or an answer that no offer names this Account here: an open dialog goes with the offer it was about.
+        if (Offers.SpaceId is null)
+        {
+            _offerOpen = false;
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OpenOffer()
+    {
+        _open = false;
+        _offerOpen = true;
+    }
+
+    /// <summary>
+    /// Focus goes back to the indicator that opened the dialog, or - once the offer is no longer open, so the indicator is
+    /// gone - to the bar, the nearest container that survives.
+    /// </summary>
+    private void OfferClosed(bool stillOffered)
+    {
+        _offerOpen = false;
+
+        if (stillOffered && Offers.Offer is not null)
+        {
+            _focusIndicator = true;
+        }
+        else
+        {
+            _focusBar = true;
+        }
+    }
 
     private void OnActiveSpaceChanged(object? sender, EventArgs args)
     {

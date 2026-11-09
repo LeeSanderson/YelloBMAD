@@ -209,6 +209,8 @@ public sealed partial class ActiveSpaceEndpointTests
         }
 
         Assert.Equal(0, storedBeforeAnchor);
+
+        await AssertOneOwnerEachAsync(wire, spaceId);
     }
 
     /// <summary>
@@ -245,6 +247,8 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal(ProblemTypes.InvalidOfferRecipient, ProblemType(refused));
         Assert.Equal(0, storedBeforeAnchor);
         Assert.True(anchor?.StatusCode == HttpStatusCode.Created, $"The anchor: {Described(anchor)}");
+
+        await AssertOneOwnerEachAsync(wire, spaceId);
     }
 
     /// <summary>
@@ -297,6 +301,8 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.DoesNotContain(await RefusalsOfAsync(database, ownerId), row => row.TargetSpaceId == spaceId);
         Assert.Single(await wire.OwnershipOffersInAsync(spaceId));
         Assert.Empty(await wire.OwnershipOffersInAsync(otherSpaceId));
+
+        await AssertOneOwnerEachAsync(wire, spaceId);
     }
 
     /// <summary>
@@ -337,6 +343,8 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.Equal("Pending", pending.State);
         Assert.Equal(space!.Members["first"].MembershipId, pending.RecipientMembershipId);
+
+        await AssertOneOwnerEachAsync(wire, spaceId);
     }
 
     /// <summary>
@@ -378,6 +386,8 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal("Lapsed", Assert.Single(rows, row => row.Id == expired).State);
         Assert.Single(rows, row => row.State == "Pending");
         Assert.Equal(2, rows.Count);
+
+        await AssertOneOwnerEachAsync(wire, spaceId);
     }
 
     /// <summary>
@@ -418,6 +428,8 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.InRange(row.ExpiresAt, before.AddDays(OwnershipOfferWire.ExpiryDays), after.AddDays(OwnershipOfferWire.ExpiryDays));
         Assert.Equal(row.ExpiresAt, answer.ExpiresAt);
         Assert.InRange(answer.ReadAt, before, after);
+
+        await AssertOneOwnerEachAsync(wire, spaceId);
     }
 
     /// <summary>
@@ -502,6 +514,8 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal(ProblemTypes.InvalidIdempotencyKey, ProblemType(answers["malformed"]));
         Assert.Single(await wire.OwnershipOffersInAsync(spaceId));
         Assert.Equal(1, (await wire.NotificationSendsInAsync(spaceId)).Count(record => record.Kind == OwnershipOfferWire.OwnershipOfferedKind));
+
+        await AssertOneOwnerEachAsync(wire, spaceId);
     }
 
     /// <summary>

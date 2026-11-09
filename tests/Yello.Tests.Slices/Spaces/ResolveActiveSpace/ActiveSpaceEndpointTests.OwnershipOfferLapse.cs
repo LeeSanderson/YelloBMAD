@@ -147,6 +147,8 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.True(refused?.StatusCode == HttpStatusCode.Forbidden, $"The Admin removing the Admin recipient: {Described(refused)}");
         Assert.Equal("Admin", (await wire.MembershipOfAsync(spaceId, recipientAccount)).Role);
         Assert.Equal("Pending", Assert.Single(await wire.OwnershipOffersInAsync(spaceId)).State);
+
+        await AssertOneOwnerEachAsync(wire, spaceId);
     }
 
     /// <summary>
@@ -183,6 +185,8 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.Equal("Pending", offer.State);
         Assert.Equal(recipientMembership, offer.RecipientMembershipId);
+
+        await AssertOneOwnerEachAsync(wire, spaceId);
     }
 
     /// <summary>

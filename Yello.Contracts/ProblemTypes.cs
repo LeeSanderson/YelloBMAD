@@ -448,8 +448,9 @@ public static class ProblemTypes
     /// </summary>
     /// <remarks>
     /// <b>Disclosable</b>: the caller is the Owner, who sees its own row in the Membership list. Ownership moves only by an
-    /// Ownership Offer (story 5.2). Also the stable answer should the filtered unique index ever refuse a second Owner
-    /// (<c>2601</c>) - never a <c>500</c>. An Admin touching the Owner's row is <see cref="InsufficientRole"/> instead.
+    /// accepted Ownership Offer. Also the stable answer whenever the filtered unique index refuses a second Owner
+    /// (<c>2601</c>), the acceptance's promote included - never a <c>500</c>. An Admin touching the Owner's row is
+    /// <see cref="InsufficientRole"/> instead.
     /// </remarks>
     public static string OwnerRoleFixed => "urn:yello:problem:owner-role-fixed";
 

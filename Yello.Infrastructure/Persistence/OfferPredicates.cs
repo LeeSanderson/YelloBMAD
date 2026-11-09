@@ -12,7 +12,7 @@ namespace Yello.Infrastructure.Persistence;
 /// <para>
 /// <b>Declared once, here, and evaluated nowhere else.</b> Every guarded statement that decides on an offer - the Invitation's
 /// duplicate-pending check, pending list and revoke (<see cref="InvitationStore"/>), its view, screen and accept, and
-/// the Ownership Offer's read and revoke (<see cref="OwnershipOfferStore"/>) - composes one of these
+/// the Ownership Offer's reads, revoke, acceptance and decline (<see cref="OwnershipOfferStore"/>) - composes one of these
 /// expressions into its own <c>WHERE</c> clause, so it translates to SQL and runs against <c>SYSDATETIMEOFFSET()</c>
 /// inside that statement. No <c>TimeProvider</c> and no C# instant appear in it; a gate holds that this is the only
 /// place an expiry is compared.

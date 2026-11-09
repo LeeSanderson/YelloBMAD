@@ -5,7 +5,7 @@ namespace Yello.Domain.Memberships;
 /// (the Role an Invitation offers) and 4.4 (the Role a change asks for, Q10 (a)).
 /// </summary>
 /// <remarks>
-/// <b>Owner is never assignable by a request</b>: ownership moves only by an Ownership Offer (FR-42, story 5.2). A code
+/// <b>Owner is never assignable by a request</b>: ownership moves only by an accepted Ownership Offer. A code
 /// that names no Role, <c>owner</c> in any case, or a missing code is refused before anything is read. Codes compare
 /// ordinally, so <c>OWNER</c> and <c>Admin</c> name nothing.
 /// </remarks>

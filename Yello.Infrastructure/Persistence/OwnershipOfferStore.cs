@@ -1,5 +1,6 @@
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Yello.Application.Memberships;
 using Yello.Application.Spaces;
 using Yello.Domain;
 using Yello.Domain.Memberships;
@@ -8,7 +9,8 @@ using Yello.Domain.Spaces;
 namespace Yello.Infrastructure.Persistence;
 
 /// <summary>
-/// Makes, reads and revokes the resolved Space's Ownership Offer inside the request's Space-scoped unit of work.
+/// Makes, reads, revokes, accepts and declines the resolved Space's Ownership Offer inside the request's Space-scoped unit
+/// of work.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -26,9 +28,14 @@ namespace Yello.Infrastructure.Persistence;
 /// <see cref="OwnershipOfferOutcome.AlreadyPending"/>, never a <c>500</c>, and the unit of work rolls back.
 /// </para>
 /// <para>
-/// <b>The revoke</b> is one guarded <c>UPDATE</c> composed with the shared actionable predicate and a rowcount check; on a
-/// miss it reads only whether the id exists in this Space, to choose between <see cref="OwnershipOfferRevocation.NotPending"/>
-/// and <see cref="OwnershipOfferRevocation.NotFound"/>. It is never a <c>DELETE</c>: offers are retained.
+/// <b>The revoke</b> is one guarded <c>UPDATE</c> composed with the shared actionable predicate, a clause that the caller is
+/// still the Owner, and a rowcount check; on a miss it reads the caller's Role and whether the id exists in this Space, to
+/// choose between <see cref="OwnershipOfferRevocation.NoLongerOwner"/>, <see cref="OwnershipOfferRevocation.NotPending"/> and
+/// <see cref="OwnershipOfferRevocation.NotFound"/>. It is never a <c>DELETE</c>: offers are retained.
+/// </para>
+/// <para>
+/// <b>The acceptance and the decline</b> are the recipient's, each one guarded <c>UPDATE</c> whose <c>WHERE</c> holds the
+/// actionable predicate and that the offer names the caller's own Membership; the acceptance then swaps the two Roles.
 /// </para>
 /// <para>
 /// <b>The read</b> takes no lock and reads the database clock in the same statement, so the client counts days from the
@@ -42,7 +49,12 @@ namespace Yello.Infrastructure.Persistence;
 /// <param name="dbContext">The request's unit of work.</param>
 /// <param name="identifiers">Produces the offer's identity.</param>
 /// <param name="clock">Stamps the offer's instant.</param>
-internal sealed class OwnershipOfferStore(YelloDbContext dbContext, IIdentifierGenerator identifiers, TimeProvider clock) : IOwnershipOfferStore
+/// <param name="membershipChanges">Records the two Roles an acceptance moves, to publish after the commit.</param>
+internal sealed partial class OwnershipOfferStore(
+    YelloDbContext dbContext,
+    IIdentifierGenerator identifiers,
+    TimeProvider clock,
+    IMembershipChanges membershipChanges) : IOwnershipOfferStore
 {
     private const int UniqueIndexViolationErrorNumber = 2601;
 
@@ -59,8 +71,7 @@ internal sealed class OwnershipOfferStore(YelloDbContext dbContext, IIdentifierG
 
         await ApplicationLocks.TakeMembershipsAsync(dbContext, cancellationToken).ConfigureAwait(false);
 
-        var spaceId = dbContext.ScopedSpaceId
-            ?? throw new InvalidOperationException("An Ownership Offer is made only inside a Space-scoped unit of work.");
+        var spaceId = ScopedSpaceId();
 
         await dbContext.Set<OwnershipOffer>()
             .Where(OfferPredicates.OwnershipOfferPendingButExpired)
@@ -98,13 +109,16 @@ internal sealed class OwnershipOfferStore(YelloDbContext dbContext, IIdentifierG
             return new OwnershipOfferMade(OwnershipOfferOutcome.Offered, offerId);
         }
 
-        // Whether the caller is still here decides between its own lost Membership and a recipient that is not one.
-        var actorStillHere = await dbContext.Memberships
-            .AsNoTracking()
-            .AnyAsync(membership => membership.AccountId == actorAccountId, cancellationToken)
-            .ConfigureAwait(false);
+        // The caller's own Role now decides between its lost Membership, ownership that moved while it waited on the lock,
+        // and a recipient that is not another Membership of this Space.
+        var outcome = await ActorRoleAsync(actorAccountId, cancellationToken).ConfigureAwait(false) switch
+        {
+            null => OwnershipOfferOutcome.LostMembership,
+            Role.Owner => OwnershipOfferOutcome.InvalidRecipient,
+            _ => OwnershipOfferOutcome.NoLongerOwner,
+        };
 
-        return new OwnershipOfferMade(actorStillHere ? OwnershipOfferOutcome.InvalidRecipient : OwnershipOfferOutcome.LostMembership, null);
+        return new OwnershipOfferMade(outcome, null);
     }
 
     /// <inheritdoc />
@@ -117,19 +131,29 @@ internal sealed class OwnershipOfferStore(YelloDbContext dbContext, IIdentifierG
             .ConfigureAwait(false);
 
     /// <inheritdoc />
-    public async Task<OwnershipOfferRevocation> RevokeAsync(Guid offerId, CancellationToken cancellationToken)
+    public async Task<OwnershipOfferRevocation> RevokeAsync(Guid actorAccountId, Guid offerId, CancellationToken cancellationToken)
     {
         await ApplicationLocks.TakeMembershipsAsync(dbContext, cancellationToken).ConfigureAwait(false);
 
+        var spaceId = ScopedSpaceId();
+
+        // The actor clause: every Role write takes the lock held here, so this statement's snapshot, taken after it, sees an
+        // acceptance that committed while the revoke waited.
         var revoked = await dbContext.Set<OwnershipOffer>()
             .Where(offer => offer.Id == offerId)
             .Where(OfferPredicates.OwnershipOfferActionable)
+            .Where(offer => dbContext.Memberships.Any(actor => actor.SpaceId == spaceId && actor.AccountId == actorAccountId && actor.Role == Role.Owner))
             .ExecuteUpdateAsync(setters => setters.SetProperty(offer => offer.State, OwnershipOfferState.Revoked), cancellationToken)
             .ConfigureAwait(false);
 
         if (revoked == 1)
         {
             return OwnershipOfferRevocation.Revoked;
+        }
+
+        if (await ActorRoleAsync(actorAccountId, cancellationToken).ConfigureAwait(false) is { } role && role != Role.Owner)
+        {
+            return OwnershipOfferRevocation.NoLongerOwner;
         }
 
         // Existence only, under both isolation layers: another Space's offer is invisible, so it answers as one that never
@@ -140,5 +164,24 @@ internal sealed class OwnershipOfferStore(YelloDbContext dbContext, IIdentifierG
             .ConfigureAwait(false);
 
         return exists ? OwnershipOfferRevocation.NotPending : OwnershipOfferRevocation.NotFound;
+    }
+
+    private Guid ScopedSpaceId() =>
+        dbContext.ScopedSpaceId
+            ?? throw new InvalidOperationException("An Ownership Offer is written only inside a Space-scoped unit of work.");
+
+    /// <summary>
+    /// The caller's own Role here as both isolation layers show it now, or <c>null</c> once its Membership is gone.
+    /// </summary>
+    private async Task<Role?> ActorRoleAsync(Guid actorAccountId, CancellationToken cancellationToken)
+    {
+        var actor = await dbContext.Memberships
+            .AsNoTracking()
+            .Where(membership => membership.AccountId == actorAccountId)
+            .Select(membership => new { membership.Role })
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return actor?.Role;
     }
 }

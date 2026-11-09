@@ -1,5 +1,5 @@
 # generated: 2026-08-22 13:10
-# last_updated: 2026-11-08
+# last_updated: 2026-11-09
 # project: YelloBMAD
 # project_key: NOKEY
 # tracking_system: file-system
@@ -64,7 +64,7 @@
 #   - issues 8, 9: PRD §7's stale sentence; missing `status` fields
 
 generated: 2026-08-22 13:10
-last_updated: 2026-11-08
+last_updated: 2026-11-09
 project: YelloBMAD
 project_key: NOKEY
 tracking_system: file-system
@@ -122,7 +122,7 @@ development_status:
   # Epic 5: Hand a Space over and leave cleanly
   epic-5: in-progress
   5-1-offer-ownership-of-a-space-and-tell-the-recipient: done
-  5-2-accept-an-ownership-offer: ready-for-dev
+  5-2-accept-an-ownership-offer: review
   5-3-decline-revoke-lapse-and-the-states-that-are-no-longer-open: backlog
   5-4-delete-your-account: backlog
   epic-5-retrospective: optional

@@ -30,10 +30,13 @@ using Yello.Application.Labels.DefineLabel;
 using Yello.Application.Labels.DeleteLabel;
 using Yello.Application.Labels.ListLabels;
 using Yello.Application.Lists.ViewList;
+using Yello.Application.Spaces.AcceptOwnershipOffer;
 using Yello.Application.Spaces.CreateSpace;
+using Yello.Application.Spaces.DeclineOwnershipOffer;
 using Yello.Application.Spaces.DeleteSpace;
 using Yello.Application.Spaces.ListSpaces;
 using Yello.Application.Spaces.OfferOwnership;
+using Yello.Application.Spaces.ReadMyOwnershipOffer;
 using Yello.Application.Spaces.ReadOwnershipOffer;
 using Yello.Application.Spaces.RenameSpace;
 using Yello.Application.Spaces.RevokeOwnershipOffer;
@@ -162,6 +165,9 @@ builder.Services.AddScoped<ListAssigneesHandler>();
 builder.Services.AddScoped<OfferOwnershipHandler>();
 builder.Services.AddScoped<ReadOwnershipOfferHandler>();
 builder.Services.AddScoped<RevokeOwnershipOfferHandler>();
+builder.Services.AddScoped<ReadMyOwnershipOfferHandler>();
+builder.Services.AddScoped<AcceptOwnershipOfferHandler>();
+builder.Services.AddScoped<DeclineOwnershipOfferHandler>();
 builder.Services.AddScoped<ActingAuthority>();
 
 // The Account-scoped context (AD-24), established by the pipeline for the two surfaces that name it.
@@ -595,6 +601,16 @@ api.MapListAssignees();
 api.MapOfferOwnership();
 api.MapReadOwnershipOffer();
 api.MapRevokeOwnershipOffer();
+
+// The recipient's side, decided by row identity rather than Role, so all three declare ReadProjectsAndTasks, which every Role
+// holds, on both surfaces. GET .../ownership-offers/mine answers the actionable offer naming the caller (200) or 204. POST
+// .../ownership-offers/{offerId}/acceptance swaps the Roles - the Owner to Admin, then the caller to Owner, two statements
+// in one transaction under the Memberships lock - and publishes both; POST .../{offerId}/decline writes Declined and moves
+// nothing. Neither sends email. Anyone the offer does not name gets the unrecorded boundary 404; its named recipient on an
+// offer no longer open gets 409 ownership-offer-not-pending.
+api.MapReadMyOwnershipOffer();
+api.MapAcceptOwnershipOffer();
+api.MapDeclineOwnershipOffer();
 
 // Every other /api path - a malformed {spaceId} included - answers the same not-available body a
 // boundary refusal does, and records nothing. Mapped on `app`, outside the group: no filter has

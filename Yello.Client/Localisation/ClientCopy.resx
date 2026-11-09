@@ -1543,4 +1543,56 @@
     <value>Ownership can be offered only to another Membership of this Space.</value>
     <comment>The 400 invalid-offer-recipient: the person chosen left the Space, or was removed, after the choice was drawn. The choice is drawn again. Names nobody.</comment>
   </data>
+  <data name="OfferIndicator" xml:space="preserve">
+    <value>Ownership offered</value>
+    <comment>The Offer indicator in the context bar, before the Role chip, shown only while an Ownership Offer names this Account in the active Space. Uppercased by CSS as the Role chip is. It opens the offer dialog.</comment>
+  </data>
+  <data name="OfferIndicatorName" xml:space="preserve">
+    <value>Ownership of {0} offered to you. Open the offer.</value>
+    <comment>The Offer indicator&apos;s accessible name. {0} is the active Space&apos;s name. Names nobody.</comment>
+  </data>
+  <data name="OwnershipOfferHeading" xml:space="preserve">
+    <value>{0} has offered you ownership of {1}.</value>
+    <comment>The offer dialog&apos;s heading. {0} is the offering Owner&apos;s display name as captured on the offer; {1} is the Space&apos;s name. Never an address.</comment>
+  </data>
+  <data name="OwnershipOfferAccepting" xml:space="preserve">
+    <value>Accepting makes you the Owner. {0} becomes an Admin and keeps their access.</value>
+    <comment>The offer dialog&apos;s first sentence: what accepting changes. {0} is the offering Owner&apos;s display name as captured on the offer.</comment>
+  </data>
+  <data name="OwnershipOfferCommitmentsLead" xml:space="preserve">
+    <value>As Owner you would take on commitments that leaving cannot undo:</value>
+    <comment>Introduces the list of what being Owner commits the recipient to. The dialog is one of the two places the product&apos;s terseness is deliberately overridden: nobody should agree to this from one line.</comment>
+  </data>
+  <data name="OwnershipOfferCommitmentMembership" xml:space="preserve">
+    <value>You could not remove your own Membership while you hold ownership.</value>
+    <comment>A commitment of being Owner: the Owner cannot leave or be removed while holding ownership (FR-14).</comment>
+  </data>
+  <data name="OwnershipOfferCommitmentAccount" xml:space="preserve">
+    <value>You could not delete your Yello Account until you pass ownership on, or delete this Space.</value>
+    <comment>A commitment of being Owner: Account deletion is refused while the Account owns a Space (FR-3).</comment>
+  </data>
+  <data name="OwnershipOfferCommitmentAgreement" xml:space="preserve">
+    <value>Passing it on needs someone else to accept. Nobody can be made an Owner without agreeing.</value>
+    <comment>Why the two commitments bind: ownership moves only by an accepted offer, never unrequested (FR-42).</comment>
+  </data>
+  <data name="OwnershipOfferAccept" xml:space="preserve">
+    <value>Accept ownership</value>
+    <comment>The offer dialog&apos;s primary button. Never pre-focused and never a default: a mis-hit Enter must not transfer a Space.</comment>
+  </data>
+  <data name="OwnershipOfferDecline" xml:space="preserve">
+    <value>Decline</value>
+    <comment>The offer dialog&apos;s secondary button: declines the offer. Nothing about the Role changes. Never pre-focused.</comment>
+  </data>
+  <data name="OwnershipOfferNoLongerOpenDetail" xml:space="preserve">
+    <value>Nothing has changed about your access to this Space.</value>
+    <comment>The offer dialog&apos;s no-longer-open state, under &quot;This offer is no longer open.&quot;: names neither the reason nor who acted.</comment>
+  </data>
+  <data name="OwnershipOfferClose" xml:space="preserve">
+    <value>Close</value>
+    <comment>The one button of the offer dialog&apos;s no-longer-open state. Closes the dialog.</comment>
+  </data>
+  <data name="OwnershipOfferNotSent" xml:space="preserve">
+    <value>Not sent.</value>
+    <comment>An Accept or Decline in the offer dialog that got no answer. The dialog stays open and the same press resends under the same key. Never &quot;Sent&quot;.</comment>
+  </data>
 </root>

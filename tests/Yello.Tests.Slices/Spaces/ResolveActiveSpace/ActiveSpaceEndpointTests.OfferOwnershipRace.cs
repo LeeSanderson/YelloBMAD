@@ -153,6 +153,8 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.True(pending.State == "Pending", compared);
         Assert.Equal(OwnershipOfferWire.Parse(winner.Body).RecipientMembershipId, pending.RecipientMembershipId);
+
+        await AssertOneOwnerEachAsync(wire, spaceId);
     }
 
     /// <summary>

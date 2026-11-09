@@ -14,8 +14,7 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds.</b> Every case is skipped until the indicator and the dialog exist. The API is
-/// <see cref="FakeYelloApi"/> at the network edge, taught the recipient's routes in
+/// The API is <see cref="FakeYelloApi"/> at the network edge, taught the recipient's routes in
 /// <c>FakeYelloApi.OwnershipOfferAnswers.cs</c>; no Host, no database, no engine. Same assembly fixture as
 /// <see cref="OwnershipSectionTests"/>, so no new fixture.
 /// </para>
@@ -25,8 +24,7 @@ namespace Yello.Tests.Client;
 /// Open the offer."; the dialog is the page's one <c>[role=dialog][aria-modal=true]</c>, headed "{offerer} has offered you
 /// ownership of {space}."; its buttons are "Accept ownership" and "Decline"; the no-longer-open state says "This offer is no
 /// longer open." and "Nothing has changed about your access to this Space." with one button "Close". The unanswered
-/// acceptance says "Not sent." (this run's assumption for <c>OwnershipOfferNotSent</c>'s value) and the same "Accept
-/// ownership" press resends. Text is read with <c>textContent</c>.
+/// acceptance says "Not sent." and the same "Accept ownership" press resends. Text is read with <c>textContent</c>.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Client")]
@@ -42,6 +40,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     private const string Indicator = "nav.context-bar button.offer-indicator";
     private const string Dialog = "[role='dialog'][aria-modal='true']";
     private const string Narration = ".role-narration";
+    private const string BarStatus = "nav.context-bar [role='status']";
     private const string SwitcherTrigger = "nav.context-bar button[aria-controls]";
     private const string OwnershipSection = "main .ownership-section";
     private const string MembersSection = "main .membership-section";
@@ -164,7 +163,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// the offer naming it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the Offer indicator and the recipient's read do not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR41")]
     public async Task A_named_recipient_sees_the_Offer_indicator_before_the_Role_chip_with_its_accessible_name()
     {
@@ -191,7 +190,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="role">The Account's Role in the Space.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - the Offer indicator and the recipient's read do not exist yet")]
+    [Theory]
     [MemberData(nameof(RolesWithNoOfferForThem))]
     [Trait("Requirement", "UX-DR27")]
     public async Task No_Offer_indicator_is_rendered_without_an_offer_naming_the_Account(string role)
@@ -213,7 +212,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// Nothing carries over between Spaces: after a switch to a Space with no offer, the indicator is gone.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the Offer indicator and its per-Space state do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-10")]
     public async Task The_Offer_indicator_is_gone_after_a_switch_to_a_Space_with_no_offer()
     {
@@ -238,7 +237,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// page sends no read of its own.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 (Q5 a) - the Offer indicator and its re-read on arrival do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-10")]
     public async Task A_re_arrival_answered_204_removes_the_Offer_indicator()
     {
@@ -266,7 +265,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// At 320px the indicator survives as the Role chip does: visible, still named, and the bar causes no sideways scroll.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the Offer indicator does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR41")]
     [Trait("Requirement", "NFR-9")]
     public async Task At_320px_the_Offer_indicator_stays_visible_and_named_and_the_bar_does_not_reflow()
@@ -293,7 +292,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// no address appears anywhere in it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the offer dialog does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR37")]
     [Trait("Requirement", "AD-23")]
     public async Task The_dialog_explains_both_commitments_and_names_the_offerer()
@@ -330,7 +329,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// machine-readable <c>time</c>. Plant 14 (days from <c>DateTimeOffset.Now</c>) says something else.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the offer dialog does not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-27")]
     [Trait("Requirement", "UX-DR42")]
     [Trait("Assumption", "PRD-12-3")]
@@ -358,7 +357,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// <c>Esc</c> closes the dialog, sends nothing, and returns focus to the indicator that opened it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the offer dialog does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     public async Task Esc_closes_the_dialog_and_returns_focus_to_the_indicator()
     {
@@ -381,7 +380,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// Focus is trapped: <c>Tab</c> and <c>Shift+Tab</c>, pressed more times than the dialog has controls, never leave it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the offer dialog does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     public async Task Tab_cycles_within_the_dialog()
     {
@@ -409,7 +408,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// <c>Enter</c> must not transfer a Space. Plant 13 (<c>autofocus</c> on Accept) turns it red.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the offer dialog does not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR12")]
     public async Task Neither_choice_is_focused_and_Enter_sends_no_acceptance()
     {
@@ -441,11 +440,12 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// Accept sends one acceptance with one <c>Idempotency-Key</c>; on its <c>204</c> the dialog closes, the indicator is
-    /// removed, the Space is re-read, and the rise is narrated politely ("You're now the Owner. ..."), not as an alert; focus
+    /// removed, the Space is re-read, and the rise is narrated politely by the context bar's status ("You're now the Owner.
+    /// ..."), as every rise is, not as an alert; focus
     /// lands in the context bar, never on the body. Plant 15 (no re-read after the <c>204</c>) turns it red.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the offer dialog and the acceptance do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-9")]
     [Trait("Requirement", "AD-18")]
     [Trait("Requirement", "UX-DR38")]
@@ -464,7 +464,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
 
             await page.Locator(Dialog).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = AcceptAction, Exact = true }).ClickAsync();
             await page.Locator(Dialog).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
-            await page.Locator(Narration, new PageLocatorOptions { HasText = NowTheOwner }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.Locator(BarStatus, new PageLocatorOptions { HasText = NowTheOwner }).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = Timeout });
 
             var sent = Assert.Single(api.AcceptancesSent(Northwind));
             var said = await page.EvaluateAsync<string[]>("() => window.__said || []");
@@ -485,7 +485,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// same <c>Idempotency-Key</c> (a retry after no answer reuses the key), and the replay's <c>204</c> completes it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AC12 - the offer dialog and its unanswered state do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     public async Task An_unanswered_acceptance_says_Not_sent_and_resends_under_the_same_key()
     {
@@ -523,7 +523,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="problemCode">The refusal's stable code.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2, AC12 - the offer dialog and its no-longer-open state do not exist yet")]
+    [Theory]
     [MemberData(nameof(RefusalsThatCloseTheOffer))]
     [Trait("Requirement", "UX-DR39")]
     public async Task An_acceptance_refused_409_shows_the_offer_is_no_longer_open_and_removes_the_indicator(string problemCode)
@@ -563,7 +563,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// <c>204</c>), the dialog opens on the no-longer-open state, and offers no Accept and no Decline.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 (Q5 a) - the offer dialog and its re-read on open do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     public async Task Opening_the_dialog_on_an_offer_that_has_closed_shows_the_no_longer_open_state()
     {
@@ -593,7 +593,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// indicator is removed; the Role is unchanged.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 (Q3 a) - the offer dialog and the decline do not exist yet")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     public async Task Decline_sends_one_decline_and_removes_the_indicator()
     {
@@ -620,7 +620,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// spacing overrides applied (WCAG 1.4.10, 1.4.12).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC2 - the Offer indicator and the offer dialog do not exist yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR41")]
     [Trait("Requirement", "NFR-9")]
     public async Task The_indicator_and_the_dialog_reflow_at_320_by_256_with_text_spacing()
@@ -651,7 +651,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// itself stays (the Members section is still there), because an Admin keeps it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the acceptance does not exist yet, so no Owner is ever demoted to Admin")]
+    [Fact]
     [Trait("Requirement", "AD-9")]
     [Trait("Requirement", "UX-DR38")]
     public async Task The_former_Owner_in_Space_settings_is_told_before_the_Ownership_section_goes()
