@@ -312,7 +312,9 @@
         {
             ShowNoLongerOpen();
 
-            if (string.Equals(type, ProblemTypes.OwnerRoleFixed, StringComparison.Ordinal))
+            // An earlier Accept that got no answer, or one from another tab, may be what closed the offer: the Space is read
+            // again, so a Role it moved reaches this tab now rather than on its next request.
+            if (accept)
             {
                 ActiveSpace.RequestReread();
             }

@@ -43,14 +43,14 @@ public sealed partial class DesignFoundationGateTests
     }
 
     /// <summary>
-    /// The Offer indicator takes the 2px chip radius (<c>deferred-work.md:40</c>).
+    /// The Offer indicator takes the 2px chip radius.
     /// </summary>
     [Fact]
     [Trait("Requirement", "UX-DR9")]
     public void The_Offer_indicator_takes_the_2px_radius() => AssertRadius(OfferIndicatorClass, 2, "var(--radius-sm)");
 
     /// <summary>
-    /// The offer dialog takes the 6px dialog radius (<c>deferred-work.md:40</c>).
+    /// The offer dialog takes the 6px dialog radius.
     /// </summary>
     [Fact]
     [Trait("Requirement", "UX-DR12")]

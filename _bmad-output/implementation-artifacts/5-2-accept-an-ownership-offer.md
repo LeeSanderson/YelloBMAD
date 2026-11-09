@@ -4,7 +4,7 @@ baseline_commit: 2f3faf669e2ef71db5ba65f8551e8637bbf08483
 
 # Story 5.2: Accept an Ownership Offer
 
-Status: review
+Status: done
 
 Epic: 5 — Hand a Space over and leave cleanly (second story)
 Story key: `5-2-accept-an-ownership-offer`
@@ -364,6 +364,28 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:1983-2022` and numbered by
     - `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0 warnings, 0 errors), then iterate with `--filter-class`.
     - Then **exactly one** full run in the background without the browser suite: `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1 -p:YelloSkipBrowserSuite=true`, logged to `artifacts/test-runs/5-2-accept-an-ownership-offer-develop.log`.
     - Record the totals. Rerun a failure once, alone, before calling it real.
+
+### Review Findings
+
+Code review 2026-11-09 (Blind Hunter, Edge Case Hunter, Acceptance Auditor; diff `3328f7f..1ea4a9c`). 34 raw findings, 30 after deduplication: 5 patched, 12 deferred as low, 0 decisions, 13 dismissed. Checked and sound: the swap's lock order, the guarded `Accepted`, demote-then-promote with exact-1 rowcounts, rollback of every miss through `UnitOfWorkResults.IsFailure`, the `2601` catch on the promote only (the demote cannot raise it; plant 1's `500` still rolls back and still goes red), and `MembershipChanged` recorded only after both writes. The revoke's LINQ actor clause holds under RCSI: the applock is transaction-owned, and the `UPDATE`'s statement snapshot starts after the lock is granted, so after the swap commits.
+
+- [x] [Review][Patch] An Accept that meets `409 ownership-offer-not-pending` did not re-read the Space, so a resent Accept whose first send committed unseen (or an accept from another tab) left this tab on the old Role [Yello.Client/Components/OwnershipOfferDialog.razor:315]
+- [x] [Review][Patch] A `5xx` or `429` on the offer read cleared the indicator while the offer was still pending [Yello.Client/Spaces/OwnershipOfferState.cs:94]
+- [x] [Review][Patch] The ledger dispositions for `:40`, `:664`, `:792-793`, `:807`, `:915` and `:929` were written as blank lines; the CLOSED/UPDATED notes are now in `deferred-work.md` [_bmad-output/implementation-artifacts/deferred-work.md:41]
+- [x] [Review][Patch] Comments this diff added carried requirement ids, question ids and ledger line numbers (`components.css`, `ClientCopy.resx`, `OwnershipOfferTests.cs`, `DesignFoundationGateTests.OfferIndicator.cs`, `ActiveSpaceEndpointTests.AcceptOwnershipOffer.cs`, `.DeclineOwnershipOffer.cs`) [Yello.Client/wwwroot/css/components.css:313]
+- [x] [Review][Patch] The `OnOffersChanged` comment said a "no offer" answer closes the dialog; only a purge does [Yello.Client/Components/ContextBar.razor:210]
+- [x] [Review][Defer] A same-key resend that waited on the lock behind its own committed first send answers `409` with "Nothing has changed about your access"; the Space pipeline has no late replay like the Invitation pipeline's (the re-read now corrects the Role) [Yello.Host/Spaces/ActiveSpaceResolution.Idempotency.cs:53] — deferred, low severity
+- [x] [Review][Defer] Overlapping offer reads can apply an older answer last [Yello.Client/Spaces/OwnershipOfferState.cs:81] — deferred, low severity
+- [x] [Review][Defer] `OfferStale` rolls back to `Pending` but the client is told the offer is no longer open (unreachable without a seeded row) [Yello.Infrastructure/Persistence/OwnershipOfferStore.Answers.cs:94] — deferred, low severity
+- [x] [Review][Defer] A revoke whose actor's Membership went while it waited answers `404`/`409` rather than the recorded `LostMembership` the offer gives [Yello.Infrastructure/Persistence/OwnershipOfferStore.cs:154] — deferred, low severity
+- [x] [Review][Defer] Several offer statements rely on the Space key and query filter without their own `SpaceId = @space` (`ActorRoleAsync`, `NamingTheCaller`, `MissAsync`, `SwapAsync`'s read) [Yello.Infrastructure/Persistence/OwnershipOfferStore.cs:176] — deferred, low severity
+- [x] [Review][Defer] The modal dialog renders inside the context bar's `<nav>` landmark [Yello.Client/Components/ContextBar.razor:119] — deferred, low severity
+- [x] [Review][Defer] Accept and Decline show nothing while a request is in flight [Yello.Client/Components/OwnershipOfferDialog.razor:248] — deferred, low severity
+- [x] [Review][Defer] "Expires today" for anything under 24 hours, beside a local date that may be tomorrow [Yello.Client/Components/OwnershipOfferDialog.razor:176] — deferred, low severity
+- [x] [Review][Defer] Opening the dialog with no answer and no offer held closes it with no message [Yello.Client/Components/OwnershipOfferDialog.razor:139] — deferred, low severity
+- [x] [Review][Defer] An offer-level `404` on Accept or Decline closes the dialog silently and re-reads a Space that is still readable [Yello.Client/Components/OwnershipOfferDialog.razor:323] — deferred, low severity
+- [x] [Review][Defer] Closing the dialog can ask focus of an indicator a refresh has just removed [Yello.Client/Components/ContextBar.razor:229] — deferred, low severity
+- [x] [Review][Defer] The decline and read handler tests sit in `AcceptOwnershipOfferHandlerTests`, so a class filter for them finds nothing; the indicator's text-spacing row is in `OwnershipOfferTests`, not `TextSpacingTests` [tests/Yello.Tests.Slices/Spaces/AcceptOwnershipOffer/AcceptOwnershipOfferHandlerTests.cs:1] — deferred, low severity
 
 ## Dev Notes
 
@@ -750,3 +772,4 @@ Claude Opus 5.5 (bmad-dev-story, unattended story cycle).
 
 - 2026-11-08: Story created (bmad-create-story). Status ready-for-dev.
 - 2026-11-09: Developed (bmad-dev-story): the recipient's read, acceptance and decline; the ordered swap; `NoLongerOwner` on the offer and revoke; the Offer indicator and dialog; ledger and spine notes. Status review.
+- 2026-11-09: Code review (bmad-code-review): 5 findings patched (the re-read after a `409` on Accept, the offer read kept on `5xx`/`429`, the ledger dispositions written, comment-rule fixes), 12 deferred as low. Status done.

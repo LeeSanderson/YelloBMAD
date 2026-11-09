@@ -310,10 +310,10 @@
 }
 
 /*
-    THE OFFER INDICATOR (DESIGN.md:456; UX-DR9). The accent fill is the only accent element in chrome, because it is the
+    THE OFFER INDICATOR. The accent fill is the only accent element in chrome, because it is the
     only one that is a proposition rather than a statement; a gate holds that. A button, because pressing it opens the
     offer's dialog. radius-sm, the chip radius; its type and uppercase come from `.type-role-label`, as the Role chip's do.
-    Like the Role chip, no breakpoint hides it (UX-DR41).
+    Like the Role chip, no breakpoint hides it.
 */
 .offer-indicator {
     display: inline-flex;
@@ -2321,7 +2321,7 @@
 }
 
 /*
-    THE OWNERSHIP OFFER DIALOG ({components.dialog}; DESIGN.md:175-179). A modal over the whole page, opened from the
+    THE OWNERSHIP OFFER DIALOG ({components.dialog}). A modal over the whole page, opened from the
     context bar's Offer indicator: the layer is the page surface itself, so nothing behind it can be clicked and pull focus
     out of the trap. surface-card on a hairline border at the 6px dialog radius, spacing.5 inside, and no shadow. No fixed
     height: the layer scrolls vertically, so text spacing and zoom grow the dialog rather than clipping it.

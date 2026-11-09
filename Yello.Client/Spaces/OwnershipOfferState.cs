@@ -91,6 +91,12 @@ public sealed class OwnershipOfferState : IDisposable
                 return true;
             }
 
+            // A server failure or a throttle says nothing about the offer, so the one last read stands.
+            if (response.StatusCode >= HttpStatusCode.InternalServerError || response.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                return false;
+            }
+
             // A 204 is the answer that no offer names this Account. A refusal of the Space itself is the page's to render,
             // and either way there is nothing here to offer.
             Set(spaceId, null);

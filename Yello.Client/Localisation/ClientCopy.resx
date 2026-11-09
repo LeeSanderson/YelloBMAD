@@ -1565,15 +1565,15 @@
   </data>
   <data name="OwnershipOfferCommitmentMembership" xml:space="preserve">
     <value>You could not remove your own Membership while you hold ownership.</value>
-    <comment>A commitment of being Owner: the Owner cannot leave or be removed while holding ownership (FR-14).</comment>
+    <comment>A commitment of being Owner: the Owner cannot leave or be removed while holding ownership.</comment>
   </data>
   <data name="OwnershipOfferCommitmentAccount" xml:space="preserve">
     <value>You could not delete your Yello Account until you pass ownership on, or delete this Space.</value>
-    <comment>A commitment of being Owner: Account deletion is refused while the Account owns a Space (FR-3).</comment>
+    <comment>A commitment of being Owner: Account deletion is refused while the Account owns a Space.</comment>
   </data>
   <data name="OwnershipOfferCommitmentAgreement" xml:space="preserve">
     <value>Passing it on needs someone else to accept. Nobody can be made an Owner without agreeing.</value>
-    <comment>Why the two commitments bind: ownership moves only by an accepted offer, never unrequested (FR-42).</comment>
+    <comment>Why the two commitments bind: ownership moves only by an accepted offer, never unrequested.</comment>
   </data>
   <data name="OwnershipOfferAccept" xml:space="preserve">
     <value>Accept ownership</value>

@@ -61,7 +61,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     private const string SettingsLink = "Space settings";
 
     /// <summary>
-    /// The commitments the dialog must state in full (FR-42; the story's copy, Q4 (a)).
+    /// The commitments the dialog must state in full.
     /// </summary>
     private static readonly string[] Commitments =
     [
@@ -589,7 +589,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// Decline (Lee's Q3 (a)) sends one decline with one <c>Idempotency-Key</c> and no acceptance; the dialog closes and the
+    /// Decline sends one decline with one <c>Idempotency-Key</c> and no acceptance; the dialog closes and the
     /// indicator is removed; the Role is unchanged.
     /// </summary>
     /// <returns>A task.</returns>

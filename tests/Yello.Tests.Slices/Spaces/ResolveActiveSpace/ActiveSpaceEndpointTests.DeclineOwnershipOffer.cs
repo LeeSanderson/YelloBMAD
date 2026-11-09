@@ -7,7 +7,7 @@ using Yello.Tests.Shared;
 namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 
 /// <summary>
-/// The recipient's decline over the wire (Lee's Q3 (a): built with the acceptance):
+/// The recipient's decline over the wire:
 /// <c>POST /api/v1/spaces/{spaceId}/ownership-offers/{offerId}/decline</c>, no body, <c>204</c>. The same identity guard and
 /// the same disambiguation as the acceptance, writing <c>Declined</c>: no Role moves, nothing is published and nothing is
 /// emailed. Telling the offering Owner, and the proofs across every settled state, stay with the later story.

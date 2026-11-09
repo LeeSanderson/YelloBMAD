@@ -207,7 +207,8 @@
 
     private void OnOffersChanged(object? sender, EventArgs args)
     {
-        // A purge, or an answer that no offer names this Account here: an open dialog goes with the offer it was about.
+        // A purge: an open dialog goes with the Space it was about. An answer that the offer closed leaves the dialog open,
+        // to say so in its no-longer-open state.
         if (Offers.SpaceId is null)
         {
             _offerOpen = false;

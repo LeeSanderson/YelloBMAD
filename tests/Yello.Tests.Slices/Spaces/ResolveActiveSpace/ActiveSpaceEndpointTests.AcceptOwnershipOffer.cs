@@ -18,7 +18,7 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Answers, by Lee's Q1 (a) and the story's Q7 (a) and Q8 (a):</b> a named recipient on an actionable offer gets
+/// <b>Answers:</b> a named recipient on an actionable offer gets
 /// <c>204</c>; the named recipient on an offer no longer actionable gets <c>409 ownership-offer-not-pending</c>; anyone else
 /// (another Member, an Admin, the Owner itself), an unknown id and another Space's id all get the in-Space not-found, byte for
 /// byte the boundary's <c>404</c> and unrecorded; an offer whose offerer is no longer the Owner is <c>409
