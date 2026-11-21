@@ -17,15 +17,13 @@ namespace Yello.Tests.Client;
 /// <b>The API is <see cref="FakeYelloApi"/></b> with the removal paths added (<c>FakeYelloApi.StatusRemoval.cs</c>).
 /// </para>
 /// <para>
-/// <b>The locators and copy are this run's assumptions</b>, from the story and the mockup (<c>project-settings.html</c>
-/// §1, §4): per row a button named "Remove"; a <c>[role='dialog']</c> holding "Removing "{name}" moves {n} Tasks.", a native
+/// <b>The locators and copy</b> follow the mockup (<c>project-settings.html</c> §1, §4): per row a button named "Remove"; a <c>[role='dialog']</c> holding "Removing "{name}" moves {n} Tasks.", a native
 /// <c>select</c> (role <c>combobox</c>) whose first option is "Choose…" with an empty value, a commit button starting "Remove
 /// and move", a "Cancel" button, and the field message "Choose where these Tasks go."; in flight a <c>[role='status']</c>
 /// region "Moving {n} Tasks to "{destination}"."; done, the polite announcement "Removed "{name}"." (plus "{n} Tasks moved to
 /// "{destination}"." when Tasks moved); refused, "Nothing was moved."; a write's <c>404</c> for a Status that left, "That
 /// Status is no longer in this Project."; and per removed default a button named "Add back". Quotes are matched loosely, so
-/// straight or typographic ones both pass. A different locator in the built page is corrected here and recorded in the Debug
-/// Log, never by weakening the assertion.
+/// straight or typographic ones both pass.
 /// </para>
 /// </remarks>
 public sealed partial class ProjectSettingsTests
@@ -160,6 +158,8 @@ public sealed partial class ProjectSettingsTests
             await progress.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             Assert.True(await progress.EvaluateAsync<bool>("region => document.activeElement === region"), "Focus is not on the progress region.");
+            await dialog.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { NameRegex = Pattern("^Remove and move") }).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
+            Assert.True(await progress.EvaluateAsync<bool>("region => document.activeElement === region"), "Focus left the progress region when the commit went.");
             Assert.DoesNotContain("%", await progress.InnerTextAsync(), StringComparison.Ordinal);
             Assert.Equal(0, await page.Locator("[role='progressbar'], progress").CountAsync());
 
@@ -277,6 +277,42 @@ public sealed partial class ProjectSettingsTests
             Assert.Equal(["Intake", "Doing", "Done", "Parked"], await RowNamesAsync(page));
             Assert.Single(api.StatusRestores);
             Assert.Equal(0, await addBack.CountAsync());
+
+            await page.WaitForFunctionAsync(
+                "() => [...document.querySelectorAll('.status-delta-row')].some(row => row.querySelector('.status-delta-row__name')?.textContent.trim() === 'Doing' && row.contains(document.activeElement))",
+                null,
+                new PageWaitForFunctionOptions { Timeout = Timeout });
+        }
+    }
+
+    /// <summary>
+    /// The only Status, though Tasks hold it, opens no dialog (there is nowhere to send them): "Remove" sends the removal,
+    /// the server refuses it as leaving the set empty, and the page says nothing was moved and keeps the Status.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-25")]
+    public async Task Removing_the_only_Status_opens_no_dialog_and_is_refused_inline()
+    {
+        var api = TwoSpaces();
+        Seed(api, Northwind, Atlas, "Atlas");
+        Shape(api, Northwind, Atlas);
+        Occupy(api, Northwind, Atlas, "Doing", 3);
+        api.ProjectStatuses[(Northwind, Atlas)].RemoveAll(status => status.Name != "Doing");
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await api.InstallAsync(page);
+            await page.GotoAsync(Address(ClientSettings(Northwind, Atlas)));
+            await RowOf(page, "Doing").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await RowOf(page, "Doing").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Remove", Exact = true }).ClickAsync();
+            await page.GetByText(NothingMovedCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal(0, await page.Locator(Dialog).CountAsync());
+            Assert.Single(api.StatusRemovals);
+            Assert.Equal(["Doing"], await RowNamesAsync(page));
         }
     }
 

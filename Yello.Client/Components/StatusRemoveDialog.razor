@@ -14,15 +14,17 @@
     NOT A DESTRUCTIVE CONFIRM: nothing is lost - the Tasks move and a default can be added back - so the commit is the primary
     button, not the danger one.
 
-    IN FLIGHT, the commit is replaced by a status region that names the scope, with no percentage and no bar, and focus moves
-    to it before the commit leaves the page. Cancel and Escape are ignored then: the removal is already out.
+    IN FLIGHT, the commit is replaced by a status region that names the scope, with no percentage and no bar. The region is
+    drawn beside the controls first and the controls leave only once it holds focus, so the pressed commit is never removed
+    while focused. Commit, Cancel and Escape are ignored then: the removal is already out.
 
-    A MODAL DIALOG labelled by its heading; focus goes to the heading on open and is trapped by a sentinel at each end.
+    A MODAL DIALOG labelled by its heading; focus goes to the heading on open and is trapped by a sentinel at each end, each
+    sending focus round to the other end's control.
 *@
 
 <div class="status-remove-dialog-layer">
     <div class="status-remove-dialog" role="dialog" aria-modal="true" aria-labelledby="@HeadingId" aria-describedby="@ScopeId" tabindex="-1" @onkeydown="KeyDownAsync">
-        <div class="status-remove-dialog__sentinel" tabindex="0" @onfocus="FocusHeadingAsync"></div>
+        <div class="status-remove-dialog__sentinel" tabindex="0" @onfocus="FocusLastAsync"></div>
 
         <h2 class="type-dialog-title status-remove-dialog__heading" id="@HeadingId" tabindex="-1" @ref="_heading">@Format("StatusRemoveTitle", StatusName)</h2>
 
@@ -33,7 +35,7 @@
             <p class="status-remove-dialog__progress" role="status" tabindex="-1" @ref="_progress">@Format("StatusRemoveInFlight", TaskCount, destination)</p>
         }
 
-        @if (InFlightTo is null)
+        @if (ControlsShown)
         {
             <div class="form-field">
                 <label class="form-field__label" for="@PickerId">@Localizer["StatusRemoveDestinationLabel"]</label>
@@ -41,6 +43,7 @@
                         class="form-field__control"
                         aria-invalid="@(_missing ? "true" : null)"
                         aria-describedby="@(_missing ? MessageId : null)"
+                        @ref="_picker"
                         @onchange="Choose">
                     <option value="" selected="@(_chosen is null)">@Localizer["StatusRemoveDestinationPlaceholder"]</option>
                     @foreach (var status in Destinations)
@@ -57,11 +60,11 @@
 
             <div class="status-remove-dialog__actions">
                 <button type="button" class="button-primary" @onclick="CommitAsync">@Format("StatusRemoveCommit", TaskCount)</button>
-                <button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["StatusRemoveCancel"]</button>
+                <button type="button" class="button-secondary" @onclick="CancelAsync" @ref="_cancel">@Localizer["StatusRemoveCancel"]</button>
             </div>
         }
 
-        <div class="status-remove-dialog__sentinel" tabindex="0" @onfocus="FocusHeadingAsync"></div>
+        <div class="status-remove-dialog__sentinel" tabindex="0" @onfocus="FocusFirstAsync"></div>
     </div>
 </div>
 
@@ -73,6 +76,8 @@
 
     private ElementReference _heading;
     private ElementReference _progress;
+    private ElementReference _picker;
+    private ElementReference _cancel;
     private Guid? _chosen;
     private bool _missing;
     private bool _opened;
@@ -104,6 +109,8 @@
     [Parameter]
     public EventCallback OnCancel { get; set; }
 
+    private bool ControlsShown => InFlightTo is null || !_progressFocused;
+
     /// <inheritdoc />
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -115,8 +122,9 @@
 
         if (InFlightTo is not null && !_progressFocused)
         {
-            _progressFocused = true;
             await _progress.FocusAsync();
+            _progressFocused = true;
+            StateHasChanged();
         }
     }
 
@@ -131,6 +139,11 @@
 
     private Task CommitAsync()
     {
+        if (InFlightTo is not null)
+        {
+            return Task.CompletedTask;
+        }
+
         if (_chosen is not { } destination)
         {
             _missing = true;
@@ -144,5 +157,7 @@
 
     private Task KeyDownAsync(KeyboardEventArgs key) => key.Key == "Escape" ? CancelAsync() : Task.CompletedTask;
 
-    private async Task FocusHeadingAsync() => await _heading.FocusAsync();
+    private async Task FocusFirstAsync() => await (ControlsShown ? _picker : _progress).FocusAsync();
+
+    private async Task FocusLastAsync() => await (ControlsShown ? _cancel : _progress).FocusAsync();
 }

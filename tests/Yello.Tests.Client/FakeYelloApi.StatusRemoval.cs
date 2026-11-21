@@ -7,8 +7,7 @@ namespace Yello.Tests.Client;
 
 /// <summary>
 /// Removing a Status from a Project, and adding a removed Space default back, on the fake - answered as the Host answers
-/// them under the story's recommended options - and the Space's own Status read the editor compares with the Project's set
-/// to list the defaults it removed.
+/// them - and the Space's own Status read the editor compares with the Project's set to list the defaults it removed.
 /// </summary>
 /// <remarks>
 /// <para>

@@ -12,13 +12,13 @@ using Wire = Yello.Tests.Slices.Projects.ProjectStatusSliceWire;
 namespace Yello.Tests.Slices.Projects;
 
 /// <summary>
-/// The removal against everything that could strand a Task: the S-2 statement itself, a Task writer that moved a Task into
+/// The removal against everything that could strand a Task: the Status invariant's own statement, a Task writer that moved a Task into
 /// the Status while the removal waited, two removals naming each other as destination, and a failure forced between the
 /// migration and the commit.
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>S-2 must know <c>Remove</c> first.</b> Every other case here ends on
+/// <b>The invariant's statement must know <c>Remove</c> first.</b> Every other case here ends on
 /// <see cref="ProjectStatusSliceWire.AssertNoTaskOutsideItsProjectsSetAsync"/>; if its statement ignored a removed default, a
 /// removal that strands Tasks would still count zero. The first case proves the statement counts such a Task and nothing
 /// else, by writing the <c>Remove</c> row itself (see <see cref="StatusRemovalWire"/> for the constraints it satisfies).
@@ -239,7 +239,7 @@ public sealed partial class ProjectEndpointTests
     }
 
     /// <summary>
-    /// S-1's removal case: a trigger that throws on the Project's delta write - after the Task migration, before the commit -
+    /// The removal's atomicity case: a trigger that throws on the Project's delta write - after the Task migration, before the commit -
     /// makes the removal answer <c>5xx</c>; every Task still holds the removed Status at its old key, the set and the delta
     /// are as they were, and no Task is outside the set. Anchored on the same removal answering <c>200</c> once the trigger
     /// is dropped, with every Task migrated.

@@ -87,7 +87,7 @@ public sealed partial class StatusDeltaEditor
             return;
         }
 
-        if (status.TaskCount > 0)
+        if (NeedsDestination(status))
         {
             Open(status);
             return;
@@ -107,6 +107,9 @@ public sealed partial class StatusDeltaEditor
             Open(recounted);
         }
     }
+
+    // The only Status has nowhere to send its Tasks: it goes to the server, whose never-empty refusal is said inline.
+    private bool NeedsDestination(ProjectStatusResponse status) => status.TaskCount > 0 && _statuses is { Count: > 1 };
 
     private async Task CommitRemovalAsync(Guid destinationStatusId)
     {
@@ -146,7 +149,16 @@ public sealed partial class StatusDeltaEditor
     {
         var name = _spaceDefaults?.Find(status => status.Id == statusId)?.Name;
 
-        if (await WriteAsync(HttpMethod.Post, ProjectStatusRoutes.RestoreOf(SpaceId, ProjectId, statusId), NoBody) is not null && name is not null)
+        if (await WriteAsync(HttpMethod.Post, ProjectStatusRoutes.RestoreOf(SpaceId, ProjectId, statusId), NoBody) is null)
+        {
+            return;
+        }
+
+        // The pressed "Add back" leaves with its entry; focus goes to the restored row rather than the page.
+        _removeFocusId = statusId;
+        _removeFocusRequests++;
+
+        if (name is not null)
         {
             Say(string.Format(CultureInfo.CurrentCulture, Localizer["StatusAddedBack"], name));
         }

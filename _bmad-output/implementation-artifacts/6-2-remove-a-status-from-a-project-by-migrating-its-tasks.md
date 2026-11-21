@@ -4,7 +4,7 @@ baseline_commit: e9c39fbc3847fc5a6919e4f65485e2ee20c63bb3
 
 # Story 6.2: Remove a Status from a Project by migrating its Tasks
 
-Status: review
+Status: done
 
 Epic: 6 — Shape Statuses per Project and retire work safely (second of six stories)
 Story key: `6-2-remove-a-status-from-a-project-by-migrating-its-tasks`
@@ -187,6 +187,32 @@ so that a Task can never hold a Status its Project does not expose.
 - [x] **Task 8 — Tests** (see Testing requirements)
   - [x] Teach `WireDatabase.TasksOutsideTheirProjectsSetSql` about `Remove`, rewrite its remarks, and assert it after every case added here.
   - [x] Slices partials, handler tests, the S-1 case, the race cases, isolation rows, gates, browser class.
+
+### Review Findings
+
+Code review 2026-11-21 (Blind Hunter, Edge Case Hunter, Acceptance Auditor; range `0c017f7..HEAD`): 41 raw findings, 33 after de-duplication: 11 patch, 10 deferred as low, 0 decisions, 12 dismissed. The dismissed findings are decisions the story records (Q6's extra read, Q10's cursor `400`, the bound count's lock for creation, an unreadable remove body being `400`), the pager case already in the ledger (owner 6.3), the plants (run in this phase), a refusal's focus (the inline error region takes it), an unreachable longest key, the new index's data check, and the Board's cold load (which starts with no selection).
+
+- [x] [Review][Patch] In flight, the pressed commit is removed in the same render that adds the progress region, so the focused node is destroyed before focus moves (AC14 "Blocking never destroys the focused node"); a second press in that window re-enters the removal [Yello.Client/Components/StatusRemoveDialog.razor:36]
+- [x] [Review][Patch] The dialog's focus trap sends both sentinels to the heading, so Shift+Tab from the heading never wraps to the last control [Yello.Client/Components/StatusRemoveDialog.razor:25]
+- [x] [Review][Patch] "Add back" removes the pressed button from the DOM and asks for no focus target, so focus falls to the body [Yello.Client/Components/StatusDeltaEditor.Removal.cs:145]
+- [x] [Review][Patch] Removing the only Status when Tasks hold it opens a dialog with no destination to choose and no reason; it should go to the server, which answers `409 status-set-empty` [Yello.Client/Components/StatusDeltaEditor.Removal.cs:90]
+- [x] [Review][Patch] The add-back round trip asserts S-2 only twice, not after each removal and add-back (AC7) [tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRemoval.cs:411]
+- [x] [Review][Patch] The migration case gives the moved Tasks no Assignee, so "the Assignee is unchanged" (AC9) passes on `null` [tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRemoval.cs:178]
+- [x] [Review][Patch] Comment rule: open-question ids (Q1-Q10) in the class remarks [tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRemoval.cs:27]
+- [x] [Review][Patch] Comment rule: "under the story's recommended options" [tests/Yello.Tests.Client/FakeYelloApi.StatusRemoval.cs:9]
+- [x] [Review][Patch] Comment rule: "this run's assumptions, from the story ... recorded in the Debug Log" [tests/Yello.Tests.Client/ProjectSettingsTests.Removal.cs:30]
+- [x] [Review][Patch] Comment rule: a new comment says the removal rows are "pending until its dev phase maps the routes", which is narrative and already false [tests/Yello.Tests.Isolation/IsolationCases.cs]
+- [x] [Review][Patch] Comment rule: test-design ids ("S-1's", "S-2") in prose, and "Pre-implementation every case here fails" narrative [tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRemovalRace.cs, tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.RemovedStatus.cs]
+- [x] [Review][Defer] The done announcement says the client's count of moved Tasks, which can be stale when Tasks arrived under the lock; a recount of 0 after a `409` opens a "moves 0 Tasks" dialog [Yello.Client/Components/StatusDeltaEditor.Removal.cs:130] — deferred, low severity
+- [x] [Review][Defer] An add-back answered `404` because another Admin already added the default back says "That Status is no longer in this Project." [Yello.Client/Components/StatusDeltaEditor.Removal.cs:181] — deferred, low severity
+- [x] [Review][Defer] The removal copy has no singular ("moves 1 Tasks", "Remove and move 1 Tasks"), and `StatusAddedBack` drops the quotes its siblings put round the name [Yello.Client/Localisation/ClientCopy.resx:1787] — deferred, low severity
+- [x] [Review][Defer] The Space defaults behind "Add back" are read once and never again, so a Space-level change leaves a missing or ghost entry until reload [Yello.Client/Components/StatusDeltaEditor.Removal.cs:61] — deferred, low severity
+- [x] [Review][Defer] A direct removal answered `409 status-destination-required` whose re-read then fails, or no longer lists the Status, shows nothing [Yello.Client/Components/StatusDeltaEditor.Removal.cs:105] — deferred, low severity
+- [x] [Review][Defer] A removal that never got an answer (network failure) is headed "Nothing was moved." although the server may have applied it [Yello.Client/Components/StatusDeltaEditor.razor:423] — deferred, low severity
+- [x] [Review][Defer] A removal committed while another editor write is in flight is dropped with no message, the removal form of the 6.1 entry [Yello.Client/Components/StatusDeltaEditor.Removal.cs:111] — deferred, low severity
+- [x] [Review][Defer] `MigrateTasksAsync` discards the `UPDATE`'s row count, so an occupant missing from the map (only possible for a writer that skipped the lock) surfaces later as a `547` on the owned definition's delete [Yello.Infrastructure/Persistence/ProjectStatusStore.cs:156] — deferred, low severity
+- [x] [Review][Defer] Adding back a default the Space no longer has would delete the `Remove` and answer `200` with an unchanged set; unreachable until a Space-level removal exists [Yello.Application/Statuses/RestoreProjectStatus/RestoreProjectStatusHandler.cs:33] — deferred, low severity
+- [x] [Review][Defer] The dialog's scope line and commit count Tasks from the last read, not the server's count at commit [Yello.Client/Components/StatusRemoveDialog.razor:29] — deferred, low severity
 
 ## Dev Notes
 
@@ -456,8 +482,14 @@ Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended develop phase.
   - Plant 7, destination checked against the set before the removal: caught by `Every_destination_outside_the_set_after_the_removal_...`. Restored.
   - Plant 8, dependent places not re-anchored: caught by `Removing_a_Status_that_others_are_placed_after_...`. Restored.
   - Plant 12, a second Project request carrying `DestinationStatusId`: caught by `A_Status_leaves_a_Project_only_through_the_remove_route_...`. Restored. (A first attempt did not compile under the analyzers and proved nothing; it was reformatted and rerun.)
-  - Plant 1 was proved by the ATDD phase. Not planted here: 4 (occupancy before the lock - the read is a single call after `LockAsync` in the writer; the two occupancy races cover it), 9 (keys from the source keys), 10 (separate transactions - the unit of work is the pipeline's; S-1 covers it) and 11 (client picker preselect - a browser plant run was not affordable in the memory budget). None was killed for memory.
+  - Plant 1 was proved by the ATDD phase. Not planted in the develop phase (all four were run at code review, below): 4 (occupancy before the lock - the read is a single call after `LockAsync` in the writer; the two occupancy races cover it), 9 (keys from the source keys), 10 (separate transactions - the unit of work is the pipeline's; S-1 covers it) and 11 (client picker preselect - a browser plant run was not affordable in the memory budget). None was killed for memory.
 - A build started while a filtered Slices run held `Yello.Host.dll` failed to copy; it was rerun after the run ended. No plant was in place.
+- Code review, plants 4, 9, 10 and 11, one at a time, each a filtered run of the class that should catch it after `dotnet build-server shutdown`, the original saved as bytes and restored in a `finally` (restoration checked byte for byte, then by `git status` and a search for the plant's text):
+  - Plant 4, occupancy counted before the Project's lock (the writer read `CountTasksByStatusAsync` before `LockAsync` and fed the draft from it): caught by `A_removal_without_a_destination_queued_behind_an_edit_into_the_Status_is_refused_409`, which answered `200` and stranded the edited Task. A first attempt did not compile (S3257, an unused lambda parameter) and proved nothing; it was corrected and rerun.
+  - Plant 9, migrated keys computed from the source keys (`PositionKey.After` of each Task's own key): caught by `Removing_an_occupied_Status_moves_every_Task_to_the_end_of_the_destination_in_source_order`, which found the moved Tasks before the resident Task.
+  - Plant 10, the migration committed on a separate connection (its own `SESSION_CONTEXT`, auto-commit) while the delta write stayed in the request's transaction: caught by `A_failure_forced_after_the_migration_rolls_the_whole_removal_back`, which found every Task in the destination after the forced failure; the occupied-removal case passed under the same plant, so the plant migrated.
+  - Plant 11, the destination picker pre-selecting the first Status (`_chosen ??= Destinations.FirstOrDefault()?.Id`): caught by `An_occupied_Status_opens_a_dialog_with_no_destination_chosen_and_only_the_Statuses_left`, which read a Status id where it expects the empty placeholder.
+- Code review patches: the new browser case `Removing_the_only_Status_opens_no_dialog_and_is_refused_inline` first timed out in `OpenSettingsAsync`, which waits for a fourth row; it now waits for its one row.
 
 ### Completion Notes List
 
@@ -493,6 +525,7 @@ Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended develop phase.
 - `tests/Yello.Tests.Client/ProjectSettingsTests.cs`
 - `tests/Yello.Tests.Client/ProjectSettingsTests.Removal.cs`
 - `tests/Yello.Tests.Isolation/IsolationCases.StatusRemoval.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.cs`
 - `tests/Yello.Tests.Shared/ProjectStatusWire.cs`
 - `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRemoval.cs`
 - `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRemovalRace.cs`
@@ -551,3 +584,4 @@ Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended develop phase.
 
 - 2026-11-21: Story created (bmad-create-story). Status: ready-for-dev.
 - 2026-11-21: Implemented (bmad-dev-story): `Remove` delta kind and re-anchoring; remove and add-back routes, slices and store statements in one transaction under the Project's lock; Task edit and move check the Status under that lock; unique delta `Sequence` index; Status-sort cursor on a removed Status refused; editor remove control, destination dialog, in-flight region and add-back list; pager selection cleared. Open questions Q1-Q12 decided at option (a). ATDD scaffolds activated (3 corrected), 11 isolation rows live, owned ledger rows dispositioned. Status: review.
+- 2026-11-21: Code review (bmad-code-review): 11 patches applied. In the removal dialog, the pressed commit now stays until the progress region holds focus, and a press in flight is ignored. The focus trap wraps both ways. "Add back" focuses the restored row. The only Status goes straight to the server's never-empty refusal. AC7's add-back round trip asserts the invariant after every step, and AC9's case proves the Assignee survives. Six test comments that broke the comment rule were fixed. 10 low findings deferred to the ledger. Plants 4, 9, 10 and 11 were run and all caught. One full run including the browser suite: 2875 total, 2864 passed, 0 failed, 11 skipped (log `artifacts/test-runs/6-2-remove-a-status-from-a-project-by-migrating-its-tasks-review.log`). Status: done.

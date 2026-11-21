@@ -3,7 +3,9 @@ using System.Text.Json;
 using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.Lists;
+using Yello.Contracts.Memberships;
 using Yello.Contracts.Projects;
+using Yello.Contracts.Tasks;
 using Yello.Tests.Shared;
 using DeleteWire = Yello.Tests.Slices.Tasks.DeleteWire;
 using LabelWire = Yello.Tests.Slices.Tasks.LabelWire;
@@ -24,11 +26,11 @@ namespace Yello.Tests.Slices.Projects;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written against each open question's recommended option</b>: <c>POST …/statuses/{id}/remove</c> with
-/// <c>{ destinationStatusId }</c> and <c>POST …/statuses/{id}/restore</c> with no body, both answering <c>200</c> with the
-/// whole set (Q2); a <c>Remove</c> operation for a default and a deleted definition for an added Status (Q1); dependent places
-/// re-anchored (Q3); <c>409 status-destination-required</c> and <c>400 invalid-status-destination</c> (Q4); one Status per
-/// request (Q5); a Status-sort cursor on a removed Status answers <c>400 invalid-list-cursor</c> (Q10).
+/// <b>The routes and their answers</b>: <c>POST …/statuses/{id}/remove</c> with <c>{ destinationStatusId }</c> and
+/// <c>POST …/statuses/{id}/restore</c> with no body, both answering <c>200</c> with the whole set; a <c>Remove</c> operation
+/// for a default and a deleted definition for an added Status; dependent places re-anchored;
+/// <c>409 status-destination-required</c> and <c>400 invalid-status-destination</c>; one Status per request; a Status-sort
+/// cursor on a removed Status answers <c>400 invalid-list-cursor</c>.
 /// </para>
 /// <para>
 /// <b>Every case ends with the Status invariant</b>, whose statement counts a Task in a Status its own Project removed.
@@ -135,8 +137,9 @@ public sealed partial class ProjectEndpointTests
 
     /// <summary>
     /// Removing the occupied first default to the second moves its three Tasks to the end of the second's column in their
-    /// source order, after the Task already there, whose key is unchanged; each moved Task keeps its id, title, Labels, due
-    /// date and creation time; the answer's destination entry counts all four Tasks; and the first default leaves the set.
+    /// source order, after the Task already there, whose key is unchanged; each moved Task keeps its id, title, Assignee,
+    /// Labels, due date and creation time; the answer's destination entry counts all four Tasks; and the first default leaves
+    /// the set.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -154,6 +157,9 @@ public sealed partial class ProjectEndpointTests
         IReadOnlyList<StatusRowOf> defaults = [];
         var viewsBefore = new Dictionary<Guid, IReadOnlyList<string>>();
         var viewsAfter = new Dictionary<Guid, IReadOnlyList<string>>();
+        var assignee = Guid.Empty;
+        var assigned = Guid.Empty;
+        Guid? assigneeAfter = null;
         WireResponse? removed = null;
 
         await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
@@ -178,6 +184,10 @@ public sealed partial class ProjectEndpointTests
             Assert.Equal(HttpStatusCode.OK, (await TaskEditWire.EditTaskAsync(actor, owner.SpaceId, created[0], TaskEditWire.Body(new { labelIds = new[] { label } }))).StatusCode);
             Assert.Equal(HttpStatusCode.OK, (await TaskEditWire.EditTaskAsync(actor, owner.SpaceId, created[1], TaskEditWire.Body(new { dueDate = "2026-12-01T00:00:00+00:00" }))).StatusCode);
 
+            assignee = AssignmentWire.ParseCandidates((await actor.Session.GetAsync(AssigneeRoutes.ListOf(owner.SpaceId))).Body)[0].MembershipId;
+            Assert.Equal(HttpStatusCode.OK, (await actor.Session.SendWithHeadersAsync(HttpMethod.Put, TaskRoutes.AssigneeOf(owner.SpaceId, created[2]), AssignmentWire.Body(assignee), TaskWire.KeyHeader(null))).StatusCode);
+            assigned = created[2];
+
             sources = await MoveWire.ColumnAsync(database, owner.SpaceId, projectId, defaults[0].Id);
 
             foreach (var id in sources)
@@ -191,6 +201,8 @@ public sealed partial class ProjectEndpointTests
             {
                 viewsAfter[id] = WithoutPlacement((await TaskEditWire.ViewTaskAsync(actor, owner.SpaceId, id)).Body);
             }
+
+            assigneeAfter = AssignmentWire.AssigneeIn((await TaskEditWire.ViewTaskAsync(actor, owner.SpaceId, assigned)).Body);
         });
 
         Assert.NotNull(owner);
@@ -204,6 +216,7 @@ public sealed partial class ProjectEndpointTests
         Assert.Equal([resident, .. sources], await MoveWire.ColumnAsync(database, owner.SpaceId, projectId, defaults[1].Id));
         Assert.Equal(residentKey, await MoveWire.KeyOfAsync(database, owner.SpaceId, resident));
         Assert.All(sources, id => Assert.Equal(viewsBefore[id], viewsAfter[id]));
+        Assert.Equal(assignee, assigneeAfter);
 
         var keys = (await MoveWire.PlacementsAsync(database, owner.SpaceId, projectId)).Where(row => row.StatusId == defaults[1].Id).Select(row => row.PositionKey).ToList();
 
@@ -409,7 +422,9 @@ public sealed partial class ProjectEndpointTests
             Assert.Equal(HttpStatusCode.OK, (await Wire.PlaceAsync(actor, owner.SpaceId, projectId, defaults[1].Id, afterStatusId: null)).StatusCode);
 
             answers.Add(("remove", await RemovalWire.RemoveAsync(actor, owner.SpaceId, projectId, defaults[1].Id, destinationStatusId: null)));
+            await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
             answers.Add(("restore", await RemovalWire.RestoreAsync(actor, owner.SpaceId, projectId, defaults[1].Id)));
+            await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
             answers.Add(("move in", await MoveWire.MoveTaskAsync(actor, owner.SpaceId, taskId, defaults[1].Id, afterTaskId: null)));
             answers.Add(("remove again", await RemovalWire.RemoveAsync(actor, owner.SpaceId, projectId, defaults[1].Id, defaults[0].Id)));
             await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);

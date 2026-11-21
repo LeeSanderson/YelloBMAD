@@ -130,7 +130,7 @@ development_status:
   # Epic 6: Shape Statuses per Project and retire work safely
   epic-6: in-progress
   6-1-shape-a-projects-statuses: done
-  6-2-remove-a-status-from-a-project-by-migrating-its-tasks: review
+  6-2-remove-a-status-from-a-project-by-migrating-its-tasks: done
   6-3-define-the-space-default-statuses-and-cascade-a-rename: backlog
   6-4-remove-a-space-default-status-across-every-project: backlog
   6-5-move-a-task-to-another-project: backlog

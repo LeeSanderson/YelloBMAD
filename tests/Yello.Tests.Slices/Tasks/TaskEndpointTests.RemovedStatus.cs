@@ -21,11 +21,8 @@ namespace Yello.Tests.Slices.Tasks;
 /// open transaction (<see cref="RemovalWire.HoldRemovalAsync"/>: the Project's lock, then the <c>Remove</c> row), sends the
 /// Task write, waits until it is blocked on <c>LCK_M_%</c>, then commits. A writer that validated its Status before the lock
 /// read the set without the removal (RCSI reads the last committed version), so it writes the removed Status once the lock is
-/// free: <c>200</c>, and the Remove-aware S-2 statement counts the stranded Task. A writer that validates after the lock reads
+/// free: <c>200</c>, and the Remove-aware invariant statement counts the stranded Task. A writer that validates after the lock reads
 /// the committed removal and answers <c>400 invalid-task-status</c>.
-/// </para>
-/// <para>
-/// Pre-implementation every case here fails at the first read of the set: the product cannot read a <c>Remove</c> row.
 /// </para>
 /// </remarks>
 public sealed partial class TaskEndpointTests
