@@ -1,0 +1,134 @@
+@using System.Globalization
+@using Yello.Contracts.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    THE QUESTION A SPACE-LEVEL RENAME ASKS when Projects renamed that Status themselves: which Projects, what each calls
+    it and how many of its Tasks hold it, and one answer for all of them - "Rename these too" or "Keep their names".
+
+    NEITHER ANSWER IS THE DEFAULT. Both are secondary buttons, neither is focused on open and neither submits on Enter:
+    the interface must not decide which Projects lose their own name. Focus goes to the heading.
+
+    CANCEL OR ESCAPE IS A WAY OUT, NOT A THIRD ANSWER: nothing is renamed anywhere, and the section returns focus to the
+    rename field.
+
+    IN FLIGHT, a status line says the rename is out and both answers are ignored; they stay where they are, so the pressed
+    one is never removed while it holds focus.
+
+    A MODAL DIALOG labelled by its heading, its focus trapped by a sentinel at each end, each sending focus round to the
+    other end's control.
+*@
+
+<div class="status-cascade-dialog-layer">
+    <div class="status-cascade-dialog" role="dialog" aria-modal="true" aria-labelledby="@HeadingId" aria-describedby="@ScopeId" tabindex="-1" @onkeydown="KeyDownAsync">
+        <div class="status-cascade-dialog__sentinel" tabindex="0" @onfocus="FocusLastAsync"></div>
+
+        <h2 class="type-dialog-title status-cascade-dialog__heading" id="@HeadingId" tabindex="-1" @ref="_heading">@Heading</h2>
+
+        <p class="status-cascade-dialog__scope" id="@ScopeId">@Format(Conflicts.Count == 1 ? "SpaceStatusCascadeScopeOne" : "SpaceStatusCascadeScopeMany", OldName, NewName)</p>
+
+        <div class="status-cascade-dialog__table">
+            <table>
+                <thead>
+                    <tr>
+                        <th scope="col">@Localizer["SpaceStatusCascadeProject"]</th>
+                        <th scope="col">@Localizer["SpaceStatusCascadeOwnName"]</th>
+                        <th scope="col">@Localizer["SpaceStatusCascadeTasks"]</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var conflict in Conflicts)
+                    {
+                        <tr @key="conflict.ProjectId">
+                            <td>@conflict.ProjectName</td>
+                            <td>@conflict.Name</td>
+                            <td>@conflict.TaskCount.ToString(CultureInfo.CurrentCulture)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <p>@Localizer["SpaceStatusCascadeOthers"]</p>
+
+        @if (InFlight)
+        {
+            <p class="status-cascade-dialog__progress" role="status">@Format("SpaceStatusCascadeInFlight", OldName, NewName)</p>
+        }
+
+        <div class="status-cascade-dialog__actions">
+            <button type="button" class="button-secondary" @onclick="ReplaceAsync" @ref="_replace">@Localizer["SpaceStatusCascadeReplace"]</button>
+            <button type="button" class="button-secondary" @onclick="KeepAsync">@Localizer["SpaceStatusCascadeKeep"]</button>
+            <button type="button" class="button-secondary" @onclick="CancelAsync" @ref="_cancel">@Localizer["SpaceStatusCascadeCancel"]</button>
+        </div>
+
+        <div class="status-cascade-dialog__sentinel" tabindex="0" @onfocus="FocusFirstAsync"></div>
+    </div>
+</div>
+
+@code {
+    private const string HeadingId = "status-cascade-dialog-heading";
+    private const string ScopeId = "status-cascade-dialog-scope";
+
+    private ElementReference _heading;
+    private ElementReference _replace;
+    private ElementReference _cancel;
+    private bool _opened;
+
+    /// <summary>The default's Space name before the rename.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string OldName { get; set; } = string.Empty;
+
+    /// <summary>The name the rename asks for.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string NewName { get; set; } = string.Empty;
+
+    /// <summary>Every Project that gave the Status a name of its own, as the server reported them.</summary>
+    [Parameter]
+    [EditorRequired]
+    public IReadOnlyList<StatusRenameConflictResponse> Conflicts { get; set; } = [];
+
+    /// <summary>Whether the answer is out; both answers are ignored until it returns.</summary>
+    [Parameter]
+    public bool InFlight { get; set; }
+
+    /// <summary>Raised by an answer: <c>true</c> to replace the Projects' own names, <c>false</c> to keep them.</summary>
+    [Parameter]
+    public EventCallback<bool> OnDecide { get; set; }
+
+    /// <summary>Raised by Cancel or Escape.</summary>
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private string Heading => Conflicts.Count == 1
+        ? Localizer["SpaceStatusCascadeTitleOne"]
+        : Format("SpaceStatusCascadeTitleMany", Conflicts.Count);
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_opened)
+        {
+            _opened = true;
+            await _heading.FocusAsync();
+        }
+    }
+
+    private string Format(string key, params object[] values) =>
+        string.Format(CultureInfo.CurrentCulture, Localizer[key], values);
+
+    private Task ReplaceAsync() => InFlight ? Task.CompletedTask : OnDecide.InvokeAsync(true);
+
+    private Task KeepAsync() => InFlight ? Task.CompletedTask : OnDecide.InvokeAsync(false);
+
+    private Task CancelAsync() => InFlight ? Task.CompletedTask : OnCancel.InvokeAsync();
+
+    private Task KeyDownAsync(KeyboardEventArgs key) => key.Key == "Escape" ? CancelAsync() : Task.CompletedTask;
+
+    private async Task FocusFirstAsync() => await _replace.FocusAsync();
+
+    private async Task FocusLastAsync() => await _cancel.FocusAsync();
+}

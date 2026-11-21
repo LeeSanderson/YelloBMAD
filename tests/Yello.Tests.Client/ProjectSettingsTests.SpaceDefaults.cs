@@ -15,7 +15,7 @@ public sealed partial class ProjectSettingsTests
     /// longer "Doing".
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - the editor reads the Space defaults once on load (Q12)")]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "FR-25")]
     public async Task The_add_back_list_takes_a_Space_rename_after_the_editors_next_write()

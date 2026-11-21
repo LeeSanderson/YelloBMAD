@@ -13,7 +13,8 @@ namespace Yello.Infrastructure.Persistence;
 /// <para>
 /// <b>The Project's Tasks lock, not a lock of its own.</b> It is the lock every placer of the Project's Tasks and the
 /// Project's deletion take, so one lock decides which Statuses a Task of the Project may hold, and a removal that must
-/// also move Tasks needs no second lock in a fixed order.
+/// also move Tasks needs no second lock in a fixed order. The Space's Status-defaults lock is taken Shared before it (see
+/// <see cref="ApplicationLocks.StatusDefaults"/>), so a change of the Space's defaults never interleaves with this write.
 /// </para>
 /// <para>
 /// <b>A plain read before the lock</b>, as the Project's deletion makes one: a Project id that is missing or another
@@ -39,6 +40,7 @@ internal sealed class ProjectStatusStore(YelloDbContext dbContext) : IProjectSta
             return false;
         }
 
+        await ApplicationLocks.TakeStatusDefaultsSharedAsync(dbContext, cancellationToken).ConfigureAwait(false);
         await ApplicationLocks.TakeProjectTasksAsync(dbContext, projectId, cancellationToken).ConfigureAwait(false);
 
         return await ProjectExistsAsync(projectId, cancellationToken).ConfigureAwait(false);

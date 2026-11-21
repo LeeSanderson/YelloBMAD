@@ -977,7 +977,7 @@ public sealed class SpaceSwitchCarryOverTests(ClientSurfaceFixture surface)
             await page.SetViewportSizeAsync(width, height);
             await api.InstallAsync(page);
             await page.GotoAsync(Address($"spaces/{Northwind:D}/settings"));
-            await page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Rename", Exact = true })
+            await page.Locator("main .space-name-section").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Rename", Exact = true })
                 .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             await KeyboardHarness.ResetFocusAsync(page);

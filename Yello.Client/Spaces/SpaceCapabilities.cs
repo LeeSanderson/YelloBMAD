@@ -54,6 +54,7 @@ public static class SpaceCapabilities
     private static readonly IReadOnlyList<Func<string, bool>> Sections =
     [
         PermitsRenameSpace,
+        StatusCapabilities.PermitsConfigureSpaceDefaultStatuses,
         LabelCapabilities.PermitsManageLabels,
         MembershipCapabilities.PermitsManageMemberships,
         InvitationCapabilities.PermitsIssueInvitations,

@@ -11,11 +11,9 @@ namespace Yello.Tests.Shared;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The item and place routes, the conflict problem type and the problem body's two lists are stand-ins</b>, written as the
-/// story recommends because the contract members do not exist yet: <c>PATCH …/statuses/{statusId}</c> with
-/// <c>{ name, replaceProjectNames? }</c>, <c>POST …/statuses/{statusId}/place</c> with <c>{ afterStatusId }</c>,
-/// <c>urn:yello:problem:status-rename-conflict</c>, and the problem body's <c>conflicts</c> and <c>projects</c>. The change that
-/// adds each to <c>Yello.Contracts</c> swaps the stand-in for the member and deletes it here.
+/// <b>Routes, problem types and the problem body's members are the contract's</b> (<see cref="SpaceRoutes"/>,
+/// <see cref="Yello.Contracts.ProblemTypes"/>): the bodies here are written as JSON so a case can leave a member out, and the
+/// lists are read from the raw body so a member the contract does not declare is not silently dropped.
 /// </para>
 /// <para>
 /// <b>A rename with no decision leaves the member out</b> rather than sending <c>null</c>: the decision is absent until the
@@ -25,37 +23,6 @@ namespace Yello.Tests.Shared;
 public static class SpaceStatusWire
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-    /// <summary>
-    /// The route pattern of one default Status, as the Host would map it.
-    /// </summary>
-    public static string Item => SpaceRoutes.Statuses + "/{statusId:guid}";
-
-    /// <summary>
-    /// The route pattern of a default Status's place action, as the Host would map it.
-    /// </summary>
-    public static string Place => Item + "/place";
-
-    /// <summary>
-    /// A rename that some Project's own name for the Status conflicts with, sent with no decision.
-    /// </summary>
-    public static string StatusRenameConflict => "urn:yello:problem:status-rename-conflict";
-
-    /// <summary>
-    /// One default Status's path, as a client calls it.
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <param name="statusId">The default Status.</param>
-    /// <returns>The path.</returns>
-    public static string ItemOf(Guid spaceId, Guid statusId) => $"{SpaceRoutes.StatusesOf(spaceId)}/{statusId:D}";
-
-    /// <summary>
-    /// One default Status's place path, as a client calls it.
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <param name="statusId">The default Status.</param>
-    /// <returns>The path.</returns>
-    public static string PlaceOf(Guid spaceId, Guid statusId) => ItemOf(spaceId, statusId) + "/place";
 
     /// <summary>
     /// The add body with no position: the new default goes last.

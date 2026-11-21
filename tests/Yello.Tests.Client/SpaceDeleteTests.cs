@@ -182,7 +182,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
         {
             await OpenSettingsAsync(api, page, Northwind);
 
-            Assert.Equal(1, await page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true }).CountAsync());
+            Assert.Equal(1, await page.Locator("main .space-name-section").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true }).CountAsync());
             Assert.Equal(0, await page.Locator("main").GetByText(DeleteSpace).CountAsync());
             Assert.Equal(0, await page.Locator(Confirm).CountAsync());
             Assert.Equal(0, await page.Locator(DisabledAnywhere).CountAsync());
@@ -816,7 +816,7 @@ public sealed class SpaceDeleteTests(ClientSurfaceFixture surface)
         page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = DeleteSpace, Exact = true });
 
     private static ILocator RenameButton(IPage page) =>
-        page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true });
+        page.Locator("main .space-name-section").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true });
 
     private static ILocator LabelsSection(IPage page) =>
         page.Locator("main").GetByRole(AriaRole.Heading, new LocatorGetByRoleOptions { Name = LabelsHeading, Exact = true });

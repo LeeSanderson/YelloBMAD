@@ -340,7 +340,7 @@ public sealed class RoleDropTests(ClientSurfaceFixture surface)
         {
             await OpenHomeAsync(api, page);
             await page.Locator(ContextBar).GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = "Space settings", Exact = true }).ClickAsync();
-            await page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Rename", Exact = true }).ClickAsync();
+            await page.Locator("main .space-name-section").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Rename", Exact = true }).ClickAsync();
             await page.EvaluateAsync(
                 """
                 () => {

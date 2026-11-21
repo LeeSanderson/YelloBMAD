@@ -2,7 +2,6 @@ using System.Text.Json;
 using Yello.Contracts;
 using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
-using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -136,7 +135,7 @@ internal sealed partial class FakeYelloApi
         {
             var report = conflicts.Select(found => new { projectId = found.ProjectId, projectName = ProjectName(spaceId, found.ProjectId), name = found.Entry!.Name, taskCount = found.Entry.TaskCount });
 
-            return (409, JsonSerializer.Serialize(new { type = SpaceStatusWire.StatusRenameConflict, conflicts = report }, JsonOptions));
+            return (409, JsonSerializer.Serialize(new { type = ProblemTypes.StatusRenameConflict, conflicts = report }, JsonOptions));
         }
 
         string NameAfter(FakeProjectStatus entry) => IsConflict(entry) && decision is false ? entry.Name : name;

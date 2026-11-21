@@ -2610,3 +2610,146 @@
     padding-block: var(--space-2);
     overflow-wrap: anywhere;
 }
+/*
+    THE DEFAULT STATUSES SECTION of Space settings: the Project Status editor's rows, without the source or the count, and
+    its rename question in the Status removal dialog's frame. The question's table reflows into stacked rows below 30em, so
+    nothing at 320px scrolls sideways. Logical properties only.
+*/
+.space-default-statuses {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-block-start: var(--space-4);
+}
+
+.space-default-statuses__heading,
+.space-default-statuses__intro,
+.space-default-statuses__progress {
+    margin-block: 0;
+}
+
+.space-default-statuses__intro,
+.space-default-statuses__progress {
+    color: var(--text-muted);
+}
+
+.space-status-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.space-status-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding-block: var(--space-3);
+    border-block-end: var(--border-hairline-width) solid var(--border-hairline);
+    overflow-wrap: anywhere;
+}
+
+.space-status-row__summary,
+.space-status-row__actions,
+.space-status-row__rename {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+}
+
+.space-status-row__name {
+    font-weight: var(--type-task-title-weight);
+}
+
+.space-status-row__field {
+    flex: 1 1 12em;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+}
+
+.space-status-add {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.status-cascade-dialog-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    box-sizing: border-box;
+    padding: var(--space-4);
+    overflow-y: auto;
+    background-color: var(--surface-page);
+}
+
+.status-cascade-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    box-sizing: border-box;
+    inline-size: min(36rem, 100%);
+    padding: var(--space-5);
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    box-shadow: none;
+    overflow-wrap: anywhere;
+}
+
+.status-cascade-dialog > p,
+.status-cascade-dialog__heading {
+    margin-block: 0;
+}
+
+.status-cascade-dialog__table table {
+    inline-size: 100%;
+    border-collapse: collapse;
+}
+
+.status-cascade-dialog__table th,
+.status-cascade-dialog__table td {
+    padding-block: var(--space-2);
+    padding-inline-end: var(--space-3);
+    text-align: start;
+    border-block-end: var(--border-hairline-width) solid var(--border-hairline);
+}
+
+.status-cascade-dialog__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+.status-cascade-dialog__sentinel {
+    position: absolute;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+@media (max-width: 29.9375em) {
+    .status-cascade-dialog__table thead {
+        position: absolute;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
+
+    .status-cascade-dialog__table tr,
+    .status-cascade-dialog__table td {
+        display: block;
+    }
+
+    .status-cascade-dialog__table td {
+        padding-block: 0;
+        border-block-end: 0;
+    }
+
+    .status-cascade-dialog__table tr {
+        padding-block: var(--space-2);
+        border-block-end: var(--border-hairline-width) solid var(--border-hairline);
+    }
+}

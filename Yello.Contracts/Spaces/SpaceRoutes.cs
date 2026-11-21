@@ -89,4 +89,36 @@ public static class SpaceRoutes
     /// <param name="spaceId">The Space.</param>
     /// <returns>The path.</returns>
     public static string StatusesOf(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}/statuses";
+
+    /// <summary>
+    /// <c>PATCH</c> here, with a <see cref="RenameSpaceStatusRequest"/>, renames one of the Space's default Statuses: <c>200</c>
+    /// with the defaults as <see cref="StatusResponse"/> rows, <c>400 invalid-status-name</c>, <c>409 status-name-taken</c>
+    /// (with the Projects whose set holds the name, when any do), <c>409 status-rename-conflict</c> (with the Projects that
+    /// renamed it themselves), or the boundary's <c>404</c> for a Status that is not one of the Space's defaults. <c>POST</c>
+    /// on <see cref="Statuses"/>, with an <see cref="AddSpaceStatusRequest"/>, adds a default and answers <c>201</c> with the
+    /// defaults. Every write declares <c>ConfigureSpaceDefaultStatuses</c>.
+    /// </summary>
+    public static string Status => "/api/v1/spaces/{spaceId:guid}/statuses/{statusId:guid}";
+
+    /// <summary>
+    /// One default Status's path, as a client calls it.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="statusId">The default Status.</param>
+    /// <returns>The path.</returns>
+    public static string StatusOf(Guid spaceId, Guid statusId) => $"/api/v1/spaces/{spaceId:D}/statuses/{statusId:D}";
+
+    /// <summary>
+    /// <c>POST</c> here, with a <see cref="PlaceSpaceStatusRequest"/>, moves one default first or after another default:
+    /// <c>200</c> with the defaults, <c>400 invalid-status-position</c>, or the boundary's <c>404</c>.
+    /// </summary>
+    public static string StatusPlace => "/api/v1/spaces/{spaceId:guid}/statuses/{statusId:guid}/place";
+
+    /// <summary>
+    /// One default Status's place path, as a client calls it.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="statusId">The default Status.</param>
+    /// <returns>The path.</returns>
+    public static string StatusPlaceOf(Guid spaceId, Guid statusId) => $"/api/v1/spaces/{spaceId:D}/statuses/{statusId:D}/place";
 }

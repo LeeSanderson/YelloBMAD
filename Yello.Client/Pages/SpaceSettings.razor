@@ -11,7 +11,8 @@
 @implements IDisposable
 
 @*
-    A SPACE'S SETTINGS - story 2.4, open question 7: its Space name section (story 3.1, AC3), its Labels section, its
+    A SPACE'S SETTINGS - story 2.4, open question 7: its Space name section (story 3.1, AC3), its Default Statuses section
+    (the Statuses every Project starts from, before the Labels as EXPERIENCE.md orders them), its Labels section, its
     Members section (story 4.4: every Membership with its address and Role, and the Role change; above the Invitations, the
     mockup's order) and its Invitations section (story 4.1's invite form and story 4.2's pending list with its revoke, one
     section) and its Ownership section (the Owner's alone: offer ownership to another Membership, see the pending offer and
@@ -50,6 +51,11 @@
                 <SpaceNameSection @key="(SectionKey.Name, SpaceId)" SpaceId="@SpaceId" CurrentName="@arrival.Current.Name" OnSpaceRefused="arrival.Refuse" />
             }
 
+            @if (StatusCapabilities.PermitsConfigureSpaceDefaultStatuses(role))
+            {
+                <SpaceDefaultStatusSection @key="(SectionKey.DefaultStatuses, SpaceId)" SpaceId="@SpaceId" OnSpaceRefused="arrival.Refuse" />
+            }
+
             @if (LabelCapabilities.PermitsManageLabels(role))
             {
                 <LabelSection @key="(SectionKey.Labels, SpaceId)" SpaceId="@SpaceId" OnSpaceRefused="arrival.Refuse" />
@@ -84,6 +90,7 @@
     private enum SectionKey
     {
         Name,
+        DefaultStatuses,
         Labels,
         Memberships,
         Invitations,

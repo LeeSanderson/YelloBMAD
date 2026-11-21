@@ -1,6 +1,7 @@
 using System.Reflection;
 using Microsoft.AspNetCore.Routing;
 using Xunit;
+using Yello.Contracts.Spaces;
 using Yello.Domain;
 using Yello.Domain.Memberships;
 using Yello.Host.Spaces;
@@ -16,9 +17,8 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The subjects are named as strings</b> - the request types, the problem type member, the lock's name method, the client
-/// predicate - because none exists yet, so these compile today and fail for the stated reason when activated. The change
-/// that adds each swaps the string for a typed reference.
+/// <b>The lock's name method and the client predicate are found by reflection</b>: the first is internal to
+/// Infrastructure, and the client's predicates are found by name across its assembly, as every Role predicate gate does.
 /// </para>
 /// <para>
 /// <b>Active gates that go red by design in that change</b>, and are amended deliberately there:
@@ -42,7 +42,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>POST</c> on its <c>place</c> action: the read keeps <c>ReadProjectsAndTasks</c>, every write requires
     /// <c>ConfigureSpaceDefaultStatuses</c>, none is Session-only and none consults a bound.
     /// </summary>
-    [Fact(Skip = "red: AC2, AC12 - the Space-level write routes are not mapped yet (Q1)")]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "FR-24")]
     [Trait("Requirement", "AD-4")]
@@ -73,7 +73,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// place route existing, no route under the collection answers <c>DELETE</c> or names a removal, a reset or a mode, and no
     /// Space Status request carries a member that could.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC3, AC8 - the Space-level write routes and requests do not exist yet (Q1)")]
+    [Fact]
     [Trait("Requirement", "FR-24")]
     [Trait("Requirement", "AD-16")]
     public void No_route_or_request_under_the_Spaces_Statuses_offers_a_removal_a_reset_or_a_mode()
@@ -88,10 +88,8 @@ public sealed partial class RefusalBoundaryGateTests
         Assert.DoesNotContain(underStatuses, route => route.Method == "DELETE");
         Assert.DoesNotContain(underStatuses, route => Array.Exists(SpaceStatusForbiddenWords, word => route.Pattern.Contains(word, StringComparison.OrdinalIgnoreCase)));
 
-        foreach (var name in new[] { "AddSpaceStatusRequest", "RenameSpaceStatusRequest", "PlaceSpaceStatusRequest" })
+        foreach (var request in new[] { typeof(AddSpaceStatusRequest), typeof(RenameSpaceStatusRequest), typeof(PlaceSpaceStatusRequest) })
         {
-            var request = SpaceContract(name);
-
             Assert.DoesNotContain(
                 request.GetProperties(BindingFlags.Public | BindingFlags.Instance),
                 property => Array.Exists(SpaceStatusForbiddenWords, word => property.Name.Contains(word, StringComparison.Ordinal)));
@@ -103,15 +101,15 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>{ AfterStatusId, Name }</c>, a rename <c>{ Name, ReplaceProjectNames }</c> with a nullable decision, a place
     /// <c>{ AfterStatusId }</c> - never a Space id, a Project id or a position number.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC5, AC8 - the Space Status request contracts do not exist yet (Q1)")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AD-19")]
     [Trait("Requirement", "FR-27")]
     public void The_Space_Status_requests_carry_exactly_their_members()
     {
-        var add = SpaceContract("AddSpaceStatusRequest");
-        var rename = SpaceContract("RenameSpaceStatusRequest");
-        var place = SpaceContract("PlaceSpaceStatusRequest");
+        var add = typeof(AddSpaceStatusRequest);
+        var rename = typeof(RenameSpaceStatusRequest);
+        var place = typeof(PlaceSpaceStatusRequest);
 
         Assert.Equal(["AfterStatusId", "Name"], PropertyNames(add));
         Assert.Equal(typeof(Guid?), add.GetProperty("AfterStatusId")?.PropertyType);
@@ -125,15 +123,12 @@ public sealed partial class RefusalBoundaryGateTests
     /// The conflict refusal has a stable type, <c>ProblemTypes.StatusRenameConflict</c> =
     /// <c>urn:yello:problem:status-rename-conflict</c>, and the existing Status refusals keep theirs.
     /// </summary>
-    [Fact(Skip = "red: AC4 - ProblemTypes has no StatusRenameConflict yet (Q2)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "UX-DR16")]
     public void The_rename_conflict_refusal_has_a_stable_problem_type()
     {
-        var type = typeof(Yello.Contracts.ProblemTypes).GetProperty("StatusRenameConflict", BindingFlags.Public | BindingFlags.Static);
-
-        Assert.True(type is not null, "ProblemTypes has no StatusRenameConflict.");
-        Assert.Equal("urn:yello:problem:status-rename-conflict", type.GetValue(null));
+        Assert.Equal("urn:yello:problem:status-rename-conflict", Yello.Contracts.ProblemTypes.StatusRenameConflict);
         Assert.Equal("urn:yello:problem:status-name-taken", Yello.Contracts.ProblemTypes.StatusNameTaken);
     }
 
@@ -141,7 +136,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The problem body gains two nullable members after its existing ones, and changes nothing else: <c>Conflicts</c>, each
     /// <c>{ Name, ProjectId, ProjectName, TaskCount }</c>, and <c>Projects</c>, each <c>{ Id, Name }</c> - identity only.
     /// </summary>
-    [Fact(Skip = "red: AC4, AC6 - ProblemResponse has no Conflicts or Projects yet (Q2, Q5)")]
+    [Fact]
     [Trait("Requirement", "AD-19")]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "UX-DR16")]
@@ -165,7 +160,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The client's predicate for the Default Statuses section and every control in it agrees with the capability matrix for
     /// every Role: it offers them exactly where <c>ConfigureSpaceDefaultStatuses</c> is not denied (Owner and Admin).
     /// </summary>
-    [Fact(Skip = "red: AC2 - Yello.Client has no ConfigureSpaceDefaultStatuses predicate yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "AD-1")]
@@ -188,7 +183,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>Yello/StatusDefaults/{spaceId:D}</c>. A different spelling would let the product and the holder take two locks and
     /// the race cases prove nothing.
     /// </summary>
-    [Fact(Skip = "red: AC9 - ApplicationLocks has no StatusDefaults name yet (Q6)")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AD-17")]
     public void The_Status_defaults_lock_is_named_for_the_Space_as_the_race_holder_names_it()
@@ -204,16 +199,6 @@ public sealed partial class RefusalBoundaryGateTests
         var spaceId = Guid.NewGuid();
 
         Assert.Equal($"Yello/StatusDefaults/{spaceId:D}", name.Invoke(null, [spaceId]));
-    }
-
-    private static Type SpaceContract(string name)
-    {
-        var fullName = typeof(Yello.Contracts.Spaces.SpaceRoutes).Namespace + "." + name;
-        var type = ProductionAssemblies.Contracts.GetType(fullName);
-
-        Assert.True(type is not null, $"No {fullName} in Yello.Contracts.");
-
-        return type;
     }
 
     private static Type ElementOf(Type list)

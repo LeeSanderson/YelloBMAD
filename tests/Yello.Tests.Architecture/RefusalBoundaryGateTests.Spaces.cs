@@ -77,10 +77,9 @@ public sealed partial class RefusalBoundaryGateTests
 
         foreach (var role in Enum.GetValues<Role>())
         {
-            var expected = RoleCapabilityMatrix.Decide(role, Capability.RenameSpace) != CapabilityDecision.Denied
-                || RoleCapabilityMatrix.Decide(role, Capability.ManageLabels) != CapabilityDecision.Denied
-                || RoleCapabilityMatrix.Decide(role, Capability.IssueAndRevokeInvitations) != CapabilityDecision.Denied
-                || RoleCapabilityMatrix.Decide(role, Capability.DeleteSpace) != CapabilityDecision.Denied;
+            var expected = Array.Exists(
+                [Capability.RenameSpace, Capability.ConfigureSpaceDefaultStatuses, Capability.ManageLabels, Capability.IssueAndRevokeInvitations, Capability.DeleteSpace],
+                capability => RoleCapabilityMatrix.Decide(role, capability) != CapabilityDecision.Denied);
 
             Assert.True(
                 predicate.Invoke(null, [StableCode.Of(role)]) is bool shown && shown == expected,

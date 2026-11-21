@@ -278,6 +278,17 @@ public static class ProblemTypes
     public static string StatusNameTaken => "urn:yello:problem:status-name-taken";
 
     /// <summary>
+    /// A rename of one of the Space's default Statuses that some Projects gave a name of their own, sent with no decision
+    /// about them. Answered <c>409</c> with a <c>conflicts</c> extension naming each such Project, its own name for the
+    /// Status and how many of its Tasks hold it; nothing is written.
+    /// </summary>
+    /// <remarks>
+    /// <b>Disclosable</b>: only an Owner or an Admin of the Space can change its defaults, and every Project named is one of
+    /// that Space's. Sending the rename again with <c>replaceProjectNames</c> decides for all of them at once.
+    /// </remarks>
+    public static string StatusRenameConflict => "urn:yello:problem:status-rename-conflict";
+
+    /// <summary>
     /// The write would leave the Project with no Status. Answered <c>409</c>; nothing is written.
     /// </summary>
     public static string StatusSetEmpty => "urn:yello:problem:status-set-empty";

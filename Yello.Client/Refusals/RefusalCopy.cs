@@ -101,6 +101,12 @@ public static class RefusalCopy
     public static string StatusSetEmptyKey => "StatusSetEmpty";
 
     /// <summary>
+    /// The copy key for <c>409 status-rename-conflict</c>: Projects renamed the default themselves. The Default Statuses
+    /// section opens its rename question from the refusal instead; this is the words when it cannot.
+    /// </summary>
+    public static string StatusRenameConflictKey => "StatusRenameConflict";
+
+    /// <summary>
     /// The copy key for <c>400 invalid-status-position</c>: the place asked for is not in the Project's set.
     /// </summary>
     public static string InvalidStatusPositionKey => "StatusPositionInvalid";
@@ -306,6 +312,7 @@ public static class RefusalCopy
         [ProblemTypes.InvalidStatusName] = InvalidStatusNameKey,
         [ProblemTypes.StatusNameTaken] = StatusNameTakenKey,
         [ProblemTypes.StatusSetEmpty] = StatusSetEmptyKey,
+        [ProblemTypes.StatusRenameConflict] = StatusRenameConflictKey,
         [ProblemTypes.InvalidStatusPosition] = InvalidStatusPositionKey,
         [ProblemTypes.StatusDestinationRequired] = StatusDestinationRequiredKey,
         [ProblemTypes.InvalidStatusDestination] = InvalidStatusDestinationKey,

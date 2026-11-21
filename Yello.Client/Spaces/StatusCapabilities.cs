@@ -24,4 +24,14 @@ public static class StatusCapabilities
     /// <returns><c>true</c> for Owner and Admin; <c>false</c> for Member, Viewer and anything unknown.</returns>
     public static bool PermitsConfigureProjectStatusDelta(string roleCode) =>
         roleCode is "owner" or "admin";
+
+    /// <summary>
+    /// Whether a Role may add, rename and reorder the Space's default Statuses (<c>configure-space-default-statuses</c>):
+    /// the Default Statuses section of Space settings and every control in it, the rename dialog included. Held against the
+    /// matrix by <c>The_clients_Space_default_Status_predicate_agrees_with_the_capability_matrix</c>.
+    /// </summary>
+    /// <param name="roleCode">The Role's stable code, from the active Space's answer.</param>
+    /// <returns><c>true</c> for Owner and Admin; <c>false</c> for Member, Viewer and anything unknown.</returns>
+    public static bool PermitsConfigureSpaceDefaultStatuses(string roleCode) =>
+        roleCode is "owner" or "admin";
 }

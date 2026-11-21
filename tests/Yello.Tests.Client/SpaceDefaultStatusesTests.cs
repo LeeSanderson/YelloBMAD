@@ -61,7 +61,7 @@ public sealed class SpaceDefaultStatusesTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="role">The Role held in the second Space.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2, AC11 - no Default Statuses section in Space settings yet")]
+    [Theory]
     [InlineData("member")]
     [InlineData("viewer")]
     [Trait("Requirement", "UX-DR27")]
@@ -99,7 +99,7 @@ public sealed class SpaceDefaultStatusesTests(ClientSurfaceFixture surface)
     /// up; each sends one write, re-renders from the answer and is announced politely.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11, AC1, AC3, AC8 - no Default Statuses section yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR42")]
     [Trait("Requirement", "NFR-9")]
     public async Task Adding_renaming_and_moving_a_default_are_each_sent_once_and_announced()
@@ -138,7 +138,7 @@ public sealed class SpaceDefaultStatusesTests(ClientSurfaceFixture surface)
     /// having sent nothing more and returns focus to the rename field.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11, AC4 - no Default Statuses section or cascade dialog yet (Q2, Q14)")]
+    [Fact]
     [Trait("Requirement", "UX-DR42")]
     [Trait("Requirement", "NFR-8")]
     public async Task A_conflicting_rename_opens_a_dialog_naming_each_Project_with_nothing_pre_focused()
@@ -186,7 +186,7 @@ public sealed class SpaceDefaultStatusesTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="replace">Whether "Rename these too" is chosen rather than "Keep their names".</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11, AC5 - no cascade dialog yet (Q4)")]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     [Trait("Requirement", "UX-DR42")]
@@ -221,7 +221,7 @@ public sealed class SpaceDefaultStatusesTests(ClientSurfaceFixture surface)
     /// row.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11, AC6 - no Default Statuses section yet (Q5)")]
+    [Fact]
     public async Task A_name_a_Project_already_uses_is_refused_inline_naming_the_Project()
     {
         var api = Seeded();
@@ -250,7 +250,7 @@ public sealed class SpaceDefaultStatusesTests(ClientSurfaceFixture surface)
     /// After "Doing" is renamed "Underway" at Space level, the plain Project's Board, read afresh, names that column "Underway".
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AC11 - no Default Statuses section yet")]
+    [Fact]
     public async Task A_Projects_Board_names_the_renamed_column_on_its_next_read()
     {
         var api = Seeded();
@@ -276,7 +276,7 @@ public sealed class SpaceDefaultStatusesTests(ClientSurfaceFixture surface)
     /// screen.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - no Default Statuses section or cascade dialog yet")]
+    [Fact]
     [Trait("Requirement", "NFR-9")]
     public async Task The_section_and_the_dialog_reflow_at_320_pixels_wide()
     {

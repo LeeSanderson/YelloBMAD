@@ -1839,4 +1839,104 @@
     <value>{0} added back.</value>
     <comment>Announced after an add-back. {0} is the Status.</comment>
   </data>
+  <data name="SpaceStatusesHeading" xml:space="preserve">
+    <value>Default Statuses</value>
+    <comment>The Default Statuses section of Space settings.</comment>
+  </data>
+  <data name="SpaceStatusesLoading" xml:space="preserve">
+    <value>Loading the Space&apos;s default Statuses.</value>
+    <comment>Said while the defaults load.</comment>
+  </data>
+  <data name="SpaceStatusesIntro" xml:space="preserve">
+    <value>Every Project starts from these Statuses. A Project that renamed or moved one keeps its own choice.</value>
+    <comment>Above the defaults.</comment>
+  </data>
+  <data name="SpaceStatusSaving" xml:space="preserve">
+    <value>Saving the change to the Space&apos;s defaults.</value>
+    <comment>Shown while a change of the defaults is out.</comment>
+  </data>
+  <data name="SpaceStatusAdded" xml:space="preserve">
+    <value>{0} added to every Project.</value>
+    <comment>Announced after an add. {0} is the Status.</comment>
+  </data>
+  <data name="SpaceStatusRenamedEverywhere" xml:space="preserve">
+    <value>Renamed “{0}” to “{1}” in every Project.</value>
+    <comment>Announced after a rename that every Project took. {0} is the old name, {1} the new.</comment>
+  </data>
+  <data name="SpaceStatusRenamedKeptOne" xml:space="preserve">
+    <value>Renamed “{0}” to “{1}”. 1 Project kept its own name.</value>
+    <comment>Announced after a rename one Project kept its own name through. {0} is the old name, {1} the new.</comment>
+  </data>
+  <data name="SpaceStatusRenamedKeptMany" xml:space="preserve">
+    <value>Renamed “{0}” to “{1}”. {2} Projects kept their own names.</value>
+    <comment>Announced after a rename several Projects kept their own names through. {0} is the old name, {1} the new, {2} how many kept theirs.</comment>
+  </data>
+  <data name="SpaceStatusNameTaken" xml:space="preserve">
+    <value>Another default Status already has that name.</value>
+    <comment>Refusal: the name is another default&apos;s.</comment>
+  </data>
+  <data name="SpaceStatusNameTakenInProjectOne" xml:space="preserve">
+    <value>{0} already uses that name for another Status.</value>
+    <comment>Refusal: one Project&apos;s Statuses already hold the name. {0} is the Project.</comment>
+  </data>
+  <data name="SpaceStatusNameTakenInProjectsMany" xml:space="preserve">
+    <value>These Projects already use that name for another Status: {0}.</value>
+    <comment>Refusal: several Projects&apos; Statuses already hold the name. {0} lists them.</comment>
+  </data>
+  <data name="SpaceStatusNoLongerHere" xml:space="preserve">
+    <value>That Status is no longer one of the Space&apos;s defaults.</value>
+    <comment>Refusal: the default changed was removed elsewhere.</comment>
+  </data>
+  <data name="SpaceStatusCascadeTitleOne" xml:space="preserve">
+    <value>1 Project renamed this Status itself.</value>
+    <comment>Heading of the rename question, for one Project.</comment>
+  </data>
+  <data name="SpaceStatusCascadeTitleMany" xml:space="preserve">
+    <value>{0} Projects renamed this Status themselves.</value>
+    <comment>Heading of the rename question. {0} is how many Projects.</comment>
+  </data>
+  <data name="SpaceStatusCascadeScopeOne" xml:space="preserve">
+    <value>You&apos;re renaming the Space default “{0}” to “{1}”. This Project gave it its own name:</value>
+    <comment>Above the one Project. {0} is the old name, {1} the new.</comment>
+  </data>
+  <data name="SpaceStatusCascadeScopeMany" xml:space="preserve">
+    <value>You&apos;re renaming the Space default “{0}” to “{1}”. These Projects gave it their own name:</value>
+    <comment>Above the Projects. {0} is the old name, {1} the new.</comment>
+  </data>
+  <data name="SpaceStatusCascadeProject" xml:space="preserve">
+    <value>Project</value>
+    <comment>Column heading.</comment>
+  </data>
+  <data name="SpaceStatusCascadeOwnName" xml:space="preserve">
+    <value>Its name for this Status</value>
+    <comment>Column heading.</comment>
+  </data>
+  <data name="SpaceStatusCascadeTasks" xml:space="preserve">
+    <value>Tasks</value>
+    <comment>Column heading.</comment>
+  </data>
+  <data name="SpaceStatusCascadeOthers" xml:space="preserve">
+    <value>Every other Project takes the new name either way.</value>
+    <comment>Below the Projects.</comment>
+  </data>
+  <data name="SpaceStatusCascadeReplace" xml:space="preserve">
+    <value>Rename these too</value>
+    <comment>Answer: the Projects take the new name.</comment>
+  </data>
+  <data name="SpaceStatusCascadeKeep" xml:space="preserve">
+    <value>Keep their names</value>
+    <comment>Answer: the Projects keep their own names.</comment>
+  </data>
+  <data name="SpaceStatusCascadeCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Closes the question; nothing is renamed.</comment>
+  </data>
+  <data name="SpaceStatusCascadeInFlight" xml:space="preserve">
+    <value>Renaming “{0}” to “{1}”.</value>
+    <comment>Shown while the answer is out. {0} is the old name, {1} the new.</comment>
+  </data>
+  <data name="StatusRenameConflict" xml:space="preserve">
+    <value>Some Projects renamed this Status themselves.</value>
+    <comment>Refusal: a Space-level rename some Projects renamed themselves, when the question cannot be asked.</comment>
+  </data>
 </root>

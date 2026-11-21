@@ -389,6 +389,7 @@
         }
 
         _statuses = set;
+        await LoadSpaceDefaultsAsync(generation, token);
 
         return set;
     }

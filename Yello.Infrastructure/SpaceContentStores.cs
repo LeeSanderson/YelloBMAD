@@ -37,6 +37,7 @@ internal static class SpaceContentStores
         services.AddScoped<IListReader, ListReader>();
         services.AddScoped<ILabelStore, LabelStore>();
         services.AddScoped<IProjectStatusStore, ProjectStatusStore>();
+        services.AddScoped<ISpaceDefaultStatusStore, SpaceDefaultStatusStore>();
 
         // Story 4.1: the Space's Invitations, on the request's unit of work like every Space-scoped store. Story 4.3: the
         // same instance answers the accept's screen, which the pipeline reads before it consults the bound.

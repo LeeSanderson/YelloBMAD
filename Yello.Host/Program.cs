@@ -44,11 +44,14 @@ using Yello.Application.Spaces.RenameSpace;
 using Yello.Application.Spaces.RevokeOwnershipOffer;
 using Yello.Application.Statuses;
 using Yello.Application.Statuses.AddProjectStatus;
+using Yello.Application.Statuses.AddSpaceStatus;
 using Yello.Application.Statuses.ListProjectStatuses;
 using Yello.Application.Statuses.ListStatuses;
 using Yello.Application.Statuses.PlaceProjectStatus;
+using Yello.Application.Statuses.PlaceSpaceStatus;
 using Yello.Application.Statuses.RemoveProjectStatus;
 using Yello.Application.Statuses.RenameProjectStatus;
+using Yello.Application.Statuses.RenameSpaceStatus;
 using Yello.Application.Statuses.RestoreProjectStatus;
 using Yello.Application.Tasks.AssignTask;
 using Yello.Application.Tasks.CreateTask;
@@ -135,6 +138,10 @@ builder.Services.AddScoped<RegisterAccountHandler>();
 builder.Services.AddScoped<AuthenticateAccountHandler>();
 builder.Services.AddScoped<SignOutHandler>();
 builder.Services.AddScoped<ListStatusesHandler>();
+builder.Services.AddScoped<SpaceDefaultStatusWriter>();
+builder.Services.AddScoped<AddSpaceStatusHandler>();
+builder.Services.AddScoped<RenameSpaceStatusHandler>();
+builder.Services.AddScoped<PlaceSpaceStatusHandler>();
 builder.Services.AddScoped<ListSpacesHandler>();
 builder.Services.AddScoped<IssueApiTokenHandler>();
 builder.Services.AddScoped<ListApiTokensHandler>();
@@ -475,6 +482,14 @@ api.MapAntiforgeryToken();
 // Space that does not exist and a Space the caller is not a member of alike. Declares the read
 // capability, which every Role holds.
 api.MapListStatuses();
+
+// The Space's default Statuses. POST on the same path adds one, PATCH .../statuses/{statusId} renames one and POST
+// .../statuses/{statusId}/place moves one, each under ConfigureSpaceDefaultStatuses (Owner and Admin) and each answering the
+// whole default list. Every Project follows through its derived set; a rename some Projects renamed themselves is refused
+// 409 status-rename-conflict naming them until it carries one decision for all of them. Both surfaces; no bound.
+api.MapAddSpaceStatus();
+api.MapRenameSpaceStatus();
+api.MapPlaceSpaceStatus();
 
 // GET /api/v1/spaces/{spaceId}. The active Space's own answer for the context bar - its name and the
 // caller's Role, as the pipeline resolved them on this request. Space-scoped like the route above.

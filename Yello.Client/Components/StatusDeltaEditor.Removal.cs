@@ -55,8 +55,9 @@ public sealed partial class StatusDeltaEditor
     }
 
     /// <summary>
-    /// The Space's defaults, for the add-back list. Only a Role that may shape the set sees that list, and a failure leaves it
-    /// empty rather than refusing the page.
+    /// The Space's defaults, for the add-back list, read again with every set the editor renders: another Admin may have
+    /// renamed a default at Space level since. Only a Role that may shape the set sees that list, and a failure keeps the
+    /// last list rather than refusing the page.
     /// </summary>
     private async Task LoadSpaceDefaultsAsync(int generation, CancellationToken token)
     {
@@ -216,6 +217,7 @@ public sealed partial class StatusDeltaEditor
             }
 
             _statuses = await response.Content.ReadFromJsonAsync<List<ProjectStatusResponse>>(JsonOptions, token);
+            await LoadSpaceDefaultsAsync(generation, token);
 
             return _statuses is not null;
         }

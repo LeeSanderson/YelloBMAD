@@ -17,9 +17,7 @@ namespace Yello.Tests.Isolation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Pending until the routes are mapped</b>; the develop phase makes these rows live before review (GATE-003) and swaps
-/// <see cref="SpaceStatusWire"/>'s stand-ins (<see cref="SpaceStatusWire.Item"/>, <see cref="SpaceStatusWire.Place"/>,
-/// <see cref="SpaceStatusWire.StatusRenameConflict"/>) for the contract members.
+/// <b>Live</b> (GATE-003): every row runs on both surfaces against the mapped routes.
 /// </para>
 /// <para>
 /// <b>Defaults are changed only in fresh actors' Spaces, never in A's or B's</b>: <c>ISO-DIRECT-STATUSES</c>,
@@ -29,10 +27,6 @@ namespace Yello.Tests.Isolation;
 /// </remarks>
 internal static partial class IsolationCases
 {
-    private const string SpaceDefaultStatusPending = "The Space-level add, rename and place routes are not mapped until the dev phase of the story that defines the Space default Statuses.";
-
-    private const string SpaceDefaultStatusStory = "6.3";
-
     private const string ConfigureDefaultsCapabilityCode = "configure-space-default-statuses";
 
     private const string OwnConflictName = "Renamed in the caller's Project";
@@ -54,12 +48,10 @@ internal static partial class IsolationCases
                     foreignOwner.SpaceId,
                     Body: () => SpaceStatusWire.AddBody(CaseBodyName));
             },
-            Both(new BoundaryNotFound { Then = NoStatusNamedForTheCaseInTheTargetSpaceAsync }),
-            PendingUntil: SpaceDefaultStatusStory,
-            PendingReason: SpaceDefaultStatusPending),
+            Both(new BoundaryNotFound { Then = NoStatusNamedForTheCaseInTheTargetSpaceAsync })),
 
         new IsolationCase(
-            "ISO-RENAME-SPACE-STATUS-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Patch, SpaceStatusWire.Item,
+            "ISO-RENAME-SPACE-STATUS-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Patch, SpaceRoutes.Status,
             async world =>
             {
                 var (foreignOwner, _) = await ForeignProjectAsync(world);
@@ -68,16 +60,14 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Patch,
-                    [new(SpaceStatusWire.ItemOf(foreignOwner.SpaceId, theirStatus), SpaceStatusWire.ItemOf(Guid.NewGuid(), theirStatus))],
+                    [new(SpaceRoutes.StatusOf(foreignOwner.SpaceId, theirStatus), SpaceRoutes.StatusOf(Guid.NewGuid(), theirStatus))],
                     foreignOwner.SpaceId,
                     Body: () => SpaceStatusWire.RenameBody(CaseBodyName));
             },
-            Both(new BoundaryNotFound { Then = NoStatusNamedForTheCaseInTheTargetSpaceAsync }),
-            PendingUntil: SpaceDefaultStatusStory,
-            PendingReason: SpaceDefaultStatusPending),
+            Both(new BoundaryNotFound { Then = NoStatusNamedForTheCaseInTheTargetSpaceAsync })),
 
         new IsolationCase(
-            "ISO-PLACE-SPACE-STATUS-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, SpaceStatusWire.Place,
+            "ISO-PLACE-SPACE-STATUS-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, SpaceRoutes.StatusPlace,
             async world =>
             {
                 var (foreignOwner, _) = await ForeignProjectAsync(world);
@@ -86,40 +76,34 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Post,
-                    [new(SpaceStatusWire.PlaceOf(foreignOwner.SpaceId, theirStatus), SpaceStatusWire.PlaceOf(Guid.NewGuid(), theirStatus))],
+                    [new(SpaceRoutes.StatusPlaceOf(foreignOwner.SpaceId, theirStatus), SpaceRoutes.StatusPlaceOf(Guid.NewGuid(), theirStatus))],
                     foreignOwner.SpaceId,
                     Body: () => SpaceStatusWire.PlaceBody(afterStatusId: null));
             },
-            Both(new BoundaryNotFound()),
-            PendingUntil: SpaceDefaultStatusStory,
-            PendingReason: SpaceDefaultStatusPending),
+            Both(new BoundaryNotFound())),
 
         // B's real default and a Project's added Status of the caller's own Space, each in the caller's own Space path: the
         // first is a row the StatusDefinition query filter must keep out, the second one the write must refuse as not a
         // default, and each must answer what a random id answers.
         new IsolationCase(
-            "ISO-RENAME-FOREIGN-STATUS-IN-OWN-SPACE", "I-4, I-5, FR-20", IsolationVector.DeepLink, HttpMethod.Patch, SpaceStatusWire.Item,
-            world => NotADefaultInOwnSpaceAsync(world, "Dr", HttpMethod.Patch, SpaceStatusWire.ItemOf, () => SpaceStatusWire.RenameBody(CaseBodyName)),
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = NoStatusNamedForTheCaseInTheActorsSpaceAsync }),
-            PendingUntil: SpaceDefaultStatusStory,
-            PendingReason: SpaceDefaultStatusPending),
+            "ISO-RENAME-FOREIGN-STATUS-IN-OWN-SPACE", "I-4, I-5, FR-20", IsolationVector.DeepLink, HttpMethod.Patch, SpaceRoutes.Status,
+            world => NotADefaultInOwnSpaceAsync(world, "Dr", HttpMethod.Patch, SpaceRoutes.StatusOf, () => SpaceStatusWire.RenameBody(CaseBodyName)),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = NoStatusNamedForTheCaseInTheActorsSpaceAsync })),
 
         new IsolationCase(
-            "ISO-PLACE-FOREIGN-STATUS-IN-OWN-SPACE", "I-4, I-5, FR-20", IsolationVector.DeepLink, HttpMethod.Post, SpaceStatusWire.Place,
-            world => NotADefaultInOwnSpaceAsync(world, "Dp", HttpMethod.Post, SpaceStatusWire.PlaceOf, () => SpaceStatusWire.PlaceBody(afterStatusId: null)),
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable)),
-            PendingUntil: SpaceDefaultStatusStory,
-            PendingReason: SpaceDefaultStatusPending),
+            "ISO-PLACE-FOREIGN-STATUS-IN-OWN-SPACE", "I-4, I-5, FR-20", IsolationVector.DeepLink, HttpMethod.Post, SpaceRoutes.StatusPlace,
+            world => NotADefaultInOwnSpaceAsync(world, "Dp", HttpMethod.Post, SpaceRoutes.StatusPlaceOf, () => SpaceStatusWire.PlaceBody(afterStatusId: null)),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable))),
 
         // An anchor is body-borne, so a foreign one is the write's own 400, identical to a random anchor's, never the
         // boundary 404 a path id gets.
         new IsolationCase(
-            "ISO-PLACE-SPACE-STATUS-FOREIGN-ANCHOR", "I-1, I-13, FR-27", IsolationVector.DirectIdentifier, HttpMethod.Post, SpaceStatusWire.Place,
+            "ISO-PLACE-SPACE-STATUS-FOREIGN-ANCHOR", "I-1, I-13, FR-27", IsolationVector.DirectIdentifier, HttpMethod.Post, SpaceRoutes.StatusPlace,
             async world =>
             {
                 var actor = await world.NewActorAsync("Da");
                 var foreign = (await StatusIdsAsync(world.B))[0];
-                var path = SpaceStatusWire.PlaceOf(actor.SpaceId, (await StatusIdsAsync(actor))[1]);
+                var path = SpaceRoutes.StatusPlaceOf(actor.SpaceId, (await StatusIdsAsync(actor))[1]);
 
                 return new CaseRequest(
                     actor,
@@ -129,9 +113,7 @@ internal static partial class IsolationCases
                     Body: () => SpaceStatusWire.PlaceBody(foreign),
                     AnchorBody: () => SpaceStatusWire.PlaceBody(Guid.NewGuid()));
             },
-            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidStatusPosition)),
-            PendingUntil: SpaceDefaultStatusStory,
-            PendingReason: SpaceDefaultStatusPending),
+            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidStatusPosition))),
 
         new IsolationCase(
             "ISO-ADD-SPACE-STATUS-FOREIGN-ANCHOR", "I-1, I-13, FR-24", IsolationVector.DirectIdentifier, HttpMethod.Post, SpaceRoutes.Statuses,
@@ -149,41 +131,31 @@ internal static partial class IsolationCases
                     Body: () => SpaceStatusWire.AddBody(CaseBodyName, foreign),
                     AnchorBody: () => SpaceStatusWire.AddBody(CaseBodyName, Guid.NewGuid()));
             },
-            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidStatusPosition) { Then = NoStatusNamedForTheCaseInTheActorsSpaceAsync }),
-            PendingUntil: SpaceDefaultStatusStory,
-            PendingReason: SpaceDefaultStatusPending),
+            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidStatusPosition) { Then = NoStatusNamedForTheCaseInTheActorsSpaceAsync })),
 
         new IsolationCase(
             "ISO-RECORD-KIND-SPACE-STATUS-ADD-VIEWER", "V-1, C-6, FR-16", IsolationVector.RecordKind, HttpMethod.Post, SpaceRoutes.Statuses,
             world => ViewerOnTheDefaultsAsync(world, "Va", HttpMethod.Post, (spaceId, _) => SpaceRoutes.StatusesOf(spaceId), () => SpaceStatusWire.AddBody(CaseBodyName)),
-            Both(new RoleRefused(ConfigureDefaultsCapabilityCode) { Then = NoStatusNamedForTheCaseInTheActorsSpaceAsync }),
-            PendingUntil: SpaceDefaultStatusStory,
-            PendingReason: SpaceDefaultStatusPending),
+            Both(new RoleRefused(ConfigureDefaultsCapabilityCode) { Then = NoStatusNamedForTheCaseInTheActorsSpaceAsync })),
 
         new IsolationCase(
-            "ISO-RECORD-KIND-SPACE-STATUS-RENAME-VIEWER", "V-1, C-6, FR-16", IsolationVector.RecordKind, HttpMethod.Patch, SpaceStatusWire.Item,
-            world => ViewerOnTheDefaultsAsync(world, "Vn", HttpMethod.Patch, SpaceStatusWire.ItemOf, () => SpaceStatusWire.RenameBody(CaseBodyName)),
-            Both(new RoleRefused(ConfigureDefaultsCapabilityCode) { Then = NoStatusNamedForTheCaseInTheActorsSpaceAsync }),
-            PendingUntil: SpaceDefaultStatusStory,
-            PendingReason: SpaceDefaultStatusPending),
+            "ISO-RECORD-KIND-SPACE-STATUS-RENAME-VIEWER", "V-1, C-6, FR-16", IsolationVector.RecordKind, HttpMethod.Patch, SpaceRoutes.Status,
+            world => ViewerOnTheDefaultsAsync(world, "Vn", HttpMethod.Patch, SpaceRoutes.StatusOf, () => SpaceStatusWire.RenameBody(CaseBodyName)),
+            Both(new RoleRefused(ConfigureDefaultsCapabilityCode) { Then = NoStatusNamedForTheCaseInTheActorsSpaceAsync })),
 
         new IsolationCase(
-            "ISO-RECORD-KIND-SPACE-STATUS-PLACE-VIEWER", "V-1, C-6, FR-16", IsolationVector.RecordKind, HttpMethod.Post, SpaceStatusWire.Place,
-            world => ViewerOnTheDefaultsAsync(world, "Vp", HttpMethod.Post, SpaceStatusWire.PlaceOf, () => SpaceStatusWire.PlaceBody(afterStatusId: null)),
-            Both(new RoleRefused(ConfigureDefaultsCapabilityCode)),
-            PendingUntil: SpaceDefaultStatusStory,
-            PendingReason: SpaceDefaultStatusPending),
+            "ISO-RECORD-KIND-SPACE-STATUS-PLACE-VIEWER", "V-1, C-6, FR-16", IsolationVector.RecordKind, HttpMethod.Post, SpaceRoutes.StatusPlace,
+            world => ViewerOnTheDefaultsAsync(world, "Vp", HttpMethod.Post, SpaceRoutes.StatusPlaceOf, () => SpaceStatusWire.PlaceBody(afterStatusId: null)),
+            Both(new RoleRefused(ConfigureDefaultsCapabilityCode))),
 
         new IsolationCase(
-            "ISO-SPACE-STATUS-RENAME-CONFLICT-AGGREGATE", "I-3, FR-27, UX-DR16", IsolationVector.Aggregate, HttpMethod.Patch, SpaceStatusWire.Item,
+            "ISO-SPACE-STATUS-RENAME-CONFLICT-AGGREGATE", "I-3, FR-27, UX-DR16", IsolationVector.Aggregate, HttpMethod.Patch, SpaceRoutes.Status,
             ConflictReportBesideAForeignRenameAsync,
-            Both(new Served(HttpStatusCode.Conflict, ReportsOnlyTheCallersProjectAsync, "409 status-rename-conflict naming the caller's one Project and nothing of the other Space's same-named rename")),
-            PendingUntil: SpaceDefaultStatusStory,
-            PendingReason: SpaceDefaultStatusPending),
+            Both(new Served(HttpStatusCode.Conflict, ReportsOnlyTheCallersProjectAsync, "409 status-rename-conflict naming the caller's one Project and nothing of the other Space's same-named rename"))),
 
         TokenOnTheDefaultsElsewhere("SPACE-STATUS-ADD", HttpMethod.Post, SpaceRoutes.Statuses, HttpStatusCode.Created, (second, _) => SpaceRoutes.StatusesOf(second.SpaceId), () => SpaceStatusWire.AddBody(CaseBodyName)),
-        TokenOnTheDefaultsElsewhere("SPACE-STATUS-RENAME", HttpMethod.Patch, SpaceStatusWire.Item, HttpStatusCode.OK, (second, status) => SpaceStatusWire.ItemOf(second.SpaceId, status), () => SpaceStatusWire.RenameBody(CaseBodyName)),
-        TokenOnTheDefaultsElsewhere("SPACE-STATUS-PLACE", HttpMethod.Post, SpaceStatusWire.Place, HttpStatusCode.OK, (second, status) => SpaceStatusWire.PlaceOf(second.SpaceId, status), () => SpaceStatusWire.PlaceBody(afterStatusId: null)),
+        TokenOnTheDefaultsElsewhere("SPACE-STATUS-RENAME", HttpMethod.Patch, SpaceRoutes.Status, HttpStatusCode.OK, (second, status) => SpaceRoutes.StatusOf(second.SpaceId, status), () => SpaceStatusWire.RenameBody(CaseBodyName)),
+        TokenOnTheDefaultsElsewhere("SPACE-STATUS-PLACE", HttpMethod.Post, SpaceRoutes.StatusPlace, HttpStatusCode.OK, (second, status) => SpaceRoutes.StatusPlaceOf(second.SpaceId, status), () => SpaceStatusWire.PlaceBody(afterStatusId: null)),
     ];
 
     /// <summary>
@@ -239,7 +211,7 @@ internal static partial class IsolationCases
         await RenameProjectStatusThroughTheProductAsync(own, ownProject, ownFirst, OwnConflictName);
         await RenameProjectStatusThroughTheProductAsync(other, otherProject, (await StatusIdsAsync(other))[0], ForeignConflictName);
 
-        var path = SpaceStatusWire.ItemOf(own.SpaceId, ownFirst);
+        var path = SpaceRoutes.StatusOf(own.SpaceId, ownFirst);
 
         return new CaseRequest(own, HttpMethod.Patch, [new(path, path)], TargetSpaceId: null, Body: () => SpaceStatusWire.RenameBody(CaseBodyName), Other: other);
     }
@@ -252,7 +224,7 @@ internal static partial class IsolationCases
     {
         var other = request.Other ?? throw new InvalidOperationException("The case names no other Space.");
 
-        Assert.Equal(SpaceStatusWire.StatusRenameConflict, ProjectStatusWire.ProblemTypeOf(answer.Body));
+        Assert.Equal(ProblemTypes.StatusRenameConflict, ProjectStatusWire.ProblemTypeOf(answer.Body));
         Assert.Equal([OwnConflictName], SpaceStatusWire.ConflictsOf(answer.Body).Select(conflict => conflict.Name));
         Assert.DoesNotContain(ForeignConflictName, answer.Body, StringComparison.Ordinal);
         Assert.DoesNotContain(other.SpaceId.ToString("D"), answer.Body, StringComparison.OrdinalIgnoreCase);
@@ -274,9 +246,7 @@ internal static partial class IsolationCases
 
                 return new CaseRequest(first.Actor, method, [new(path, path)], second.SpaceId, Body: body, Other: second.Actor);
             },
-            TokenOwnOtherSpaceExpectations(sessionStatus),
-            PendingUntil: SpaceDefaultStatusStory,
-            PendingReason: SpaceDefaultStatusPending);
+            TokenOwnOtherSpaceExpectations(sessionStatus));
 
     /// <summary>
     /// Renames one Status of <paramref name="owner"/>'s Project through the product.

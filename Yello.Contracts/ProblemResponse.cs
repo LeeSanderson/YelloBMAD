@@ -36,10 +36,19 @@ namespace Yello.Contracts;
 /// </param>
 /// <param name="Limit">On <see cref="ProblemTypes.BoundReached"/>: the bound's value.</param>
 /// <param name="Spaces">On <see cref="ProblemTypes.AccountOwnsSpaces"/>: every Space the caller owns, identity only.</param>
+/// <param name="Conflicts">
+/// On <see cref="ProblemTypes.StatusRenameConflict"/>: every Project of the Space that gave the default a name of its own.
+/// </param>
+/// <param name="Projects">
+/// On <see cref="ProblemTypes.StatusNameTaken"/> from a change of the Space's defaults: the Projects whose set already holds
+/// the name, identity only. Absent when the name is another default's.
+/// </param>
 public sealed record ProblemResponse(
     string? Type,
     IReadOnlyList<string>? Errors,
     string? Capability = null,
     string? Bound = null,
     int? Limit = null,
-    IReadOnlyList<Spaces.SpaceIdentityResponse>? Spaces = null);
+    IReadOnlyList<Spaces.SpaceIdentityResponse>? Spaces = null,
+    IReadOnlyList<Spaces.StatusRenameConflictResponse>? Conflicts = null,
+    IReadOnlyList<Spaces.ProjectIdentityResponse>? Projects = null);

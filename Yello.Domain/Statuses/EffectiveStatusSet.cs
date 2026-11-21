@@ -120,10 +120,25 @@ public static class EffectiveStatusSet
         ArgumentNullException.ThrowIfNull(current);
         ArgumentNullException.ThrowIfNull(placed);
 
-        var order = current.Select(status => status.Id).Where(id => id != statusId).ToList();
-        order.Insert(afterStatusId is { } anchor ? order.IndexOf(anchor) + 1 : 0, statusId);
+        var order = Moved(current.Select(status => status.Id), statusId, afterStatusId);
 
         return Anchors(order, id => id == statusId || placed.Contains(id));
+    }
+
+    /// <summary>
+    /// <paramref name="order"/> with <paramref name="statusId"/> taken out and put back after <paramref name="afterStatusId"/>,
+    /// or first: the one list move both a Project's place and the Space's own reorder make.
+    /// </summary>
+    /// <param name="order">The ids in their current order; <paramref name="statusId"/> need not be among them.</param>
+    /// <param name="statusId">The id being moved.</param>
+    /// <param name="afterStatusId">The id it goes after, which must be in <paramref name="order"/>, or <c>null</c> for first.</param>
+    /// <returns>The ids in their new order.</returns>
+    internal static List<Guid> Moved(IEnumerable<Guid> order, Guid statusId, Guid? afterStatusId)
+    {
+        var moved = order.Where(id => id != statusId).ToList();
+        moved.Insert(afterStatusId is { } anchor ? moved.IndexOf(anchor) + 1 : 0, statusId);
+
+        return moved;
     }
 
     /// <summary>

@@ -4,10 +4,17 @@ namespace Yello.Domain.Statuses;
 /// Writes one Project's Status delta inside the request's Space-scoped unit of work.
 /// </summary>
 /// <remarks>
+/// <para>
 /// <b>Every write runs under the Project's lock</b>, the one each placer of the Project's Tasks takes: the effective set's
 /// name uniqueness cannot be an index (a renamed default's name lives in the delta), so two writes are serialised and the
 /// second reads the first's result before it is checked. A removal's Task migration, its operation deletes and inserts,
 /// and an owned definition's delete all share the one unit of work, so they commit together or not at all.
+/// </para>
+/// <para>
+/// <b>Before the Project's lock, the Space-level Status lock, shared.</b> A change of the Space's defaults holds it
+/// exclusively (<see cref="ISpaceDefaultStatusStore"/>), so a Project's name check never interleaves with one, while two
+/// Projects' writes never wait on each other.
+/// </para>
 /// </remarks>
 public interface IProjectStatusStore
 {

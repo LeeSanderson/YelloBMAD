@@ -1,6 +1,10 @@
+---
+baseline_commit: 4b1ed3d6f880244f8b31c7f1197f53525e7cbaca
+---
+
 # Story 6.3: Define the Space default Statuses, and cascade a rename
 
-Status: ready-for-dev
+Status: review
 
 Epic: 6 — Shape Statuses per Project and retire work safely (third of six stories)
 Story key: `6-3-define-the-space-default-statuses-and-cascade-a-rename`
@@ -131,17 +135,17 @@ so that a Space-wide change never silently overwrites a deliberate local one.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Domain: the Space-level plan** (AC1, AC3-AC8, AC10, AC15)
-  - [ ] A pure planner in `Yello.Domain/Statuses/` (name is the dev's, for example `SpaceDefaultStatusPlan`): given the defaults, every Project's delta (with the Project's id) and one change (add, rename + decision, place), return:
+- [x] **Task 1 — Domain: the Space-level plan** (AC1, AC3-AC8, AC10, AC15)
+  - [x] A pure planner in `Yello.Domain/Statuses/` (name is the dev's, for example `SpaceDefaultStatusPlan`): given the defaults, every Project's delta (with the Project's id) and one change (add, rename + decision, place), return:
     - the defaults after the change,
     - the conflicting Projects (rename only; Q3),
     - the `Rename` ops to delete (AC5),
     - the Projects whose after-set would hold a name twice (Q5).
     
     Compute every Project's after-set with `EffectiveStatusSet.Of(defaultsAfter, deltaAfter)` and judge it with `EffectiveStatusSet.Check(after, statusId)`. **No second derivation.**
-  - [ ] Reorder: produce the defaults' new `Position`s from an anchor (reuse the list logic of `EffectiveStatusSet.Placements` or a small sibling; never a third ordering algorithm for the same job).
-  - [ ] The never-empty guard for the default set (AC10, Q7): a check that refuses an empty default set, ready for 6.4.
-  - [ ] Unit tests (no database), in `tests/Yello.Tests.Slices/Statuses/` (for example `SpaceDefaultStatusPlanTests.cs`):
+  - [x] Reorder: produce the defaults' new `Position`s from an anchor (reuse the list logic of `EffectiveStatusSet.Placements` or a small sibling; never a third ordering algorithm for the same job).
+  - [x] The never-empty guard for the default set (AC10, Q7): a check that refuses an empty default set, ready for 6.4.
+  - [x] Unit tests (no database), in `tests/Yello.Tests.Slices/Statuses/` (for example `SpaceDefaultStatusPlanTests.cs`):
     - an add reaches a plain Project, one that removed another default, and one that added Statuses (slot before unplaced added Statuses);
     - a rename reaches plain, placed and other-renamed Projects;
     - conflicts: an own name differs → conflict; an own name equal to the old name or the new name (ordinal) → not a conflict, op deleted;
@@ -150,45 +154,45 @@ so that a Space-wide change never silently overwrites a deliberate local one.
     - a name clash with an added Status, and with another renamed default, under both decisions;
     - reorder: P-plain follows, P-placed keeps its place;
     - an empty default set is refused.
-- [ ] **Task 2 — Lock and reads** (AC9, AC4)
-  - [ ] `ApplicationLocks.StatusDefaults(spaceId)` = `Yello/StatusDefaults/{spaceId:D}`, with Exclusive and Shared takers. Write in its remarks the lock order (StatusDefaults → ProjectTasks) and why Task writers never take it: no Space-level change in 6.3 takes a Status out of a set, so a Task's Status check is unaffected. 6.4 takes it Exclusive before every ProjectTasks it migrates.
-  - [ ] `ProjectStatusStore.LockAsync`: take StatusDefaults **Shared** before `TakeProjectTasksAsync`. Update `IProjectStatusStore`'s remarks.
-  - [ ] Reader: every Project's delta in the active Space (`IStatusDefinitionReader.DeltasAsync()` or similar): owned definitions and operations, two queries, grouped by Project, no `Where SpaceId`.
-  - [ ] Reader: for one Status, the Task count per Project (one grouped statement), and the names of the Projects the report names. Use the existing Project read if one fits.
-- [ ] **Task 3 — Infrastructure: the Space-level store** (AC1, AC3, AC5, AC8, AC14)
-  - [ ] A Domain port (for example `ISpaceDefaultStatusStore`) and an Infrastructure store: `LockAsync` (StatusDefaults Exclusive), add a default, set a default's name, rewrite positions, and delete named `Rename` ops (one set-based `ExecuteDelete` over `(ProjectId, StatusId, Kind = Rename)` for the listed Projects).
-  - [ ] Statement order in one unit of work: delete the ops, then rename the default (or the reverse; both are in one transaction). Catch `2601`/`2627` from the default-name index as `NameTaken`, and detach so nothing stays pending (copy `ProjectStatusStore`).
-  - [ ] No `Where SpaceId` (the policy narrows it). No raw SQL unless needed; any raw SQL lives in Infrastructure with parameters.
-  - [ ] Register in `SpaceContentStores.cs` / `InfrastructureServices.cs` as the Project store is.
-- [ ] **Task 4 — Application: the writer and three slices** (AC1, AC3-AC8, AC14)
-  - [ ] `Yello.Application/Statuses/SpaceDefaultStatusWriter.cs` (mirrors `ProjectStatusDeltaWriter`): lock → read defaults and every delta → plan → refuse or record → re-read and answer the defaults.
-  - [ ] Slices: `Yello.Application/Statuses/AddSpaceStatus/`, `RenameSpaceStatus/`, `PlaceSpaceStatus/` (names are the dev's).
-  - [ ] Decision order for a rename, under the lock:
+- [x] **Task 2 — Lock and reads** (AC9, AC4)
+  - [x] `ApplicationLocks.StatusDefaults(spaceId)` = `Yello/StatusDefaults/{spaceId:D}`, with Exclusive and Shared takers. Write in its remarks the lock order (StatusDefaults → ProjectTasks) and why Task writers never take it: no Space-level change in 6.3 takes a Status out of a set, so a Task's Status check is unaffected. 6.4 takes it Exclusive before every ProjectTasks it migrates.
+  - [x] `ProjectStatusStore.LockAsync`: take StatusDefaults **Shared** before `TakeProjectTasksAsync`. Update `IProjectStatusStore`'s remarks.
+  - [x] Reader: every Project's delta in the active Space (`IStatusDefinitionReader.DeltasAsync()` or similar): owned definitions and operations, two queries, grouped by Project, no `Where SpaceId`.
+  - [x] Reader: for one Status, the Task count per Project (one grouped statement), and the names of the Projects the report names. Use the existing Project read if one fits.
+- [x] **Task 3 — Infrastructure: the Space-level store** (AC1, AC3, AC5, AC8, AC14)
+  - [x] A Domain port (for example `ISpaceDefaultStatusStore`) and an Infrastructure store: `LockAsync` (StatusDefaults Exclusive), add a default, set a default's name, rewrite positions, and delete named `Rename` ops (one set-based `ExecuteDelete` over `(ProjectId, StatusId, Kind = Rename)` for the listed Projects).
+  - [x] Statement order in one unit of work: delete the ops, then rename the default (or the reverse; both are in one transaction). Catch `2601`/`2627` from the default-name index as `NameTaken`, and detach so nothing stays pending (copy `ProjectStatusStore`).
+  - [x] No `Where SpaceId` (the policy narrows it). No raw SQL unless needed; any raw SQL lives in Infrastructure with parameters.
+  - [x] Register in `SpaceContentStores.cs` / `InfrastructureServices.cs` as the Project store is.
+- [x] **Task 4 — Application: the writer and three slices** (AC1, AC3-AC8, AC14)
+  - [x] `Yello.Application/Statuses/SpaceDefaultStatusWriter.cs` (mirrors `ProjectStatusDeltaWriter`): lock → read defaults and every delta → plan → refuse or record → re-read and answer the defaults.
+  - [x] Slices: `Yello.Application/Statuses/AddSpaceStatus/`, `RenameSpaceStatus/`, `PlaceSpaceStatus/` (names are the dev's).
+  - [x] Decision order for a rename, under the lock:
     1. Status not a default → `NotFound`.
     2. Name unchanged (ordinal) → `Written` with no change.
     3. Name clash among the defaults → `NameTaken`.
     4. Conflicts and no decision → `RenameConflict` (with the report).
     5. Clash in any Project's after-set → `NameTaken` (with the Projects).
     6. Otherwise record.
-  - [ ] An outcome type for Space writes (or extend `ProjectStatusWriteOutcome`; the dev's call), carrying the conflict report and the clashing Projects.
-  - [ ] Handler tests with fakes (no database).
-- [ ] **Task 5 — Contracts and Host** (AC2, AC4, AC6, AC12, AC14; Q1, Q2)
-  - [ ] Routes on `SpaceRoutes` (or a new `SpaceStatusRoutes`): `POST /api/v1/spaces/{spaceId}/statuses` (`AddSpaceStatusRequest(string? Name, Guid? AfterStatusId)`), `PATCH …/statuses/{statusId}` (`RenameSpaceStatusRequest(string? Name, bool? ReplaceProjectNames)`), `POST …/statuses/{statusId}/place` (`PlaceSpaceStatusRequest(Guid? AfterStatusId)`). Path helpers for each.
-  - [ ] `ProblemTypes.StatusRenameConflict` = `urn:yello:problem:status-rename-conflict` (409).
-  - [ ] `ProblemResponse` gains two nullable, additive members (Q2, Q5): `Conflicts` (a list of `{ ProjectId, ProjectName, Name, TaskCount }`) and `Projects` (a list of `{ Id, Name }`). Reuse an existing identity record for the second if one fits. The problem writer emits them only on their type.
-  - [ ] Endpoints: `RequiresCapability(Capability.ConfigureSpaceDefaultStatuses)`, both surfaces, idempotent through the pipeline. An unreadable body → `400 invalid-status-name` (add, rename) or `400 invalid-status-position` (place). Register them in `Program.cs`.
-  - [ ] Gates: the routes declare their capability and serve both surfaces; the role-matrix theory gains a `ConfigureSpaceDefaultStatuses` representative (`ActiveSpaceEndpointTests.RoleMatrix.cs`; `The_matrix_theory_covers_exactly_the_capabilities_endpoints_declare` will go red until it does); the problem type is stable; `StatusResponse` keeps its shape; no route or contract under the Space's Statuses offers a remove, a reset or a mode. If a gate pins `ProblemResponse`'s members, amend it deliberately.
-- [ ] **Task 6 — Client** (AC2, AC11, AC13)
-  - [ ] `StatusCapabilities.PermitsConfigureSpaceDefaultStatuses` (Owner, Admin) plus a matrix gate. Add it to `SpaceCapabilities.Sections` (`The_clients_Space_settings_predicate_is_the_union_of_its_sections` must stay green).
-  - [ ] `SpaceDefaultStatusSection.razor` (name per the dev) in `SpaceSettings.razor`, keyed `(SectionKey.DefaultStatuses, SpaceId)`, between `Name` and `Labels`. Rows, rename, move, add (reuse `StatusDeltaRow` only if the caps allow).
-  - [ ] `StatusRenameCascadeDialog.razor` (name per the dev), per AC11. Reuse `StatusRemoveDialog`'s dialog, focus and trap pattern. "Keep their names" is not a `destructive-confirm`, and neither button gets the `button-primary` "safe default" treatment over the other (mockup note). Follow DESIGN.md `dialog` (`:223-229`).
-  - [ ] `RefusalCopy` maps `status-rename-conflict` (it opens the dialog rather than rendering an error) and `status-name-taken` with Projects.
-  - [ ] `StatusDeltaEditor`: re-read the Space defaults with every set it renders (AC13).
-  - [ ] `FakeYelloApi.SpaceDefaultStatuses.cs`: the three writes, the `409` with conflicts, the `409` name clash, and the Project sets and Board columns derived from the fake's defaults so a Project page follows.
-- [ ] **Task 7 — Ledger and docs**
-  - [ ] Write the disposition of every owned ledger entry in `deferred-work.md` (CLOSED / UPDATED / RE-OWNED, with the reason). Leave none blank.
-  - [ ] AD-16: a dated, additive note: a Space-level rename writes the default's name and, on a "replace" decision, deletes the conflicting Projects' `Rename` ops; an add and a reorder write no Project row; a Space-level Status lock (Shared for Project writes) serialises name checks. Additive only; no rule changes.
-- [ ] **Task 8 — Tests** (see Testing requirements)
+  - [x] An outcome type for Space writes (or extend `ProjectStatusWriteOutcome`; the dev's call), carrying the conflict report and the clashing Projects.
+  - [x] Handler tests with fakes (no database).
+- [x] **Task 5 — Contracts and Host** (AC2, AC4, AC6, AC12, AC14; Q1, Q2)
+  - [x] Routes on `SpaceRoutes` (or a new `SpaceStatusRoutes`): `POST /api/v1/spaces/{spaceId}/statuses` (`AddSpaceStatusRequest(string? Name, Guid? AfterStatusId)`), `PATCH …/statuses/{statusId}` (`RenameSpaceStatusRequest(string? Name, bool? ReplaceProjectNames)`), `POST …/statuses/{statusId}/place` (`PlaceSpaceStatusRequest(Guid? AfterStatusId)`). Path helpers for each.
+  - [x] `ProblemTypes.StatusRenameConflict` = `urn:yello:problem:status-rename-conflict` (409).
+  - [x] `ProblemResponse` gains two nullable, additive members (Q2, Q5): `Conflicts` (a list of `{ ProjectId, ProjectName, Name, TaskCount }`) and `Projects` (a list of `{ Id, Name }`). Reuse an existing identity record for the second if one fits. The problem writer emits them only on their type.
+  - [x] Endpoints: `RequiresCapability(Capability.ConfigureSpaceDefaultStatuses)`, both surfaces, idempotent through the pipeline. An unreadable body → `400 invalid-status-name` (add, rename) or `400 invalid-status-position` (place). Register them in `Program.cs`.
+  - [x] Gates: the routes declare their capability and serve both surfaces; the role-matrix theory gains a `ConfigureSpaceDefaultStatuses` representative (`ActiveSpaceEndpointTests.RoleMatrix.cs`; `The_matrix_theory_covers_exactly_the_capabilities_endpoints_declare` will go red until it does); the problem type is stable; `StatusResponse` keeps its shape; no route or contract under the Space's Statuses offers a remove, a reset or a mode. If a gate pins `ProblemResponse`'s members, amend it deliberately.
+- [x] **Task 6 — Client** (AC2, AC11, AC13)
+  - [x] `StatusCapabilities.PermitsConfigureSpaceDefaultStatuses` (Owner, Admin) plus a matrix gate. Add it to `SpaceCapabilities.Sections` (`The_clients_Space_settings_predicate_is_the_union_of_its_sections` must stay green).
+  - [x] `SpaceDefaultStatusSection.razor` (name per the dev) in `SpaceSettings.razor`, keyed `(SectionKey.DefaultStatuses, SpaceId)`, between `Name` and `Labels`. Rows, rename, move, add (reuse `StatusDeltaRow` only if the caps allow).
+  - [x] `StatusRenameCascadeDialog.razor` (name per the dev), per AC11. Reuse `StatusRemoveDialog`'s dialog, focus and trap pattern. "Keep their names" is not a `destructive-confirm`, and neither button gets the `button-primary` "safe default" treatment over the other (mockup note). Follow DESIGN.md `dialog` (`:223-229`).
+  - [x] `RefusalCopy` maps `status-rename-conflict` (it opens the dialog rather than rendering an error) and `status-name-taken` with Projects.
+  - [x] `StatusDeltaEditor`: re-read the Space defaults with every set it renders (AC13).
+  - [x] `FakeYelloApi.SpaceDefaultStatuses.cs`: the three writes, the `409` with conflicts, the `409` name clash, and the Project sets and Board columns derived from the fake's defaults so a Project page follows.
+- [x] **Task 7 — Ledger and docs**
+  - [x] Write the disposition of every owned ledger entry in `deferred-work.md` (CLOSED / UPDATED / RE-OWNED, with the reason). Leave none blank.
+  - [x] AD-16: a dated, additive note: a Space-level rename writes the default's name and, on a "replace" decision, deletes the conflicting Projects' `Rename` ops; an add and a reorder write no Project row; a Space-level Status lock (Shared for Project writes) serialises name checks. Additive only; no rule changes.
+- [x] **Task 8 — Tests** (see Testing requirements)
 
 ## Dev Notes
 
@@ -471,14 +475,124 @@ General rules:
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended story cycle.
+
 ### Debug Log References
+
+- ATDD activation order followed: lock-name gate and the four race cases first (green after one fix), then the Space plan
+  and handler unit tests, the contract gates, the 17 Space-defaults wire cases, the role-matrix row, the 14 isolation rows
+  (made live, `PendingUntil` removed), the client predicate gate, AC13's editor case and the seven Space settings browser
+  cases.
+- First race run: `A_Project_rename_and_a_Space_rename_of_one_default_queue_and_the_outcome_is_consistent(spaceFirst: False)`
+  reported TaskCount 0 - the plan's refused conflict did not carry the renamed Status's id, so the writer counted Tasks of
+  `Guid.Empty`. Fixed in `SpaceDefaultStatusPlan.Rename`.
+- **Scaffolds corrected: 1.** `A_replayed_write_answers_the_original_and_applies_once_and_a_replayed_cascade_deletes_nothing_again`
+  read `afterReplay[0]` as the first default, but the case's own replayed place moves the third default first; it now finds
+  the first default by id. The assertion is unchanged.
+- **Stand-ins swapped** for contract members (`SpaceRoutes.Status`, `StatusOf`, `StatusPlace`, `StatusPlaceOf`,
+  `ProblemTypes.StatusRenameConflict`) across the wire, isolation, gate and fake files, and deleted from `SpaceStatusWire`;
+  the gate's string subjects for the requests and problem type became typed references.
+- **Gates amended by design:** `The_owned_Spaces_refusal_has_a_stable_type_and_an_appended_identity_only_Spaces_member` (pins
+  `ProblemResponse`'s parameters; now lists `Conflicts`, `Projects` and checks `Spaces` by name);
+  `The_matrix_theory_covers_exactly_the_capabilities_endpoints_declare` (went red; the role matrix gained a
+  `ConfigureSpaceDefaultStatuses` row); `The_clients_Space_settings_predicate_is_the_union_of_its_sections` (names the new
+  section's capability; same Roles).
+- **Existing browser cases amended:** the Space name section's "Rename" was located across `main`; the new rows add one
+  "Rename" per default, so `SpaceCreateAndRenameTests`, `SpaceDeleteTests`, `RoleDropTests` and `SpaceSwitchCarryOverTests`
+  now scope it to `main .space-name-section` (10 locators, assertions unchanged). The fake answered `404` for an unseeded
+  Space's Status read, which would refuse every Space settings page; it now serves the three registration seeds for any
+  Space the caller holds a Role in, as the Host does.
+- Planted violations (one at a time, filtered, restored from saved content in a `finally`, each `RESTORED: True`):
+  1 rename writes a `Rename` op per Project - caught (`Renaming_a_default_reaches_...`; the replay case stayed green);
+  2 decision ignored - caught (`One_decision_...(True)`); 3 every `Rename` a conflict - caught (`An_own_name_equal_...`);
+  4 clash check defaults only - caught (`A_Space_add_or_rename_to_a_name_...`; a first form did not compile);
+  5 Project writes skip the Shared lock - caught (all four race rows); 6 Project writes take it Exclusive - caught
+  (`Two_Project_delta_writes_...`); 7 reorder writes a `Place` per Project - caught (`Reordering_a_default_...`; a first form
+  did not compile); 8 the report's delta read with `IgnoreQueryFilters` - **not caught** by case 14 or the seam gate: row-level
+  security still narrows the read, so bypassing one layer leaves the answer right; 9 the dialog pre-focuses "Rename these
+  too" - caught (browser); 10 the predicate admits Member - caught (both client predicate gates and the browser absence case).
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created.
+- Dominant finding confirmed: add, plain rename and reorder are true by derivation. `SpaceDefaultStatusPlan` (Domain) plans
+  each change on the defaults and judges every Project's after-set with `EffectiveStatusSet.Of` + `Check`; no per-Project
+  row is written except deleting `Rename` ops on a rename. `EffectiveStatusSet.Moved` is the one list move both levels use.
+- New lock `Yello/StatusDefaults/{spaceId}`: Exclusive in `SpaceDefaultStatusStore.LockAsync`, Shared in
+  `ProjectStatusStore.LockAsync` before ProjectTasks. Never-empty guard `SpaceDefaultStatusPlan.CheckDefaults`, unit-tested.
+- Routes: `POST /statuses` (201 + Location), `PATCH /statuses/{id}`, `POST /statuses/{id}/place`, each
+  `ConfigureSpaceDefaultStatuses`, both surfaces, answering the defaults as `StatusResponse`. New problem type
+  `status-rename-conflict`; `ProblemResponse` gains nullable `Conflicts` and `Projects`.
+- Client: "Default Statuses" section (between Space name and Labels), `SpaceStatusRow`, `StatusRenameCascadeDialog`; the
+  Project editor re-reads the Space defaults with every set it renders (ledger `:1051` closed).
+- No migration, no new package or project.
+- Decisions (reversible; each line can be cut):
+  - Q1 (a): routes on the existing Space Statuses collection.
+  - Q2 (a): conflicts reported in the `409` body; the dialog opens from it.
+  - Q3 (a): only an own name differing exactly from both old and new is a conflict; ops equal to either are deleted.
+  - Q4 (a): the decision applies to the Projects conflicting at commit; low ledger entry added (owner 6.4).
+  - Q5 (a): a clash is refused `409 status-name-taken` with a `projects` list.
+  - Q6 (a): Space-level lock, Shared for Project delta writes.
+  - Q7 (a): the never-empty guard is a domain unit test now; HTTP case is 6.4's.
+  - Q8 (a): a new default goes last unless anchored; in a Project it takes its Space slot.
+  - Q9 (a): a reorder rewrites every default's `Position` to 0..n-1.
+  - Q10 (a): S-1-style trigger case for the cascade.
+  - Q11 (b, after looking): pager browser case re-owned to 6.4 - no 6.3 operation takes a column off a Board.
+  - Q12 (a): the editor re-reads the Space defaults with every rendered set.
+  - Q13 (a): no divergence chip; UX ledger entry added.
+  - Q14 (a): Cancel and Escape close the dialog, send nothing, and return focus to the rename field.
+  - The Space-wide reads (every delta, Task counts per Project, Project names) sit on the new `ISpaceDefaultStatusStore`
+    rather than `IStatusDefinitionReader`, so the six existing reader fakes are untouched and the reads are visibly the
+    ones taken under the Space lock.
 
 ### File List
+
+Production (new): `Yello.Domain/Statuses/SpaceDefaultStatusPlan.cs`, `Yello.Domain/Statuses/ISpaceDefaultStatusStore.cs`,
+`Yello.Application/Statuses/SpaceDefaultStatusWriter.cs`, `Yello.Application/Statuses/AddSpaceStatus/AddSpaceStatusHandler.cs`,
+`Yello.Application/Statuses/RenameSpaceStatus/RenameSpaceStatusHandler.cs`,
+`Yello.Application/Statuses/PlaceSpaceStatus/PlaceSpaceStatusHandler.cs`,
+`Yello.Infrastructure/Persistence/SpaceDefaultStatusStore.cs`, `Yello.Contracts/Spaces/AddSpaceStatusRequest.cs`,
+`Yello.Contracts/Spaces/RenameSpaceStatusRequest.cs`, `Yello.Contracts/Spaces/PlaceSpaceStatusRequest.cs`,
+`Yello.Contracts/Spaces/StatusRenameConflictResponse.cs`, `Yello.Contracts/Spaces/ProjectIdentityResponse.cs`,
+`Yello.Host/Endpoints/SpaceDefaultStatusEndpoints.cs`, `Yello.Client/Components/SpaceDefaultStatusSection.razor`,
+`Yello.Client/Components/SpaceDefaultStatusSection.razor.cs`, `Yello.Client/Components/SpaceStatusRow.razor`,
+`Yello.Client/Components/StatusRenameCascadeDialog.razor`.
+
+Production (modified): `Yello.Domain/Statuses/EffectiveStatusSet.cs`, `Yello.Domain/Statuses/IProjectStatusStore.cs`,
+`Yello.Infrastructure/Persistence/ApplicationLocks.cs`, `Yello.Infrastructure/Persistence/ProjectStatusStore.cs`,
+`Yello.Infrastructure/SpaceContentStores.cs`, `Yello.Contracts/ProblemResponse.cs`, `Yello.Contracts/ProblemTypes.cs`,
+`Yello.Contracts/Spaces/SpaceRoutes.cs`, `Yello.Host/Program.cs`, `Yello.Client/Pages/SpaceSettings.razor`,
+`Yello.Client/Spaces/SpaceCapabilities.cs`, `Yello.Client/Spaces/StatusCapabilities.cs`,
+`Yello.Client/Refusals/RefusalCopy.cs`, `Yello.Client/Localisation/ClientCopy.resx`,
+`Yello.Client/Components/StatusDeltaEditor.razor`, `Yello.Client/Components/StatusDeltaEditor.Removal.cs`,
+`Yello.Client/wwwroot/css/components.css`.
+
+Tests (new): `tests/Yello.Tests.Slices/Statuses/SpaceDefaultStatusPlanTests.cs`,
+`tests/Yello.Tests.Slices/Statuses/SpaceDefaultStatusHandlerTests.cs`.
+
+Tests (modified): `tests/Yello.Tests.Shared/SpaceStatusWire.cs`,
+`tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaults.cs`,
+`tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaultsRace.cs`,
+`tests/Yello.Tests.Slices/Projects/SpaceDefaultStatusWire.cs`,
+`tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RoleMatrix.cs`,
+`tests/Yello.Tests.Isolation/IsolationCases.SpaceDefaultStatuses.cs`,
+`tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.SpaceDefaultStatuses.cs`,
+`tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.DeleteAccount.cs`,
+`tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Spaces.cs`,
+`tests/Yello.Tests.Client/SpaceDefaultStatusesTests.cs`, `tests/Yello.Tests.Client/ProjectSettingsTests.SpaceDefaults.cs`,
+`tests/Yello.Tests.Client/FakeYelloApi.SpaceDefaultStatuses.cs`, `tests/Yello.Tests.Client/FakeYelloApi.StatusRemoval.cs`,
+`tests/Yello.Tests.Client/SpaceCreateAndRenameTests.cs`, `tests/Yello.Tests.Client/SpaceDeleteTests.cs`,
+`tests/Yello.Tests.Client/RoleDropTests.cs`, `tests/Yello.Tests.Client/SpaceSwitchCarryOverTests.cs`.
+
+Docs: `_bmad-output/implementation-artifacts/deferred-work.md`, `_bmad-output/implementation-artifacts/sprint-status.yaml`,
+`_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md` (AD-16 note), this file.
 
 ## Change Log
 
 - 2026-11-21: Story created (bmad-create-story). Status: ready-for-dev.
+- 2026-11-21: Implemented (bmad-dev-story): Space-level add, rename (with the conflict report and one decision) and reorder
+  of the default Statuses; Space-wide name check; the Status-defaults lock (Shared for Project delta writes); the Default
+  Statuses section and cascade dialog; the Project editor re-reads the Space defaults. Decisions Q1-Q14 recorded above.
+  Status stays in-progress: full run 1 (log `...-develop-run1.log`) had 2359 passed, 1 failed, 8 skipped - the role-matrix
+  row had no probe; fixed and green filtered (14/14). Full run 2 was stopped by the harness for low system memory before it
+  finished, so the gate before review is still open.

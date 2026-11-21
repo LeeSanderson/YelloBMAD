@@ -16,8 +16,8 @@ namespace Yello.Tests.Slices.Projects;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Routes, the conflict type and the problem body's lists are <see cref="SpaceStatusWire"/>'s stand-ins</b> until the
-/// contract members exist.
+/// <b>Routes and problem types are the contract's</b> (<see cref="SpaceRoutes"/>); the bodies and the problem body's lists
+/// are <see cref="SpaceStatusWire"/>'s, read from the raw JSON.
 /// </para>
 /// <para>
 /// <b>Seed constraints.</b> Nothing here inserts a row: every Project, Task, added Status, rename, place and removal in these
@@ -41,16 +41,16 @@ internal static class SpaceDefaultStatusWire
         actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, SpaceRoutes.StatusesOf(spaceId), token, SpaceStatusWire.AddBody(name), TaskWire.NoHeaders);
 
     public static Task<WireResponse> RenameAsync(Actor actor, Guid spaceId, Guid statusId, string? name, bool? replaceProjectNames = null, string? key = null) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Patch, SpaceStatusWire.ItemOf(spaceId, statusId), SpaceStatusWire.RenameBody(name, replaceProjectNames), TaskWire.KeyHeader(key));
+        actor.Session.SendWithHeadersAsync(HttpMethod.Patch, SpaceRoutes.StatusOf(spaceId, statusId), SpaceStatusWire.RenameBody(name, replaceProjectNames), TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> RenameWithTokenAsync(Actor actor, string token, Guid spaceId, Guid statusId, string name) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Patch, SpaceStatusWire.ItemOf(spaceId, statusId), token, SpaceStatusWire.RenameBody(name), TaskWire.NoHeaders);
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Patch, SpaceRoutes.StatusOf(spaceId, statusId), token, SpaceStatusWire.RenameBody(name), TaskWire.NoHeaders);
 
     public static Task<WireResponse> PlaceAsync(Actor actor, Guid spaceId, Guid statusId, Guid? afterStatusId, string? key = null) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, SpaceStatusWire.PlaceOf(spaceId, statusId), SpaceStatusWire.PlaceBody(afterStatusId), TaskWire.KeyHeader(key));
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, SpaceRoutes.StatusPlaceOf(spaceId, statusId), SpaceStatusWire.PlaceBody(afterStatusId), TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> PlaceWithTokenAsync(Actor actor, string token, Guid spaceId, Guid statusId, Guid? afterStatusId) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, SpaceStatusWire.PlaceOf(spaceId, statusId), token, SpaceStatusWire.PlaceBody(afterStatusId), TaskWire.NoHeaders);
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, SpaceRoutes.StatusPlaceOf(spaceId, statusId), token, SpaceStatusWire.PlaceBody(afterStatusId), TaskWire.NoHeaders);
 
     public static Task<WireResponse> RawAsync(Actor actor, HttpMethod method, string path, string json) =>
         actor.Session.SendWithHeadersAsync(method, path, TaskEditWire.RawBody(json), TaskWire.NoHeaders);

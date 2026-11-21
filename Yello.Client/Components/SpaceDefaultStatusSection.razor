@@ -1,0 +1,88 @@
+@using Yello.Client.Spaces
+
+@implements IDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceWrites Writes
+
+@*
+    THE DEFAULT STATUSES SECTION OF SPACE SETTINGS: the Statuses every Project starts from, in Space order, with add,
+    rename and reorder. No removal here.
+
+    EVERY WRITE RE-RENDERS FROM THE SERVER'S ANSWER, the Space's whole default list. Every Project follows through its own
+    derived set; this section never reads a Project.
+
+    A RENAME SOME PROJECTS RENAMED THEMSELVES is refused until it carries one decision for all of them: the refusal names
+    them, and the cascade dialog asks. A name a Project already uses is refused naming those Projects.
+
+    RENDERED ONLY AFTER THE SERVER HAS ANSWERED and PURGED WITH THE SPACE. A write in flight ignores another, and says so.
+*@
+
+<LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
+
+<section class="space-default-statuses" aria-labelledby="space-default-statuses-heading">
+    <h2 class="type-space-name space-default-statuses__heading" id="space-default-statuses-heading">@Localizer["SpaceStatusesHeading"]</h2>
+
+    @if (_defaults is null)
+    {
+        <div class="space-default-statuses__loading" aria-busy="true">
+            <p class="visually-hidden">@Localizer["SpaceStatusesLoading"]</p>
+        </div>
+    }
+
+    @if (_defaults is { } defaults)
+    {
+        <p class="space-default-statuses__intro">@Localizer["SpaceStatusesIntro"]</p>
+
+        @if (_refusal is { } refusal)
+        {
+            <InlineErrorRegion @key="_attempts" Heading="@Localizer["StatusChangeRefused"]" Messages="@([refusal])" />
+        }
+
+        <ol class="space-status-list">
+            @foreach (var (status, index) in Indexed(defaults))
+            {
+                <SpaceStatusRow @key="status.Id"
+                                Status="@status"
+                                Index="@index"
+                                Count="@defaults.Count"
+                                Renaming="@(_renaming == status.Id)"
+                                FocusRequest="@(status.Id == _focusId ? _focusRequests : 0)"
+                                FocusTarget="@_focusTarget"
+                                OnMove="MoveAsync"
+                                OnStartRename="StartRename"
+                                OnRename="RenameAsync"
+                                OnCancelRename="CancelRename" />
+            }
+        </ol>
+
+        @if (_busy)
+        {
+            <p class="space-default-statuses__progress" role="status">@Localizer["SpaceStatusSaving"]</p>
+        }
+
+        <form class="space-status-add" @onsubmit="AddAsync" novalidate>
+            <FormField FieldId="space-status-add-name"
+                       FieldName="@_nameFieldName"
+                       Label="@Localizer["StatusAddFieldLabel"]"
+                       Value="@_name"
+                       ValueChanged="value => _name = value"
+                       Message="@_nameMessage"
+                       Invalid="@(_nameMessage is not null)" />
+
+            <PrimaryButton>@Localizer["StatusAdd"]</PrimaryButton>
+        </form>
+
+        @if (_cascade is { } cascade)
+        {
+            <StatusRenameCascadeDialog OldName="@cascade.OldName"
+                                       NewName="@cascade.NewName"
+                                       Conflicts="@cascade.Conflicts"
+                                       InFlight="@_busy"
+                                       OnDecide="DecideAsync"
+                                       OnCancel="CancelCascade" />
+        }
+    }
+</section>

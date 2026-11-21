@@ -1,0 +1,175 @@
+@using System.Globalization
+@using Yello.Contracts.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    ONE OF THE SPACE'S DEFAULT STATUSES in the Default Statuses section: its name, "Move up", "Move down" and "Rename".
+    There is no remove: a default leaves only through a removal that also decides where every Project's Tasks go.
+
+    THE MOVE BUTTONS ARE THE KEYBOARD PATH, and the only one. The first row has no "Move up" and the last no "Move down" -
+    absent, never disabled. After a move the row asks for focus back on the button that moved it, or on the other one
+    when it reached an end.
+
+    RENAME IS INLINE, with Save and Cancel; Enter saves, Escape cancels. The field stays open while the section asks what
+    to do about Projects that renamed this Status themselves, so cancelling that question returns to the field as it was.
+*@
+
+<li class="space-status-row">
+    <div class="space-status-row__summary">
+        <span class="space-status-row__name" id="@NameId">@Status.Name</span>
+    </div>
+
+    @if (Renaming)
+    {
+        <form class="space-status-row__rename" @onsubmit="SaveAsync" novalidate>
+            <input type="text"
+                   class="space-status-row__field"
+                   autocomplete="off"
+                   aria-label="@string.Format(CultureInfo.CurrentCulture, Localizer["StatusRenameFieldLabel"], Status.Name)"
+                   value="@_draft"
+                   @oninput="Draft"
+                   @onkeydown="CancelOnEscapeAsync"
+                   @ref="_field" />
+            <button type="submit" class="button-secondary">@Localizer["StatusRenameSave"]</button>
+            <button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["StatusRenameCancel"]</button>
+        </form>
+    }
+
+    @if (!Renaming)
+    {
+        <div class="space-status-row__actions">
+            @if (Index > 0)
+            {
+                <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="UpAsync" @ref="_up">@Localizer["StatusMoveUp"]</button>
+            }
+
+            @if (Index < Count - 1)
+            {
+                <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="DownAsync" @ref="_down">@Localizer["StatusMoveDown"]</button>
+            }
+
+            <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="StartRenameAsync" @ref="_rename">@Localizer["StatusRename"]</button>
+        </div>
+    }
+</li>
+
+@code {
+    private ElementReference _field;
+    private ElementReference _up;
+    private ElementReference _down;
+    private ElementReference _rename;
+    private string _draft = string.Empty;
+    private bool _wasRenaming;
+    private bool _focusField;
+    private int _focusSeen;
+
+    /// <summary>The default.</summary>
+    [Parameter]
+    [EditorRequired]
+    public StatusResponse Status { get; set; } = new(Guid.Empty, string.Empty, 0);
+
+    /// <summary>Where it sits in Space order, from zero.</summary>
+    [Parameter]
+    public int Index { get; set; }
+
+    /// <summary>How many defaults the Space has.</summary>
+    [Parameter]
+    public int Count { get; set; }
+
+    /// <summary>Whether its rename field is open.</summary>
+    [Parameter]
+    public bool Renaming { get; set; }
+
+    /// <summary>Bumped when the section asks this row to take focus back.</summary>
+    [Parameter]
+    public int FocusRequest { get; set; }
+
+    /// <summary>Which control the focus request is for.</summary>
+    [Parameter]
+    public SpaceStatusFocus FocusTarget { get; set; }
+
+    /// <summary>Raised by a move button, with the Status's id and <c>-1</c> for up or <c>1</c> for down.</summary>
+    [Parameter]
+    public EventCallback<(Guid StatusId, int Step)> OnMove { get; set; }
+
+    /// <summary>Raised by "Rename", with the Status's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnStartRename { get; set; }
+
+    /// <summary>Raised by Save, with the Status's id and the name typed.</summary>
+    [Parameter]
+    public EventCallback<(Guid StatusId, string Name)> OnRename { get; set; }
+
+    /// <summary>Raised by Cancel or Escape.</summary>
+    [Parameter]
+    public EventCallback OnCancelRename { get; set; }
+
+    private string NameId => $"space-status-{Status.Id:N}";
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (Renaming && !_wasRenaming)
+        {
+            _draft = Status.Name;
+            _focusField = true;
+        }
+
+        _wasRenaming = Renaming;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusField && Renaming)
+        {
+            _focusField = false;
+            await _field.FocusAsync();
+        }
+
+        if (FocusRequest == 0 || FocusRequest == _focusSeen)
+        {
+            return;
+        }
+
+        _focusSeen = FocusRequest;
+        await FocusedControl().FocusAsync();
+    }
+
+    /// <summary>
+    /// The control a focus request lands on. A move lands on the button that moved the row, or on the other once the row
+    /// reached that end; a single default has neither, so it lands on "Rename".
+    /// </summary>
+    private ElementReference FocusedControl()
+    {
+        if (Renaming)
+        {
+            return _field;
+        }
+
+        if (FocusTarget == SpaceStatusFocus.Rename || Count < 2)
+        {
+            return _rename;
+        }
+
+        var up = Index == Count - 1 || (FocusTarget == SpaceStatusFocus.Up && Index > 0);
+
+        return up ? _up : _down;
+    }
+
+    private void Draft(ChangeEventArgs change) => _draft = change.Value?.ToString() ?? string.Empty;
+
+    private Task UpAsync() => OnMove.InvokeAsync((Status.Id, -1));
+
+    private Task DownAsync() => OnMove.InvokeAsync((Status.Id, 1));
+
+    private Task StartRenameAsync() => OnStartRename.InvokeAsync(Status.Id);
+
+    private Task SaveAsync() => OnRename.InvokeAsync((Status.Id, _draft));
+
+    private Task CancelAsync() => OnCancelRename.InvokeAsync();
+
+    private Task CancelOnEscapeAsync(KeyboardEventArgs key) =>
+        key.Key == "Escape" ? OnCancelRename.InvokeAsync() : Task.CompletedTask;
+}

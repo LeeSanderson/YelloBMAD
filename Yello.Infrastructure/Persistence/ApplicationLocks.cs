@@ -114,6 +114,47 @@ internal static class ApplicationLocks
     internal static string MembershipsOf(Guid spaceId) => $"Yello/Memberships/{spaceId:D}";
 
     /// <summary>
+    /// The lock that orders a change of one Space's default Statuses against every Project's own Status write.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>Exclusive for a Space-level change, Shared for a Project's delta write</b>, which takes it before its Project's
+    /// lock: a Project's name check and a Space-level name change never interleave, and two Projects' writes never wait on
+    /// each other. The order is always this lock, then <see cref="ProjectTasks"/>; nothing takes this one after that.
+    /// </para>
+    /// <para>
+    /// <b>Task writers never take it.</b> No change it guards takes a Status out of a Project's set, so a Status a Task could
+    /// hold before stays one it can hold. A Space-level removal does take Statuses away: it must take this lock Exclusive and
+    /// then every affected Project's <see cref="ProjectTasks"/> lock in a fixed order, by Project id.
+    /// </para>
+    /// </remarks>
+    /// <param name="spaceId">The request's Space.</param>
+    /// <returns>The resource name.</returns>
+    internal static string StatusDefaults(Guid spaceId) => $"Yello/StatusDefaults/{spaceId:D}";
+
+    /// <summary>
+    /// Takes the request's Space's Status-defaults lock exclusively, as a change of the Space's default Statuses does.
+    /// </summary>
+    /// <param name="dbContext">The request's unit of work, scoped to a Space and inside its transaction.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>A task.</returns>
+    internal static Task TakeStatusDefaultsAsync(YelloDbContext dbContext, CancellationToken cancellationToken) =>
+        TakeAsync(dbContext, StatusDefaults(StatusDefaultsSpaceOf(dbContext)), cancellationToken);
+
+    /// <summary>
+    /// Takes the request's Space's Status-defaults lock in Shared mode, as every Project delta write does before its
+    /// Project's lock.
+    /// </summary>
+    /// <param name="dbContext">The request's unit of work, scoped to a Space and inside its transaction.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>A task.</returns>
+    internal static Task TakeStatusDefaultsSharedAsync(YelloDbContext dbContext, CancellationToken cancellationToken) =>
+        TakeAsync(dbContext, StatusDefaults(StatusDefaultsSpaceOf(dbContext)), cancellationToken, SharedMode);
+
+    private static Guid StatusDefaultsSpaceOf(YelloDbContext dbContext) =>
+        dbContext.ScopedSpaceId ?? throw new InvalidOperationException("The Status-defaults lock is taken only inside a Space-scoped unit of work.");
+
+    /// <summary>
     /// Takes the request's Space's Memberships lock.
     /// </summary>
     /// <param name="dbContext">The request's unit of work, scoped to a Space and inside its transaction.</param>

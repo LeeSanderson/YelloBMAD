@@ -303,7 +303,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
             await OpenSettingsAsync(api, page, Northwind);
             await page.EvaluateAsync("() => { window.__notReloaded = true; }");
 
-            var opener = page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true });
+            var opener = page.Locator("main .space-name-section").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true });
             await opener.ClickAsync();
 
             var field = page.GetByLabel(SpaceNameLabel, new PageGetByLabelOptions { Exact = true });
@@ -372,7 +372,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
 
             Assert.Equal(0, await link.CountAsync());
             Assert.Equal(0, await page.Locator(ContextBar).GetByText(SettingsLink).CountAsync());
-            Assert.Equal(0, await page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true }).CountAsync());
+            Assert.Equal(0, await page.Locator("main .space-name-section").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true }).CountAsync());
             Assert.Equal(0, await page.Locator("main [disabled], main [aria-disabled='true'], nav.context-bar [disabled], nav.context-bar [aria-disabled='true']").CountAsync());
         }
     }
@@ -393,7 +393,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
         {
             await OpenSettingsAsync(api, page, Northwind);
 
-            var opener = page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true });
+            var opener = page.Locator("main .space-name-section").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true });
             await opener.ClickAsync();
 
             var field = page.GetByLabel(SpaceNameLabel, new PageGetByLabelOptions { Exact = true });
@@ -428,7 +428,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
             var firstCreateName = await AssertNotAutofillableAsync(page.GetByLabel(SpaceNameLabel, new PageGetByLabelOptions { Exact = true }));
 
             await page.GotoAsync(Address($"spaces/{Northwind:D}/settings"));
-            await page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true }).ClickAsync();
+            await page.Locator("main .space-name-section").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true }).ClickAsync();
             var renameName = await AssertNotAutofillableAsync(page.GetByLabel(SpaceNameLabel, new PageGetByLabelOptions { Exact = true }));
 
             await OpenSwitcherAsync(page);
@@ -472,7 +472,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
             Assert.True(await page.Locator(RoleChip).IsVisibleAsync(), "The Role chip is not visible at 320px.");
             Assert.Equal(1, await page.Locator(ContextBar).GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = SettingsLink, Exact = true }).CountAsync());
 
-            await page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true }).ClickAsync();
+            await page.Locator("main .space-name-section").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true }).ClickAsync();
             await page.GetByLabel(SpaceNameLabel, new PageGetByLabelOptions { Exact = true }).FillAsync(longName);
             Assert.Empty(await page.EvaluateAsync<string[]>(Reflow));
 
@@ -540,7 +540,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
     {
         await OpenSpaceAsync(api, page, spaceId);
         await page.Locator(ContextBar).GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = SettingsLink, Exact = true }).ClickAsync();
-        await page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true })
+        await page.Locator("main .space-name-section").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true })
             .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
     }
 

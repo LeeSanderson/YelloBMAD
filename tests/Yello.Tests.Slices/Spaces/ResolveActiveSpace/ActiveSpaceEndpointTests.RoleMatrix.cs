@@ -54,6 +54,7 @@ public sealed partial class ActiveSpaceEndpointTests
         new MatrixRoute(Capability.AssignTask, "PUT", TaskRoutes.Assignee, HttpStatusCode.OK),
         new MatrixRoute(Capability.ManageLabels, "POST", LabelRoutes.Create, HttpStatusCode.Created),
         new MatrixRoute(Capability.ConfigureProjectStatusDelta, "POST", ProjectStatusRoutes.Collection, HttpStatusCode.Created),
+        new MatrixRoute(Capability.ConfigureSpaceDefaultStatuses, "POST", SpaceRoutes.Statuses, HttpStatusCode.Created),
         new MatrixRoute(Capability.IssueAndRevokeInvitations, "POST", InvitationRoutes.Issue, HttpStatusCode.NoContent),
         new MatrixRoute(Capability.ChangeMembershipRole, "PATCH", MembershipRoutes.Membership, HttpStatusCode.OK),
         new MatrixRoute(Capability.RemoveMembership, "DELETE", MembershipRoutes.Membership, HttpStatusCode.NoContent),
@@ -243,6 +244,9 @@ public sealed partial class ActiveSpaceEndpointTests
 
                 return new MatrixProbe((actor, viaToken) => SendAsAsync(actor, viaToken, HttpMethod.Post, ProjectStatusRoutes.CollectionOf(spaceId, projectId), JsonContent.Create(new { name = "Matrix " + Suffix() }, options: JsonOptions)));
             }
+
+            case Capability.ConfigureSpaceDefaultStatuses:
+                return new MatrixProbe((actor, viaToken) => SendAsAsync(actor, viaToken, HttpMethod.Post, SpaceRoutes.StatusesOf(spaceId), JsonContent.Create(new { name = "Matrix " + Suffix() }, options: JsonOptions)));
 
             case Capability.IssueAndRevokeInvitations:
                 return new MatrixProbe((actor, viaToken) => SendAsAsync(actor, viaToken, HttpMethod.Post, InvitationRoutes.InvitationsOf(spaceId), InvitationWire.Body(InvitationWire.FreshAddress("matrix"), "member")));

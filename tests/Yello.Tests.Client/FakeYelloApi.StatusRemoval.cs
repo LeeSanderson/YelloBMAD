@@ -24,6 +24,8 @@ namespace Yello.Tests.Client;
 /// </remarks>
 internal sealed partial class FakeYelloApi
 {
+    private static readonly string[] RegistrationSeeds = ["Todo", "Doing", "Done"];
+
     private TaskCompletionSource? _heldStatusRemoval;
     private TaskCompletionSource? _arrivedStatusRemoval;
 
@@ -66,11 +68,35 @@ internal sealed partial class FakeYelloApi
     public void ReleaseStatusRemoval() => _releaseStatusRemoval?.TrySetResult();
 
     /// <summary>
-    /// The answer to a removal, an add-back or a seeded Space's Status read; <c>null</c> when the request is none of them.
+    /// A Space's defaults as its read serves them. A Space the caller holds a Role in that no case seeded starts with the
+    /// three registration seeds, as the Host's does: Space settings reads them for every Owner and Admin, and the Host never
+    /// answers that read <c>404</c> for a member.
+    /// </summary>
+    private List<StatusResponse>? DefaultsOf(Guid spaceId)
+    {
+        if (SpaceDefaultStatuses.TryGetValue(spaceId, out var seeded))
+        {
+            return seeded;
+        }
+
+        if (!Roles.ContainsKey(spaceId))
+        {
+            return null;
+        }
+
+        List<StatusResponse> defaults = [.. RegistrationSeeds.Select((name, position) => new StatusResponse(Guid.NewGuid(), name, position))];
+
+        SpaceDefaultStatuses[spaceId] = defaults;
+
+        return defaults;
+    }
+
+    /// <summary>
+    /// The answer to a removal, an add-back or a Space's Status read; <c>null</c> when the request is none of them.
     /// </summary>
     private async Task<(int Status, string Body)?> StatusRemovalAsync(FakeRequest request)
     {
-        if (request.Method == "GET" && TrySpaceStatuses(request.Path, out var spaceId) && SpaceDefaultStatuses.TryGetValue(spaceId, out var defaults))
+        if (request.Method == "GET" && TrySpaceStatuses(request.Path, out var spaceId) && DefaultsOf(spaceId) is { } defaults)
         {
             return (200, JsonSerializer.Serialize(defaults, JsonOptions));
         }

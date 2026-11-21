@@ -37,7 +37,7 @@ public sealed partial class ProjectEndpointTests
     /// </summary>
     /// <param name="spaceFirst">Whether the Space rename queues before the Project add.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9, AC6 - no StatusDefaults lock and no Space rename route yet (Q5, Q6); the riskiest assumption, activate first")]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     [Trait("Requirement", "FR-27")]
@@ -123,7 +123,7 @@ public sealed partial class ProjectEndpointTests
     /// name and the Project's set holds it once.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9, AC6 - no StatusDefaults lock and no Space add route yet (Q5, Q6)")]
+    [Fact]
     [Trait("Requirement", "FR-24")]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "AD-17")]
@@ -176,7 +176,7 @@ public sealed partial class ProjectEndpointTests
     /// </summary>
     /// <param name="spaceFirst">Whether the Space rename queues before the Project rename.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC9, AC4 - no StatusDefaults lock and no Space rename route yet (Q2, Q3, Q6)")]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     [Trait("Requirement", "FR-27")]
@@ -246,7 +246,7 @@ public sealed partial class ProjectEndpointTests
         }
         else
         {
-            RemovalWire.AssertRefused(spaceRename, HttpStatusCode.Conflict, SpaceStatusWire.StatusRenameConflict);
+            RemovalWire.AssertRefused(spaceRename, HttpStatusCode.Conflict, ProblemTypes.StatusRenameConflict);
 
             var conflict = Assert.Single(SpaceStatusWire.ConflictsOf(spaceRename!.Body));
 
@@ -264,7 +264,7 @@ public sealed partial class ProjectEndpointTests
     /// admitted once it is released. A Project write that took the lock Exclusive would wait here.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - no StatusDefaults lock and no Space add route yet (Q6)")]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "AD-17")]
     public async Task Two_Project_delta_writes_do_not_wait_on_each_other_while_a_Space_write_waits_on_both()

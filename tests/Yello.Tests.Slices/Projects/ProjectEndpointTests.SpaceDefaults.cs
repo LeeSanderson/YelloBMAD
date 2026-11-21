@@ -43,7 +43,7 @@ public sealed partial class ProjectEndpointTests
     /// Board gains a fourth column, and the Space's delta holds exactly the operations it held before.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC15 - no Space add route yet (Q1, Q8)")]
+    [Fact]
     [Trait("Requirement", "FR-24")]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "AD-16")]
@@ -107,7 +107,7 @@ public sealed partial class ProjectEndpointTests
     /// the first, "Triage", the second and the third at positions 0 to 3, and a plain Project shows the same order.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - no Space add route yet (Q8)")]
+    [Fact]
     [Trait("Requirement", "FR-24")]
     [Trait("Requirement", "FR-27")]
     public async Task Adding_a_default_after_another_places_it_there_in_the_Space_and_in_a_plain_Project()
@@ -146,7 +146,7 @@ public sealed partial class ProjectEndpointTests
     /// first, and in one that renamed the first default - and the Space's delta is untouched.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - no Space rename route yet (Q1)")]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "AD-16")]
     [Trait("Requirement", "AR-23")]
@@ -209,7 +209,7 @@ public sealed partial class ProjectEndpointTests
     /// every set are as they were.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - no Space rename route and no conflict report yet (Q2, Q3)")]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "UX-DR16")]
     public async Task A_rename_Projects_conflict_with_is_refused_409_naming_each_Project_its_name_and_its_Task_count()
@@ -230,7 +230,7 @@ public sealed partial class ProjectEndpointTests
 
         Assert.NotNull(owner);
         Assert.NotNull(seeded);
-        RemovalWire.AssertRefused(refused, HttpStatusCode.Conflict, SpaceStatusWire.StatusRenameConflict);
+        RemovalWire.AssertRefused(refused, HttpStatusCode.Conflict, ProblemTypes.StatusRenameConflict);
         Assert.Equal(
             [(seeded.Backlog, "Backlog project", "Backlog", 0), (seeded.Intake, "Intake project", "Intake", 2)],
             SpaceStatusWire.ConflictsOf(refused!.Body).Select(conflict => (conflict.ProjectId, conflict.ProjectName, conflict.Name, conflict.TaskCount)).OrderBy(conflict => conflict.ProjectName, StringComparer.Ordinal));
@@ -247,7 +247,7 @@ public sealed partial class ProjectEndpointTests
     /// </summary>
     /// <param name="replaceProjectNames">The decision.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC5 - no Space rename route and no cascade yet (Q3, Q4)")]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     [Trait("Requirement", "FR-27")]
@@ -311,7 +311,7 @@ public sealed partial class ProjectEndpointTests
     /// adding it back, gets it under "Queued". A Project whose name differs only in case is still reported.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - no Space rename route yet (Q3)")]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "UX-DR16")]
     public async Task An_own_name_equal_to_the_old_or_new_name_or_a_removal_is_no_conflict_and_follows_the_rename()
@@ -357,7 +357,7 @@ public sealed partial class ProjectEndpointTests
         });
 
         Assert.NotNull(owner);
-        RemovalWire.AssertRefused(caseOnly, HttpStatusCode.Conflict, SpaceStatusWire.StatusRenameConflict);
+        RemovalWire.AssertRefused(caseOnly, HttpStatusCode.Conflict, ProblemTypes.StatusRenameConflict);
         Assert.Equal([caseOnlyProject], SpaceStatusWire.ConflictsOf(caseOnly!.Body).Select(conflict => conflict.ProjectId));
         Assert.True(renamed?.StatusCode == HttpStatusCode.OK, $"{renamed?.StatusCode} {renamed?.Body}");
         Assert.Equal(("Queued", null), (sameAsOld[0].Name, sameAsOld[0].DefaultName));
@@ -374,7 +374,7 @@ public sealed partial class ProjectEndpointTests
     /// case is admitted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - no Space add or rename route and no Space-wide name check yet (Q5)")]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "FR-25")]
     public async Task A_Space_add_or_rename_to_a_name_a_Projects_set_holds_is_refused_409_naming_those_Projects()
@@ -431,7 +431,7 @@ public sealed partial class ProjectEndpointTests
     /// </summary>
     /// <param name="replaceProjectNames">The decision.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC6, AC5 - no Space rename route and no Space-wide name check yet (Q3, Q5)")]
+    [Theory]
     [InlineData(true)]
     [InlineData(false)]
     [Trait("Requirement", "FR-27")]
@@ -489,7 +489,7 @@ public sealed partial class ProjectEndpointTests
     /// Project. Nothing is written by a refusal; 100 characters is admitted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - no Space add, rename or place route yet (Q1)")]
+    [Fact]
     [Trait("Requirement", "FR-24")]
     [Trait("Requirement", "AR-34")]
     public async Task A_blank_overlong_unreadable_or_default_held_name_is_refused_and_100_characters_is_admitted()
@@ -512,8 +512,8 @@ public sealed partial class ProjectEndpointTests
             refusals.Add((await Space.AddAsync(actor, owner.SpaceId, new string('n', 101)), HttpStatusCode.BadRequest, ProblemTypes.InvalidStatusName));
             refusals.Add((await Space.RenameAsync(actor, owner.SpaceId, defaults[0].Id, string.Empty), HttpStatusCode.BadRequest, ProblemTypes.InvalidStatusName));
             refusals.Add((await Space.RawAsync(actor, HttpMethod.Post, SpaceRoutes.StatusesOf(owner.SpaceId), "{ not json"), HttpStatusCode.BadRequest, ProblemTypes.InvalidStatusName));
-            refusals.Add((await Space.RawAsync(actor, HttpMethod.Patch, SpaceStatusWire.ItemOf(owner.SpaceId, defaults[0].Id), "[]"), HttpStatusCode.BadRequest, ProblemTypes.InvalidStatusName));
-            refusals.Add((await Space.RawAsync(actor, HttpMethod.Post, SpaceStatusWire.PlaceOf(owner.SpaceId, defaults[0].Id), "{ not json"), HttpStatusCode.BadRequest, ProblemTypes.InvalidStatusPosition));
+            refusals.Add((await Space.RawAsync(actor, HttpMethod.Patch, SpaceRoutes.StatusOf(owner.SpaceId, defaults[0].Id), "[]"), HttpStatusCode.BadRequest, ProblemTypes.InvalidStatusName));
+            refusals.Add((await Space.RawAsync(actor, HttpMethod.Post, SpaceRoutes.StatusPlaceOf(owner.SpaceId, defaults[0].Id), "{ not json"), HttpStatusCode.BadRequest, ProblemTypes.InvalidStatusPosition));
             refusals.Add((await Space.AddAsync(actor, owner.SpaceId, defaults[1].Name.ToUpperInvariant()), HttpStatusCode.Conflict, ProblemTypes.StatusNameTaken));
             refusals.Add((await Space.RenameAsync(actor, owner.SpaceId, defaults[0].Id, defaults[2].Name.ToUpperInvariant()), HttpStatusCode.Conflict, ProblemTypes.StatusNameTaken));
 
@@ -543,7 +543,7 @@ public sealed partial class ProjectEndpointTests
     /// after the first keeps its own placement.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8, AC15 - no Space place route yet (Q9)")]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "FR-30")]
     [Trait("Requirement", "AD-16")]
@@ -600,7 +600,7 @@ public sealed partial class ProjectEndpointTests
     /// in-Space <c>404</c>, byte-identical to a random id's. The defaults are unchanged.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8, AC12 - no Space rename or place route yet (Q1)")]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "FR-20")]
@@ -647,7 +647,7 @@ public sealed partial class ProjectEndpointTests
     /// </summary>
     /// <param name="role">The caller's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - no Space write route declares ConfigureSpaceDefaultStatuses yet")]
+    [Theory]
     [InlineData("Member")]
     [InlineData("Viewer")]
     [Trait("Requirement", "FR-16")]
@@ -701,7 +701,7 @@ public sealed partial class ProjectEndpointTests
     /// Session and on its Token.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - no Space write route yet")]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "FR-24")]
     public async Task An_Admin_adds_renames_and_places_a_default_on_both_surfaces()
@@ -740,7 +740,7 @@ public sealed partial class ProjectEndpointTests
     /// <c>404</c>, byte-identical to a random id's, and records nothing. Neither Space's defaults change.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - no Space rename or place route yet")]
+    [Fact]
     [Trait("Requirement", "NFR-1")]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-20")]
@@ -789,7 +789,7 @@ public sealed partial class ProjectEndpointTests
     /// "Parked" is admitted, because no Project of the caller's Space holds it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12, AC4, AC6 - no Space rename or add route yet (Q2, Q5)")]
+    [Fact]
     [Trait("Requirement", "NFR-1")]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "FR-27")]
@@ -825,7 +825,7 @@ public sealed partial class ProjectEndpointTests
         });
 
         Assert.NotNull(owner);
-        RemovalWire.AssertRefused(report, HttpStatusCode.Conflict, SpaceStatusWire.StatusRenameConflict);
+        RemovalWire.AssertRefused(report, HttpStatusCode.Conflict, ProblemTypes.StatusRenameConflict);
         Assert.Equal([ownProject], SpaceStatusWire.ConflictsOf(report!.Body).Select(conflict => conflict.ProjectId));
         Assert.DoesNotContain(foreignProject.ToString("D"), report.Body, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Theirs", report.Body, StringComparison.Ordinal);
@@ -839,7 +839,7 @@ public sealed partial class ProjectEndpointTests
     /// <c>200</c> and deletes nothing a second time: the Project's new op survives.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - no Space add, rename or place route yet")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     public async Task A_replayed_write_answers_the_original_and_applies_once_and_a_replayed_cascade_deletes_nothing_again()
     {
@@ -847,6 +847,7 @@ public sealed partial class ProjectEndpointTests
         Actor? owner = null;
         var pairs = new List<(WireResponse Original, WireResponse Replay)>();
         var projectId = Guid.Empty;
+        var firstId = Guid.Empty;
         IReadOnlyList<ProjectStatusEntry> afterReplay = [];
 
         await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
@@ -858,6 +859,7 @@ public sealed partial class ProjectEndpointTests
             var placeKey = Guid.NewGuid().ToString("D");
             var renameKey = Guid.NewGuid().ToString("D");
 
+            firstId = defaults[0].Id;
             projectId = IdOf(await CreateAsync(owner, "Renamed twice"));
             Assert.Equal(HttpStatusCode.OK, (await Wire.RenameAsync(actor, owner.SpaceId, projectId, defaults[0].Id, "Intake")).StatusCode);
 
@@ -882,7 +884,10 @@ public sealed partial class ProjectEndpointTests
             Assert.Equal(pair.Original.Body, pair.Replay.Body);
         });
         Assert.Single(await Wire.DefinitionsAsync(database, owner.SpaceId), row => row.Name == "Review");
-        Assert.Equal(("Intake again", "Queued"), (afterReplay[0].Name, afterReplay[0].DefaultName));
+        // Found by id: the replayed place put the third default first.
+        var first = afterReplay.Single(entry => entry.Id == firstId);
+
+        Assert.Equal(("Intake again", "Queued"), (first.Name, first.DefaultName));
         await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
@@ -893,7 +898,7 @@ public sealed partial class ProjectEndpointTests
     /// the op gone and the Project showing the new name.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - no Space rename route and no cascade yet (Q10)")]
+    [Fact]
     [Trait("Requirement", "AD-16")]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-27")]
