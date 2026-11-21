@@ -22,8 +22,8 @@ public sealed partial class ActiveSpaceEndpointTests
     /// The deleting Account accepts an offer of ownership in another tab, and the acceptance is queued on the Space's
     /// Memberships lock ahead of the deletion's leave of that Space. <c>sp_getapplock</c> grants the queued waiters in
     /// order, so the acceptance commits first: the leave then meets an Owner's row and the deletion is refused
-    /// <c>409 account-owns-spaces</c> naming that Space. The Account still exists and owns it; the former Owner is an Admin,
-    /// as every accepted offer leaves it; one Owner.
+    /// <c>409 account-owns-spaces</c> naming that Space, and stops there: a Space after it in id order is not left. The
+    /// Account still exists and owns it; the former Owner is an Admin, as every accepted offer leaves it; one Owner.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -36,7 +36,11 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var (ownerAddress, address, name) = (RandomAddress(), RandomAddress(), DisplayName());
-        var spaceId = Guid.NewGuid();
+
+        // The raced Space is left first; the later one, in the server's id order, must still be held once the deletion
+        // stops at the raced one.
+        var spaceId = FirstInSqlServerOrder();
+        var laterSpace = Guid.NewGuid();
         var (ownerId, accountId) = (Guid.Empty, Guid.Empty);
         WireResponse[] raced = [];
 
@@ -47,9 +51,11 @@ public sealed partial class ActiveSpaceEndpointTests
             var owner = await SignedInAsync(client, ownerAddress);
             ownerId = await AccountIdOfAsync(database, ownerAddress);
             await SeedNamedSpaceAsync(database, spaceId, "Accepted mid-deletion " + Suffix(), ownerId, Role.Owner);
+            await SeedNamedSpaceAsync(database, laterSpace, "Left alone " + Suffix(), ownerId, Role.Owner);
 
             var deleting = await JoinedThroughTheProductAsync(client, wire, mail, (owner, spaceId), address, name, "member");
             accountId = await AccountIdOfAsync(database, address);
+            await wire.AddMembershipAsync(laterSpace, accountId, "member");
 
             await owner.FetchAntiforgeryTokenAsync();
 
@@ -93,7 +99,8 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal(1, await AccountRowsAsync(database, accountId));
         Assert.Equal("Owner", (await wire.MembershipOfAsync(spaceId, accountId)).Role);
         Assert.Equal("Admin", (await wire.MembershipOfAsync(spaceId, ownerId)).Role);
-        await AssertOneOwnerEachAsync(wire, spaceId);
+        Assert.Equal("Member", (await wire.MembershipOfAsync(laterSpace, accountId)).Role);
+        await AssertOneOwnerEachAsync(wire, spaceId, laterSpace);
     }
 
     /// <summary>

@@ -128,6 +128,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var personalSpace = Guid.Empty;
         var memberships = new Dictionary<Guid, Guid>();
         var assigned = new Dictionary<Guid, (Guid TaskId, string Title)>();
+        var placedBefore = new Dictionary<Guid, (Guid StatusId, string PositionKey)>();
         var offerId = Guid.Empty;
         var tokens = new List<(Guid SpaceId, string Plaintext)>();
         var refusalsBefore = 0;
@@ -168,6 +169,10 @@ public sealed partial class ActiveSpaceEndpointTests
 
                 Assert.True(assignment.StatusCode == HttpStatusCode.OK, $"Assigning through the product: {Described(assignment)}");
                 assigned[space] = (taskId, title);
+
+                var placed = Assert.Single(await wire.TaskPlacementsInAsync(space), task => task.Id == taskId);
+
+                placedBefore[space] = (placed.StatusId, placed.PositionKey);
             }
 
             offerId = (await OfferedAsync(memberOwner, memberSpace, memberships[memberSpace])).Id;
@@ -214,6 +219,10 @@ public sealed partial class ActiveSpaceEndpointTests
         {
             Assert.Contains(await wire.TasksInAsync(space), task => task.Id == taskId && task.Title == title);
             Assert.Null(await wire.AssigneeOfAsync(space, taskId));
+
+            var placed = Assert.Single(await wire.TaskPlacementsInAsync(space), task => task.Id == taskId);
+
+            Assert.Equal(placedBefore[space], (placed.StatusId, placed.PositionKey));
         }
 
         Assert.Equal("Lapsed", Assert.Single(await wire.OwnershipOffersInAsync(memberSpace), offer => offer.Id == offerId).State);
@@ -353,6 +362,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Equal([ownedSpace, personalSpace], named.Select(space => space.Id));
         Assert.Equal(ownedName, named[0].Name);
         Assert.DoesNotContain(memberSpace.ToString("D"), refused.Body, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("@", refused.Body, StringComparison.Ordinal);
         Assert.Equal("Member", (await wire.MembershipOfAsync(memberSpace, accountId)).Role);
         Assert.Equal(1, await AccountRowsAsync(database, accountId));
         await AssertOneOwnerEachAsync(wire, ownedSpace, memberSpace, personalSpace);
@@ -398,6 +408,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.True(refused?.StatusCode == HttpStatusCode.Conflict, $"The offering Owner's deletion: {Described(refused)}");
         Assert.Equal(ProblemTypes.AccountOwnsSpaces, ProblemType(refused));
         Assert.Equal([spaceId], AccountDeletionWire.OwnedSpacesIn(refused.Body).Select(space => space.Id));
+        Assert.DoesNotContain("@", refused.Body, StringComparison.Ordinal);
         Assert.Equal("Pending", Assert.Single(await wire.OwnershipOffersInAsync(spaceId), offer => offer.Id == offerId).State);
         Assert.Equal("Owner", (await wire.MembershipOfAsync(spaceId, accountId)).Role);
         Assert.Equal(1, await AccountRowsAsync(database, accountId));
@@ -463,6 +474,8 @@ public sealed partial class ActiveSpaceEndpointTests
             Assert.True(answers[key].StatusCode == HttpStatusCode.NotFound, $"The new Account in the {key} Space: {Described(answers[key])}");
             Assert.Equal(ProblemTypes.NotAvailable, ProblemType(answers[key]));
         }
+
+        await AssertOneOwnerEachAsync(wire, joinedSpace, addedSpace, held[0].SpaceId);
     }
 
     /// <summary>
@@ -509,6 +522,7 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Contains(replayed.Headers.GetValueOrDefault("Set-Cookie") ?? [], value => value.StartsWith(SessionCookie + "=;", StringComparison.Ordinal));
         Assert.Equal("Pending", Assert.Single(await wire.InvitationsInAsync(invited!.SpaceId), row => row.Id == invited.InvitationId).State);
         Assert.DoesNotContain(await wire.MembershipRowsInAsync(invited.SpaceId), row => row.AccountId == accountId);
+        await AssertOneOwnerEachAsync(wire, invited.SpaceId);
     }
 
     /// <summary>

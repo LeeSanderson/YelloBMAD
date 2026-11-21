@@ -10,8 +10,8 @@ namespace Yello.Tests.Client;
 /// <c>204</c> with the Account signed out and every Space, Role and Token gone.
 /// </summary>
 /// <remarks>
-/// <b>Inert unless a case sends the route.</b> No earlier case sends it, and it fell to the unmatched <c>404</c> before, so
-/// every earlier case is served the bytes it always was.
+/// <b>Inert unless a case sends the route</b>, so a case that never deletes an Account is served exactly what it would be
+/// without this partial.
 /// </remarks>
 internal sealed partial class FakeYelloApi
 {

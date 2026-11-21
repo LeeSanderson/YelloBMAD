@@ -34,7 +34,7 @@ public static class AccountEndpoints
             .AccountScoped(AccountScopedSurface.AccountSettings);
 
     /// <summary>
-    /// Deletes the caller's Account.
+    /// Runs the deletion and signs the Session out only once the Account is gone.
     /// </summary>
     /// <param name="handler">The slice.</param>
     /// <param name="request">The Account-scoped context the pipeline established.</param>

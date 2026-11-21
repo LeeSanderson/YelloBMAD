@@ -21,7 +21,7 @@ namespace Yello.Tests.Architecture;
 /// <c>Invitation.IssuedByAccountId</c>.
 /// </para>
 /// <para>
-/// <b>Existing gates the route turns red by design, widened in the same change:</b>
+/// <b>Other gates that list the route:</b>
 /// <c>Every_Account_scoped_endpoint_names_an_AD_24_surface</c> (one more <c>AccountSettings</c> entry) and the
 /// <c>AccountScopedReads</c> / <c>Readers</c> / <c>Endpoints</c> lists in <c>SpaceSwitcherGateTests.Isolation</c>.
 /// </para>

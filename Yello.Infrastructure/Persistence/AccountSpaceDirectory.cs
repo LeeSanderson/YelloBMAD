@@ -171,9 +171,10 @@ internal sealed class AccountSpaceDirectory(YelloDbContext dbContext, AccountSco
         }
         catch (SqlException exception) when (exception.Number == ForeignKeyViolationErrorNumber)
         {
-            // A Membership committed after the read above (an Invitation accepted in another tab takes no Account lock):
-            // the caller reads the holdings again and leaves it.
-            return new AccountErasure(Erased: false, new AccountHoldings([], []));
+            // A Membership committed after the read above (an Invitation accepted in another tab takes no Account lock).
+            // A foreign-key violation ends only its statement, so the transaction can read the holdings again, and the
+            // caller leaves what it finds instead of spending its last pass on an empty list.
+            return new AccountErasure(Erased: false, await ReadHoldingsAsync(cancellationToken).ConfigureAwait(false));
         }
 
         return new AccountErasure(Erased: true, new AccountHoldings([], []));

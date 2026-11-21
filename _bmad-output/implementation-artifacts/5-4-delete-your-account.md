@@ -4,7 +4,7 @@ baseline_commit: 07ff06fc1e9cf5a0233f4c8ac891be6342549570
 
 # Story 5.4: Delete your Account
 
-Status: review
+Status: done
 
 Epic: 5 — Hand a Space over and leave cleanly (fourth and last story)
 Story key: `5-4-delete-your-account`
@@ -242,6 +242,38 @@ Every Slices case that deletes an Account, or races a deletion against an accept
 - [x] **Task 7: gates** (AC5, AC8). See AC8's list.
 - [x] **Task 8: plants.** (7 of 12 rows run, all 7 caught; 5b, 6, 8, 10, 11 not run - memory kill, see Debug Log) Save each original in memory and restore it in a `finally`. **Never** use `git checkout --`, `git restore` or `git reset`. Run them in small groups. Stop if a planted build fails, so stale binaries never pass for green. Record each in the Debug Log table. Grep for the plant marker after any killed run.
 - [x] **Task 9: ledger, docs, verification**
+- [x] **Review Follow-ups (AI)** - see Review Findings below.
+
+### Review Findings
+
+- [x] [Review][Patch] The erase's foreign-key (`547`) path returned empty holdings, so the extra pass left nothing and a Membership that arrived in that window ended `Interrupted` instead of being left [Yello.Infrastructure/Persistence/AccountSpaceDirectory.cs:176] - the catch now reads the holdings again in the same transaction.
+- [x] [Review][Patch] Plant 5b was not caught: no case saw the sequence continue after a leave answered `OwnershipHeld` [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteAccountRace.cs:34] - the race now holds a later Space that must stay held.
+- [x] [Review][Patch] AC13: two deleting cases did not assert one Owner per Space [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteAccount.cs:427, :484]
+- [x] [Review][Patch] AC6: no proof that the lapse sends no email or that the Owner can offer again [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.OfferOwnershipOutbox.cs:228] - a `delete` row on the silent-lapse theory, with a new offer to a bystander.
+- [x] [Review][Patch] AC4: the unassigned Tasks' Status and position were not compared [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteAccount.cs:121]
+- [x] [Review][Patch] Two refusal cases did not assert that no `@` is in the body [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteAccount.cs:320, :370]
+- [x] [Review][Patch] AC14: the refusal state's reflow ran without the text-spacing override [tests/Yello.Tests.Client/AccountSettingsTests.cs:529]
+- [x] [Review][Patch] New comments carried story, Q and requirement ids or narrative history [InvitationConfiguration.cs:16, InvitationRow.razor:12, RefusalBoundaryGateTests.DeleteAccount.cs:24, AccountSettingsTests.cs:408, FakeYelloApi.AccountDeletion.cs:13, FakeYelloApi.SpaceDeletion.cs:114, IsolationCases.AccountDeletion.cs:18/:84/:114, ActiveSpaceEndpointTests.IssueInvitationSchema.cs:48]
+- [x] [Review][Patch] Two XML summaries restated the member's name [Yello.Application/Accounts/DeleteAccount/DeleteAccountHandler.cs:27, Yello.Host/Endpoints/AccountEndpoints.cs:37]
+- [x] [Review][Defer] The erase's `DELETE` can deadlock (1205) with a concurrent Invitation accept and answer `500` [Yello.Infrastructure/Persistence/AccountSpaceDirectory.cs:169] — deferred, low severity
+- [x] [Review][Defer] An in-flight request can record an `AccessRefusal` for the Account after the erase commits [Yello.Infrastructure/Persistence/AccessRefusalPurge.cs:50] — deferred, low severity
+- [x] [Review][Defer] The migration's `Down` fails once any issuer was nulled [Yello.Infrastructure/Persistence/Migrations/20261121132222_InvitationIssuerSetNull.cs:54] — deferred, low severity
+- [x] [Review][Defer] The endpoint's `default` arm answers any unknown outcome as `interrupted` [Yello.Host/Endpoints/AccountEndpoints.cs:76] — deferred, low severity
+- [x] [Review][Defer] The deletion logs under `SessionEndpointMarker`'s category [Yello.Host/Endpoints/AccountEndpoints.cs:52] — deferred, low severity
+- [x] [Review][Defer] Two concurrent deletions both answer `204` and both log [Yello.Host/Endpoints/AccountEndpoints.cs:62] — deferred, low severity
+- [x] [Review][Defer] "Not sent." reuses `TaskEditNotSent` [Yello.Client/Components/AccountDeleteSection.razor:209] — deferred, low severity
+- [x] [Review][Defer] The heading and the opener share one accessible name [Yello.Client/Components/AccountDeleteSection.razor:80] — deferred, low severity
+- [x] [Review][Defer] In-flight buttons look active but ignore presses [Yello.Client/Components/AccountDeleteSection.razor:67] — deferred, low severity
+- [x] [Review][Defer] "Account deleted." is in a status region present at first render [Yello.Client/Pages/SignIn.razor:69] — deferred, low severity
+- [x] [Review][Defer] The tombstone's name and "Sent by a deleted Account" are read out together [Yello.Client/Components/InvitationRow.razor:33] — deferred, low severity
+- [x] [Review][Defer] `ProblemResponse.Spaces` has a namespace's name [Yello.Contracts/ProblemResponse.cs:38] — deferred, low severity
+- [x] [Review][Defer] The erasure inventory is found by column name [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteAccount.cs:605] — deferred, low severity
+- [x] [Review][Defer] The client fake never answers `account-deletion-interrupted` [tests/Yello.Tests.Client/FakeYelloApi.AccountDeletion.cs:56] — deferred, low severity
+- [x] [Review][Defer] Nothing gates the tombstone's size against the live avatar's [Yello.Client/wwwroot/css/components.css:2445] — deferred, low severity
+- [x] [Review][Defer] The three-Space inventory seeds no issued Invitation and no keyed Space write [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteAccount.cs:121] — deferred, low severity
+- [x] [Review][Defer] The re-registration case does not assert that there is no Account idempotency record [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteAccount.cs:427] — deferred, low severity
+
+Dismissed (8): a sign-in that needs no rehash and races the deletion gets a Session that `SessionRevocation` refuses on its next request; the stored `IssuerName` is the recorded Q3 (a) cost (ledger, owner Lee); the client never meets an empty `spaces` list, because `OwnsSpaces` is only returned with at least one Space; the resolver records no refusal for a Space the Account has already left; the reset of pooled connections is AD-2's existing design; aborting mid-sequence is the recorded Q1 (a) cost; "Not sent." on a 5xx is what AC14 specifies; plant 6 is an equivalent mutant.
   - [x] Ledger dispositions (below): one line per CLOSED/UPDATED/RE-OWNED note, written out, no blank lines, no TAB or FORM FEED, final newline kept.
   - [x] Dated notes in `ARCHITECTURE-SPINE.md`: AD-24 amendment, AD-5 note, AD-6 note (AC8).
   - [x] `Account.cs` remarks: keep the hard-delete statement; the "story 5.4's" wording is existing text — leave it unless you touch that paragraph (CLAUDE.md: do not rewrite existing comments as a side task).
@@ -475,15 +507,17 @@ Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended.
 | 3 | Refusal item carries a `role` | `An_Owner_is_refused_409_...` (identity-only members) | Caught |
 | 4 | Leave skipped, Memberships deleted under the `AccountId` key in the erase | `An_Account_in_three_Spaces_...` | Caught |
 | 5a | Handler ignores `OwnershipHeld` | `DeleteAccountHandlerTests.A_Space_owned_part_way_...` | Caught |
-| 5b | `AccountDeletion` maps `OwnershipHeld` to `AlreadyGone` | race case (expected to stay green: the erase's re-read refuses the same way) | **Not run** - group killed for low memory |
-| 6 | Erase skips its re-read | `A_Membership_accepted_while_the_deletion_waits_...` | **Not run** - group killed for low memory |
+| 5b | `AccountDeletion` maps `OwnershipHeld` to `AlreadyGone` | race case | Review: **not caught** on the first run (the erase's re-read refused the same way); the race case now holds a later Space that must stay held, and the rerun **caught** it |
+| 6 | Erase skips its re-read | `A_Membership_accepted_while_the_deletion_waits_...` | Review: **not caught - equivalent mutant**. The review's `547` fix reads the holdings again on the foreign-key path, so the outcome is the same with or without the explicit re-read |
 | 7 | `IssuerName` served for a null issuer | `An_Invitation_issued_in_a_Space_its_issuer_was_removed_from_...` | Caught |
-| 8 | Tombstone renders initials | the two browser tombstone cases | **Not run** - group never started |
+| 8 | Tombstone renders initials | the two browser tombstone cases | Review: **Caught** (both) |
 | 9 | Rehash ignores a zero rowcount | `A_rehash_that_wrote_no_row_authenticates_nothing` | Caught |
-| 10 | A third exit ("leave") in the refused state | `An_Owner_is_shown_the_Spaces_it_owns_...` | **Not run** - group never started |
-| 11 | Erase keeps the `AccessRefusal` rows | the three-Space inventory | **Not run** - group killed for low memory |
+| 10 | A third exit ("leave") in the refused state | `An_Owner_is_shown_the_Spaces_it_owns_...` | Review: **Caught** |
+| 11 | Erase keeps the `AccessRefusal` rows | the three-Space inventory | Review: **Caught** |
 
   Group F (5b, 6, 11) was killed by Claude Code for host memory pressure while it ran; its three plants were left in the files and were reversed by hand to the exact original lines (a marker grep found none afterwards, and the clean build and full run followed). Groups F and G were not restarted (the kill notice says not to); they are for Review.
+
+  **Review (2026-11-21):** the hand reversal left no residue. `AccountDeletion.cs` maps `OwnershipHeld` to `OwnershipHeld`, the erase re-reads before it deletes and calls `AccessRefusalPurge.EraseAccountAsync`, and no `accountId == Guid.Empty` guard is left anywhere in production or test code. Plants 5b, 6, 11, 8 and 10 were then run one at a time by a script that saved each file's bytes, restored them in a `finally`, built before every run and compared file hashes at the end (0 files changed). The log is `artifacts/test-runs/5-4-delete-your-account-review-plants.log`, and the results are in the table above.
 
 ### Completion Notes List
 
@@ -548,3 +582,4 @@ Modified (docs and tracking):
 
 - 2026-11-21: Story created (bmad-create-story). Status ready-for-dev.
 - 2026-11-21: Developed (bmad-dev-story): `DELETE /api/v1/account` as a check / per-Space leave / erase sequence (AD-24 amendment), `Invitation.IssuedByAccountId` nullable `ON DELETE SET NULL`, the rehash rowcount, the Account settings deletion section, the tombstone avatar; every ATDD scaffold live (two corrected), isolation and revocation rows live; ledger dispositions; spine notes. Status review.
+- 2026-11-21: Code review (bmad-code-review). 9 patches: the erase's `547` path reads the holdings again; the race case catches plant 5b; AC4, AC6, AC13 and AC14 test gaps closed; comment-rule fixes. 17 low findings deferred to the ledger; 8 dismissed. Plants 5b, 6, 8, 10 and 11 run (6 is an equivalent mutant). One full run including the browser suite: 2707 total, 2697 passed, 0 failed, 10 skipped (`artifacts/test-runs/5-4-delete-your-account-review.log`). Status done.

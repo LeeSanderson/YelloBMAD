@@ -59,6 +59,10 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// <summary>
     /// A 1.4.10 reflow probe over the page, as <c>InvitationViewTests.Reflow</c>.
     /// </summary>
+    private const string TextSpacingOverride =
+        "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } "
+        + "p { margin-block-end: 2em !important; }";
+
     private const string Reflow =
         """
         () => {
@@ -401,7 +405,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// Confirmed, the deletion is one <c>DELETE</c> carrying the anti-forgery token and no <c>Idempotency-Key</c> (Q7 (a));
+    /// Confirmed, the deletion is one <c>DELETE</c> carrying the anti-forgery token and no <c>Idempotency-Key</c>;
     /// on <c>204</c> the tab purges and lands on the sign-in page, which says "Account deleted." politely.
     /// </summary>
     [Fact]
@@ -517,12 +521,15 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// At 320 by 256 (1280 by 1024 at 400%) the refusal state reflows: no sideways page scroll and nothing in <c>main</c> that
-    /// scrolls sideways, with a long Space name in the list.
+    /// scrolls sideways, with a long Space name in the list - also under the 1.4.12 text-spacing override.
     /// </summary>
-    [Fact]
+    /// <param name="spaced">Whether the 1.4.12 text-spacing override is applied.</param>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "NFR-9")]
-    public async Task The_refusal_state_reflows_at_320_by_256()
+    public async Task The_refusal_state_reflows_at_320_by_256(bool spaced)
     {
         var api = OwnsNothing();
 
@@ -538,6 +545,11 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
             await Button(page, DeleteAction).ClickAsync();
             await page.Locator(DeletionSection).GetByRole(AriaRole.Heading, new LocatorGetByRoleOptions { Name = OwnsSpacesStatement, Exact = true })
                 .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            if (spaced)
+            {
+                await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = TextSpacingOverride });
+            }
 
             var problems = await page.EvaluateAsync<string[]>(Reflow);
 

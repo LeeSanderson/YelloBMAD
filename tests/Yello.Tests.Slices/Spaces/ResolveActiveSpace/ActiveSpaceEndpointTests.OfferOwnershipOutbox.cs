@@ -31,7 +31,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <summary>
     /// The acts after an offer that must send nothing: its revoke, the removal of its recipient, and the recipient leaving.
     /// </summary>
-    public static TheoryData<string> SilentAfterTheOffer => new() { "revoke", "removal", "leave" };
+    public static TheoryData<string> SilentAfterTheOffer => new() { "revoke", "removal", "leave", "delete" };
 
     /// <summary>
     /// One offer sends exactly one offer email, to the recipient, and none to the offerer; a replay of the offer under its
@@ -215,9 +215,10 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
-    /// Nothing is sent on revoke or lapse: after the offer's own email has arrived, the revoke, the recipient's removal or the
-    /// recipient's leave is followed by a fence email that must arrive; the recipient then still has exactly one offer email
-    /// and the Space exactly one <c>ownership-offered</c> send record.
+    /// Nothing is sent on revoke or lapse: after the offer's own email has arrived, the revoke, the recipient's removal, the
+    /// recipient's leave or the recipient's Account deletion is followed by a fence email that must arrive; the recipient then
+    /// still has exactly one offer email. After the deletion the Owner can offer again, to the bystander, so the Space holds
+    /// one <c>ownership-offered</c> send record per offer made.
     /// </summary>
     /// <param name="act">What follows the offer.</param>
     /// <returns>A task.</returns>
@@ -229,8 +230,10 @@ public sealed partial class ActiveSpaceEndpointTests
     {
         var database = Available();
         var spaceId = Guid.NewGuid();
+        var recipientName = DisplayName();
         OfferSpace? space = null;
         WireResponse? acted = null;
+        WireResponse? offeredAgain = null;
         IReadOnlyList<DroppedEmail> dropped = [];
 
         using var mail = new MailDrop();
@@ -239,24 +242,39 @@ public sealed partial class ActiveSpaceEndpointTests
 
         await HostProcess.RunAsync(fixture.ConnectionString!, mail.With(Configured), async client =>
         {
-            space = await OfferableSpaceAsync(client, database, wire, mail, spaceId, DisplayName(), ("recipient", DisplayName(), "member"));
+            space = act == "delete"
+                ? await OfferableSpaceAsync(client, database, wire, mail, spaceId, DisplayName(), ("recipient", recipientName, "member"), ("bystander", DisplayName(), "member"))
+                : await OfferableSpaceAsync(client, database, wire, mail, spaceId, DisplayName(), ("recipient", recipientName, "member"));
             var recipient = space.Members["recipient"];
             var fence = InvitationWire.FreshAddress("silent-fence");
             var offer = await OfferedAsync(space.Owner, spaceId, recipient.MembershipId);
 
             _ = await mail.WaitForEmailsToAsync(recipient.Address, OwnershipOfferWire.IsOwnershipOfferEmail);
 
-            if (act == "leave")
+            if (act is "leave" or "delete")
             {
                 await recipient.Session.FetchAntiforgeryTokenAsync();
+            }
+
+            if (act == "delete")
+            {
+                _ = await DeletePersonalSpaceAsync(recipient.Session, database, recipientName);
             }
 
             acted = act switch
             {
                 "revoke" => await RevokeOfferOverWireAsync(space.Owner, spaceId, offer.Id),
                 "removal" => await RemoveOverWireAsync(space.Owner, spaceId, recipient.MembershipId),
+                "delete" => await AccountDeletionWire.DeleteAsync(recipient.Session),
                 _ => await LeaveOverWireAsync(recipient.Session, spaceId),
             };
+
+            if (act == "delete")
+            {
+                await space.Owner.FetchAntiforgeryTokenAsync();
+                offeredAgain = await OfferOverWireAsync(space.Owner, spaceId, space.Members["bystander"].MembershipId);
+                _ = await mail.WaitForEmailsToAsync(space.Members["bystander"].Address, OwnershipOfferWire.IsOwnershipOfferEmail);
+            }
 
             await space.Owner.FetchAntiforgeryTokenAsync();
             Assert.Equal(HttpStatusCode.NoContent, (await IssueAsync(space.Owner, spaceId, fence, "member")).StatusCode);
@@ -267,7 +285,16 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.True(acted?.StatusCode == HttpStatusCode.NoContent, $"The {act}: {Described(acted)}");
         Assert.Single(OwnershipOfferWire.OfferEmailsTo(dropped, space!.Members["recipient"].Address));
-        Assert.Equal(1, (await wire.NotificationSendsInAsync(spaceId)).Count(record => record.Kind == OwnershipOfferWire.OwnershipOfferedKind));
+
+        var offersMade = 1;
+
+        if (act == "delete")
+        {
+            Assert.True(offeredAgain?.StatusCode == HttpStatusCode.Created, $"The Owner's new offer after the lapse: {Described(offeredAgain)}");
+            offersMade = 2;
+        }
+
+        Assert.Equal(offersMade, (await wire.NotificationSendsInAsync(spaceId)).Count(record => record.Kind == OwnershipOfferWire.OwnershipOfferedKind));
     }
 
     /// <summary>

@@ -13,7 +13,7 @@ namespace Yello.Infrastructure.Persistence.Configurations;
 /// <remarks>
 /// <para>
 /// <b>Cascades from its Space</b> (Lee's Q1, FR-7): deleting a Space destroys its Invitations in the one deletion
-/// statement. <b>References its issuer's Account with <c>SET NULL</c></b> (FR-12, AD-5): an Invitation survives its
+/// statement. <b>References its issuer's Account with <c>SET NULL</c></b>: an Invitation survives its
 /// issuer's demotion and removal, and its issuer's Account deletion nulls the key, which the reads then answer as a
 /// deleted Account. <b>There is no reference to <c>Membership</c></b>:
 /// a composite <c>(SpaceId, MembershipId)</c> with <c>SET NULL</c> would null the Space too, and with no action it would

@@ -24,7 +24,7 @@ public sealed class DeleteAccountHandler(IAccountDeletion deletion)
     private const int Passes = 2;
 
     /// <summary>
-    /// Deletes the Account.
+    /// Refuses, or leaves every Space and erases the Account, in at most two passes.
     /// </summary>
     /// <param name="context">The Account-scoped context the pipeline established.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>

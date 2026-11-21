@@ -45,7 +45,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <summary>
     /// AC12, Q1 (Lee), FR-7, FR-12, AD-5 - <c>Invitation</c> cascades from its Space (the Space's deletion stays one
     /// statement), references its issuer's Account with <c>SET NULL</c> (an Invitation survives the issuer's demotion,
-    /// removal and Account deletion - story 5.4, Lee's Q3 (a)), and has no foreign key to <c>Membership</c>.
+    /// removal and Account deletion), and has no foreign key to <c>Membership</c>.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]

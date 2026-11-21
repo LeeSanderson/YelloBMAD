@@ -111,8 +111,7 @@ internal sealed partial class FakeYelloApi
     /// </summary>
     private async Task<(int Status, string Body)?> SpaceDeletionAsync(FakeRequest request)
     {
-        // Account deletion (FakeYelloApi.AccountDeletion.cs) is answered first: it fell to the unmatched 404 before, and no
-        // earlier case sends it.
+        // Account deletion (FakeYelloApi.AccountDeletion.cs) is answered here too; it answers only its own route.
         if (AccountDeletion(request) is { } accountDeletion)
         {
             return accountDeletion;

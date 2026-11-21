@@ -15,7 +15,7 @@ namespace Yello.Tests.Isolation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The refusal's list is the caller's own owned Spaces and nothing else</b> (I-11): an Account that owns two Spaces and
+/// <b>The refusal's list is the caller's own owned Spaces and nothing else</b>: an Account that owns two Spaces and
 /// is a Member of a third is named its two, each item exactly <c>{ id, name }</c>; never the third, never world.A's or
 /// world.B's.
 /// </para>
@@ -81,7 +81,7 @@ internal static partial class IsolationCases
     }
 
     /// <summary>
-    /// I-11: the refusal is <c>account-owns-spaces</c> and lists exactly the caller's two owned Spaces, each exactly
+    /// The refusal is <c>account-owns-spaces</c> and lists exactly the caller's two owned Spaces, each exactly
     /// <c>{ id, name }</c>; it names neither the Space the caller merely belongs to nor A's or B's, and carries no address.
     /// </summary>
     private static Task NamesExactlyTheCallersOwnedSpacesAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
@@ -111,7 +111,7 @@ internal static partial class IsolationCases
 
     /// <summary>
     /// The answer has no body; the caller holds no Membership in the host's Space and no Token, and the host still owns its
-    /// Space and A and B their own, each with exactly one Owner (S-2).
+    /// Space and A and B their own, each with exactly one Owner.
     /// </summary>
     private static async Task ErasedFromTheHostsSpaceAloneAsync(IsolationWorld world, CaseRequest request, WireResponse answer)
     {
