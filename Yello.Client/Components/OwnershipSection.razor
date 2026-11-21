@@ -329,8 +329,8 @@
     }
 
     /// <summary>
-    /// Whether the Space's latest offer was declined. Read only once no offer is pending; a failure here leaves the
-    /// statement out rather than refusing a Space whose pending read has just succeeded.
+    /// Whether the Space's latest offer was declined. Read only once no offer is pending. Only a refusal is answered as one;
+    /// any other failure leaves the statement out rather than refusing a Space whose pending read has just succeeded.
     /// </summary>
     private async Task ReadDeclinedAsync(int generation, CancellationToken token)
     {
@@ -355,11 +355,20 @@
                 return;
             }
 
-            await RefusedReadAsync(response, token);
+            _declined = null;
+
+            if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden or HttpStatusCode.NotFound)
+            {
+                await RefusedReadAsync(response, token);
+            }
         }
         catch (Exception exception) when (exception is HttpRequestException or JsonException)
         {
             // No statement: the pending read has already answered, so the section stands without it.
+            if (generation == _generation)
+            {
+                _declined = null;
+            }
         }
     }
 

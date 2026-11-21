@@ -150,7 +150,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>WHERE</c> tests <c>State</c> against <c>Pending</c>. Anchor: the gate finds exactly the three transition methods.
     /// </summary>
     /// <remarks>
-    /// <b>Green today, and a standing gate.</b> Removing <c>.Where(OfferPredicates.OwnershipOfferActionable)</c> from
+    /// Removing <c>.Where(OfferPredicates.OwnershipOfferActionable)</c> from
     /// <c>DeclineAsync</c> turns it red. The target state is read as the last <c>ldc.i4</c> before each
     /// <c>SetProperty&lt;OwnershipOfferState&gt;</c> call, so it holds while the states are written as the enum constants.
     /// </remarks>
@@ -232,12 +232,10 @@ public sealed partial class RefusalBoundaryGateTests
     /// writer.
     /// </summary>
     /// <remarks>
-    /// <b>Green today, and a standing gate.</b> There are no scheduled roots today, so two anchors make the walk real: from
+    /// With no scheduled roots the walk alone proves nothing, so two anchors make it real: from
     /// <c>DeclineOwnershipOfferHandler.HandleAsync</c> the same walk reaches <c>OwnershipOfferStore.DeclineAsync</c>, a writer,
     /// through the store's interface; and the writer set holds every transition of both entities. Unlike the timer ban, this
-    /// gate still holds A-10 should that ban be lifted for an unrelated reason. Plants: an unregistered
-    /// <c>BackgroundService</c> whose <c>ExecuteAsync</c> calls <c>OwnershipOfferWrites.LapseNamingAsync</c>, and a method
-    /// passed to <c>new Timer(...)</c> that calls it.
+    /// gate still holds A-10 should that ban be lifted for an unrelated reason.
     /// </remarks>
     [Fact]
     [Trait("Requirement", "AR-31")]
@@ -335,7 +333,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// path, and <c>OfferPredicates</c> declares no other expiry predicate - so no Invitation expiry write exists.
     /// </summary>
     /// <remarks>
-    /// <b>Green today, and a standing gate.</b> A second reference to the expired predicate anywhere turns it red.
+    /// A second reference to the expired predicate anywhere turns it red.
     /// </remarks>
     [Fact]
     [Trait("Requirement", "AR-31")]

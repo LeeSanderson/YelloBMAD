@@ -39,8 +39,8 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <summary>
     /// Neither a decline nor a revoke publishes or emails. The recipient declines its offer after the offer's own email has
     /// arrived; a second offer, to a bystander, is revoked after its own email has arrived; then a fence Invitation is awaited.
-    /// No publish names the Owner (never joined), the recipient is named exactly as often as the bystander (both joined and
-    /// were offered the same way), neither offered Member nor the Owner received anything after its offer, and the Space's
+    /// No publish names the Owner (never joined), and the recipient and the bystander are each named exactly as often as a
+    /// control Member that joined the same way and was never offered anything, neither offered Member nor the Owner received anything after its offer, and the Space's
     /// send record holds only the two <c>ownership-offered</c> rows. Every Membership row is as it was.
     /// </summary>
     /// <returns>A task.</returns>
@@ -52,7 +52,7 @@ public sealed partial class ActiveSpaceEndpointTests
     {
         var database = Available();
         var spaceId = Guid.NewGuid();
-        var (ownerAccount, recipientAccount, bystanderAccount) = (Guid.Empty, Guid.Empty, Guid.Empty);
+        var (ownerAccount, recipientAccount, bystanderAccount, controlAccount) = (Guid.Empty, Guid.Empty, Guid.Empty, Guid.Empty);
         OfferSpace? space = null;
         IReadOnlyList<MembershipRow> before = [];
         IReadOnlyList<DroppedEmail> beforeDecline = [];
@@ -66,12 +66,12 @@ public sealed partial class ActiveSpaceEndpointTests
 
         var log = await HostProcess.RunAsync(fixture.ConnectionString!, mail.With(Configured), async client =>
         {
-            space = await OfferableSpaceAsync(client, database, wire, mail, spaceId, DisplayName(), ("recipient", DisplayName(), "member"), ("bystander", DisplayName(), "member"));
+            space = await OfferableSpaceAsync(client, database, wire, mail, spaceId, DisplayName(), ("recipient", DisplayName(), "member"), ("bystander", DisplayName(), "member"), ("control", DisplayName(), "member"));
             var recipient = space.Members["recipient"];
             var bystander = space.Members["bystander"];
             var fence = InvitationWire.FreshAddress("settled-fence");
 
-            (ownerAccount, recipientAccount, bystanderAccount) = (space.OwnerAccountId, recipient.AccountId, bystander.AccountId);
+            (ownerAccount, recipientAccount, bystanderAccount, controlAccount) = (space.OwnerAccountId, recipient.AccountId, bystander.AccountId, space.Members["control"].AccountId);
             before = await wire.MembershipRowsInAsync(spaceId);
 
             var declined = await OfferedAsync(space.Owner, spaceId, recipient.MembershipId);
@@ -97,7 +97,8 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.True(answers["decline"].StatusCode == HttpStatusCode.NoContent, $"The decline: {Described(answers["decline"])}");
         Assert.True(answers["revoke"].StatusCode == HttpStatusCode.NoContent, $"The revoke: {Described(answers["revoke"])}");
         Assert.Equal(0, PublishesNaming(log, ownerAccount, spaceId));
-        Assert.Equal(PublishesNaming(log, bystanderAccount, spaceId), PublishesNaming(log, recipientAccount, spaceId));
+        Assert.Equal(PublishesNaming(log, controlAccount, spaceId), PublishesNaming(log, recipientAccount, spaceId));
+        Assert.Equal(PublishesNaming(log, controlAccount, spaceId), PublishesNaming(log, bystanderAccount, spaceId));
 
         int To(IEnumerable<DroppedEmail> emails, string address) =>
             emails.Count(email => string.Equals(email.To, address, StringComparison.OrdinalIgnoreCase));

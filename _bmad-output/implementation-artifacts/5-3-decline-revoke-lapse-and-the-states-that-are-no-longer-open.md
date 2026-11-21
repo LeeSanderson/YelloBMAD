@@ -4,7 +4,7 @@ baseline_commit: ce960eaf7df1b72e5be23400a95ac297612bcd73
 
 # Story 5.3: Decline, revoke, lapse — and the states that are no longer open
 
-Status: review
+Status: done
 
 Epic: 5 — Hand a Space over and leave cleanly (third story)
 Story key: `5-3-decline-revoke-lapse-and-the-states-that-are-no-longer-open`
@@ -338,6 +338,33 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:2032-2065` and numbered by
     - Run the affected browser classes filtered (`OwnershipOfferTests`, `OwnershipSectionTests`, `TextSpacingTests`, and any class whose request counts moved).
     - Rerun a failure once, alone, before calling it real.
 
+### Review Findings
+
+Code review 2026-11-21 (Blind Hunter, Edge Case Hunter, Acceptance Auditor; range `a9f4473..7bb5122`): 35 raw findings, 26 after merging duplicates. 5 patched, 13 deferred as low, 0 decisions, 8 dismissed.
+
+- [x] [Review][Patch] The declined read sent any non-2xx answer (a 5xx included) to `RefusedReadAsync`, which raises the Space refusal surface, though its summary said a failure leaves the statement out; a transport failure also kept a stale statement [Yello.Client/Components/OwnershipSection.razor:358]. Only `401`/`403`/`404` are now answered as refusals; anything else, or a thrown read, clears the statement.
+- [x] [Review][Patch] The no-publish proof compared the recipient's publish count with the bystander's, both of whose offers were settled, so a symmetric defect (each transition publishing once) stayed green [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.SettledOwnershipOffer.cs:100]. A control Member who joins the same way and is never offered anything is now the baseline for both.
+- [x] [Review][Patch] The revoke race's `<remarks>` held a process instruction to the develop phase [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.SettledOwnershipOfferRace.cs:108]. It now states the queue-order assumption instead.
+- [x] [Review][Patch] Three gate remarks opened with "Green today, and a standing gate.", and the A-10 gate's remark named plants that differ from those recorded [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.SettledOwnershipOffers.cs:153, :235, :338]. The narrative and the plant list were removed.
+- [x] [Review][Patch] Plants 10 and 11 had no recorded result while Task 8 was checked [Debug Log]. Both were run at review: plant 10 (the in-Space `404` closes silently) turned `A_decline_answered_by_the_in_Space_404_shows_the_no_longer_open_state` red (timeout waiting for "This offer is no longer open."); plant 11 (`role="alert"` on the statement) turned `A_declined_offer_is_stated_by_name_above_the_picker_and_is_not_an_alert` red (`Actual: "alert"`). Log: `artifacts/test-runs/5-3-review-plants-client.log`.
+- [x] [Review][Defer] The declined statement uses the raw display name, not the disambiguated label [Yello.Client/Components/OwnershipSection.razor:276] — deferred, low severity
+- [x] [Review][Defer] "The latest offer" is ordered by Host-clock `CreatedAt` with a non-chronological `Id` tie-break [Yello.Infrastructure/Persistence/OwnershipOfferStore.cs:145] — deferred, low severity
+- [x] [Review][Defer] The declined read's "no offerer clause" rests on an invariant no gate pins [Yello.Infrastructure/Persistence/OwnershipOfferStore.cs:136] — deferred, low severity
+- [x] [Review][Defer] The dialog's in-Space `404` briefly tells a removed recipient "Nothing has changed about your access" [Yello.Client/Components/OwnershipOfferDialog.razor:326] — deferred, low severity
+- [x] [Review][Defer] The "every cause" theory runs one scenario five times [tests/Yello.Tests.Client/OwnershipOfferTests.cs] — deferred, low severity
+- [x] [Review][Defer] The transition-predicate gate checks the method, not the guarded statement, and the first state set only [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.SettledOwnershipOffers.cs:176] — deferred, low severity
+- [x] [Review][Defer] No declined-read case for a latest offer that lapsed or was accepted [tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeclinedOwnershipOffer.cs] — deferred, low severity
+- [x] [Review][Defer] The "after removal" isolation rows remove as the Owner, not an Admin [tests/Yello.Tests.Isolation/IsolationCases.SettledOwnershipOffers.cs] — deferred, low severity
+- [x] [Review][Defer] The reflow row is in `OwnershipSectionTests`, not `TextSpacingTests` [tests/Yello.Tests.Client/OwnershipSectionTests.cs] — deferred, low severity
+- [x] [Review][Defer] The four-route gate carries `FR-42` where the gate it replaced carried `FR-8` [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.SettledOwnershipOffers.cs] — deferred, low severity
+- [x] [Review][Defer] Leftover double blank line and an unwrapped doc comment [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.OwnershipOffers.cs:74] — deferred, low severity
+- [x] [Review][Defer] `DisplayNameOfAsync` has no explicit `SpaceId = @space` [Yello.Infrastructure/Persistence/MembershipStore.Assignees.cs:102] — deferred, low severity
+- [x] [Review][Defer] A purge during the declined read's body read can set the statement after the generation moved [Yello.Client/Components/OwnershipSection.razor:354] — deferred, low severity
+
+Dismissed (8): the statement persists until a new offer (Q1 (a) by design); a re-joined recipient reads nameless (a new Membership, by design); the declined read's extra sequential `GET` (Q1 (a)'s accepted cost); an `HttpClient` timeout escaping `ReadDeclinedAsync` (the pending read's catch handles it); the dialog staying open if the re-read fails (it unmounts with `ActiveSpace.Current`); `HandleAsync`'s summary (the sibling handlers' required doc shape); the Completion Notes' browser-run wording and the File List leaving out the ATDD commit's files (record-only).
+
+Verification after the patches: build 0 warnings, 0 errors; Architecture 513/513; the patched Slices case green; `OwnershipSectionTests` and `OwnershipOfferTests` 41/41; one full run with the browser suite: 2669 total, 2659 passed, 0 failed, 10 skipped (`artifacts/test-runs/5-3-decline-revoke-lapse-and-the-states-that-are-no-longer-open-review.log`).
+
 ## Dev Notes
 
 ### The shape of the story in one paragraph
@@ -596,8 +623,8 @@ Claude Opus 5.5 (bmad-dev-story, unattended).
 | 7 | Unregistered `BackgroundService` in Host calling `IMembershipStore.LeaveAsync` (which lapses through `OwnershipOfferWrites.LapseNamingAsync`) | A-10 gate and timer ban | red, both (`-arch-1.log`). Placed in Host, not Infrastructure: Infrastructure does not reference `Microsoft.Extensions.Hosting`, and going through the store's interface also proves the walk crosses ports |
 | 8 | A method passed to `new Timer(...)` calling `LeaveAsync` | A-10 gate | red, and the timer ban too (`-arch-2.log`) |
 | 9 | A second reference to `OwnershipOfferPendingButExpired` (in `ReadLastDeclinedAsync`) | expired-predicate exception gate | red (`-arch-1.log`) |
-| 10 | The dialog's in-Space `404` closes silently again | in-Space `404` browser case | see Client plant run below |
-| 11 | The declined statement rendered with `role="alert"` | the panel's first declined case | see Client plant run below |
+| 10 | The dialog's in-Space `404` closes silently again | in-Space `404` browser case | red at review: timeout waiting for "This offer is no longer open." (`5-3-review-plants-client.log`) |
+| 11 | The declined statement rendered with `role="alert"` | the panel's first declined case | red at review: `role` was `"alert"` (`5-3-review-plants-client.log`) |
 | 12 | An `IOutbox` on `DeclineOwnershipOfferHandler` | `The_ownership_acceptance_and_decline_take_no_outbox` | red (`-arch-1.log`); the runtime no-mail case not run under the plant |
 
 Plants 4, 6, 7, 9 and 12 ran as one Architecture batch: each turns a different gate red, so none masks another (8 failures, every one expected). Three attempts at that batch failed to build first (a missing `<param>` tag, S3923 on the first form of plant 9, and the Slices fake's constructor call); the script stopped each time without running tests, and the batch was then built through the Architecture project alone.
@@ -663,3 +690,4 @@ Modified (docs and tracking):
 
 - 2026-11-21: Story created (bmad-create-story). Status ready-for-dev.
 - 2026-11-21: Developed (bmad-dev-story). The Owner's declined read and panel statement; the revoke's `LostMembership` answered as the recorded boundary `404`; own `SpaceId` on the offer statements touched; the dialog's in-Space `404` shown as the designed state; the A-10, transition and AC1 gates live; the isolation rows live; R12 written into the testing conventions; AD-26/AD-27 notes; ledger dispositions. Status review.
+- 2026-11-21: Code review (bmad-code-review). 5 patches applied (the declined read refuses only on a refusal; the no-publish proof gains a control Member; three test comments; plants 10 and 11 run), 13 low findings deferred to the ledger. Status done.

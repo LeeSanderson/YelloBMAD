@@ -105,9 +105,8 @@ public sealed partial class ActiveSpaceEndpointTests
     /// with no Membership that the Space and the offer exist. The offer stays <c>Accepted</c> and the Space holds one Owner.
     /// </summary>
     /// <remarks>
-    /// Should a run show the waiters granted out of the order sent, the develop phase records the observed order and makes the
-    /// assertion order-tolerant: the revoke answers <c>404</c> whenever the leave committed before it, and is never a
-    /// <c>409</c> to a non-member.
+    /// The assertions rely on <c>sp_getapplock</c> granting exclusive waiters in the order they queued, which is why each
+    /// request is waited until blocked before the next is sent.
     /// </remarks>
     /// <returns>A task.</returns>
     [Fact]
