@@ -30,7 +30,7 @@ namespace Yello.Tests.Client;
 [Trait("Priority", "P0")]
 [Trait("Requirement", "FR-25")]
 [Trait("Requirement", "UX-DR15")]
-public sealed class ProjectSettingsTests(ClientSurfaceFixture surface)
+public sealed partial class ProjectSettingsTests(ClientSurfaceFixture surface)
 {
     private const float Timeout = 30_000;
     private const string EnglishLocale = "en-GB";

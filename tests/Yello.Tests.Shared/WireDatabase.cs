@@ -183,6 +183,23 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// How many Status delta operations every Project of <paramref name="spaceId"/> holds together, read under that Space's
+    /// own key.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The count.</returns>
+    public async Task<int> DeltaOperationCountInAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT COUNT(*) FROM dbo.[StatusDeltaOperation] WHERE SpaceId = @space";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+
+        return Convert.ToInt32(await command.ExecuteScalarAsync().ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
     /// Every Task in <paramref name="spaceId"/>, as (id, Project, title), read under that Space's own key -
     /// the database's view, independent of the Host's query filter. Added by the story 2.2 ATDD run; the
     /// columns are the ones story 2.2 Task 2 names (<c>dbo.[Task].Id</c>, <c>SpaceId</c>, <c>ProjectId</c>,
@@ -804,9 +821,10 @@ public sealed class WireDatabase(string connectionString)
 
     /// <summary>
     /// The Status half of the one-Owner-one-Status invariant as one statement: the Tasks of the Space read under its
-    /// key whose Status is outside their own Project's effective set. With no operation that removes a Status, a Project's
-    /// set is the Space's defaults plus the definitions that Project owns, so a Task is outside it when its Status is
-    /// another Project's definition, or no definition of the Space at all.
+    /// key whose Status is outside their own Project's effective set. That set is the Space's defaults the Project's delta
+    /// does not remove, plus the definitions that Project owns, so a Task is outside it when its Status is another Project's
+    /// definition, no definition of the Space at all, or a default its own Project removed. Without the last clause a
+    /// removal that strands its Tasks would still count zero.
     /// </summary>
     public static string TasksOutsideTheirProjectsSetSql =>
         """
@@ -814,6 +832,9 @@ public sealed class WireDatabase(string connectionString)
         WHERE NOT EXISTS (
             SELECT 1 FROM dbo.[StatusDefinition] s
             WHERE s.SpaceId = t.SpaceId AND s.Id = t.StatusId AND (s.OwnerProjectId IS NULL OR s.OwnerProjectId = t.ProjectId))
+        OR EXISTS (
+            SELECT 1 FROM dbo.[StatusDeltaOperation] o
+            WHERE o.SpaceId = t.SpaceId AND o.ProjectId = t.ProjectId AND o.StatusId = t.StatusId AND o.Kind = 'Remove')
         """;
 
     /// <summary>

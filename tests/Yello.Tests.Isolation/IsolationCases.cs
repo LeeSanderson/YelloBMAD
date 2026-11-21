@@ -904,6 +904,10 @@ internal static partial class IsolationCases
 
         // A Project's Status delta (IsolationCases.ProjectStatuses.cs), pending until its dev phase maps the routes.
         .. ProjectStatusCases(),
+
+        // Removing a Status and adding a default back (IsolationCases.StatusRemoval.cs), pending until its dev phase maps
+        // the routes.
+        .. StatusRemovalCases(),
     ];
 
     /// <summary>

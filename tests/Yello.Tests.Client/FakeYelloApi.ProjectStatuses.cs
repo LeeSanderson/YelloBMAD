@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Yello.Contracts.Projects;
+using Yello.Contracts.Spaces;
 
 namespace Yello.Tests.Client;
 
@@ -39,16 +40,23 @@ internal sealed partial class FakeYelloApi
         [.. _requests.Where(request => request.Method != "GET" && request.Method != "OPTIONS" && TryProjectStatusPath(request.Path, out _, out _, out _, out _))];
 
     /// <summary>
-    /// Starts a Project's effective set from its seeded Board: each column a Space default, in column order.
+    /// Starts a Project's effective set from its seeded Board: each column a Space default, in column order. The Space's own
+    /// Status read (<c>FakeYelloApi.StatusRemoval.cs</c>) serves the same defaults, unless a case seeded them already.
     /// </summary>
     /// <param name="spaceId">The Space.</param>
     /// <param name="projectId">The Project.</param>
-    public void SeedProjectStatuses(Guid spaceId, Guid projectId) =>
+    public void SeedProjectStatuses(Guid spaceId, Guid projectId)
+    {
+        var columns = Boards[(spaceId, projectId)].Columns;
+
         ProjectStatuses[(spaceId, projectId)] =
         [
-            .. Boards[(spaceId, projectId)].Columns.Select(column =>
+            .. columns.Select(column =>
                 new FakeProjectStatus(column.StatusId, column.Name, ProjectStatusSources.SpaceDefault, DefaultName: null, column.Total)),
         ];
+
+        _ = SpaceDefaultStatuses.TryAdd(spaceId, [.. columns.Select((column, position) => new StatusResponse(column.StatusId, column.Name, position))]);
+    }
 
     /// <summary>
     /// The answer to a Project Status request, or <c>null</c> when the request is not one.

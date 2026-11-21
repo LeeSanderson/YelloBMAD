@@ -117,7 +117,13 @@ internal sealed partial class FakeYelloApi
             return accountDeletion;
         }
 
-        // A Project's Status delta (FakeYelloApi.ProjectStatuses.cs) likewise answers only its own paths.
+        // A Status's removal and add-back (FakeYelloApi.StatusRemoval.cs), and a Project's Status delta
+        // (FakeYelloApi.ProjectStatuses.cs), likewise answer only their own paths.
+        if (await StatusRemovalAsync(request).ConfigureAwait(false) is { } statusRemoval)
+        {
+            return statusRemoval;
+        }
+
         if (ProjectStatus(request) is { } projectStatus)
         {
             return projectStatus;

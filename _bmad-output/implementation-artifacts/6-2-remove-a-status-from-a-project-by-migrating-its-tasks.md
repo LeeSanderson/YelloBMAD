@@ -286,6 +286,36 @@ Each has a recommendation, which is the default. The dev phase decides each as a
 - **The editor's write path.** It drops a write while another is in flight and reuses an unanswered key (ledger `:1035`). The removal is long-running: the progress region must make the in-flight state visible, and a second press must not send a second removal.
 - `TreatWarningsAsErrors`: 0 warnings is a gate. `--no-build` runs stale binaries; rebuild after every change. A leftover `Yello.Host.exe` locks `bin/Debug` (`Get-Process Yello.Host`).
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-6-2-remove-a-status-from-a-project-by-migrating-its-tasks.md` (scenario map, seed constraints, findings).
+
+| File | Cases | ACs | Today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.RemovedStatus.cs` | 4 | AC8, AC15 | red (skipped) |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRemovalRace.cs` | 5 | AC1-AC3, AC8 | 4 red; **1 green**: `The_S2_statement_counts_a_Task_whose_Status_its_own_Project_removed_and_nothing_else` |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRemoval.cs` | 15 | AC1-AC3, AC5-AC7, AC9-AC13, AC15 | red (skipped) |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRemovalScale.cs` | 1 (Nightly, Explicit) | AC16 | red (skipped) |
+| `tests/Yello.Tests.Slices/Statuses/EffectiveStatusSetRemovalTests.cs` | 7 (no database) | AC2, AC5-AC7, AC10 | red (skipped) |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.StatusRemoval.cs` | 6 | AC1, AC2, AC4, AC7, AC11, AC12, Task 2 | 5 red; **1 green**: `Every_delta_kind_fits_the_column_it_is_stored_in` |
+| `tests/Yello.Tests.Isolation/IsolationCases.StatusRemoval.cs` | 11 rows | AC11, AC12 | pending until 6.2 (GATE-003: live before review) |
+| `tests/Yello.Tests.Client/ProjectSettingsTests.Removal.cs` | 8 | AC7, AC14 | red (skipped) |
+
+Supporting: `tests/Yello.Tests.Slices/Projects/StatusRemovalWire.cs`, `tests/Yello.Tests.Client/FakeYelloApi.StatusRemoval.cs` (hooked in `FakeYelloApi.SpaceDeletion.cs`; Space defaults seeded by `SeedProjectStatuses`), stand-ins in `tests/Yello.Tests.Shared/ProjectStatusWire.cs`, `WireDatabase.DeltaOperationCountInAsync`. **`WireDatabase.TasksOutsideTheirProjectsSetSql` already knows `Remove`** (Task 8's first bullet, C3); plant 1 was run: with the `Remove` clause removed the S-2 gate failed `Expected 1, Actual 0`, then was restored. The two green cases are standing regression gates.
+
+Activation order, riskiest assumption first:
+
+1. S-2 under the edit/move-versus-removal race with the lock taken before the Status check: confirm the S-2 gate is green, then (with `Remove` in the domain) `An_edit_to_a_Status_queued_behind_its_removal_is_refused_400_invalid_task_status` and `A_move_to_a_Status_queued_behind_its_removal_is_refused_400_invalid_task_status` - each must first fail with `200` and an S-2 count of 1, then pass with Task 4's `LockProjectAsync`; then `A_creation_queued_behind_the_removal_of_the_first_Status_lands_in_the_new_first_Status`.
+2. `EffectiveStatusSetRemovalTests`; `The_delta_kinds_are_add_rename_place_and_remove`; `The_delta_sequence_is_unique_per_Project_in_the_model`.
+3. The problem-type, route and AC4 gates (amend ARCH-503, `The_Project_Status_routes_declare_...` and `No_Project_request_contract_carries_anything_but_a_name` in the same change; swap the stand-ins).
+4. The removal cases in `StatusRemoval.cs` (unoccupied, occupied, 409, destinations, set-empty, added Status).
+5. `StatusRemovalRace.cs`: occupancy under the lock (both variants), crossed removals, S-1.
+6. Order and add-back; 7. role, boundary, replay, deletion, then the 11 isolation rows live; 8. readers (removed Status refused, List cursor); 9. the browser cases, then the Nightly case by hand.
+
+Expect these active cases to go red by design and amend them deliberately: ARCH-503, `The_Project_Status_routes_declare_their_capability_serve_both_surfaces_and_consult_no_bound`, `No_Project_request_contract_carries_anything_but_a_name`, isolation route coverage, and `ProjectSettingsTests.The_Board_links_an_Owner_to_the_editor_which_names_each_Statuses_source` (asserts no Remove button).
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ### Library / framework
 
 No new package or project; no web research needed. Every API used is already in the codebase.

@@ -11,9 +11,16 @@ namespace Yello.Tests.Shared;
 /// Status, in effective order.
 /// </summary>
 /// <remarks>
+/// <para>
 /// <b>An add answers <c>201</c></b> with the whole set and a <c>Location</c> on the collection, as the Label definition does;
 /// rename and place answer <c>200</c>. An add may carry <c>afterStatusId</c> to add at a position (the delta's "Add, then
 /// Place, in one transaction").
+/// </para>
+/// <para>
+/// <b>The removal and add-back members are stand-ins</b> (<see cref="Remove"/>, <see cref="Restore"/>, the two problem
+/// types) for routes and types the contract does not state yet. The change that adds them swaps every use for the contract
+/// member and deletes the stand-in.
+/// </para>
 /// </remarks>
 public static class ProjectStatusWire
 {
@@ -45,6 +52,51 @@ public static class ProjectStatusWire
     /// <param name="afterStatusId">The anchor, or <c>null</c> for first.</param>
     /// <returns>The body.</returns>
     public static JsonContent PlaceBody(Guid? afterStatusId) => JsonContent.Create(new { afterStatusId }, options: JsonOptions);
+
+    /// <summary>
+    /// Stand-in for the removal route, <c>POST …/statuses/{statusId}/remove</c>, until <c>ProjectStatusRoutes</c> states it.
+    /// </summary>
+    public static string Remove => ProjectStatusRoutes.Item + "/remove";
+
+    /// <summary>
+    /// Stand-in for the add-back route of a removed Space default, <c>POST …/statuses/{statusId}/restore</c>, no body.
+    /// </summary>
+    public static string Restore => ProjectStatusRoutes.Item + "/restore";
+
+    /// <summary>
+    /// Stand-in for <c>ProblemTypes.StatusDestinationRequired</c>: an occupied Status removed with no destination (<c>409</c>).
+    /// </summary>
+    public static string StatusDestinationRequired => "urn:yello:problem:status-destination-required";
+
+    /// <summary>
+    /// Stand-in for <c>ProblemTypes.InvalidStatusDestination</c>: a destination outside the set the removal leaves (<c>400</c>).
+    /// </summary>
+    public static string InvalidStatusDestination => "urn:yello:problem:invalid-status-destination";
+
+    /// <summary>
+    /// The removal path of one Status of a Project.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="projectId">The Project.</param>
+    /// <param name="statusId">The Status to remove.</param>
+    /// <returns>The path.</returns>
+    public static string RemoveOf(Guid spaceId, Guid projectId, Guid statusId) => $"{ProjectStatusRoutes.ItemOf(spaceId, projectId, statusId)}/remove";
+
+    /// <summary>
+    /// The add-back path of one removed Space default.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="projectId">The Project.</param>
+    /// <param name="statusId">The removed default.</param>
+    /// <returns>The path.</returns>
+    public static string RestoreOf(Guid spaceId, Guid projectId, Guid statusId) => $"{ProjectStatusRoutes.ItemOf(spaceId, projectId, statusId)}/restore";
+
+    /// <summary>
+    /// The removal body: <c>destinationStatusId</c> is always present, <c>null</c> meaning no destination.
+    /// </summary>
+    /// <param name="destinationStatusId">Where the occupying Tasks go, or <c>null</c>.</param>
+    /// <returns>The body.</returns>
+    public static JsonContent RemoveBody(Guid? destinationStatusId) => JsonContent.Create(new { destinationStatusId }, options: JsonOptions);
 
     /// <summary>
     /// The entries of an answer, in the order served.
