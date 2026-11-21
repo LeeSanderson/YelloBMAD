@@ -120,7 +120,7 @@ development_status:
   epic-4-retrospective: optional
 
   # Epic 5: Hand a Space over and leave cleanly
-  epic-5: in-progress
+  epic-5: done
   5-1-offer-ownership-of-a-space-and-tell-the-recipient: done
   5-2-accept-an-ownership-offer: done
   5-3-decline-revoke-lapse-and-the-states-that-are-no-longer-open: done
