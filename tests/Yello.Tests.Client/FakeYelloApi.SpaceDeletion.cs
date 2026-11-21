@@ -117,6 +117,12 @@ internal sealed partial class FakeYelloApi
             return accountDeletion;
         }
 
+        // A Project's Status delta (FakeYelloApi.ProjectStatuses.cs) likewise answers only its own paths.
+        if (ProjectStatus(request) is { } projectStatus)
+        {
+            return projectStatus;
+        }
+
         if (SwitcherFails && request.Method == "GET" && request.Path == SpaceRoutes.Directory)
         {
             return (503, Problem(ProblemTypes.ServiceUnavailable));

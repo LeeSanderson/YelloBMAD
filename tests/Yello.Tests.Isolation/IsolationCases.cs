@@ -901,6 +901,9 @@ internal static partial class IsolationCases
 
         // Story 4.1 - issue an Invitation (IsolationCases.Invitations.cs), pending until its dev phase maps the route.
         .. InvitationCases(),
+
+        // A Project's Status delta (IsolationCases.ProjectStatuses.cs), pending until its dev phase maps the routes.
+        .. ProjectStatusCases(),
     ];
 
     /// <summary>

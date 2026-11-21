@@ -446,6 +446,55 @@ General rules:
   - `WireDatabase.cs:762`
   - `IsolationCases.cs:66-160`, `:290-325`
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-6-1-shape-a-projects-statuses.md`. Every scaffold is written against
+the recommended option of each open question, and a skip reason names the AC (and the question it rests on).
+
+| File | Cases | ACs | Today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusSchema.cs` | 5 | AC4, AC10, AC11, AC13 | red (skipped) |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.Statuses.cs` | 12 (one a Member/Viewer theory) | AC1-AC3, AC5-AC7, AC9-AC12 | red (skipped) |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRace.cs` | 1 | AC10 (Q4) | red (skipped) |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.SiblingStatus.cs` | 2 | AC6 (ledger `:533`) | red (skipped) |
+| `tests/Yello.Tests.Isolation/IsolationCases.ProjectStatuses.cs` | 9 rows x 2 surfaces | AC11 | pending `6.1` (GATE-003) |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.ProjectStatuses.cs` | 8 | AC1, AC2, AC4, AC7-AC11, AC13 | 7 red (skipped); 1 green |
+| `tests/Yello.Tests.Client/ProjectSettingsTests.cs` | 7 (one a member/viewer theory) | AC2, AC7, AC9, AC10, AC14 | red (skipped) |
+
+Supporting files with no cases: `tests/Yello.Tests.Shared/ProjectStatusWire.cs` (route, problem-type and source
+stand-ins to swap for the contract members, then delete), `tests/Yello.Tests.Slices/Projects/ProjectStatusSliceWire.cs`,
+`tests/Yello.Tests.Client/FakeYelloApi.ProjectStatuses.cs` (hooked from `FakeYelloApi.SpaceDeletion.cs`),
+`WireDatabase.StatusNamesInAsync`, and the `.. ProjectStatusCases()` spread in `IsolationCases.All`.
+
+**Green today:** `RefusalBoundaryGateTests.The_Spaces_own_Status_read_keeps_its_shape`, a standing regression gate (the
+Space's read stays `{ Id, Name, Position }`). Every other scaffold is red. Not scaffolded: the `EffectiveStatusSet` unit
+tests and the empty-set guard (AC8, Q7) - the delta types do not exist, so Task 1 writes them with the types.
+
+**Active gates that go red by design** when the schema or routes land, to amend in the same change:
+`ProjectEndpointTests.Creating_a_Project_leaves_the_Space_default_Statuses_unchanged_and_stores_no_effective_set` (its
+`%Delta%` clause), ARCH-503, and the isolation route coverage until the nine rows are live.
+
+**Activation order (riskiest assumption first):**
+
+1. `ProjectEndpointTests.A_Project_added_Status_is_a_StatusDefinition_keyed_NO_ACTION_to_its_Project_under_filtered_unique_names`,
+   then `Two_Projects_add_the_same_name_and_deleting_one_holding_Tasks_in_it_removes_only_its_own`, with the model gate
+   `The_owning_key_is_NO_ACTION_and_the_three_name_columns_declare_their_case_insensitive_collation_in_the_model`. This is
+   the riskiest assumption: a Project-added Status as a `StatusDefinition` row with a NO ACTION key to `Project`, ordered
+   Project deletion, and filtered unique indexes.
+2. The Space deletion case, `The_delta_is_stored_as_operations_and_no_table_stores_an_effective_set`, the collation case,
+   and the delta-entity gate.
+3. The `EffectiveStatusSet` and empty-set unit tests (dev-written).
+4. The problem-type, entry-contract and route gates (widen ARCH-503); swap the stand-ins.
+5. Add, rename (default and added), add-after, replayed add.
+6. The six consumers: place/reorder (Board and List), Task creation's first Status, two Projects at once, the two sibling
+   Status Task cases.
+7. The name rules, the lock race, the Member/Viewer `403`s, the unknown Project, the foreign Status in the path.
+8. The nine isolation rows live, and the no-mode gate.
+9. The client predicate gate, then the seven `ProjectSettingsTests`.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and
+the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

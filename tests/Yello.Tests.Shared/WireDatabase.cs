@@ -157,6 +157,32 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// The name of every Status definition in <paramref name="spaceId"/>, Space defaults and Project-owned alike, read under
+    /// that Space's own key - the database's view, independent of the Host's query filter.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The names.</returns>
+    public async Task<IReadOnlyList<string>> StatusNamesInAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT Name FROM dbo.[StatusDefinition] WHERE SpaceId = @space";
+        command.Parameters.Add(new SqlParameter("@space", spaceId));
+
+        var names = new List<string>();
+
+        await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+
+        while (await reader.ReadAsync().ConfigureAwait(false))
+        {
+            names.Add(reader.GetString(0));
+        }
+
+        return names;
+    }
+
+    /// <summary>
     /// Every Task in <paramref name="spaceId"/>, as (id, Project, title), read under that Space's own key -
     /// the database's view, independent of the Host's query filter. Added by the story 2.2 ATDD run; the
     /// columns are the ones story 2.2 Task 2 names (<c>dbo.[Task].Id</c>, <c>SpaceId</c>, <c>ProjectId</c>,
