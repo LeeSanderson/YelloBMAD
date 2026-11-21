@@ -803,7 +803,7 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
-    /// The Status half of S-2 (<c>test-design-qa.md:319</c>; AD-17) as one statement: the Tasks of the Space read under its
+    /// The Status half of the one-Owner-one-Status invariant as one statement: the Tasks of the Space read under its
     /// key whose Status is outside their own Project's effective set. With no operation that removes a Status, a Project's
     /// set is the Space's defaults plus the definitions that Project owns, so a Task is outside it when its Status is
     /// another Project's definition, or no definition of the Space at all.
@@ -817,7 +817,7 @@ public sealed class WireDatabase(string connectionString)
         """;
 
     /// <summary>
-    /// The Status half of S-2 for one Space: how many of its Tasks hold a Status outside their own Project's effective set,
+    /// The Status half of that invariant for one Space: how many of its Tasks hold a Status outside their own Project's effective set,
     /// read under that Space's own key (<see cref="TasksOutsideTheirProjectsSetSql"/>).
     /// </summary>
     /// <param name="spaceId">The Space.</param>

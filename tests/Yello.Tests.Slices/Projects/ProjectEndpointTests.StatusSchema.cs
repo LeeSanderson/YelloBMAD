@@ -21,11 +21,10 @@ namespace Yello.Tests.Slices.Projects;
 /// <b>The riskiest assumption of the story is the first case here</b>: SQL Server refuses a second cascade path into one
 /// table (1785), so the owning key from <c>StatusDefinition</c> to <c>Project</c> must be NO ACTION, and Project deletion
 /// becomes ordered statements (its Tasks, its delta operations, its owned definitions, then the Project) instead of one
-/// cascading <c>DELETE</c>. If the migration cannot take that shape, open question 2 is revisited before anything else is
-/// built on it.
+/// cascading <c>DELETE</c>.
 /// </para>
 /// <para>
-/// <b>Names the recommended schema</b> (open questions 1 (a), 2 (a), 6 (a)): <c>StatusDefinition.OwnerProjectId</c>, the table
+/// <b>Names the schema</b>: <c>StatusDefinition.OwnerProjectId</c>, the table
 /// <c>dbo.StatusDeltaOperation</c>, and <c>SQL_Latin1_General_CP1_CI_AS</c> on the three name columns. See
 /// <see cref="ProjectStatusSliceWire"/> for the seed constraints.
 /// </para>

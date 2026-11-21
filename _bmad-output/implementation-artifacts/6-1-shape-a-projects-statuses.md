@@ -4,7 +4,7 @@ baseline_commit: bca3a5fe8550d8e2a14c5059b03575d5d8c489b7
 
 # Story 6.1: Shape a Project's Statuses
 
-Status: review
+Status: done
 
 Epic: 6 — Shape Statuses per Project and retire work safely (first of six stories)
 Story key: `6-1-shape-a-projects-statuses`
@@ -159,6 +159,27 @@ so that a Project's Board can reflect how that work actually flows without chang
   - [x] Amend `ProjectEndpointTests.Creating_a_Project_leaves_the_Space_default_Statuses_unchanged_and_stores_no_effective_set` (AC4).
   - [x] Add the Status half of S-2 to `WireDatabase` and assert it after every delta case and every Task-write case added here.
   - [x] Add the isolation rows, the handler tests, the Slices partials and the browser class.
+
+### Review Findings
+
+- [x] [Review][Patch] Moving a Status that was already placed replays the other places against an order that no longer exists, so the Board lands in an order nobody asked for (A B C D: B up, C up, B down answered A C B D, not C B A D) [Yello.Domain/Statuses/ProjectStatusDelta.cs:27] — high. A place now re-anchors every Status the Project already placed to its predecessor in the intended order, sequenced left to right (`EffectiveStatusSet.Placements`, `ProjectStatusDeltaDraft.Place`); a Status never placed still gets no place. Regression: `ProjectStatusWriteHandlerTests.Moving_an_already_placed_Status_lands_every_Status_where_the_moves_asked`.
+- [x] [Review][Patch] Re-adding the name an added Status had before its rename is refused `409 status-name-taken` although the set does not hold it: the owned row kept its added name under the owned-name unique index [Yello.Infrastructure/Persistence/ProjectStatusStore.cs:53] — medium (AC10). A rename of an owned Status now also writes its definition's `Name` (defaults never); `Renaming_an_added_Status_changes_its_effective_name_and_keeps_its_id` re-adds the old name.
+- [x] [Review][Patch] Comments this diff added carry requirement, AD, UX-DR, story and open-question ids [Yello.Host/Endpoints/ProjectStatusEndpoints.cs:19 and 20 other places] — comment rule. Stripped.
+- [x] [Review][Patch] The race case's remark said no unique index refuses a second "Parked"; the owned-name index does, so the lock is proved by the `LCK_M_%` wait, not the `409` [tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRace.cs:17] — comment rule (false comment). Rewritten.
+- [x] [Review][Defer] Name comparison (`OrdinalIgnoreCase`) and column collation disagree on some non-ASCII pairs [Yello.Domain/Statuses/StatusName.cs:24] — deferred, low severity
+- [x] [Review][Defer] Look-alike names (zero-width, full-width) pass as different [Yello.Domain/Statuses/StatusName.cs:32] — deferred, low severity
+- [x] [Review][Defer] `Sequence` has no unique database backstop [Yello.Infrastructure/Persistence/Configurations/StatusDeltaOperationConfiguration.cs] — deferred, low severity
+- [x] [Review][Defer] An owned definition's `Position` is written and never read [Yello.Application/Statuses/ProjectStatusDeltaDraft.cs:85] — deferred, low severity
+- [x] [Review][Defer] The rename field closes before validation, losing the typed name on any refusal [Yello.Client/Components/StatusDeltaEditor.razor] — deferred, low severity
+- [x] [Review][Defer] A write submitted while another is in flight is dropped silently [Yello.Client/Components/StatusDeltaEditor.razor] — deferred, low severity
+- [x] [Review][Defer] A move's anchor comes from a possibly stale client list [Yello.Client/Components/StatusDeltaEditor.razor] — deferred, low severity
+- [x] [Review][Defer] A `null` JSON body on the first read leaves the editor loading [Yello.Client/Components/StatusDeltaEditor.razor] — deferred, low severity
+- [x] [Review][Defer] The migration is not safe for a revision still running the old code (lists added Statuses as defaults; one-statement delete fails 547) [Yello.Infrastructure/Persistence/Migrations/20261121155445_ProjectStatusDelta.cs] — deferred, low severity
+- [x] [Review][Defer] `Down()` fails on a repeated added name, or turns added Statuses into defaults [Yello.Infrastructure/Persistence/Migrations/20261121155445_ProjectStatusDelta.cs] — deferred, low severity
+- [x] [Review][Defer] The AD-16 spine note names an ER edge the diagram does not have [ARCHITECTURE-SPINE.md:191] — deferred, low severity
+- [x] [Review][Defer] BoardView's comment still calls `ViewToggle` parameterless [Yello.Client/Components/BoardView.razor:90] — deferred, low severity
+
+Dismissed (7): replace-deletes surviving a refused write (the unit of work rolls back every failure result); Task Status validation before the lock (no 6.1 AC broken: sets only grow, deletion takes the same lock and removes Tasks first, no cross-Project move; already ledgered for 6.2); `Location` naming the collection and the unreadable-body problem types (Q12 (a)); the unreachable empty-set guard (Q7 (a)); unbounded Statuses (Q11 (a), ledgered); the unrun plants (run in this review, below).
 
 ## Dev Notes
 
@@ -528,6 +549,17 @@ Claude Opus 5.5 (bmad-dev-story, unattended story cycle).
   - Plants 1 and 2: the planted code did not compile under the analyzers (S1144 unused `Apply`; IDE0005 unused using), so they proved nothing; restored.
   - Plant 4 (the delta table left out of the policy): was in the migration when the run was killed; **the harness's `finally` did not run. Restored by hand** to the exact original three predicates and confirmed by reading the file; rebuilt before the full run.
   - Plants 5-10: not run (the harness was killed and, per the host, not restarted).
+- **Plants re-run at code review**, one at a time, each a filtered run of the one class or case that should catch it, the file saved as bytes and restored in a `finally` (log `artifacts/test-runs/6-1-shape-a-projects-statuses-review-plants.log`). No residue: the migration's three `StatusDeltaOperation` predicates are intact and `git status` showed no planted file afterwards. All **caught**:
+  - 1 (`EffectiveStatusSet` applies an empty delta instead of the Project's): `EffectiveStatusSetTests` 7 of 16 red.
+  - 2 (edit reads the set of no Project, i.e. the Space defaults): `A_sibling_Projects_Status_is_refused_for_an_edit_identically_to_a_random_id` red (its anchor, the sibling's own Task, is refused).
+  - 5 (a rename's definition write reaches a default): `Renaming_a_default_in_a_Project_keeps_its_id_and_leaves_the_Space_default_as_it_was` red.
+  - 6 (case-sensitive comparer): `A_name_the_set_holds_or_a_blank_or_overlong_name_is_refused_and_a_change_of_case_is_admitted` red.
+  - 7 (no lock taken): `Two_adds_of_one_name_queue_on_the_Projects_lock_and_the_second_is_refused_409` red.
+  - 8 (Project deletion leaves owned definitions to the cascade): `Two_Projects_add_the_same_name_and_deleting_one_holding_Tasks_in_it_removes_only_its_own` red.
+  - 9 (predicate admits Member): `The_clients_Project_Status_delta_predicate_agrees_with_the_capability_matrix` red.
+  - 10 (an `Ordinal` column in the delta table's migration): `The_delta_is_stored_as_operations_and_no_table_stores_an_effective_set` red.
+  - R (the review's reorder fix reverted to placing only the moved Status): `ProjectStatusWriteHandlerTests.Moving_an_already_placed_Status_lands_every_Status_where_the_moves_asked` red.
+  - Plant 4 was not re-run (the brief named 1-2 and 5-10); its migration was confirmed intact.
 
 ### Completion Notes List
 
@@ -650,3 +682,4 @@ Claude Opus 5.5 (bmad-dev-story, unattended story cycle).
 
 - 2026-11-21: Story created (bmad-create-story). Status: ready-for-dev.
 - 2026-11-21: Implemented (bmad-dev-story): Project-owned Statuses and the operation delta, one effective-set derivation for all six consumers, four routes, Project settings with the Status delta editor, explicit name collation; decisions Q1-Q13 at their recommendations; ledger dispositioned. Status: review.
+- 2026-11-21: Code review (bmad-code-review): a place now re-anchors the Statuses already placed, so a repeated move lands where asked; renaming an added Status also renames its definition, so its old name can be added again; id-bearing comments stripped; plants 1, 2, 5-10 run and caught; 12 low findings deferred. Full run 2795/2785 passed, 0 failed, 10 skipped. Status: done.

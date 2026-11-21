@@ -9,13 +9,13 @@
     SpaceArrival and the purge hook cover both, and switching views starts the other afresh - filter state does not survive
     the trip (AC17, intended).
 
-    NO PARAMETER BUT THE ROLE, a string, so the Board adds no dependency for it (BoardView is at its dependency cap, story
-    2.9): the Space and the Project are read from the address both views live at, and the current view is whichever of the
+    NO PARAMETER BUT THE ROLE, a string, so the Board adds no dependency for it (BoardView is at its dependency cap): the
+    Space and the Project are read from the address both views live at, and the current view is whichever of the
     two that address is. Rendered by both views under the page heading. Absent - never disabled - when the address names
     no Project.
 
     THE PROJECT SETTINGS LINK sits beside the two views, for a Role that may shape the Project's Statuses
-    (StatusCapabilities) and absent from the DOM for any other (UX-DR27).
+    (StatusCapabilities) and absent from the DOM for any other.
 *@
 
 @if (_projectId is { } projectId && _spaceId is { } spaceId)

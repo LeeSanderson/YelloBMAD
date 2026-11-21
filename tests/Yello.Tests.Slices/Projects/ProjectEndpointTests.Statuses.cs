@@ -19,13 +19,11 @@ namespace Yello.Tests.Slices.Projects;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Scaffolded against the recommended options</b>: open question 1 (a) (an owned <c>StatusDefinition</c> plus a delta of
-/// <c>Add</c>, <c>Rename</c> and <c>Place</c> operations), 5 (a) (the entry <c>{ defaultName, id, name, source, taskCount }</c>),
-/// 6 (a) (case-insensitive, trimmed, 1 to 100), 12 (a) (the four routes). An add answers <c>201</c>, rename and place
-/// <c>200</c>, each with the whole effective set. A skip that rests on one of them names it.
+/// An add answers <c>201</c>, rename and place <c>200</c>, each with the whole effective set: entries of
+/// <c>{ defaultName, id, name, source, taskCount }</c>. Names are case-insensitive, trimmed, 1 to 100.
 /// </para>
 /// <para>
-/// <b>Every case ends with S-2</b>: no Task of the Space holds a Status outside its own Project's set.
+/// <b>Every case ends with the Status invariant</b>: no Task of the Space holds a Status outside its own Project's set.
 /// </para>
 /// </remarks>
 public sealed partial class ProjectEndpointTests
@@ -173,8 +171,8 @@ public sealed partial class ProjectEndpointTests
     }
 
     /// <summary>
-    /// Renaming a Status the Project added keeps its id and source, changes its effective name, and leaves the owned
-    /// definition's own name as it was added (the rename is an operation, uniform for both kinds of Status).
+    /// Renaming a Status the Project added keeps its id and source and changes its effective name; the owned definition
+    /// takes the new name too, so the name it was added with is free again and adding it once more is admitted.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -186,6 +184,7 @@ public sealed partial class ProjectEndpointTests
         Actor? owner = null;
         var parked = Guid.Empty;
         WireResponse? renamed = null;
+        WireResponse? readded = null;
 
         await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
@@ -195,15 +194,18 @@ public sealed partial class ProjectEndpointTests
 
             parked = await Wire.AddedAsync(actor, owner.SpaceId, projectId, "Parked");
             renamed = await Wire.RenameAsync(actor, owner.SpaceId, projectId, parked, "On ice");
+            readded = await Wire.AddAsync(actor, owner.SpaceId, projectId, "Parked");
         });
 
         Assert.NotNull(owner);
         Assert.True(renamed?.StatusCode == HttpStatusCode.OK, $"{renamed?.StatusCode} {renamed?.Body}");
+        Assert.True(readded?.StatusCode == HttpStatusCode.Created, $"{readded?.StatusCode} {readded?.Body}");
 
         var entry = ProjectStatusWire.EntriesOf(renamed!.Body)[^1];
 
         Assert.Equal((parked, "On ice", ProjectStatusSources.AddedHere), (entry.Id, entry.Name, entry.Source));
-        Assert.Equal("Parked", (await Wire.DefinitionsAsync(database, owner.SpaceId)).Single(row => row.Id == parked).Name);
+        Assert.Equal(["On ice", "Parked"], ProjectStatusWire.EntriesOf(readded!.Body).Skip(3).Select(status => status.Name));
+        Assert.Equal("On ice", (await Wire.DefinitionsAsync(database, owner.SpaceId)).Single(row => row.Id == parked).Name);
         await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 

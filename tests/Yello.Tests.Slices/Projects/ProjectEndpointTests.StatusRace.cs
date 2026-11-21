@@ -14,10 +14,10 @@ namespace Yello.Tests.Slices.Projects;
 /// lock, never fired and hoped for.
 /// </summary>
 /// <remarks>
-/// Open question 4 (a): delta writes take <c>Yello/ProjectTasks/{spaceId}/{projectId}</c> exclusively, the lock every key
-/// placer of the Project's Tasks already takes. The test holds it (<see cref="DeleteWire.HoldProjectRangeAsync"/>), sends both
-/// adds, waits until both are blocked on <c>LCK_M_%</c>, then commits. A write that skips the lock lets both read a set
-/// without "Parked" and both insert it, under two different ids that no unique index refuses.
+/// Delta writes take <c>Yello/ProjectTasks/{spaceId}/{projectId}</c> exclusively, the lock every key placer of the
+/// Project's Tasks already takes. The test holds it (<see cref="DeleteWire.HoldProjectRangeAsync"/>), sends both adds, waits
+/// until both are blocked on <c>LCK_M_%</c>, then commits. A write that skips the lock is caught by that wait, not by the
+/// <c>409</c>: the owned-name index would still refuse the second "Parked".
 /// </remarks>
 public sealed partial class ProjectEndpointTests
 {

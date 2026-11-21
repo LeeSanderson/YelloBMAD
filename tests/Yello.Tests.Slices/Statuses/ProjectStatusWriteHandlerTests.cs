@@ -127,6 +127,37 @@ public sealed class ProjectStatusWriteHandlerTests
     }
 
     /// <summary>
+    /// Moving a Status that was already placed lands every Status exactly where the editor's one-step moves put it, and
+    /// leaves the others where they were: a replaced place must not replay the other places against an order that no
+    /// longer exists. Up, up, down over A B C D first (which used to answer A C B D for C B A D), then a fixed run of moves
+    /// up and down, each checked against the order the move asked for.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    public async Task Moving_an_already_placed_Status_lands_every_Status_where_the_moves_asked()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var added = await new AddProjectStatusHandler(_world.Writer).HandleAsync(_world.Context, _world.ProjectId, "Parked", afterStatusId: null, cancellationToken);
+        var expected = added.Set!.Statuses.Select(status => status.Id).ToList();
+        var place = new PlaceProjectStatusHandler(_world.Writer);
+        (int From, int To)[] opening = [(1, 0), (2, 1), (0, 1)];
+        var moves = opening.Concat(Enumerable.Range(0, 40).Select(step => OneStep((step * 7 + 3) % 4, up: step % 3 == 0)));
+
+        foreach (var (from, to) in moves)
+        {
+            var moved = expected[from];
+
+            expected.RemoveAt(from);
+            expected.Insert(to, moved);
+
+            var result = await place.HandleAsync(_world.Context, _world.ProjectId, moved, to == 0 ? null : expected[to - 1], cancellationToken);
+
+            Assert.Equal(ProjectStatusWriteOutcome.Written, result.Outcome);
+            Assert.Equal(expected, result.Set!.Statuses.Select(status => status.Id));
+        }
+    }
+
+    /// <summary>
     /// A name index that refuses what the check admitted answers as a taken name, never a failure.
     /// </summary>
     /// <returns>A task.</returns>
@@ -139,6 +170,22 @@ public sealed class ProjectStatusWriteHandlerTests
 
         Assert.Equal(ProjectStatusWriteOutcome.NameTaken, result.Outcome);
         Assert.Null(result.Set);
+    }
+
+    // A one-place move over four rows, as the editor's buttons make it; an end row can only go inwards.
+    private static (int From, int To) OneStep(int from, bool up)
+    {
+        if (from == 0)
+        {
+            return (from, 1);
+        }
+
+        if (from == 3)
+        {
+            return (from, 2);
+        }
+
+        return (from, up ? from - 1 : from + 1);
     }
 
     private sealed class World : IProjectStatusStore, IStatusDefinitionReader, IBoardReader, IIdentifierGenerator

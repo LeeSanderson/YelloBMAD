@@ -1573,9 +1573,9 @@
 }
 
 /*
-    PROJECT SETTINGS AND THE STATUS DELTA EDITOR (UX-DR15). One row per Status: its name, source chip and Task count on
-    one wrapping line, its controls on the next; nothing scrolls sideways at 320px (NFR-9). Logical properties only. No
-    hue encodes a Status (DESIGN.md:326): the source is said in words.
+    PROJECT SETTINGS AND THE STATUS DELTA EDITOR. One row per Status: its name, source chip and Task count on one
+    wrapping line, its controls on the next; nothing scrolls sideways at 320px. Logical properties only. No hue encodes
+    a Status: the source is said in words.
 */
 .project-settings {
     display: flex;

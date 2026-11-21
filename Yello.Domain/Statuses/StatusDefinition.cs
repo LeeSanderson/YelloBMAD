@@ -51,9 +51,10 @@ public sealed class StatusDefinition
     /// The Status's name, as a person reads it.
     /// </summary>
     /// <remarks>
-    /// A Project's rename never writes it: that is an operation of the Project's delta, so the Space's
-    /// default keeps its own name for every other Project. An owned definition keeps the name it was
-    /// added with for the same reason - one path for every rename.
+    /// A Project's rename of a default never writes it: that is an operation of the Project's delta, so
+    /// the Space's default keeps its own name for every other Project. A rename of an owned definition
+    /// records the same operation and also writes this, because the unique index over the Project's
+    /// owned names would otherwise still hold the old name and refuse adding it again.
     /// </remarks>
     public required string Name { get; set; }
 

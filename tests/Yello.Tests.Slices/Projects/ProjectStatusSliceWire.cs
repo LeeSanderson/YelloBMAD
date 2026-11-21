@@ -177,7 +177,7 @@ internal static class ProjectStatusSliceWire
     }
 
     /// <summary>
-    /// The Space's Tasks whose Status is outside their own Project's effective set - the Status half of S-2, by the one
+    /// The Space's Tasks whose Status is outside their own Project's effective set - the Status half of the invariant, by the one
     /// statement <see cref="WireDatabase.TasksOutsideTheirProjectsSetSql"/> states.
     /// </summary>
     public static async Task<int> TasksOutsideTheirProjectsSetAsync(RegistrationDatabase database, Guid spaceId)
@@ -193,7 +193,7 @@ internal static class ProjectStatusSliceWire
     }
 
     /// <summary>
-    /// S-2 after a case's writes: no Task in the Space holds a Status outside its own Project's set. Anchored by the caller on
+    /// After a case's writes, no Task in the Space holds a Status outside its own Project's set. Anchored by the caller on
     /// the Space holding Tasks at all.
     /// </summary>
     public static async Task AssertNoTaskOutsideItsProjectsSetAsync(RegistrationDatabase database, Guid spaceId) =>

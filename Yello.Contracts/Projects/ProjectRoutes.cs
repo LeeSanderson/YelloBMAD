@@ -10,8 +10,8 @@ namespace Yello.Contracts.Projects;
 /// because of the route's shape.
 /// </para>
 /// <para>
-/// <b>No route moves a Project</b> (AC7): the collection takes <c>GET</c> and <c>POST</c>, and one Project
-/// takes <c>PATCH</c> for its name and <c>DELETE</c> (story 2.5). The routes under a Project's id - its Tasks,
+/// <b>No route moves a Project</b>: the collection takes <c>GET</c> and <c>POST</c>, and one Project
+/// takes <c>PATCH</c> for its name and <c>DELETE</c>. The routes under a Project's id - its Tasks,
 /// Board, List and Statuses - are other contracts', and <c>RefusalBoundaryGateTests</c> holds the exact set.
 /// </para>
 /// </remarks>

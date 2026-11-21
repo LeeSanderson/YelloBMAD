@@ -95,6 +95,49 @@ public static class EffectiveStatusSet
             : StatusDeltaVerdict.Admitted;
     }
 
+    /// <summary>
+    /// The place operations that move <paramref name="statusId"/> after <paramref name="afterStatusId"/> (or first) in
+    /// <paramref name="current"/>, as anchors that replay to exactly that order.
+    /// </summary>
+    /// <remarks>
+    /// A new place replaces the Status's old one and replays last, so every other place written against the old order
+    /// would replay against a different list and land somewhere nobody asked for. Re-anchoring every Status that already
+    /// has a place to its predecessor in the intended order, sequenced left to right, replays to that order exactly; a
+    /// Status that never had a place still gets none, so it keeps following its Space order.
+    /// </remarks>
+    /// <param name="current">The effective set before the move, with a Status added by the same write at its end.</param>
+    /// <param name="placed">The Statuses the Project's delta already places.</param>
+    /// <param name="statusId">The Status being moved.</param>
+    /// <param name="afterStatusId">The Status it goes after, or <c>null</c> for first.</param>
+    /// <returns>Each Status to place and its anchor, in the order the operations must be sequenced.</returns>
+    public static IReadOnlyList<(Guid StatusId, Guid? AfterStatusId)> Placements(
+        IReadOnlyList<EffectiveStatus> current,
+        IReadOnlySet<Guid> placed,
+        Guid statusId,
+        Guid? afterStatusId)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        ArgumentNullException.ThrowIfNull(placed);
+
+        var order = current.Select(status => status.Id).Where(id => id != statusId).ToList();
+        order.Insert(afterStatusId is { } anchor ? order.IndexOf(anchor) + 1 : 0, statusId);
+
+        var placements = new List<(Guid StatusId, Guid? AfterStatusId)>();
+        Guid? predecessor = null;
+
+        foreach (var id in order)
+        {
+            if (id == statusId || placed.Contains(id))
+            {
+                placements.Add((id, predecessor));
+            }
+
+            predecessor = id;
+        }
+
+        return placements;
+    }
+
     private static void Apply(List<EffectiveStatus> set, IReadOnlyList<StatusDefinition> owned, StatusDeltaOperation operation)
     {
         var index = set.FindIndex(status => status.Id == operation.StatusId);

@@ -142,7 +142,7 @@ public static class ClientRoutes
     public static string List(Guid spaceId, Guid projectId) => $"/spaces/{spaceId:D}/projects/{projectId:D}/list";
 
     /// <summary>
-    /// A Project's settings: its Status delta editor. Ids only (UX-DR33); the Space leads, so <see cref="SpaceIn"/> reads it
+    /// A Project's settings: its Status delta editor. Ids only; the Space leads, so <see cref="SpaceIn"/> reads it
     /// and the purge hook covers it unchanged.
     /// </summary>
     /// <param name="spaceId">The Space.</param>

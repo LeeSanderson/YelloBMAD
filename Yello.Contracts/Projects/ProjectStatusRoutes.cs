@@ -6,7 +6,7 @@ namespace Yello.Contracts.Projects;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Under the Project, after <c>{spaceId}</c></b> (AR-9), so the pipeline resolves the Space because of the route's
+/// <b>Under the Project, after <c>{spaceId}</c></b>, so the pipeline resolves the Space because of the route's
 /// shape, and the Project and the Status are read inside it.
 /// </para>
 /// <para>

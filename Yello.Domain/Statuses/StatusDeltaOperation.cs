@@ -1,7 +1,7 @@
 namespace Yello.Domain.Statuses;
 
 /// <summary>
-/// One operation of a Project's Status delta: add, rename or place one Status, keyed by the Status's id. AD-16.
+/// One operation of a Project's Status delta: add, rename or place one Status, keyed by the Status's id.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -27,7 +27,7 @@ public sealed class StatusDeltaOperation
     public required Guid Id { get; init; }
 
     /// <summary>
-    /// The Space the Project belongs to. Non-nullable (AD-2), and set once.
+    /// The Space the Project belongs to. Non-nullable, and set once.
     /// </summary>
     public required Guid SpaceId { get; init; }
 

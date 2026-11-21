@@ -60,6 +60,8 @@ internal sealed class ProjectStatusStore(YelloDbContext dbContext) : IProjectSta
                 .ConfigureAwait(false);
         }
 
+        await RenameOwnedAsync(operations, cancellationToken).ConfigureAwait(false);
+
         if (added is not null)
         {
             dbContext.StatusDefinitions.Add(added);
@@ -89,6 +91,21 @@ internal sealed class ProjectStatusStore(YelloDbContext dbContext) : IProjectSta
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Keeps the owned-name index on the names the Project shows (see <see cref="StatusDefinition.Name"/>). A default has
+    /// no owner, so its row is never written.
+    /// </summary>
+    private async Task RenameOwnedAsync(IReadOnlyList<StatusDeltaOperation> operations, CancellationToken cancellationToken)
+    {
+        foreach (var rename in operations.Where(operation => operation.Kind == StatusDeltaKind.Rename && operation.Name is not null))
+        {
+            await dbContext.StatusDefinitions
+                .Where(status => status.Id == rename.StatusId && status.OwnerProjectId == rename.ProjectId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(status => status.Name, rename.Name!), cancellationToken)
+                .ConfigureAwait(false);
+        }
     }
 
     private Task<bool> ProjectExistsAsync(Guid projectId, CancellationToken cancellationToken) =>

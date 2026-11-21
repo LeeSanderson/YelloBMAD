@@ -8,7 +8,7 @@ namespace Yello.Application.Statuses.ListProjectStatuses;
 /// Tasks hold it.
 /// </summary>
 /// <remarks>
-/// <b>No Role, no Space and no lock</b> (AR-3): the pipeline resolved the Space and checked the read capability every
+/// <b>No Role, no Space and no lock</b>:the pipeline resolved the Space and checked the read capability every
 /// Role holds, so a Viewer reads exactly what an Owner does.
 /// </remarks>
 /// <param name="boards">Reads the Project and its Task counts.</param>

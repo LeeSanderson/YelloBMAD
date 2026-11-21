@@ -158,8 +158,8 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// The Space's own Status read keeps its shape, <c>{ Id, Name, Position }</c>: it serves the Space defaults only, and a
-    /// Project's delta never reaches it. A standing gate, green before and after the delta (AD-19: a served type is never
-    /// changed in a breaking way).
+    /// Project's delta never reaches it. A standing gate, green before and after the delta: a served type is never
+    /// changed in a breaking way.
     /// </summary>
     [Fact]
     [Trait("Requirement", "AD-19")]

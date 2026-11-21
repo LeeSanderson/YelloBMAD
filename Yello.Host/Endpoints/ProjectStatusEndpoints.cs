@@ -16,18 +16,18 @@ namespace Yello.Host.Endpoints;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>No Membership check, no Role and no idempotency here</b> - the reasons <see cref="ProjectEndpoints"/> gives (AR-3).
+/// <b>No Membership check, no Role and no idempotency here</b> - the reasons <see cref="ProjectEndpoints"/> gives.
 /// Each route carries <c>{spaceId}</c>, so the pipeline has resolved the Space, checked the declared capability and
 /// replayed a key it had already seen before this code runs.
 /// </para>
 /// <para>
 /// <b>Reading takes the capability every Role holds</b>; <b>every write takes <c>ConfigureProjectStatusDelta</c></b>, which
-/// only Owners and Admins hold. <b>No bound</b>, and <b>both surfaces</b> (AD-4). <b>Bodies are read inside the
+/// only Owners and Admins hold. <b>No bound</b>, and <b>both surfaces</b>. <b>Bodies are read inside the
 /// endpoint</b>, never bound.
 /// </para>
 /// <para>
 /// <b>A Project or a Status in the path that is not this Space's, or not in this Project's set, answers the boundary's
-/// <c>404</c></b>, byte for byte, unrecorded (AD-20): another Project's Status is not this Project's, whichever Space holds
+/// <c>404</c></b>, byte for byte, unrecorded: another Project's Status is not this Project's, whichever Space holds
 /// it.
 /// </para>
 /// </remarks>

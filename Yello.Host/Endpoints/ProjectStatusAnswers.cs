@@ -41,7 +41,7 @@ internal static class ProjectStatusAnswers
             type: ProblemTypes.InvalidStatusPosition,
             title: "A Status is placed after another Status of the same Project."),
 
-        // Not recorded: an in-Space not-found crossed no boundary (AD-20). The body is the boundary's.
+        // Not recorded: an in-Space not-found crossed no boundary. The body is the boundary's.
         _ => BoundaryProblems.NotAvailable(),
     };
 }

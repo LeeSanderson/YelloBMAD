@@ -39,7 +39,7 @@ internal sealed class StatusDeltaOperationConfiguration(YelloDbContext context) 
             .HasColumnName(SchemaNames.SpaceIdColumn)
             .IsRequired();
 
-        // AD-2's second layer, from application state. See MembershipConfiguration.
+        // The second isolation layer, from application state. See MembershipConfiguration.
         builder.HasQueryFilter(operation => operation.SpaceId == context.ScopedSpaceId);
 
         builder.Property(operation => operation.Kind)

@@ -21,6 +21,8 @@ public sealed class ProjectStatusDeltaDraft
 
     private readonly List<StatusDeltaOperation> _operations = [];
 
+    private readonly HashSet<Guid> _placed;
+
     private int _nextSequence;
 
     internal ProjectStatusDeltaDraft(
@@ -34,6 +36,7 @@ public sealed class ProjectStatusDeltaDraft
         _spaceId = spaceId;
         _projectId = projectId;
         _ownedCount = delta.OwnedDefinitions.Count;
+        _placed = delta.Operations.Where(operation => operation.Kind == StatusDeltaKind.Place).Select(operation => operation.StatusId).ToHashSet();
         _nextSequence = delta.NextSequence;
         _identifiers = identifiers;
         _now = now;
@@ -104,12 +107,25 @@ public sealed class ProjectStatusDeltaDraft
     }
 
     /// <summary>
-    /// Plans a Status's place after another, or first.
+    /// Plans a Status's place after another, or first, re-anchoring every Status the Project already placed (see
+    /// <see cref="EffectiveStatusSet.Placements"/>).
     /// </summary>
     /// <param name="statusId">The Status.</param>
     /// <param name="afterStatusId">The Status it goes after, or <c>null</c> for first.</param>
-    public void Place(Guid statusId, Guid? afterStatusId) =>
-        Record(statusId, StatusDeltaKind.Place, name: null, afterStatusId);
+    public void Place(Guid statusId, Guid? afterStatusId)
+    {
+        var current = Before;
+
+        if (Added is { } added && !Holds(added.Id))
+        {
+            current = [.. Before, new EffectiveStatus(added.Id, added.Name, StatusSource.AddedHere, DefaultName: null)];
+        }
+
+        foreach (var (placedId, anchor) in EffectiveStatusSet.Placements(current, _placed, statusId, afterStatusId))
+        {
+            Record(placedId, StatusDeltaKind.Place, name: null, anchor);
+        }
+    }
 
     private void Record(Guid statusId, StatusDeltaKind kind, string? name, Guid? afterStatusId) =>
         _operations.Add(new StatusDeltaOperation

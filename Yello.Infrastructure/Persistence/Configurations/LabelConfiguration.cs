@@ -11,7 +11,7 @@ namespace Yello.Infrastructure.Persistence.Configurations;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Unique by <c>(SpaceId, Name)</c></b> (open question 2): the column's declared case-insensitive collation
+/// <b>Unique by <c>(SpaceId, Name)</c></b>: the column's declared case-insensitive collation
 /// makes "Bug" and "bug" collide, which is the intended rule, and the index rather than a pre-check is what refuses
 /// two concurrent definitions of one name.
 /// </para>

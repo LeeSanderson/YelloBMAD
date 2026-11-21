@@ -13,8 +13,8 @@
 @inject SpaceWrites Writes
 
 @*
-    THE STATUS DELTA EDITOR (UX-DR15): one Project's effective Status set, in effective order, and - for a Role that may
-    shape it - add, rename and reorder. FR-25; UX-DR27, UX-DR31, UX-DR42.
+    THE STATUS DELTA EDITOR: one Project's effective Status set, in effective order, and - for a Role that may shape it -
+    add, rename and reorder.
 
     EACH ROW SAYS WHERE ITS STATUS COMES FROM: a Space default, a Space default this Project renamed (and the default's own
     name), or a Status added here. That distinction is what makes a later change to the Space's defaults understandable
@@ -25,7 +25,7 @@
     always one the server holds. A refusal is said in the inline error region in the client's own words, and the rows keep
     what the server last admitted. A write in flight ignores another rather than disabling anything.
 
-    RENDERED ONLY AFTER THE SERVER HAS ANSWERED and PURGED WITH THE SPACE (UX-DR31). An empty Project is never prompted to
+    RENDERED ONLY AFTER THE SERVER HAS ANSWERED and PURGED WITH THE SPACE. An empty Project is never prompted to
     configure anything: the set is shown, and the add form is simply there for those who may use it.
 *@
 
@@ -86,7 +86,7 @@
 @code {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    // A field name no browser's autofill would match to a saved value (UX-DR33): random per page.
+    // A field name no browser's autofill would match to a saved value: random per page.
     private readonly string _nameFieldName = Guid.NewGuid().ToString("N");
 
     private IDisposable? _purgeRegistration;
