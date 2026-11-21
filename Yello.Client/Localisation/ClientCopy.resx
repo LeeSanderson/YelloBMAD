@@ -1667,4 +1667,104 @@
     <value>A deleted Account invited you to {0}.</value>
     <comment>The Invitation view&apos;s heading when the issuer&apos;s Account was deleted. {0} is the Space&apos;s name.</comment>
   </data>
+  <data name="ProjectSettingsLink" xml:space="preserve">
+    <value>Project settings</value>
+    <comment>The link from a Project&apos;s Board and List to its settings, for Owners and Admins only.</comment>
+  </data>
+  <data name="ProjectSettingsHeading" xml:space="preserve">
+    <value>Project settings</value>
+    <comment>The heading of a Project&apos;s settings page.</comment>
+  </data>
+  <data name="ProjectSettingsBack" xml:space="preserve">
+    <value>Back to the Board</value>
+    <comment>The link from a Project&apos;s settings back to its Board.</comment>
+  </data>
+  <data name="ProjectStatusesHeading" xml:space="preserve">
+    <value>This Project&apos;s Statuses</value>
+    <comment>The Status delta editor&apos;s heading on Project settings.</comment>
+  </data>
+  <data name="ProjectStatusesLoading" xml:space="preserve">
+    <value>Loading this Project&apos;s Statuses.</value>
+    <comment>Said to assistive technology while the editor waits for the server.</comment>
+  </data>
+  <data name="StatusSourceSpaceDefault" xml:space="preserve">
+    <value>Space default</value>
+    <comment>The source chip of a Space default this Project has not renamed.</comment>
+  </data>
+  <data name="StatusSourceAddedHere" xml:space="preserve">
+    <value>Added here</value>
+    <comment>The source chip of a Status this Project added.</comment>
+  </data>
+  <data name="StatusSourceRenamedHere" xml:space="preserve">
+    <value>Space default · renamed here (was {0})</value>
+    <comment>The source chip of a Space default this Project renamed. {0} is the default&apos;s own name.</comment>
+  </data>
+  <data name="StatusTaskCount" xml:space="preserve">
+    <value>Tasks in this Status: {0}</value>
+    <comment>Read by assistive technology beside a row&apos;s Task count. {0} is the count.</comment>
+  </data>
+  <data name="StatusMoveUp" xml:space="preserve">
+    <value>Move up</value>
+    <comment>A row&apos;s control that moves its Status one place up. Described by the Status&apos;s name.</comment>
+  </data>
+  <data name="StatusMoveDown" xml:space="preserve">
+    <value>Move down</value>
+    <comment>A row&apos;s control that moves its Status one place down. Described by the Status&apos;s name.</comment>
+  </data>
+  <data name="StatusRename" xml:space="preserve">
+    <value>Rename</value>
+    <comment>A row&apos;s control that opens its inline rename field. Described by the Status&apos;s name.</comment>
+  </data>
+  <data name="StatusRenameFieldLabel" xml:space="preserve">
+    <value>New name for {0}</value>
+    <comment>The accessible name of the inline rename field. {0} is the Status&apos;s current name.</comment>
+  </data>
+  <data name="StatusRenameSave" xml:space="preserve">
+    <value>Save</value>
+    <comment>Saves an inline Status rename.</comment>
+  </data>
+  <data name="StatusRenameCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Closes an inline Status rename without saving.</comment>
+  </data>
+  <data name="StatusAddFieldLabel" xml:space="preserve">
+    <value>New Status name</value>
+    <comment>The label of the add form&apos;s name field.</comment>
+  </data>
+  <data name="StatusAdd" xml:space="preserve">
+    <value>Add a Status</value>
+    <comment>The add form&apos;s button.</comment>
+  </data>
+  <data name="StatusAdded" xml:space="preserve">
+    <value>{0} added.</value>
+    <comment>Announced politely when a Status is added. {0} is its name.</comment>
+  </data>
+  <data name="StatusRenamed" xml:space="preserve">
+    <value>Renamed to {0}.</value>
+    <comment>Announced politely when a Status is renamed. {0} is its new name.</comment>
+  </data>
+  <data name="StatusMoved" xml:space="preserve">
+    <value>{0} moved to position {1} of {2}.</value>
+    <comment>Announced politely after a move. {0} is the Status&apos;s name, {1} its new position from 1, {2} how many there are.</comment>
+  </data>
+  <data name="StatusChangeRefused" xml:space="preserve">
+    <value>That change was not made.</value>
+    <comment>The heading of the editor&apos;s inline error region.</comment>
+  </data>
+  <data name="StatusNameInvalid" xml:space="preserve">
+    <value>A Status&apos;s name is 1 to 100 characters.</value>
+    <comment>400 invalid-status-name, and the client&apos;s own check before sending.</comment>
+  </data>
+  <data name="StatusNameTaken" xml:space="preserve">
+    <value>That name is already used in this Project.</value>
+    <comment>409 status-name-taken. Never repeats the name.</comment>
+  </data>
+  <data name="StatusSetEmpty" xml:space="preserve">
+    <value>A Project keeps at least one Status.</value>
+    <comment>409 status-set-empty.</comment>
+  </data>
+  <data name="StatusPositionInvalid" xml:space="preserve">
+    <value>That place is no longer in this Project&apos;s Statuses. Reload the page and try again.</value>
+    <comment>400 invalid-status-position: the Status to place after is not in the set the server holds.</comment>
+  </data>
 </root>

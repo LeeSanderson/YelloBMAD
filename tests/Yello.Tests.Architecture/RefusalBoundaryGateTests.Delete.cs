@@ -100,7 +100,9 @@ public sealed partial class RefusalBoundaryGateTests
     /// mapped the deletion. Story 2.9 widened it by exactly the Board's column page (<c>GET …/board/columns/{statusId}</c>,
     /// one column read by keyset seek - still never a flat list of the Project's Tasks). Story 2.10 widened it by exactly
     /// the List View's page (<c>GET …/list</c>): one bounded page by pair keyset seek with its true total from its own
-    /// count, so the client still derives no total - never the whole of the Project's Tasks.
+    /// count, so the client still derives no total - never the whole of the Project's Tasks. It is widened by exactly the
+    /// Project's Statuses: the read of its effective set, and the add, rename and place of one Status - none lists the
+    /// Project's Tasks or moves the Project.
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-19")]
@@ -120,7 +122,11 @@ public sealed partial class RefusalBoundaryGateTests
                 $"GET {ProjectPattern}/board",
                 $"GET {ProjectPattern}/board/columns/{{statusId:guid}}",
                 $"GET {ProjectPattern}/list",
+                $"GET {ProjectPattern}/statuses",
                 $"PATCH {ProjectPattern}",
+                $"PATCH {ProjectPattern}/statuses/{{statusId:guid}}",
+                $"POST {ProjectPattern}/statuses",
+                $"POST {ProjectPattern}/statuses/{{statusId:guid}}/place",
                 $"POST {ProjectPattern}/tasks",
             ],
             routes);

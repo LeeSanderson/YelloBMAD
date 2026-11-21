@@ -1,5 +1,5 @@
 using System.Text.Json;
-using Yello.Tests.Shared;
+using Yello.Contracts.Projects;
 
 namespace Yello.Tests.Client;
 
@@ -15,8 +15,8 @@ namespace Yello.Tests.Client;
 /// other case is served exactly what it would be without this partial.
 /// </para>
 /// <para>
-/// <b>Paths and codes are <see cref="ProjectStatusWire"/>'s stand-ins</b> until the contract members exist; bodies become
-/// the contract's <c>ProjectStatusResponse</c> then.
+/// <b>Bodies are the contract's <see cref="ProjectStatusResponse"/> shape</b>, serialised from <see cref="FakeProjectStatus"/>
+/// with the same member names.
 /// </para>
 /// </remarks>
 internal sealed partial class FakeYelloApi
@@ -47,7 +47,7 @@ internal sealed partial class FakeYelloApi
         ProjectStatuses[(spaceId, projectId)] =
         [
             .. Boards[(spaceId, projectId)].Columns.Select(column =>
-                new FakeProjectStatus(column.StatusId, column.Name, ProjectStatusWire.SpaceDefault, DefaultName: null, column.Total)),
+                new FakeProjectStatus(column.StatusId, column.Name, ProjectStatusSources.SpaceDefault, DefaultName: null, column.Total)),
         ];
 
     /// <summary>
@@ -86,7 +86,7 @@ internal sealed partial class FakeYelloApi
     {
         var name = ReadString(body, "name").Trim();
 
-        set.Add(new FakeProjectStatus(Guid.NewGuid(), name, ProjectStatusWire.AddedHere, DefaultName: null, TaskCount: 0));
+        set.Add(new FakeProjectStatus(Guid.NewGuid(), name, ProjectStatusSources.AddedHere, DefaultName: null, TaskCount: 0));
         FollowOnTheBoard(spaceId, projectId, set);
 
         return (201, Entries(set));
@@ -102,7 +102,7 @@ internal sealed partial class FakeYelloApi
         }
 
         var entry = set[index];
-        var defaultName = entry.Source == ProjectStatusWire.SpaceDefault ? entry.DefaultName ?? entry.Name : null;
+        var defaultName = entry.Source == ProjectStatusSources.SpaceDefault ? entry.DefaultName ?? entry.Name : null;
 
         set[index] = entry with { Name = ReadString(body, "name").Trim(), DefaultName = defaultName };
         FollowOnTheBoard(spaceId, projectId, set);
@@ -204,8 +204,8 @@ internal sealed partial class FakeYelloApi
 }
 
 /// <summary>
-/// One entry of a Project's effective set as the fake serves it - the shape of <c>ProjectStatusResponse</c>. Replace with
-/// the contract type on activation.
+/// One entry of a Project's effective set as the fake serves it - the shape of <see cref="ProjectStatusResponse"/>, kept a
+/// record of its own so a case can rewrite one entry with <c>with</c>.
 /// </summary>
 /// <param name="Id">The Status's id.</param>
 /// <param name="Name">Its effective name in the Project.</param>

@@ -258,5 +258,8 @@ public sealed class ViewListHandlerTests
 
         public Task<IReadOnlyList<StatusDefinition>> ListAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<StatusDefinition>>(_statuses);
+
+        public Task<ProjectStatusDelta> DeltaOfAsync(Guid projectId, CancellationToken cancellationToken) =>
+            Task.FromResult(ProjectStatusDelta.Empty);
     }
 }

@@ -121,7 +121,10 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
 
     /// <summary>
     /// AC2, Q2 (a), AD-16 - creating a Project leaves the Space's default Status set exactly as it was,
-    /// and nothing stores a Project's effective set: no Status column on <c>Project</c>, no delta table.
+    /// and nothing stores a Project's effective set: no Status column on <c>Project</c>, no
+    /// <c>%EffectiveStatus%</c> table, and the delta table a Project's changes are written to holds no
+    /// operation for a Project that has changed nothing. That the delta table holds no order of its own is
+    /// <c>The_delta_is_stored_as_operations_and_no_table_stores_an_effective_set</c>'s.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -155,7 +158,11 @@ public sealed partial class ProjectEndpointTests(MigratedDatabaseFixture fixture
         Assert.DoesNotContain(columns, column => column.Contains("Status", StringComparison.OrdinalIgnoreCase));
         Assert.Empty(await CatalogueAsync(
             database,
-            "SELECT t.name FROM sys.tables t WHERE t.name LIKE N'%Delta%' OR t.name LIKE N'%EffectiveStatus%'"));
+            "SELECT t.name FROM sys.tables t WHERE t.name LIKE N'%EffectiveStatus%'"));
+        Assert.Equal(["StatusDeltaOperation"], await CatalogueAsync(
+            database,
+            "SELECT t.name FROM sys.tables t WHERE t.name LIKE N'%Delta%'"));
+        Assert.Equal(0, await ProjectStatusSliceWire.DeltaCountAsync(database, owner.SpaceId, IdOf(created!)));
     }
 
     /// <summary>

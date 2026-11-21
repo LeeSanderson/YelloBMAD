@@ -1,0 +1,189 @@
+@using System.Globalization
+@using Yello.Contracts.Projects
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    ONE STATUS OF A PROJECT'S EFFECTIVE SET in the Status delta editor: its name, where it comes from, how many of the
+    Project's Tasks hold it, and - for a Role that may shape the set - "Move up", "Move down" and "Rename".
+
+    THE MOVE BUTTONS ARE THE KEYBOARD PATH, and the only one: there is no drag. The first row has no "Move up" and the last
+    no "Move down" - absent, never disabled. After a move the row asks for focus back on the button that moved it, or on
+    the other one when it reached an end, so a keyboard user can press again.
+
+    RENAME IS INLINE: the row keeps its name and source in view, and a field named for the Status opens beneath them with
+    Save and Cancel; Enter saves, Escape cancels. No remove control.
+*@
+
+<li class="status-delta-row">
+    <div class="status-delta-row__summary">
+        <span class="status-delta-row__name" id="@NameId">@Status.Name</span>
+        <span class="type-meta status-source">@SourceText</span>
+        <span class="type-meta column-count" aria-hidden="true">@Status.TaskCount</span>
+        <span class="visually-hidden">@string.Format(CultureInfo.CurrentCulture, Localizer["StatusTaskCount"], Status.TaskCount)</span>
+    </div>
+
+    @if (CanEdit && Renaming)
+    {
+        <form class="status-delta-row__rename" @onsubmit="SaveAsync" novalidate>
+            <input type="text"
+                   class="status-delta-row__field"
+                   autocomplete="off"
+                   aria-label="@string.Format(CultureInfo.CurrentCulture, Localizer["StatusRenameFieldLabel"], Status.Name)"
+                   value="@_draft"
+                   @oninput="Draft"
+                   @onkeydown="CancelOnEscapeAsync"
+                   @ref="_field" />
+            <button type="submit" class="button-secondary">@Localizer["StatusRenameSave"]</button>
+            <button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["StatusRenameCancel"]</button>
+        </form>
+    }
+
+    @if (CanEdit && !Renaming)
+    {
+        <div class="status-delta-row__actions">
+            @if (Index > 0)
+            {
+                <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="UpAsync" @ref="_up">@Localizer["StatusMoveUp"]</button>
+            }
+
+            @if (Index < Count - 1)
+            {
+                <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="DownAsync" @ref="_down">@Localizer["StatusMoveDown"]</button>
+            }
+
+            <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="StartRenameAsync">@Localizer["StatusRename"]</button>
+        </div>
+    }
+</li>
+
+@code {
+    private ElementReference _field;
+    private ElementReference _up;
+    private ElementReference _down;
+    private string _draft = string.Empty;
+    private bool _wasRenaming;
+    private bool _focusField;
+    private int _focusSeen;
+
+    /// <summary>The Status.</summary>
+    [Parameter]
+    [EditorRequired]
+    public ProjectStatusResponse Status { get; set; } = new(Guid.Empty, string.Empty, string.Empty, null, 0);
+
+    /// <summary>Where it sits in the set, from zero.</summary>
+    [Parameter]
+    public int Index { get; set; }
+
+    /// <summary>How many Statuses the set holds.</summary>
+    [Parameter]
+    public int Count { get; set; }
+
+    /// <summary>Whether the Role may shape the set; without it the row has no control at all.</summary>
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    /// <summary>Whether its rename field is open.</summary>
+    [Parameter]
+    public bool Renaming { get; set; }
+
+    /// <summary>Bumped when the editor asks this row to take focus back after a move.</summary>
+    [Parameter]
+    public int FocusRequest { get; set; }
+
+    /// <summary>Which move button the focus request is for: <c>true</c> for the up button.</summary>
+    [Parameter]
+    public bool FocusUp { get; set; }
+
+    /// <summary>Raised by a move button, with the Status's id and <c>-1</c> for up or <c>1</c> for down.</summary>
+    [Parameter]
+    public EventCallback<(Guid StatusId, int Step)> OnMove { get; set; }
+
+    /// <summary>Raised by "Rename", with the Status's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnStartRename { get; set; }
+
+    /// <summary>Raised by Save, with the Status's id and the name typed.</summary>
+    [Parameter]
+    public EventCallback<(Guid StatusId, string Name)> OnRename { get; set; }
+
+    /// <summary>Raised by Cancel or Escape.</summary>
+    [Parameter]
+    public EventCallback OnCancelRename { get; set; }
+
+    private string NameId => $"status-{Status.Id:N}";
+
+    /// <summary>
+    /// The source chip: a renamed default names the default it renamed, because that is what a later change to the Space's
+    /// default will be measured against.
+    /// </summary>
+    private string SourceText
+    {
+        get
+        {
+            if (Status.Source == ProjectStatusSources.AddedHere)
+            {
+                return Localizer["StatusSourceAddedHere"];
+            }
+
+            return Status.DefaultName is { } defaultName
+                ? string.Format(CultureInfo.CurrentCulture, Localizer["StatusSourceRenamedHere"], defaultName)
+                : Localizer["StatusSourceSpaceDefault"];
+        }
+    }
+
+    /// <inheritdoc />
+    protected override void OnParametersSet()
+    {
+        if (Renaming && !_wasRenaming)
+        {
+            _draft = Status.Name;
+            _focusField = true;
+        }
+
+        _wasRenaming = Renaming;
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_focusField && Renaming)
+        {
+            _focusField = false;
+            await _field.FocusAsync();
+        }
+
+        if (WantsFocus)
+        {
+            _focusSeen = FocusRequest;
+            await (FocusesUp ? _up : _down).FocusAsync();
+        }
+    }
+
+    /// <summary>
+    /// Whether a focus request after a move is new and there is a move button to take it.
+    /// </summary>
+    private bool WantsFocus => HasNewFocusRequest && CanEdit && !Renaming && Count > 1;
+
+    private bool HasNewFocusRequest => FocusRequest != 0 && FocusRequest != _focusSeen;
+
+    /// <summary>
+    /// The button that takes focus back: the one that moved the row, or the other once the row reached that end.
+    /// </summary>
+    private bool FocusesUp => Index == Count - 1 || (FocusUp && Index > 0);
+
+    private void Draft(ChangeEventArgs change) => _draft = change.Value?.ToString() ?? string.Empty;
+
+    private Task UpAsync() => OnMove.InvokeAsync((Status.Id, -1));
+
+    private Task DownAsync() => OnMove.InvokeAsync((Status.Id, 1));
+
+    private Task StartRenameAsync() => OnStartRename.InvokeAsync(Status.Id);
+
+    private Task SaveAsync() => OnRename.InvokeAsync((Status.Id, _draft));
+
+    private Task CancelAsync() => OnCancelRename.InvokeAsync();
+
+    private Task CancelOnEscapeAsync(KeyboardEventArgs key) =>
+        key.Key == "Escape" ? OnCancelRename.InvokeAsync() : Task.CompletedTask;
+}

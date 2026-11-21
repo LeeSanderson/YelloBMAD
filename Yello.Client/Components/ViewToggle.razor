@@ -1,3 +1,5 @@
+@using Yello.Client.Spaces
+
 @inject IStringLocalizer<ClientCopy> Localizer
 @inject NavigationManager Navigation
 
@@ -7,9 +9,13 @@
     SpaceArrival and the purge hook cover both, and switching views starts the other afresh - filter state does not survive
     the trip (AC17, intended).
 
-    PARAMETERLESS, so the Board adds no dependency for it (BoardView is at its dependency cap, story 2.9): the Space and
-    the Project are read from the address both views live at, and the current view is whichever of the two that address
-    is. Rendered by both views under the page heading. Absent - never disabled - when the address names no Project.
+    NO PARAMETER BUT THE ROLE, a string, so the Board adds no dependency for it (BoardView is at its dependency cap, story
+    2.9): the Space and the Project are read from the address both views live at, and the current view is whichever of the
+    two that address is. Rendered by both views under the page heading. Absent - never disabled - when the address names
+    no Project.
+
+    THE PROJECT SETTINGS LINK sits beside the two views, for a Role that may shape the Project's Statuses
+    (StatusCapabilities) and absent from the DOM for any other (UX-DR27).
 *@
 
 @if (_projectId is { } projectId && _spaceId is { } spaceId)
@@ -17,6 +23,11 @@
     <nav class="view-toggle" aria-label="@Localizer["ViewToggleName"]">
         <a class="view-toggle__link" href="@ClientRoutes.Board(spaceId, projectId)" aria-current="@(_isList ? null : "page")">@Localizer["ViewBoard"]</a>
         <a class="view-toggle__link" href="@ClientRoutes.List(spaceId, projectId)" aria-current="@(_isList ? "page" : null)">@Localizer["ViewList"]</a>
+
+        @if (StatusCapabilities.PermitsConfigureProjectStatusDelta(RoleCode))
+        {
+            <a class="view-toggle__link view-toggle__settings" data-role-gated href="@ClientRoutes.ProjectSettings(spaceId, projectId)">@Localizer["ProjectSettingsLink"]</a>
+        }
     </nav>
 }
 
@@ -24,6 +35,12 @@
     private Guid? _spaceId;
     private Guid? _projectId;
     private bool _isList;
+
+    /// <summary>
+    /// The Role held in the active Space, as the view was given it; empty offers no settings link.
+    /// </summary>
+    [Parameter]
+    public string RoleCode { get; set; } = string.Empty;
 
     /// <inheritdoc />
     protected override void OnParametersSet()

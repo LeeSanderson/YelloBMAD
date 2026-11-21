@@ -217,6 +217,9 @@ public sealed class EditTaskAttributesHandlerTests
     {
         public Task<IReadOnlyList<StatusDefinition>> ListAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<StatusDefinition>>(statuses);
+
+        public Task<ProjectStatusDelta> DeltaOfAsync(Guid projectId, CancellationToken cancellationToken) =>
+            Task.FromResult(ProjectStatusDelta.Empty);
     }
 
     private sealed class RecordingStore(TaskItem? visible, bool labelsVisible = true) : ITaskStore

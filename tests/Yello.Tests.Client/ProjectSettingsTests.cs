@@ -1,6 +1,7 @@
 using Microsoft.Playwright;
 using Xunit;
-using Yello.Tests.Shared;
+using Yello.Contracts;
+using Yello.Contracts.Projects;
 
 namespace Yello.Tests.Client;
 
@@ -55,7 +56,7 @@ public sealed class ProjectSettingsTests(ClientSurfaceFixture surface)
     /// control (removal is the next story's).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2, AC7 - Q5 (a): there is no Project settings page and no Status delta editor")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     public async Task The_Board_links_an_Owner_to_the_editor_which_names_each_Statuses_source()
     {
@@ -86,7 +87,7 @@ public sealed class ProjectSettingsTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="role">The caller's Role code.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - Q13 (a): there is no Project settings page or link, and no client predicate")]
+    [Theory]
     [InlineData("member")]
     [InlineData("viewer")]
     [Trait("Requirement", "UX-DR27")]
@@ -122,7 +123,7 @@ public sealed class ProjectSettingsTests(ClientSurfaceFixture surface)
     /// announces the new position politely; back on the Board the columns follow the Project's order.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9, AC14 - there is no Status delta editor and no reorder control")]
+    [Fact]
     [Trait("Requirement", "NFR-9")]
     [Trait("Requirement", "UX-DR42")]
     public async Task Move_up_reorders_announces_the_new_position_and_the_Board_follows()
@@ -155,10 +156,67 @@ public sealed class ProjectSettingsTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// The small-viewport pager's tabs and the Task detail panel's Status picker take the Project's order and names from the
+    /// Board's own answer: with "Parked" placed first and the first default renamed "Intake", both list Parked, Intake,
+    /// Doing, Done.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR11")]
+    public async Task The_pager_and_the_Status_picker_follow_the_Projects_order()
+    {
+        var api = TwoSpaces();
+        Seed(api, Northwind, Atlas, "Atlas");
+        Shape(api, Northwind, Atlas);
+
+        var set = api.ProjectStatuses[(Northwind, Atlas)];
+        var parked = set[^1];
+
+        set.RemoveAt(set.Count - 1);
+        set.Insert(0, parked);
+
+        var columns = set.Select(entry => new FakeColumn(entry.Id, entry.Name, 0, [])).ToList();
+        var task = new FakeTask(Guid.NewGuid(), "Shaped work", columns[1].StatusId, "a00000", DateTimeOffset.UtcNow);
+
+        columns[1].Tasks.Add(task);
+        columns[1].Total++;
+        api.Boards[(Northwind, Atlas)] = api.Boards[(Northwind, Atlas)] with { Columns = columns };
+
+        string[] expected = ["Parked", "Intake", "Doing", "Done"];
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(375, 800);
+            await OpenBoardAsync(api, page, Northwind, Atlas);
+            await page.Locator("main [role='tab']").Nth(3).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var tabs = await page.Locator("main [role='tab']").AllTextContentsAsync();
+
+            Assert.Equal(expected, tabs.Select(text => expected.First(name => text.Trim().StartsWith(name, StringComparison.Ordinal))));
+
+            await page.SetViewportSizeAsync(1280, 800);
+            await page.Locator($".task-card button[data-task-id='{task.Id:D}']").ClickAsync();
+
+            var dialog = page.Locator("[role='dialog']");
+
+            await dialog.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await dialog.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Status" }).ClickAsync();
+
+            var options = dialog.Locator("[role='listbox'] [role='option']");
+
+            await options.First.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal(expected, (await options.AllTextContentsAsync()).Select(name => name.Trim()));
+        }
+    }
+
+    /// <summary>
     /// The add form sends the name and renders the answer: the new Status is last, marked "Added here".
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7, AC14 - there is no Status delta editor and no add form")]
+    [Fact]
     public async Task Adding_a_Status_renders_it_last_as_added_here()
     {
         var api = TwoSpaces();
@@ -184,13 +242,13 @@ public sealed class ProjectSettingsTests(ClientSurfaceFixture surface)
     /// name the server last admitted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10, AC14 - there is no inline rename and no RefusalCopy for status-name-taken")]
+    [Fact]
     public async Task A_refused_rename_says_why_inline_and_keeps_the_admitted_name()
     {
         var api = TwoSpaces();
         Seed(api, Northwind, Atlas, "Atlas");
         Shape(api, Northwind, Atlas);
-        api.NextProjectStatusRefusal = (409, ProjectStatusWire.StatusNameTakenType);
+        api.NextProjectStatusRefusal = (409, ProblemTypes.StatusNameTaken);
 
         var (context, page) = await surface.OpenAsync(EnglishLocale);
 
@@ -216,7 +274,7 @@ public sealed class ProjectSettingsTests(ClientSurfaceFixture surface)
     /// At 320 by 640 CSS pixels the editor reflows: nothing scrolls sideways and every row's controls stay on screen.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - there is no Status delta editor to lay out")]
+    [Fact]
     [Trait("Requirement", "NFR-9")]
     public async Task The_editor_reflows_at_320_pixels_wide()
     {
@@ -247,7 +305,7 @@ public sealed class ProjectSettingsTests(ClientSurfaceFixture surface)
     /// name that only the first Project held is anywhere on the page.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - there is no Status delta editor whose state could outlive its Space")]
+    [Fact]
     [Trait("Requirement", "UX-DR31")]
     public async Task Switching_Space_purges_the_editors_Statuses()
     {
@@ -304,7 +362,7 @@ public sealed class ProjectSettingsTests(ClientSurfaceFixture surface)
         var set = api.ProjectStatuses[(spaceId, projectId)];
 
         set[0] = set[0] with { Name = "Intake", DefaultName = StatusNames[0] };
-        set.Add(new FakeProjectStatus(Guid.NewGuid(), "Parked", ProjectStatusWire.AddedHere, DefaultName: null, TaskCount: 0));
+        set.Add(new FakeProjectStatus(Guid.NewGuid(), "Parked", ProjectStatusSources.AddedHere, DefaultName: null, TaskCount: 0));
 
         api.Boards[(spaceId, projectId)] = api.Boards[(spaceId, projectId)] with
         {

@@ -188,6 +188,7 @@ graph TD
 - **Binds:** FR-19, FR-20, FR-24, FR-25, FR-26, FR-27, FR-41
 - **Prevents:** name-keyed deltas, which cannot express FR-27's rename-cascade conflict detection, and a materialised set going stale against a Space-level change.
 - **Rule:** A `StatusDefinition` has a stable id surviving rename at both levels. A Project's delta is a set of operations keyed by that id, never a materialised list. The effective set is computed on read; caching is permitted only within a single request. No table stores a Project's effective Status set.
+- **Note (2026-11-21, story 6.1, additive):** a Status a Project adds is itself a `STATUS_DEFINITION` row owned by that Project (nullable `OwnerProjectId`, a NO ACTION key to `PROJECT`, since a cascade would be a second path from `SPACE`), so `TASK`'s `(SpaceId, StatusId)` key covers every Status a Task can hold. `STATUS_DELTA_OP` is the table `StatusDeltaOperation`: `Add`, `Rename` and `Place` operations, at most one per Project, Status and kind, applied in `Sequence` order; a `Place` names the Status it goes after, never an ordinal, so a Status no Project placed keeps its Space-order slot. The ER below therefore also has `PROJECT ||--o{ STATUS_DEFINITION : adds`.
 
 ### AD-17 — Status removal and Task move are single atomic operations
 

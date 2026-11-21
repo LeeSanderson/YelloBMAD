@@ -1,0 +1,413 @@
+@using System.Globalization
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Spaces
+@using Yello.Contracts.Projects
+
+@implements IDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+@inject ActiveSpaceState ActiveSpace
+@inject SpaceWrites Writes
+
+@*
+    THE STATUS DELTA EDITOR (UX-DR15): one Project's effective Status set, in effective order, and - for a Role that may
+    shape it - add, rename and reorder. FR-25; UX-DR27, UX-DR31, UX-DR42.
+
+    EACH ROW SAYS WHERE ITS STATUS COMES FROM: a Space default, a Space default this Project renamed (and the default's own
+    name), or a Status added here. That distinction is what makes a later change to the Space's defaults understandable
+    when it reaches this Project: a default renamed here keeps this Project's name, and one added here is untouched by
+    the Space at all.
+
+    EVERY WRITE RE-RENDERS FROM THE SERVER'S ANSWER, which is the whole set: nothing is optimistic, so the order shown is
+    always one the server holds. A refusal is said in the inline error region in the client's own words, and the rows keep
+    what the server last admitted. A write in flight ignores another rather than disabling anything.
+
+    RENDERED ONLY AFTER THE SERVER HAS ANSWERED and PURGED WITH THE SPACE (UX-DR31). An empty Project is never prompted to
+    configure anything: the set is shown, and the add form is simply there for those who may use it.
+*@
+
+<LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
+
+<section class="status-delta-editor" aria-labelledby="status-delta-heading">
+    <h2 class="type-space-name status-delta-editor__heading" id="status-delta-heading">@Localizer["ProjectStatusesHeading"]</h2>
+
+    @if (_statuses is null)
+    {
+        <div class="status-delta-editor__loading" aria-busy="true">
+            <p class="visually-hidden">@Localizer["ProjectStatusesLoading"]</p>
+        </div>
+    }
+
+    @if (_statuses is { } statuses)
+    {
+        @if (_refusal is { } refusal)
+        {
+            <InlineErrorRegion @key="_attempts" Heading="@Localizer["StatusChangeRefused"]" Messages="@([refusal])" />
+        }
+
+        <ol class="status-delta-list">
+            @foreach (var (status, index) in Indexed(statuses))
+            {
+                <StatusDeltaRow @key="status.Id"
+                                Status="@status"
+                                Index="@index"
+                                Count="@statuses.Count"
+                                CanEdit="@CanEdit"
+                                Renaming="@(_renaming == status.Id)"
+                                FocusRequest="@(status.Id == _focusId ? _focusRequests : 0)"
+                                FocusUp="@_focusUp"
+                                OnMove="MoveAsync"
+                                OnStartRename="StartRename"
+                                OnRename="RenameAsync"
+                                OnCancelRename="CancelRename" />
+            }
+        </ol>
+
+        @if (CanEdit)
+        {
+            <form class="status-delta-add" @onsubmit="AddAsync" novalidate>
+                <FormField FieldId="status-delta-add-name"
+                           FieldName="@_nameFieldName"
+                           Label="@Localizer["StatusAddFieldLabel"]"
+                           Value="@_name"
+                           ValueChanged="value => _name = value"
+                           Message="@_nameMessage"
+                           Invalid="@(_nameMessage is not null)" />
+
+                <PrimaryButton>@Localizer["StatusAdd"]</PrimaryButton>
+            </form>
+        }
+    }
+</section>
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    // A field name no browser's autofill would match to a saved value (UX-DR33): random per page.
+    private readonly string _nameFieldName = Guid.NewGuid().ToString("N");
+
+    private IDisposable? _purgeRegistration;
+
+    /// <summary>
+    /// Bumped by every purge and by disposal. An answer that started before one is dropped when it arrives.
+    /// </summary>
+    private int _generation;
+
+    private List<ProjectStatusResponse>? _statuses;
+    private string? _announcement;
+    private int _announcements;
+    private string _name = string.Empty;
+    private string? _nameMessage;
+    private string? _refusal;
+    private int _attempts;
+    private bool _busy;
+    private (string Signature, string Key)? _unanswered;
+    private Guid? _renaming;
+    private Guid? _focusId;
+    private int _focusRequests;
+    private bool _focusUp;
+
+    /// <summary>The Space the Project is in.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>The Project whose Statuses these are.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    /// <summary>Whether the Role may shape the set; without it the editor renders the set and no control.</summary>
+    [Parameter]
+    public bool CanEdit { get; set; }
+
+    /// <summary>Raised for a <c>404</c> - the Space or the Project refused - so the page renders its one refusal surface.</summary>
+    [Parameter]
+    public EventCallback<ProblemResponse?> OnRefused { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnInitializedAsync()
+    {
+        _purgeRegistration = ActiveSpace.RegisterPurge(Purge);
+
+        await LoadAsync(_generation);
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _generation++;
+        _purgeRegistration?.Dispose();
+    }
+
+    /// <summary>
+    /// The Space is being left: its Statuses, and everything half-typed about them, go synchronously.
+    /// </summary>
+    private void Purge()
+    {
+        _generation++;
+        _statuses = null;
+        _announcement = null;
+        _announcements++;
+        _name = string.Empty;
+        _nameMessage = null;
+        _refusal = null;
+        _busy = false;
+        _unanswered = null;
+        _renaming = null;
+        _focusId = null;
+    }
+
+    private async Task LoadAsync(int generation)
+    {
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(ProjectStatusRoutes.CollectionOf(SpaceId, ProjectId), UriKind.Relative), token);
+
+            if (generation != _generation || token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                _statuses = await response.Content.ReadFromJsonAsync<List<ProjectStatusResponse>>(JsonOptions, token);
+                return;
+            }
+
+            if (response.StatusCode != HttpStatusCode.Unauthorized)
+            {
+                await OnRefused.InvokeAsync(await SpaceWrites.ProblemOfAsync(response, token));
+            }
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended: both purges have run.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            if (generation == _generation)
+            {
+                await OnRefused.InvokeAsync(null);
+            }
+        }
+    }
+
+    private void StartRename(Guid statusId)
+    {
+        _renaming = statusId;
+        _refusal = null;
+    }
+
+    private void CancelRename() => _renaming = null;
+
+    private async Task AddAsync()
+    {
+        _nameMessage = null;
+
+        var name = _name.Trim();
+
+        if (!StatusNameRule.IsStatusName(name))
+        {
+            _nameMessage = Localizer["StatusNameInvalid"];
+            return;
+        }
+
+        if (await WriteAsync(HttpMethod.Post, ProjectStatusRoutes.CollectionOf(SpaceId, ProjectId), new AddProjectStatusRequest(name, null)) is not null)
+        {
+            _name = string.Empty;
+            Say(string.Format(CultureInfo.CurrentCulture, Localizer["StatusAdded"], name));
+        }
+    }
+
+    private async Task RenameAsync((Guid StatusId, string Name) rename)
+    {
+        var name = rename.Name.Trim();
+
+        _renaming = null;
+
+        if (!StatusNameRule.IsStatusName(name))
+        {
+            Refuse(Localizer["StatusNameInvalid"]);
+            return;
+        }
+
+        if (await WriteAsync(HttpMethod.Patch, ProjectStatusRoutes.ItemOf(SpaceId, ProjectId, rename.StatusId), new RenameProjectStatusRequest(name)) is not null)
+        {
+            Say(string.Format(CultureInfo.CurrentCulture, Localizer["StatusRenamed"], name));
+        }
+    }
+
+    /// <summary>
+    /// Moves one Status a place up or down: a place after the Status that will be above it, or first.
+    /// </summary>
+    private async Task MoveAsync((Guid StatusId, int Step) move)
+    {
+        if (AnchorFor(move) is not { } anchor)
+        {
+            return;
+        }
+
+        var answered = await WriteAsync(HttpMethod.Post, ProjectStatusRoutes.PlaceOf(SpaceId, ProjectId, move.StatusId), new PlaceProjectStatusRequest(anchor.After));
+        var position = answered?.FindIndex(status => status.Id == move.StatusId) ?? -1;
+
+        if (answered is null || position < 0)
+        {
+            return;
+        }
+
+        _focusId = move.StatusId;
+        _focusUp = move.Step < 0;
+        _focusRequests++;
+        Say(string.Format(CultureInfo.CurrentCulture, Localizer["StatusMoved"], answered[position].Name, position + 1, answered.Count));
+    }
+
+    /// <summary>
+    /// The place a move asks for: after the Status that will sit above the moved one, or <c>null</c> for first. Moving up
+    /// lands after the one two above; moving down, after the one below. <c>null</c> as a whole when there is nowhere to go.
+    /// </summary>
+    private (Guid? After, int Target)? AnchorFor((Guid StatusId, int Step) move)
+    {
+        var index = _statuses?.FindIndex(status => status.Id == move.StatusId) ?? -1;
+        var target = index + move.Step;
+
+        if (_statuses is not { } statuses || index < 0 || target < 0 || target >= statuses.Count)
+        {
+            return null;
+        }
+
+        if (move.Step > 0)
+        {
+            return (statuses[target].Id, target);
+        }
+
+        return (target == 0 ? null : statuses[target - 1].Id, target);
+    }
+
+    /// <summary>
+    /// Sends one write and re-renders from its answer, the Project's whole set. Answers <c>null</c> when it was refused or
+    /// never answered, after saying why.
+    /// </summary>
+    private async Task<List<ProjectStatusResponse>?> WriteAsync(HttpMethod method, string path, object body)
+    {
+        if (_busy || _statuses is null)
+        {
+            return null;
+        }
+
+        _busy = true;
+        _refusal = null;
+
+        var generation = _generation;
+        var token = ActiveSpace.Token;
+
+        var key = KeyFor(method, path, body);
+
+        try
+        {
+            using var answer = await Writes.SendAsync(method, path, body, key.Key, token);
+
+            if (answer.Problem?.Type != ProblemTypes.IdempotencyKeyInFlight)
+            {
+                _unanswered = null;
+            }
+
+            return generation == _generation ? await UseAsync(answer, generation, token) : null;
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // The tab left this Space, or the Session ended, while the answer was on its way.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            Refuse(Localizer["TaskEditNotSent"]);
+        }
+        finally
+        {
+            _busy = false;
+        }
+
+        return null;
+    }
+
+    private static IEnumerable<(ProjectStatusResponse Status, int Index)> Indexed(List<ProjectStatusResponse> statuses) =>
+        statuses.Select((status, index) => (status, index));
+
+    /// <summary>
+    /// The key a write is sent with. A write that never got an answer may still have been applied: the same write sent
+    /// again reuses its key, so the server replays it rather than meeting its own name as taken.
+    /// </summary>
+    private (string Signature, string Key) KeyFor(HttpMethod method, string path, object body)
+    {
+        var signature = string.Join('|', method.Method, path, JsonSerializer.Serialize(body, body.GetType(), JsonOptions));
+        var key = _unanswered is { } unanswered && unanswered.Signature == signature ? unanswered.Key : Guid.NewGuid().ToString("D");
+
+        _unanswered = (signature, key);
+
+        return _unanswered.Value;
+    }
+
+    /// <summary>
+    /// An answer to a write: the set it carries is rendered, or the refusal is said.
+    /// </summary>
+    private async Task<List<ProjectStatusResponse>?> UseAsync(SpaceWriteAnswer answer, int generation, CancellationToken token)
+    {
+        if (!answer.Response.IsSuccessStatusCode)
+        {
+            await RefuseAsync(answer);
+            return null;
+        }
+
+        var set = await answer.Response.Content.ReadFromJsonAsync<List<ProjectStatusResponse>>(JsonOptions, token);
+
+        if (set is null || generation != _generation)
+        {
+            return null;
+        }
+
+        _statuses = set;
+
+        return set;
+    }
+
+    /// <summary>
+    /// A refused write: the Space or the Project refused raises the one refusal surface; anything else is said inline in
+    /// RefusalCopy's words. A 401 is YelloApiHandler's.
+    /// </summary>
+    private async Task RefuseAsync(SpaceWriteAnswer answer)
+    {
+        switch (answer.StatusCode)
+        {
+            case HttpStatusCode.Unauthorized:
+                return;
+
+            case HttpStatusCode.NotFound:
+                await OnRefused.InvokeAsync(answer.Problem);
+                return;
+
+            default:
+                Refuse(RefusalText.Of(Localizer, answer.Problem));
+                return;
+        }
+    }
+
+    private void Refuse(string words)
+    {
+        _refusal = words;
+        _attempts++;
+    }
+
+    /// <summary>
+    /// Says a sentence politely - the same one again included.
+    /// </summary>
+    private void Say(string words)
+    {
+        _announcement = words;
+        _announcements++;
+    }
+}

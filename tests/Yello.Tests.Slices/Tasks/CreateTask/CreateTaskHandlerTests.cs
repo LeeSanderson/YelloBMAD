@@ -122,8 +122,8 @@ public sealed class CreateTaskHandlerTests
         var tiedSecond = Status(spaceId, 1);
         var lowest = Status(spaceId, 0);
 
-        Assert.Equal([lowest, tiedFirst, tiedSecond], EffectiveStatusSet.Of([tiedFirst, tiedSecond, lowest]));
-        Assert.Equal([lowest, tiedSecond, tiedFirst], EffectiveStatusSet.Of([tiedSecond, lowest, tiedFirst]));
+        Assert.Equal([lowest.Id, tiedFirst.Id, tiedSecond.Id], EffectiveStatusSet.Of([tiedFirst, tiedSecond, lowest]).Select(status => status.Id));
+        Assert.Equal([lowest.Id, tiedSecond.Id, tiedFirst.Id], EffectiveStatusSet.Of([tiedSecond, lowest, tiedFirst]).Select(status => status.Id));
     }
 
     private static StatusDefinition Status(Guid spaceId, int position) => new()
@@ -139,6 +139,9 @@ public sealed class CreateTaskHandlerTests
     {
         public Task<IReadOnlyList<StatusDefinition>> ListAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<StatusDefinition>>(statuses);
+
+        public Task<ProjectStatusDelta> DeltaOfAsync(Guid projectId, CancellationToken cancellationToken) =>
+            Task.FromResult(ProjectStatusDelta.Empty);
     }
 
     private sealed class RecordingStore : ITaskStore

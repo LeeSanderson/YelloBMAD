@@ -1,6 +1,10 @@
+---
+baseline_commit: bca3a5fe8550d8e2a14c5059b03575d5d8c489b7
+---
+
 # Story 6.1: Shape a Project's Statuses
 
-Status: ready-for-dev
+Status: review
 
 Epic: 6 — Shape Statuses per Project and retire work safely (first of six stories)
 Story key: `6-1-shape-a-projects-statuses`
@@ -118,43 +122,43 @@ so that a Project's Board can reflect how that work actually flows without chang
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Domain: the delta and its application** (AC1, AC3, AC4, AC5, AC8, AC10)
-  - [ ] `StatusDefinition` gains a nullable owning-Project id (Q1, Q2). `null` means a Space default.
-  - [ ] A `StatusDeltaOperation` entity (name per Q1) under `Yello.Domain/Statuses/`: `Id`, `SpaceId`, `ProjectId`, `StatusId`, `Kind` (`Add`, `Rename`, `Place`), `Name` (Rename), `AfterStatusId` (Place; `null` = first), `Sequence` (the delta's order), `CreatedAt`.
-  - [ ] Extend `EffectiveStatusSet.Of(spaceDefaults, projectDelta)` (keep a single derivation; the one-argument form becomes "empty delta"). Return entries that carry id, effective name and source (default, default renamed here, added here). Keep the stable tie rule in its remarks (`Position`, then id in database order).
-  - [ ] A domain validator: name normalisation (trim, 1-100), case-insensitive uniqueness within the post-operation set, and refusal of an empty result (AC8).
-  - [ ] Unit tests for the pure function: ordering, rename, add, place-after, place-first, an anchor absent from the set (Q3), a stable tie, two Projects' deltas over one set of defaults, and the empty-set refusal.
-- [ ] **Task 2 — Infrastructure: schema and migration** (AC4, AC11, AC13; ledger `:558`)
-  - [ ] Configuration for the delta table. Composite keys: `(SpaceId, ProjectId)` → `Project (SpaceId, Id)` **CASCADE**; `(SpaceId, StatusId)` → `StatusDefinition (SpaceId, Id)` **NO ACTION**; `(SpaceId, AfterStatusId)` → NO ACTION (or no FK, per Q3). **No FK to `Space`** (error 1785; copy `TaskConfiguration.cs:22-26`). Unique `(SpaceId, ProjectId, StatusId, Kind)`. Query filter on `ScopedSpaceId`.
-  - [ ] `StatusDefinition` gets the owning-Project column with composite FK `(SpaceId, OwnerProjectId)` → `Project`, **NO ACTION** (a cascade would be a second path from `Space`). Replace the unique `(SpaceId, Name)` with two filtered unique indexes: `(SpaceId, Name) WHERE OwnerProjectId IS NULL` and `(SpaceId, OwnerProjectId, Name) WHERE OwnerProjectId IS NOT NULL`. These are backstops only. Effective-set uniqueness is enforced in the application under the lock (Q4).
-  - [ ] Explicit case-insensitive collation (Q6) on `StatusDefinition.Name`, `Label.Name` and the delta's `Name`. Drop and recreate the indexes that cover those columns inside the migration.
-  - [ ] The migration adds the RLS predicates as **literals** (see the `SchemaNames.cs:236-253` remarks for why), adds the table to `SchemaNames.SpaceScopedTables`, and sets the table's `LOCK_ESCALATION` as the other Task-side tables do, if the dev judges it relevant. Follow `TESTING-CONVENTIONS.md:599` ("EF Core migrations need a hand-editing pass"). Run `dotnet tool restore` first, then `dotnet ef` 10.0.11.
-  - [ ] Project deletion (Q2): keep it one transaction under the existing locks. Delete in this order: the Project's Tasks, its delta operations, its owned definitions, then the Project. Update the `ProjectStore` remarks; they currently say "one statement".
-  - [ ] Readers: `StatusDefinitionReader.ListAsync` returns **defaults only** (`OwnerProjectId IS NULL`). Add a read of one Project's owned definitions and operations. The Project's existence is not decided by this read (the handlers already read the Project).
-- [ ] **Task 3 — Application: one effective-set source for six consumers** (AC5, AC6; ledger `:533`)
-  - [ ] Add one Application-level service (for example `ProjectStatuses.EffectiveAsync(projectId)`), request-scoped, that reads the defaults and the Project's delta and calls `EffectiveStatusSet.Of`. It may memoise per request; nothing may cache it beyond the request.
-  - [ ] Rewire `CreateTaskHandler`, `EditTaskAttributesHandler` (`task.ProjectId`), `MoveTaskHandler` (`task.ProjectId`), `ViewBoardHandler`, `ViewBoardColumnHandler` and `ViewListHandler`. Delete the "Until story 6.1" comments.
-  - [ ] Add the literal sibling-Project case for edit and move: `400 invalid-task-status`, byte-identical to the random-id body.
-- [ ] **Task 4 — Slices and endpoints** (AC1, AC2, AC10, AC12)
-  - [ ] Under `Yello.Application/Statuses/`: `ListProjectStatuses`, `AddProjectStatus`, `RenameProjectStatus`, `PlaceProjectStatus` (names are the dev's; one folder per use case).
-  - [ ] Routes in `Yello.Contracts` (Q12): `GET` and `POST …/projects/{projectId}/statuses`, `PATCH …/projects/{projectId}/statuses/{statusId}` (rename), and `POST …/projects/{projectId}/statuses/{statusId}/place` (`{ afterStatusId: guid | null }`). Reads use `ReadProjectsAndTasks`; writes use `ConfigureProjectStatusDelta`.
-  - [ ] Contracts: a request record for each write, and `ProjectStatusResponse` (Q5).
-  - [ ] Add `ProblemTypes`: `invalid-status-name` (400), `status-name-taken` (409), `status-set-empty` (409), and `invalid-status-position` (400, for an anchor outside the set).
-  - [ ] An unknown Project, or a Status outside the Project's set in the path, answers `BoundaryProblems.NotAvailable()` (an in-Space not-found; the `NotAvailableFloor` already applies).
-  - [ ] Widen ARCH-503 by exactly the new routes, and update its remarks. Register the endpoints in `Program.cs`.
-- [ ] **Task 5 — Client: Project settings and the editor** (AC2, AC7, AC9, AC14)
-  - [ ] `ClientRoutes.ProjectSettings(spaceId, projectId)` = `/spaces/{s}/projects/{p}/settings`. A `ProjectSettings.razor` page holding a `StatusDeltaEditor` component (the UX-DR15 name).
-  - [ ] Link from the Board header (`BoardView.razor:88-91`, next to `ViewToggle`) and from the List page, both `data-role-gated`, Owner and Admin only, through `StatusCapabilities.PermitsConfigureProjectStatusDelta` plus a matrix gate.
-  - [ ] Rows: name, source chip, and the existing column-count chip style (the Task count, if the read carries it; Q5). "Move up" and "Move down" controls. Inline rename. "Add a Status" form. **No remove control.**
-  - [ ] Copy in `ClientCopy.resx`. Map the refusals in `RefusalCopy`. Apply the purge rule (UX-DR31).
-  - [ ] `FakeYelloApi.ProjectStatuses.cs`: the fake must also serve the Board's columns from the Project's set, so the browser cases see the Board follow.
-- [ ] **Task 6 — Ledger and docs** (all ledger rows above)
-  - [ ] Write the disposition of every owned entry in `deferred-work.md` (CLOSED / UPDATED / RE-OWNED, with the reason). Do not leave any blank.
-  - [ ] If Q1's design differs from the spine's ER (`STATUS_DELTA_OP`), add a dated note to AD-16. A note is additive; it is not a new AD.
-- [ ] **Task 7 — Tests** (see Testing requirements)
-  - [ ] Amend `ProjectEndpointTests.Creating_a_Project_leaves_the_Space_default_Statuses_unchanged_and_stores_no_effective_set` (AC4).
-  - [ ] Add the Status half of S-2 to `WireDatabase` and assert it after every delta case and every Task-write case added here.
-  - [ ] Add the isolation rows, the handler tests, the Slices partials and the browser class.
+- [x] **Task 1 — Domain: the delta and its application** (AC1, AC3, AC4, AC5, AC8, AC10)
+  - [x] `StatusDefinition` gains a nullable owning-Project id (Q1, Q2). `null` means a Space default.
+  - [x] A `StatusDeltaOperation` entity (name per Q1) under `Yello.Domain/Statuses/`: `Id`, `SpaceId`, `ProjectId`, `StatusId`, `Kind` (`Add`, `Rename`, `Place`), `Name` (Rename), `AfterStatusId` (Place; `null` = first), `Sequence` (the delta's order), `CreatedAt`.
+  - [x] Extend `EffectiveStatusSet.Of(spaceDefaults, projectDelta)` (keep a single derivation; the one-argument form becomes "empty delta"). Return entries that carry id, effective name and source (default, default renamed here, added here). Keep the stable tie rule in its remarks (`Position`, then id in database order).
+  - [x] A domain validator: name normalisation (trim, 1-100), case-insensitive uniqueness within the post-operation set, and refusal of an empty result (AC8).
+  - [x] Unit tests for the pure function: ordering, rename, add, place-after, place-first, an anchor absent from the set (Q3), a stable tie, two Projects' deltas over one set of defaults, and the empty-set refusal.
+- [x] **Task 2 — Infrastructure: schema and migration** (AC4, AC11, AC13; ledger `:558`)
+  - [x] Configuration for the delta table. Composite keys: `(SpaceId, ProjectId)` → `Project (SpaceId, Id)` **CASCADE**; `(SpaceId, StatusId)` → `StatusDefinition (SpaceId, Id)` **NO ACTION**; `(SpaceId, AfterStatusId)` → NO ACTION (or no FK, per Q3). **No FK to `Space`** (error 1785; copy `TaskConfiguration.cs:22-26`). Unique `(SpaceId, ProjectId, StatusId, Kind)`. Query filter on `ScopedSpaceId`.
+  - [x] `StatusDefinition` gets the owning-Project column with composite FK `(SpaceId, OwnerProjectId)` → `Project`, **NO ACTION** (a cascade would be a second path from `Space`). Replace the unique `(SpaceId, Name)` with two filtered unique indexes: `(SpaceId, Name) WHERE OwnerProjectId IS NULL` and `(SpaceId, OwnerProjectId, Name) WHERE OwnerProjectId IS NOT NULL`. These are backstops only. Effective-set uniqueness is enforced in the application under the lock (Q4).
+  - [x] Explicit case-insensitive collation (Q6) on `StatusDefinition.Name`, `Label.Name` and the delta's `Name`. Drop and recreate the indexes that cover those columns inside the migration.
+  - [x] The migration adds the RLS predicates as **literals** (see the `SchemaNames.cs:236-253` remarks for why), adds the table to `SchemaNames.SpaceScopedTables`, and sets the table's `LOCK_ESCALATION` as the other Task-side tables do, if the dev judges it relevant. Follow `TESTING-CONVENTIONS.md:599` ("EF Core migrations need a hand-editing pass"). Run `dotnet tool restore` first, then `dotnet ef` 10.0.11.
+  - [x] Project deletion (Q2): keep it one transaction under the existing locks. Delete in this order: the Project's Tasks, its delta operations, its owned definitions, then the Project. Update the `ProjectStore` remarks; they currently say "one statement".
+  - [x] Readers: `StatusDefinitionReader.ListAsync` returns **defaults only** (`OwnerProjectId IS NULL`). Add a read of one Project's owned definitions and operations. The Project's existence is not decided by this read (the handlers already read the Project).
+- [x] **Task 3 — Application: one effective-set source for six consumers** (AC5, AC6; ledger `:533`)
+  - [x] Add one Application-level service (for example `ProjectStatuses.EffectiveAsync(projectId)`), request-scoped, that reads the defaults and the Project's delta and calls `EffectiveStatusSet.Of`. It may memoise per request; nothing may cache it beyond the request.
+  - [x] Rewire `CreateTaskHandler`, `EditTaskAttributesHandler` (`task.ProjectId`), `MoveTaskHandler` (`task.ProjectId`), `ViewBoardHandler`, `ViewBoardColumnHandler` and `ViewListHandler`. Delete the "Until story 6.1" comments.
+  - [x] Add the literal sibling-Project case for edit and move: `400 invalid-task-status`, byte-identical to the random-id body.
+- [x] **Task 4 — Slices and endpoints** (AC1, AC2, AC10, AC12)
+  - [x] Under `Yello.Application/Statuses/`: `ListProjectStatuses`, `AddProjectStatus`, `RenameProjectStatus`, `PlaceProjectStatus` (names are the dev's; one folder per use case).
+  - [x] Routes in `Yello.Contracts` (Q12): `GET` and `POST …/projects/{projectId}/statuses`, `PATCH …/projects/{projectId}/statuses/{statusId}` (rename), and `POST …/projects/{projectId}/statuses/{statusId}/place` (`{ afterStatusId: guid | null }`). Reads use `ReadProjectsAndTasks`; writes use `ConfigureProjectStatusDelta`.
+  - [x] Contracts: a request record for each write, and `ProjectStatusResponse` (Q5).
+  - [x] Add `ProblemTypes`: `invalid-status-name` (400), `status-name-taken` (409), `status-set-empty` (409), and `invalid-status-position` (400, for an anchor outside the set).
+  - [x] An unknown Project, or a Status outside the Project's set in the path, answers `BoundaryProblems.NotAvailable()` (an in-Space not-found; the `NotAvailableFloor` already applies).
+  - [x] Widen ARCH-503 by exactly the new routes, and update its remarks. Register the endpoints in `Program.cs`.
+- [x] **Task 5 — Client: Project settings and the editor** (AC2, AC7, AC9, AC14)
+  - [x] `ClientRoutes.ProjectSettings(spaceId, projectId)` = `/spaces/{s}/projects/{p}/settings`. A `ProjectSettings.razor` page holding a `StatusDeltaEditor` component (the UX-DR15 name).
+  - [x] Link from the Board header (`BoardView.razor:88-91`, next to `ViewToggle`) and from the List page, both `data-role-gated`, Owner and Admin only, through `StatusCapabilities.PermitsConfigureProjectStatusDelta` plus a matrix gate.
+  - [x] Rows: name, source chip, and the existing column-count chip style (the Task count, if the read carries it; Q5). "Move up" and "Move down" controls. Inline rename. "Add a Status" form. **No remove control.**
+  - [x] Copy in `ClientCopy.resx`. Map the refusals in `RefusalCopy`. Apply the purge rule (UX-DR31).
+  - [x] `FakeYelloApi.ProjectStatuses.cs`: the fake must also serve the Board's columns from the Project's set, so the browser cases see the Board follow.
+- [x] **Task 6 — Ledger and docs** (all ledger rows above)
+  - [x] Write the disposition of every owned entry in `deferred-work.md` (CLOSED / UPDATED / RE-OWNED, with the reason). Do not leave any blank.
+  - [x] If Q1's design differs from the spine's ER (`STATUS_DELTA_OP`), add a dated note to AD-16. A note is additive; it is not a new AD.
+- [x] **Task 7 — Tests** (see Testing requirements)
+  - [x] Amend `ProjectEndpointTests.Creating_a_Project_leaves_the_Space_default_Statuses_unchanged_and_stores_no_effective_set` (AC4).
+  - [x] Add the Status half of S-2 to `WireDatabase` and assert it after every delta case and every Task-write case added here.
+  - [x] Add the isolation rows, the handler tests, the Slices partials and the browser class.
 
 ## Dev Notes
 
@@ -499,14 +503,150 @@ the correction recorded in the Debug Log, not deleted.
 
 ### Agent Model Used
 
+Claude Opus 5.5 (bmad-dev-story, unattended story cycle).
+
 ### Debug Log References
+
+- Iteration logs: `artifacts/test-runs/6-1-iter-isolation.log`, `6-1-iter-client.log`, `6-1-iter-client2.log`; plant log `artifacts/test-runs/6-1-shape-a-projects-statuses-plants.log`; full run `artifacts/test-runs/6-1-shape-a-projects-statuses-develop.log`.
+- **Scaffolds corrected (5), none weakened:**
+  1. `ProjectEndpointTests.StatusSchema.cs` - the catalogue `CONCAT`/`STRING_AGG` queries mixed catalogue collations (`Latin1_General_CI_AS_KS_WS`) with the database's and failed with a collation conflict; each concatenated column now carries `COLLATE DATABASE_DEFAULT`.
+  2. `ProjectEndpointTests.Statuses.cs` `Placing_first_and_placing_after_...` - read the Space's statuses over the wire after the host had been disposed (`ObjectDisposedException`); the read moved inside the host block, the assertion is unchanged.
+  3. `RefusalBoundaryGateTests.ProjectStatuses.cs` model gate - `GetCollation()` is not kept in the read-optimised runtime model; the gate reads the design-time model (`IDesignTimeModel`). The subject names became `typeof(...)` references.
+  4. `IsolationCases.ProjectStatuses.cs` - five rows each seeded a new Project in B on both surfaces, taking B past its 50-Project bound and failing pre-existing rows (`ISO-DIRECT-BOARD`, `ISO-BOARD-AGGREGATE-PAGED`, ...). The foreign side is now one fresh Account's Space seeded once per world; the B-specific `Then` check reads the request's target Space instead. The four routes also gained `ISO-TOKEN-OWN-OTHER-SPACE-PROJECT-STATUS*` rows, which `Every_Space_scoped_route_a_Token_reaches_has_a_row_...` requires.
+  5. `ProjectStatusWire` / `ProjectStatusSliceWire` / the fake / the browser class - stand-ins swapped for `ProjectStatusRoutes`, `ProblemTypes`, `ProjectStatusSources`, then deleted (as the checklist asked).
+- **Gates amended by design (the three the ATDD phase named, plus four found):**
+  - `SpaceIsolationSchemaTests.Every_Space_scoped_table_carries_a_filter_and_a_block_predicate`: `StatusDeltaOperation` joins the tables that carry BLOCK AFTER UPDATE (found by the first full run, its only failure).
+  - `ProjectEndpointTests.Creating_a_Project_leaves_..._stores_no_effective_set`: the `%Delta%` clause now asserts the one delta table is `StatusDeltaOperation` and a new Project holds no operation; "no Status column on `Project`" and "no `%EffectiveStatus%`" are kept.
+  - ARCH-503 widened by exactly the four Project Status routes; its remarks say so. `ProjectRoutes`' "nothing carries a segment after the Project's id" remark corrected (C1).
+  - Isolation route coverage: the nine rows are live (no `PendingUntil`), GATE-003 satisfied.
+  - `The_matrix_theory_covers_exactly_the_capabilities_endpoints_declare`: `ConfigureProjectStatusDelta` joined the matrix theory (`ActiveSpaceEndpointTests.RoleMatrix.cs`) with a representative add.
+  - `No_Project_request_contract_carries_anything_but_a_name`: the Project Status requests share the namespace; the vacuity list names all five requests, the "only Name" rule applies to the Project's own two, and no request in the namespace carries a Space or a `ProjectId`.
+  - `SpaceScopedEntities` names `StatusDeltaOperation`.
+- `TaskEditWire.TasksOutsideTheirEffectiveSetAsync` (Space-wide S-2) retired; the Project-level statement lives once in `WireDatabase.TasksOutsideTheirProjectsSetSql` and is asserted after every delta case and the Task-write cases added here.
+- **Planted violations** (harness restores each file in a `finally`; the run was killed by the host for low memory after plant 3):
+  - Plant 3 (the Space read returns owned definitions): **caught** - `Adding_a_Status_appends_...` and `Two_Projects_add_the_same_name_...` red. Restored.
+  - Plants 1 and 2: the planted code did not compile under the analyzers (S1144 unused `Apply`; IDE0005 unused using), so they proved nothing; restored.
+  - Plant 4 (the delta table left out of the policy): was in the migration when the run was killed; **the harness's `finally` did not run. Restored by hand** to the exact original three predicates and confirmed by reading the file; rebuilt before the full run.
+  - Plants 5-10: not run (the harness was killed and, per the host, not restarted).
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created.
+- **Shape.** A Status a Project adds is a `StatusDefinition` row owned by that Project (`OwnerProjectId`, NO ACTION to `Project`); the delta is `StatusDeltaOperation` (`Add`, `Rename`, `Place`, unique per Project/Status/Kind, `Sequence`-ordered, `Place` by anchor). `EffectiveStatusSet.Of(defaults, delta)` is the one derivation and returns `EffectiveStatus(Id, Name, Source, DefaultName)`; `EffectiveStatusSet.Check` refuses an empty result and a taken name. `ProjectStatuses.EffectiveOfAsync` feeds all six consumers with the Task's or route's Project. `ProjectStatusDeltaWriter` locks (`ProjectTasks`), reads, plans, checks, writes and re-reads. Four routes under `ProjectStatusRoutes`; `ProjectStatusResponse(Id, Name, Source, DefaultName, TaskCount)`; four problem types. Project deletion is now ordered statements in one transaction; Space deletion stays one statement (proved). Migration `20261121155445_ProjectStatusDelta` (RLS literals, filtered unique indexes, explicit collation with indexes dropped and recreated). Client: `ProjectSettings` page, `StatusDeltaEditor` + `StatusDeltaRow`, `StatusCapabilities` (gated), the "Project settings" link in the view toggle for Owner/Admin, copy and refusal mappings, purge on Space exit, key reuse for an unanswered write.
+- **Decisions (reversible; each is the story's recommendation unless noted - cut any line to revisit):**
+  - Q1 (a): owned `StatusDefinition` + `StatusDeltaOperation` with `Add`/`Rename`/`Place`; no `Remove` kind reserved (6.2 adds it).
+  - Q2 (a): NO ACTION owning key; Project deletion deletes Tasks, delta, owned definitions, Project in order, under the existing locks.
+  - Q3 (a): a `Place` whose anchor is not in the set is ignored. Placing a Status after itself, or after one outside the set, is `400 invalid-status-position` at write time.
+  - Q4 (a): delta writes take `ProjectTasks(space, project)` exclusively.
+  - Q5 (a): `ProjectStatusResponse(Id, Name, Source, DefaultName, TaskCount)`; `DefaultName` is cleared if a default is renamed back to its own name exactly.
+  - Q6 (a): `SQL_Latin1_General_CP1_CI_AS` declared on the three name columns; application comparison `OrdinalIgnoreCase` after trimming; an index refusal (2601/2627) the check missed answers `409 status-name-taken`.
+  - Q7 (a): the empty-set guard is proved by `EffectiveStatusSetTests.A_write_that_would_leave_the_set_empty_is_refused`; unreachable through the product until 6.2.
+  - Q8 (a): three neutral skeleton columns kept; ledger re-owned to UX.
+  - Q9 (a): no Delete Project entry point in Project settings.
+  - Q10 (a): List cursor and pager selection re-owned to 6.2; `PagerTabs` allocation left (BoardView is at its dependency cap).
+  - Q11 (a): no bound on Statuses per Project; ledger entry owned by Lee/PM.
+  - Q12 (a): four routes; an add may carry `afterStatusId` (Add then Place, one write); add answers `201` with `Location` on the collection, rename and place `200`; an unreadable place body is `400 invalid-status-position`.
+  - Q13 (a): Project settings by URL renders read-only for Member and Viewer (no control in the DOM).
+  - Dev choice: the effective-set source is a static extension on `IStatusDefinitionReader` (no cache at all, not even per request), so the six handlers' constructors and test fakes did not change shape.
+  - Dev choice: the "Project settings" link lives in `ViewToggle` (given the Role), because `BoardView` is at its S1200 dependency cap.
+  - Dev choice: no `LOCK_ESCALATION` change on `StatusDeltaOperation` - it is bounded by Statuses x 3 per Project.
+- **Ledger:** all eight owned entries dispositioned (`:533`, `:558` closed; `:566`, `:668` 6.1 halves closed; `:114` re-owned to Epic 6; `:521` re-owned to UX; `:655`, `:676` re-owned to 6.2). New: medium/6.2 Task Status validation before the lock; low/6.2 `Place` anchor leaving the set; low/6.3 Project-added name equal to a later default; low/Lee-PM unbounded Statuses.
+- AD-16 gained a dated, additive note on the owned-definition design (spine).
+- **Tests:** build 0 warnings, 0 errors. Iteration: Architecture 528/528; Isolation list and case classes 454/454; Client `ProjectSettingsTests` 9/9 (the seven scaffolds, the theory's two rows counted, plus a pager and picker follow-order case), `ListViewTests`, `RoleDropTests`, `SmallViewportTests` 55/55; new unit classes `EffectiveStatusSetTests` and `ProjectStatusWriteHandlerTests`. Full runs: 2, without the browser suite. First: 2211 total, 1 failed (`SpaceIsolationSchemaTests`, turned red by the new table's third predicate), fixed. Second: 2211 total, 2204 passed, 0 failed, 7 skipped (the three migration-bundle skips, the by-design timing oracle and the tiered scale cases). Log `artifacts/test-runs/6-1-shape-a-projects-statuses-develop.log`.
 
 ### File List
+
+- Yello.Domain/Statuses/StatusDefinition.cs (modified)
+- Yello.Domain/Statuses/EffectiveStatusSet.cs (modified)
+- Yello.Domain/Statuses/IStatusDefinitionReader.cs (modified)
+- Yello.Domain/Statuses/EffectiveStatus.cs (new)
+- Yello.Domain/Statuses/ProjectStatusDelta.cs (new)
+- Yello.Domain/Statuses/StatusDeltaOperation.cs (new)
+- Yello.Domain/Statuses/StatusName.cs (new)
+- Yello.Domain/Statuses/IProjectStatusStore.cs (new)
+- Yello.Domain/Projects/Project.cs (modified, remark)
+- Yello.Application/Statuses/ProjectStatuses.cs (new)
+- Yello.Application/Statuses/ProjectStatusSet.cs (new)
+- Yello.Application/Statuses/ProjectStatusDeltaDraft.cs (new)
+- Yello.Application/Statuses/ProjectStatusDeltaWriter.cs (new)
+- Yello.Application/Statuses/ListProjectStatuses/ListProjectStatusesHandler.cs (new)
+- Yello.Application/Statuses/AddProjectStatus/AddProjectStatusHandler.cs (new)
+- Yello.Application/Statuses/RenameProjectStatus/RenameProjectStatusHandler.cs (new)
+- Yello.Application/Statuses/PlaceProjectStatus/PlaceProjectStatusHandler.cs (new)
+- Yello.Application/Tasks/CreateTask/CreateTaskHandler.cs (modified)
+- Yello.Application/Tasks/EditTaskAttributes/EditTaskAttributesHandler.cs (modified)
+- Yello.Application/Tasks/MoveTask/MoveTaskHandler.cs (modified)
+- Yello.Application/Boards/ViewBoard/ViewBoardHandler.cs (modified)
+- Yello.Application/Boards/ViewBoardColumn/ViewBoardColumnHandler.cs (modified)
+- Yello.Application/Lists/ViewList/ViewListHandler.cs (modified)
+- Yello.Infrastructure/Persistence/Configurations/StatusDefinitionConfiguration.cs (modified)
+- Yello.Infrastructure/Persistence/Configurations/LabelConfiguration.cs (modified)
+- Yello.Infrastructure/Persistence/Configurations/StatusDeltaOperationConfiguration.cs (new)
+- Yello.Infrastructure/Persistence/Configurations/StatusModel.cs (new)
+- Yello.Infrastructure/Persistence/Migrations/20261121155445_ProjectStatusDelta.cs (new)
+- Yello.Infrastructure/Persistence/Migrations/20261121155445_ProjectStatusDelta.Designer.cs (new)
+- Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs (modified)
+- Yello.Infrastructure/Persistence/ProjectStatusStore.cs (new)
+- Yello.Infrastructure/Persistence/ProjectStore.cs (modified)
+- Yello.Infrastructure/Persistence/StatusDefinitionReader.cs (modified)
+- Yello.Infrastructure/Persistence/SchemaNames.cs (modified)
+- Yello.Infrastructure/Persistence/YelloDbContext.cs (modified)
+- Yello.Infrastructure/SpaceContentStores.cs (modified)
+- Yello.Contracts/ProblemTypes.cs (modified)
+- Yello.Contracts/Projects/ProjectRoutes.cs (modified, remark)
+- Yello.Contracts/Projects/ProjectStatusRoutes.cs (new)
+- Yello.Contracts/Projects/ProjectStatusResponse.cs (new)
+- Yello.Contracts/Projects/AddProjectStatusRequest.cs (new)
+- Yello.Contracts/Projects/RenameProjectStatusRequest.cs (new)
+- Yello.Contracts/Projects/PlaceProjectStatusRequest.cs (new)
+- Yello.Host/Endpoints/ProjectStatusEndpoints.cs (new)
+- Yello.Host/Endpoints/ProjectStatusAnswers.cs (new)
+- Yello.Host/Program.cs (modified)
+- Yello.Client/Pages/ProjectSettings.razor (new)
+- Yello.Client/Pages/ClientRoutes.cs (modified)
+- Yello.Client/Pages/TaskListPage.razor (modified)
+- Yello.Client/Components/StatusDeltaEditor.razor (new)
+- Yello.Client/Components/StatusDeltaRow.razor (new)
+- Yello.Client/Components/ViewToggle.razor (modified)
+- Yello.Client/Components/BoardView.razor (modified)
+- Yello.Client/Components/TaskListView.razor (modified)
+- Yello.Client/Components/TaskListView.razor.cs (modified)
+- Yello.Client/Spaces/StatusCapabilities.cs (new)
+- Yello.Client/Spaces/StatusNameRule.cs (new)
+- Yello.Client/Refusals/RefusalCopy.cs (modified)
+- Yello.Client/Localisation/ClientCopy.resx (modified)
+- Yello.Client/wwwroot/css/components.css (modified)
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.ProjectStatuses.cs (modified)
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Delete.cs (modified)
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Projects.cs (modified)
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.cs (modified)
+- tests/Yello.Tests.Client/ProjectSettingsTests.cs (modified)
+- tests/Yello.Tests.Client/FakeYelloApi.ProjectStatuses.cs (modified)
+- tests/Yello.Tests.Isolation/IsolationCases.ProjectStatuses.cs (modified)
+- tests/Yello.Tests.Shared/ProjectStatusWire.cs (modified)
+- tests/Yello.Tests.Shared/WireDatabase.cs (modified)
+- tests/Yello.Tests.Slices/Statuses/EffectiveStatusSetTests.cs (new)
+- tests/Yello.Tests.Slices/Statuses/ProjectStatusWriteHandlerTests.cs (new)
+- tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.cs (modified)
+- tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusSchema.cs (modified)
+- tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.Statuses.cs (modified)
+- tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRace.cs (modified)
+- tests/Yello.Tests.Slices/Projects/ProjectStatusSliceWire.cs (modified)
+- tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.SiblingStatus.cs (modified)
+- tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Edit.cs (modified)
+- tests/Yello.Tests.Slices/Tasks/TaskEditWire.cs (modified)
+- tests/Yello.Tests.Slices/Tasks/CreateTask/CreateTaskHandlerTests.cs (modified)
+- tests/Yello.Tests.Slices/Tasks/EditTaskAttributes/EditTaskAttributesHandlerTests.cs (modified)
+- tests/Yello.Tests.Slices/Tasks/MoveTask/MoveTaskHandlerTests.cs (modified)
+- tests/Yello.Tests.Slices/Boards/ViewBoard/ViewBoardHandlerTests.cs (modified)
+- tests/Yello.Tests.Slices/Lists/ViewList/ViewListHandlerTests.cs (modified)
+- tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RoleMatrix.cs (modified)
+- tests/Yello.Tests.Slices/Accounts/RegisterAccount/SpaceIsolationSchemaTests.cs (modified)
+- _bmad-output/implementation-artifacts/deferred-work.md (modified)
+- _bmad-output/implementation-artifacts/sprint-status.yaml (modified)
+- _bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md (modified, AD-16 note)
 
 ## Change Log
 
 - 2026-11-21: Story created (bmad-create-story). Status: ready-for-dev.
+- 2026-11-21: Implemented (bmad-dev-story): Project-owned Statuses and the operation delta, one effective-set derivation for all six consumers, four routes, Project settings with the Status delta editor, explicit name collation; decisions Q1-Q13 at their recommendations; ledger dispositioned. Status: review.

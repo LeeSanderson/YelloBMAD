@@ -3,6 +3,7 @@ using Xunit;
 using Yello.Contracts;
 using Yello.Contracts.Boards;
 using Yello.Contracts.Lists;
+using Yello.Contracts.Projects;
 using Yello.Tests.Shared;
 using ListWire = Yello.Tests.Slices.Lists.ListWire;
 using SliceListQuery = Yello.Tests.Slices.Lists.ListQuery;
@@ -38,7 +39,7 @@ public sealed partial class ProjectEndpointTests
     /// its three defaults.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC7, AC12 - Q5 (a), Q12 (a): the Project Status routes are not mapped")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "AD-16")]
     [Trait("Requirement", "UX-DR15")]
@@ -74,8 +75,8 @@ public sealed partial class ProjectEndpointTests
         Assert.Equal(4, entries.Count);
         Assert.All(entries, entry => Assert.Equal(ProjectStatusWire.EntryMembers, entry.Members));
         Assert.Equal(defaults.Select(row => row.Id), entries.Take(3).Select(entry => entry.Id));
-        Assert.All(entries.Take(3), entry => Assert.Equal(ProjectStatusWire.SpaceDefault, entry.Source));
-        Assert.Equal(("Parked", ProjectStatusWire.AddedHere, 0), (entries[3].Name, entries[3].Source, entries[3].TaskCount));
+        Assert.All(entries.Take(3), entry => Assert.Equal(ProjectStatusSources.SpaceDefault, entry.Source));
+        Assert.Equal(("Parked", ProjectStatusSources.AddedHere, 0), (entries[3].Name, entries[3].Source, entries[3].TaskCount));
         Assert.Null(entries[3].DefaultName);
         Assert.Equal(entries.Select(entry => (entry.Id, entry.Name)), columns);
         Assert.Equal(defaults.Select(row => (row.Id, row.Name)), spaceRead);
@@ -87,7 +88,7 @@ public sealed partial class ProjectEndpointTests
     /// set is the first default, the new Status, then the other two.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC5 - Q12 (a): the add route does not exist, nor its afterStatusId (Add then Place in one transaction)")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     public async Task Adding_after_a_default_places_the_new_Status_right_after_it()
     {
@@ -112,6 +113,7 @@ public sealed partial class ProjectEndpointTests
         Assert.Equal(
             [defaults[0].Name, "Triage", defaults[1].Name, defaults[2].Name],
             ProjectStatusWire.EntriesOf(added!.Body).Select(entry => entry.Name));
+        await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -121,7 +123,7 @@ public sealed partial class ProjectEndpointTests
     /// still answers; and a sibling Project still shows the original name.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC3, AC7 - Q5 (a): no rename operation and no defaultName yet")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "AD-16")]
     [Trait("Requirement", "AR-23")]
@@ -160,7 +162,7 @@ public sealed partial class ProjectEndpointTests
         var defaults = await Wire.DefaultsAsync(database, owner.SpaceId);
         var entry = ProjectStatusWire.EntriesOf(renamed!.Body)[0];
 
-        Assert.Equal((defaults[0].Id, "Intake", ProjectStatusWire.SpaceDefault), (entry.Id, entry.Name, entry.Source));
+        Assert.Equal((defaults[0].Id, "Intake", ProjectStatusSources.SpaceDefault), (entry.Id, entry.Name, entry.Source));
         Assert.Equal(defaults[0].Name, entry.DefaultName);
         Assert.Equal(defaults.Select(row => (row.Id, row.Name)), spaceRead);
         Assert.Equal((defaults[0].Id, "Intake"), columns[0]);
@@ -175,7 +177,7 @@ public sealed partial class ProjectEndpointTests
     /// definition's own name as it was added (the rename is an operation, uniform for both kinds of Status).
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC3 - Q1 (a): no add or rename operation yet")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "AD-16")]
     public async Task Renaming_an_added_Status_changes_its_effective_name_and_keeps_its_id()
@@ -200,8 +202,9 @@ public sealed partial class ProjectEndpointTests
 
         var entry = ProjectStatusWire.EntriesOf(renamed!.Body)[^1];
 
-        Assert.Equal((parked, "On ice", ProjectStatusWire.AddedHere), (entry.Id, entry.Name, entry.Source));
+        Assert.Equal((parked, "On ice", ProjectStatusSources.AddedHere), (entry.Id, entry.Name, entry.Source));
         Assert.Equal("Parked", (await Wire.DefinitionsAsync(database, owner.SpaceId)).Single(row => row.Id == parked).Name);
+        await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -209,7 +212,7 @@ public sealed partial class ProjectEndpointTests
     /// columns and the List page's Status order both follow it, and the Space's own read keeps Space order.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5, AC9 - Q1 (a), Q3 (a): no place operation, and the Board and List compute the Space's set")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "FR-30")]
     [Trait("Requirement", "AD-16")]
@@ -222,6 +225,7 @@ public sealed partial class ProjectEndpointTests
         WireResponse? after = null;
         IReadOnlyList<(Guid StatusId, string Name)> columns = [];
         IReadOnlyList<Guid> listOrder = [];
+        IReadOnlyList<(Guid Id, string Name)> spaceRead = [];
 
         await fixture.Hosts.RunAsync(fixture.ConnectionString!, Configured, async client =>
         {
@@ -236,6 +240,7 @@ public sealed partial class ProjectEndpointTests
             after = await Wire.PlaceAsync(actor, owner.SpaceId, projectId, third, parked);
             columns = await Wire.BoardColumnsAsync(actor, owner.SpaceId, projectId);
             listOrder = ListWire.PageOf(await ListWire.PageAsync(actor, owner.SpaceId, projectId, new SliceListQuery(ListSorts.Status, [], []))).StatusIds;
+            spaceRead = await Wire.SpaceReadAsync(actor, owner.SpaceId);
         });
 
         Assert.NotNull(owner);
@@ -248,7 +253,7 @@ public sealed partial class ProjectEndpointTests
         Assert.Equal(expected, ProjectStatusWire.EntriesOf(after!.Body).Select(entry => entry.Id));
         Assert.Equal(expected, columns.Select(column => column.StatusId));
         Assert.Equal(expected, listOrder);
-        Assert.Equal(defaults.Select(row => row.Id), (await Wire.SpaceReadAsync(AsTaskActor(owner), owner.SpaceId)).Select(row => row.Id));
+        Assert.Equal(defaults.Select(row => row.Id), spaceRead.Select(row => row.Id));
         await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
@@ -257,7 +262,7 @@ public sealed partial class ProjectEndpointTests
     /// Project, a Task created there holds it, while a Task created in a sibling Project still holds the first default.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - CreateTaskHandler takes the first Status of the Space's set, and no place operation exists")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "FR-19")]
     [Trait("Requirement", "AD-17")]
@@ -297,7 +302,7 @@ public sealed partial class ProjectEndpointTests
     /// "Parked" answers <c>404</c> byte-identical to a random Status id's, while P1's answers <c>200</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the Board and its column page compute the Space's set, and no Project can differ")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "FR-20")]
     [Trait("Requirement", "AD-17")]
@@ -341,6 +346,7 @@ public sealed partial class ProjectEndpointTests
         Assert.Equal(randomPage?.StatusCode, siblingPage?.StatusCode);
         Assert.Equal(randomPage?.ContentType, siblingPage?.ContentType);
         Assert.Equal(randomPage?.Body, siblingPage?.Body);
+        await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -350,7 +356,7 @@ public sealed partial class ProjectEndpointTests
     /// refusal. Renaming a Status to its own name in another case is admitted, and 100 characters is admitted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - Q6 (a): no name rule for a Project Status, and no add or rename route")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     public async Task A_name_the_set_holds_or_a_blank_or_overlong_name_is_refused_and_a_change_of_case_is_admitted()
     {
@@ -373,12 +379,12 @@ public sealed partial class ProjectEndpointTests
             var parked = await Wire.AddedAsync(actor, owner.SpaceId, projectId, "Parked");
             var before = await Wire.DeltaCountAsync(database, owner.SpaceId, projectId);
 
-            refusals.Add((await Wire.AddAsync(actor, owner.SpaceId, projectId, defaults[0].Name.ToUpperInvariant()), ProjectStatusWire.StatusNameTakenType));
-            refusals.Add((await Wire.AddAsync(actor, owner.SpaceId, projectId, " parked "), ProjectStatusWire.StatusNameTakenType));
-            refusals.Add((await Wire.RenameAsync(actor, owner.SpaceId, projectId, parked, defaults[1].Name.ToUpperInvariant()), ProjectStatusWire.StatusNameTakenType));
-            refusals.Add((await Wire.AddAsync(actor, owner.SpaceId, projectId, "   "), ProjectStatusWire.InvalidStatusNameType));
-            refusals.Add((await Wire.AddAsync(actor, owner.SpaceId, projectId, new string('n', 101)), ProjectStatusWire.InvalidStatusNameType));
-            refusals.Add((await Wire.RenameAsync(actor, owner.SpaceId, projectId, parked, string.Empty), ProjectStatusWire.InvalidStatusNameType));
+            refusals.Add((await Wire.AddAsync(actor, owner.SpaceId, projectId, defaults[0].Name.ToUpperInvariant()), ProblemTypes.StatusNameTaken));
+            refusals.Add((await Wire.AddAsync(actor, owner.SpaceId, projectId, " parked "), ProblemTypes.StatusNameTaken));
+            refusals.Add((await Wire.RenameAsync(actor, owner.SpaceId, projectId, parked, defaults[1].Name.ToUpperInvariant()), ProblemTypes.StatusNameTaken));
+            refusals.Add((await Wire.AddAsync(actor, owner.SpaceId, projectId, "   "), ProblemTypes.InvalidStatusName));
+            refusals.Add((await Wire.AddAsync(actor, owner.SpaceId, projectId, new string('n', 101)), ProblemTypes.InvalidStatusName));
+            refusals.Add((await Wire.RenameAsync(actor, owner.SpaceId, projectId, parked, string.Empty), ProblemTypes.InvalidStatusName));
 
             deltaAfterRefusals = await Wire.DeltaCountAsync(database, owner.SpaceId, projectId) - before;
             ownNameInCase = await Wire.RenameAsync(actor, owner.SpaceId, projectId, defaults[2].Id, defaults[2].Name.ToUpperInvariant());
@@ -389,7 +395,7 @@ public sealed partial class ProjectEndpointTests
 
         foreach (var (answer, type) in refusals)
         {
-            var expected = type == ProjectStatusWire.StatusNameTakenType ? HttpStatusCode.Conflict : HttpStatusCode.BadRequest;
+            var expected = type == ProblemTypes.StatusNameTaken ? HttpStatusCode.Conflict : HttpStatusCode.BadRequest;
 
             Assert.True(answer.StatusCode == expected, $"{answer.StatusCode} {answer.Body}");
             Assert.Equal(type, ProjectStatusWire.ProblemTypeOf(answer.Body));
@@ -398,6 +404,7 @@ public sealed partial class ProjectEndpointTests
         Assert.Equal(0, deltaAfterRefusals);
         Assert.True(ownNameInCase?.StatusCode == HttpStatusCode.OK, $"{ownNameInCase?.StatusCode} {ownNameInCase?.Body}");
         Assert.True(longest?.StatusCode == HttpStatusCode.Created, $"{longest?.StatusCode} {longest?.Body}");
+        await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -407,7 +414,7 @@ public sealed partial class ProjectEndpointTests
     /// </summary>
     /// <param name="role">The caller's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - no write route declares configure-project-status-delta yet")]
+    [Theory]
     [InlineData("Member")]
     [InlineData("Viewer")]
     [Trait("Requirement", "FR-16")]
@@ -463,7 +470,7 @@ public sealed partial class ProjectEndpointTests
     /// <c>404 not-available</c>, byte-identical to a Space that does not exist, and records nothing.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the Project Status routes are not mapped")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-20")]
     public async Task An_unknown_Project_answers_the_boundary_404_byte_identical_and_records_nothing()
@@ -494,7 +501,7 @@ public sealed partial class ProjectEndpointTests
     /// nothing is written in either Project. A place anchor outside the set is <c>400 invalid-status-position</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the rename and place routes are not mapped, and no Project can own a Status")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "FR-20")]
     [Trait("Requirement", "NFR-1")]
@@ -536,7 +543,7 @@ public sealed partial class ProjectEndpointTests
         Assert.All(answers, pair => AssertSameNotAvailable(pair.Foreign, pair.Random));
         Assert.Empty(await RefusalKindsAsync(database, owner.AccountId, owner.SpaceId));
         Assert.True(outsideAnchor?.StatusCode == HttpStatusCode.BadRequest, $"{outsideAnchor?.StatusCode} {outsideAnchor?.Body}");
-        Assert.Equal(ProjectStatusWire.InvalidStatusPositionType, ProjectStatusWire.ProblemTypeOf(outsideAnchor!.Body));
+        Assert.Equal(ProblemTypes.InvalidStatusPosition, ProjectStatusWire.ProblemTypeOf(outsideAnchor!.Body));
         Assert.Equal(0, await Wire.DeltaCountAsync(database, owner.SpaceId, projectId));
     }
 
@@ -545,7 +552,7 @@ public sealed partial class ProjectEndpointTests
     /// Status is added once: one owned definition, one <c>Add</c> operation.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the add route is not mapped")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     public async Task A_replayed_add_returns_the_original_answer_and_adds_once()
     {
@@ -572,6 +579,7 @@ public sealed partial class ProjectEndpointTests
         Assert.Equal(original.Body, replay!.Body);
         Assert.Single(await Wire.DefinitionsAsync(database, owner.SpaceId), row => row.OwnerProjectId == projectId);
         Assert.Equal(1, await Wire.DeltaCountAsync(database, owner.SpaceId, projectId));
+        await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     private static void AssertSameNotAvailable(WireResponse answer, WireResponse anchor)

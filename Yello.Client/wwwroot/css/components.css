@@ -1573,6 +1573,80 @@
 }
 
 /*
+    PROJECT SETTINGS AND THE STATUS DELTA EDITOR (UX-DR15). One row per Status: its name, source chip and Task count on
+    one wrapping line, its controls on the next; nothing scrolls sideways at 320px (NFR-9). Logical properties only. No
+    hue encodes a Status (DESIGN.md:326): the source is said in words.
+*/
+.project-settings {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.project-settings__back {
+    display: inline-flex;
+    align-items: center;
+    align-self: flex-start;
+    min-inline-size: var(--target-min);
+    min-block-size: var(--target-min);
+}
+
+.status-delta-editor {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    margin-block-start: var(--space-4);
+}
+
+.status-delta-editor__heading {
+    margin-block: 0;
+}
+
+.status-delta-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.status-delta-row {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding-block: var(--space-3);
+    border-block-end: var(--border-hairline-width) solid var(--border-hairline);
+    overflow-wrap: anywhere;
+}
+
+.status-delta-row__summary,
+.status-delta-row__actions,
+.status-delta-row__rename {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+}
+
+.status-delta-row__name {
+    font-weight: var(--type-task-title-weight);
+}
+
+.status-source {
+    color: var(--text-muted);
+}
+
+.status-delta-row__field {
+    flex: 1 1 12em;
+    min-inline-size: 0;
+    max-inline-size: 100%;
+}
+
+.status-delta-add {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+/*
     THE LIST VIEW (story 2.10). FR-30; UX-DR19, UX-DR26, UX-DR40; open questions 2 (a), 8 (a), 10 (a).
 
     The controls wrap above a native table; the table pages with "Show more Tasks" under it - never load-on-scroll. Below

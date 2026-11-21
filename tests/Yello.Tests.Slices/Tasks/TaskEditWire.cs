@@ -86,28 +86,4 @@ internal static class TaskEditWire
             ? null
             : await reader.GetFieldValueAsync<DateTimeOffset>(0, TestContext.Current.CancellationToken);
     }
-
-    /// <summary>
-    /// The Space's Tasks whose Status is not one of their own Space's Statuses - AD-17's invariant as a query
-    /// (story 2.2 SCH-006's shape; until 6.1's deltas every Project's effective set is the Space's defaults).
-    /// </summary>
-    /// <remarks>
-    /// Until 6.1 the composite foreign key <c>(SpaceId, StatusId)</c> already makes this count zero, so the
-    /// query is the invariant's standing statement rather than its only guard: what a run of edits proves today
-    /// is that a foreign Status is refused as a <c>400</c> before the key could answer it. 6.1 narrows this
-    /// query to each Project's own effective set, where the key no longer covers it.
-    /// </remarks>
-    public static async Task<int> TasksOutsideTheirEffectiveSetAsync(RegistrationDatabase database, Guid spaceId)
-    {
-        await using var connection = await database.OpenForSpaceAsync(spaceId, TestContext.Current.CancellationToken);
-        await using var command = connection.CreateCommand();
-
-        command.CommandText =
-            """
-            SELECT COUNT(*) FROM dbo.[Task] t
-            WHERE NOT EXISTS (SELECT 1 FROM dbo.[StatusDefinition] s WHERE s.SpaceId = t.SpaceId AND s.Id = t.StatusId)
-            """;
-
-        return Convert.ToInt32(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken), System.Globalization.CultureInfo.InvariantCulture);
-    }
 }

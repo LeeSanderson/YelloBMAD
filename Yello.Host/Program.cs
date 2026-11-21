@@ -42,7 +42,12 @@ using Yello.Application.Spaces.ReadMyOwnershipOffer;
 using Yello.Application.Spaces.ReadOwnershipOffer;
 using Yello.Application.Spaces.RenameSpace;
 using Yello.Application.Spaces.RevokeOwnershipOffer;
+using Yello.Application.Statuses;
+using Yello.Application.Statuses.AddProjectStatus;
+using Yello.Application.Statuses.ListProjectStatuses;
 using Yello.Application.Statuses.ListStatuses;
+using Yello.Application.Statuses.PlaceProjectStatus;
+using Yello.Application.Statuses.RenameProjectStatus;
 using Yello.Application.Tasks.AssignTask;
 using Yello.Application.Tasks.CreateTask;
 using Yello.Application.Tasks.DeleteTask;
@@ -148,6 +153,11 @@ builder.Services.AddScoped<ViewListHandler>();
 builder.Services.AddScoped<ListLabelsHandler>();
 builder.Services.AddScoped<DefineLabelHandler>();
 builder.Services.AddScoped<DeleteLabelHandler>();
+builder.Services.AddScoped<ProjectStatusDeltaWriter>();
+builder.Services.AddScoped<ListProjectStatusesHandler>();
+builder.Services.AddScoped<AddProjectStatusHandler>();
+builder.Services.AddScoped<RenameProjectStatusHandler>();
+builder.Services.AddScoped<PlaceProjectStatusHandler>();
 builder.Services.AddScoped<CreateSpaceHandler>();
 builder.Services.AddScoped<RenameSpaceHandler>();
 builder.Services.AddScoped<DeleteSpaceHandler>();
@@ -544,6 +554,15 @@ api.MapMoveTask();
 api.MapListLabels();
 api.MapDefineLabel();
 api.MapDeleteLabel();
+
+// A Project's Statuses. GET /api/v1/spaces/{spaceId}/projects/{projectId}/statuses reads its effective set under the read
+// capability every Role holds; POST on it adds a Status, PATCH .../statuses/{statusId} renames one in this Project, and
+// POST .../statuses/{statusId}/place moves one, each under ConfigureProjectStatusDelta (Owner and Admin). Every answer is
+// the whole set. Space-scoped on both surfaces; no bound.
+api.MapListProjectStatuses();
+api.MapAddProjectStatus();
+api.MapRenameProjectStatus();
+api.MapPlaceProjectStatus();
 
 // Invitations (story 4.1). POST /api/v1/spaces/{spaceId}/invitations issues one to an email address at a Role, under
 // IssueAndRevokeInvitations (Owner and Admin), on both surfaces; 204 with no body whether or not the address has an

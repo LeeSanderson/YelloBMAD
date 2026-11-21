@@ -49,7 +49,7 @@ public sealed partial class ProjectEndpointTests
     /// the Space policy's FILTER and two BLOCK predicates.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4, AC11, AC13 - Q1 (a), Q2 (a): StatusDefinition has no OwnerProjectId and there is no StatusDeltaOperation table yet")]
+    [Fact]
     [Trait("Requirement", "AD-16")]
     [Trait("Requirement", "AR-23")]
     [Trait("Requirement", "NFR-1")]
@@ -65,10 +65,10 @@ public sealed partial class ProjectEndpointTests
             database,
             """
             SELECT CONCAT(
-                (SELECT STRING_AGG(c.name, ',') WITHIN GROUP (ORDER BY fkc.constraint_column_id)
+                (SELECT STRING_AGG(c.name COLLATE DATABASE_DEFAULT, ',') WITHIN GROUP (ORDER BY fkc.constraint_column_id)
                  FROM sys.foreign_key_columns fkc JOIN sys.columns c ON c.object_id = fkc.parent_object_id AND c.column_id = fkc.parent_column_id
                  WHERE fkc.constraint_object_id = fk.object_id),
-                '|', fk.delete_referential_action_desc)
+                '|', fk.delete_referential_action_desc COLLATE DATABASE_DEFAULT)
             FROM sys.foreign_keys fk
             WHERE fk.parent_object_id = OBJECT_ID(N'dbo.StatusDefinition') AND fk.referenced_object_id = OBJECT_ID(N'dbo.Project')
             """));
@@ -81,7 +81,7 @@ public sealed partial class ProjectEndpointTests
 
         var deltaKeys = await CatalogueAsync(
             database,
-            $"SELECT CONCAT(OBJECT_NAME(fk.referenced_object_id), '|', fk.delete_referential_action_desc) FROM sys.foreign_keys fk WHERE fk.parent_object_id = OBJECT_ID(N'dbo.{DeltaTable}')");
+            $"SELECT CONCAT(OBJECT_NAME(fk.referenced_object_id) COLLATE DATABASE_DEFAULT, '|', fk.delete_referential_action_desc COLLATE DATABASE_DEFAULT) FROM sys.foreign_keys fk WHERE fk.parent_object_id = OBJECT_ID(N'dbo.{DeltaTable}')");
 
         Assert.Equal(["Project|CASCADE"], deltaKeys.Where(key => key.StartsWith("Project|", StringComparison.Ordinal)));
         Assert.Contains("StatusDefinition|NO_ACTION", deltaKeys);
@@ -94,7 +94,7 @@ public sealed partial class ProjectEndpointTests
             ["BLOCK|AFTER INSERT", "BLOCK|AFTER UPDATE", "FILTER|"],
             (await CatalogueAsync(
                 database,
-                $"SELECT CONCAT(p.predicate_type_desc, '|', ISNULL(p.operation_desc, N'')) FROM sys.security_predicates p WHERE p.target_object_id = OBJECT_ID(N'dbo.{DeltaTable}')"))
+                $"SELECT CONCAT(p.predicate_type_desc COLLATE DATABASE_DEFAULT, '|', ISNULL(p.operation_desc COLLATE DATABASE_DEFAULT, N'')) FROM sys.security_predicates p WHERE p.target_object_id = OBJECT_ID(N'dbo.{DeltaTable}')"))
                 .Order(StringComparer.Ordinal));
     }
 
@@ -105,7 +105,7 @@ public sealed partial class ProjectEndpointTests
     /// and no Task is left outside its Project's set.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - Q2 (a): no Project can own a Status, and Project deletion is still one cascading statement")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "AD-17")]
     public async Task Two_Projects_add_the_same_name_and_deleting_one_holding_Tasks_in_it_removes_only_its_own()
@@ -164,7 +164,7 @@ public sealed partial class ProjectEndpointTests
     /// <c>%Delta%</c> clause the delta table turns red by design.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - Q1 (a): there is no delta table and no rename operation yet")]
+    [Fact]
     [Trait("Requirement", "AD-16")]
     [Trait("Requirement", "FR-25")]
     public async Task The_delta_is_stored_as_operations_and_no_table_stores_an_effective_set()
@@ -205,6 +205,7 @@ public sealed partial class ProjectEndpointTests
             || column.Contains("Order", StringComparison.OrdinalIgnoreCase)
             || column.Contains("Rank", StringComparison.OrdinalIgnoreCase));
         Assert.Equal(1, await Wire.DeltaCountAsync(database, owner.SpaceId, projectId));
+        await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -213,7 +214,7 @@ public sealed partial class ProjectEndpointTests
     /// the end of the statement, after the cascades have emptied both sides. Nothing of the Space remains.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - Q2 (a): no Project can own a Status or hold a delta yet")]
+    [Fact]
     [Trait("Requirement", "FR-7")]
     [Trait("Requirement", "AD-17")]
     public async Task Deleting_a_Space_holding_Projects_with_deltas_and_added_Statuses_succeeds_in_one_statement()
@@ -259,7 +260,7 @@ public sealed partial class ProjectEndpointTests
     /// <c>RefusalBoundaryGateTests.The_three_name_columns_declare_their_case_insensitive_collation_in_the_model</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - Q6 (a): the delta table and its Name column do not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "FR-22")]
     public async Task The_Status_and_Label_name_columns_compare_case_insensitively()
@@ -283,10 +284,10 @@ public sealed partial class ProjectEndpointTests
             database,
             $"""
             SELECT CONCAT(
-                (SELECT STRING_AGG(c.name, ',') WITHIN GROUP (ORDER BY ic.key_ordinal)
+                (SELECT STRING_AGG(c.name COLLATE DATABASE_DEFAULT, ',') WITHIN GROUP (ORDER BY ic.key_ordinal)
                  FROM sys.index_columns ic JOIN sys.columns c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
                  WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id AND ic.is_included_column = 0),
-                '|', ISNULL(i.filter_definition, N''))
+                '|', ISNULL(i.filter_definition COLLATE DATABASE_DEFAULT, N''))
             FROM sys.indexes i
             WHERE i.object_id = OBJECT_ID(N'dbo.{table}') AND i.is_unique = 1 AND i.is_primary_key = 0
             """);

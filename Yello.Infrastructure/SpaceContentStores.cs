@@ -6,6 +6,7 @@ using Yello.Domain.Boards;
 using Yello.Domain.Labels;
 using Yello.Domain.Lists;
 using Yello.Domain.Projects;
+using Yello.Domain.Statuses;
 using Yello.Domain.Tasks;
 using Yello.Infrastructure.Memberships;
 using Yello.Infrastructure.Persistence;
@@ -35,6 +36,7 @@ internal static class SpaceContentStores
         services.AddScoped<IBoardReader, BoardReader>();
         services.AddScoped<IListReader, ListReader>();
         services.AddScoped<ILabelStore, LabelStore>();
+        services.AddScoped<IProjectStatusStore, ProjectStatusStore>();
 
         // Story 4.1: the Space's Invitations, on the request's unit of work like every Space-scoped store. Story 4.3: the
         // same instance answers the accept's screen, which the pipeline reads before it consults the bound.

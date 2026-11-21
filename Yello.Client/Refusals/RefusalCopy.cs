@@ -86,6 +86,26 @@ public static class RefusalCopy
     public static string LabelNameTakenKey => "LabelNameTaken";
 
     /// <summary>
+    /// The copy key for <c>400 invalid-status-name</c>: a Status's name is 1 to 100 characters.
+    /// </summary>
+    public static string InvalidStatusNameKey => "StatusNameInvalid";
+
+    /// <summary>
+    /// The copy key for <c>409 status-name-taken</c>: the Project's set already holds that name.
+    /// </summary>
+    public static string StatusNameTakenKey => "StatusNameTaken";
+
+    /// <summary>
+    /// The copy key for <c>409 status-set-empty</c>: a Project keeps at least one Status.
+    /// </summary>
+    public static string StatusSetEmptyKey => "StatusSetEmpty";
+
+    /// <summary>
+    /// The copy key for <c>400 invalid-status-position</c>: the place asked for is not in the Project's set.
+    /// </summary>
+    public static string InvalidStatusPositionKey => "StatusPositionInvalid";
+
+    /// <summary>
     /// The copy key for <c>409 label-in-use</c> (story 2.4, AC3): the Label is on Tasks and was not deleted.
     /// </summary>
     public static string LabelInUseKey => "LabelInUse";
@@ -273,6 +293,10 @@ public static class RefusalCopy
         [ProblemTypes.InvalidLabelColour] = InvalidLabelColourKey,
         [ProblemTypes.LabelNameTaken] = LabelNameTakenKey,
         [ProblemTypes.LabelInUse] = LabelInUseKey,
+        [ProblemTypes.InvalidStatusName] = InvalidStatusNameKey,
+        [ProblemTypes.StatusNameTaken] = StatusNameTakenKey,
+        [ProblemTypes.StatusSetEmpty] = StatusSetEmptyKey,
+        [ProblemTypes.InvalidStatusPosition] = InvalidStatusPositionKey,
         [ProblemTypes.InvalidTaskLabels] = InvalidTaskLabelsKey,
         [ProblemTypes.InvalidAssignee] = InvalidAssigneeKey,
         [ProblemTypes.TaskPositionUnavailable] = TaskPositionUnavailableKey,

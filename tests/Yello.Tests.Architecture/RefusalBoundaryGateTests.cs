@@ -141,6 +141,7 @@ public sealed partial class RefusalBoundaryGateTests
         "Yello.Domain.Labels.Label",
         "Yello.Domain.Invitations.Invitation",
         "Yello.Domain.Spaces.OwnershipOffer",
+        "Yello.Domain.Statuses.StatusDeltaOperation",
     ];
 
     /// <summary>

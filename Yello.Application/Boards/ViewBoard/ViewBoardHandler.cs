@@ -1,3 +1,4 @@
+using Yello.Application.Statuses;
 using Yello.Domain.Boards;
 using Yello.Domain.Projects;
 using Yello.Domain.Statuses;
@@ -36,7 +37,7 @@ namespace Yello.Application.Boards.ViewBoard;
 /// </para>
 /// </remarks>
 /// <param name="reader">Reads the Project, its counts and its Tasks.</param>
-/// <param name="statuses">Reads the Space's Status definitions.</param>
+/// <param name="statuses">Reads the Space's Status definitions and the Project's delta.</param>
 public sealed class ViewBoardHandler(IBoardReader reader, IStatusDefinitionReader statuses)
 {
     /// <summary>
@@ -52,9 +53,9 @@ public sealed class ViewBoardHandler(IBoardReader reader, IStatusDefinitionReade
             return null;
         }
 
-        var effective = EffectiveStatusSet.Of(await statuses.ListAsync(cancellationToken).ConfigureAwait(false));
+        var effective = await statuses.EffectiveOfAsync(projectId, cancellationToken).ConfigureAwait(false);
         var totals = await reader.CountTasksByStatusAsync(projectId, cancellationToken).ConfigureAwait(false);
-        var pages = new List<(StatusDefinition Status, IReadOnlyList<TaskItem> Tasks, string? NextAfter)>();
+        var pages = new List<(EffectiveStatus Status, IReadOnlyList<TaskItem> Tasks, string? NextAfter)>();
 
         foreach (var status in effective)
         {
@@ -90,8 +91,8 @@ public sealed record BoardView(
 /// <summary>
 /// One column of a Board.
 /// </summary>
-/// <param name="Status">The column's Status.</param>
+/// <param name="Status">The column's Status, under its name in the Project.</param>
 /// <param name="Total">The true number of the Project's Tasks in that Status, counted by the database.</param>
 /// <param name="Tasks">Its first page of Tasks, by position key.</param>
 /// <param name="NextAfter">The cursor: the last Task's key when another follows, otherwise <c>null</c> (story 2.9).</param>
-public sealed record BoardColumnView(StatusDefinition Status, int Total, IReadOnlyList<TaskItem> Tasks, string? NextAfter);
+public sealed record BoardColumnView(EffectiveStatus Status, int Total, IReadOnlyList<TaskItem> Tasks, string? NextAfter);

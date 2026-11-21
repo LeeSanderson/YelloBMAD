@@ -55,6 +55,12 @@ public static class SchemaNames
     public static string StatusDefinitionTable => "StatusDefinition";
 
     /// <summary>
+    /// The StatusDeltaOperation table: every Project's Status delta, one row per operation. Space-scoped, and like
+    /// <see cref="ProjectTable"/> its policy carries a BLOCK predicate <c>AFTER UPDATE</c>.
+    /// </summary>
+    public static string StatusDeltaOperationTable => "StatusDeltaOperation";
+
+    /// <summary>
     /// The SpacePresence table - who is live in a Space, for NFR-8's concurrent-Sessions bound.
     /// </summary>
     public static string SpacePresenceTable => "SpacePresence";
@@ -251,5 +257,5 @@ public static class SchemaNames
     /// reader would have acted on.
     /// </remarks>
     public static IReadOnlyList<string> SpaceScopedTables { get; } =
-        [MembershipTable, StatusDefinitionTable, SpacePresenceTable, ProjectTable, IdempotencyRecordTable, TaskTable, LabelTable, TaskLabelTable, InvitationTable, NotificationSendTable, OwnershipOfferTable];
+        [MembershipTable, StatusDefinitionTable, SpacePresenceTable, ProjectTable, IdempotencyRecordTable, TaskTable, LabelTable, TaskLabelTable, InvitationTable, NotificationSendTable, OwnershipOfferTable, StatusDeltaOperationTable];
 }

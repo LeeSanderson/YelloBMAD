@@ -1,3 +1,4 @@
+using Yello.Application.Statuses;
 using Yello.Domain.Statuses;
 using Yello.Domain.Tasks;
 
@@ -27,7 +28,7 @@ namespace Yello.Application.Tasks.EditTaskAttributes;
 /// </para>
 /// </remarks>
 /// <param name="store">Reads and writes the Task.</param>
-/// <param name="statuses">Reads the Space's Status definitions.</param>
+/// <param name="statuses">Reads the Space's Status definitions and the Project's delta.</param>
 public sealed class EditTaskAttributesHandler(ITaskStore store, IStatusDefinitionReader statuses)
 {
     /// <summary>
@@ -55,9 +56,7 @@ public sealed class EditTaskAttributesHandler(ITaskStore store, IStatusDefinitio
 
         if (edit.StatusId is { } statusId)
         {
-            // Until story 6.1 adds a Project's own delta, every Project's effective set is its Space's
-            // definitions; EffectiveStatusSet is where that delta will land.
-            var effective = EffectiveStatusSet.Of(await statuses.ListAsync(cancellationToken).ConfigureAwait(false));
+            var effective = await statuses.EffectiveOfAsync(task.ProjectId, cancellationToken).ConfigureAwait(false);
 
             if (!EffectiveStatusSet.Contains(effective, statusId))
             {

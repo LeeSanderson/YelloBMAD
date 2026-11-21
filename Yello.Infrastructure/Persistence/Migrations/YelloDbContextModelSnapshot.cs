@@ -216,7 +216,8 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(50)
-                        .HasColumnType("nvarchar(50)");
+                        .HasColumnType("nvarchar(50)")
+                        .UseCollation("SQL_Latin1_General_CP1_CI_AS");
 
                     b.Property<Guid>("SpaceId")
                         .HasColumnType("uniqueidentifier")
@@ -375,7 +376,11 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("SQL_Latin1_General_CP1_CI_AS");
+
+                    b.Property<Guid?>("OwnerProjectId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<int>("Position")
                         .HasColumnType("int");
@@ -387,9 +392,61 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("SpaceId", "Name")
-                        .IsUnique();
+                        .IsUnique()
+                        .HasFilter("[OwnerProjectId] IS NULL");
+
+                    b.HasIndex("SpaceId", "OwnerProjectId", "Name")
+                        .IsUnique()
+                        .HasFilter("[OwnerProjectId] IS NOT NULL");
 
                     b.ToTable("StatusDefinition", (string)null);
+                });
+
+            modelBuilder.Entity("Yello.Domain.Statuses.StatusDeltaOperation", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AfterStatusId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .IsUnicode(false)
+                        .HasColumnType("varchar(16)");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)")
+                        .UseCollation("SQL_Latin1_General_CP1_CI_AS");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
+                    b.Property<Guid>("SpaceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("SpaceId");
+
+                    b.Property<Guid>("StatusId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("SpaceId", "AfterStatusId");
+
+                    b.HasIndex("SpaceId", "StatusId");
+
+                    b.HasIndex("SpaceId", "ProjectId", "StatusId", "Kind")
+                        .IsUnique();
+
+                    b.ToTable("StatusDeltaOperation", (string)null);
                 });
 
             modelBuilder.Entity("Yello.Domain.Tasks.TaskItem", b =>
@@ -772,6 +829,35 @@ namespace Yello.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("SpaceId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Yello.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId", "OwnerProjectId")
+                        .HasPrincipalKey("SpaceId", "Id")
+                        .OnDelete(DeleteBehavior.NoAction);
+                });
+
+            modelBuilder.Entity("Yello.Domain.Statuses.StatusDeltaOperation", b =>
+                {
+                    b.HasOne("Yello.Domain.Statuses.StatusDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId", "AfterStatusId")
+                        .HasPrincipalKey("SpaceId", "Id")
+                        .OnDelete(DeleteBehavior.NoAction);
+
+                    b.HasOne("Yello.Domain.Projects.Project", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId", "ProjectId")
+                        .HasPrincipalKey("SpaceId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Yello.Domain.Statuses.StatusDefinition", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId", "StatusId")
+                        .HasPrincipalKey("SpaceId", "Id")
+                        .OnDelete(DeleteBehavior.NoAction)
                         .IsRequired();
                 });
 

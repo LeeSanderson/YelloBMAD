@@ -70,6 +70,12 @@ public sealed partial class TaskListView
     public Guid ProjectId { get; set; }
 
     /// <summary>
+    /// The Role held in the active Space, re-read on every arrival; it decides only which links the view offers.
+    /// </summary>
+    [Parameter]
+    public string RoleCode { get; set; } = string.Empty;
+
+    /// <summary>
     /// Raised for a refused read - a <c>404</c> (the Project matches nothing in the Space, or the Space is refused) or a
     /// <c>400</c> the client should never have caused - so the page renders its one refusal surface.
     /// </summary>

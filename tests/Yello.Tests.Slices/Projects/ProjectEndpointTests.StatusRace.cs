@@ -1,5 +1,6 @@
 using System.Net;
 using Xunit;
+using Yello.Contracts;
 using Yello.Tests.Shared;
 using DeleteWire = Yello.Tests.Slices.Tasks.DeleteWire;
 using TaskWire = Yello.Tests.Slices.Tasks.TaskWire;
@@ -25,7 +26,7 @@ public sealed partial class ProjectEndpointTests
     /// other is <c>409 status-name-taken</c>; the Project owns one "Parked" and its delta holds one operation.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - Q4 (a): the add route is not mapped and takes no lock")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "AR-34")]
     public async Task Two_adds_of_one_name_queue_on_the_Projects_lock_and_the_second_is_refused_409()
@@ -66,8 +67,9 @@ public sealed partial class ProjectEndpointTests
         Assert.Equal(
             [HttpStatusCode.Created, HttpStatusCode.Conflict],
             answers.Select(answer => answer.StatusCode).Order());
-        Assert.Equal(ProjectStatusWire.StatusNameTakenType, ProjectStatusWire.ProblemTypeOf(answers.Single(answer => answer.StatusCode == HttpStatusCode.Conflict).Body));
+        Assert.Equal(ProblemTypes.StatusNameTaken, ProjectStatusWire.ProblemTypeOf(answers.Single(answer => answer.StatusCode == HttpStatusCode.Conflict).Body));
         Assert.Single(await Wire.DefinitionsAsync(database, owner.SpaceId), row => row.OwnerProjectId == projectId);
         Assert.Equal(1, await Wire.DeltaCountAsync(database, owner.SpaceId, projectId));
+        await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 }

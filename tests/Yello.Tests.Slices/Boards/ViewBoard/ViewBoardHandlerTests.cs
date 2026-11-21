@@ -260,6 +260,9 @@ public sealed class ViewBoardHandlerTests
         public Task<IReadOnlyList<StatusDefinition>> ListAsync(CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<StatusDefinition>>(_statuses);
 
+        public Task<ProjectStatusDelta> DeltaOfAsync(Guid projectId, CancellationToken cancellationToken) =>
+            Task.FromResult(ProjectStatusDelta.Empty);
+
         public Task<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>> LabelIdsOfAsync(IReadOnlyCollection<Guid> taskIds, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyDictionary<Guid, IReadOnlyList<Guid>>>(new Dictionary<Guid, IReadOnlyList<Guid>>());
     }

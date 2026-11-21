@@ -4,7 +4,7 @@ using Yello.Domain.Statuses;
 namespace Yello.Infrastructure.Persistence;
 
 /// <summary>
-/// Reads the Status definitions visible to the current unit of work.
+/// Reads the Status definitions and Project deltas visible to the current unit of work.
 /// </summary>
 /// <remarks>
 /// <b>No <c>Where</c> on <c>SpaceId</c>, and that is the point.</b> Both isolation layers - the
@@ -19,8 +19,30 @@ internal sealed class StatusDefinitionReader(YelloDbContext dbContext) : IStatus
     public async Task<IReadOnlyList<StatusDefinition>> ListAsync(CancellationToken cancellationToken) =>
         await dbContext.StatusDefinitions
             .AsNoTracking()
+            .Where(status => status.OwnerProjectId == null)
             .OrderBy(status => status.Position)
             .ThenBy(status => status.Id)
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    public async Task<ProjectStatusDelta> DeltaOfAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        var owned = await dbContext.StatusDefinitions
+            .AsNoTracking()
+            .Where(status => status.OwnerProjectId == projectId)
+            .OrderBy(status => status.Position)
+            .ThenBy(status => status.Id)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        var operations = await dbContext.Set<StatusDeltaOperation>()
+            .AsNoTracking()
+            .Where(operation => operation.ProjectId == projectId)
+            .OrderBy(operation => operation.Sequence)
+            .ToListAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return new ProjectStatusDelta(owned, operations);
+    }
 }

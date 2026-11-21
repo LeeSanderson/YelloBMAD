@@ -18,9 +18,14 @@ namespace Yello.Domain.Statuses;
 /// </para>
 /// <para>
 /// <b>No per-Project effective Status set is materialised, and none may be.</b> No table stores
-/// one: a Project's effective set is derived from its own definitions and its Space's defaults at
-/// the point of use. Materialising it would create a second copy that a cascade has to keep in
-/// step, which is the shape Epic 6's stories exist to avoid.
+/// one: a Project's effective set is derived from its Space's defaults, the definitions it owns and
+/// its delta at the point of use (<see cref="EffectiveStatusSet"/>). Materialising it would create a
+/// second copy that a cascade has to keep in step, which is the shape Epic 6's stories exist to avoid.
+/// </para>
+/// <para>
+/// <b>A Status a Project adds is a row of this type too</b>, owned by that Project
+/// (<see cref="OwnerProjectId"/>), so a Task references every Status it can hold through the one key
+/// <c>(SpaceId, Id)</c>.
 /// </para>
 /// </remarks>
 public sealed class StatusDefinition
@@ -38,10 +43,17 @@ public sealed class StatusDefinition
     public required Guid SpaceId { get; init; }
 
     /// <summary>
+    /// The Project that added this Status and alone holds it, or <c>null</c> for one of the Space's defaults.
+    /// </summary>
+    public Guid? OwnerProjectId { get; init; }
+
+    /// <summary>
     /// The Status's name, as a person reads it.
     /// </summary>
     /// <remarks>
-    /// Settable: renaming is FR-25's, in Epic 6, and it must not change <see cref="Id"/>.
+    /// A Project's rename never writes it: that is an operation of the Project's delta, so the Space's
+    /// default keeps its own name for every other Project. An owned definition keeps the name it was
+    /// added with for the same reason - one path for every rename.
     /// </remarks>
     public required string Name { get; set; }
 

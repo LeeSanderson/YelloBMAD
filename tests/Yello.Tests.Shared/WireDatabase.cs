@@ -803,6 +803,38 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// The Status half of S-2 (<c>test-design-qa.md:319</c>; AD-17) as one statement: the Tasks of the Space read under its
+    /// key whose Status is outside their own Project's effective set. With no operation that removes a Status, a Project's
+    /// set is the Space's defaults plus the definitions that Project owns, so a Task is outside it when its Status is
+    /// another Project's definition, or no definition of the Space at all.
+    /// </summary>
+    public static string TasksOutsideTheirProjectsSetSql =>
+        """
+        SELECT COUNT(*) FROM dbo.[Task] t
+        WHERE NOT EXISTS (
+            SELECT 1 FROM dbo.[StatusDefinition] s
+            WHERE s.SpaceId = t.SpaceId AND s.Id = t.StatusId AND (s.OwnerProjectId IS NULL OR s.OwnerProjectId = t.ProjectId))
+        """;
+
+    /// <summary>
+    /// The Status half of S-2 for one Space: how many of its Tasks hold a Status outside their own Project's effective set,
+    /// read under that Space's own key (<see cref="TasksOutsideTheirProjectsSetSql"/>).
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The count; zero when the invariant holds.</returns>
+    public async Task<int> TasksOutsideTheirProjectsSetAsync(Guid spaceId)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+        await using var command = connection.CreateCommand();
+
+#pragma warning disable CA2100 // Review SQL queries - a fixed statement; no input reaches it.
+        command.CommandText = TasksOutsideTheirProjectsSetSql;
+#pragma warning restore CA2100
+
+        return Convert.ToInt32(await command.ExecuteScalarAsync().ConfigureAwait(false), System.Globalization.CultureInfo.InvariantCulture);
+    }
+
+    /// <summary>
     /// Every Space id in the database. <c>Space</c> carries no policy, so it is read without a key.
     /// </summary>
     /// <returns>The ids.</returns>

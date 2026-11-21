@@ -1,3 +1,4 @@
+using Yello.Application.Statuses;
 using Yello.Domain.Boards;
 using Yello.Domain.Lists;
 using Yello.Domain.Projects;
@@ -34,7 +35,7 @@ namespace Yello.Application.Lists.ViewList;
 /// </remarks>
 /// <param name="boards">Reads the Project and the page's Labels, as the Board does.</param>
 /// <param name="reader">Reads the List's count and page.</param>
-/// <param name="statuses">Reads the Space's Status definitions.</param>
+/// <param name="statuses">Reads the Space's Status definitions and the Project's delta.</param>
 public sealed class ViewListHandler(IBoardReader boards, IListReader reader, IStatusDefinitionReader statuses)
 {
     /// <summary>
@@ -60,7 +61,7 @@ public sealed class ViewListHandler(IBoardReader boards, IListReader reader, ISt
             return null;
         }
 
-        var effective = EffectiveStatusSet.Of(await statuses.ListAsync(cancellationToken).ConfigureAwait(false));
+        var effective = await statuses.EffectiveOfAsync(projectId, cancellationToken).ConfigureAwait(false);
 
         var narrowed = filter with
         {
@@ -99,7 +100,7 @@ public sealed class ViewListHandler(IBoardReader boards, IListReader reader, ISt
 /// <param name="LabelIds">The Labels applied to each of the page's Tasks, in chip order; a Task carrying none is absent.</param>
 public sealed record ListView(
     Project Project,
-    IReadOnlyList<StatusDefinition> Statuses,
+    IReadOnlyList<EffectiveStatus> Statuses,
     int Total,
     IReadOnlyList<TaskItem> Tasks,
     string? NextAfter,

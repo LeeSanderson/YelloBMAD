@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Data.SqlClient;
 using Xunit;
 using Yello.Contracts.Boards;
+using Yello.Contracts.Projects;
 using Yello.Contracts.Spaces;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
@@ -34,31 +35,31 @@ namespace Yello.Tests.Slices.Projects;
 internal static class ProjectStatusSliceWire
 {
     public static Task<WireResponse> ReadAsync(Actor actor, Guid spaceId, Guid projectId) =>
-        actor.Session.GetAsync(ProjectStatusWire.CollectionOf(spaceId, projectId));
+        actor.Session.GetAsync(ProjectStatusRoutes.CollectionOf(spaceId, projectId));
 
     public static Task<WireResponse> ReadWithTokenAsync(Actor actor, string token, Guid spaceId, Guid projectId) =>
-        actor.Session.GetWithTokenAsync(ProjectStatusWire.CollectionOf(spaceId, projectId), token);
+        actor.Session.GetWithTokenAsync(ProjectStatusRoutes.CollectionOf(spaceId, projectId), token);
 
     public static Task<WireResponse> AddAsync(Actor actor, Guid spaceId, Guid projectId, string? name, string? key = null) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectStatusWire.CollectionOf(spaceId, projectId), ProjectStatusWire.NameBody(name), TaskWire.KeyHeader(key));
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectStatusRoutes.CollectionOf(spaceId, projectId), ProjectStatusWire.NameBody(name), TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> AddWithTokenAsync(Actor actor, string token, Guid spaceId, Guid projectId, string name) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, ProjectStatusWire.CollectionOf(spaceId, projectId), token, ProjectStatusWire.NameBody(name), TaskWire.NoHeaders);
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, ProjectStatusRoutes.CollectionOf(spaceId, projectId), token, ProjectStatusWire.NameBody(name), TaskWire.NoHeaders);
 
     public static Task<WireResponse> AddAfterAsync(Actor actor, Guid spaceId, Guid projectId, string name, Guid afterStatusId) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectStatusWire.CollectionOf(spaceId, projectId), ProjectStatusWire.NameAfterBody(name, afterStatusId), TaskWire.NoHeaders);
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectStatusRoutes.CollectionOf(spaceId, projectId), ProjectStatusWire.NameAfterBody(name, afterStatusId), TaskWire.NoHeaders);
 
     public static Task<WireResponse> RenameAsync(Actor actor, Guid spaceId, Guid projectId, Guid statusId, string? name) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Patch, ProjectStatusWire.ItemOf(spaceId, projectId, statusId), ProjectStatusWire.NameBody(name), TaskWire.NoHeaders);
+        actor.Session.SendWithHeadersAsync(HttpMethod.Patch, ProjectStatusRoutes.ItemOf(spaceId, projectId, statusId), ProjectStatusWire.NameBody(name), TaskWire.NoHeaders);
 
     public static Task<WireResponse> RenameWithTokenAsync(Actor actor, string token, Guid spaceId, Guid projectId, Guid statusId, string name) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Patch, ProjectStatusWire.ItemOf(spaceId, projectId, statusId), token, ProjectStatusWire.NameBody(name), TaskWire.NoHeaders);
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Patch, ProjectStatusRoutes.ItemOf(spaceId, projectId, statusId), token, ProjectStatusWire.NameBody(name), TaskWire.NoHeaders);
 
     public static Task<WireResponse> PlaceAsync(Actor actor, Guid spaceId, Guid projectId, Guid statusId, Guid? afterStatusId) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectStatusWire.PlaceOf(spaceId, projectId, statusId), ProjectStatusWire.PlaceBody(afterStatusId), TaskWire.NoHeaders);
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectStatusRoutes.PlaceOf(spaceId, projectId, statusId), ProjectStatusWire.PlaceBody(afterStatusId), TaskWire.NoHeaders);
 
     public static Task<WireResponse> PlaceWithTokenAsync(Actor actor, string token, Guid spaceId, Guid projectId, Guid statusId, Guid? afterStatusId) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, ProjectStatusWire.PlaceOf(spaceId, projectId, statusId), token, ProjectStatusWire.PlaceBody(afterStatusId), TaskWire.NoHeaders);
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, ProjectStatusRoutes.PlaceOf(spaceId, projectId, statusId), token, ProjectStatusWire.PlaceBody(afterStatusId), TaskWire.NoHeaders);
 
     /// <summary>
     /// Adds <paramref name="name"/> to a Project through the product, failing the case unless it is admitted, and answers the
@@ -70,7 +71,7 @@ internal static class ProjectStatusSliceWire
 
         Assert.True(added.StatusCode == HttpStatusCode.Created, $"Adding a Status through the product: {added.StatusCode} {added.Body}");
 
-        return ProjectStatusWire.EntriesOf(added.Body).Single(entry => entry.Name == name && entry.Source == ProjectStatusWire.AddedHere).Id;
+        return ProjectStatusWire.EntriesOf(added.Body).Single(entry => entry.Name == name && entry.Source == ProjectStatusSources.AddedHere).Id;
     }
 
     /// <summary>
@@ -176,22 +177,17 @@ internal static class ProjectStatusSliceWire
     }
 
     /// <summary>
-    /// The Space's Tasks whose Status is outside their own Project's effective set - S-2 / AD-17 once Projects differ. In a
-    /// set with no removal, a Project's set is the Space defaults plus the definitions that Project owns, so a Task is
-    /// outside it when its Status is another Project's definition, or no definition of the Space at all.
+    /// The Space's Tasks whose Status is outside their own Project's effective set - the Status half of S-2, by the one
+    /// statement <see cref="WireDatabase.TasksOutsideTheirProjectsSetSql"/> states.
     /// </summary>
     public static async Task<int> TasksOutsideTheirProjectsSetAsync(RegistrationDatabase database, Guid spaceId)
     {
         await using var connection = await database.OpenForSpaceAsync(spaceId, TestContext.Current.CancellationToken);
         await using var command = connection.CreateCommand();
 
-        command.CommandText =
-            """
-            SELECT COUNT(*) FROM dbo.[Task] t
-            WHERE NOT EXISTS (
-                SELECT 1 FROM dbo.[StatusDefinition] s
-                WHERE s.SpaceId = t.SpaceId AND s.Id = t.StatusId AND (s.OwnerProjectId IS NULL OR s.OwnerProjectId = t.ProjectId))
-            """;
+#pragma warning disable CA2100 // Review SQL queries - a fixed statement; no input reaches it.
+        command.CommandText = WireDatabase.TasksOutsideTheirProjectsSetSql;
+#pragma warning restore CA2100
 
         return Convert.ToInt32(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken), System.Globalization.CultureInfo.InvariantCulture);
     }

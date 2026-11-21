@@ -127,12 +127,18 @@ public sealed partial class RefusalBoundaryGateTests
             .Where(type => type.Namespace == ProjectContractsNamespace && type.Name.EndsWith("Request", StringComparison.Ordinal))
             .ToList();
 
-        // Vacuity guard: create and rename both exist.
-        Assert.Equal(["CreateProjectRequest", "RenameProjectRequest"], requests.Select(type => type.Name).Order(StringComparer.Ordinal));
+        // Vacuity guard: create and rename both exist, and so do the Project's own Status requests, which share the
+        // namespace and are held to their members by the Project Status gates.
+        Assert.Equal(
+            ["AddProjectStatusRequest", "CreateProjectRequest", "PlaceProjectStatusRequest", "RenameProjectRequest", "RenameProjectStatusRequest"],
+            requests.Select(type => type.Name).Order(StringComparer.Ordinal));
 
-        Assert.All(requests, request => Assert.Equal(
+        Assert.All(requests.Where(request => !request.Name.Contains("Status", StringComparison.Ordinal)), request => Assert.Equal(
             ["Name"],
             request.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(property => property.Name)));
+        Assert.All(requests, request => Assert.DoesNotContain(
+            request.GetProperties(BindingFlags.Public | BindingFlags.Instance),
+            property => property.Name.Contains("Space", StringComparison.Ordinal) || property.Name == "ProjectId"));
     }
 
     /// <summary>

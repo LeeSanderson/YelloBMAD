@@ -670,7 +670,7 @@ public sealed partial class TaskEndpointTests
         var rows = await TaskRowsAsync(database, owner.SpaceId);
 
         Assert.Equal(3, rows.Select(row => row.StatusId).Distinct().Count());
-        Assert.Equal(0, await TasksOutsideTheirEffectiveSetAsync(database, owner.SpaceId));
+        await Projects.ProjectStatusSliceWire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>

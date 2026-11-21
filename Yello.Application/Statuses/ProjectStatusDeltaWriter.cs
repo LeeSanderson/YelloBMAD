@@ -1,0 +1,106 @@
+using Yello.Domain;
+using Yello.Domain.Boards;
+using Yello.Domain.Statuses;
+
+namespace Yello.Application.Statuses;
+
+/// <summary>
+/// The one way a Project's Status delta is written: under the Project's lock, against the set read after the lock was
+/// granted, checked as the set it would leave, and answered with the set as the read then returns it.
+/// </summary>
+/// <remarks>
+/// <para>
+/// <b>Checked after the lock, never before.</b> Two adds of one name both pass a check made before it; under it the second
+/// reads the first's Status and is refused. The check is the effective set's own - an index cannot see a renamed default's
+/// name, which lives in the delta.
+/// </para>
+/// <para>
+/// <b>A refusal writes nothing</b>: the check runs before the store is called, and the endpoint's error result rolls the
+/// unit of work back if an index refuses what the check admitted.
+/// </para>
+/// </remarks>
+/// <param name="store">Takes the lock and records the write.</param>
+/// <param name="statuses">Reads the Space's defaults and the Project's delta.</param>
+/// <param name="boards">Counts the Project's Tasks per Status.</param>
+/// <param name="identifiers">Produces the ids of what the write adds.</param>
+/// <param name="clock">Stamps the write.</param>
+public sealed class ProjectStatusDeltaWriter(
+    IProjectStatusStore store,
+    IStatusDefinitionReader statuses,
+    IBoardReader boards,
+    IIdentifierGenerator identifiers,
+    TimeProvider clock)
+{
+    /// <summary>
+    /// Plans and records one write.
+    /// </summary>
+    /// <param name="spaceId">The active Space, from the pipeline's context.</param>
+    /// <param name="projectId">The Project, from the route.</param>
+    /// <param name="plan">
+    /// Plans the write on the draft, or answers why it cannot be made; <see cref="ProjectStatusWriteOutcome.Written"/> means
+    /// planned.
+    /// </param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The outcome, and the Project's set when it was written.</returns>
+    public Task<ProjectStatusWriteResult> WriteAsync(
+        Guid spaceId,
+        Guid projectId,
+        Func<ProjectStatusDeltaDraft, ProjectStatusWriteOutcome> plan,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+
+        return WriteUnderLockAsync(spaceId, projectId, plan, cancellationToken);
+    }
+
+    private async Task<ProjectStatusWriteResult> WriteUnderLockAsync(
+        Guid spaceId,
+        Guid projectId,
+        Func<ProjectStatusDeltaDraft, ProjectStatusWriteOutcome> plan,
+        CancellationToken cancellationToken)
+    {
+        if (!await store.LockAsync(projectId, cancellationToken).ConfigureAwait(false))
+        {
+            return ProjectStatusWriteResult.Refused(ProjectStatusWriteOutcome.NotFound);
+        }
+
+        var defaults = await statuses.ListAsync(cancellationToken).ConfigureAwait(false);
+        var delta = await statuses.DeltaOfAsync(projectId, cancellationToken).ConfigureAwait(false);
+        var draft = new ProjectStatusDeltaDraft(spaceId, projectId, EffectiveStatusSet.Of(defaults, delta), delta, identifiers, clock.GetUtcNow());
+
+        var planned = plan(draft);
+
+        if (planned != ProjectStatusWriteOutcome.Written)
+        {
+            return ProjectStatusWriteResult.Refused(planned);
+        }
+
+        var verdict = EffectiveStatusSet.Check(EffectiveStatusSet.Of(defaults, delta.With(draft.Added, draft.Operations)), draft.NamedStatusId);
+
+        if (verdict != StatusDeltaVerdict.Admitted)
+        {
+            return ProjectStatusWriteResult.Refused(verdict == StatusDeltaVerdict.NameTaken ? ProjectStatusWriteOutcome.NameTaken : ProjectStatusWriteOutcome.SetEmpty);
+        }
+
+        if (!await store.WriteAsync(draft.Added, draft.Operations, cancellationToken).ConfigureAwait(false))
+        {
+            return ProjectStatusWriteResult.Refused(ProjectStatusWriteOutcome.NameTaken);
+        }
+
+        return new ProjectStatusWriteResult(ProjectStatusWriteOutcome.Written, await ReadAsync(projectId, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Reads one Project's set and its Task counts, as the read and every write answer it.
+    /// </summary>
+    /// <param name="projectId">The Project, already known to be the active Space's.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The set.</returns>
+    internal async Task<ProjectStatusSet> ReadAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        var effective = await statuses.EffectiveOfAsync(projectId, cancellationToken).ConfigureAwait(false);
+        var counts = await boards.CountTasksByStatusAsync(projectId, cancellationToken).ConfigureAwait(false);
+
+        return new ProjectStatusSet(effective, counts);
+    }
+}

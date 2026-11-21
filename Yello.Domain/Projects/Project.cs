@@ -12,8 +12,8 @@ namespace Yello.Domain.Projects;
 /// </para>
 /// <para>
 /// <b>No Status column, and no effective Status set.</b> A Project's effective set is derived from
-/// its Space's defaults and its own delta at the point of use (AD-16); the delta does not exist until
-/// story 6.1, so a new Project's effective set is the Space default set by construction.
+/// its Space's defaults and its own delta at the point of use (AD-16). A new Project's delta is empty,
+/// so its effective set is the Space default set by construction.
 /// </para>
 /// <para>
 /// No navigation properties - see <c>YelloDbContext</c>'s remarks.

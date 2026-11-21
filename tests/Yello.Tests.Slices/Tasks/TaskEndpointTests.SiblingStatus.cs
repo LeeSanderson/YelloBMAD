@@ -26,7 +26,7 @@ public sealed partial class TaskEndpointTests
     /// is admitted for a Task of the sibling Project itself.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - EditTaskAttributesHandler checks the Space's set, and no Project can add a Status")]
+    [Fact]
     [Trait("Requirement", "FR-20")]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "AD-17")]
@@ -72,7 +72,7 @@ public sealed partial class TaskEndpointTests
     /// id's refusal, and the Task keeps its Status and key. Anchor: the same move inside the sibling Project is admitted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - MoveTaskHandler checks the Space's set, and no Project can add a Status")]
+    [Fact]
     [Trait("Requirement", "FR-20")]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "AD-17")]

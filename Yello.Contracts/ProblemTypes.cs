@@ -260,6 +260,38 @@ public static class ProblemTypes
     public static string LabelInUse => "urn:yello:problem:label-in-use";
 
     /// <summary>
+    /// A Status name that is not 1-100 characters once trimmed. Answered <c>400</c>; nothing is written.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never "that name is taken"</b> - that is <see cref="StatusNameTaken"/>. This reports only what was sent.
+    /// </remarks>
+    public static string InvalidStatusName => "urn:yello:problem:invalid-status-name";
+
+    /// <summary>
+    /// The Project's effective set already holds a Status of that name, compared ignoring case. Answered <c>409</c>;
+    /// nothing is written.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never the name or the other Status's id.</b> Only the Project's own set is compared: another Project may hold
+    /// the same name.
+    /// </remarks>
+    public static string StatusNameTaken => "urn:yello:problem:status-name-taken";
+
+    /// <summary>
+    /// The write would leave the Project with no Status. Answered <c>409</c>; nothing is written.
+    /// </summary>
+    public static string StatusSetEmpty => "urn:yello:problem:status-set-empty";
+
+    /// <summary>
+    /// A place or an add at a position whose anchor is not another Status of the Project's set, or a place body that
+    /// cannot be read. Answered <c>400</c>; nothing is written.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never the id sent</b>: a random id and another Project's or Space's real one answer the same bytes.
+    /// </remarks>
+    public static string InvalidStatusPosition => "urn:yello:problem:invalid-status-position";
+
+    /// <summary>
     /// A Task edit whose <c>labelIds</c> names a Label that is not one of the Space's - unknown, another Space's,
     /// repeated, not an id, or deleted while the edit ran. Answered <c>400</c>; nothing is written. Story 2.4, AC10,
     /// AC11.

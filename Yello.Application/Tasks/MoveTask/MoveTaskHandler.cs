@@ -1,3 +1,4 @@
+using Yello.Application.Statuses;
 using Yello.Domain.Statuses;
 using Yello.Domain.Tasks;
 
@@ -23,7 +24,7 @@ namespace Yello.Application.Tasks.MoveTask;
 /// </para>
 /// </remarks>
 /// <param name="store">Reads and moves the Task.</param>
-/// <param name="statuses">Reads the Space's Status definitions.</param>
+/// <param name="statuses">Reads the Space's Status definitions and the Project's delta.</param>
 public sealed class MoveTaskHandler(ITaskStore store, IStatusDefinitionReader statuses)
 {
     /// <summary>
@@ -43,8 +44,7 @@ public sealed class MoveTaskHandler(ITaskStore store, IStatusDefinitionReader st
             return MoveTaskResult.NotFound;
         }
 
-        // Until story 6.1 adds a Project's own delta, every Project's effective set is its Space's definitions.
-        var effective = EffectiveStatusSet.Of(await statuses.ListAsync(cancellationToken).ConfigureAwait(false));
+        var effective = await statuses.EffectiveOfAsync(task.ProjectId, cancellationToken).ConfigureAwait(false);
 
         if (!EffectiveStatusSet.Contains(effective, statusId))
         {

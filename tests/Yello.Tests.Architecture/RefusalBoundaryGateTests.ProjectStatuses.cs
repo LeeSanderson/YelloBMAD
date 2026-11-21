@@ -2,6 +2,8 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
 using Xunit;
 using Yello.Domain;
 using Yello.Domain.Memberships;
@@ -32,9 +34,9 @@ namespace Yello.Tests.Architecture;
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
 {
-    private const string DeltaEntityName = "Yello.Domain.Statuses.StatusDeltaOperation";
+    private static readonly string DeltaEntityName = typeof(Yello.Domain.Statuses.StatusDeltaOperation).FullName!;
 
-    private const string ProjectStatusResponseName = "Yello.Contracts.Projects.ProjectStatusResponse";
+    private static readonly string ProjectStatusResponseName = typeof(Yello.Contracts.Projects.ProjectStatusResponse).FullName!;
 
     private const string ProjectStatusesPattern = ProjectPattern + "/statuses";
 
@@ -51,7 +53,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>POST</c> on its <c>place</c> action: the read requires <c>ReadProjectsAndTasks</c> (a Viewer sees the set), every
     /// write requires <c>ConfigureProjectStatusDelta</c> (no new capability), none is Session-only, none consults a bound.
     /// </summary>
-    [Fact(Skip = "red: AC2, AC11 - Q12 (a): the Project Status routes are not mapped")]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "AD-4")]
     [Trait("Requirement", "FR-25")]
@@ -82,7 +84,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// mapped route under a Project and no member of the Project contracts' namespace names <c>Inherit</c>, <c>Override</c>,
     /// <c>Reset</c> or <c>Mode</c>.
     /// </summary>
-    [Fact(Skip = "red: AC9 - the absence is anchored on the Project Status routes, which are not mapped")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "AD-16")]
     public void No_route_or_contract_offers_an_inherit_override_or_reset_mode_for_a_Projects_Statuses()
@@ -110,7 +112,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>ProblemTypes</c>: <c>invalid-status-name</c>, <c>status-name-taken</c>, <c>status-set-empty</c> and
     /// <c>invalid-status-position</c>.
     /// </summary>
-    [Fact(Skip = "red: AC8, AC10 - ProblemTypes has no Status refusal types yet")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-25")]
     public void The_Status_refusals_have_stable_problem_types()
@@ -137,7 +139,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// survives a rename, the effective name, where it comes from, the Space default's own name when renamed here (nullable),
     /// and the Task count - never a Space, never a position.
     /// </summary>
-    [Fact(Skip = "red: AC7 - Q5 (a): there is no ProjectStatusResponse contract yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR15")]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-19")]
@@ -175,7 +177,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// created, and it carries one operation - <c>{ AfterStatusId, CreatedAt, Id, Kind, Name, ProjectId, Sequence, SpaceId,
     /// StatusId }</c> - with no navigation and no column holding a whole order.
     /// </summary>
-    [Fact(Skip = "red: AC4, AC11 - Q1 (a): there is no StatusDeltaOperation entity yet")]
+    [Fact]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "AD-16")]
     public void The_delta_entity_is_Space_scoped_fixed_at_creation_and_holds_one_operation()
@@ -203,7 +205,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// error 1785), and the three name columns declare <c>SQL_Latin1_General_CP1_CI_AS</c> explicitly rather than resting on
     /// the database's default.
     /// </summary>
-    [Fact(Skip = "red: AC10, AC13 - Q2 (a), Q6 (a): no owning key and no explicit name collation in the model yet")]
+    [Fact]
     [Trait("Requirement", "AD-16")]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "FR-22")]
@@ -211,7 +213,9 @@ public sealed partial class RefusalBoundaryGateTests
     {
         using var context = new YelloDbContextFactory().CreateDbContext([]);
 
-        var statusDefinition = context.Model.FindEntityType(typeof(Yello.Domain.Statuses.StatusDefinition));
+        // The design-time model: the read-optimised one the runtime uses drops a column's collation.
+        var model = context.GetService<IDesignTimeModel>().Model;
+        var statusDefinition = model.FindEntityType(typeof(Yello.Domain.Statuses.StatusDefinition));
 
         Assert.NotNull(statusDefinition);
 
@@ -226,7 +230,7 @@ public sealed partial class RefusalBoundaryGateTests
 
         foreach (var entityName in new[] { typeof(Yello.Domain.Statuses.StatusDefinition).FullName!, typeof(Yello.Domain.Labels.Label).FullName!, DeltaEntityName })
         {
-            var mapped = context.Model.FindEntityType(entityName);
+            var mapped = model.FindEntityType(entityName);
 
             Assert.True(mapped is not null, $"{entityName} is not in the model.");
             Assert.Equal(CaseInsensitiveNameCollation, mapped.FindProperty("Name")?.GetCollation());
@@ -237,7 +241,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The client's predicate for the Project settings link and every Status-delta control agrees with the capability matrix
     /// for every Role: it offers them exactly where <c>ConfigureProjectStatusDelta</c> is not denied (Owner and Admin).
     /// </summary>
-    [Fact(Skip = "red: AC2 - there is no client predicate for ConfigureProjectStatusDelta yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "AD-1")]

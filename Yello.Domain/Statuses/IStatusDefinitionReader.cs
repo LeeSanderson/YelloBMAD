@@ -12,7 +12,7 @@ namespace Yello.Domain.Statuses;
 public interface IStatusDefinitionReader
 {
     /// <summary>
-    /// Every Status definition in the active Space, in Board order.
+    /// The active Space's default Status definitions, in Space order. A definition a Project owns is never one of them.
     /// </summary>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>
@@ -20,4 +20,16 @@ public interface IStatusDefinitionReader
     /// the same way on every request.
     /// </returns>
     Task<IReadOnlyList<StatusDefinition>> ListAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// One Project's delta: the definitions it owns and its operations in the delta's order.
+    /// </summary>
+    /// <remarks>
+    /// Whether the Project exists is not this read's to say: a Project that matches nothing has an empty delta, and the
+    /// caller has already read the Project.
+    /// </remarks>
+    /// <param name="projectId">The Project.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The delta.</returns>
+    Task<ProjectStatusDelta> DeltaOfAsync(Guid projectId, CancellationToken cancellationToken);
 }

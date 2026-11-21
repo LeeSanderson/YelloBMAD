@@ -1,3 +1,4 @@
+using Yello.Application.Statuses;
 using Yello.Domain.Boards;
 using Yello.Domain.Statuses;
 using Yello.Domain.Tasks;
@@ -26,7 +27,7 @@ namespace Yello.Application.Boards.ViewBoardColumn;
 /// </para>
 /// </remarks>
 /// <param name="reader">Reads the Project, the column's count and its page.</param>
-/// <param name="statuses">Reads the Space's Status definitions.</param>
+/// <param name="statuses">Reads the Space's Status definitions and the Project's delta.</param>
 public sealed class ViewBoardColumnHandler(IBoardReader reader, IStatusDefinitionReader statuses)
 {
     /// <summary>
@@ -44,7 +45,7 @@ public sealed class ViewBoardColumnHandler(IBoardReader reader, IStatusDefinitio
             return null;
         }
 
-        var effective = EffectiveStatusSet.Of(await statuses.ListAsync(cancellationToken).ConfigureAwait(false));
+        var effective = await statuses.EffectiveOfAsync(projectId, cancellationToken).ConfigureAwait(false);
 
         if (!EffectiveStatusSet.Contains(effective, statusId))
         {

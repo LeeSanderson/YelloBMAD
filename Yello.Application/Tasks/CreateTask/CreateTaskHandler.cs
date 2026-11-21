@@ -1,4 +1,5 @@
 using Yello.Application.Spaces;
+using Yello.Application.Statuses;
 using Yello.Domain.Statuses;
 using Yello.Domain.Tasks;
 
@@ -21,7 +22,7 @@ namespace Yello.Application.Tasks.CreateTask;
 /// </para>
 /// </remarks>
 /// <param name="store">Writes the Task.</param>
-/// <param name="statuses">Reads the Space's Status definitions.</param>
+/// <param name="statuses">Reads the Space's Status definitions and the Project's delta.</param>
 public sealed class CreateTaskHandler(ITaskStore store, IStatusDefinitionReader statuses)
 {
     /// <summary>
@@ -45,13 +46,13 @@ public sealed class CreateTaskHandler(ITaskStore store, IStatusDefinitionReader 
 
     private async Task<TaskItem?> CreateAsync(Guid spaceId, Guid projectId, string title, CancellationToken cancellationToken)
     {
-        var effective = EffectiveStatusSet.Of(await statuses.ListAsync(cancellationToken).ConfigureAwait(false));
+        var effective = await statuses.EffectiveOfAsync(projectId, cancellationToken).ConfigureAwait(false);
 
-        // Every Space is seeded with three Statuses at registration and nothing removes one until Epic 6,
-        // whose migration keeps at least one. An empty set is a broken Space, not a request to refuse.
+        // No delta write may leave a Project's set empty, so an empty set is a broken Project, not a request to refuse.
+        // A Project id that matches nothing reads the Space's defaults, and the store answers it as not found.
         var first = effective.Count > 0
             ? effective[0]
-            : throw new InvalidOperationException("The active Space defines no Status.");
+            : throw new InvalidOperationException("The Project's effective Status set is empty.");
 
         return await store.CreateAsync(spaceId, projectId, first.Id, title, cancellationToken).ConfigureAwait(false);
     }

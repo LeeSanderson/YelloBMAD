@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Yello.Domain;
 using Yello.Domain.Projects;
+using Yello.Domain.Statuses;
 
 namespace Yello.Infrastructure.Persistence;
 
@@ -29,10 +30,13 @@ namespace Yello.Infrastructure.Persistence;
 /// 2.5's RACE-P1 and RACE-P2.
 /// </para>
 /// <para>
-/// <b>One statement, cascades in the database.</b> <c>ExecuteDelete</c> on the Project; <c>FK_Task_Project_SpaceId_ProjectId</c>
-/// and <c>TaskLabel</c>'s key to <c>Task</c> are <c>CASCADE</c> and carry <c>SpaceId</c>, so they cannot leave the Space.
-/// Never batched: atomicity wins, and since story 2.9 the Task tables never escalate (LOCK_ESCALATION = DISABLE), so a large
-/// deletion holds rows, not the tables other Spaces write to.
+/// <b>Ordered statements in the request's one transaction.</b> The Project's Tasks (their Label applications cascade), its
+/// Status delta, the Statuses it owns, then the Project. A single cascading <c>DELETE</c> of the Project cannot do it: an
+/// owned Status's key to the Project is NO ACTION (a cascade would be a second path from <c>Space</c>, 1785), and a Task
+/// references its Status NO ACTION too, so the Tasks must be gone before the Statuses they hold, and those before the
+/// Project. Every statement carries <c>SpaceId</c> through both isolation layers, so none can leave the Space. Never
+/// batched: atomicity wins, and the Task tables never escalate (LOCK_ESCALATION = DISABLE), so a large deletion holds rows,
+/// not the tables other Spaces write to.
 /// </para>
 /// </remarks>
 /// <param name="dbContext">The request's unit of work.</param>
@@ -126,6 +130,23 @@ internal sealed class ProjectStore(YelloDbContext dbContext, IIdentifierGenerato
         // The Project's Tasks lock, as a creation's bound count and every key placer take it, so the two meet on it (story
         // 2.9: a lock of its own, where a range scan's last key reached another Space).
         await ApplicationLocks.TakeProjectTasksAsync(dbContext, projectId, cancellationToken).ConfigureAwait(false);
+
+        // In key order: a Task and a delta operation each reference a Status the Project owns, and an owned Status
+        // references the Project, all NO ACTION, so each goes before what it references.
+        await dbContext.Tasks
+            .Where(task => task.ProjectId == projectId)
+            .ExecuteDeleteAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        await dbContext.Set<StatusDeltaOperation>()
+            .Where(operation => operation.ProjectId == projectId)
+            .ExecuteDeleteAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        await dbContext.StatusDefinitions
+            .Where(status => status.OwnerProjectId == projectId)
+            .ExecuteDeleteAsync(cancellationToken)
+            .ConfigureAwait(false);
 
         var deleted = await dbContext.Projects
             .Where(project => project.Id == projectId)
