@@ -28,10 +28,7 @@ namespace Yello.Tests.Architecture;
 /// method as written, not the compiler's split of it.
 /// </para>
 /// <para>
-/// <b>Existing gates the declined read widens deliberately:</b> <c>OfferOwnershipTransfer_is_required_by_exactly_the_three_offer_routes</c>
-/// is replaced by <see cref="OfferOwnershipTransfer_is_required_by_exactly_the_four_offer_routes"/>, and
-/// <c>The_ownership_offer_routes_require_OfferOwnershipTransfer_and_serve_both_surfaces</c> gains the pattern. <b>Kept green
-/// unchanged:</b> <c>Only_the_offer_store_writes_an_OwnershipOffer_state</c>,
+/// <b>Kept green unchanged:</b> <c>Only_the_offer_store_writes_an_OwnershipOffer_state</c>,
 /// <c>No_production_code_runs_on_a_timer_or_as_a_hosted_service</c>, both no-outbox gates, and the problem-type gate (no new
 /// problem type).
 /// </para>
@@ -48,16 +45,13 @@ public sealed partial class RefusalBoundaryGateTests
 
     private const string OwnershipOfferStateTypeName = "Yello.Domain.Spaces.OwnershipOfferState";
 
-    private const string DeclinedReadPending = "red: AC1 - the Owner's declined read (Q1 (a)) is not mapped yet";
-
     private static readonly string[] OfferBulkWrites = ["ExecuteUpdate", "ExecuteUpdateAsync", "ExecuteDelete", "ExecuteDeleteAsync"];
 
     /// <summary>
     /// The matrix's "Offer to transfer ownership" row governs exactly the four offer routes: the offer, the pending read, the
     /// declined read and the revoke. No other route borrows it, and none of the four is folded under another capability.
-    /// Replaces the three-route gate when the declined read is mapped.
     /// </summary>
-    [Fact(Skip = DeclinedReadPending + "; this gate replaces OfferOwnershipTransfer_is_required_by_exactly_the_three_offer_routes")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-1")]
     public void OfferOwnershipTransfer_is_required_by_exactly_the_four_offer_routes()
@@ -78,7 +72,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The declined read is exactly one <c>GET</c>; it requires <c>OfferOwnershipTransfer</c>, is not Session-only and consults
     /// no bound, so a Token reaches it.
     /// </summary>
-    [Fact(Skip = DeclinedReadPending)]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-4")]
     [Trait("Requirement", "AD-1")]
@@ -96,7 +90,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The declined answer carries exactly <c>Id</c> (a <c>Guid</c>) and <c>RecipientName</c> (a nullable <c>string</c>, null
     /// once the Membership is gone): no address, no recipient id, no Role.
     /// </summary>
-    [Fact(Skip = DeclinedReadPending)]
+    [Fact]
     [Trait("Requirement", "AD-23")]
     [Trait("Requirement", "FR-42")]
     public void The_declined_ownership_offer_contract_carries_exactly_Id_and_RecipientName()
@@ -118,7 +112,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The declined read can emit nothing and moves nothing: <c>ReadDeclinedOwnershipOfferHandler</c>'s constructors take an
     /// offer port and name no outbox type. Sibling of <c>The_ownership_acceptance_and_decline_take_no_outbox</c>.
     /// </summary>
-    [Fact(Skip = DeclinedReadPending)]
+    [Fact]
     [Trait("Requirement", "FR-43")]
     [Trait("Requirement", "AR-33")]
     public void The_declined_ownership_offer_read_takes_no_outbox()
@@ -135,7 +129,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>OwnershipOfferRevocation.LostMembership</c>, which the endpoint answers with the recorded boundary <c>404</c>, beside
     /// <c>Revoked</c>, <c>NotPending</c>, <c>NotFound</c> and <c>NoLongerOwner</c>. The runtime proof is the revoke race.
     /// </summary>
-    [Fact(Skip = "red: AC4 - OwnershipOfferRevocation has no LostMembership member yet")]
+    [Fact]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AD-3")]
     public void The_revoke_outcome_names_a_lost_Membership()

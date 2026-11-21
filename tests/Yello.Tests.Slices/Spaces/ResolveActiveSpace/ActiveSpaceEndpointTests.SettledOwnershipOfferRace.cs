@@ -110,7 +110,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// <c>409</c> to a non-member.
     /// </remarks>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the revoke has no LostMembership outcome yet, so a revoker whose Membership ended while it waited answers 409 for an offer that exists")]
+    [Fact]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "NFR-1")]

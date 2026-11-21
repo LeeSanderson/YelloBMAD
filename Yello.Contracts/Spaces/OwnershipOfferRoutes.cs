@@ -5,9 +5,9 @@ namespace Yello.Contracts.Spaces;
 /// </summary>
 /// <remarks>
 /// <b><c>{spaceId}</c> first after the version</b>, so the pipeline resolves the route because of its shape. The offer, the
-/// Owner's read and the revoke declare <c>OfferOwnershipTransfer</c>, which only the Owner holds. The recipient's read, the
-/// acceptance and the decline are decided by row identity - is the caller the Membership the offer names - so they declare
-/// <c>ReadProjectsAndTasks</c>, which every Role holds. All six are served on both surfaces.
+/// Owner's two reads and the revoke declare <c>OfferOwnershipTransfer</c>, which only the Owner holds. The recipient's read,
+/// the acceptance and the decline are decided by row identity - is the caller the Membership the offer names - so they
+/// declare <c>ReadProjectsAndTasks</c>, which every Role holds. All seven are served on both surfaces.
 /// </remarks>
 public static class OwnershipOfferRoutes
 {
@@ -29,6 +29,13 @@ public static class OwnershipOfferRoutes
     /// the caller's own Membership, or <c>204</c> with no body otherwise - for everyone else, the Owner included.
     /// </summary>
     public static string Mine => "/api/v1/spaces/{spaceId:guid}/ownership-offers/mine";
+
+    /// <summary>
+    /// <c>GET</c> here: <c>200</c> with the <see cref="DeclinedOwnershipOfferResponse"/> when the Space's most recent offer
+    /// was declined, or <c>204</c> with no body otherwise - no offer, a pending one, or a latest offer that was accepted,
+    /// revoked, lapsed or expired.
+    /// </summary>
+    public static string Declined => "/api/v1/spaces/{spaceId:guid}/ownership-offers/declined";
 
     /// <summary>
     /// <c>DELETE</c> here revokes the offer: <c>204</c> with no body; <c>409 ownership-offer-not-pending</c> for an offer of
@@ -69,6 +76,13 @@ public static class OwnershipOfferRoutes
     /// <param name="spaceId">The Space.</param>
     /// <returns>The path.</returns>
     public static string MineOf(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}/ownership-offers/mine";
+
+    /// <summary>
+    /// The Owner's declined read of one Space, as a client calls it.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <returns>The path.</returns>
+    public static string DeclinedOf(Guid spaceId) => $"/api/v1/spaces/{spaceId:D}/ownership-offers/declined";
 
     /// <summary>
     /// One offer of one Space, as a client calls it.

@@ -3,6 +3,7 @@ using Yello.Application.Memberships;
 using Yello.Application.Outbox;
 using Yello.Application.Spaces;
 using Yello.Application.Spaces.OfferOwnership;
+using Yello.Application.Spaces.ReadDeclinedOwnershipOffer;
 using Yello.Application.Spaces.RevokeOwnershipOffer;
 using Yello.Domain.Memberships;
 
@@ -105,6 +106,29 @@ public sealed class OfferOwnershipHandlerTests
         Assert.Equal(offerId, store.Revoked);
     }
 
+    /// <summary>
+    /// The declined read names the recipient as it is called now, names no one once that Membership is gone, and answers
+    /// nothing when the store found no declined offer. It holds no outbox, so it can send nothing.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-42")]
+    public async Task The_declined_read_names_the_recipient_now_or_no_one_once_its_Membership_is_gone()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var offerId = Guid.NewGuid();
+        var names = new FixedNotice(null, new Dictionary<Guid, string> { [Recipient] = "Nadia Ansari" });
+        var made = new OwnershipOfferMade(OwnershipOfferOutcome.Offered, offerId);
+
+        Assert.Equal(
+            new DeclinedOwnershipOfferView(offerId, "Nadia Ansari"),
+            await new ReadDeclinedOwnershipOfferHandler(new FixedOffers(made, null, new DeclinedOwnershipOffer(offerId, Recipient)), names).HandleAsync(token));
+        Assert.Equal(
+            new DeclinedOwnershipOfferView(offerId, null),
+            await new ReadDeclinedOwnershipOfferHandler(new FixedOffers(made, null, new DeclinedOwnershipOffer(offerId, Guid.NewGuid())), names).HandleAsync(token));
+        Assert.Null(await new ReadDeclinedOwnershipOfferHandler(new FixedOffers(made, null), names).HandleAsync(token));
+    }
+
     private static ActiveSpaceContext Context() => new(Guid.NewGuid(), Guid.NewGuid(), Role.Owner);
 
     private static (OfferOwnershipHandler Handler, RecordingOutbox Outbox) Handler(OwnershipOfferMade made, Guid? pendingId, bool noticeKnown = true)
@@ -128,9 +152,11 @@ public sealed class OfferOwnershipHandlerTests
         }
     }
 
-    private sealed class FixedOffers(OwnershipOfferMade made, PendingOwnershipOffer? pending) : IOwnershipOfferStore
+    private sealed class FixedOffers(OwnershipOfferMade made, PendingOwnershipOffer? pending, DeclinedOwnershipOffer? declined = null) : IOwnershipOfferStore
     {
         public Guid? Revoked { get; private set; }
+
+        public Task<DeclinedOwnershipOffer?> ReadLastDeclinedAsync(CancellationToken cancellationToken) => Task.FromResult(declined);
 
         public Task<OwnershipOfferMade> OfferAsync(Guid actorAccountId, Guid recipientMembershipId, string offererName, CancellationToken cancellationToken) =>
             Task.FromResult(made);
@@ -159,13 +185,15 @@ public sealed class OfferOwnershipHandlerTests
         public Task<string?> ReadAsync(CancellationToken cancellationToken) => Task.FromResult(name);
     }
 
-    private sealed class FixedNotice(OwnershipOfferNotice? notice) : IMembershipStore
+    private sealed class FixedNotice(OwnershipOfferNotice? notice, IReadOnlyDictionary<Guid, string>? names = null) : IMembershipStore
     {
         public Task<OwnershipOfferNotice?> OwnershipOfferNoticeAsync(Guid actorAccountId, Guid recipientMembershipId, CancellationToken cancellationToken) =>
             Task.FromResult(notice);
 
         public Task<string?> DisplayNameOfAsync(Guid membershipId, CancellationToken cancellationToken) =>
-            throw new NotSupportedException("The offer reads the recipient's name with its notice.");
+            names is null
+                ? throw new NotSupportedException("The offer reads the recipient's name with its notice.")
+                : Task.FromResult(names.GetValueOrDefault(membershipId));
 
         public Task<AssignmentNotice?> AssignmentNoticeAsync(Guid actorAccountId, Guid membershipId, Guid taskId, CancellationToken cancellationToken) =>
             throw new NotSupportedException("An offer assigns no Task.");

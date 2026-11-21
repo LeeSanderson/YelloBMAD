@@ -1,7 +1,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Yello.Contracts;
-using Yello.Tests.Shared;
+using Yello.Contracts.Spaces;
 
 namespace Yello.Tests.Client;
 
@@ -14,12 +14,11 @@ namespace Yello.Tests.Client;
 /// <b>As the Host answers them.</b> The declined read is the Owner's alone (the pipeline's boundary <c>404</c> and the
 /// <c>403</c> naming <c>offer-ownership-transfer</c> first); then <c>200</c> with <c>{ id, recipientName }</c> while the
 /// Space's latest offer is the one in <see cref="DeclinedOffers"/>, or <c>204</c>. A new offer makes the latest offer a pending
-/// one, so it clears the Space's entry. The route is <see cref="OwnershipOfferWire.DeclinedOf"/>'s stand-in until the contract
-/// declares it.
+/// one, so it clears the Space's entry.
 /// </para>
 /// <para>
-/// <b>Nothing here changes an earlier case.</b> The client sends no declined read until the Ownership section learns to, and
-/// <see cref="NextOfferDeclineRefusal"/> is unset unless a case sets it.
+/// <b>Inert unless a case sets it.</b> With no entry the declined read answers <c>204</c>, and
+/// <see cref="NextOfferDeclineRefusal"/> is unset.
 /// </para>
 /// </remarks>
 internal sealed partial class FakeYelloApi
@@ -43,7 +42,7 @@ internal sealed partial class FakeYelloApi
     /// <param name="spaceId">The Space.</param>
     /// <returns>The requests.</returns>
     public IReadOnlyList<FakeRequest> DeclinedReads(Guid spaceId) =>
-        [.. _requests.Where(request => request.Method == "GET" && request.Path == OwnershipOfferWire.DeclinedOf(spaceId))];
+        [.. _requests.Where(request => request.Method == "GET" && request.Path == OwnershipOfferRoutes.DeclinedOf(spaceId))];
 
     /// <summary>
     /// The recipient declines the Space's pending offer in another tab: the offer is no longer pending, a revoke of it is

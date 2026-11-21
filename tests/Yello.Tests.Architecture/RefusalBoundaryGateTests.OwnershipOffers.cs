@@ -48,8 +48,9 @@ public sealed partial class RefusalBoundaryGateTests
     private const string OwnershipOfferTypeName = "Yello.Domain.Spaces.OwnershipOffer";
 
     /// <summary>
-    /// The offer routes are exactly <c>POST</c> on the collection, <c>GET</c> on the pending read and <c>DELETE</c> on one offer;
-    /// each requires <c>OfferOwnershipTransfer</c>, none is Session-only and none consults a bound, so a Token reaches all three.
+    /// The offer routes are exactly <c>POST</c> on the collection, <c>GET</c> on the pending and declined reads and
+    /// <c>DELETE</c> on one offer; each requires <c>OfferOwnershipTransfer</c>, none is Session-only and none consults a bound,
+    /// so a Token reaches all four.
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-8")]
@@ -58,37 +59,19 @@ public sealed partial class RefusalBoundaryGateTests
     public void The_ownership_offer_routes_require_OfferOwnershipTransfer_and_serve_both_surfaces()
     {
         var routes = RouteTable()
-            .Where(endpoint => endpoint.RoutePattern.RawText is OwnershipOffersPattern or PendingOwnershipOfferPattern or OwnershipOfferPattern)
+            .Where(endpoint => endpoint.RoutePattern.RawText is OwnershipOffersPattern or PendingOwnershipOfferPattern or DeclinedOwnershipOfferPattern or OwnershipOfferPattern)
             .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? [])
                 .Select(method => (Key: $"{method} {endpoint.RoutePattern.RawText}", Endpoint: endpoint)))
             .ToDictionary(route => route.Key, route => route.Endpoint, StringComparer.Ordinal);
 
         Assert.Equal(
-            [$"DELETE {OwnershipOfferPattern}", $"GET {PendingOwnershipOfferPattern}", $"POST {OwnershipOffersPattern}"],
+            [$"DELETE {OwnershipOfferPattern}", $"GET {DeclinedOwnershipOfferPattern}", $"GET {PendingOwnershipOfferPattern}", $"POST {OwnershipOffersPattern}"],
             routes.Keys.Order(StringComparer.Ordinal));
         Assert.All(routes.Values, endpoint => Assert.Equal(Capability.OfferOwnershipTransfer, endpoint.Metadata.GetMetadata<RequiredCapability>()?.Capability));
         Assert.All(routes.Values, endpoint => Assert.DoesNotContain(endpoint.Metadata, metadata => metadata.GetType().Name == "SessionOnlyEndpoint"));
         Assert.All(routes.Values, endpoint => Assert.Null(endpoint.Metadata.GetMetadata<RequiredBound>()));
     }
 
-    /// <summary>
-    /// The matrix's "Offer to transfer ownership" row governs exactly the three offer routes: no other route borrows it, and
-    /// none of the three is folded under another capability.
-    /// </summary>
-    [Fact]
-    [Trait("Requirement", "FR-8")]
-    [Trait("Requirement", "AD-1")]
-    public void OfferOwnershipTransfer_is_required_by_exactly_the_three_offer_routes()
-    {
-        var requiring = RouteTable()
-            .Where(endpoint => endpoint.Metadata.GetMetadata<RequiredCapability>()?.Capability == Capability.OfferOwnershipTransfer)
-            .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? [])
-                .Select(method => $"{method} {endpoint.RoutePattern.RawText}"))
-            .Order(StringComparer.Ordinal)
-            .ToList();
-
-        Assert.Equal([$"DELETE {OwnershipOfferPattern}", $"GET {PendingOwnershipOfferPattern}", $"POST {OwnershipOffersPattern}"], requiring);
-    }
 
     /// <summary>
     /// The offer contracts carry no address, Role, Account or Space: <c>OfferOwnershipRequest</c> is exactly

@@ -2305,6 +2305,7 @@
     gap: var(--space-3);
 }
 
+.ownership-section__declined,
 .ownership-section__pending-text,
 .ownership-section__question,
 .ownership-section__expiry,

@@ -48,7 +48,6 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     private const string SpaceName = "Northwind Redesign";
     private const string InvalidRecipientCopy = "Ownership can be offered only to another Membership of this Space.";
     private const string DeclinedStatement = "main .ownership-section p.ownership-section__declined";
-    private const string DeclinedStatementPending = "red: AC1 - the Ownership section does not read or state a declined offer yet (Q1 (a), Q10 (a))";
 
     /// <summary>
     /// Records every non-empty text a polite or status region changes to: <c>window.__said</c>.
@@ -383,7 +382,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// exclamation mark, and the picker is still offered. The section asked for the declined read.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = DeclinedStatementPending)]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "UX-DR27")]
     public async Task A_declined_offer_is_stated_by_name_above_the_picker_and_is_not_an_alert()
@@ -424,7 +423,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// declined."
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = DeclinedStatementPending)]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     public async Task A_declined_offer_whose_recipient_is_gone_is_stated_without_a_name()
     {
@@ -448,7 +447,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// declined statement is gone.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = DeclinedStatementPending)]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     public async Task The_declined_statement_is_gone_after_a_confirmed_new_offer()
     {
@@ -477,7 +476,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// declined statement explains why, by the recipient's name.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = DeclinedStatementPending)]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-26")]
     public async Task A_revoke_answered_409_rereads_and_states_the_decline()
@@ -514,7 +513,7 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     /// the text spacing overrides applied.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = DeclinedStatementPending)]
+    [Fact]
     [Trait("Requirement", "UX-DR41")]
     [Trait("Requirement", "NFR-9")]
     public async Task The_declined_statement_reflows_at_320_by_256_with_text_spacing()

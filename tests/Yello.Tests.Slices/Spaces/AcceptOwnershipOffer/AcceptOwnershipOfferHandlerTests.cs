@@ -114,5 +114,8 @@ public sealed class AcceptOwnershipOfferHandlerTests
 
         public Task<OwnershipOfferRevocation> RevokeAsync(Guid actorAccountId, Guid offerId, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The recipient revokes nothing.");
+
+        public Task<DeclinedOwnershipOffer?> ReadLastDeclinedAsync(CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The recipient does not read the Owner's declined offer.");
     }
 }

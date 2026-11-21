@@ -324,9 +324,9 @@
 
         if (answer.StatusCode == HttpStatusCode.NotFound)
         {
-            // The Space itself refused: the page reads it again and renders the one refusal surface.
-            Offers.Closed();
-            await OnClosed.InvokeAsync(false);
+            // The offer's not-found and the Space's are the same bytes by design, so the two are not told apart here: the
+            // dialog shows the designed state, and the re-read lands on the refusal surface only if the Space itself refused.
+            ShowNoLongerOpen();
             ActiveSpace.RequestReread();
             return;
         }

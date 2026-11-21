@@ -29,8 +29,9 @@ namespace Yello.Infrastructure.Persistence;
 /// </para>
 /// <para>
 /// <b>The revoke</b> is one guarded <c>UPDATE</c> composed with the shared actionable predicate, a clause that the caller is
-/// still the Owner, and a rowcount check; on a miss it reads the caller's Role and whether the id exists in this Space, to
-/// choose between <see cref="OwnershipOfferRevocation.NoLongerOwner"/>, <see cref="OwnershipOfferRevocation.NotPending"/> and
+/// still the Owner, and a rowcount check; on a miss it reads the caller's Role and only then whether the id exists in this
+/// Space, to choose between <see cref="OwnershipOfferRevocation.LostMembership"/>,
+/// <see cref="OwnershipOfferRevocation.NoLongerOwner"/>, <see cref="OwnershipOfferRevocation.NotPending"/> and
 /// <see cref="OwnershipOfferRevocation.NotFound"/>. It is never a <c>DELETE</c>: offers are retained.
 /// </para>
 /// <para>
@@ -111,7 +112,7 @@ internal sealed partial class OwnershipOfferStore(
 
         // The caller's own Role now decides between its lost Membership, ownership that moved while it waited on the lock,
         // and a recipient that is not another Membership of this Space.
-        var outcome = await ActorRoleAsync(actorAccountId, cancellationToken).ConfigureAwait(false) switch
+        var outcome = await ActorRoleAsync(spaceId, actorAccountId, cancellationToken).ConfigureAwait(false) switch
         {
             null => OwnershipOfferOutcome.LostMembership,
             Role.Owner => OwnershipOfferOutcome.InvalidRecipient,
@@ -129,6 +130,28 @@ internal sealed partial class OwnershipOfferStore(
             .Select(offer => new PendingOwnershipOffer(offer.Id, offer.RecipientMembershipId, offer.ExpiresAt, DatabaseClock.Now()))
             .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
+
+    /// <inheritdoc />
+    /// <remarks>
+    /// The latest row is taken first and its state tested second: filtering on <c>Declined</c> first would surface an old
+    /// decline behind a newer offer. No offerer clause is needed, because ownership moves only by accepting the latest offer,
+    /// so the latest offer's offerer is the current Owner unless that offer was accepted, which reads as none.
+    /// </remarks>
+    public async Task<DeclinedOwnershipOffer?> ReadLastDeclinedAsync(CancellationToken cancellationToken)
+    {
+        var spaceId = ScopedSpaceId();
+
+        var latest = await dbContext.Set<OwnershipOffer>()
+            .AsNoTracking()
+            .Where(offer => offer.SpaceId == spaceId)
+            .OrderByDescending(offer => offer.CreatedAt)
+            .ThenByDescending(offer => offer.Id)
+            .Select(offer => new { offer.Id, offer.RecipientMembershipId, offer.State })
+            .FirstOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return latest is { State: OwnershipOfferState.Declined } ? new DeclinedOwnershipOffer(latest.Id, latest.RecipientMembershipId) : null;
+    }
 
     /// <inheritdoc />
     public async Task<OwnershipOfferRevocation> RevokeAsync(Guid actorAccountId, Guid offerId, CancellationToken cancellationToken)
@@ -151,7 +174,16 @@ internal sealed partial class OwnershipOfferStore(
             return OwnershipOfferRevocation.Revoked;
         }
 
-        if (await ActorRoleAsync(actorAccountId, cancellationToken).ConfigureAwait(false) is { } role && role != Role.Owner)
+        // The caller's own Membership is read before the offer: a caller with none must get the boundary, and an answer that
+        // read the offer first would tell it that the Space and the offer exist.
+        var role = await ActorRoleAsync(spaceId, actorAccountId, cancellationToken).ConfigureAwait(false);
+
+        if (role is null)
+        {
+            return OwnershipOfferRevocation.LostMembership;
+        }
+
+        if (role != Role.Owner)
         {
             return OwnershipOfferRevocation.NoLongerOwner;
         }
@@ -160,7 +192,7 @@ internal sealed partial class OwnershipOfferStore(
         // existed. No field of the row is read.
         var exists = await dbContext.Set<OwnershipOffer>()
             .AsNoTracking()
-            .AnyAsync(offer => offer.Id == offerId, cancellationToken)
+            .AnyAsync(offer => offer.SpaceId == spaceId && offer.Id == offerId, cancellationToken)
             .ConfigureAwait(false);
 
         return exists ? OwnershipOfferRevocation.NotPending : OwnershipOfferRevocation.NotFound;
@@ -173,11 +205,11 @@ internal sealed partial class OwnershipOfferStore(
     /// <summary>
     /// The caller's own Role here as both isolation layers show it now, or <c>null</c> once its Membership is gone.
     /// </summary>
-    private async Task<Role?> ActorRoleAsync(Guid actorAccountId, CancellationToken cancellationToken)
+    private async Task<Role?> ActorRoleAsync(Guid spaceId, Guid actorAccountId, CancellationToken cancellationToken)
     {
         var actor = await dbContext.Memberships
             .AsNoTracking()
-            .Where(membership => membership.AccountId == actorAccountId)
+            .Where(membership => membership.SpaceId == spaceId && membership.AccountId == actorAccountId)
             .Select(membership => new { membership.Role })
             .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);

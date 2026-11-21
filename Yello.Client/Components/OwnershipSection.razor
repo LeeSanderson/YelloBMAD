@@ -25,13 +25,17 @@
     form in place with a confirm naming the Space and the recipient; focus goes to its text, so neither choice is
     pre-focused. One Idempotency-Key per deliberate Offer, kept for an identical resend after no answer.
 
+    DECLINED: with no offer pending, the Space's latest offer may have been declined. Declining sends no email, so this is
+    how the Owner is told: a plain statement above the picker, read on arrival and after a refused revoke, never pushed
+    and never polled. It goes once a new offer is made.
+
     PENDING: the recipient's label, and the days left counted as ExpiresAt minus ReadAt - both the server's clock - never
     the browser's, with the absolute expiry in a time element. Revoke asks nothing first: it is undone by a new offer and is
     not on the destructive ladder (EXPERIENCE.md:220). After a revoke the picker returns with nothing checked, the revoke is
     announced with no name, and focus goes to the picker.
 
     NOT OPTIMISTIC: the section changes only when the server answers. 409 ownership-offer-pending or
-    ownership-offer-not-pending reads the pending offer again; 400 invalid-offer-recipient says so and reads the picker
+    ownership-offer-not-pending reads the pending offer again, and with it the declined statement; 400 invalid-offer-recipient says so and reads the picker
     again; 403 asks the page to read the Role again; 404 is the Space refusal surface. PURGED WITH THE SPACE.
 *@
 
@@ -45,6 +49,11 @@
         <div class="ownership-section__loading" aria-busy="true">
             <p class="visually-hidden">@Localizer["OwnershipLoading"]</p>
         </div>
+    }
+
+    @if (_pending is null && _declined is { } declined)
+    {
+        <p class="ownership-section__declined">@DeclinedText(declined)</p>
     }
 
     @if (_pending is { } pending)
@@ -134,6 +143,7 @@
 
     private bool _pendingRead;
     private OwnershipOfferResponse? _pending;
+    private DeclinedOwnershipOfferResponse? _declined;
     private List<(Guid Id, string Label)>? _recipients;
     private Dictionary<Guid, string> _labels = [];
     private Guid? _chosen;
@@ -224,6 +234,7 @@
         _generation++;
         _pendingRead = false;
         _pending = null;
+        _declined = null;
         _recipients = null;
         _labels = [];
         _chosen = null;
@@ -262,6 +273,11 @@
     private string PendingText(OwnershipOfferResponse offer) =>
         string.Format(CultureInfo.CurrentCulture, Localizer["OwnershipPending"], LabelOf(offer.RecipientMembershipId, offer.RecipientName));
 
+    private string DeclinedText(DeclinedOwnershipOfferResponse declined) =>
+        declined.RecipientName is { } name
+            ? string.Format(CultureInfo.CurrentCulture, Localizer["OwnershipOfferDeclinedBy"], name)
+            : Localizer["OwnershipOfferDeclined"];
+
     private string Question(Guid recipient) =>
         string.Format(CultureInfo.CurrentCulture, Localizer["OwnershipOfferQuestion"], SpaceName, LabelOf(recipient, string.Empty));
 
@@ -285,12 +301,14 @@
             {
                 _pending = null;
                 _pendingRead = true;
+                await ReadDeclinedAsync(generation, token);
                 return;
             }
 
             if (response.IsSuccessStatusCode)
             {
                 _pending = await response.Content.ReadFromJsonAsync<OwnershipOfferResponse>(JsonOptions, token);
+                _declined = null;
                 _pendingRead = true;
                 return;
             }
@@ -307,6 +325,41 @@
             {
                 await OnSpaceRefused.InvokeAsync(null);
             }
+        }
+    }
+
+    /// <summary>
+    /// Whether the Space's latest offer was declined. Read only once no offer is pending; a failure here leaves the
+    /// statement out rather than refusing a Space whose pending read has just succeeded.
+    /// </summary>
+    private async Task ReadDeclinedAsync(int generation, CancellationToken token)
+    {
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(OwnershipOfferRoutes.DeclinedOf(SpaceId), UriKind.Relative), token);
+
+            if (generation != _generation || token.IsCancellationRequested)
+            {
+                return;
+            }
+
+            if (response.StatusCode == HttpStatusCode.NoContent)
+            {
+                _declined = null;
+                return;
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                _declined = await response.Content.ReadFromJsonAsync<DeclinedOwnershipOfferResponse>(JsonOptions, token);
+                return;
+            }
+
+            await RefusedReadAsync(response, token);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or JsonException)
+        {
+            // No statement: the pending read has already answered, so the section stands without it.
         }
     }
 
@@ -508,6 +561,7 @@
         if (answer.StatusCode == HttpStatusCode.Created)
         {
             _pending = await answer.Response.Content.ReadFromJsonAsync<OwnershipOfferResponse>(JsonOptions, token);
+            _declined = null;
             Settled();
             _focusPending = true;
             Say(Localizer["OwnershipOffered"]);
@@ -612,6 +666,7 @@
         if (answer.StatusCode == HttpStatusCode.NoContent)
         {
             _pending = null;
+            _declined = null;
             _focusPicker = true;
             Say(Localizer["OwnershipOfferRevoked"]);
             return;

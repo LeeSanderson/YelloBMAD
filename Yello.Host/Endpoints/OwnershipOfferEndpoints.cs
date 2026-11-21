@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Yello.Application.Spaces;
 using Yello.Application.Spaces.OfferOwnership;
+using Yello.Application.Spaces.ReadDeclinedOwnershipOffer;
 using Yello.Application.Spaces.ReadOwnershipOffer;
 using Yello.Application.Spaces.RevokeOwnershipOffer;
 using Yello.Contracts;
@@ -11,12 +12,13 @@ using Yello.Host.Spaces;
 namespace Yello.Host.Endpoints;
 
 /// <summary>
-/// Offer ownership of the active Space to one of its Memberships, read the pending offer, and revoke it.
+/// Offer ownership of the active Space to one of its Memberships, read the pending offer, read whether the last one was
+/// declined, and revoke it.
 /// </summary>
 /// <remarks>
 /// <para>
 /// <b>No Membership check, no Role, no idempotency and no refusal record here</b> - the reasons
-/// <see cref="ProjectEndpoints"/> gives. The offer, the Owner's read and the revoke declare <c>OfferOwnershipTransfer</c>,
+/// <see cref="ProjectEndpoints"/> gives. The offer, the Owner's two reads and the revoke declare <c>OfferOwnershipTransfer</c>,
 /// which only the Owner holds, so an Admin, a Member or a Viewer meets the pipeline's recorded <c>403</c> before this code
 /// runs. Both surfaces.
 /// </para>
@@ -45,6 +47,15 @@ public static class OwnershipOfferEndpoints
     /// <returns>The registered route, for further configuration.</returns>
     public static RouteHandlerBuilder MapReadOwnershipOffer(this IEndpointRouteBuilder endpoints) =>
         endpoints.MapGet(OwnershipOfferRoutes.Pending, ReadAsync)
+            .RequiresCapability(Capability.OfferOwnershipTransfer);
+
+    /// <summary>
+    /// Registers <c>GET /api/v1/spaces/{spaceId}/ownership-offers/declined</c>: the Owner's read of a declined offer.
+    /// </summary>
+    /// <param name="endpoints">The route builder.</param>
+    /// <returns>The registered route, for further configuration.</returns>
+    public static RouteHandlerBuilder MapReadDeclinedOwnershipOffer(this IEndpointRouteBuilder endpoints) =>
+        endpoints.MapGet(OwnershipOfferRoutes.Declined, ReadDeclinedAsync)
             .RequiresCapability(Capability.OfferOwnershipTransfer);
 
     /// <summary>
@@ -133,6 +144,19 @@ public static class OwnershipOfferEndpoints
     }
 
     /// <summary>
+    /// Reads whether the active Space's most recent offer was declined.
+    /// </summary>
+    /// <param name="handler">The slice.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns><c>200</c> with the declined offer, or <c>204</c> when the most recent offer was not declined.</returns>
+    public static async Task<IResult> ReadDeclinedAsync(ReadDeclinedOwnershipOfferHandler handler, CancellationToken cancellationToken)
+    {
+        var declined = await handler.HandleAsync(cancellationToken).ConfigureAwait(false);
+
+        return declined is null ? Results.NoContent() : Results.Ok(new DeclinedOwnershipOfferResponse(declined.Id, declined.RecipientName));
+    }
+
+    /// <summary>
     /// Revokes the active Space's pending offer.
     /// </summary>
     /// <param name="offerId">The offer, from the route.</param>
@@ -141,8 +165,9 @@ public static class OwnershipOfferEndpoints
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>
     /// <c>204</c>; <c>409 ownership-offer-not-pending</c> for an offer of this Space that is no longer actionable; the
-    /// pipeline's recorded <c>403</c> when ownership moved while the revoke waited; or the boundary's <c>404
-    /// not-available</c> - byte for byte, and not recorded - for an id that names no offer here.
+    /// pipeline's recorded <c>403</c> when ownership moved while the revoke waited; the pipeline's recorded boundary
+    /// <c>404</c> when the caller's own Membership went first; or the boundary's <c>404 not-available</c> - byte for byte, and
+    /// not recorded - for an id that names no offer here.
     /// </returns>
     public static async Task<IResult> RevokeAsync(
         Guid offerId,
@@ -166,6 +191,9 @@ public static class OwnershipOfferEndpoints
             // The pipeline records it and answers the 403 the caller's next request would get.
             OwnershipOfferRevocation.NoLongerOwner => new QualifiedRefusal(Capability.OfferOwnershipTransfer),
 
+            // The pipeline records it and answers the boundary's 404.
+            OwnershipOfferRevocation.LostMembership => new MembershipLost(),
+
             _ => throw new InvalidOperationException($"Unanswered revoke outcome {outcome}."),
         };
     }
@@ -173,6 +201,13 @@ public static class OwnershipOfferEndpoints
     private static OwnershipOfferResponse Response(OwnershipOfferView offer) =>
         new(offer.Id, offer.RecipientMembershipId, offer.RecipientName, offer.ExpiresAt, offer.ReadAt);
 
+    /// <summary>
+    /// The one answer to a transition of an offer that has been settled, whatever settled it.
+    /// </summary>
+    /// <remarks>
+    /// A <c>409</c>, never a <c>404</c>: a caller that reaches it holds a Membership here, so the boundary rule does not apply,
+    /// and a caller without one is answered by the pipeline or the store's lost-Membership outcome before any state is read.
+    /// </remarks>
     internal static IResult NotPending() =>
         Results.Problem(
             statusCode: StatusCodes.Status409Conflict,

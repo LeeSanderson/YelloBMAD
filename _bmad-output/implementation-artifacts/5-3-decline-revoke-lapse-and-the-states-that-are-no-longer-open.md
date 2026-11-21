@@ -1,6 +1,10 @@
+---
+baseline_commit: ce960eaf7df1b72e5be23400a95ac297612bcd73
+---
+
 # Story 5.3: Decline, revoke, lapse — and the states that are no longer open
 
-Status: ready-for-dev
+Status: review
 
 Epic: 5 — Hand a Space over and leave cleanly (third story)
 Story key: `5-3-decline-revoke-lapse-and-the-states-that-are-no-longer-open`
@@ -292,42 +296,42 @@ AC1 to AC8 are reproduced **verbatim** from `epics.md:2032-2065` and numbered by
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0: decisions** (before any code)
-  - [ ] Q1 is marked **[LEE]**. If the orchestrator routes it to Lee, record his answer here under "Decided by Lee" before ATDD. Otherwise take recommendation (a) and record it as "Q1 - (a)", with its cost, in Completion Notes.
-  - [ ] Decide Q2-Q10 the same way. Each recommendation is the default.
-- [ ] **Task 1: Contracts** (AC1)
-  - [ ] `OwnershipOfferRoutes.Declined` and `DeclinedOf(spaceId)`. Update the class remark, which today says "All six are served on both surfaces"; with this route there are seven.
-  - [ ] `Yello.Contracts/Spaces/DeclinedOwnershipOfferResponse.cs` (`Guid Id, string? RecipientName`), with a short remark: no address, and the name is null once the Membership is gone.
-- [ ] **Task 2: Application** (AC1, AC4)
-  - [ ] `IOwnershipOfferStore.ReadLastDeclinedAsync` returning a small record (`Id`, `RecipientMembershipId`) or `null`.
-  - [ ] `OwnershipOfferRevocation.LostMembership`.
-  - [ ] `Yello.Application/Spaces/ReadDeclinedOwnershipOffer/ReadDeclinedOwnershipOfferHandler.cs`: no outbox, no Role read, nothing recorded, the name read through `IMembershipStore.DisplayNameOfAsync`.
-- [ ] **Task 3: Infrastructure** (AC1, AC4, AC5, Q8)
-  - [ ] `OwnershipOfferStore.ReadLastDeclinedAsync`: a projection, top row first, then the state test, with an explicit `SpaceId = @space`.
-  - [ ] `RevokeAsync`: `ActorRoleAsync` null → `LostMembership`, **before** the existence read. Add the "why" comment.
-  - [ ] Q8 (a): add `SpaceId == spaceId` to `ActorRoleAsync`, `MissAsync`'s offer read and `SwapAsync`'s offer read.
-  - [ ] **No migration.** Confirm with `dotnet ef migrations has-pending-model-changes`.
-- [ ] **Task 4: Host** (AC1, AC3, AC4)
-  - [ ] `OwnershipOfferEndpoints`: `MapReadDeclinedOwnershipOffer` (`OfferOwnershipTransfer`; `200`/`204`); map `OwnershipOfferRevocation.LostMembership` → `new MembershipLost()`; add the "why" remark on `NotPending()`.
+- [x] **Task 0: decisions** (before any code)
+  - [x] Q1 is marked **[LEE]**. If the orchestrator routes it to Lee, record his answer here under "Decided by Lee" before ATDD. Otherwise take recommendation (a) and record it as "Q1 - (a)", with its cost, in Completion Notes.
+  - [x] Decide Q2-Q10 the same way. Each recommendation is the default.
+- [x] **Task 1: Contracts** (AC1)
+  - [x] `OwnershipOfferRoutes.Declined` and `DeclinedOf(spaceId)`. Update the class remark, which today says "All six are served on both surfaces"; with this route there are seven.
+  - [x] `Yello.Contracts/Spaces/DeclinedOwnershipOfferResponse.cs` (`Guid Id, string? RecipientName`), with a short remark: no address, and the name is null once the Membership is gone.
+- [x] **Task 2: Application** (AC1, AC4)
+  - [x] `IOwnershipOfferStore.ReadLastDeclinedAsync` returning a small record (`Id`, `RecipientMembershipId`) or `null`.
+  - [x] `OwnershipOfferRevocation.LostMembership`.
+  - [x] `Yello.Application/Spaces/ReadDeclinedOwnershipOffer/ReadDeclinedOwnershipOfferHandler.cs`: no outbox, no Role read, nothing recorded, the name read through `IMembershipStore.DisplayNameOfAsync`.
+- [x] **Task 3: Infrastructure** (AC1, AC4, AC5, Q8)
+  - [x] `OwnershipOfferStore.ReadLastDeclinedAsync`: a projection, top row first, then the state test, with an explicit `SpaceId = @space`.
+  - [x] `RevokeAsync`: `ActorRoleAsync` null → `LostMembership`, **before** the existence read. Add the "why" comment.
+  - [x] Q8 (a): add `SpaceId == spaceId` to `ActorRoleAsync`, `MissAsync`'s offer read and `SwapAsync`'s offer read.
+  - [x] **No migration.** Confirm with `dotnet ef migrations has-pending-model-changes`.
+- [x] **Task 4: Host** (AC1, AC3, AC4)
+  - [x] `OwnershipOfferEndpoints`: `MapReadDeclinedOwnershipOffer` (`OfferOwnershipTransfer`; `200`/`204`); map `OwnershipOfferRevocation.LostMembership` → `new MembershipLost()`; add the "why" remark on `NotPending()`.
     - If S1200's coupling limit trips again (it did in 5.2), put the read in `OwnershipOfferAnswerEndpoints` or a new small endpoints class. Record the choice.
-  - [ ] Register the handler and map the route in `Program.cs` beside the other offer routes, and extend that comment block.
-- [ ] **Task 5: Client** (AC1, AC6)
-  - [ ] `OwnershipSection.razor`: the `declined` read after a pending `204` (including the re-read after a revoke `409`), the statement, and the purge.
-  - [ ] `ClientCopy.resx`: `OwnershipOfferDeclinedBy`, `OwnershipOfferDeclined`, each with a `<comment>`.
-  - [ ] `components.css`: `.ownership-section__declined`, with tokens only and logical properties.
-  - [ ] `OwnershipOfferDialog.razor`: the in-Space `404` shows the no-longer-open state and keeps the re-read (Q5).
-  - [ ] `FakeYelloApi.OwnershipOffers.cs`: the `declined` read, plus a settable settled cause for the dialog theory.
-- [ ] **Task 6: tests** (all ACs). See Testing requirements.
-- [ ] **Task 7: gates** (AC1, AC8, AC9): the four-route capability gate, the route/surface gate, the contract-shape pin, `Every_OwnershipOffer_state_transition_composes_the_actionable_predicate`, and `No_scheduled_component_reaches_an_offer_or_Invitation_state_write`.
-- [ ] **Task 8: plants.** Save each original in memory and restore it in a `finally`. **Never** use `git checkout --`, `git restore` or `git reset`. Run them in small groups (the low-memory reaper killed a 5.1 batch and a 5.2 batch). Stop if a planted build fails, so stale binaries never pass for green. Record each plant in the Debug Log table. After any killed run, grep for the plant marker.
-- [ ] **Task 9: ledger, docs, verification**
-  - [ ] Ledger dispositions (below): one line per CLOSED/UPDATED/RE-OWNED note, no TAB or FORM FEED, keep the final newline. Write the text; do not leave blank lines (the 5.2 review's finding).
-  - [ ] `TESTING-CONVENTIONS.md`: the R12 section (AC10).
-  - [ ] Dated notes (2026-11-xx, story 5.3) in `ARCHITECTURE-SPINE.md`:
+  - [x] Register the handler and map the route in `Program.cs` beside the other offer routes, and extend that comment block.
+- [x] **Task 5: Client** (AC1, AC6)
+  - [x] `OwnershipSection.razor`: the `declined` read after a pending `204` (including the re-read after a revoke `409`), the statement, and the purge.
+  - [x] `ClientCopy.resx`: `OwnershipOfferDeclinedBy`, `OwnershipOfferDeclined`, each with a `<comment>`.
+  - [x] `components.css`: `.ownership-section__declined`, with tokens only and logical properties.
+  - [x] `OwnershipOfferDialog.razor`: the in-Space `404` shows the no-longer-open state and keeps the re-read (Q5).
+  - [x] `FakeYelloApi.OwnershipOffers.cs`: the `declined` read, plus a settable settled cause for the dialog theory.
+- [x] **Task 6: tests** (all ACs). See Testing requirements.
+- [x] **Task 7: gates** (AC1, AC8, AC9): the four-route capability gate, the route/surface gate, the contract-shape pin, `Every_OwnershipOffer_state_transition_composes_the_actionable_predicate`, and `No_scheduled_component_reaches_an_offer_or_Invitation_state_write`.
+- [x] **Task 8: plants.** Save each original in memory and restore it in a `finally`. **Never** use `git checkout --`, `git restore` or `git reset`. Run them in small groups (the low-memory reaper killed a 5.1 batch and a 5.2 batch). Stop if a planted build fails, so stale binaries never pass for green. Record each plant in the Debug Log table. After any killed run, grep for the plant marker.
+- [x] **Task 9: ledger, docs, verification**
+  - [x] Ledger dispositions (below): one line per CLOSED/UPDATED/RE-OWNED note, no TAB or FORM FEED, keep the final newline. Write the text; do not leave blank lines (the 5.2 review's finding).
+  - [x] `TESTING-CONVENTIONS.md`: the R12 section (AC10).
+  - [x] Dated notes (2026-11-xx, story 5.3) in `ARCHITECTURE-SPINE.md`:
     - AD-26: the 409 goes to the party the transition belongs to (Q2/Q3); the revoke's `LostMembership`; the Owner's `declined` read (Q1).
     - AD-27: the A-10 gate's concrete predicate.
-  - [ ] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-5` stays `in-progress`.
-  - [ ] Verification follows CLAUDE.md:
+  - [x] `sprint-status.yaml`: this story goes to `review` at the end of dev. `epic-5` stays `in-progress`.
+  - [x] Verification follows CLAUDE.md:
     - `docker info --format '{{.ServerVersion}}'`, then `dotnet build Yello.slnx` (0 warnings, 0 errors).
     - Iterate with `--filter-class` on the affected classes only.
     - Then **exactly one** full run in the background without the browser suite: `dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1 -p:YelloSkipBrowserSuite=true`, logged to `artifacts/test-runs/5-3-decline-revoke-lapse-and-the-states-that-are-no-longer-open-develop.log`.
@@ -567,14 +571,95 @@ The cycle: story, then decisions recorded, then ATDD scaffolds (`Skip = "red: ..
 
 ### Agent Model Used
 
+Claude Opus 5.5 (bmad-dev-story, unattended).
+
 ### Debug Log References
+
+**Activation (ATDD order).**
+
+- Step 0: the six AC4 isolation rows (stranger x3, after-removal x2, after-leaving) were made live first, before any product code, and `IsolationCaseTests` passed whole (402/402, `artifacts/test-runs/5-3-develop-isolation-1.log`). They were green today, as the scaffold expected; the pipeline answers a non-member before any state is read.
+- Step 1-2: the revoke race and `The_revoke_outcome_names_a_lost_Membership` were activated with the fix written in the same build, so their red was taken from plants 1 and 2 instead (below): with the `LostMembership` branch removed the race answers exactly the pre-fix `409 ownership-offer-not-pending`. Observed order: accept `204`, leave `204`, revoke - `sp_getapplock` granted the three queued waiters in the order sent, so the assertion did not need to be made order-tolerant.
+- Step 3-6: the five declined-read Slices cases, the five AC1 gates (the three-route gate replaced by the four-route one, the route/surface gate widened), the three declined-read isolation rows, the five `OwnershipSectionTests` cases and the three `OwnershipOfferTests` cases were activated and their stand-ins swapped for `OwnershipOfferRoutes.Declined`/`DeclinedOf` (the stand-ins in `OwnershipOfferWire.Declined.cs` were deleted).
+- **Scaffolds corrected: 2.** `A_decline_refused_409_shows_the_offer_is_no_longer_open_with_focus_on_its_heading` and `A_decline_answered_by_the_in_Space_404_shows_the_no_longer_open_state` asserted no `[role=alert]` anywhere on the page, which is never true: `RoleNarration` is an empty assertive region (`role="alert"`) on every authenticated surface. Both now count alerts that say something (`SpokenAlerts`), which keeps the intent (no toast, no alert) and is still red under plant 10. Every other activated scaffold passed as written; edits were limited to removing the skips, the `PendingUntil` markers, the stand-in route members and the remarks that described them as pending.
+- Build fixes on the way: S1301/S131 on a two-arm `switch` in `RevokeAsync` (rewritten as two `if`s); S1541 on `SwapAsync` once its read gained `SpaceId` (the read extracted to `PartiesAsync`); an unused `using` in the fake.
+
+**Plants** (each original saved in memory and restored in a `finally` by a scratch script, never through git; marker `PLANT-5-3`, grepped clean after each batch):
+
+| # | Plant | Expected red | Observed |
+|---|---|---|---|
+| 1 | `RevokeAsync`: the `role is null => LostMembership` branch removed | revoke race | red: revoke `409 ownership-offer-not-pending` (`5-3-develop-plants-slices-1.log`) |
+| 2 | `RevokeAsync`: an existence read of the offer before `ActorRoleAsync` | revoke race | red: revoke `409` (`-slices-2.log`) |
+| 3 | `MissAsync`: with no own Membership, decide by the offer's existence (offer read first) | decline-vs-removal race | red: decline `409` (`-slices-1.log`) |
+| 4 | `DeclineAsync` without `.Where(OwnershipOfferActionable)` | transition-predicate gate | red (`-arch-1.log`); runtime case not run, the gate is the guard |
+| 5 | Declined read filters `State == Declined` before taking the latest row | decline-then-later-revoked case | red: `200` with the old decline (`-slices-1.log`) |
+| 6 | Declined read under `ReadProjectsAndTasks` | four-route gate, route/surface gate, declined-route gate | red, all three (`-arch-1.log`); the Admin/Member/Viewer `403` case not run under the plant |
+| 7 | Unregistered `BackgroundService` in Host calling `IMembershipStore.LeaveAsync` (which lapses through `OwnershipOfferWrites.LapseNamingAsync`) | A-10 gate and timer ban | red, both (`-arch-1.log`). Placed in Host, not Infrastructure: Infrastructure does not reference `Microsoft.Extensions.Hosting`, and going through the store's interface also proves the walk crosses ports |
+| 8 | A method passed to `new Timer(...)` calling `LeaveAsync` | A-10 gate | red, and the timer ban too (`-arch-2.log`) |
+| 9 | A second reference to `OwnershipOfferPendingButExpired` (in `ReadLastDeclinedAsync`) | expired-predicate exception gate | red (`-arch-1.log`) |
+| 10 | The dialog's in-Space `404` closes silently again | in-Space `404` browser case | see Client plant run below |
+| 11 | The declined statement rendered with `role="alert"` | the panel's first declined case | see Client plant run below |
+| 12 | An `IOutbox` on `DeclineOwnershipOfferHandler` | `The_ownership_acceptance_and_decline_take_no_outbox` | red (`-arch-1.log`); the runtime no-mail case not run under the plant |
+
+Plants 4, 6, 7, 9 and 12 ran as one Architecture batch: each turns a different gate red, so none masks another (8 failures, every one expected). Three attempts at that batch failed to build first (a missing `<param>` tag, S3923 on the first form of plant 9, and the Slices fake's constructor call); the script stopped each time without running tests, and the batch was then built through the Architecture project alone.
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created.
 
+**Decisions taken in the dev phase (unattended; each is reversible and can be cut):**
+
+- Q1 - (a): the Owner is told by a new Owner-only read, `GET .../ownership-offers/declined` (`200 DeclinedOwnershipOfferResponse(Id, RecipientName?)` while the Space's latest offer is `Declined`, else `204`), and a plain statement above the picker. Cost: one more route with its gates and isolation rows, one more `GET` when no offer is pending, and copy UX has not specified (ledgered, owner UX). Not routed to Lee before develop.
+- Q2 - (a): a Member the offer does not name keeps the unrecorded in-Space `404` (5.2's Q7); the `409` goes to the party the transition belongs to. Recorded as a dated AD-26 note.
+- Q3 - (a): a non-Owner Member calling the revoke keeps the pipeline's recorded `403 offer-ownership-transfer`; capability is judged before state.
+- Q4 - (a): `OfferStale` keeps its rollback and `409`; ledger `:946` closed as unreachable through the product.
+- Q5 - (a): the dialog's in-Space `404` shows the designed no-longer-open state and keeps the Space re-read.
+- Q6 - (a): A-10 is the call-graph gate from scheduled roots to state writers, plus the expired-predicate exception gate (both were scaffolded green; the plants below prove them).
+- Q7 - (a): `WireDatabase.SetOwnershipOfferExpiresAtAsync` (added at ATDD) and the convention stated once in `TESTING-CONVENTIONS.md`.
+- Q8 - (a): own `SpaceId = @space` added to `ActorRoleAsync`, `NamingTheCaller`, `MissAsync`'s offer read, the swap's offer read (extracted to `PartiesAsync` to stay under S1541), the revoke's existence read and the new declined read. `ReadPendingAsync` and `OfferAsync`'s supersede were left as they were and are named in the ledger.
+- Q9 - (a): ledger `:932` closed as accepted.
+- Q10 - (a): no push; the statement is read on arrival and after a refused revoke. Ledger `:937` updated (owner 7.7).
+- **Verification.** Build 0 warnings, 0 errors. One full run without the browser suite: 2103 total, 2096 passed, 0 failed, 7 skipped (the three migration-bundle skips, the timing-oracle skip, and four explicitly filtered timing/envelope tests), `artifacts/test-runs/5-3-decline-revoke-lapse-and-the-states-that-are-no-longer-open-develop.log`. Browser classes run filtered: `OwnershipOfferTests` 27/27, and `OwnershipSectionTests` with `MembershipSectionTests` green in the same run (72 total, the only two failures being the corrected scaffolds). No migration (`has-pending-model-changes`: none).
+- S1200 did not trip: the declined read lives in `OwnershipOfferEndpoints` beside the pending read.
+
 ### File List
+
+New:
+- `Yello.Contracts/Spaces/DeclinedOwnershipOfferResponse.cs`
+- `Yello.Application/Spaces/ReadDeclinedOwnershipOffer/ReadDeclinedOwnershipOfferHandler.cs`
+
+Modified (product):
+- `Yello.Contracts/Spaces/OwnershipOfferRoutes.cs`
+- `Yello.Application/Spaces/IOwnershipOfferStore.cs`
+- `Yello.Infrastructure/Persistence/OwnershipOfferStore.cs`
+- `Yello.Infrastructure/Persistence/OwnershipOfferStore.Answers.cs`
+- `Yello.Host/Endpoints/OwnershipOfferEndpoints.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Client/Components/OwnershipSection.razor`
+- `Yello.Client/Components/OwnershipOfferDialog.razor`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/wwwroot/css/components.css`
+
+Modified (tests; the ATDD scaffolds activated):
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.OwnershipOffers.cs` (three-route gate removed, route/surface gate widened)
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.SettledOwnershipOffers.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.DeclinedOwnershipOffers.cs`
+- `tests/Yello.Tests.Client/OwnershipOfferTests.cs`
+- `tests/Yello.Tests.Client/OwnershipSectionTests.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.SettledOwnershipOffers.cs`
+- `tests/Yello.Tests.Shared/OwnershipOfferWire.Declined.cs` (stand-ins deleted)
+- `tests/Yello.Tests.Slices/Spaces/AcceptOwnershipOffer/AcceptOwnershipOfferHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Spaces/OfferOwnership/OfferOwnershipHandlerTests.cs` (declined-read handler test)
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeclinedOwnershipOffer.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.SettledOwnershipOfferRace.cs`
+
+Modified (docs and tracking):
+- `tests/TESTING-CONVENTIONS.md`
+- `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/5-3-decline-revoke-lapse-and-the-states-that-are-no-longer-open.md`
 
 ## Change Log
 
 - 2026-11-21: Story created (bmad-create-story). Status ready-for-dev.
+- 2026-11-21: Developed (bmad-dev-story). The Owner's declined read and panel statement; the revoke's `LostMembership` answered as the recorded boundary `404`; own `SpaceId` on the offer statements touched; the dialog's in-Space `404` shown as the designed state; the A-10, transition and AC1 gates live; the isolation rows live; R12 written into the testing conventions; AD-26/AD-27 notes; ledger dispositions. Status review.

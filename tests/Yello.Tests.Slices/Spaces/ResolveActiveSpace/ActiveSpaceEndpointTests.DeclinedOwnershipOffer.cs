@@ -1,6 +1,7 @@
 using System.Net;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Spaces;
 using Yello.Domain.Memberships;
 using Yello.Tests.Shared;
 
@@ -16,9 +17,8 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Written against the open question's recommendation</b> (a new Owner-only read rather than a widened pending read, an
-/// email or an accent element). Each skip names the question, so the develop phase corrects the scaffold if the decision
-/// changes. The route is <see cref="OwnershipOfferWire.DeclinedOf"/>'s stand-in until the contract declares it.
+/// <b>A new Owner-only read</b> rather than a widened pending read, an email or an accent element: declining sends no email,
+/// and the Offer indicator is the only accent element in chrome.
 /// </para>
 /// <para>
 /// <b>Seeding</b> is as in <c>.OfferOwnership.cs</c>: every Membership joins through the product and every offer, decline and
@@ -28,8 +28,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// </remarks>
 public sealed partial class ActiveSpaceEndpointTests
 {
-    private const string DeclinedReadPending = "red: AC1 - the Owner's declined read (Q1 (a)) is not mapped yet";
-
     private static readonly string[] DeclinedReadRefusedRoles = ["admin", "member", "viewer"];
 
     /// <summary>
@@ -38,7 +36,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// recipient's own read of the same Space answers <c>204</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = DeclinedReadPending)]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-23")]
     [Trait("Requirement", "AD-26")]
@@ -82,7 +80,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// offer follows a decline. Anchor: between the last two, the same read answers <c>200</c> for the decline.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = DeclinedReadPending)]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-27")]
     [Trait("Assumption", "PRD-12-3")]
@@ -135,7 +133,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// answer <c>200</c>. Anchor: right after the decline the same read answered <c>200</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = DeclinedReadPending)]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-26")]
     public async Task A_decline_followed_by_a_later_offer_that_was_revoked_reads_204()
@@ -174,7 +172,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// read is still <c>200</c> for that offer, with <c>recipientName</c> <c>null</c> and no <c>@</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = DeclinedReadPending)]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-23")]
     public async Task After_the_declining_recipient_leaves_the_declined_read_names_no_one()
@@ -214,7 +212,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// that capability.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = DeclinedReadPending)]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-1")]
     [Trait("Requirement", "UX-DR27")]
@@ -263,5 +261,5 @@ public sealed partial class ActiveSpaceEndpointTests
     /// The Owner's declined read: the Session's cookie, a <c>GET</c>.
     /// </summary>
     private static Task<WireResponse> DeclinedOfferOverWireAsync(WireSession session, Guid spaceId) =>
-        session.SendWithHeadersAsync(HttpMethod.Get, OwnershipOfferWire.DeclinedOf(spaceId), content: null, NoKey, withAntiforgeryToken: false);
+        session.SendWithHeadersAsync(HttpMethod.Get, OwnershipOfferRoutes.DeclinedOf(spaceId), content: null, NoKey, withAntiforgeryToken: false);
 }

@@ -579,6 +579,23 @@ commit, at process start, or on the next authenticated request. There is no time
   `MutationObserver` log, never by waiting. Selectors in such a log carry no ancestor (`.task-card__actions`, not
   `main .task-card__actions`): a removed node is detached by the time the observer reads it, so an ancestor never matches.
 
+## Expiry is reached only by seeding the past (R12)
+
+- **No clock a test controls makes a row expire.** The shared actionable predicate (`OfferPredicates`) compares
+  `ExpiresAt` with `SYSDATETIMEOFFSET()` inside the statement itself. A fake `TimeProvider`, a `Task.Delay` or the
+  browser's clock cannot move it, and waiting for a real expiry is days.
+- **A case reaches expiry by writing a past `ExpiresAt` measured from the database clock**:
+  `(await wire.DatabaseNowAsync()).AddMinutes(-1)`, never `DateTimeOffset.UtcNow`, which can disagree with the container's.
+- **Prefer moving a product-made row**: `WireDatabase.SetInvitationExpiresAtAsync` and
+  `WireDatabase.SetOwnershipOfferExpiresAtAsync`, each a raw `UPDATE` of `ExpiresAt` alone under the Space's own key. Insert
+  a raw expired row (`AddOwnershipOfferAsync(..., "Pending", past)`, `AddInvitationAsync`) only when no product path can make
+  it, and say so in the case. A raw row skips the guarded insert, so it proves less.
+- **The helpers live in `Yello.Tests.Shared`**, outside the production assemblies the state-writer gates scan, and they
+  write `ExpiresAt`, never `State`. Expiry is computed on read; nothing writes it, and a test must not either.
+- **Such cases carry `Assumption = "PRD-12-3"`** (the seven-day window), or the Invitation counterpart.
+- **Browser cases fake the `ReadAt`/`ExpiresAt` pair** the API sends and set Playwright's `Clock` far from it, so a case
+  proves the client counts from the server's clock and never from its own.
+
 ## EF Core migrations need a hand-editing pass
 
 `dotnet ef migrations add` scaffolds a migration that **fails this build**: `IDE0005`, `IDE0161`,

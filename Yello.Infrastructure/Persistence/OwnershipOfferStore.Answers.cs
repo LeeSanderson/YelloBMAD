@@ -70,12 +70,7 @@ internal sealed partial class OwnershipOfferStore
     /// </summary>
     private async Task<OwnershipOfferAcceptance> SwapAsync(Guid spaceId, Guid actorAccountId, Guid offerId, CancellationToken cancellationToken)
     {
-        var offered = await dbContext.Set<OwnershipOffer>()
-            .AsNoTracking()
-            .Where(offer => offer.Id == offerId)
-            .Select(offer => new { offer.OfferedByMembershipId, offer.RecipientMembershipId })
-            .SingleAsync(cancellationToken)
-            .ConfigureAwait(false);
+        var offered = await PartiesAsync(spaceId, offerId, cancellationToken).ConfigureAwait(false);
 
         var formerOwnerAccountId = await dbContext.Memberships
             .AsNoTracking()
@@ -127,6 +122,21 @@ internal sealed partial class OwnershipOfferStore
         return OwnershipOfferAcceptance.Accepted;
     }
 
+    /// <summary>
+    /// The offerer and the recipient an accepted offer names.
+    /// </summary>
+    private async Task<(Guid OfferedByMembershipId, Guid RecipientMembershipId)> PartiesAsync(Guid spaceId, Guid offerId, CancellationToken cancellationToken)
+    {
+        var parties = await dbContext.Set<OwnershipOffer>()
+            .AsNoTracking()
+            .Where(offer => offer.SpaceId == spaceId && offer.Id == offerId)
+            .Select(offer => new { offer.OfferedByMembershipId, offer.RecipientMembershipId })
+            .SingleAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        return (parties.OfferedByMembershipId, parties.RecipientMembershipId);
+    }
+
     /// <inheritdoc />
     public async Task<OwnershipOfferDecline> DeclineAsync(Guid actorAccountId, Guid offerId, CancellationToken cancellationToken)
     {
@@ -150,7 +160,8 @@ internal sealed partial class OwnershipOfferStore
     /// </summary>
     private IQueryable<OwnershipOffer> NamingTheCaller(Guid spaceId, Guid actorAccountId, Guid offerId) =>
         dbContext.Set<OwnershipOffer>()
-            .Where(offer => offer.Id == offerId
+            .Where(offer => offer.SpaceId == spaceId
+                && offer.Id == offerId
                 && dbContext.Memberships.Any(recipient =>
                     recipient.Id == offer.RecipientMembershipId && recipient.SpaceId == spaceId && recipient.AccountId == actorAccountId));
 
@@ -161,6 +172,8 @@ internal sealed partial class OwnershipOfferStore
     /// </summary>
     private async Task<OwnershipOfferDecline> MissAsync(Guid spaceId, Guid actorAccountId, Guid offerId, CancellationToken cancellationToken)
     {
+        // The caller's own Membership is read before the offer: a caller with none must get the boundary, and an answer that
+        // read the offer first would tell it that the Space and the offer exist.
         var own = await dbContext.Memberships
             .AsNoTracking()
             .Where(membership => membership.SpaceId == spaceId && membership.AccountId == actorAccountId)
@@ -177,7 +190,7 @@ internal sealed partial class OwnershipOfferStore
 
         var named = await dbContext.Set<OwnershipOffer>()
             .AsNoTracking()
-            .AnyAsync(offer => offer.Id == offerId && offer.RecipientMembershipId == membershipId, cancellationToken)
+            .AnyAsync(offer => offer.SpaceId == spaceId && offer.Id == offerId && offer.RecipientMembershipId == membershipId, cancellationToken)
             .ConfigureAwait(false);
 
         return named ? OwnershipOfferDecline.NotPending : OwnershipOfferDecline.NotFound;

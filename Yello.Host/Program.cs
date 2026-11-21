@@ -36,6 +36,7 @@ using Yello.Application.Spaces.DeclineOwnershipOffer;
 using Yello.Application.Spaces.DeleteSpace;
 using Yello.Application.Spaces.ListSpaces;
 using Yello.Application.Spaces.OfferOwnership;
+using Yello.Application.Spaces.ReadDeclinedOwnershipOffer;
 using Yello.Application.Spaces.ReadMyOwnershipOffer;
 using Yello.Application.Spaces.ReadOwnershipOffer;
 using Yello.Application.Spaces.RenameSpace;
@@ -164,6 +165,7 @@ builder.Services.AddScoped<AssignTaskHandler>();
 builder.Services.AddScoped<ListAssigneesHandler>();
 builder.Services.AddScoped<OfferOwnershipHandler>();
 builder.Services.AddScoped<ReadOwnershipOfferHandler>();
+builder.Services.AddScoped<ReadDeclinedOwnershipOfferHandler>();
 builder.Services.AddScoped<RevokeOwnershipOfferHandler>();
 builder.Services.AddScoped<ReadMyOwnershipOfferHandler>();
 builder.Services.AddScoped<AcceptOwnershipOfferHandler>();
@@ -595,11 +597,14 @@ api.MapListAssignees();
 // missing, random, foreign or the Owner's own Membership), or 409 ownership-offer-pending. One guarded insert under the
 // Space's Memberships lock, after lapsing a pending offer past its expiry, and one email in the same unit of work. No Role
 // moves. GET .../ownership-offers/pending answers the actionable pending offer (200, with the database clock's reading) or
-// 204. DELETE .../ownership-offers/{offerId} revokes it - 204, 409 ownership-offer-not-pending, or the unrecorded boundary
-// 404 - and sends nothing. All three under OfferOwnershipTransfer (the Owner only) on both surfaces. A removal or leave of
-// the recipient lapses its offer in the same transaction.
+// 204. GET .../ownership-offers/declined answers the Space's latest offer when it was declined (200, the recipient's name
+// now or null) or 204: declining sends no email, so this read is how the Owner is told. DELETE .../ownership-offers/{offerId}
+// revokes it - 204, 409 ownership-offer-not-pending, the unrecorded boundary 404, or the recorded boundary 404 when the
+// caller's Membership went while it waited - and sends nothing. All four under OfferOwnershipTransfer (the Owner only) on
+// both surfaces. A removal or leave of the recipient lapses its offer in the same transaction.
 api.MapOfferOwnership();
 api.MapReadOwnershipOffer();
+api.MapReadDeclinedOwnershipOffer();
 api.MapRevokeOwnershipOffer();
 
 // The recipient's side, decided by row identity rather than Role, so all three declare ReadProjectsAndTasks, which every Role

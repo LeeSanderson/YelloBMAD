@@ -1531,6 +1531,14 @@
     <value>Ownership offer revoked.</value>
     <comment>Announced politely once a revoke is answered 204. Names nobody.</comment>
   </data>
+  <data name="OwnershipOfferDeclinedBy" xml:space="preserve">
+    <value>{0} declined your offer of ownership.</value>
+    <comment>A plain statement above the Owner's picker while the Space's latest offer is the one declined. {0} is the recipient's display name now, never an address. Not an alert; no exclamation mark.</comment>
+  </data>
+  <data name="OwnershipOfferDeclined" xml:space="preserve">
+    <value>Your last offer of ownership was declined.</value>
+    <comment>The same statement when the recipient's Membership has since gone, so there is no name to give.</comment>
+  </data>
   <data name="ownership-offer-pending" xml:space="preserve">
     <value>This Space already has a pending Ownership Offer. Revoke it to make another.</value>
     <comment>The 409 ownership-offer-pending: another offer of the Space is still pending, made from another tab. The section then shows it. Names nobody.</comment>

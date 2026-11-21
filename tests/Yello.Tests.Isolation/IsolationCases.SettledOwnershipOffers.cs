@@ -16,8 +16,8 @@ namespace Yello.Tests.Isolation;
 /// get the boundary <c>404</c>, byte-identical to a random Space id and recorded <c>CrossSpace</c>, with the offer and every
 /// Role unchanged: a stranger, on an offer that was declined, one that was revoked and one that was accepted; the former
 /// recipient, removed by the Owner, on its own lapsed offer; and the former Owner, who left after the acceptance, on the
-/// accepted offer. These rows are answered by the pipeline, before any state is read, so they are expected to pass today;
-/// they are pending only until they have been run, and the dev phase makes them live first (GATE-003).
+/// accepted offer. The pipeline answers these rows before any state is read; a non-member whose Membership ends while its
+/// request waits on the lock is the store's to answer, and the Slices races prove that half.
 /// </para>
 /// <para>
 /// <b>The "former" rows use a Token bound to the Account's own Space</b>, never one issued in the Space it left: removing a
@@ -25,9 +25,8 @@ namespace Yello.Tests.Isolation;
 /// Token issued there would be an unknown credential, not a non-member's.
 /// </para>
 /// <para>
-/// <b>The declined read's rows are pending</b> until the route is mapped; the develop phase makes them live before review
-/// (GATE-003) and swaps <see cref="OwnershipOfferWire.DeclinedRoute"/> and <see cref="OwnershipOfferWire.DeclinedOf"/> for
-/// the contract's members.
+/// <b>The declined read is the Owner's alone</b>: a foreign Space's is the boundary <c>404</c>, an Admin of the Space gets
+/// the recorded <c>403</c>, and a Token bound to another Space reads only its own.
 /// </para>
 /// <para>
 /// <b>Seeding through the product.</b> Fresh hosts, recipients joined through an accepted Invitation, and offers, declines,
@@ -37,10 +36,6 @@ namespace Yello.Tests.Isolation;
 /// </remarks>
 internal static partial class IsolationCases
 {
-    private const string SettledRowsUnverified = "Expected to pass today (the pipeline answers a non-member before any state is read), but not yet run: the ATDD run that would have proved it was stopped for low memory. Make it live first in the dev phase.";
-
-    private const string DeclinedReadPending = "The Owner's declined read is not mapped until the dev phase of the story that tells the Owner of a decline.";
-
     private static IEnumerable<IsolationCase> SettledOwnershipOfferCases() =>
     [
         // A stranger - world.A - on a fresh host's three settled offers: declined, revoked, accepted.
@@ -52,9 +47,7 @@ internal static partial class IsolationCases
 
                 return SettledRequest(world.A, HttpMethod.Post, settled, OwnershipOfferRoutes.AcceptanceOf);
             },
-            Both(new BoundaryNotFound { Then = TheOthersSettledOffersAreUnchangedAsync }),
-            PendingUntil: "5.3",
-            PendingReason: SettledRowsUnverified),
+            Both(new BoundaryNotFound { Then = TheOthersSettledOffersAreUnchangedAsync })),
 
         new IsolationCase(
             "ISO-DECLINE-SETTLED-OWNERSHIP-OFFER-FOREIGN-SPACE", "I-1, I-2", IsolationVector.Write, HttpMethod.Post, OwnershipOfferRoutes.Decline,
@@ -64,9 +57,7 @@ internal static partial class IsolationCases
 
                 return SettledRequest(world.A, HttpMethod.Post, settled, OwnershipOfferRoutes.DeclineOf);
             },
-            Both(new BoundaryNotFound { Then = TheOthersSettledOffersAreUnchangedAsync }),
-            PendingUntil: "5.3",
-            PendingReason: SettledRowsUnverified),
+            Both(new BoundaryNotFound { Then = TheOthersSettledOffersAreUnchangedAsync })),
 
         new IsolationCase(
             "ISO-REVOKE-SETTLED-OWNERSHIP-OFFER-FOREIGN-SPACE", "I-1, I-2", IsolationVector.Write, HttpMethod.Delete, OwnershipOfferRoutes.Offer,
@@ -76,9 +67,7 @@ internal static partial class IsolationCases
 
                 return SettledRequest(world.A, HttpMethod.Delete, settled, OwnershipOfferRoutes.OfferOf);
             },
-            Both(new BoundaryNotFound { Then = TheOthersSettledOffersAreUnchangedAsync }),
-            PendingUntil: "5.3",
-            PendingReason: SettledRowsUnverified),
+            Both(new BoundaryNotFound { Then = TheOthersSettledOffersAreUnchangedAsync })),
 
         // The former recipient, removed by the host: its offer is Lapsed, and its own old offer id is the boundary 404 to it.
         new IsolationCase(
@@ -94,9 +83,7 @@ internal static partial class IsolationCases
                     host.SpaceId,
                     Other: host);
             },
-            Both(new BoundaryNotFound { Then = TheOthersOfferIsLapsedAndItStillOwnsAsync }),
-            PendingUntil: "5.3",
-            PendingReason: SettledRowsUnverified),
+            Both(new BoundaryNotFound { Then = TheOthersOfferIsLapsedAndItStillOwnsAsync })),
 
         new IsolationCase(
             "ISO-DECLINE-OWNERSHIP-OFFER-AFTER-REMOVAL", "I-1, I-2", IsolationVector.Write, HttpMethod.Post, OwnershipOfferRoutes.Decline,
@@ -111,9 +98,7 @@ internal static partial class IsolationCases
                     host.SpaceId,
                     Other: host);
             },
-            Both(new BoundaryNotFound { Then = TheOthersOfferIsLapsedAndItStillOwnsAsync }),
-            PendingUntil: "5.3",
-            PendingReason: SettledRowsUnverified),
+            Both(new BoundaryNotFound { Then = TheOthersOfferIsLapsedAndItStillOwnsAsync })),
 
         // The former Owner: it offered its second Space to a Member, the Member accepted, and it left. Its Token is bound to its
         // first Space, which it still owns.
@@ -130,20 +115,16 @@ internal static partial class IsolationCases
                     spaceId,
                     Other: newOwner);
             },
-            Both(new BoundaryNotFound { Then = TheOtherHoldsOwnerAsync }),
-            PendingUntil: "5.3",
-            PendingReason: SettledRowsUnverified),
+            Both(new BoundaryNotFound { Then = TheOtherHoldsOwnerAsync })),
 
         new IsolationCase(
-            "ISO-READ-DECLINED-OWNERSHIP-OFFER-FOREIGN-SPACE", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, OwnershipOfferWire.DeclinedRoute,
-            world => ForeignAsync(world, OwnershipOfferWire.DeclinedOf),
-            Both(new BoundaryNotFound()),
-            PendingUntil: "5.3",
-            PendingReason: DeclinedReadPending),
+            "ISO-READ-DECLINED-OWNERSHIP-OFFER-FOREIGN-SPACE", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, OwnershipOfferRoutes.Declined,
+            world => ForeignAsync(world, OwnershipOfferRoutes.DeclinedOf),
+            Both(new BoundaryNotFound())),
 
         // The declined read is the Owner's alone: an Admin of the host's Space, after the host's offer was declined there.
         new IsolationCase(
-            "ISO-RECORD-KIND-READ-DECLINED-OWNERSHIP-OFFER-ADMIN", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Get, OwnershipOfferWire.DeclinedRoute,
+            "ISO-RECORD-KIND-READ-DECLINED-OWNERSHIP-OFFER-ADMIN", "V-1, C-6, NFR-7", IsolationVector.RecordKind, HttpMethod.Get, OwnershipOfferRoutes.Declined,
             async world =>
             {
                 var (host, _, joined, offerId) = await HostWithAnOfferToAFreshAccountAsync(world, "Ya", "Yb");
@@ -151,20 +132,16 @@ internal static partial class IsolationCases
                 await SentThroughTheProductAsync(joined, HttpMethod.Post, OwnershipOfferRoutes.DeclineOf(host.SpaceId, offerId));
 
                 var admin = await JoinedThroughTheProductAsync(world, host, "Yc", "admin");
-                var path = OwnershipOfferWire.DeclinedOf(host.SpaceId);
+                var path = OwnershipOfferRoutes.DeclinedOf(host.SpaceId);
 
                 return new CaseRequest(admin, HttpMethod.Get, [new(path, path)], host.SpaceId, Other: host);
             },
-            Both(new RoleRefused(OwnershipOfferWire.CapabilityCode)),
-            PendingUntil: "5.3",
-            PendingReason: DeclinedReadPending),
+            Both(new RoleRefused(OwnershipOfferWire.CapabilityCode))),
 
-        TokenOwnOtherSpace("READ-DECLINED-OWNERSHIP-OFFER", HttpMethod.Get, OwnershipOfferWire.DeclinedRoute, HttpStatusCode.NoContent, second => OwnershipOfferWire.DeclinedOf(second.SpaceId))
+        TokenOwnOtherSpace("READ-DECLINED-OWNERSHIP-OFFER", HttpMethod.Get, OwnershipOfferRoutes.Declined, HttpStatusCode.NoContent, second => OwnershipOfferRoutes.DeclinedOf(second.SpaceId))
             with
         {
             TestDesignId = "I-12",
-            PendingUntil = "5.3",
-            PendingReason = DeclinedReadPending,
         },
     ];
 

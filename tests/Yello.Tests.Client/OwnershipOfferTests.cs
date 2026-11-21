@@ -690,7 +690,11 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// </summary>
     public static TheoryData<string> SettledCauses => new() { "revoked", "declined elsewhere", "lapsed", "expired", "accepted elsewhere" };
 
-    private const string UnverifiedDeclineState = "red: AC6 - expected to pass today (a decline's 409 already shows the designed state), but not yet run: the ATDD browser run was not made for low memory; activate first and keep active if green";
+    /// <summary>
+    /// Alerts that say something. The Role narration is an empty assertive region on every authenticated surface, so the bare
+    /// count of <c>[role=alert]</c> is never zero.
+    /// </summary>
+    private const string SpokenAlerts = "() => [...document.querySelectorAll('[role=alert]')].filter(e => e.textContent.trim()).length";
 
     private static readonly string[] ReasonWords = ["declined", "revoked", "expired", "lapsed", "accepted"];
 
@@ -701,11 +705,8 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// <c>[role=alert]</c> on the page, and the words appear only inside the dialog), it names no reason and no one, and the
     /// indicator is removed. A decline moves no Role, so it asks for no re-read of the Space.
     /// </summary>
-    /// <remarks>
-    /// Expected to pass today: the dialog already treats a decline's <c>409</c> as an acceptance's.
-    /// </remarks>
     /// <returns>A task.</returns>
-    [Fact(Skip = UnverifiedDeclineState)]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-26")]
     [Trait("Requirement", "UX-DR39")]
@@ -731,7 +732,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
             var text = await page.Locator(Dialog).TextContentAsync() ?? string.Empty;
 
             Assert.Single(api.DeclinesSent(Northwind));
-            Assert.Equal(0, await page.Locator("[role=alert]").CountAsync());
+            Assert.Equal(0, await page.EvaluateAsync<int>(SpokenAlerts));
             Assert.Equal(1, await page.GetByText(NoLongerOpen, new PageGetByTextOptions { Exact = true }).CountAsync());
             Assert.Equal(1, await page.Locator(Dialog).GetByText(NoLongerOpen, new LocatorGetByTextOptions { Exact = true }).CountAsync());
             Assert.All(
@@ -746,12 +747,9 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// is answered with the same <c>409 ownership-offer-not-pending</c> and the dialog shows the same designed state, word for
     /// word: the heading, the one sentence and "Close", and nothing that names a reason.
     /// </summary>
-    /// <remarks>
-    /// Expected to pass today, as the case above.
-    /// </remarks>
     /// <param name="cause">What closed the offer, which the answer does not carry.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = UnverifiedDeclineState)]
+    [Theory]
     [MemberData(nameof(SettledCauses))]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-26")]
@@ -784,7 +782,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     /// that refused would render the one refusal surface.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the dialog closes silently on the in-Space 404 today (Q5 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "NFR-8")]
     public async Task A_decline_answered_by_the_in_Space_404_shows_the_no_longer_open_state()
@@ -807,7 +805,7 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
             await page.Locator(Indicator).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
             await WaitUntilAsync(() => api.SpaceArrivalReads(Northwind).Count > arrivalsBefore);
 
-            Assert.Equal(0, await page.Locator("[role=alert]").CountAsync());
+            Assert.Equal(0, await page.EvaluateAsync<int>(SpokenAlerts));
         }
     }
 

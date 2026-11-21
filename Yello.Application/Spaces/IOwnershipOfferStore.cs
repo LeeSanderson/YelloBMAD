@@ -17,6 +17,11 @@ namespace Yello.Application.Spaces;
 /// <b>At most one pending offer per Space</b> is the schema's guarantee, a filtered unique index; the store answers its
 /// violation as <see cref="OwnershipOfferOutcome.AlreadyPending"/>, never a failure.
 /// </para>
+/// <para>
+/// <b>Every transition is guarded by <c>State = Pending</c> and a rowcount, not by the <c>Idempotency-Key</c> alone.</b> The
+/// key deduplicates one request; the guarded statement refuses a second request under a new key, so ownership can never
+/// arrive through a retry the recipient did not make.
+/// </para>
 /// </remarks>
 public interface IOwnershipOfferStore
 {
@@ -38,6 +43,14 @@ public interface IOwnershipOfferStore
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>The offer, or <c>null</c>.</returns>
     Task<PendingOwnershipOffer?> ReadPendingAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// The Space's most recent offer when it was declined; <c>null</c> when there is no offer or the most recent one is in
+    /// any other state. Writes nothing.
+    /// </summary>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The declined offer, or <c>null</c>.</returns>
+    Task<DeclinedOwnershipOffer?> ReadLastDeclinedAsync(CancellationToken cancellationToken);
 
     /// <summary>
     /// Revokes an actionable pending offer of this Space, while the caller is still its Owner. The row is kept, set
@@ -143,6 +156,20 @@ public sealed record PendingOwnershipOffer(Guid Id, Guid RecipientMembershipId, 
 public sealed record OwnershipOfferView(Guid Id, Guid RecipientMembershipId, string RecipientName, DateTimeOffset ExpiresAt, DateTimeOffset ReadAt);
 
 /// <summary>
+/// The Space's most recent offer, declined, before the recipient's name is added.
+/// </summary>
+/// <param name="Id">The offer.</param>
+/// <param name="RecipientMembershipId">The Membership it named, which may since have gone.</param>
+public sealed record DeclinedOwnershipOffer(Guid Id, Guid RecipientMembershipId);
+
+/// <summary>
+/// A declined offer as its offering Owner is told it.
+/// </summary>
+/// <param name="Id">The offer.</param>
+/// <param name="RecipientName">The recipient's display name now, or <c>null</c> once its Membership is gone.</param>
+public sealed record DeclinedOwnershipOfferView(Guid Id, string? RecipientName);
+
+/// <summary>
 /// What a revoke came to.
 /// </summary>
 public enum OwnershipOfferRevocation
@@ -167,6 +194,11 @@ public enum OwnershipOfferRevocation
     /// <c>403</c>. Nothing written.
     /// </summary>
     NoLongerOwner,
+
+    /// <summary>
+    /// The caller's own Membership was gone when the revoke was written: the pipeline answers it as the boundary.
+    /// </summary>
+    LostMembership,
 }
 
 /// <summary>
