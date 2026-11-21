@@ -1,5 +1,7 @@
 using System.Net;
 using Xunit;
+using Yello.Contracts;
+using Yello.Contracts.Accounts;
 using Yello.Contracts.Spaces;
 using Yello.Tests.Shared;
 
@@ -22,19 +24,13 @@ namespace Yello.Tests.Isolation;
 /// presence anchor reads a Space that exists after its own Personal Space has been deleted, and the Token surface sends a
 /// Token that still works anywhere it is accepted.
 /// </para>
-/// <para>
-/// <b>Pending until the route is mapped</b>; the develop phase makes these rows live before review (GATE-003) and swaps
-/// <see cref="AccountDeletionWire.Route"/> for the contract's member.
-/// </para>
 /// </remarks>
 internal static partial class IsolationCases
 {
-    private const string AccountDeletionPending = "DELETE /api/v1/account is not mapped until the dev phase of the story that deletes an Account.";
-
     private static IEnumerable<IsolationCase> AccountDeletionCases() =>
     [
         new IsolationCase(
-            "ISO-DELETE-ACCOUNT-NAMES-ONLY-OWNED-SPACES", "I-11, AR-29", IsolationVector.Listing, HttpMethod.Delete, AccountDeletionWire.Route,
+            "ISO-DELETE-ACCOUNT-NAMES-ONLY-OWNED-SPACES", "I-11, AR-29", IsolationVector.Listing, HttpMethod.Delete, AccountRoutes.Account,
             async world =>
             {
                 var (first, second) = await world.OwnerOfTwoAsync("Dk");
@@ -44,7 +40,7 @@ internal static partial class IsolationCases
 
                 var joined = await JoinedThroughTheProductAsync(world, host, first.Actor, "member");
 
-                return new CaseRequest(joined, HttpMethod.Delete, [new(AccountDeletionWire.Route, AccountDeletionWire.Route)], TargetSpaceId: null, Other: second.Actor);
+                return new CaseRequest(joined, HttpMethod.Delete, [new(AccountRoutes.Account, AccountRoutes.Account)], TargetSpaceId: null, Other: second.Actor);
             },
             new Dictionary<IsolationSurface, Expectation>
             {
@@ -53,20 +49,16 @@ internal static partial class IsolationCases
                     Then = TheCallerStillBelongsWhereItBelongedAsync,
                 },
                 [IsolationSurface.ApiToken] = new NoCredential { Then = TheCallerStillBelongsWhereItBelongedAsync },
-            },
-            PendingUntil: "5.4",
-            PendingReason: AccountDeletionPending),
+            }),
 
         new IsolationCase(
-            "ISO-DELETE-ACCOUNT-OWN", "I-12, FR-3, V-3", IsolationVector.Api, HttpMethod.Delete, AccountDeletionWire.Route,
+            "ISO-DELETE-ACCOUNT-OWN", "I-12, FR-3, V-3", IsolationVector.Api, HttpMethod.Delete, AccountRoutes.Account,
             OwnsNothingAndDeletesItselfAsync,
             new Dictionary<IsolationSurface, Expectation>
             {
                 [IsolationSurface.Session] = new Served(HttpStatusCode.NoContent, ErasedFromTheHostsSpaceAloneAsync, "204, no body; gone from the host's Space; the host, A and B unchanged"),
                 [IsolationSurface.ApiToken] = new NoCredential { Then = TheCallerStillBelongsWhereItBelongedAsync },
-            },
-            PendingUntil: "5.4",
-            PendingReason: AccountDeletionPending),
+            }),
     ];
 
     /// <summary>
@@ -85,7 +77,7 @@ internal static partial class IsolationCases
 
         Assert.True(personal.StatusCode == HttpStatusCode.NoContent, $"Deleting the Personal Space through the product: {personal.StatusCode} {personal.Body}");
 
-        return new CaseRequest(joined, HttpMethod.Delete, [new(AccountDeletionWire.Route, AccountDeletionWire.Route)], TargetSpaceId: null, Other: host);
+        return new CaseRequest(joined, HttpMethod.Delete, [new(AccountRoutes.Account, AccountRoutes.Account)], TargetSpaceId: null, Other: host);
     }
 
     /// <summary>
@@ -97,7 +89,7 @@ internal static partial class IsolationCases
         var second = request.Other ?? throw new InvalidOperationException("The case names no second owned Space.");
         var named = AccountDeletionWire.OwnedSpacesIn(answer.Body);
 
-        Assert.Equal(AccountDeletionWire.AccountOwnsSpacesType, AccountDeletionWire.ProblemTypeOf(answer.Body));
+        Assert.Equal(ProblemTypes.AccountOwnsSpaces, AccountDeletionWire.ProblemTypeOf(answer.Body));
         Assert.Equal(new[] { request.Actor.Origin.SpaceId, second.SpaceId }.Order(), named.Select(space => space.Id).Order());
         Assert.All(named, space => Assert.Equal(AccountDeletionWire.OwnedSpaceMembers, space.Members));
 

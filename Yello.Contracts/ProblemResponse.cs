@@ -35,9 +35,11 @@ namespace Yello.Contracts;
 /// resource key.
 /// </param>
 /// <param name="Limit">On <see cref="ProblemTypes.BoundReached"/>: the bound's value.</param>
+/// <param name="Spaces">On <see cref="ProblemTypes.AccountOwnsSpaces"/>: every Space the caller owns, identity only.</param>
 public sealed record ProblemResponse(
     string? Type,
     IReadOnlyList<string>? Errors,
     string? Capability = null,
     string? Bound = null,
-    int? Limit = null);
+    int? Limit = null,
+    IReadOnlyList<Spaces.SpaceIdentityResponse>? Spaces = null);

@@ -151,7 +151,7 @@ public sealed class AuthenticateAccountHandlerTests
     /// nothing: the result is the same <c>null</c> every other failure is, so no Session is issued for an Account that is
     /// gone. The verifier still ran, so the duration is a success's.
     /// </summary>
-    [Fact(Skip = "red: AC11 - RehashAsync returns no rowcount, so the handler authenticates an Account its rehash did not find")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     public async Task A_rehash_that_wrote_no_row_authenticates_nothing()
     {
@@ -276,14 +276,14 @@ public sealed class AuthenticateAccountHandlerTests
             return Task.FromResult(credential);
         }
 
-        public Task RehashAsync(Guid accountId, string passwordHash, CancellationToken cancellationToken)
+        public Task<bool> RehashAsync(Guid accountId, string passwordHash, CancellationToken cancellationToken)
         {
             if (RehashFindsTheRow)
             {
                 Rehashes.Add((accountId, passwordHash));
             }
 
-            return Task.CompletedTask;
+            return Task.FromResult(RehashFindsTheRow);
         }
     }
 }

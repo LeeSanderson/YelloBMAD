@@ -106,6 +106,9 @@ public sealed partial class RefusalBoundaryGateTests
                 // never join its Account to another. Its route carries no {spaceId}, so its shape alone already answers a
                 // Token as no credential; the marker also gives it the 401 ahead of anti-forgery.
                 Yello.Contracts.Invitations.InvitationRoutes.Acceptance,
+
+                // Account deletion, on Account settings: a Token is bound to one Space and never acts on its Account.
+                Yello.Contracts.Accounts.AccountRoutes.Account,
             }.Order(StringComparer.Ordinal),
             marked);
     }

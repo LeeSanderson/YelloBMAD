@@ -1,0 +1,271 @@
+@using System.Net
+@using System.Text.Json
+@using Yello.Client.Refusals
+@using Yello.Client.Sessions
+@using Yello.Client.Spaces
+@using Yello.Contracts.Spaces
+
+@implements IDisposable
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject SessionState Session
+@inject SpaceWrites Writes
+@inject NavigationManager Navigation
+
+@*
+    THE DELETE SECTION OF ACCOUNT SETTINGS, below the API Tokens.
+
+    "DELETE YOUR ACCOUNT" ASKS FIRST, IN PLACE: the destructive-confirm with its question as the heading, which takes focus,
+    "This cannot be undone." after it, what happens, the danger action and Cancel. No typed field and no password: the
+    Session and the anti-forgery token are the authority, as for every other write, and an Account with no password must
+    be able to leave too. Esc or Cancel closes it, sends nothing and returns focus to the opener.
+
+    NOT OPTIMISTIC. While the deletion is out the confirm stays, aria-busy. 204: the Session purge runs and the tab lands on
+    sign-in, which says "Account deleted." politely. No Idempotency-Key: a replay after success meets a dead Session. No
+    answer or a 5xx: "Not sent.", and the confirm stays. A 401 is YelloApiHandler's.
+
+    AN OWNER IS REFUSED, AND THE REFUSAL IS A DESIGNED STATE OF THIS SECTION - not a toast, not an alert. The confirm closes;
+    the statement becomes a heading and takes focus; every owned Space is listed by name, each a link to its settings; then
+    exactly two exits - an accepted offer of ownership, or deleting the Space - and why deleting is the one the Account
+    controls. Nothing suggests a third. The list is identity only, as the server sends it.
+*@
+
+<section class="account-delete-section" aria-labelledby="account-delete-heading">
+    <h2 class="type-space-name" id="account-delete-heading">@Localizer["AccountDeletionHeading"]</h2>
+
+    @if (_owned is { } owned)
+    {
+        <div class="account-delete-section__refused">
+            <h3 class="type-space-name account-delete-section__statement" tabindex="-1" @ref="_statement">@Localizer[RefusalCopy.AccountOwnsSpacesKey]</h3>
+
+            <ul class="account-delete-section__owned">
+                @foreach (var space in owned)
+                {
+                    <li @key="space.Id"><a class="text-link" href="@ClientRoutes.SpaceSettings(space.Id)">@space.Name</a></li>
+                }
+            </ul>
+
+            <p class="account-delete-section__fact">@Localizer["AccountOwnsSpacesExits"]</p>
+            <p class="account-delete-section__fact">@Localizer["AccountOwnsSpacesWhy"]</p>
+        </div>
+    }
+
+    @if (_confirming)
+    {
+        <div class="destructive-confirm account-delete-section__confirm" aria-busy="@(_deleting ? "true" : null)" @onkeydown="ConfirmKeyDown">
+            <h3 class="type-space-name account-delete-section__question" id="@QuestionId" tabindex="-1" @ref="_question">@Localizer["AccountDeletionQuestion"]</h3>
+            <p class="account-delete-section__fact">@Localizer["DeleteCannotBeUndone"]</p>
+
+            <ul class="account-delete-section__consequences">
+                <li>@Localizer["AccountDeletionLeaves"]</li>
+                <li>@Localizer["AccountDeletionUnassigns"]</li>
+                <li>@Localizer["AccountDeletionTokens"]</li>
+                <li>@Localizer["AccountDeletionKeepsWork"]</li>
+            </ul>
+
+            <div class="account-delete-section__actions">
+                <button type="button" class="button-danger" aria-describedby="@QuestionId" @onclick="DeleteAsync">@Localizer["AccountDeletionAction"]</button>
+                <button type="button" class="button-secondary" @onclick="Cancel">@Localizer["DeleteCancel"]</button>
+            </div>
+
+            @if (_status is { } status)
+            {
+                <p class="account-delete-section__status" role="status">@status</p>
+            }
+        </div>
+    }
+
+    @if (!_confirming)
+    {
+        <button type="button" class="button-secondary" @onclick="Ask" @ref="_opener">@Localizer["AccountDeletionOpen"]</button>
+    }
+
+    @if (_refusal is { } refusal)
+    {
+        <p class="account-delete-section__status" role="status">@refusal</p>
+    }
+</section>
+
+@code {
+    private const string QuestionId = "account-delete-question";
+
+    private readonly CancellationTokenSource _disposal = new();
+
+    private ElementReference _opener;
+    private ElementReference _question;
+    private ElementReference _statement;
+    private IDisposable? _purgeRegistration;
+
+    private bool _confirming;
+    private bool _deleting;
+    private string? _status;
+    private string? _refusal;
+    private IReadOnlyList<SpaceIdentityResponse>? _owned;
+    private Focus _focus;
+
+    private enum Focus
+    {
+        None,
+        Opener,
+        Question,
+        Statement,
+    }
+
+    /// <inheritdoc />
+    protected override void OnInitialized() => _purgeRegistration = Session.RegisterPurge(PurgeAsync);
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var focus = _focus;
+
+        _focus = Focus.None;
+
+        switch (focus)
+        {
+            case Focus.Question when _confirming:
+                await _question.FocusAsync();
+                break;
+
+            case Focus.Statement when _owned is not null:
+                await _statement.FocusAsync();
+                break;
+
+            case Focus.Opener when !_confirming:
+                await _opener.FocusAsync();
+                break;
+
+            default:
+                // Nothing asked for focus on this render, or what asked has gone; it stays where the person put it.
+                break;
+        }
+    }
+
+    /// <inheritdoc />
+    public void Dispose()
+    {
+        _purgeRegistration?.Dispose();
+        _disposal.Cancel();
+        _disposal.Dispose();
+    }
+
+    private void Ask()
+    {
+        _owned = null;
+        _refusal = null;
+        _status = null;
+        _confirming = true;
+        _focus = Focus.Question;
+    }
+
+    private void Cancel()
+    {
+        if (_deleting)
+        {
+            return;
+        }
+
+        _confirming = false;
+        _status = null;
+        _focus = Focus.Opener;
+    }
+
+    private void ConfirmKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            Cancel();
+        }
+    }
+
+    private async Task DeleteAsync()
+    {
+        if (_deleting)
+        {
+            return;
+        }
+
+        _deleting = true;
+        _status = null;
+
+        using var linked = Session.LinkToSession(_disposal.Token);
+
+        try
+        {
+            using var answer = await Writes.SendWithoutKeyAsync(HttpMethod.Delete, AccountRoutes.Account, linked.Token);
+
+            if (!linked.IsCancellationRequested)
+            {
+                await UseAnswerAsync(answer);
+            }
+        }
+        catch (OperationCanceledException) when (linked.IsCancellationRequested)
+        {
+            // The page was left, or the Session ended, while the answer was on its way.
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            // No answer: the deletion may not have run, and the same press may be sent again.
+            _status = Localizer["TaskEditNotSent"];
+        }
+        finally
+        {
+            _deleting = false;
+        }
+    }
+
+    private async Task UseAnswerAsync(SpaceWriteAnswer answer)
+    {
+        switch (answer.StatusCode)
+        {
+            case HttpStatusCode.NoContent:
+                await Session.SignedOutAsync(LandAsync);
+                return;
+
+            case HttpStatusCode.Unauthorized:
+                // YelloApiHandler's: the Session has ended and the purge has run.
+                return;
+
+            case HttpStatusCode.Conflict when answer.Problem?.Type == ProblemTypes.AccountOwnsSpaces:
+                _owned = answer.Problem.Spaces ?? [];
+                _confirming = false;
+                _focus = Focus.Statement;
+                return;
+
+            case >= HttpStatusCode.InternalServerError:
+                _status = Localizer["TaskEditNotSent"];
+                return;
+
+            default:
+                _confirming = false;
+                _refusal = RefusalText.Of(Localizer, answer.Problem);
+                _focus = Focus.Opener;
+                return;
+        }
+    }
+
+    /// <summary>
+    /// Where the tab lands once the Session purge has run: sign-in, saying the Account is deleted. Replaced, so Back does not
+    /// return to settings of an Account that no longer exists.
+    /// </summary>
+    private Task LandAsync()
+    {
+        Navigation.NavigateTo(ClientRoutes.SignInAfterAccountDeletion, replace: true);
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// The Session ended or was signed out: the owned Spaces and any half-finished state go with it.
+    /// </summary>
+    private Task PurgeAsync()
+    {
+        _owned = null;
+        _confirming = false;
+        _status = null;
+        _refusal = null;
+        _focus = Focus.None;
+
+        return InvokeAsync(StateHasChanged);
+    }
+}

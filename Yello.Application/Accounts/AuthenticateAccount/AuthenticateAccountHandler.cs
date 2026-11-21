@@ -103,12 +103,19 @@ public sealed class AuthenticateAccountHandler(
             // work factor and the next successful sign-in tries the upgrade again.
             try
             {
-                await credentialStore
+                var written = await credentialStore
                     .RehashAsync(
                         credential.AccountId,
                         passwordHasher.Hash(command.Password),
                         cancellationToken)
                     .ConfigureAwait(false);
+
+                // No row means the Account was deleted between the read and the write; issuing a Session for it would
+                // let a dead Account sign in once more. A failed write (below) proves nothing either way, so it does not.
+                if (!written)
+                {
+                    return null;
+                }
             }
             // S2221 disabled here, deliberately and narrowly, following the same reasoning as
             // StartupConnectivityCheck. An allow-list of exception types IS the defect: this slice

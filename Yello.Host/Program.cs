@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Localization;
 using Yello.Application.Accounts.AuthenticateAccount;
+using Yello.Application.Accounts.DeleteAccount;
 using Yello.Application.ApiTokens.IssueApiToken;
 using Yello.Application.ApiTokens.ListApiTokens;
 using Yello.Application.ApiTokens.RevokeApiToken;
@@ -131,6 +132,7 @@ builder.Services.AddScoped<ListSpacesHandler>();
 builder.Services.AddScoped<IssueApiTokenHandler>();
 builder.Services.AddScoped<ListApiTokensHandler>();
 builder.Services.AddScoped<RevokeApiTokenHandler>();
+builder.Services.AddScoped<DeleteAccountHandler>();
 builder.Services.AddScoped<ListProjectsHandler>();
 builder.Services.AddScoped<CreateProjectHandler>();
 builder.Services.AddScoped<RenameProjectHandler>();
@@ -490,6 +492,10 @@ api.MapSpaceDeletionSummary();
 api.MapIssueApiToken();
 api.MapListApiTokens();
 api.MapRevokeApiToken();
+
+// Account deletion. DELETE /api/v1/account, on Account settings: refused 409 while the Account owns a Space,
+// naming each; otherwise it leaves every Space through that Space's own leave and erases the Account row.
+api.MapDeleteAccount();
 
 // Projects (story 2.1). GET and POST /api/v1/spaces/{spaceId}/projects list and create; PATCH
 // /api/v1/spaces/{spaceId}/projects/{projectId} renames. Space-scoped on both surfaces. Create declares

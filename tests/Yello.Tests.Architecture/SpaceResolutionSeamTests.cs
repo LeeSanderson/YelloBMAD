@@ -280,6 +280,11 @@ public sealed class SpaceResolutionSeamTests
             "Yello.Host.Spaces.ActiveSpaceResolution",
             "Yello.Infrastructure.Persistence.MembershipActiveSpaceResolver",
             "Yello.Infrastructure.InfrastructureServices",
+
+            // Account deletion leaves each Space on that Space's own unit of work, one at a time, after the request's
+            // Account-scoped check and before its erase; it is never beside the pipeline's unit of work, because an
+            // Account-scoped route opens none (the AD-24 amendment for Account deletion).
+            "Yello.Infrastructure.Persistence.AccountDeletion",
         ];
 
         var dependents = new SortedSet<string>(StringComparer.Ordinal);

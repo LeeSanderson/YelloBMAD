@@ -124,7 +124,7 @@ development_status:
   5-1-offer-ownership-of-a-space-and-tell-the-recipient: done
   5-2-accept-an-ownership-offer: done
   5-3-decline-revoke-lapse-and-the-states-that-are-no-longer-open: done
-  5-4-delete-your-account: ready-for-dev
+  5-4-delete-your-account: review
   epic-5-retrospective: optional
 
   # Epic 6: Shape Statuses per Project and retire work safely

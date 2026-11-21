@@ -13,8 +13,9 @@ namespace Yello.Infrastructure.Persistence.Configurations;
 /// <remarks>
 /// <para>
 /// <b>Cascades from its Space</b> (Lee's Q1, FR-7): deleting a Space destroys its Invitations in the one deletion
-/// statement. <b>References its issuer's Account with no action</b> (FR-12, AD-5): an Invitation survives its issuer's
-/// demotion and removal, and Account deletion tombstones (story 5.4). <b>There is no reference to <c>Membership</c></b>:
+/// statement. <b>References its issuer's Account with <c>SET NULL</c></b> (FR-12, AD-5): an Invitation survives its
+/// issuer's demotion and removal, and its issuer's Account deletion nulls the key, which the reads then answer as a
+/// deleted Account. <b>There is no reference to <c>Membership</c></b>:
 /// a composite <c>(SpaceId, MembershipId)</c> with <c>SET NULL</c> would null the Space too, and with no action it would
 /// block a Membership's removal. <c>Account</c> is not Space-scoped, so <c>IssuedByAccountId</c> is a deliberate
 /// non-Membership reference outside the rule that Space-scoped references carry the Space.
@@ -101,7 +102,7 @@ internal sealed class InvitationConfiguration(YelloDbContext context) : IEntityT
             .HasMaxLength(TokenHashLength)
             .IsFixedLength(false);
 
-        builder.Property(invitation => invitation.IssuedByAccountId).IsRequired();
+        builder.Property(invitation => invitation.IssuedByAccountId).IsRequired(false);
 
         builder.Property(invitation => invitation.IssuerName)
             .IsRequired()
@@ -125,9 +126,12 @@ internal sealed class InvitationConfiguration(YelloDbContext context) : IEntityT
             .HasForeignKey(invitation => invitation.SpaceId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // SET NULL rather than Restrict: an Invitation is its Space's work and outlives its issuer's Account, and
+        // only the engine's referential action reaches it in a Space the issuer no longer belongs to.
         builder.HasOne<Account>()
             .WithMany()
             .HasForeignKey(invitation => invitation.IssuedByAccountId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .IsRequired(false)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

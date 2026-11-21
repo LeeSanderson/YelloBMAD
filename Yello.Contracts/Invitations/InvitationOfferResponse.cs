@@ -9,9 +9,11 @@ namespace Yello.Contracts.Invitations;
 /// </remarks>
 /// <param name="SpaceName">The invited Space's name.</param>
 /// <param name="Role">The Role offered, as its stable code: <c>admin</c>, <c>member</c> or <c>viewer</c>.</param>
-/// <param name="IssuerName">The issuer's display name, as captured at issue.</param>
+/// <param name="IssuerName">
+/// The issuer's display name, as captured at issue; <c>null</c> once the issuer's Account is deleted.
+/// </param>
 /// <param name="AddressedToYou">
 /// With a Session, whether its Account's address is the invited one; <c>null</c> without one (a bearer Token included).
 /// Neither address is ever returned (AC7).
 /// </param>
-public sealed record InvitationOfferResponse(string SpaceName, string Role, string IssuerName, bool? AddressedToYou);
+public sealed record InvitationOfferResponse(string SpaceName, string Role, string? IssuerName, bool? AddressedToYou);

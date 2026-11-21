@@ -35,7 +35,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>AccountSettings</c> surface - AD-24's second Account-scoped surface, with no new member - and declares no Space
     /// capability and no bound, because it is decided by identity, not by a Role in a Space.
     /// </summary>
-    [Fact(Skip = "red: AC8 - DELETE /api/v1/account is not mapped")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-24")]
@@ -59,7 +59,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>urn:yello:problem:account-owns-spaces</c>, and <c>ProblemResponse</c> gains <c>Spaces</c> after its existing
     /// members, typed as a list of <c>SpaceIdentityResponse</c> - identity only, nothing a Role or a count could ride on.
     /// </summary>
-    [Fact(Skip = "red: AC2 - ProblemTypes.AccountOwnsSpaces and ProblemResponse.Spaces do not exist")]
+    [Fact]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "AD-24")]
@@ -83,7 +83,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Space it was removed from included, where no Space-scoped step of the deletion runs. Not <c>Cascade</c>, which would
     /// delete another Account's Space's work; not <c>Restrict</c>, which would refuse the deletion.
     /// </summary>
-    [Fact(Skip = "red: AC4 - Invitation.IssuedByAccountId is a required Guid with DeleteBehavior.Restrict (Q3 (a), Lee: nullable, ON DELETE SET NULL)")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "AD-5")]
@@ -108,7 +108,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Both Invitation contracts serve the issuer's name as nullable: <c>null</c> once the issuer's Account is deleted, so
     /// the deleted Account's name is never served again and the client renders the tombstone instead.
     /// </summary>
-    [Fact(Skip = "red: AC5 - InvitationResponse.IssuerName and InvitationOfferResponse.IssuerName are non-nullable (Q3 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "UX-DR10")]
     public void The_Invitation_contracts_serve_a_nullable_issuer_name()

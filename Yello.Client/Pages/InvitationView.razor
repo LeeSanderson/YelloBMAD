@@ -53,6 +53,10 @@
         @if (_phase == InvitationViewPhase.Offer && _offer is not null)
         {
             <h1 class="type-dialog-title invitation-view__heading" tabindex="-1" @ref="_heading">@OfferHeading</h1>
+            @if (IssuerDeleted)
+            {
+                <p class="invitation-view__issuer"><DeletedAccountAvatar /></p>
+            }
             <p class="invitation-view__role">@JoinAsCopy</p>
             <p class="invitation-view__meaning">@RoleMeaningCopy</p>
 

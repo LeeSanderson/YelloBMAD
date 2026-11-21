@@ -42,6 +42,7 @@ public sealed partial class SpaceNavigationGateTests
     {
         ["Yello.Client/Program.cs"] = (2, "Session end and sign-out: the Session purge empties every Space-scoped holder before the navigation"),
         ["Yello.Client/Pages/AccountSettings.razor"] = (1, "leaves Account settings, which is in no Space, for sign-in when no Session is held"),
+        ["Yello.Client/Components/AccountDeleteSection.razor"] = (1, "Account deletion's landing on sign-in: it runs as SignedOutAsync's landing, after the Session purge has emptied every Space-scoped holder"),
         ["Yello.Client/Pages/SignIn.razor"] = (1, "leaves sign-in, which is in no Space, for the entry point once signed in"),
     };
 

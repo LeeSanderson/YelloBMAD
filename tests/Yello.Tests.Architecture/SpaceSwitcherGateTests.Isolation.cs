@@ -14,25 +14,28 @@ public sealed partial class SpaceSwitcherGateTests
     [
         "Yello.Application.Spaces.IAccountSpaceDirectory",
         "Yello.Application.ApiTokens.IAccountApiTokenDirectory",
+        "Yello.Application.Accounts.DeleteAccount.IAccountDeletion",
     ];
 
     /// <summary>
     /// The only types allowed to depend on an Account-scoped read: the handlers behind AD-24's two
-    /// Account-scoped surfaces, the switcher and Account settings.
+    /// Account-scoped surfaces, the switcher and Account settings (its Token list and Account deletion).
     /// </summary>
     private static readonly string[] AccountScopedReaders =
     [
+        "Yello.Application.Accounts.DeleteAccount.DeleteAccountHandler",
         "Yello.Application.ApiTokens.ListApiTokens.ListApiTokensHandler",
         "Yello.Application.Spaces.ListSpaces.ListSpacesHandler",
     ];
 
     /// <summary>
     /// The endpoint methods behind AD-24's two Account-scoped surfaces: the switcher and Account
-    /// settings' Token list. By method, because <c>ApiTokenEndpoints</c> also maps the Space-scoped
-    /// issue route.
+    /// settings' Token list and Account deletion. By method, because <c>ApiTokenEndpoints</c> also maps
+    /// the Space-scoped issue route.
     /// </summary>
     private static readonly string[] AccountScopedEndpoints =
     [
+        "Yello.Host.Endpoints.AccountEndpoints::DeleteAsync",
         "Yello.Host.Endpoints.ApiTokenEndpoints::ListAsync",
         "Yello.Host.Endpoints.SpaceDirectoryEndpoints::ListAsync",
     ];
@@ -64,17 +67,15 @@ public sealed partial class SpaceSwitcherGateTests
         var dependants = DependantsOf(AccountScopedReads);
 
         // Vacuity guard: each Account-scoped read is found depended on, by its own handler.
-        Assert.Contains(AccountScopedReaders[0], dependants);
-        Assert.Contains(AccountScopedReaders[1], dependants);
+        Assert.All(AccountScopedReaders, reader => Assert.Contains(reader, dependants));
 
         Assert.Equal(AccountScopedReaders, dependants);
 
         // The second hop: a Space-scoped endpoint that took a handler instead of the directory would
-        // reach the same read. Only the two Account-scoped endpoint methods take or call the handlers.
+        // reach the same read. Only the Account-scoped endpoint methods take or call the handlers.
         var handlerUsers = MethodsDependingOn(AccountScopedReaders);
 
-        Assert.Contains(AccountScopedEndpoints[0], handlerUsers);
-        Assert.Contains(AccountScopedEndpoints[1], handlerUsers);
+        Assert.All(AccountScopedEndpoints, endpoint => Assert.Contains(endpoint, handlerUsers));
 
         Assert.Equal(AccountScopedEndpoints, handlerUsers);
     }
@@ -93,8 +94,9 @@ public sealed partial class SpaceSwitcherGateTests
         {
             using var module = ModuleDefinition.ReadModule(assembly.Location);
 
+            // A handler's own compiler-generated state machines call its private methods; that is not a use from outside.
             var found = module.GetTypes()
-                .Where(type => !types.Contains(type.FullName))
+                .Where(type => !types.Contains(OutermostOf(type).FullName))
                 .SelectMany(type => type.Methods
                     .Where(method =>
                         method.Parameters.Any(parameter => types.Contains(parameter.ParameterType.FullName))

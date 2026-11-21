@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Yello.Application.Accounts.DeleteAccount;
 using Yello.Application.ApiTokens;
 using Yello.Application.Spaces;
 using Yello.Infrastructure.Persistence;
@@ -37,6 +38,9 @@ internal static class AccountScopedReads
 
         // Story 3.3: the counts the delete confirm states (open question 2 (a)).
         services.AddScoped<ISpaceContentsReader, SpaceContentsReader>();
+
+        // Account deletion: the directory's Account-scoped check and erase around one Space-scoped leave per Space.
+        services.AddScoped<IAccountDeletion, AccountDeletion>();
 
         return services;
     }

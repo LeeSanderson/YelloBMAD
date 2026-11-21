@@ -172,7 +172,7 @@ internal sealed class InvitationStore(
                 invitation.Id,
                 invitation.EmailAddress,
                 invitation.Role,
-                invitation.IssuerName,
+                invitation.IssuedByAccountId == null ? null : invitation.IssuerName,
                 invitation.CreatedAt))
             .ToListAsync(cancellationToken)
             .ConfigureAwait(false);
@@ -253,7 +253,7 @@ internal sealed class InvitationStore(
                 {
                     SpaceName = space.Name,
                     invitation.Role,
-                    invitation.IssuerName,
+                    IssuerName = invitation.IssuedByAccountId == null ? null : invitation.IssuerName,
                     Addressed = invitation.NormalizedEmailAddress == callerAddress,
                 })
             .SingleOrDefaultAsync(cancellationToken)

@@ -45,8 +45,11 @@ public sealed partial class InvitationView
     /// </summary>
     private bool IsAddressedToTheSession => _offer?.AddressedToYou == true || _joinOffered;
 
-    private string OfferHeading =>
-        string.Format(CultureInfo.CurrentCulture, Localizer["InvitationOfferHeading"], _offer?.IssuerName, _offer?.SpaceName);
+    private bool IssuerDeleted => _offer is { IssuerName: null };
+
+    private string OfferHeading => IssuerDeleted
+        ? string.Format(CultureInfo.CurrentCulture, Localizer["InvitationOfferHeadingDeletedIssuer"], _offer?.SpaceName)
+        : string.Format(CultureInfo.CurrentCulture, Localizer["InvitationOfferHeading"], _offer?.IssuerName, _offer?.SpaceName);
 
     private string JoinAsCopy =>
         string.Format(CultureInfo.CurrentCulture, Localizer["InvitationJoinAs"], RoleName);

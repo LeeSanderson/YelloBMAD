@@ -100,10 +100,7 @@ internal static class RevocationCases
             {
                 [IsolationSurface.Session] = new(HolderDeletesTheAccountAsync, new NoCredential(ClearsTheDeadCookie: true)),
                 [IsolationSurface.ApiToken] = new(HolderDeletesTheAccountAsync, new JoinedTokenDead()),
-            })
-        {
-            Skip = "red: AC12 - DELETE /api/v1/account is not mapped, so the holder cannot delete its Account through the product",
-        },
+            }),
 
         new(
             "REV-ROLE-CHANGED", "I-10, NFR-2",

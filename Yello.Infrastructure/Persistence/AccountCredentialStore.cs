@@ -51,16 +51,18 @@ internal sealed class AccountCredentialStore(YelloDbContext dbContext) : IAccoun
     }
 
     /// <inheritdoc />
-    public async Task RehashAsync(
+    public async Task<bool> RehashAsync(
         Guid accountId,
         string passwordHash,
         CancellationToken cancellationToken)
     {
-        await dbContext.Accounts
+        var written = await dbContext.Accounts
             .Where(account => account.Id == accountId)
             .ExecuteUpdateAsync(
                 setters => setters.SetProperty(account => account.PasswordHash, passwordHash),
                 cancellationToken)
             .ConfigureAwait(false);
+
+        return written == 1;
     }
 }

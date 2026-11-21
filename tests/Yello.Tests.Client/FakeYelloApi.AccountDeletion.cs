@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Yello.Contracts;
-using Yello.Tests.Shared;
+using Yello.Contracts.Accounts;
 
 namespace Yello.Tests.Client;
 
@@ -11,8 +11,7 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <b>Inert unless a case sends the route.</b> No earlier case sends it, and it fell to the unmatched <c>404</c> before, so
-/// every earlier case is served the bytes it always was. The path is <see cref="AccountDeletionWire.Route"/>'s stand-in
-/// until the contract names it.
+/// every earlier case is served the bytes it always was.
 /// </remarks>
 internal sealed partial class FakeYelloApi
 {
@@ -31,14 +30,14 @@ internal sealed partial class FakeYelloApi
     /// Every Account deletion the page sent, in order.
     /// </summary>
     public IReadOnlyList<FakeRequest> AccountDeletions =>
-        [.. _requests.Where(request => request.Method == "DELETE" && request.Path == AccountDeletionWire.Route)];
+        [.. _requests.Where(request => request.Method == "DELETE" && request.Path == AccountRoutes.Account)];
 
     /// <summary>
     /// The deletion's answer, or <c>null</c> when the request is not the deletion.
     /// </summary>
     private (int Status, string Body)? AccountDeletion(FakeRequest request)
     {
-        if (request.Method != "DELETE" || request.Path != AccountDeletionWire.Route)
+        if (request.Method != "DELETE" || request.Path != AccountRoutes.Account)
         {
             return null;
         }
@@ -54,7 +53,7 @@ internal sealed partial class FakeYelloApi
         {
             var refusal = new
             {
-                type = AccountDeletionWire.AccountOwnsSpacesType,
+                type = ProblemTypes.AccountOwnsSpaces,
                 spaces = OwnedSpaces.Select(space => new { id = space.Id, name = space.Name }).ToList(),
             };
 

@@ -91,17 +91,29 @@ public static class ClientRoutes
     /// <remarks>
     /// <b>It names the Session and nothing else.</b> UJ-6 tells a <i>live</i> participant that
     /// access ended, because that connection was already authorised for the Space; UJ-4's cold
-    /// path must not, and UX-DR38 keeps the Space name out of the copy "in any case". There is
-    /// deliberately only one value. A sign-out lands on <see cref="SignIn"/> with no reason at all:
-    /// the person chose it, and nothing ended under them.
+    /// path must not, and UX-DR38 keeps the Space name out of the copy "in any case". A sign-out
+    /// lands on <see cref="SignIn"/> with no reason at all: the person chose it, and nothing ended
+    /// under them.
     /// </remarks>
     public static string SessionEndedReason => "session-ended";
+
+    /// <summary>
+    /// The other reason value: the person deleted their own Account. Said politely, not as an alert -
+    /// nothing ended under them.
+    /// </summary>
+    public static string AccountDeletedReason => "account-deleted";
 
     /// <summary>
     /// Where a client whose Session has ended is returned to, with the reason stated.
     /// </summary>
     public static string SignInAfterSessionEnd =>
         $"{SignIn}?{ReasonQueryKey}={SessionEndedReason}";
+
+    /// <summary>
+    /// Where a client lands once its Account is deleted.
+    /// </summary>
+    public static string SignInAfterAccountDeletion =>
+        $"{SignIn}?{ReasonQueryKey}={AccountDeletedReason}";
 
     /// <summary>
     /// A Space's home, the first Space-scoped route.

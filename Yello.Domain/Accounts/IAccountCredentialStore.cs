@@ -53,7 +53,8 @@ public interface IAccountCredentialStore
     /// <param name="accountId">The Account whose hash is being upgraded.</param>
     /// <param name="passwordHash">The new hash, made at the configured work factor.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
-    Task RehashAsync(Guid accountId, string passwordHash, CancellationToken cancellationToken);
+    /// <returns><c>false</c> when no row was written: the Account was deleted after it was read.</returns>
+    Task<bool> RehashAsync(Guid accountId, string passwordHash, CancellationToken cancellationToken);
 }
 
 /// <summary>

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Yello.Contracts.Accounts;
 
 namespace Yello.Tests.Shared;
 
@@ -8,15 +9,8 @@ namespace Yello.Tests.Shared;
 /// <c>409 account-owns-spaces</c> with a <c>spaces</c> extension listing each owned Space as <c>{ id, name }</c>.
 /// </summary>
 /// <remarks>
-/// <para>
-/// <b><see cref="Route"/>, <see cref="AccountOwnsSpacesType"/> and <see cref="DeletionInterruptedType"/> stand in for
-/// contract members that do not exist yet.</b> Every use is swapped for the <c>Yello.Contracts</c> member when the route
-/// and the problem types are added, and these three are then deleted, so the route is stated once.
-/// </para>
-/// <para>
 /// <b>The old cookie is kept on purpose</b> by <see cref="DeleteAndKeepTheOldCookieAsync"/>: the <c>204</c> clears the
 /// cookie in the session, and a case about what a dead Account's cookie gets must send that cookie again.
-/// </para>
 /// </remarks>
 public static class AccountDeletionWire
 {
@@ -25,22 +19,6 @@ public static class AccountDeletionWire
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     private static readonly Dictionary<string, string> NoHeaders = new(StringComparer.Ordinal);
-
-    /// <summary>
-    /// The deletion's path. A stand-in for the contract's route.
-    /// </summary>
-    public static string Route => "/api/v1/account";
-
-    /// <summary>
-    /// The refusal's stable type while the Account owns a Space. A stand-in for <c>ProblemTypes.AccountOwnsSpaces</c>.
-    /// </summary>
-    public static string AccountOwnsSpacesType => "urn:yello:problem:account-owns-spaces";
-
-    /// <summary>
-    /// The refusal's stable type when Memberships keep arriving while the deletion runs. A stand-in for the problem type
-    /// the dev phase names.
-    /// </summary>
-    public static string DeletionInterruptedType => "urn:yello:problem:account-deletion-interrupted";
 
     /// <summary>
     /// The members of each item in the refusal's <c>spaces</c> list, in ordinal order: identity only.
@@ -56,7 +34,7 @@ public static class AccountDeletionWire
     {
         ArgumentNullException.ThrowIfNull(session);
 
-        return session.SendWithHeadersAsync(HttpMethod.Delete, Route, content: null, NoHeaders);
+        return session.SendWithHeadersAsync(HttpMethod.Delete, AccountRoutes.Account, content: null, NoHeaders);
     }
 
     /// <summary>

@@ -900,7 +900,7 @@ public sealed class WireDatabase(string connectionString)
                 reader.GetString(5),
                 await reader.GetFieldValueAsync<DateTimeOffset>(6).ConfigureAwait(false),
                 await reader.GetFieldValueAsync<byte[]>(7).ConfigureAwait(false),
-                reader.GetGuid(8),
+                await reader.IsDBNullAsync(8).ConfigureAwait(false) ? null : reader.GetGuid(8),
                 reader.GetString(9),
                 await reader.GetFieldValueAsync<DateTimeOffset>(10).ConfigureAwait(false)));
         }
@@ -1332,7 +1332,7 @@ public sealed class WireDatabase(string connectionString)
 /// <param name="State">The state as stored: <c>Pending</c>, <c>Accepted</c> or <c>Revoked</c>; never <c>Expired</c>.</param>
 /// <param name="ExpiresAt">The expiry, stamped from the database clock.</param>
 /// <param name="TokenHash">SHA-256 of the token; never the token.</param>
-/// <param name="IssuedByAccountId">The issuing Account.</param>
+/// <param name="IssuedByAccountId">The issuing Account; <c>null</c> once that Account is deleted.</param>
 /// <param name="IssuerName">The issuer's display name, captured at issue.</param>
 /// <param name="CreatedAt">When it was issued.</param>
 #pragma warning disable CA1819 // Properties should not return arrays - a row read for assertions, compared by value where it matters.
@@ -1345,7 +1345,7 @@ public sealed record InvitationRow(
     string State,
     DateTimeOffset ExpiresAt,
     byte[] TokenHash,
-    Guid IssuedByAccountId,
+    Guid? IssuedByAccountId,
     string IssuerName,
     DateTimeOffset CreatedAt);
 #pragma warning restore CA1819

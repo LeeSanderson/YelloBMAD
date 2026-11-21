@@ -159,13 +159,15 @@ internal static class ApplicationLocks
     /// <summary>
     /// Takes the acting Account's Spaces-per-Account lock.
     /// </summary>
-    /// <param name="dbContext">The Space creation's unit of work, scoped to the Account and inside its transaction.</param>
+    /// <param name="dbContext">
+    /// Space creation's or Account deletion's unit of work, scoped to the Account and inside its transaction.
+    /// </param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>A task.</returns>
     internal static Task TakeSpacesPerAccountAsync(YelloDbContext dbContext, CancellationToken cancellationToken)
     {
         var accountId = dbContext.ScopedAccountId
-            ?? throw new InvalidOperationException("The Spaces-per-Account lock is taken only inside the Space creation unit of work.");
+            ?? throw new InvalidOperationException("The Spaces-per-Account lock is taken only inside an Account-scoped unit of work.");
 
         return TakeAsync(dbContext, SpacesPerAccount(accountId), cancellationToken);
     }

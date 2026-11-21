@@ -12,6 +12,9 @@ namespace Yello.Contracts.Invitations;
 /// <param name="Id">The Invitation's id, which the revoke names.</param>
 /// <param name="EmailAddress">The address as issued, trimmed.</param>
 /// <param name="Role">The Role offered, as its stable code: <c>admin</c>, <c>member</c> or <c>viewer</c>.</param>
-/// <param name="IssuerName">The issuer's display name as captured at issue - never a live Account lookup.</param>
+/// <param name="IssuerName">
+/// The issuer's display name as captured at issue - never a live Account lookup. <c>null</c> once the issuer's Account is
+/// deleted, so a deleted Account's name is never served again.
+/// </param>
 /// <param name="IssuedAt">When it was issued.</param>
-public sealed record InvitationResponse(Guid Id, string EmailAddress, string Role, string IssuerName, DateTimeOffset IssuedAt);
+public sealed record InvitationResponse(Guid Id, string EmailAddress, string Role, string? IssuerName, DateTimeOffset IssuedAt);

@@ -2390,3 +2390,69 @@
     overflow: hidden;
     clip-path: inset(50%);
 }
+
+/*
+    THE DELETE SECTION OF ACCOUNT SETTINGS: "Delete your Account", its in-place destructive-confirm stacked as Space
+    settings' is, and the refused state - a heading, the owned Spaces as links, the two exits - in the section itself, not
+    an alert. No icon, no shadow, no transition.
+*/
+.account-delete-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+    margin-block-start: var(--space-4);
+    min-inline-size: 0;
+}
+
+.account-delete-section__confirm,
+.account-delete-section__refused {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    align-self: stretch;
+    gap: var(--space-3);
+    min-inline-size: 0;
+}
+
+.account-delete-section__question,
+.account-delete-section__statement,
+.account-delete-section__fact,
+.account-delete-section__consequences,
+.account-delete-section__owned,
+.account-delete-section__status {
+    margin-block: 0;
+    min-inline-size: 0;
+    overflow-wrap: anywhere;
+}
+
+.account-delete-section__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-3);
+}
+
+.account-delete-section__status {
+    color: var(--text-muted);
+}
+
+/*
+    THE TOMBSTONE: a deleted Account's avatar. The live avatar's box - the default radius, the meta type's font and line
+    height, the same padding - holding no initials, so it is given at least two initials' measure and one line; muted by
+    the column surface and the muted ink. Never hidden, never blank.
+*/
+.avatar-tombstone {
+    display: inline-block;
+    flex-shrink: 0;
+    min-inline-size: 2ch;
+    min-block-size: 1lh;
+    padding-inline: var(--space-1);
+    border-radius: var(--radius-default);
+    background: var(--surface-column);
+    color: var(--text-muted);
+    font-family: var(--type-meta-family);
+    font-size: var(--type-meta-size);
+    line-height: var(--type-meta-line-height);
+    vertical-align: middle;
+}

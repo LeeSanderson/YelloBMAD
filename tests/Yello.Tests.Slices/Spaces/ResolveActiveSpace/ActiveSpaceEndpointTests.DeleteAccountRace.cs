@@ -1,5 +1,6 @@
 using System.Net;
 using Xunit;
+using Yello.Contracts;
 using Yello.Domain.Memberships;
 using Yello.Tests.Shared;
 using TaskWire = Yello.Tests.Slices.Tasks.TaskWire;
@@ -21,11 +22,11 @@ public sealed partial class ActiveSpaceEndpointTests
     /// The deleting Account accepts an offer of ownership in another tab, and the acceptance is queued on the Space's
     /// Memberships lock ahead of the deletion's leave of that Space. <c>sp_getapplock</c> grants the queued waiters in
     /// order, so the acceptance commits first: the leave then meets an Owner's row and the deletion is refused
-    /// <c>409 account-owns-spaces</c> naming that Space. The Account still exists and owns it; the former Owner is a Member;
-    /// one Owner.
+    /// <c>409 account-owns-spaces</c> naming that Space. The Account still exists and owns it; the former Owner is an Admin,
+    /// as every accepted offer leaves it; one Owner.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - DELETE /api/v1/account is not mapped, so no leave meets the acceptance (Q2 (a): stop and refuse naming the Space)")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "FR-42")]
     [Trait("Requirement", "AD-5")]
@@ -87,11 +88,11 @@ public sealed partial class ActiveSpaceEndpointTests
 
         Assert.True(accepted.StatusCode == HttpStatusCode.NoContent, $"The acceptance queued first: {Described(accepted)}");
         Assert.True(refused.StatusCode == HttpStatusCode.Conflict, $"The deletion queued second: {Described(refused)}; the acceptance was {Described(accepted)}");
-        Assert.Equal(AccountDeletionWire.AccountOwnsSpacesType, ProblemType(refused));
+        Assert.Equal(ProblemTypes.AccountOwnsSpaces, ProblemType(refused));
         Assert.Equal([spaceId], AccountDeletionWire.OwnedSpacesIn(refused.Body).Select(space => space.Id));
         Assert.Equal(1, await AccountRowsAsync(database, accountId));
         Assert.Equal("Owner", (await wire.MembershipOfAsync(spaceId, accountId)).Role);
-        Assert.Equal("Member", (await wire.MembershipOfAsync(spaceId, ownerId)).Role);
+        Assert.Equal("Admin", (await wire.MembershipOfAsync(spaceId, ownerId)).Role);
         await AssertOneOwnerEachAsync(wire, spaceId);
     }
 
@@ -102,7 +103,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// erase re-reads the Account's Memberships and leaves the new one in one extra pass.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - DELETE /api/v1/account is not mapped, so no erase re-reads the Memberships (Q2 (a): one extra leave pass)")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "AD-5")]
     [Trait("Requirement", "AD-24")]

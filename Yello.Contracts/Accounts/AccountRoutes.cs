@@ -27,4 +27,10 @@ public static class AccountRoutes
     /// was new or already registered (AD-23).
     /// </summary>
     public static string Register => "/api/v1/accounts";
+
+    /// <summary>
+    /// <c>DELETE</c> here to delete the signed-in Account. Session only, no body and no <c>Idempotency-Key</c>: a replay
+    /// after success meets a dead Session, and a replay of a refusal reads the Account's Spaces again.
+    /// </summary>
+    public static string Account => "/api/v1/account";
 }

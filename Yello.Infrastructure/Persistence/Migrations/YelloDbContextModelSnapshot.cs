@@ -152,7 +152,7 @@ namespace Yello.Infrastructure.Persistence.Migrations
                         .HasColumnType("datetimeoffset")
                         .HasDefaultValueSql("DATEADD(day, 7, SYSDATETIMEOFFSET())");
 
-                    b.Property<Guid>("IssuedByAccountId")
+                    b.Property<Guid?>("IssuedByAccountId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("IssuerName")
@@ -706,8 +706,7 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.HasOne("Yello.Domain.Accounts.Account", null)
                         .WithMany()
                         .HasForeignKey("IssuedByAccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.SetNull);
 
                     b.HasOne("Yello.Domain.Spaces.Space", null)
                         .WithMany()

@@ -90,9 +90,13 @@ public sealed class Invitation
     public required byte[] TokenHash { get; init; }
 
     /// <summary>
-    /// The Account that issued the Invitation.
+    /// The Account that issued the Invitation, or <c>null</c> once that Account is deleted.
     /// </summary>
-    public required Guid IssuedByAccountId { get; init; }
+    /// <remarks>
+    /// The database nulls it when the Account row goes (<c>ON DELETE SET NULL</c>), in every Space at once, a Space the
+    /// issuer had already been removed from included. A null issuer is what makes <see cref="IssuerName"/> unserved.
+    /// </remarks>
+    public required Guid? IssuedByAccountId { get; init; }
 
     /// <summary>
     /// The issuer's display name as it stood at issue.

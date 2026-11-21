@@ -1,0 +1,9 @@
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    THE TOMBSTONE - the avatar of an Account that has been deleted. The live avatar's box, muted, with no initials: the
+    attribution survives and the identity does not. Never blank (it has a box and an accessible name) and never removed.
+    It holds no text node, so no initials can be read from it, by sight or by a screen reader.
+*@
+
+<span class="avatar-tombstone" role="img" aria-label="@Localizer["DeletedAccountAvatarName"]"></span>

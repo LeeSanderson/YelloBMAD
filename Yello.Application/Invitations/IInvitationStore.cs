@@ -81,9 +81,9 @@ public interface IInvitationStore
 /// </summary>
 /// <param name="SpaceName">The invited Space's name.</param>
 /// <param name="Role">The Role offered.</param>
-/// <param name="IssuerName">The issuer's display name as captured at issue.</param>
+/// <param name="IssuerName">The issuer's display name as captured at issue; <c>null</c> once its Account is deleted.</param>
 /// <param name="AddressedToYou">With a Session, whether the Invitation names its Account's address; otherwise <c>null</c>.</param>
-public sealed record InvitationOffer(string SpaceName, Role Role, string IssuerName, bool? AddressedToYou);
+public sealed record InvitationOffer(string SpaceName, Role Role, string? IssuerName, bool? AddressedToYou);
 
 /// <summary>
 /// What an accept came to, or - from the screen - would come to before the bound. Story 4.3, AC4-AC7, open question 12.
@@ -168,9 +168,9 @@ public enum InvitationIssueOutcome
 /// <param name="Id">The Invitation's id.</param>
 /// <param name="EmailAddress">The address as issued, trimmed.</param>
 /// <param name="Role">The Role offered.</param>
-/// <param name="IssuerName">The issuer's display name as captured at issue.</param>
+/// <param name="IssuerName">The issuer's display name as captured at issue; <c>null</c> once its Account is deleted.</param>
 /// <param name="IssuedAt">The row's <c>CreatedAt</c>.</param>
-public sealed record PendingInvitation(Guid Id, string EmailAddress, Role Role, string IssuerName, DateTimeOffset IssuedAt);
+public sealed record PendingInvitation(Guid Id, string EmailAddress, Role Role, string? IssuerName, DateTimeOffset IssuedAt);
 
 /// <summary>
 /// What a revoke came to. Story 4.2, AC2, AC4.

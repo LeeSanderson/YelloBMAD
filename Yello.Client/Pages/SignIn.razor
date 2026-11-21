@@ -64,6 +64,11 @@
             <InlineErrorRegion @key="_attempt" Heading="@(_notice ?? string.Empty)" Messages="@_messages" />
         }
 
+        @if (_accountDeleted)
+        {
+            <p class="form-status" role="status">@Localizer["AccountDeleted"]</p>
+        }
+
         @if (_phase == SignInPhase.Submitting)
         {
             @* role="status" is polite: it announces without interrupting, which is right for
@@ -126,6 +131,7 @@
     private IReadOnlyList<string> _failureCodes = [];
     private IReadOnlyList<string> _messages = [];
     private string? _notice;
+    private bool _accountDeleted;
     private int _attempt;
 
     private string _emailAddress = string.Empty;
@@ -153,6 +159,8 @@
         // Read from the address rather than from client state, because the navigation that brings
         // a person here has already destroyed the component tree any state would have lived in -
         // and because it survives the reload they may well perform next.
+        _accountDeleted = string.Equals(Reason, ClientRoutes.AccountDeletedReason, StringComparison.Ordinal);
+
         if (!string.Equals(Reason, ClientRoutes.SessionEndedReason, StringComparison.Ordinal))
         {
             return;
@@ -184,6 +192,7 @@
         _failureCodes = [];
         _messages = [];
         _notice = null;
+        _accountDeleted = false;
         _attempt++;
 
         try

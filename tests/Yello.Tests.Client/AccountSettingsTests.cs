@@ -368,7 +368,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// focus, "This cannot be undone." after it, the danger "Delete Account" and Cancel. Cancel and Esc each close it and
     /// send nothing.
     /// </summary>
-    [Fact(Skip = "red: AC14 - Account settings has no deletion section (Q4 (a): an in-place confirm, no typed field)")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "UX-DR36")]
     [Trait("Requirement", "UX-DR40")]
@@ -404,7 +404,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// Confirmed, the deletion is one <c>DELETE</c> carrying the anti-forgery token and no <c>Idempotency-Key</c> (Q7 (a));
     /// on <c>204</c> the tab purges and lands on the sign-in page, which says "Account deleted." politely.
     /// </summary>
-    [Fact(Skip = "red: AC14 - Account settings has no deletion section, so nothing is sent and nothing lands")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "AR-14")]
     [Trait("Requirement", "UX-DR36")]
@@ -436,7 +436,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// statement as a heading with focus moved to it; every owned Space by name, each a link to that Space's settings; the
     /// two exits; and why deleting the Space is the one exit the Account controls. No third exit is offered or implied.
     /// </summary>
-    [Fact(Skip = "red: AC3 - Account settings has no deletion section and no account-owns-spaces state (Q8 (a): each name links to the Space's settings)")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "UX-DR36")]
@@ -490,7 +490,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// <summary>
     /// A deletion that gets a server failure says "Not sent." and keeps the confirm open, on Account settings, still signed in.
     /// </summary>
-    [Fact(Skip = "red: AC14 - Account settings has no deletion section, so no failure is shown")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "UX-DR36")]
     public async Task A_deletion_that_fails_says_Not_sent_and_keeps_the_confirm()
@@ -519,7 +519,7 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     /// At 320 by 256 (1280 by 1024 at 400%) the refusal state reflows: no sideways page scroll and nothing in <c>main</c> that
     /// scrolls sideways, with a long Space name in the list.
     /// </summary>
-    [Fact(Skip = "red: AC14 - Account settings has no deletion section and no refusal state to reflow")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "NFR-9")]
     public async Task The_refusal_state_reflows_at_320_by_256()

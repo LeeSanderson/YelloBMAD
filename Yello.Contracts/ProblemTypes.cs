@@ -504,4 +504,20 @@ public static class ProblemTypes
     /// not a <c>404</c>: the Space is present.
     /// </remarks>
     public static string InvalidOfferRecipient => "urn:yello:problem:invalid-offer-recipient";
+
+    /// <summary>
+    /// The Account cannot be deleted while it owns a Space. Answered <c>409</c> with a <c>spaces</c> extension listing every
+    /// Space the caller owns, as <c>{ id, name }</c> ordered by name then id; nothing is written and nothing is recorded.
+    /// </summary>
+    /// <remarks>
+    /// <b>Disclosable</b>: every listed Space is one the caller owns. Identity only - no Role, no count, never a Space the
+    /// caller merely belongs to.
+    /// </remarks>
+    public static string AccountOwnsSpaces => "urn:yello:problem:account-owns-spaces";
+
+    /// <summary>
+    /// The Account kept gaining Memberships while it was being deleted, so it was not deleted. Answered <c>409</c>; the
+    /// Spaces already left stay left, and sending the deletion again finishes it.
+    /// </summary>
+    public static string AccountDeletionInterrupted => "urn:yello:problem:account-deletion-interrupted";
 }

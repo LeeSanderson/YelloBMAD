@@ -1,6 +1,10 @@
+---
+baseline_commit: 07ff06fc1e9cf5a0233f4c8ac891be6342549570
+---
+
 # Story 5.4: Delete your Account
 
-Status: ready-for-dev
+Status: review
 
 Epic: 5 — Hand a Space over and leave cleanly (fourth and last story)
 Story key: `5-4-delete-your-account`
@@ -205,44 +209,44 @@ Every Slices case that deletes an Account, or races a deletion against an accept
 
 ## Tasks / Subtasks
 
-- [ ] **Task 0: decisions** (before any code)
-  - [ ] Q1 and Q3 are marked **[LEE]**. If the orchestrator routes them to Lee, record his answers here under "Decided by Lee" before ATDD. Otherwise take recommendation (a) and record it as "Q1 - (a)", with its cost, in Completion Notes.
+- [x] **Task 0: decisions** (before any code)
+  - [x] Q1 and Q3 are marked **[LEE]**. If the orchestrator routes them to Lee, record his answers here under "Decided by Lee" before ATDD. Otherwise take recommendation (a) and record it as "Q1 - (a)", with its cost, in Completion Notes.
   - Decided by Lee (2026-11-21): **Q1 - (a)** three-step sequence, recorded as an AD-24 amendment. **Q3 - (a)** nullable `IssuedByAccountId` with `ON DELETE SET NULL`. If the cascade cannot get past RLS, fall back to (b) as the question describes.
-  - [ ] Decide Q2 and Q4-Q10 the same way. Each recommendation is the default.
-  - [ ] **Prove Q3's riskiest assumption first** (below): a cascading `SET NULL` from `Account` reaches `Invitation` rows in Spaces whose key is not set. If it does not, take Q3 (b).
-- [ ] **Task 1: Contracts** (AC1, AC2)
-  - [ ] `AccountRoutes` gains the deletion route (`/api/v1/account`).
-  - [ ] `ProblemTypes.AccountOwnsSpaces`; `ProblemResponse` gains `Spaces` (appended).
-  - [ ] `InvitationResponse.IssuerName` / `InvitationOfferResponse.IssuerName` become nullable (Q3 (a)), with the remark "null once the issuer's Account is deleted". Check any contract-shape gate that pins them.
-- [ ] **Task 2: Domain/Application** (AC1, AC2, AC6, AC11)
-  - [ ] `Yello.Application/Accounts/DeleteAccount/DeleteAccountHandler.cs` and its port (`IAccountDeletion` or similar) with an outcome: `Deleted`, `OwnsSpaces(IReadOnlyList<SpaceIdentity>)`, `Raced` (Q2).
-  - [ ] Reuse `IMembershipStore.LeaveAsync` per Space; no new unassign or lapse.
-  - [ ] `IAccountCredentialStore.RehashAsync` returns whether a row was written; `AuthenticateAccountHandler` returns `null` on zero (AC11).
-- [ ] **Task 3: Infrastructure** (AC1-AC4, AC6, AC9)
-  - [ ] The Account-scoped check and erase steps (Account lock `Yello/SpacesPerAccount/{accountId}`; owned-Space read joined to `Space`; Membership list; `AccessRefusal` delete; `Account` delete).
-  - [ ] The per-Space leave driven through `IActiveSpaceResolver.BeginAsync` + `LeaveAsync` + `CompleteAsync`, one Space at a time, in a deterministic order (by `SpaceId`).
-  - [ ] Migration per Q3 (a): `Invitation.IssuedByAccountId` nullable, `ON DELETE SET NULL` (expand-only; literal names, as the existing migrations do). Update `InvitationConfiguration` and its remark. Read paths map a null issuer id to `IssuerName = null`.
-  - [ ] `AccountCredentialStore.RehashAsync`: return the rowcount.
-  - [ ] Delete or update `WireDatabase.DeleteAccountAsync` only if a case needs it; prefer the product route in new cases.
-- [ ] **Task 4: Host** (AC1, AC2, AC8)
-  - [ ] `AccountEndpoints` (or extend an existing Account endpoints class): `MapDeleteAccount` → `.AccountScoped(AccountScopedSurface.AccountSettings)`; `204` + cookie cleared; `409 account-owns-spaces` with the `spaces` extension; a stable `409` for `Raced` (Q2).
-  - [ ] Register the handler and port in `Program.cs` / the Infrastructure registration beside the other Account-scoped slices.
-  - [ ] Log one line on deletion with the Account id only (no address, no name), after commit — follow `SessionLog`/`RegistrationLog`.
-- [ ] **Task 5: Client** (AC3, AC5, AC14)
-  - [ ] `AccountSettings.razor` (or a new `AccountDeleteSection.razor`): confirm, refusal state, landing.
-  - [ ] Tombstone avatar state + CSS (`components.css`, tokens only, logical properties).
-  - [ ] `InvitationRow.razor` and the Invitation view render the tombstone and "a deleted Account" when `IssuerName` is null.
-  - [ ] `ClientCopy.resx` strings with `<comment>`s; `RefusalCopy` key for `account-owns-spaces`.
-  - [ ] `FakeYelloApi.AccountDeletion.cs` (the fake's partial pattern, as `FakeYelloApi.SpaceDeletion.cs`).
-- [ ] **Task 6: tests** (all ACs). See Testing requirements.
-- [ ] **Task 7: gates** (AC5, AC8). See AC8's list.
-- [ ] **Task 8: plants.** Save each original in memory and restore it in a `finally`. **Never** use `git checkout --`, `git restore` or `git reset`. Run them in small groups. Stop if a planted build fails, so stale binaries never pass for green. Record each in the Debug Log table. Grep for the plant marker after any killed run.
-- [ ] **Task 9: ledger, docs, verification**
-  - [ ] Ledger dispositions (below): one line per CLOSED/UPDATED/RE-OWNED note, written out, no blank lines, no TAB or FORM FEED, final newline kept.
-  - [ ] Dated notes in `ARCHITECTURE-SPINE.md`: AD-24 amendment, AD-5 note, AD-6 note (AC8).
-  - [ ] `Account.cs` remarks: keep the hard-delete statement; the "story 5.4's" wording is existing text — leave it unless you touch that paragraph (CLAUDE.md: do not rewrite existing comments as a side task).
-  - [ ] `sprint-status.yaml`: this story to `review` at the end of dev. `epic-5` stays `in-progress` (the retrospective is optional).
-  - [ ] Verification follows CLAUDE.md: `docker info --format '{{.ServerVersion}}'`; `dotnet build Yello.slnx` (0 warnings, 0 errors); `dotnet ef migrations has-pending-model-changes` (none after the migration); iterate with `--filter-class`; then **exactly one** full run in the background without the browser suite (`dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1 -p:YelloSkipBrowserSuite=true`, logged to `artifacts/test-runs/5-4-delete-your-account-develop.log`); the affected browser classes filtered (`AccountSettingsTests`, the Invitation row/view classes, `TextSpacingTests`). Rerun a failure once, alone, before calling it real.
+  - [x] Decide Q2 and Q4-Q10 the same way. Each recommendation is the default.
+  - [x] **Prove Q3's riskiest assumption first** (below): a cascading `SET NULL` from `Account` reaches `Invitation` rows in Spaces whose key is not set. If it does not, take Q3 (b).
+- [x] **Task 1: Contracts** (AC1, AC2)
+  - [x] `AccountRoutes` gains the deletion route (`/api/v1/account`).
+  - [x] `ProblemTypes.AccountOwnsSpaces`; `ProblemResponse` gains `Spaces` (appended).
+  - [x] `InvitationResponse.IssuerName` / `InvitationOfferResponse.IssuerName` become nullable (Q3 (a)), with the remark "null once the issuer's Account is deleted". Check any contract-shape gate that pins them.
+- [x] **Task 2: Domain/Application** (AC1, AC2, AC6, AC11)
+  - [x] `Yello.Application/Accounts/DeleteAccount/DeleteAccountHandler.cs` and its port (`IAccountDeletion` or similar) with an outcome: `Deleted`, `OwnsSpaces(IReadOnlyList<SpaceIdentity>)`, `Raced` (Q2).
+  - [x] Reuse `IMembershipStore.LeaveAsync` per Space; no new unassign or lapse.
+  - [x] `IAccountCredentialStore.RehashAsync` returns whether a row was written; `AuthenticateAccountHandler` returns `null` on zero (AC11).
+- [x] **Task 3: Infrastructure** (AC1-AC4, AC6, AC9)
+  - [x] The Account-scoped check and erase steps (Account lock `Yello/SpacesPerAccount/{accountId}`; owned-Space read joined to `Space`; Membership list; `AccessRefusal` delete; `Account` delete).
+  - [x] The per-Space leave driven through `IActiveSpaceResolver.BeginAsync` + `LeaveAsync` + `CompleteAsync`, one Space at a time, in a deterministic order (by `SpaceId`).
+  - [x] Migration per Q3 (a): `Invitation.IssuedByAccountId` nullable, `ON DELETE SET NULL` (expand-only; literal names, as the existing migrations do). Update `InvitationConfiguration` and its remark. Read paths map a null issuer id to `IssuerName = null`.
+  - [x] `AccountCredentialStore.RehashAsync`: return the rowcount.
+  - [x] Delete or update `WireDatabase.DeleteAccountAsync` only if a case needs it; prefer the product route in new cases.
+- [x] **Task 4: Host** (AC1, AC2, AC8)
+  - [x] `AccountEndpoints` (or extend an existing Account endpoints class): `MapDeleteAccount` → `.AccountScoped(AccountScopedSurface.AccountSettings)`; `204` + cookie cleared; `409 account-owns-spaces` with the `spaces` extension; a stable `409` for `Raced` (Q2).
+  - [x] Register the handler and port in `Program.cs` / the Infrastructure registration beside the other Account-scoped slices.
+  - [x] Log one line on deletion with the Account id only (no address, no name), after commit — follow `SessionLog`/`RegistrationLog`.
+- [x] **Task 5: Client** (AC3, AC5, AC14)
+  - [x] `AccountSettings.razor` (or a new `AccountDeleteSection.razor`): confirm, refusal state, landing.
+  - [x] Tombstone avatar state + CSS (`components.css`, tokens only, logical properties).
+  - [x] `InvitationRow.razor` and the Invitation view render the tombstone and "a deleted Account" when `IssuerName` is null.
+  - [x] `ClientCopy.resx` strings with `<comment>`s; `RefusalCopy` key for `account-owns-spaces`.
+  - [x] `FakeYelloApi.AccountDeletion.cs` (the fake's partial pattern, as `FakeYelloApi.SpaceDeletion.cs`).
+- [x] **Task 6: tests** (all ACs). See Testing requirements.
+- [x] **Task 7: gates** (AC5, AC8). See AC8's list.
+- [x] **Task 8: plants.** (7 of 12 rows run, all 7 caught; 5b, 6, 8, 10, 11 not run - memory kill, see Debug Log) Save each original in memory and restore it in a `finally`. **Never** use `git checkout --`, `git restore` or `git reset`. Run them in small groups. Stop if a planted build fails, so stale binaries never pass for green. Record each in the Debug Log table. Grep for the plant marker after any killed run.
+- [x] **Task 9: ledger, docs, verification**
+  - [x] Ledger dispositions (below): one line per CLOSED/UPDATED/RE-OWNED note, written out, no blank lines, no TAB or FORM FEED, final newline kept.
+  - [x] Dated notes in `ARCHITECTURE-SPINE.md`: AD-24 amendment, AD-5 note, AD-6 note (AC8).
+  - [x] `Account.cs` remarks: keep the hard-delete statement; the "story 5.4's" wording is existing text — leave it unless you touch that paragraph (CLAUDE.md: do not rewrite existing comments as a side task).
+  - [x] `sprint-status.yaml`: this story to `review` at the end of dev. `epic-5` stays `in-progress` (the retrospective is optional).
+  - [x] Verification follows CLAUDE.md: `docker info --format '{{.ServerVersion}}'`; `dotnet build Yello.slnx` (0 warnings, 0 errors); `dotnet ef migrations has-pending-model-changes` (none after the migration); iterate with `--filter-class`; then **exactly one** full run in the background without the browser suite (`dotnet build-server shutdown`, then `dotnet test Yello.slnx --no-build --max-parallel-test-modules 1 -p:YelloSkipBrowserSuite=true`, logged to `artifacts/test-runs/5-4-delete-your-account-develop.log`); the affected browser classes filtered (`AccountSettingsTests`, the Invitation row/view classes, `TextSpacingTests`). Rerun a failure once, alone, before calling it real.
 
 ## Dev Notes
 
@@ -449,14 +453,98 @@ correction recorded in the Debug Log, not deleted.
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended.
+
 ### Debug Log References
+
+- **Riskiest assumption (Q3) - holds.** `An_Invitation_issued_in_a_Space_its_issuer_was_removed_from_survives_the_issuers_deletion_with_no_issuer` passed on its first activation with the migration and the route in place: the engine's `ON DELETE SET NULL` from `Account` reaches `Invitation` rows in a Space whose `SpaceId` key is not set (the issuer had been removed from it), past the Space-only FILTER and BLOCK AFTER UPDATE predicates. Q3 (a) stands; (b) was not needed.
+- **Scaffolds corrected (2):**
+  1. `ActiveSpaceEndpointTests.DeleteAccountRace.An_acceptance_queued_ahead_of_the_deletions_leave_makes_the_deletion_refuse_naming_that_Space` asserted the former Owner becomes `Member`; an accepted offer leaves the former Owner `Admin` (story 5.2's swap). Corrected to `Admin` and its summary to match. It failed for that reason only; the deletion half (409 naming the Space) was green.
+  2. `An_Owner_is_refused_409_naming_exactly_its_owned_Space_and_nothing_changes` seeded the Member Space with a random id, so a deletion that skipped the owned-Space check would leave it only when it happened to sort before the Personal Space. Strengthened (not weakened): the Member Space's id now sorts first in SQL Server's `uniqueidentifier` order (`FirstInSqlServerOrder`), so plant 1 is seen red every time.
+- **Stand-ins swapped and deleted:** `AccountDeletionWire.Route`, `.AccountOwnsSpacesType`, `.DeletionInterruptedType` -> `AccountRoutes.Account`, `ProblemTypes.AccountOwnsSpaces`, `ProblemTypes.AccountDeletionInterrupted` (Slices, Isolation, the fake).
+- **Existing gates widened in the same change (by design, ATDD finding 3):** `Every_Account_scoped_endpoint_names_an_AD_24_surface` (+ `AccountRoutes.Account` on `AccountSettings`); `SpaceSwitcherGateTests.Isolation` lists (+ `IAccountDeletion`, `DeleteAccountHandler`, `AccountEndpoints::DeleteAsync`; `MethodsDependingOn` now ignores a listed handler's own compiler-generated state machines, which call its private methods); `The_endpoints_unreachable_with_a_Token_are_Token_management_the_switcher_and_the_move` (+ the deletion route); `Only_the_pipeline_depends_on_the_Space_resolver` (+ `AccountDeletion`, with its reason); `SpaceNavigationGateTests.Allowed` (+ `AccountDeleteSection.razor`, 1 call, the post-purge landing); `An_Invitation_cascades_from_its_Space_sets_its_issuer_null_and_references_no_Membership` (renamed from `..._restricts_its_issuer_...`, expects `SET_NULL`). `WireDatabase.InvitationRow.IssuedByAccountId` became `Guid?`.
+- **Gates unchanged on purpose:** `No_caller_but_the_Space_creation_unit_of_work_sets_both_session_context_keys` (the Account-scoped steps live in `AccountSpaceDirectory`), `Space_is_read_only_where_named` (the owned-Space join is in `AccountSpaceDirectory`), `Only_the_recorder_and_the_purge_refer_to_the_refusal_record` (the erase calls `AccessRefusalPurge.EraseAccountAsync`).
+- **Browser filter note:** `--filter-class` and `--filter-method` AND together; the first browser run combined them and matched nothing (exit 8), rerun with method filters only.
+
+- **Plants** (`artifacts/test-runs/5-4-delete-your-account-plants.log`). The script saved each original and restored it in a `finally`, built before every run, and stopped when a planted build failed (three times, all on analyzer rules - a one-line `if`, an unused `using` - never a stale-binary pass). Single-line plants guarded by an impossible condition (`accountId == Guid.Empty`) kept the analyzers quiet.
+
+| # | Plant | Expected red | Result |
+|---|---|---|---|
+| 1 | Skip the owned-Space check | `An_Owner_is_refused_409_naming_exactly_its_owned_Space_and_nothing_changes` | Caught |
+| 2 | Owned-Space read without `Role = Owner` | the same, `An_Owner_of_two_Spaces_and_Member_of_a_third_...` | Caught (both) |
+| 3 | Refusal item carries a `role` | `An_Owner_is_refused_409_...` (identity-only members) | Caught |
+| 4 | Leave skipped, Memberships deleted under the `AccountId` key in the erase | `An_Account_in_three_Spaces_...` | Caught |
+| 5a | Handler ignores `OwnershipHeld` | `DeleteAccountHandlerTests.A_Space_owned_part_way_...` | Caught |
+| 5b | `AccountDeletion` maps `OwnershipHeld` to `AlreadyGone` | race case (expected to stay green: the erase's re-read refuses the same way) | **Not run** - group killed for low memory |
+| 6 | Erase skips its re-read | `A_Membership_accepted_while_the_deletion_waits_...` | **Not run** - group killed for low memory |
+| 7 | `IssuerName` served for a null issuer | `An_Invitation_issued_in_a_Space_its_issuer_was_removed_from_...` | Caught |
+| 8 | Tombstone renders initials | the two browser tombstone cases | **Not run** - group never started |
+| 9 | Rehash ignores a zero rowcount | `A_rehash_that_wrote_no_row_authenticates_nothing` | Caught |
+| 10 | A third exit ("leave") in the refused state | `An_Owner_is_shown_the_Spaces_it_owns_...` | **Not run** - group never started |
+| 11 | Erase keeps the `AccessRefusal` rows | the three-Space inventory | **Not run** - group killed for low memory |
+
+  Group F (5b, 6, 11) was killed by Claude Code for host memory pressure while it ran; its three plants were left in the files and were reversed by hand to the exact original lines (a marker grep found none afterwards, and the clean build and full run followed). Groups F and G were not restarted (the kill notice says not to); they are for Review.
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
+- **Built.** `DELETE /api/v1/account` on Account settings (Session only, anti-forgery, no key): `DeleteAccountHandler` orders three steps behind `IAccountDeletion`; `AccountDeletion` (Infrastructure) delegates the Account-scoped check and erase to `AccountSpaceDirectory` (so the `AccountId` key keeps its two setters) and leaves each Space on `IActiveSpaceResolver` + `MembershipStore.LeaveAsync`, clearing the Space scope after each. `204` signs the cookie scheme out and logs the Account id only; `409 account-owns-spaces` carries `spaces: [{id, name}]`; `409 account-deletion-interrupted` for Memberships that keep arriving. Migration `InvitationIssuerSetNull`; the reads serve `IssuerName = null` for a null issuer. `RehashAsync` returns whether it wrote; zero rows authenticates nothing. Client: `AccountDeleteSection` (in-place confirm, refused state with links and two exits, landing on `/sign-in?reason=account-deleted` saying "Account deleted." politely after the Session purge), `DeletedAccountAvatar` (`.avatar-tombstone`) on the Invitation row and view. Spine: AD-24 amendment, AD-5 and AD-6 notes (2026-11-21).
+- **Q1 - (a)** (Lee): three-step sequence; cost recorded in the AD-24 amendment and the ledger (owner Lee): a crash or mid-sequence refusal leaves the Account out of the Spaces already left with its row intact; a resend finishes it.
+- **Q3 - (a)** (Lee): nullable `IssuedByAccountId`, `ON DELETE SET NULL`; the riskiest assumption holds (Debug Log). The stored `IssuerName` text stays in the row (ledger, owner Lee, §6.4).
+- **Q2 - (a)** (dev decision; cut it by choosing (b)): an acceptance that makes the Account an Owner mid-sequence stops it with `409 account-owns-spaces`, read again so it names what is owned now; a Membership found by the erase gets one extra leave pass, then `409 account-deletion-interrupted`. Reason: bounded, and a hostile inviter cannot keep a request looping.
+- **Q4 - (a)** (dev decision): in-place confirm, no typed field, no password. Reason: Session + anti-forgery are the authority for every write, and passwordless (OAuth) Accounts must be able to leave.
+- **Q5 - (a)** (dev decision): one tombstone component (`DeletedAccountAvatar`), rendered on the Invitation row and view; ledger entry for story 7.2 to reuse it. Reason: a state with a consumer a case can see.
+- **Q6 - (a)** (dev decision): the erase deletes the Account's `AccessRefusal` rows. Reason: FR-3 is an erasure and §6.4 counts it; the refusals leave the 90-day record early.
+- **Q7 - (a)** (dev decision): no `Idempotency-Key`. Reason: a replay after success meets a dead Session (`401`), a replay of a refusal re-reads the truth, and an Account-scoped record would cascade away with the Account anyway.
+- **Q8 - (a)** (dev decision): each owned Space name links to its settings. Reason: the person can act on each exit at once; navigation, not a key change.
+- **Q9 - (a)** (dev decision): keep the cookie-clearing dead-cookie `401`; ledger `:424` closed as accepted. Reason: discloses nothing about any Space, and a dead cookie would otherwise linger.
+- **Q10 - (a)** (dev decision): a reach gate for the new port (the `SpaceSwitcherGateTests.Isolation` lists); ledger `:687`, `:787` and `:717` re-owned to the sweep (2.9 is done, so `:717` goes to the sweep). Reason: Account deletion adds no unit of work and never deletes a Space.
+- **ATDD finding - `IdempotencyRecord.AccountId`** (dev decision; cut it by erasing them in the per-Space leave): recorded as **retained**, not erased. Reason: the row is Space-scoped with no key to `Account`, no Account-scoped step can reach it, and Spaces the Account was removed from earlier are beyond any per-Space step, so a partial erase would not make AC9 true anyway; it answers retries for 24 hours and goes with that Space's next keyed write after that; its id is unlinkable to a re-registered address. Ledger entry, owner Lee (§6.4 gate).
+- **Contradictions read as the story records them:** C1 (per-step transactions), C2 (tombstone = rendered attribution, Account hard-deleted), C3 (Tokens die in each Space's leave transaction), C4 (an Invitation pending to the address belongs to its Space, not to the deleted Account), C5 (no effect).
+- **`WireDatabase.DeleteAccountAsync`** kept unchanged as the raw-SQL schema proof behind `REV-ACCOUNT-DELETED`; ledger `:870` updated.
+- **The low "epic 5" ledger entries were not touched**, as scoped: left for the epic-5 retrospective or the sweep (a ledger line says so).
+- **Ledger:** 14 dispositions written (`:250`, `:338`, `:385`, `:394`, `:424`, `:687`, `:717`, `:767`, `:787`, `:790`, `:849`, `:870`, `:910`, `:921`) and 7 new entries (Lee x3, story 7.2, sweep, epic-5 retrospective, story 5.4's review for the unrun plants).
+
+- **Tests.** New: 7 Slices wire cases + 2 races (all live), `DeleteAccountHandlerTests` (6, fakes), the rehash handler case, 4 + 3 Architecture gates, 5 Account settings + 2 Invitation browser cases, `ISO-DELETE-ACCOUNT-NAMES-ONLY-OWNED-SPACES` and `ISO-DELETE-ACCOUNT-OWN` live (no `PendingUntil` left, GATE-003), `REV-ACCOUNT-DELETED-BY-HOLDER` unskipped. Filtered runs while iterating: Architecture 520/520; Slices deletion and invitation cases 84/84; browser `AccountSettingsTests` + deleted-issuer cases 16/16, `InvitationListTests` + `InvitationViewTests` + `TextSpacingTests` 61/61. `dotnet ef migrations has-pending-model-changes`: none.
+- **One full run** (without the browser suite, `-p:YelloSkipBrowserSuite=true`, `--max-parallel-test-modules 1`): 2132 total, 2125 passed, 0 failed, 7 skipped - `artifacts/test-runs/5-4-delete-your-account-develop.log`.
 
 ### File List
+
+New:
+- `Yello.Application/Accounts/DeleteAccount/IAccountDeletion.cs`
+- `Yello.Application/Accounts/DeleteAccount/DeleteAccountHandler.cs`
+- `Yello.Infrastructure/Persistence/AccountDeletion.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261121132222_InvitationIssuerSetNull.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261121132222_InvitationIssuerSetNull.Designer.cs`
+- `Yello.Host/Endpoints/AccountEndpoints.cs`
+- `Yello.Host/AccountLog.cs`
+- `Yello.Client/Components/AccountDeleteSection.razor`
+- `Yello.Client/Components/DeletedAccountAvatar.razor`
+- `tests/Yello.Tests.Slices/Accounts/DeleteAccount/DeleteAccountHandlerTests.cs`
+
+Modified (production):
+- `Yello.Contracts/Accounts/AccountRoutes.cs`, `Yello.Contracts/ProblemTypes.cs`, `Yello.Contracts/ProblemResponse.cs`, `Yello.Contracts/Invitations/InvitationResponse.cs`, `Yello.Contracts/Invitations/InvitationOfferResponse.cs`
+- `Yello.Domain/Accounts/IAccountCredentialStore.cs`, `Yello.Domain/Invitations/Invitation.cs`
+- `Yello.Application/Accounts/AuthenticateAccount/AuthenticateAccountHandler.cs`, `Yello.Application/Invitations/IInvitationStore.cs`
+- `Yello.Infrastructure/AccountScopedReads.cs`, `Yello.Infrastructure/Persistence/AccessRefusalPurge.cs`, `Yello.Infrastructure/Persistence/AccountCredentialStore.cs`, `Yello.Infrastructure/Persistence/AccountSpaceDirectory.cs`, `Yello.Infrastructure/Persistence/ApplicationLocks.cs`, `Yello.Infrastructure/Persistence/Configurations/InvitationConfiguration.cs`, `Yello.Infrastructure/Persistence/InvitationStore.cs`, `Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Client/Components/InvitationRow.razor`, `Yello.Client/Localisation/ClientCopy.resx`, `Yello.Client/Pages/AccountSettings.razor`, `Yello.Client/Pages/ClientRoutes.cs`, `Yello.Client/Pages/InvitationView.razor`, `Yello.Client/Pages/InvitationView.razor.cs`, `Yello.Client/Pages/SignIn.razor`, `Yello.Client/Refusals/RefusalCopy.cs`, `Yello.Client/Spaces/SpaceWrites.cs`, `Yello.Client/wwwroot/css/components.css`
+
+Modified (tests):
+- `tests/Yello.Tests.Architecture/DesignFoundationGateTests.Tombstone.cs`, `RefusalBoundaryGateTests.DeleteAccount.cs`, `RefusalBoundaryGateTests.Move.cs`, `RefusalBoundaryGateTests.cs`, `SpaceNavigationGateTests.cs`, `SpaceResolutionSeamTests.cs`, `SpaceSwitcherGateTests.Isolation.cs`
+- `tests/Yello.Tests.Client/AccountSettingsTests.cs`, `FakeYelloApi.AccountDeletion.cs`, `InvitationListTests.cs`, `InvitationViewTests.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.AccountDeletion.cs`
+- `tests/Yello.Tests.Revocation/RevocationCases.cs`
+- `tests/Yello.Tests.Shared/AccountDeletionWire.cs`, `tests/Yello.Tests.Shared/WireDatabase.cs`
+- `tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/AuthenticateAccountHandlerTests.cs`, `PasswordVerificationDurationTests.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteAccount.cs`, `ActiveSpaceEndpointTests.DeleteAccountRace.cs`, `ActiveSpaceEndpointTests.IssueInvitationSchema.cs`
+
+Modified (docs and tracking):
+- `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/5-4-delete-your-account.md`
 
 ## Change Log
 
 - 2026-11-21: Story created (bmad-create-story). Status ready-for-dev.
+- 2026-11-21: Developed (bmad-dev-story): `DELETE /api/v1/account` as a check / per-Space leave / erase sequence (AD-24 amendment), `Invitation.IssuedByAccountId` nullable `ON DELETE SET NULL`, the rehash rowcount, the Account settings deletion section, the tombstone avatar; every ATDD scaffold live (two corrected), isolation and revocation rows live; ledger dispositions; spine notes. Status review.

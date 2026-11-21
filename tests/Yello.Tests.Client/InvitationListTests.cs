@@ -531,7 +531,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     /// "Deleted Account", shown and never blank. The issuer's name is served as <c>null</c>, so no name is anywhere.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the Invitation row has no deleted-issuer rendering and no tombstone avatar (Q5 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "UX-DR10")]
     public async Task A_deleted_issuer_renders_as_a_deleted_Account_beside_a_tombstone_avatar()

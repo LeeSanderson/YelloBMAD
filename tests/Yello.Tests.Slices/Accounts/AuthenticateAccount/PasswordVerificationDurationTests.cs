@@ -259,8 +259,8 @@ public sealed class PasswordVerificationDurationTests
             CancellationToken cancellationToken) =>
             Task.FromResult<AccountCredential?>(null);
 
-        public Task RehashAsync(Guid accountId, string passwordHash, CancellationToken cancellationToken) =>
-            Task.CompletedTask;
+        public Task<bool> RehashAsync(Guid accountId, string passwordHash, CancellationToken cancellationToken) =>
+            Task.FromResult(false);
     }
 }
 

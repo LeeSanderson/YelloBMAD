@@ -1603,4 +1603,68 @@
     <value>Not sent.</value>
     <comment>An Accept or Decline in the offer dialog that got no answer. The dialog stays open and the same press resends under the same key. Never &quot;Sent&quot;.</comment>
   </data>
+  <data name="AccountDeletionHeading" xml:space="preserve">
+    <value>Delete your Account</value>
+    <comment>The heading of Account settings&apos; deletion section, below the API Tokens.</comment>
+  </data>
+  <data name="AccountDeletionOpen" xml:space="preserve">
+    <value>Delete your Account</value>
+    <comment>The control that opens the deletion&apos;s confirm, in place. Nothing is sent until the confirm&apos;s Delete Account is pressed.</comment>
+  </data>
+  <data name="AccountDeletionQuestion" xml:space="preserve">
+    <value>Delete your Account?</value>
+    <comment>The deletion confirm&apos;s heading, which takes focus when it opens. Esc or Cancel closes it and sends nothing.</comment>
+  </data>
+  <data name="AccountDeletionLeaves" xml:space="preserve">
+    <value>You leave every Space you belong to.</value>
+    <comment>The first consequence the deletion confirm states.</comment>
+  </data>
+  <data name="AccountDeletionUnassigns" xml:space="preserve">
+    <value>Tasks assigned to you become unassigned.</value>
+    <comment>A consequence the deletion confirm states: the Tasks stay, with no Assignee.</comment>
+  </data>
+  <data name="AccountDeletionTokens" xml:space="preserve">
+    <value>Your API Tokens stop working.</value>
+    <comment>A consequence the deletion confirm states. &quot;API Token&quot; is Glossary vocabulary.</comment>
+  </data>
+  <data name="AccountDeletionKeepsWork" xml:space="preserve">
+    <value>The Spaces you belonged to keep everything their members made.</value>
+    <comment>The last consequence the deletion confirm states: deleting an Account never deletes another Account&apos;s work.</comment>
+  </data>
+  <data name="AccountDeletionAction" xml:space="preserve">
+    <value>Delete Account</value>
+    <comment>The deletion confirm&apos;s danger action. The deletion is irreversible; there is no restore.</comment>
+  </data>
+  <data name="AccountDeleted" xml:space="preserve">
+    <value>Account deleted.</value>
+    <comment>Said politely by the sign-in page once the Account is deleted and the Session with it. Names nothing else.</comment>
+  </data>
+  <data name="account-owns-spaces" xml:space="preserve">
+    <value>You own these Spaces, so your Account cannot be deleted yet.</value>
+    <comment>The 409 account-owns-spaces: the heading of the refusal state, which takes focus, above the list of every Space the Account owns. Not an alert and not a toast.</comment>
+  </data>
+  <data name="AccountOwnsSpacesExits" xml:space="preserve">
+    <value>For each one, either offer ownership to someone in it and have them accept, or delete the Space.</value>
+    <comment>Under the owned Spaces: the two exits and no third - nothing else is offered or implied.</comment>
+  </data>
+  <data name="AccountOwnsSpacesWhy" xml:space="preserve">
+    <value>Deleting the Space is the only exit you control on your own, because a transfer needs someone else to accept.</value>
+    <comment>Why deleting the Space is the exit the Account controls: a transfer waits on someone else&apos;s acceptance.</comment>
+  </data>
+  <data name="account-deletion-interrupted" xml:space="preserve">
+    <value>Your Account was not deleted, because it joined a Space while the deletion ran. Delete it again to finish.</value>
+    <comment>The 409 account-deletion-interrupted: Memberships kept arriving while the deletion ran. The Spaces already left stay left.</comment>
+  </data>
+  <data name="DeletedAccountAvatarName" xml:space="preserve">
+    <value>Deleted Account</value>
+    <comment>The accessible name of the tombstone avatar that stands for a deleted Account&apos;s attribution. The avatar carries no initials.</comment>
+  </data>
+  <data name="InvitationSentByDeletedAccount" xml:space="preserve">
+    <value>Sent by a deleted Account</value>
+    <comment>A pending Invitation whose issuer&apos;s Account was deleted. The Invitation stays valid and revocable; the issuer&apos;s name is no longer served.</comment>
+  </data>
+  <data name="InvitationOfferHeadingDeletedIssuer" xml:space="preserve">
+    <value>A deleted Account invited you to {0}.</value>
+    <comment>The Invitation view&apos;s heading when the issuer&apos;s Account was deleted. {0} is the Space&apos;s name.</comment>
+  </data>
 </root>

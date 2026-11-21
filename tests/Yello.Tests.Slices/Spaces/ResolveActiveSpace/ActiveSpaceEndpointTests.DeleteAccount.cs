@@ -26,9 +26,6 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 /// address is added with <see cref="WireDatabase.AddMembershipAsync"/>, because the mail drop answers the first email to an
 /// address. Tasks, assignments, offers, Tokens and presence are made through their routes.
 /// </para>
-/// <para>
-/// <b>The route and the problem types are stand-ins</b> (<see cref="AccountDeletionWire"/>) until the contract names them.
-/// </para>
 /// </remarks>
 public sealed partial class ActiveSpaceEndpointTests
 {
@@ -41,7 +38,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// name and can still revoke it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - DELETE /api/v1/account is not mapped and Invitation.IssuedByAccountId is Restrict, not nullable SET NULL (Q3 (a), Lee); riskiest assumption: the SET NULL cascade reaches Invitation rows past RLS")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "AD-5")]
@@ -112,7 +109,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Nothing anywhere still carries the Account's id or its Memberships' ids except the terminal offer, which has no key.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - DELETE /api/v1/account is not mapped, so the Account leaves no Space and is not erased")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "FR-21")]
@@ -256,7 +253,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Nothing changes: the Membership, the Personal Space, the Account and its Session all stand, and no refusal is recorded.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - DELETE /api/v1/account is not mapped, so no owned-Space refusal exists")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-5")]
@@ -266,7 +263,10 @@ public sealed partial class ActiveSpaceEndpointTests
         var database = Available();
         var wire = Wire();
         var (ownerAddress, address, name) = (RandomAddress(), RandomAddress(), DisplayName());
-        var memberSpace = Guid.NewGuid();
+
+        // First in the server's id order, so a deletion that skipped the owned-Space check would leave it before meeting
+        // the Personal Space's Owner row - and the case would see it gone.
+        var memberSpace = FirstInSqlServerOrder();
         var accountId = Guid.Empty;
         var personalSpace = Guid.Empty;
         var refusalsBefore = 0;
@@ -291,7 +291,7 @@ public sealed partial class ActiveSpaceEndpointTests
         var refused = answers["refused"];
 
         Assert.True(refused.StatusCode == HttpStatusCode.Conflict, $"The Owner's deletion: {Described(refused)}");
-        Assert.Equal(AccountDeletionWire.AccountOwnsSpacesType, ProblemType(refused));
+        Assert.Equal(ProblemTypes.AccountOwnsSpaces, ProblemType(refused));
 
         var named = AccountDeletionWire.OwnedSpacesIn(refused.Body);
 
@@ -313,7 +313,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// the third. Neither owned Space nor the Membership changes.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - DELETE /api/v1/account is not mapped, so no owned-Space refusal exists")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "AR-29")]
     [Trait("Requirement", "AD-24")]
@@ -346,7 +346,7 @@ public sealed partial class ActiveSpaceEndpointTests
         });
 
         Assert.True(refused?.StatusCode == HttpStatusCode.Conflict, $"The deletion: {Described(refused)}");
-        Assert.Equal(AccountDeletionWire.AccountOwnsSpacesType, ProblemType(refused));
+        Assert.Equal(ProblemTypes.AccountOwnsSpaces, ProblemType(refused));
 
         var named = AccountDeletionWire.OwnedSpacesIn(refused.Body);
 
@@ -363,7 +363,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// stays <c>Pending</c> with the Owner still Owner.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - DELETE /api/v1/account is not mapped, so the Owner with a pending offer is not refused")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "FR-8")]
     [Trait("Requirement", "AD-5")]
@@ -396,7 +396,7 @@ public sealed partial class ActiveSpaceEndpointTests
         });
 
         Assert.True(refused?.StatusCode == HttpStatusCode.Conflict, $"The offering Owner's deletion: {Described(refused)}");
-        Assert.Equal(AccountDeletionWire.AccountOwnsSpacesType, ProblemType(refused));
+        Assert.Equal(ProblemTypes.AccountOwnsSpaces, ProblemType(refused));
         Assert.Equal([spaceId], AccountDeletionWire.OwnedSpacesIn(refused.Body).Select(space => space.Id));
         Assert.Equal("Pending", Assert.Single(await wire.OwnershipOffersInAsync(spaceId), offer => offer.Id == offerId).State);
         Assert.Equal("Owner", (await wire.MembershipOfAsync(spaceId, accountId)).Role);
@@ -410,7 +410,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// former Spaces answer it the boundary <c>404</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - DELETE /api/v1/account is not mapped, so the address is never freed")]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "FR-1")]
     public async Task The_deleted_address_registers_again_as_a_new_Account_that_inherits_nothing()
@@ -471,7 +471,7 @@ public sealed partial class ActiveSpaceEndpointTests
     /// Invitation stays pending with no Membership written.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - DELETE /api/v1/account is not mapped, so the Session never dies")]
+    [Fact]
     [Trait("Requirement", "FR-2")]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "NFR-6")]
@@ -509,6 +509,19 @@ public sealed partial class ActiveSpaceEndpointTests
         Assert.Contains(replayed.Headers.GetValueOrDefault("Set-Cookie") ?? [], value => value.StartsWith(SessionCookie + "=;", StringComparison.Ordinal));
         Assert.Equal("Pending", Assert.Single(await wire.InvitationsInAsync(invited!.SpaceId), row => row.Id == invited.InvitationId).State);
         Assert.DoesNotContain(await wire.MembershipRowsInAsync(invited.SpaceId), row => row.AccountId == accountId);
+    }
+
+    /// <summary>
+    /// A fresh id that SQL Server's <c>uniqueidentifier</c> ordering puts before any random one: it compares bytes 10-15
+    /// first, and those are zero here.
+    /// </summary>
+    private static Guid FirstInSqlServerOrder()
+    {
+        var bytes = Guid.NewGuid().ToByteArray();
+
+        Array.Clear(bytes, 10, 6);
+
+        return new Guid(bytes);
     }
 
     /// <summary>

@@ -506,7 +506,7 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
     /// <c>null</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the Invitation view has no deleted-issuer rendering and no tombstone avatar (Q5 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-12")]
     [Trait("Requirement", "UX-DR10")]
     public async Task A_deleted_issuer_is_named_as_a_deleted_Account_on_the_offer()

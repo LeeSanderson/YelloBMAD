@@ -39,6 +39,19 @@ internal sealed class AccessRefusalPurge(
     /// </summary>
     internal static TimeSpan Retention { get; } = TimeSpan.FromDays(90);
 
+    /// <summary>
+    /// Deletes every refusal recorded against one Account, ahead of its retention: the Account is being erased, and a
+    /// record that outlived it would keep its id.
+    /// </summary>
+    /// <param name="dbContext">The Account deletion's erase, inside its transaction.</param>
+    /// <param name="accountId">The Account being erased.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>A task.</returns>
+    internal static Task EraseAccountAsync(YelloDbContext dbContext, Guid accountId, CancellationToken cancellationToken) =>
+        dbContext.Set<AccessRefusal>()
+            .Where(refusal => refusal.AccountId == accountId)
+            .ExecuteDeleteAsync(cancellationToken);
+
     /// <inheritdoc />
     public Task PurgeIfDueAsync(CancellationToken cancellationToken)
     {

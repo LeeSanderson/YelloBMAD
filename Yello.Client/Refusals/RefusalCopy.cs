@@ -196,6 +196,17 @@ public static class RefusalCopy
     public static string InvalidOfferRecipientKey => "invalid-offer-recipient";
 
     /// <summary>
+    /// The copy key for <c>409 account-owns-spaces</c>: the statement that heads Account settings' refusal state, above the
+    /// Spaces the Account owns.
+    /// </summary>
+    public static string AccountOwnsSpacesKey => "account-owns-spaces";
+
+    /// <summary>
+    /// The copy key for <c>409 account-deletion-interrupted</c>: the Account gained a Membership while it was being deleted.
+    /// </summary>
+    public static string AccountDeletionInterruptedKey => "account-deletion-interrupted";
+
+    /// <summary>
     /// The resource a refusal is rendered with.
     /// </summary>
     /// <param name="problem">The problem body, or <c>null</c> for an address the client cannot route.</param>
@@ -282,6 +293,8 @@ public static class RefusalCopy
         [ProblemTypes.OwnershipOfferPending] = OwnershipOfferPendingKey,
         [ProblemTypes.OwnershipOfferNotPending] = OwnershipOfferNotPendingKey,
         [ProblemTypes.InvalidOfferRecipient] = InvalidOfferRecipientKey,
+        [ProblemTypes.AccountOwnsSpaces] = AccountOwnsSpacesKey,
+        [ProblemTypes.AccountDeletionInterrupted] = AccountDeletionInterruptedKey,
     }.ToFrozenDictionary(StringComparer.Ordinal);
 
     private static string? OwnKey(string? type) =>

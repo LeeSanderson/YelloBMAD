@@ -61,6 +61,17 @@ public sealed class SpaceWrites(HttpClient http, AntiforgeryTokenSource antiforg
         SendCoreAsync(method, path, body: null, key, token);
 
     /// <summary>
+    /// Sends a bodiless state-changing request that takes no <c>Idempotency-Key</c> - Account deletion, whose replay after
+    /// success meets a dead Session - and once more if the anti-forgery token is refused.
+    /// </summary>
+    /// <param name="method">The method.</param>
+    /// <param name="path">The path.</param>
+    /// <param name="token">The caller's token.</param>
+    /// <returns>The answer; the caller disposes it.</returns>
+    public Task<SpaceWriteAnswer> SendWithoutKeyAsync(HttpMethod method, string path, CancellationToken token) =>
+        SendCoreAsync(method, path, body: null, key: null, token);
+
+    /// <summary>
     /// The problem body of a refusal, or <c>null</c> when it carries none.
     /// </summary>
     /// <param name="response">The response.</param>
@@ -78,7 +89,7 @@ public sealed class SpaceWrites(HttpClient http, AntiforgeryTokenSource antiforg
             ? await response.Content.ReadFromJsonAsync<ProblemResponse>(JsonOptions, token)
             : null;
 
-    private async Task<SpaceWriteAnswer> SendCoreAsync(HttpMethod method, string path, object? body, string key, CancellationToken token)
+    private async Task<SpaceWriteAnswer> SendCoreAsync(HttpMethod method, string path, object? body, string? key, CancellationToken token)
     {
         await antiforgery.EnsureTokenAsync();
 
@@ -97,14 +108,17 @@ public sealed class SpaceWrites(HttpClient http, AntiforgeryTokenSource antiforg
     }
 
 
-    private static HttpRequestMessage Message(HttpMethod method, string path, object? body, string key)
+    private static HttpRequestMessage Message(HttpMethod method, string path, object? body, string? key)
     {
         var message = new HttpRequestMessage(method, new Uri(path, UriKind.Relative))
         {
             Content = body is null ? null : JsonContent.Create(body, body.GetType(), options: JsonOptions),
         };
 
-        message.Headers.TryAddWithoutValidation(Idempotency.HeaderName, key);
+        if (key is not null)
+        {
+            message.Headers.TryAddWithoutValidation(Idempotency.HeaderName, key);
+        }
 
         return message;
     }

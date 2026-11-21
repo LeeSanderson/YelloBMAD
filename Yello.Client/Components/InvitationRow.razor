@@ -8,7 +8,8 @@
     ONE PENDING INVITATION IN SPACE SETTINGS' LIST - story 4.2: AC1, AC2, AC9; FR-12; UX-DR12, UX-DR14, UX-DR26, UX-DR38.
 
     Its address, its Role's display name, "Sent by" the name captured at issue (never a live lookup, and nothing about the
-    issuer's current standing), and its issue date as an absolute short date in a time element (open question 6 (a)).
+    issuer's current standing) - or, once the issuer's Account is deleted and the name is no longer served, "Sent by a
+    deleted Account" beside the tombstone avatar - and its issue date as an absolute short date in a time element (open question 6 (a)).
     The address renders here because this is Space settings, read only by Owners and Admins (UX-DR14; the story's C1).
 
     REVOKE ASKS FIRST, IN PLACE (open question 9 (a); UX-DR12): the row's control is replaced by the warning - the email
@@ -22,7 +23,15 @@
 <li class="invitation-list__row">
     <span class="invitation-list__address" id="@AddressId">@Invitation.EmailAddress</span>
     <span class="invitation-list__role type-role-label">@Localizer[RoleCopy.NameKey(Invitation.Role)]</span>
-    <span class="invitation-list__issuer">@string.Format(CultureInfo.CurrentCulture, Localizer["InvitationSentBy"], Invitation.IssuerName)</span>
+    @if (Invitation.IssuerName is { } issuer)
+    {
+        <span class="invitation-list__issuer">@string.Format(CultureInfo.CurrentCulture, Localizer["InvitationSentBy"], issuer)</span>
+    }
+
+    @if (Invitation.IssuerName is null)
+    {
+        <span class="invitation-list__issuer"><DeletedAccountAvatar /> @Localizer["InvitationSentByDeletedAccount"]</span>
+    }
     <time class="invitation-list__issued type-meta" datetime="@IssuedInstant">@IssuedDate</time>
 
     @if (Confirming)

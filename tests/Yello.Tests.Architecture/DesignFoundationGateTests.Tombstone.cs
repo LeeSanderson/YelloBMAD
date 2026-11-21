@@ -22,7 +22,7 @@ public sealed partial class DesignFoundationGateTests
     /// <summary>
     /// The tombstone takes the avatar's 3px default radius, as the live avatar does.
     /// </summary>
-    [Fact(Skip = "red: AC5 - no tombstone avatar state exists (Q5 (a): one state on the avatar, class .avatar-tombstone)")]
+    [Fact]
     [Trait("Requirement", "UX-DR10")]
     public void The_tombstone_avatar_takes_the_3px_radius() => AssertRadius(TombstoneAvatarClass, 3, "var(--radius-default)");
 
@@ -30,7 +30,7 @@ public sealed partial class DesignFoundationGateTests
     /// The tombstone is muted by tokens only: its background is <c>var(--surface-column)</c> and its colour
     /// <c>var(--text-muted)</c>, and no rule that selects it sets any other background or colour.
     /// </summary>
-    [Fact(Skip = "red: AC5 - no tombstone avatar state exists (Q5 (a): one state on the avatar, class .avatar-tombstone)")]
+    [Fact]
     [Trait("Requirement", "UX-DR10")]
     public void The_tombstone_avatar_is_muted_by_the_column_surface_and_the_muted_ink()
     {
@@ -62,7 +62,7 @@ public sealed partial class DesignFoundationGateTests
     /// <summary>
     /// The tombstone is never removed from view: no rule that selects it hides it, at any breakpoint or none.
     /// </summary>
-    [Fact(Skip = "red: AC5 - no tombstone avatar state exists (Q5 (a): one state on the avatar, class .avatar-tombstone)")]
+    [Fact]
     [Trait("Requirement", "UX-DR10")]
     public void The_tombstone_avatar_is_never_hidden()
     {
