@@ -907,6 +907,10 @@ internal static partial class IsolationCases
 
         // Removing a Status and adding a default back (IsolationCases.StatusRemoval.cs).
         .. StatusRemovalCases(),
+
+        // The Space's default Statuses changed at Space level (IsolationCases.SpaceDefaultStatuses.cs), pending until its dev
+        // phase maps the routes.
+        .. SpaceDefaultStatusCases(),
     ];
 
     /// <summary>

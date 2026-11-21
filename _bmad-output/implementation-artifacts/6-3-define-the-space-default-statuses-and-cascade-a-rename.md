@@ -434,6 +434,39 @@ General rules:
   - `SpaceSettings.razor`, `SpaceCapabilities.cs`, `StatusCapabilities.cs`, `StatusDeltaEditor.razor`, `StatusDeltaEditor.Removal.cs:40-80`, `StatusDeltaRow.razor`, `StatusRemoveDialog.razor`, `LabelSection.razor`, `BoardView.Pager.cs:53`, `BoardView.Paging.cs:288-310`;
   - tests: `ProjectEndpointTests.StatusRace.cs`, `DeleteWire.HoldProjectRangeAsync`, `WireDatabase.cs`, `ActiveSpaceEndpointTests.DeleteSpace.cs:268-305`, `ActiveSpaceEndpointTests.CreateSpace.cs:108`, `IsolationCases.cs:66`, `RefusalBoundaryGateTests.ProjectStatuses.cs`.
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+- **Checklist:** `_bmad-output/test-artifacts/atdd-checklist-6-3-define-the-space-default-statuses-and-cascade-a-rename.md`.
+- **Scaffolds** (red = skipped `red: AC<n> - …` or isolation rows `PendingUntil: "6.3"`):
+
+  | File | Cases | ACs | Today |
+  |---|---|---|---|
+  | `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaultsRace.cs` | 4 (2 theories) | AC4, AC6, AC9, AC16 | red |
+  | `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaults.cs` | 17 (3 theories) | AC1-AC8, AC12, AC14-AC16 | red |
+  | `tests/Yello.Tests.Slices/Statuses/EffectiveStatusSetSpaceDefaultTests.cs` | 6 | AC1, AC3, AC5, AC6, AC8 | **green, active** |
+  | `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.SpaceDefaultStatuses.cs` | 7 | AC1-AC6, AC8, AC9, AC12 | red |
+  | `tests/Yello.Tests.Isolation/IsolationCases.SpaceDefaultStatuses.cs` | 14 rows | AC2, AC4, AC12 | pending 6.3 |
+  | `tests/Yello.Tests.Client/SpaceDefaultStatusesTests.cs` | 7 (2 theories) | AC1-AC6, AC8, AC11 | red |
+  | `tests/Yello.Tests.Client/ProjectSettingsTests.SpaceDefaults.cs` | 1 | AC13 | red |
+
+  Supporting, no cases: `tests/Yello.Tests.Shared/SpaceStatusWire.cs` (route, problem-type and problem-body stand-ins),
+  `tests/Yello.Tests.Slices/Projects/SpaceDefaultStatusWire.cs` (the writes, the held Status-defaults lock, the S-1 trigger
+  pair), `tests/Yello.Tests.Client/FakeYelloApi.SpaceDefaultStatuses.cs` (+ one hook in `FakeYelloApi.SpaceDeletion.cs`), and
+  `.. SpaceDefaultStatusCases()` in `IsolationCases.All`.
+- **Green today:** the six `EffectiveStatusSetSpaceDefaultTests` cases - standing gates on the derivation the Space plan must
+  reuse (`Of` and `Check`, no second derivation).
+- **Activation order:** (1) the riskiest assumption first - the Space-wide no-duplicate-name check under the new lock order
+  (Space write Exclusive vs Project delta write Shared, before ProjectTasks): the lock-name gate
+  `The_Status_defaults_lock_is_named_for_the_Space_as_the_race_holder_names_it`, then
+  `A_Space_rename_and_a_Project_add_of_one_name_queue_on_the_Status_lock_and_no_set_holds_it_twice` (both orders), then the
+  other three race cases; (2) the derivation unit tests stay green, plus the dev's planner/handler/never-empty unit tests;
+  (3) the contract gates (problem type, requests, problem body - amend the `ProblemResponse` parameter gate - routes, no
+  removal); (4) add, rename, reorder; (5) conflict, decision, Q3, S-1; (6) name clash; (7) name and anchor refusals;
+  (8) Role, Admin, boundary, foreign report, replay, role-matrix theory row, then the 14 isolation rows live before review;
+  (9) the client predicate gate, AC13's editor case, then the 7 Space settings browser cases.
+- Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and
+  the correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

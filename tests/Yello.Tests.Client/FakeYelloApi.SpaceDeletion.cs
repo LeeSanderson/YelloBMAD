@@ -117,8 +117,14 @@ internal sealed partial class FakeYelloApi
             return accountDeletion;
         }
 
-        // A Status's removal and add-back (FakeYelloApi.StatusRemoval.cs), and a Project's Status delta
-        // (FakeYelloApi.ProjectStatuses.cs), likewise answer only their own paths.
+        // A Space-level write of the default Statuses (FakeYelloApi.SpaceDefaultStatuses.cs), a Status's removal and add-back
+        // (FakeYelloApi.StatusRemoval.cs), and a Project's Status delta (FakeYelloApi.ProjectStatuses.cs), likewise answer only
+        // their own paths.
+        if (SpaceDefaultStatusWrite(request) is { } spaceDefaultStatus)
+        {
+            return spaceDefaultStatus;
+        }
+
         if (await StatusRemovalAsync(request).ConfigureAwait(false) is { } statusRemoval)
         {
             return statusRemoval;
