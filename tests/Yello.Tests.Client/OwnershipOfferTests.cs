@@ -685,6 +685,142 @@ public sealed class OwnershipOfferTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// The reasons an offer stops being open while its dialog is up. The Host answers every one with the same
+    /// <c>409 ownership-offer-not-pending</c>, so the dialog cannot tell them apart and must not try.
+    /// </summary>
+    public static TheoryData<string> SettledCauses => new() { "revoked", "declined elsewhere", "lapsed", "expired", "accepted elsewhere" };
+
+    private const string UnverifiedDeclineState = "red: AC6 - expected to pass today (a decline's 409 already shows the designed state), but not yet run: the ATDD browser run was not made for low memory; activate first and keep active if green";
+
+    private static readonly string[] ReasonWords = ["declined", "revoked", "expired", "lapsed", "accepted"];
+
+    /// <summary>
+    /// A decline refused because the offer closed meanwhile (<c>409 ownership-offer-not-pending</c>) replaces the dialog's body
+    /// in place with the designed state: the heading "This offer is no longer open." and "Nothing has changed about your access
+    /// to this Space.", focus on that heading, and "Close" the only button. It is no toast and no alert (no
+    /// <c>[role=alert]</c> on the page, and the words appear only inside the dialog), it names no reason and no one, and the
+    /// indicator is removed. A decline moves no Role, so it asks for no re-read of the Space.
+    /// </summary>
+    /// <remarks>
+    /// Expected to pass today: the dialog already treats a decline's <c>409</c> as an acceptance's.
+    /// </remarks>
+    /// <returns>A task.</returns>
+    [Fact(Skip = UnverifiedDeclineState)]
+    [Trait("Requirement", "FR-42")]
+    [Trait("Requirement", "AD-26")]
+    [Trait("Requirement", "UX-DR39")]
+    public async Task A_decline_refused_409_shows_the_offer_is_no_longer_open_with_focus_on_its_heading()
+    {
+        var api = Spaces("member", offered: true);
+
+        api.NextOfferDeclineRefusal = (409, ProblemTypes.OwnershipOfferNotPending);
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenDialogAsync(api, page);
+
+            var arrivalsBefore = api.SpaceArrivalReads(Northwind).Count;
+
+            await page.Locator(Dialog).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = DeclineAction, Exact = true }).ClickAsync();
+            await AssertNoLongerOpenAsync(page);
+            await HeadingFocusedAsync(page);
+            await page.Locator(Indicator).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
+
+            var text = await page.Locator(Dialog).TextContentAsync() ?? string.Empty;
+
+            Assert.Single(api.DeclinesSent(Northwind));
+            Assert.Equal(0, await page.Locator("[role=alert]").CountAsync());
+            Assert.Equal(1, await page.GetByText(NoLongerOpen, new PageGetByTextOptions { Exact = true }).CountAsync());
+            Assert.Equal(1, await page.Locator(Dialog).GetByText(NoLongerOpen, new LocatorGetByTextOptions { Exact = true }).CountAsync());
+            Assert.All(
+                ReasonWords,
+                reason => Assert.DoesNotContain(reason, text, StringComparison.OrdinalIgnoreCase));
+            Assert.Equal(arrivalsBefore, api.SpaceArrivalReads(Northwind).Count);
+        }
+    }
+
+    /// <summary>
+    /// Whatever closed the offer - its revoke, a decline or an acceptance in another tab, a lapse, or its expiry - the decline
+    /// is answered with the same <c>409 ownership-offer-not-pending</c> and the dialog shows the same designed state, word for
+    /// word: the heading, the one sentence and "Close", and nothing that names a reason.
+    /// </summary>
+    /// <remarks>
+    /// Expected to pass today, as the case above.
+    /// </remarks>
+    /// <param name="cause">What closed the offer, which the answer does not carry.</param>
+    /// <returns>A task.</returns>
+    [Theory(Skip = UnverifiedDeclineState)]
+    [MemberData(nameof(SettledCauses))]
+    [Trait("Requirement", "FR-42")]
+    [Trait("Requirement", "AD-26")]
+    public async Task Every_cause_of_a_closed_offer_renders_the_same_no_longer_open_state(string cause)
+    {
+        var api = Spaces("member", offered: true);
+
+        api.NextOfferDeclineRefusal = (409, ProblemTypes.OwnershipOfferNotPending);
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenDialogAsync(api, page);
+            await page.Locator(Dialog).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = DeclineAction, Exact = true }).ClickAsync();
+            await AssertNoLongerOpenAsync(page);
+
+            var text = await page.Locator(Dialog).TextContentAsync() ?? string.Empty;
+
+            Assert.True(
+                string.Concat(text.Where(character => !char.IsWhiteSpace(character))) == string.Concat((NoLongerOpen + NothingChanged + CloseAction).Where(character => !char.IsWhiteSpace(character))),
+                $"The dialog for an offer {cause} says something other than the designed state: {text}");
+        }
+    }
+
+    /// <summary>
+    /// A decline answered by the in-Space not-found - the offer no longer names this Account, with the Space still readable -
+    /// shows the same designed state rather than a dialog that vanishes: the heading "This offer is no longer open." with focus
+    /// on it, "Close" the only button, and the indicator removed. The Space is read again, and its arrival decides: a Space
+    /// that refused would render the one refusal surface.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC6 - the dialog closes silently on the in-Space 404 today (Q5 (a))")]
+    [Trait("Requirement", "FR-42")]
+    [Trait("Requirement", "NFR-8")]
+    public async Task A_decline_answered_by_the_in_Space_404_shows_the_no_longer_open_state()
+    {
+        var api = Spaces("member", offered: true);
+
+        api.NextOfferDeclineRefusal = (404, ProblemTypes.NotAvailable);
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenDialogAsync(api, page);
+
+            var arrivalsBefore = api.SpaceArrivalReads(Northwind).Count;
+
+            await page.Locator(Dialog).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = DeclineAction, Exact = true }).ClickAsync();
+            await AssertNoLongerOpenAsync(page);
+            await HeadingFocusedAsync(page);
+            await page.Locator(Indicator).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
+            await WaitUntilAsync(() => api.SpaceArrivalReads(Northwind).Count > arrivalsBefore);
+
+            Assert.Equal(0, await page.Locator("[role=alert]").CountAsync());
+        }
+    }
+
+    /// <summary>
+    /// Waits until focus is on the dialog's heading "This offer is no longer open.".
+    /// </summary>
+    private static Task HeadingFocusedAsync(IPage page) =>
+        page.WaitForFunctionAsync(
+            "text => !!document.activeElement && /^H[1-6]$/.test(document.activeElement.tagName) && document.activeElement.textContent.trim() === text",
+            NoLongerOpen,
+            new PageWaitForFunctionOptions { Timeout = Timeout });
+
+    /// <summary>
     /// Northwind, where the Account holds <paramref name="role"/> - with an offer from Olu Owner naming it when
     /// <paramref name="offered"/> - and Harbour Ops, where it is a Member with no offer. Northwind's Memberships are listed
     /// (an Owner, an Admin, a Member, a Viewer) so Space settings renders its sections.

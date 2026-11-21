@@ -181,6 +181,8 @@ internal static partial class IsolationCases
             }),
 
         .. OwnershipOfferAnswerCases(),
+
+        .. SettledOwnershipOfferCases(),
     ];
 
     /// <summary>

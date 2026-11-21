@@ -86,6 +86,7 @@ internal sealed partial class FakeYelloApi
             ("POST", [_, _, var offer, "acceptance"]) when Guid.TryParse(offer, out var acceptedId) => AnswerOffer(spaceId, acceptedId, request, accept: true),
             ("POST", [_, _, var offer, "decline"]) when Guid.TryParse(offer, out var declinedId) => AnswerOffer(spaceId, declinedId, request, accept: false),
             ("GET", [_, _, "pending"]) => RefusedOutsideTheOwner(spaceId) ?? ReadPending(spaceId),
+            ("GET", [_, _, "declined"]) => RefusedOutsideTheOwner(spaceId) ?? ReadDeclined(spaceId),
             ("DELETE", [_, _, var offer]) when Guid.TryParse(offer, out var offerId) => RefusedOutsideTheOwner(spaceId) ?? Revoke(spaceId, offerId),
             _ => null,
         };
@@ -145,6 +146,7 @@ internal sealed partial class FakeYelloApi
         var offer = (Id: Guid.NewGuid(), RecipientMembershipId: recipient.Id, RecipientName: recipient.DisplayName, ExpiresAt: ServerNow + OfferLifetime, ReadAt: ServerNow);
 
         PendingOffers[spaceId] = offer;
+        DeclinedOffers.TryRemove(spaceId, out _);
 
         return (201, Serialize(offer));
     }

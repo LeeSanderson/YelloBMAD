@@ -47,6 +47,8 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
     private const string RevokeAction = "Revoke";
     private const string SpaceName = "Northwind Redesign";
     private const string InvalidRecipientCopy = "Ownership can be offered only to another Membership of this Space.";
+    private const string DeclinedStatement = "main .ownership-section p.ownership-section__declined";
+    private const string DeclinedStatementPending = "red: AC1 - the Ownership section does not read or state a declined offer yet (Q1 (a), Q10 (a))";
 
     /// <summary>
     /// Records every non-empty text a polite or status region changes to: <c>window.__said</c>.
@@ -368,6 +370,166 @@ public sealed class OwnershipSectionTests(ClientSurfaceFixture surface)
             await page.ReloadAsync();
             await page.Locator(RoleChip).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await PendingTextAsync(page, recipient.DisplayName);
+            await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = TextSpacingOverride });
+
+            Assert.Empty(await page.EvaluateAsync<string[]>(Reflow));
+        }
+    }
+
+    /// <summary>
+    /// The Owner is told its offer was declined, at the panel's next read: with no offer pending and the Space's latest offer
+    /// declined, the section states "{name} declined your offer of ownership." in a plain paragraph above the picker. It is no
+    /// alert (no <c>[role=alert]</c> anywhere in the section, and the statement carries no role and no live region), it has no
+    /// exclamation mark, and the picker is still offered. The section asked for the declined read.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = DeclinedStatementPending)]
+    [Trait("Requirement", "FR-42")]
+    [Trait("Requirement", "UX-DR27")]
+    public async Task A_declined_offer_is_stated_by_name_above_the_picker_and_is_not_an_alert()
+    {
+        var api = SpaceWithMembers("owner", out var others);
+        var recipient = others[1];
+
+        api.DeclinedOffers[Northwind] = (Guid.NewGuid(), recipient.DisplayName);
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenOwnershipAsync(api, page);
+
+            var statement = page.Locator(DeclinedStatement);
+
+            await statement.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.Locator(Section).GetByRole(AriaRole.Radio).First.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var text = (await statement.TextContentAsync() ?? string.Empty).Trim();
+
+            Assert.Equal($"{recipient.DisplayName} declined your offer of ownership.", text);
+            Assert.DoesNotContain("!", text, StringComparison.Ordinal);
+            Assert.Equal("P", await statement.EvaluateAsync<string>("e => e.tagName"));
+            Assert.Null(await statement.GetAttributeAsync("role"));
+            Assert.Null(await statement.GetAttributeAsync("aria-live"));
+            Assert.Equal(0, await page.Locator($"{Section} [role=alert]").CountAsync());
+            Assert.True(
+                await statement.EvaluateAsync<bool>("(e, section) => { const radio = document.querySelector(section + ' input[type=radio]'); return !!radio && !!(e.compareDocumentPosition(radio) & Node.DOCUMENT_POSITION_FOLLOWING); }", Section),
+                "The declined statement is not above the picker.");
+            Assert.NotEmpty(api.DeclinedReads(Northwind));
+        }
+    }
+
+    /// <summary>
+    /// A declined offer whose recipient's Membership is gone is stated without a name: "Your last offer of ownership was
+    /// declined."
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = DeclinedStatementPending)]
+    [Trait("Requirement", "FR-42")]
+    public async Task A_declined_offer_whose_recipient_is_gone_is_stated_without_a_name()
+    {
+        var api = SpaceWithMembers("owner", out _);
+
+        api.DeclinedOffers[Northwind] = (Guid.NewGuid(), null);
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenOwnershipAsync(api, page);
+            await page.Locator(DeclinedStatement).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal("Your last offer of ownership was declined.", (await page.Locator(DeclinedStatement).TextContentAsync() ?? string.Empty).Trim());
+        }
+    }
+
+    /// <summary>
+    /// The statement goes once a new offer is made: after a confirmed offer the section shows the pending offer, and the
+    /// declined statement is gone.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = DeclinedStatementPending)]
+    [Trait("Requirement", "FR-42")]
+    public async Task The_declined_statement_is_gone_after_a_confirmed_new_offer()
+    {
+        var api = SpaceWithMembers("owner", out var others);
+        var (declinedBy, next) = (others[1], others[2]);
+
+        api.DeclinedOffers[Northwind] = (Guid.NewGuid(), declinedBy.DisplayName);
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenOwnershipAsync(api, page);
+            await page.Locator(DeclinedStatement).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await ChooseAndAskAsync(page, next.DisplayName);
+            await page.Locator(Section).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = OfferAction, Exact = true }).ClickAsync();
+            await PendingTextAsync(page, next.DisplayName);
+
+            Assert.Equal(0, await page.Locator(DeclinedStatement).CountAsync());
+        }
+    }
+
+    /// <summary>
+    /// A revoke that meets an offer already declined in another tab is answered <c>409 ownership-offer-not-pending</c>; the
+    /// section reads the Space's offers again, says "This offer is no longer open." politely, offers the picker, and the
+    /// declined statement explains why, by the recipient's name.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = DeclinedStatementPending)]
+    [Trait("Requirement", "FR-42")]
+    [Trait("Requirement", "AD-26")]
+    public async Task A_revoke_answered_409_rereads_and_states_the_decline()
+    {
+        var api = SpaceWithMembers("owner", out var others);
+        var recipient = others[0];
+
+        api.PendingOffers[Northwind] = (Guid.NewGuid(), recipient.Id, recipient.DisplayName, api.ServerNow.AddDays(OwnershipOfferWire.ExpiryDays), api.ServerNow);
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenOwnershipAsync(api, page);
+            await PendingTextAsync(page, recipient.DisplayName);
+            await page.EvaluateAsync(RecordEverythingSaid);
+
+            api.DeclineElsewhere(Northwind, recipient.DisplayName);
+
+            await page.Locator(Section).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RevokeAction, Exact = true }).ClickAsync();
+            await page.Locator(DeclinedStatement).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var said = await page.EvaluateAsync<string[]>("() => window.__said || []");
+
+            Assert.Equal($"{recipient.DisplayName} declined your offer of ownership.", (await page.Locator(DeclinedStatement).TextContentAsync() ?? string.Empty).Trim());
+            Assert.Contains("This offer is no longer open.", said);
+            Assert.True(await page.Locator(Section).GetByRole(AriaRole.Radio).First.IsVisibleAsync(), "The picker is not offered after the refused revoke.");
+            Assert.Equal(0, await page.Locator($"{Section} [role=alert]").CountAsync());
+        }
+    }
+
+    /// <summary>
+    /// The section with the declined statement reflows at 320 by 256 CSS pixels with no sideways scroll, and still does with
+    /// the text spacing overrides applied.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = DeclinedStatementPending)]
+    [Trait("Requirement", "UX-DR41")]
+    [Trait("Requirement", "NFR-9")]
+    public async Task The_declined_statement_reflows_at_320_by_256_with_text_spacing()
+    {
+        var api = SpaceWithMembers("owner", out var others);
+
+        api.DeclinedOffers[Northwind] = (Guid.NewGuid(), others[0].DisplayName);
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(320, 256);
+            await OpenOwnershipAsync(api, page);
+            await page.Locator(DeclinedStatement).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await page.AddStyleTagAsync(new PageAddStyleTagOptions { Content = TextSpacingOverride });
 
             Assert.Empty(await page.EvaluateAsync<string[]>(Reflow));

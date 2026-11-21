@@ -50,10 +50,10 @@ public sealed partial class ActiveSpaceEndpointTests
     public static TheoryData<string> AcceptingRoles => new() { "admin", "member", "viewer" };
 
     /// <summary>
-    /// The stored offers the named recipient may no longer accept: three terminal states, and a <c>Pending</c> row past its
-    /// expiry.
+    /// The stored offers the named recipient may no longer accept or decline: the four terminal states, and a <c>Pending</c>
+    /// row past its expiry. The <c>Accepted</c> row is seeded with its offerer still the Owner, which no request can reach.
     /// </summary>
-    public static TheoryData<string> OffersNoLongerOpenToTheRecipient => new() { "Revoked", "Lapsed", "Declined", "Expired" };
+    public static TheoryData<string> OffersNoLongerOpenToTheRecipient => new() { "Revoked", "Lapsed", "Declined", "Expired", "Accepted" };
 
     /// <summary>
     /// The named recipient, at any Role, accepts: <c>204</c> with no body; the offer row is retained with
@@ -177,7 +177,7 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
-    /// The named recipient may not accept an offer that is no longer actionable - revoked, lapsed, declined, or still stored
+    /// The named recipient may not accept an offer that is no longer actionable - revoked, lapsed, declined, accepted, or still stored
     /// <c>Pending</c> past its expiry: <c>409 ownership-offer-not-pending</c> with no address in the body, nothing recorded,
     /// the stored row unchanged (the expired one stays <c>Pending</c>: expiry is never written), and every Role unchanged.
     /// Anchor: the Space's live offer was revoked <c>204</c> first.

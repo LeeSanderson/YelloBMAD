@@ -443,6 +443,37 @@ No new package, no new project and no migration.
 
 No web research was needed: every API is already in the codebase.
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-5-3-decline-revoke-lapse-and-the-states-that-are-no-longer-open.md`. All written against Q1-Q10's recommendations (a); a skip that depends on one names it.
+
+| File | Cases | ACs | State today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeclinedOwnershipOffer.cs` (new) | 5 | AC1, AC7 | all red (skipped, Q1) |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.SettledOwnershipOffer.cs` (new) | 8 methods, 12 cases | AC1 (no publish, no mail), AC2 (3), AC3 (decline theory x5, superseded), AC5 (replay), AC7 | all green today, active |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.SettledOwnershipOfferRace.cs` (new) | 2 | AC4, AC5 | decline-vs-removal race green, active; revoke-after-leaving race red (skipped) |
+| `.AcceptOwnershipOffer.cs` / `.RevokeOwnershipOffer.cs` theory data | +1 row (`Accepted`) / +2 rows (`Declined`, `Accepted`) | AC3 | green today, active |
+| `tests/Yello.Tests.Isolation/IsolationCases.SettledOwnershipOffers.cs` (new; spread from `OwnershipOfferCases()`) | 9 rows | AC4 (6 settled/former-member rows), AC1 (3 declined-read rows) | all `PendingUntil: "5.3"`; the 6 AC4 rows are expected green today but unverified |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.SettledOwnershipOffers.cs` (new) | 8 | AC1 (4 gates), AC4 (`LostMembership`), AC8, AC9 (2) | 5 red (skipped); the AC8 and both AC9 gates green today, active |
+| `tests/Yello.Tests.Client/OwnershipSectionTests.cs` (5 added) | 5 | AC1 | all red (skipped, Q1/Q10) |
+| `tests/Yello.Tests.Client/OwnershipOfferTests.cs` (3 added) | 3 methods, 7 cases | AC6 | in-Space 404 red (Q5); the decline-409 case and the cause theory expected green but unverified (skipped) |
+
+Support: `tests/Yello.Tests.Shared/OwnershipOfferWire.Declined.cs` (route stand-ins `DeclinedRoute`/`DeclinedOf`: swap for the contract members and delete them), `WireDatabase.SetOwnershipOfferExpiresAtAsync` (Q7 (a), done), `tests/Yello.Tests.Client/FakeYelloApi.DeclinedOwnershipOffers.cs`.
+
+**Unverified.** An Isolation run was stopped by Claude Code for low system memory and was not restarted, and no browser run was made. So eight scaffolds that should pass today stay red: the six AC4 isolation rows and the two AC6 browser cases. Make them live first.
+
+**A correction to this story:** the "former" isolation rows cannot use a Token issued in the Space they left, because removing a Membership cascades its Tokens away (a `401`, not a non-member's `404`). They use a Token bound to the Account's own Space.
+
+**Activation order (riskiest assumption first):**
+1. `A_revoke_queued_behind_the_acceptance_and_its_offerers_leave_is_the_recorded_boundary_404`: three queued waiters granted in order, and the store reads the caller's Membership before the offer. It should be seen `409` before the fix.
+2. `The_revoke_outcome_names_a_lost_Membership`, then the mapping.
+3. `A_decline_followed_by_a_later_offer_that_was_revoked_reads_204`: top row first, state second.
+4. The rest of `.DeclinedOwnershipOffer.cs`; the four AC1 gates (replace `OfferOwnershipTransfer_is_required_by_exactly_the_three_offer_routes`, widen the route/surface gate); the 9 isolation rows made live (the 6 AC4 rows can go first, before any code).
+5. The 5 `OwnershipSectionTests` cases (widen any arrival-request counts deliberately).
+6. The 3 `OwnershipOfferTests` cases (the two unverified ones first; then the in-Space `404`).
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
 ### Testing requirements
 
 Follow `tests/TESTING-CONVENTIONS.md`: `:44-86` traits, `:87-207` rules (races `:102-113`), `:517-543` outbox, `:545-580` Memberships, `:604-673` the shared container, `:773-895` isolation.

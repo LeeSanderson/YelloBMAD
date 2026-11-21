@@ -656,6 +656,37 @@ public sealed class WireDatabase(string connectionString)
     }
 
     /// <summary>
+    /// Moves an Ownership Offer's <c>ExpiresAt</c>, under its Space's own key, so a case reaches expiry by seeding the past on
+    /// a row the product made. The offer's actionable predicate reads <c>SYSDATETIMEOFFSET()</c> inside the statement, so no
+    /// fake clock can make a row expire.
+    /// </summary>
+    /// <remarks>
+    /// The update keeps <c>SpaceId</c>, so the <c>BLOCK AFTER UPDATE</c> predicate admits it; <c>State</c> is untouched - an
+    /// expired offer is stored <c>Pending</c>. A test helper, outside the production assemblies the offer's state-writer gate
+    /// scans, and it writes no state.
+    /// </remarks>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="offerId">The offer.</param>
+    /// <param name="expiresAt">The expiry to store.</param>
+    /// <returns>A task.</returns>
+    public async Task SetOwnershipOfferExpiresAtAsync(Guid spaceId, Guid offerId, DateTimeOffset expiresAt)
+    {
+        await using var connection = await OpenForSpaceAsync(spaceId).ConfigureAwait(false);
+
+        var changed = await ExecuteAsync(
+            connection,
+            null,
+            "UPDATE dbo.[OwnershipOffer] SET ExpiresAt = @expires WHERE Id = @id",
+            ("@expires", expiresAt),
+            ("@id", offerId)).ConfigureAwait(false);
+
+        if (changed != 1)
+        {
+            throw new InvalidOperationException($"Expected to change one Ownership Offer; changed {changed}.");
+        }
+    }
+
+    /// <summary>
     /// Every Membership an Account holds, in any Space, read under the <c>AccountId</c> key (story 1.7's predicate shows
     /// exactly that Account's Memberships across Spaces) with an explicit <c>WHERE AccountId</c>. Story 4.3 (ATDD run):
     /// AC3 and AC8's "exactly these Memberships, nothing else".

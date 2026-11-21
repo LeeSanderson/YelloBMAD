@@ -127,6 +127,11 @@ internal sealed partial class FakeYelloApi
             return refused;
         }
 
+        if (!accept && TakeDeclineRefusal(spaceId) is { } refusedDecline)
+        {
+            return refusedDecline;
+        }
+
         if (OffersForMe.TryGetValue(spaceId, out var offer) && offer.Id == offerId)
         {
             return Answered(spaceId, offerId, request.Path, key, accept);

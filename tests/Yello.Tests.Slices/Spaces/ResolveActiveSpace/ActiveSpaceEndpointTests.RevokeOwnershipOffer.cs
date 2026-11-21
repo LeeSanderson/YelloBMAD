@@ -29,9 +29,11 @@ namespace Yello.Tests.Slices.Spaces.ResolveActiveSpace;
 public sealed partial class ActiveSpaceEndpointTests
 {
     /// <summary>
-    /// The stored states a revoke must refuse: two terminal states, and a <c>Pending</c> row past its expiry.
+    /// The stored states a revoke must refuse: the four terminal states, and a <c>Pending</c> row past its expiry. The
+    /// <c>Accepted</c> row is seeded with its offerer still the Owner, which no request can reach: through the product the
+    /// revoker would be an Admin by then and get the recorded <c>403</c>.
     /// </summary>
-    public static TheoryData<string> OffersNoLongerPending => new() { "Revoked", "Lapsed", "Expired" };
+    public static TheoryData<string> OffersNoLongerPending => new() { "Revoked", "Lapsed", "Expired", "Declined", "Accepted" };
 
     /// <summary>
     /// The Owner revokes the pending offer: <c>204</c> with no body; the row is retained with <c>State = Revoked</c> and
@@ -79,7 +81,8 @@ public sealed partial class ActiveSpaceEndpointTests
     }
 
     /// <summary>
-    /// An offer already revoked, lapsed, or still stored <c>Pending</c> but past its expiry is not actionable: its revoke is
+    /// An offer already revoked, lapsed, declined, accepted, or still stored <c>Pending</c> but past its expiry is not
+    /// actionable: its revoke is
     /// <c>409 ownership-offer-not-pending</c> with no address in the body, nothing is recorded as a refusal, and the stored row
     /// is unchanged (the expired one stays <c>Pending</c>: expiry is never written). Anchor: the Space's live offer was revoked
     /// <c>204</c> first.
