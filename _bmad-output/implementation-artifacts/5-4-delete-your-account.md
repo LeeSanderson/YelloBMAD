@@ -207,6 +207,7 @@ Every Slices case that deletes an Account, or races a deletion against an accept
 
 - [ ] **Task 0: decisions** (before any code)
   - [ ] Q1 and Q3 are marked **[LEE]**. If the orchestrator routes them to Lee, record his answers here under "Decided by Lee" before ATDD. Otherwise take recommendation (a) and record it as "Q1 - (a)", with its cost, in Completion Notes.
+  - Decided by Lee (2026-11-21): **Q1 - (a)** three-step sequence, recorded as an AD-24 amendment. **Q3 - (a)** nullable `IssuedByAccountId` with `ON DELETE SET NULL`. If the cascade cannot get past RLS, fall back to (b) as the question describes.
   - [ ] Decide Q2 and Q4-Q10 the same way. Each recommendation is the default.
   - [ ] **Prove Q3's riskiest assumption first** (below): a cascading `SET NULL` from `Account` reaches `Invitation` rows in Spaces whose key is not set. If it does not, take Q3 (b).
 - [ ] **Task 1: Contracts** (AC1, AC2)
