@@ -189,6 +189,7 @@ graph TD
 - **Prevents:** name-keyed deltas, which cannot express FR-27's rename-cascade conflict detection, and a materialised set going stale against a Space-level change.
 - **Rule:** A `StatusDefinition` has a stable id surviving rename at both levels. A Project's delta is a set of operations keyed by that id, never a materialised list. The effective set is computed on read; caching is permitted only within a single request. No table stores a Project's effective Status set.
 - **Note (2026-11-21, story 6.1, additive):** a Status a Project adds is itself a `STATUS_DEFINITION` row owned by that Project (nullable `OwnerProjectId`, a NO ACTION key to `PROJECT`, since a cascade would be a second path from `SPACE`), so `TASK`'s `(SpaceId, StatusId)` key covers every Status a Task can hold. `STATUS_DELTA_OP` is the table `StatusDeltaOperation`: `Add`, `Rename` and `Place` operations, at most one per Project, Status and kind, applied in `Sequence` order; a `Place` names the Status it goes after, never an ordinal, so a Status no Project placed keeps its Space-order slot. The ER below therefore also has `PROJECT ||--o{ STATUS_DEFINITION : adds`.
+- **Note (2026-11-21, story 6.2, additive):** the delta gains a fourth kind, `Remove`, keyed on a Space default's id, so the default stays "removed in this Project" against later Space-level changes and can be added back under the same id by deleting that operation. Removing a Status the Project added writes no `Remove`: its definition and its operations are deleted, so its name leaves the owned-name index and adding it again makes a new Status. A removal re-anchors every other `Place` so the remaining order does not move, and deletes the removed Status's own `Rename` and `Place`. `(SpaceId, ProjectId, Sequence)` is unique.
 
 ### AD-17 — Status removal and Task move are single atomic operations
 
@@ -404,6 +405,7 @@ erDiagram
     SPACE ||--o{ API_TOKEN : scopes
     PROJECT ||--o{ TASK : contains
     PROJECT ||--o{ STATUS_DELTA_OP : overrides
+    PROJECT ||--o{ STATUS_DEFINITION : adds
     STATUS_DEFINITION ||--o{ STATUS_DELTA_OP : targets
     MEMBERSHIP ||--o{ TASK : "is assignee of"
     TASK ||--o{ TASK_LABEL : carries

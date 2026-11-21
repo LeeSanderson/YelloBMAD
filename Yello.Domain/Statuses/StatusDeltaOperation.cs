@@ -1,7 +1,7 @@
 namespace Yello.Domain.Statuses;
 
 /// <summary>
-/// One operation of a Project's Status delta: add, rename or place one Status, keyed by the Status's id.
+/// One operation of a Project's Status delta: add, rename, place or remove one Status, keyed by the Status's id.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -11,7 +11,12 @@ namespace Yello.Domain.Statuses;
 /// </para>
 /// <para>
 /// <b>At most one operation per Status and kind.</b> Writing an operation again replaces the earlier one and takes the
-/// next <see cref="Sequence"/>, so the delta stays bounded by the Project's Statuses times the three kinds.
+/// next <see cref="Sequence"/>, so the delta stays bounded by the Project's Statuses times the four kinds.
+/// </para>
+/// <para>
+/// <b>Only a Space default is removed by an operation.</b> A default must stay "removed in this Project" against later
+/// Space-level changes, which needs a row keyed on its id. A Status the Project added exists nowhere else, so its removal
+/// deletes its definition and its operations instead: keeping them would hold its name in the owned-name index.
 /// </para>
 /// <para>
 /// <b>A place names an anchor, never an ordinal.</b> A Status with no <see cref="StatusDeltaKind.Place"/> keeps its slot
@@ -86,4 +91,9 @@ public enum StatusDeltaKind
     /// Moves a Status after another, or to the front.
     /// </summary>
     Place,
+
+    /// <summary>
+    /// Takes a Space default out of this Project's set, keyed by its id so the default can be added back.
+    /// </summary>
+    Remove,
 }

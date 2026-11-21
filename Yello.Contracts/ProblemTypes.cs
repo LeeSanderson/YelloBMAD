@@ -292,6 +292,25 @@ public static class ProblemTypes
     public static string InvalidStatusPosition => "urn:yello:problem:invalid-status-position";
 
     /// <summary>
+    /// A removal of a Status that Tasks hold names no destination for them. Answered <c>409</c>, because it depends on the
+    /// occupancy counted under the Project's lock; nothing is written.
+    /// </summary>
+    /// <remarks>
+    /// <b>No count in the body</b>: the client re-reads the set, whose Task counts are the truth.
+    /// </remarks>
+    public static string StatusDestinationRequired => "urn:yello:problem:status-destination-required";
+
+    /// <summary>
+    /// A removal's destination is not a Status of the set the removal leaves, or its body cannot be read. Answered
+    /// <c>400</c>; nothing is written.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never the id sent</b>: the removed Status itself, a random id and another Project's or Space's real one answer the
+    /// same bytes.
+    /// </remarks>
+    public static string InvalidStatusDestination => "urn:yello:problem:invalid-status-destination";
+
+    /// <summary>
     /// A Task edit whose <c>labelIds</c> names a Label that is not one of the Space's - unknown, another Space's,
     /// repeated, not an id, or deleted while the edit ran. Answered <c>400</c>; nothing is written. Story 2.4, AC10,
     /// AC11.

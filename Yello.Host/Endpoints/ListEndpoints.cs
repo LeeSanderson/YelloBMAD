@@ -68,10 +68,7 @@ public static class ListEndpoints
 
         if (!ListQueryReading.TryReadCursor(query[ListRoutes.AfterParameter], sort, out var after))
         {
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                type: ProblemTypes.InvalidListCursor,
-                title: "A List cursor is one this route issued for the same sort.");
+            return InvalidCursor();
         }
 
         var page = await handler.HandleAsync(projectId, sort, filter, after, cancellationToken).ConfigureAwait(false);
@@ -82,6 +79,11 @@ public static class ListEndpoints
             return BoundaryProblems.NotAvailable();
         }
 
+        if (page.CursorOutsideTheOrder)
+        {
+            return InvalidCursor();
+        }
+
         return Results.Ok(new ListPageResponse(
             new BoardProjectResponse(page.Project.Id, page.Project.Name),
             [.. page.Statuses.Select(status => new ListStatusResponse(status.Id, status.Name))],
@@ -89,4 +91,10 @@ public static class ListEndpoints
             [.. page.Tasks.Select(task => TaskEndpoints.Response(task, page.LabelIds.GetValueOrDefault(task.Id, [])))],
             page.NextAfter));
     }
+
+    private static IResult InvalidCursor() =>
+        Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            type: ProblemTypes.InvalidListCursor,
+            title: "A List cursor is one this route issued for the same sort.");
 }

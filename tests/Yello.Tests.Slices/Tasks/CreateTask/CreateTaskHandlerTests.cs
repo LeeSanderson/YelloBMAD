@@ -167,6 +167,9 @@ public sealed class CreateTaskHandlerTests
         public Task<TaskItem?> FindAsync(Guid taskId, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The create slice reads no Task.");
 
+        public Task LockProjectAsync(Guid projectId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The create slice relies on the bound count's lock.");
+
         public Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The create slice edits no Task.");
 

@@ -31,6 +31,15 @@ public interface ITaskStore
     Task<TaskItem?> FindAsync(Guid taskId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Takes the Project's Tasks lock - the one every key placer and every change to the Project's Statuses takes - and
+    /// holds it until the unit of work ends. Taking it again in the same unit of work is a no-op.
+    /// </summary>
+    /// <param name="projectId">A Project of the resolved Space.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>A task.</returns>
+    Task LockProjectAsync(Guid projectId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Applies an edit to one Task of the resolved Space and saves it. A Status that differs from the Task's
     /// own places it after the last key of its new column (story 2.3, open question 3 (a)); the same Status
     /// writes no key.

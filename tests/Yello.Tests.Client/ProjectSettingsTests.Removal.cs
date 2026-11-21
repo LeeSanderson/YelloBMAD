@@ -2,7 +2,7 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using Xunit;
-using Yello.Tests.Shared;
+using Yello.Contracts;
 
 namespace Yello.Tests.Client;
 
@@ -41,7 +41,7 @@ public sealed partial class ProjectSettingsTests
     /// row and announces it politely; the Board then has three columns.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - the editor has no remove control (Q12)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     [Trait("Requirement", "UX-DR42")]
     public async Task Removing_an_unoccupied_Status_removes_it_directly_and_announces_it()
@@ -64,7 +64,7 @@ public sealed partial class ProjectSettingsTests
             Assert.Contains("\"destinationStatusId\":null", api.StatusRemovals[0].Body ?? string.Empty, StringComparison.Ordinal);
 
             await page.EvaluateAsync("path => Blazor.navigateTo(path)", ClientBoard(Northwind, Atlas));
-            await page.Locator(Column).Nth(2).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.Locator(Column).Locator("h2, h3").Nth(2).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             Assert.Equal(["Intake", "Doing", "Done"], await ColumnNamesAsync(page));
         }
@@ -76,7 +76,7 @@ public sealed partial class ProjectSettingsTests
     /// field and sends nothing; Cancel closes the dialog and returns focus to the row's Remove control.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - no mapping dialog yet; UX-DR16's no-default picker (Q7)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     [Trait("Requirement", "UX-DR16")]
     public async Task An_occupied_Status_opens_a_dialog_with_no_destination_chosen_and_only_the_Statuses_left()
@@ -127,7 +127,7 @@ public sealed partial class ProjectSettingsTests
     /// Tasks moved where, and focus is on the destination's row.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - no in-flight progress region yet (EXPERIENCE.md :259)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     [Trait("Requirement", "UX-DR42")]
     [Trait("Requirement", "NFR-9")]
@@ -178,7 +178,7 @@ public sealed partial class ProjectSettingsTests
     /// the dialog with the server's count.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - no remove control or 409 handling yet (Q4)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     public async Task A_stale_count_answered_409_re_reads_the_set_and_opens_the_dialog()
     {
@@ -212,7 +212,7 @@ public sealed partial class ProjectSettingsTests
     /// A refused removal says nothing was moved, in the editor's inline error region, and the Status stays in the list.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - no removal refusal copy yet (RefusalCopy, ClientCopy.resx)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     public async Task A_refused_removal_says_nothing_was_moved_and_keeps_the_Status()
     {
@@ -232,7 +232,7 @@ public sealed partial class ProjectSettingsTests
 
             await dialog.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await dialog.GetByRole(AriaRole.Combobox).SelectOptionAsync(new SelectOptionValue { Label = "Done" });
-            api.NextProjectStatusRefusal = (400, ProjectStatusWire.InvalidStatusDestination);
+            api.NextProjectStatusRefusal = (400, ProblemTypes.InvalidStatusDestination);
             await dialog.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { NameRegex = Pattern("^Remove and move") }).ClickAsync();
             await page.GetByText(NothingMovedCopy).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
@@ -245,7 +245,7 @@ public sealed partial class ProjectSettingsTests
     /// add-back and the default returns at its Space slot under its Space name.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7, AC14 - no removed-defaults list or add-back control yet (Q2)")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     public async Task A_removed_default_is_listed_and_added_back()
     {
@@ -285,7 +285,7 @@ public sealed partial class ProjectSettingsTests
     /// stays the editor, says so inline, and renders the set without that Status - never the page-level refusal.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - a write's 404 still raises the page refusal (Q8)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     public async Task A_404_for_a_Status_that_left_the_set_re_reads_and_says_so_inline()
     {
@@ -315,7 +315,7 @@ public sealed partial class ProjectSettingsTests
     /// At 320 by 640 CSS pixels the open dialog reflows: nothing scrolls sideways and every control in it stays on screen.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - no mapping dialog yet (NFR-9)")]
+    [Fact]
     [Trait("Requirement", "NFR-9")]
     public async Task The_removal_dialog_reflows_at_320_pixels_wide()
     {

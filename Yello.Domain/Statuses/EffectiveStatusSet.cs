@@ -16,8 +16,9 @@ namespace Yello.Domain.Statuses;
 /// every SQL reader.
 /// </para>
 /// <para>
-/// <b>A place whose anchor is not in the set is ignored</b>, and the Status keeps its slot: deterministic, and it needs
-/// nothing from whoever removed the anchor.
+/// <b>A place whose anchor is not in the set is ignored</b>, and the Status keeps its slot. A Project's own removal
+/// re-anchors every place first (<see cref="Reanchored"/>), so this is only the deterministic fallback for an anchor that
+/// leaves some other way.
 /// </para>
 /// </remarks>
 public static class EffectiveStatusSet
@@ -122,12 +123,39 @@ public static class EffectiveStatusSet
         var order = current.Select(status => status.Id).Where(id => id != statusId).ToList();
         order.Insert(afterStatusId is { } anchor ? order.IndexOf(anchor) + 1 : 0, statusId);
 
+        return Anchors(order, id => id == statusId || placed.Contains(id));
+    }
+
+    /// <summary>
+    /// The place operations that keep every other Status where it was once <paramref name="removedStatusId"/> leaves
+    /// <paramref name="current"/>: each Status that already has a place is re-anchored to its predecessor in the order
+    /// without the removed one, the same way <see cref="Placements"/> re-anchors for a move.
+    /// </summary>
+    /// <param name="current">The effective set before the removal.</param>
+    /// <param name="placed">The Statuses the Project's delta already places.</param>
+    /// <param name="removedStatusId">The Status leaving the set.</param>
+    /// <returns>Each Status to place and its anchor, in the order the operations must be sequenced.</returns>
+    public static IReadOnlyList<(Guid StatusId, Guid? AfterStatusId)> Reanchored(
+        IReadOnlyList<EffectiveStatus> current,
+        IReadOnlySet<Guid> placed,
+        Guid removedStatusId)
+    {
+        ArgumentNullException.ThrowIfNull(current);
+        ArgumentNullException.ThrowIfNull(placed);
+
+        var order = current.Select(status => status.Id).Where(id => id != removedStatusId).ToList();
+
+        return Anchors(order, placed.Contains);
+    }
+
+    private static List<(Guid StatusId, Guid? AfterStatusId)> Anchors(IReadOnlyList<Guid> order, Func<Guid, bool> anchored)
+    {
         var placements = new List<(Guid StatusId, Guid? AfterStatusId)>();
         Guid? predecessor = null;
 
         foreach (var id in order)
         {
-            if (id == statusId || placed.Contains(id))
+            if (anchored(id))
             {
                 placements.Add((id, predecessor));
             }
@@ -141,6 +169,16 @@ public static class EffectiveStatusSet
     private static void Apply(List<EffectiveStatus> set, IReadOnlyList<StatusDefinition> owned, StatusDeltaOperation operation)
     {
         var index = set.FindIndex(status => status.Id == operation.StatusId);
+
+        if (operation.Kind == StatusDeltaKind.Remove)
+        {
+            if (index >= 0)
+            {
+                set.RemoveAt(index);
+            }
+
+            return;
+        }
 
         if (operation.Kind == StatusDeltaKind.Add)
         {

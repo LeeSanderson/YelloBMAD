@@ -1,5 +1,6 @@
 using System.Net;
 using Xunit;
+using Yello.Contracts;
 using Yello.Tests.Shared;
 using DeleteWire = Yello.Tests.Slices.Tasks.DeleteWire;
 using MoveWire = Yello.Tests.Slices.Tasks.MoveWire;
@@ -85,7 +86,7 @@ public sealed partial class ProjectEndpointTests
     /// still in the set holding the Task, and nothing is written.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC8 - the remove route does not exist and occupancy is not yet read under the Project's lock (Q1, Q2, Q4)")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-26")]
     public async Task A_removal_without_a_destination_queued_behind_an_edit_into_the_Status_is_refused_409()
@@ -124,7 +125,7 @@ public sealed partial class ProjectEndpointTests
         });
 
         Assert.NotNull(owner);
-        RemovalWire.AssertRefused(queued, HttpStatusCode.Conflict, ProjectStatusWire.StatusDestinationRequired);
+        RemovalWire.AssertRefused(queued, HttpStatusCode.Conflict, ProblemTypes.StatusDestinationRequired);
         Assert.Contains(set, entry => entry.Id == third && entry.TaskCount == 1);
         Assert.Equal(third, (await TaskWire.TaskRowsAsync(database, owner.SpaceId)).Single(row => row.Id == taskId).StatusId);
         Assert.Equal(0, await Wire.DeltaCountAsync(database, owner.SpaceId, projectId));
@@ -137,7 +138,7 @@ public sealed partial class ProjectEndpointTests
     /// second default, and the third is no longer in the set.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC8 - the remove route does not exist and occupancy is not yet read under the Project's lock (Q1, Q2)")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-26")]
     public async Task A_removal_with_a_destination_queued_behind_an_edit_into_the_Status_migrates_the_edited_Task()
@@ -185,7 +186,7 @@ public sealed partial class ProjectEndpointTests
     /// Statuses, every Task is in the survivor of the pair or the third default, and no Task is outside the set.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2, AC8 - the remove route does not exist (Q1, Q2, Q4, Q5)")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-26")]
     public async Task Two_removals_naming_each_other_as_destination_queue_and_the_second_is_refused_400()
@@ -228,7 +229,7 @@ public sealed partial class ProjectEndpointTests
 
         Assert.NotNull(owner);
         Assert.Equal([HttpStatusCode.OK, HttpStatusCode.BadRequest], answers.Select(answer => answer.StatusCode).Order());
-        RemovalWire.AssertRefused(answers.Single(answer => answer.StatusCode == HttpStatusCode.BadRequest), HttpStatusCode.BadRequest, ProjectStatusWire.InvalidStatusDestination);
+        RemovalWire.AssertRefused(answers.Single(answer => answer.StatusCode == HttpStatusCode.BadRequest), HttpStatusCode.BadRequest, ProblemTypes.InvalidStatusDestination);
 
         var survivors = ProjectStatusWire.EntriesOf(answers.Single(answer => answer.StatusCode == HttpStatusCode.OK).Body).Select(entry => entry.Id).ToList();
 
@@ -244,7 +245,7 @@ public sealed partial class ProjectEndpointTests
     /// is dropped, with every Task migrated.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the remove route does not exist; the migration and the delta write must share one transaction (S-1)")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "AR-24")]
     [Trait("Requirement", "FR-26")]

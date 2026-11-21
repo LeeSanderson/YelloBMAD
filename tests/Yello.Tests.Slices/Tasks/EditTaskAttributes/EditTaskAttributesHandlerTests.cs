@@ -60,6 +60,32 @@ public sealed class EditTaskAttributesHandlerTests
     }
 
     /// <summary>
+    /// A Status edit takes the Task's Project's lock before it reads the set it checks against, so a removal of that Status
+    /// that holds the lock is seen; an edit naming no Status takes no Project lock.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AD-17")]
+    public async Task A_Status_edit_locks_the_Project_before_it_reads_the_set_and_a_title_edit_does_not()
+    {
+        var spaceId = Guid.NewGuid();
+        var task = NewTask(spaceId);
+        var done = Status(spaceId, 2);
+        var store = new RecordingStore(task);
+        var statuses = new FixedStatuses(Status(spaceId, 0), done) { Calls = store.Calls };
+        var handler = new EditTaskAttributesHandler(store, statuses);
+
+        await handler.HandleAsync(task.Id, new TaskEdit(Title: null, StatusId: done.Id, ChangesDueDate: false, DueDate: null), TestContext.Current.CancellationToken);
+
+        Assert.Equal([$"lock {task.ProjectId:D}", "read the set"], store.Calls);
+
+        store.Calls.Clear();
+        await handler.HandleAsync(task.Id, new TaskEdit("Renamed", StatusId: null, ChangesDueDate: false, DueDate: null), TestContext.Current.CancellationToken);
+
+        Assert.Empty(store.Calls);
+    }
+
+    /// <summary>
     /// AD-3, AD-20 - a Task the unit of work cannot see is not found, and nothing is written.
     /// </summary>
     /// <returns>A task.</returns>
@@ -215,8 +241,14 @@ public sealed class EditTaskAttributesHandlerTests
 
     private sealed class FixedStatuses(params StatusDefinition[] statuses) : IStatusDefinitionReader
     {
-        public Task<IReadOnlyList<StatusDefinition>> ListAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<StatusDefinition>>(statuses);
+        public List<string>? Calls { get; init; }
+
+        public Task<IReadOnlyList<StatusDefinition>> ListAsync(CancellationToken cancellationToken)
+        {
+            Calls?.Add("read the set");
+
+            return Task.FromResult<IReadOnlyList<StatusDefinition>>(statuses);
+        }
 
         public Task<ProjectStatusDelta> DeltaOfAsync(Guid projectId, CancellationToken cancellationToken) =>
             Task.FromResult(ProjectStatusDelta.Empty);
@@ -228,11 +260,20 @@ public sealed class EditTaskAttributesHandlerTests
 
         public List<IReadOnlyList<Guid>> Replacements { get; } = [];
 
+        public List<string> Calls { get; } = [];
+
         public Task<TaskItem?> CreateAsync(Guid spaceId, Guid projectId, Guid statusId, string title, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The edit slice creates no Task.");
 
         public Task<TaskItem?> FindAsync(Guid taskId, CancellationToken cancellationToken) =>
             Task.FromResult(visible?.Id == taskId ? visible : null);
+
+        public Task LockProjectAsync(Guid projectId, CancellationToken cancellationToken)
+        {
+            Calls.Add($"lock {projectId:D}");
+
+            return Task.CompletedTask;
+        }
 
         public Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken)
         {

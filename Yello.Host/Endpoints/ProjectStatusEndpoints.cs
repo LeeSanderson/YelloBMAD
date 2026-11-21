@@ -166,7 +166,12 @@ public static class ProjectStatusEndpoints
         return result.Set is { } set ? Results.Ok(Responses(set)) : ProjectStatusAnswers.Refusal(result.Outcome);
     }
 
-    private static List<ProjectStatusResponse> Responses(ProjectStatusSet set) =>
+    /// <summary>
+    /// The Project's set as the read and every write answer it.
+    /// </summary>
+    /// <param name="set">The set.</param>
+    /// <returns>One row per Status, in effective order.</returns>
+    internal static List<ProjectStatusResponse> Responses(ProjectStatusSet set) =>
         [.. set.Statuses.Select(status => new ProjectStatusResponse(
             status.Id,
             status.Name,

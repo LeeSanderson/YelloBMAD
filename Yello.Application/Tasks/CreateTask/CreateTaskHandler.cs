@@ -20,6 +20,11 @@ namespace Yello.Application.Tasks.CreateTask;
 /// <b>"The first Status" is true by construction.</b> The request carries no Status; this slice takes the
 /// first of the effective set (AD-16) and nothing else could be chosen.
 /// </para>
+/// <para>
+/// <b>It reads the set under the Project's lock without taking it here</b>: the pipeline's Tasks-per-Project bound count
+/// takes that lock before this runs, so a removal of the first Status that holds it is seen. A change to that bound that
+/// stopped taking the lock would let a creation land in a Status that has just left the set.
+/// </para>
 /// </remarks>
 /// <param name="store">Writes the Task.</param>
 /// <param name="statuses">Reads the Space's Status definitions and the Project's delta.</param>

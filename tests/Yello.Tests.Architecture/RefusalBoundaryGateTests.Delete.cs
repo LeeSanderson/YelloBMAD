@@ -102,7 +102,8 @@ public sealed partial class RefusalBoundaryGateTests
     /// the List View's page (<c>GET …/list</c>): one bounded page by pair keyset seek with its true total from its own
     /// count, so the client still derives no total - never the whole of the Project's Tasks. It is widened by exactly the
     /// Project's Statuses: the read of its effective set, and the add, rename and place of one Status - none lists the
-    /// Project's Tasks or moves the Project.
+    /// Project's Tasks or moves the Project. It is widened by exactly the removal of one Status and the add-back of a removed
+    /// default: the removal moves the Status's Tasks within the Project and answers the set, never a list of Tasks.
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-19")]
@@ -127,6 +128,8 @@ public sealed partial class RefusalBoundaryGateTests
                 $"PATCH {ProjectPattern}/statuses/{{statusId:guid}}",
                 $"POST {ProjectPattern}/statuses",
                 $"POST {ProjectPattern}/statuses/{{statusId:guid}}/place",
+                $"POST {ProjectPattern}/statuses/{{statusId:guid}}/remove",
+                $"POST {ProjectPattern}/statuses/{{statusId:guid}}/restore",
                 $"POST {ProjectPattern}/tasks",
             ],
             routes);

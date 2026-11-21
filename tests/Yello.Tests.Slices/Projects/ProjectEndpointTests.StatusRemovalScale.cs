@@ -30,7 +30,7 @@ public sealed partial class ProjectEndpointTests
     /// are distinct, the removed Status has left the set, and no Task is outside it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Explicit = true, Skip = "red: AC16 - the remove route does not exist; one set-based migration statement (Q11)")]
+    [Fact(Explicit = true)]
     [Trait("Tier", "Nightly")]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "AD-17")]

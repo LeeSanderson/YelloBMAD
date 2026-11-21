@@ -81,6 +81,13 @@ public sealed class ViewListHandler(IBoardReader boards, IListReader reader, ISt
             .Where(statusId => narrowed.StatusIds is null || narrowed.StatusIds.Contains(statusId))
             .ToList();
 
+        // A Status-sort cursor carries only its Status, so once that Status has left the order there is no telling where the
+        // walk was; an empty page would end it silently with Tasks unread.
+        if (sort == ListSort.Status && after?.StatusId is { } cursorStatus && !statusOrder.Contains(cursorStatus))
+        {
+            return new ListView(project, effective, 0, [], null, new Dictionary<Guid, IReadOnlyList<Guid>>()) { CursorOutsideTheOrder = true };
+        }
+
         var total = await reader.CountAsync(projectId, narrowed, cancellationToken).ConfigureAwait(false);
         var (tasks, nextAfter) = await ListPage.ReadAsync(reader, projectId, narrowed, sort, statusOrder, after, cancellationToken).ConfigureAwait(false);
         var labels = await boards.LabelIdsOfAsync([.. tasks.Select(task => task.Id)], cancellationToken).ConfigureAwait(false);
@@ -104,4 +111,10 @@ public sealed record ListView(
     int Total,
     IReadOnlyList<TaskItem> Tasks,
     string? NextAfter,
-    IReadOnlyDictionary<Guid, IReadOnlyList<Guid>> LabelIds);
+    IReadOnlyDictionary<Guid, IReadOnlyList<Guid>> LabelIds)
+{
+    /// <summary>
+    /// Whether the page was refused because a Status-sort cursor names a Status outside the order; nothing else is read.
+    /// </summary>
+    public bool CursorOutsideTheOrder { get; init; }
+}

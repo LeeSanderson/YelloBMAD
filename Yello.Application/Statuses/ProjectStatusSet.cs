@@ -54,4 +54,14 @@ public enum ProjectStatusWriteOutcome
     /// The Status to place after is not another Status of the Project's set.
     /// </summary>
     PositionInvalid,
+
+    /// <summary>
+    /// The Status to remove holds Tasks, and the request names nowhere for them to go.
+    /// </summary>
+    DestinationRequired,
+
+    /// <summary>
+    /// The destination of a removal is not a Status of the set the removal leaves.
+    /// </summary>
+    DestinationInvalid,
 }

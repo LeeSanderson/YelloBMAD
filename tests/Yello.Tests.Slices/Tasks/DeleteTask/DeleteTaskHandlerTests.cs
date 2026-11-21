@@ -44,6 +44,9 @@ public sealed class DeleteTaskHandlerTests
         public Task<TaskItem?> FindAsync(Guid taskId, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The deletion slice reads nothing.");
 
+        public Task LockProjectAsync(Guid projectId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The deletion slice locks in the store.");
+
         public Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The deletion slice edits nothing.");
 

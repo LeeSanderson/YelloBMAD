@@ -20,6 +20,12 @@ namespace Yello.Application.Tasks.EditTaskAttributes;
 /// composite foreign key <c>(SpaceId, StatusId)</c>, which would answer it as a <c>500</c>.
 /// </para>
 /// <para>
+/// <b>Checked under the Project's lock, never before it.</b> A Status can leave a Project's set, and its removal holds that
+/// lock while it migrates the Status's Tasks. A check made before the lock reads the set without the removal and, once the
+/// lock is free, writes a Status the Project no longer has. The store takes the same lock again for the key; it is
+/// re-entrant, and the store stays safe on its own.
+/// </para>
+/// <para>
 /// <b>Applying Labels is a Task edit</b> (story 2.4, open question 1 (a)): the same capability, the same
 /// idempotency, and the whole set replaces the Task's own. Which of the Labels exist is the store's to decide under
 /// its lock (AC10); a set with any missing - unknown, another Space's, or deleted under the request - comes back as
@@ -56,6 +62,18 @@ public sealed class EditTaskAttributesHandler(ITaskStore store, IStatusDefinitio
 
         if (edit.StatusId is { } statusId)
         {
+            var locked = task.ProjectId;
+
+            await store.LockProjectAsync(locked, cancellationToken).ConfigureAwait(false);
+
+            // Read again under the lock: the set checked must be the set of the Project whose lock is held.
+            task = await store.FindAsync(taskId, cancellationToken).ConfigureAwait(false);
+
+            if (task is null || task.ProjectId != locked)
+            {
+                return EditTaskAttributesResult.NotFound;
+            }
+
             var effective = await statuses.EffectiveOfAsync(task.ProjectId, cancellationToken).ConfigureAwait(false);
 
             if (!EffectiveStatusSet.Contains(effective, statusId))

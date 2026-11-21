@@ -47,6 +47,18 @@ public sealed partial class BoardView
     private bool IsSelected(ColumnState column) => ReferenceEquals(SelectedColumn, column);
 
     /// <summary>
+    /// Drops a selection whose Status is no longer a column, so the pager shows the first column and a Status added back
+    /// later is not selected again without the person choosing it.
+    /// </summary>
+    private void ForgetSelectionThatLeft()
+    {
+        if (_selectedStatusId is { } selected && _columns?.Exists(column => column.StatusId == selected) != true)
+        {
+            _selectedStatusId = null;
+        }
+    }
+
+    /// <summary>
     /// The one roving stop below 768px (AC9): the active card when the shown column holds it, else that column's first card,
     /// else the column itself.
     /// </summary>

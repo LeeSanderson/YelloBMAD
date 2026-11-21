@@ -2530,3 +2530,83 @@
     line-height: var(--type-meta-line-height);
     vertical-align: middle;
 }
+
+/*
+    THE STATUS REMOVAL DIALOG of Project settings: the ownership offer dialog's frame - a full layer that scrolls, a card on a
+    hairline border, no shadow - so text spacing and zoom grow it rather than clip it. Its progress region is plain text: no
+    accent border, no bar.
+*/
+.status-remove-dialog-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 2;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    box-sizing: border-box;
+    padding: var(--space-4);
+    overflow-y: auto;
+    background-color: var(--surface-page);
+}
+
+.status-remove-dialog {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+    box-sizing: border-box;
+    inline-size: min(36rem, 100%);
+    padding: var(--space-5);
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-lg);
+    box-shadow: none;
+    overflow-wrap: anywhere;
+}
+
+.status-remove-dialog__heading,
+.status-remove-dialog__scope,
+.status-remove-dialog__progress {
+    margin-block: 0;
+}
+
+.status-remove-dialog .form-field__control {
+    max-inline-size: 100%;
+}
+
+.status-remove-dialog__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+}
+
+.status-remove-dialog__sentinel {
+    position: absolute;
+    overflow: hidden;
+    clip-path: inset(50%);
+}
+
+.status-restore {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-3);
+}
+
+.status-restore__heading {
+    margin-block: 0;
+}
+
+.status-restore__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.status-restore__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2) var(--space-3);
+    padding-block: var(--space-2);
+    overflow-wrap: anywhere;
+}

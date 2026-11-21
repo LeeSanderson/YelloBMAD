@@ -3,7 +3,9 @@ using Yello.Application.Spaces;
 using Yello.Application.Statuses;
 using Yello.Application.Statuses.AddProjectStatus;
 using Yello.Application.Statuses.PlaceProjectStatus;
+using Yello.Application.Statuses.RemoveProjectStatus;
 using Yello.Application.Statuses.RenameProjectStatus;
+using Yello.Application.Statuses.RestoreProjectStatus;
 using Yello.Domain;
 using Yello.Domain.Boards;
 using Yello.Domain.Memberships;
@@ -172,6 +174,171 @@ public sealed class ProjectStatusWriteHandlerTests
         Assert.Null(result.Set);
     }
 
+    /// <summary>
+    /// A removal decides under the lock, in order: a Status outside the set is not found; a destination that is the removed
+    /// Status or outside the set is invalid whatever the occupancy; an occupied Status with no destination needs one, counted
+    /// after the lock. Nothing is written by any of them.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-26")]
+    public async Task A_removal_refuses_in_order_under_the_lock_and_writes_nothing()
+    {
+        var handler = new RemoveProjectStatusHandler(_world.Writer);
+        var first = _world.Defaults[0].Id;
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        _world.Occupants[first] = 2;
+
+        var outside = await handler.HandleAsync(_world.Context, _world.ProjectId, Guid.NewGuid(), destinationStatusId: null, cancellationToken);
+        var itself = await handler.HandleAsync(_world.Context, _world.ProjectId, first, first, cancellationToken);
+        var random = await handler.HandleAsync(_world.Context, _world.ProjectId, first, Guid.NewGuid(), cancellationToken);
+
+        _world.Calls.Clear();
+
+        var unmapped = await handler.HandleAsync(_world.Context, _world.ProjectId, first, destinationStatusId: null, cancellationToken);
+
+        Assert.Equal(
+            [ProjectStatusWriteOutcome.NotFound, ProjectStatusWriteOutcome.DestinationInvalid, ProjectStatusWriteOutcome.DestinationInvalid, ProjectStatusWriteOutcome.DestinationRequired],
+            new[] { outside, itself, random, unmapped }.Select(result => result.Outcome));
+        Assert.Equal(["lock", "defaults", "delta", "count"], _world.Calls);
+        Assert.Empty(_world.Writes);
+        Assert.Empty(_world.Migrations);
+    }
+
+    /// <summary>
+    /// An occupied default removed with a destination migrates first, then deletes the default's own operations, then
+    /// records its <c>Remove</c>; the answer lacks it.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-26")]
+    [Trait("Requirement", "AD-17")]
+    public async Task An_occupied_default_removed_with_a_destination_migrates_then_records_its_removal()
+    {
+        var (first, second) = (_world.Defaults[0].Id, _world.Defaults[1].Id);
+
+        _world.Occupants[first] = 3;
+
+        var result = await new RemoveProjectStatusHandler(_world.Writer).HandleAsync(_world.Context, _world.ProjectId, first, second, TestContext.Current.CancellationToken);
+
+        Assert.Equal(ProjectStatusWriteOutcome.Written, result.Outcome);
+        Assert.Equal(["lock", "defaults", "delta", "migrate", "delete all", "write"], _world.Calls.Take(6));
+        Assert.Equal((first, second), Assert.Single(_world.Migrations));
+        Assert.Equal((first, StatusDeltaKind.Remove), _world.Operations.Select(operation => (operation.StatusId, operation.Kind)).Single());
+        Assert.Equal([second, _world.Defaults[2].Id], result.Set!.Statuses.Select(status => status.Id));
+    }
+
+    /// <summary>
+    /// A Status the Project added is removed by deleting its operations, writing no <c>Remove</c>, and then its definition,
+    /// once nothing refers to it.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-25")]
+    public async Task An_added_Status_is_removed_by_deleting_its_definition_last()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var added = (await new AddProjectStatusHandler(_world.Writer).HandleAsync(_world.Context, _world.ProjectId, "Parked", _world.Defaults[0].Id, cancellationToken)).Set!.Statuses[1].Id;
+
+        _world.Calls.Clear();
+
+        var result = await new RemoveProjectStatusHandler(_world.Writer).HandleAsync(_world.Context, _world.ProjectId, added, destinationStatusId: null, cancellationToken);
+
+        Assert.Equal(ProjectStatusWriteOutcome.Written, result.Outcome);
+        Assert.Equal(["lock", "defaults", "delta", "count", "delete all", "write", "delete definition"], _world.Calls.Take(7));
+        Assert.Empty(_world.Operations);
+        Assert.Equal(_world.Defaults.Select(status => status.Id), result.Set!.Statuses.Select(status => status.Id));
+    }
+
+    /// <summary>
+    /// Removing a Status others are placed after leaves the rest in their order, over a fixed run of places and removals.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AD-16")]
+    public async Task Removing_a_Status_others_are_placed_after_keeps_the_rest_in_their_order()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var add = new AddProjectStatusHandler(_world.Writer);
+        var place = new PlaceProjectStatusHandler(_world.Writer);
+        var remove = new RemoveProjectStatusHandler(_world.Writer);
+
+        _ = await add.HandleAsync(_world.Context, _world.ProjectId, "Parked", afterStatusId: null, cancellationToken);
+        var set = (await add.HandleAsync(_world.Context, _world.ProjectId, "Waiting", afterStatusId: null, cancellationToken)).Set!.Statuses.Select(status => status.Id).ToList();
+
+        // Third after first, Parked after third, Waiting first: Waiting, first, third, Parked, second.
+        _ = await place.HandleAsync(_world.Context, _world.ProjectId, set[2], set[0], cancellationToken);
+        _ = await place.HandleAsync(_world.Context, _world.ProjectId, set[3], set[2], cancellationToken);
+        var expected = (await place.HandleAsync(_world.Context, _world.ProjectId, set[4], afterStatusId: null, cancellationToken)).Set!.Statuses.Select(status => status.Id).ToList();
+
+        foreach (var removed in new[] { set[2], set[4], set[0] })
+        {
+            expected.Remove(removed);
+
+            var result = await remove.HandleAsync(_world.Context, _world.ProjectId, removed, destinationStatusId: null, cancellationToken);
+
+            Assert.Equal(ProjectStatusWriteOutcome.Written, result.Outcome);
+            Assert.Equal(expected, result.Set!.Statuses.Select(status => status.Id));
+            Assert.DoesNotContain(_world.Operations, operation => operation.AfterStatusId == removed);
+            Assert.Equal(_world.Operations.Count, _world.Operations.Select(operation => operation.Sequence).Distinct().Count());
+        }
+    }
+
+    /// <summary>
+    /// The last Status is never removed: with two defaults removed, the third is refused as an empty set, even with a
+    /// destination named.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-25")]
+    public async Task The_last_Status_is_refused_as_an_empty_set()
+    {
+        var handler = new RemoveProjectStatusHandler(_world.Writer);
+        var cancellationToken = TestContext.Current.CancellationToken;
+
+        _ = await handler.HandleAsync(_world.Context, _world.ProjectId, _world.Defaults[1].Id, destinationStatusId: null, cancellationToken);
+        _ = await handler.HandleAsync(_world.Context, _world.ProjectId, _world.Defaults[2].Id, destinationStatusId: null, cancellationToken);
+
+        var writes = _world.Writes.Count;
+
+        Assert.Equal(ProjectStatusWriteOutcome.SetEmpty, (await handler.HandleAsync(_world.Context, _world.ProjectId, _world.Defaults[0].Id, destinationStatusId: null, cancellationToken)).Outcome);
+        Assert.Equal(ProjectStatusWriteOutcome.SetEmpty, (await handler.HandleAsync(_world.Context, _world.ProjectId, _world.Defaults[0].Id, Guid.NewGuid(), cancellationToken)).Outcome);
+        Assert.Equal(writes, _world.Writes.Count);
+    }
+
+    /// <summary>
+    /// A removed default comes back by deleting its <c>Remove</c>, at its Space slot under its Space name; a default not
+    /// removed is not found; a removed default whose name the Project has since given to an added Status is a taken name.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-25")]
+    public async Task A_removed_default_is_restored_unless_its_name_is_taken_and_only_a_removed_default_is()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var remove = new RemoveProjectStatusHandler(_world.Writer);
+        var restore = new RestoreProjectStatusHandler(_world.Writer);
+        var (first, second, third) = (_world.Defaults[0], _world.Defaults[1], _world.Defaults[2]);
+
+        _ = await new RenameProjectStatusHandler(_world.Writer).HandleAsync(_world.Context, _world.ProjectId, second.Id, "Underway", cancellationToken);
+        _ = await remove.HandleAsync(_world.Context, _world.ProjectId, second.Id, destinationStatusId: null, cancellationToken);
+
+        Assert.Equal(ProjectStatusWriteOutcome.NotFound, (await restore.HandleAsync(_world.Context, _world.ProjectId, first.Id, cancellationToken)).Outcome);
+
+        var restored = await restore.HandleAsync(_world.Context, _world.ProjectId, second.Id, cancellationToken);
+
+        Assert.Equal(ProjectStatusWriteOutcome.Written, restored.Outcome);
+        Assert.Equal(new EffectiveStatus(second.Id, second.Name, StatusSource.SpaceDefault, null), restored.Set!.Statuses[1]);
+        Assert.DoesNotContain(_world.Operations, operation => operation.StatusId == second.Id);
+
+        _ = await remove.HandleAsync(_world.Context, _world.ProjectId, third.Id, destinationStatusId: null, cancellationToken);
+        _ = await new AddProjectStatusHandler(_world.Writer).HandleAsync(_world.Context, _world.ProjectId, third.Name, afterStatusId: null, cancellationToken);
+
+        Assert.Equal(ProjectStatusWriteOutcome.NameTaken, (await restore.HandleAsync(_world.Context, _world.ProjectId, third.Id, cancellationToken)).Outcome);
+        Assert.Contains(_world.Operations, operation => operation.StatusId == third.Id && operation.Kind == StatusDeltaKind.Remove);
+    }
+
     // A one-place move over four rows, as the editor's buttons make it; an end row can only go inwards.
     private static (int From, int To) OneStep(int from, bool up)
     {
@@ -217,6 +384,12 @@ public sealed class ProjectStatusWriteHandlerTests
 
         public bool IndexRefuses { get; set; }
 
+        public Dictionary<Guid, int> Occupants { get; } = [];
+
+        public List<(Guid From, Guid To)> Migrations { get; } = [];
+
+        public IReadOnlyList<StatusDeltaOperation> Operations => _operations;
+
         public Guid Next() => Guid.NewGuid();
 
         public Task<bool> LockAsync(Guid projectId, CancellationToken cancellationToken)
@@ -248,6 +421,42 @@ public sealed class ProjectStatusWriteHandlerTests
             return Task.FromResult(true);
         }
 
+        public Task MigrateTasksAsync(Guid projectId, Guid fromStatusId, Guid toStatusId, CancellationToken cancellationToken)
+        {
+            Calls.Add("migrate");
+            Migrations.Add((fromStatusId, toStatusId));
+
+            foreach (var key in Occupants.Keys.Where(key => key == fromStatusId).ToList())
+            {
+                Occupants[toStatusId] = Occupants.GetValueOrDefault(toStatusId) + Occupants[key];
+                Occupants.Remove(key);
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteOperationsAsync(Guid projectId, Guid statusId, StatusDeltaKind? kind, CancellationToken cancellationToken)
+        {
+            Calls.Add(kind is { } only ? $"delete {only}" : "delete all");
+            _operations.RemoveAll(operation => operation.StatusId == statusId && (kind is null || operation.Kind == kind));
+
+            return Task.CompletedTask;
+        }
+
+        public Task DeleteOwnedDefinitionAsync(Guid projectId, Guid statusId, CancellationToken cancellationToken)
+        {
+            Calls.Add("delete definition");
+
+            if (_operations.Exists(operation => operation.StatusId == statusId || operation.AfterStatusId == statusId) || Occupants.ContainsKey(statusId))
+            {
+                throw new InvalidOperationException("The definition is still referenced: a NO ACTION key would refuse its delete.");
+            }
+
+            _owned.RemoveAll(definition => definition.Id == statusId);
+
+            return Task.CompletedTask;
+        }
+
         public Task<IReadOnlyList<StatusDefinition>> ListAsync(CancellationToken cancellationToken)
         {
             Calls.Add("defaults");
@@ -268,8 +477,12 @@ public sealed class ProjectStatusWriteHandlerTests
         public Task<IReadOnlyDictionary<Guid, int>> CountTasksByStatusAsync(Guid projectId, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyDictionary<Guid, int>>(new Dictionary<Guid, int>());
 
-        public Task<int> CountTasksAsync(Guid projectId, Guid statusId, CancellationToken cancellationToken) =>
-            Task.FromResult(0);
+        public Task<int> CountTasksAsync(Guid projectId, Guid statusId, CancellationToken cancellationToken)
+        {
+            Calls.Add("count");
+
+            return Task.FromResult(Occupants.GetValueOrDefault(statusId));
+        }
 
         public Task<IReadOnlyList<TaskItem>> PageAsync(Guid projectId, Guid statusId, string? after, int take, CancellationToken cancellationToken) =>
             Task.FromResult<IReadOnlyList<TaskItem>>([]);

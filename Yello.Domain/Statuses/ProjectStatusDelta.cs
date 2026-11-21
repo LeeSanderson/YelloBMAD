@@ -36,4 +36,32 @@ public sealed record ProjectStatusDelta(IReadOnlyList<StatusDefinition> OwnedDef
 
         return new ProjectStatusDelta(added is null ? OwnedDefinitions : [.. OwnedDefinitions, added], kept);
     }
+
+    /// <summary>
+    /// This delta with every operation of <paramref name="statusId"/> deleted, and its definition too when the Project owns
+    /// it: what a removal deletes before it records anything.
+    /// </summary>
+    /// <param name="statusId">The Status being removed.</param>
+    /// <returns>The delta without it.</returns>
+    public ProjectStatusDelta Without(Guid statusId) => new(
+        [.. OwnedDefinitions.Where(definition => definition.Id != statusId)],
+        [.. Operations.Where(operation => operation.StatusId != statusId)]);
+
+    /// <summary>
+    /// This delta with the <see cref="StatusDeltaKind.Remove"/> of <paramref name="statusId"/> deleted: a removed Space
+    /// default added back.
+    /// </summary>
+    /// <param name="statusId">The removed default.</param>
+    /// <returns>The delta with the default restored.</returns>
+    public ProjectStatusDelta WithoutRemovalOf(Guid statusId) => this with
+    {
+        Operations = [.. Operations.Where(operation => operation.StatusId != statusId || operation.Kind != StatusDeltaKind.Remove)],
+    };
+
+    /// <summary>
+    /// Whether this Project's delta removes the Space default <paramref name="statusId"/>.
+    /// </summary>
+    /// <param name="statusId">The Status.</param>
+    /// <returns><c>true</c> when a <see cref="StatusDeltaKind.Remove"/> names it.</returns>
+    public bool Removes(Guid statusId) => Operations.Any(operation => operation.StatusId == statusId && operation.Kind == StatusDeltaKind.Remove);
 }

@@ -1,7 +1,8 @@
 namespace Yello.Contracts.Projects;
 
 /// <summary>
-/// The paths of one Project's Statuses: the read of its effective set, and the add, rename and place writes, stated once
+/// The paths of one Project's Statuses: the read of its effective set, and the add, rename, place, remove and add-back
+/// writes, stated once
 /// for the client that calls them and the Host that serves them.
 /// </summary>
 /// <remarks>
@@ -39,6 +40,17 @@ public static class ProjectStatusRoutes
     public static string Place => "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/statuses/{statusId:guid}/place";
 
     /// <summary>
+    /// <c>POST</c> a <see cref="RemoveProjectStatusRequest"/> here to take the Status out of the Project's set, moving its
+    /// Tasks to the destination in the same transaction. The only way a Status leaves a Project.
+    /// </summary>
+    public static string Remove => "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/statuses/{statusId:guid}/remove";
+
+    /// <summary>
+    /// <c>POST</c> here, with no body, to add back a Space default this Project removed, under its own id.
+    /// </summary>
+    public static string Restore => "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/statuses/{statusId:guid}/restore";
+
+    /// <summary>
     /// The collection's path, as a client calls it and as an add's <c>Location</c> states it.
     /// </summary>
     /// <param name="spaceId">The Space.</param>
@@ -63,4 +75,22 @@ public static class ProjectStatusRoutes
     /// <param name="statusId">The Status being placed.</param>
     /// <returns>The path.</returns>
     public static string PlaceOf(Guid spaceId, Guid projectId, Guid statusId) => $"{ItemOf(spaceId, projectId, statusId)}/place";
+
+    /// <summary>
+    /// The remove action's path.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="projectId">The Project.</param>
+    /// <param name="statusId">The Status being removed.</param>
+    /// <returns>The path.</returns>
+    public static string RemoveOf(Guid spaceId, Guid projectId, Guid statusId) => $"{ItemOf(spaceId, projectId, statusId)}/remove";
+
+    /// <summary>
+    /// The add-back action's path.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="projectId">The Project.</param>
+    /// <param name="statusId">The removed Space default.</param>
+    /// <returns>The path.</returns>
+    public static string RestoreOf(Guid spaceId, Guid projectId, Guid statusId) => $"{ItemOf(spaceId, projectId, statusId)}/restore";
 }

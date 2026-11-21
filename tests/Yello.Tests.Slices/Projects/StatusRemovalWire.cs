@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Net;
 using Microsoft.Data.SqlClient;
 using Xunit;
+using Yello.Contracts.Projects;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
 using Yello.Tests.Slices.Tasks;
@@ -15,8 +16,8 @@ namespace Yello.Tests.Slices.Projects;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Routes and problem types are <see cref="ProjectStatusWire"/>'s stand-ins</b> (<c>POST …/statuses/{id}/remove</c> with
-/// <c>{ destinationStatusId }</c>, <c>POST …/statuses/{id}/restore</c> with no body) until the contract states them.
+/// <b>Routes and problem types are the contract's</b> (<c>POST …/statuses/{id}/remove</c> with <c>{ destinationStatusId }</c>,
+/// <c>POST …/statuses/{id}/restore</c> with no body).
 /// </para>
 /// <para>
 /// <b>The played removal is a <c>Remove</c> row</b> in <c>dbo.StatusDeltaOperation</c>, written after the Project's lock
@@ -36,19 +37,19 @@ internal static class StatusRemovalWire
     public const string RemoveKind = "Remove";
 
     public static Task<WireResponse> RemoveAsync(Actor actor, Guid spaceId, Guid projectId, Guid statusId, Guid? destinationStatusId, string? key = null) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectStatusWire.RemoveOf(spaceId, projectId, statusId), ProjectStatusWire.RemoveBody(destinationStatusId), TaskWire.KeyHeader(key));
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectStatusRoutes.RemoveOf(spaceId, projectId, statusId), ProjectStatusWire.RemoveBody(destinationStatusId), TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> RemoveWithTokenAsync(Actor actor, string token, Guid spaceId, Guid projectId, Guid statusId, Guid? destinationStatusId) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, ProjectStatusWire.RemoveOf(spaceId, projectId, statusId), token, ProjectStatusWire.RemoveBody(destinationStatusId), TaskWire.NoHeaders);
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, ProjectStatusRoutes.RemoveOf(spaceId, projectId, statusId), token, ProjectStatusWire.RemoveBody(destinationStatusId), TaskWire.NoHeaders);
 
     public static Task<WireResponse> RemoveRawAsync(Actor actor, Guid spaceId, Guid projectId, Guid statusId, string json) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectStatusWire.RemoveOf(spaceId, projectId, statusId), TaskEditWire.RawBody(json), TaskWire.NoHeaders);
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectStatusRoutes.RemoveOf(spaceId, projectId, statusId), TaskEditWire.RawBody(json), TaskWire.NoHeaders);
 
     public static Task<WireResponse> RestoreAsync(Actor actor, Guid spaceId, Guid projectId, Guid statusId, string? key = null) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectStatusWire.RestoreOf(spaceId, projectId, statusId), content: null, TaskWire.KeyHeader(key));
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectStatusRoutes.RestoreOf(spaceId, projectId, statusId), content: null, TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> RestoreWithTokenAsync(Actor actor, string token, Guid spaceId, Guid projectId, Guid statusId) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, ProjectStatusWire.RestoreOf(spaceId, projectId, statusId), token, content: null, TaskWire.NoHeaders);
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, ProjectStatusRoutes.RestoreOf(spaceId, projectId, statusId), token, content: null, TaskWire.NoHeaders);
 
     /// <summary>
     /// Removes a Status through the product, failing the case unless the removal answers <c>200</c>, and answers the set.

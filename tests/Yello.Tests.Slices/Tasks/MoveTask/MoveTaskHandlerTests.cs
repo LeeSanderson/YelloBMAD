@@ -56,6 +56,26 @@ public sealed class MoveTaskHandlerTests
     }
 
     /// <summary>
+    /// A move takes the Task's Project's lock before it reads the set it checks the destination against, so a removal of
+    /// that Status that holds the lock is seen.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "AD-17")]
+    public async Task A_move_locks_the_Project_before_it_reads_the_set()
+    {
+        var spaceId = Guid.NewGuid();
+        var task = NewTask(spaceId);
+        var doing = Status(spaceId, 1);
+        var store = new RecordingStore(task, TaskMove.Moved(task));
+
+        await new MoveTaskHandler(store, new FixedStatuses(Status(spaceId, 0), doing) { Calls = store.Calls })
+            .HandleAsync(task.Id, doing.Id, afterTaskId: null, TestContext.Current.CancellationToken);
+
+        Assert.Equal([$"lock {task.ProjectId:D}", "read the set"], store.Calls);
+    }
+
+    /// <summary>
     /// AC9 - each outcome the store reaches is the slice's answer, for the Task, Status and neighbour the request named.
     /// </summary>
     /// <param name="outcome">What the store decided.</param>
@@ -115,8 +135,14 @@ public sealed class MoveTaskHandlerTests
 
     private sealed class FixedStatuses(params StatusDefinition[] statuses) : IStatusDefinitionReader
     {
-        public Task<IReadOnlyList<StatusDefinition>> ListAsync(CancellationToken cancellationToken) =>
-            Task.FromResult<IReadOnlyList<StatusDefinition>>(statuses);
+        public List<string>? Calls { get; init; }
+
+        public Task<IReadOnlyList<StatusDefinition>> ListAsync(CancellationToken cancellationToken)
+        {
+            Calls?.Add("read the set");
+
+            return Task.FromResult<IReadOnlyList<StatusDefinition>>(statuses);
+        }
 
         public Task<ProjectStatusDelta> DeltaOfAsync(Guid projectId, CancellationToken cancellationToken) =>
             Task.FromResult(ProjectStatusDelta.Empty);
@@ -126,11 +152,20 @@ public sealed class MoveTaskHandlerTests
     {
         public List<(Guid TaskId, Guid StatusId, Guid? AfterTaskId)> Moves { get; } = [];
 
+        public List<string> Calls { get; } = [];
+
         public Task<TaskItem?> CreateAsync(Guid spaceId, Guid projectId, Guid statusId, string title, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The move slice creates no Task.");
 
         public Task<TaskItem?> FindAsync(Guid taskId, CancellationToken cancellationToken) =>
             Task.FromResult(visible?.Id == taskId ? visible : null);
+
+        public Task LockProjectAsync(Guid projectId, CancellationToken cancellationToken)
+        {
+            Calls.Add($"lock {projectId:D}");
+
+            return Task.CompletedTask;
+        }
 
         public Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The move slice edits nothing else.");

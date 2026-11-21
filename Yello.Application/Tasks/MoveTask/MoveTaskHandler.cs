@@ -16,7 +16,8 @@ namespace Yello.Application.Tasks.MoveTask;
 /// </para>
 /// <para>
 /// <b>The Status is checked before anything is written</b> against the effective set of the Task's own Project (AD-17),
-/// exactly as the edit checks it, so another Space's Status id is the same validation refusal as a random one.
+/// exactly as the edit checks it, so another Space's Status id is the same validation refusal as a random one. It is
+/// checked under the Project's lock, for the reason the edit gives: a Status can leave the set while this waits.
 /// </para>
 /// <para>
 /// <b>Where the Task lands is the store's to decide under its lock</b>: the request names a neighbour, never a key
@@ -40,6 +41,18 @@ public sealed class MoveTaskHandler(ITaskStore store, IStatusDefinitionReader st
         var task = await store.FindAsync(taskId, cancellationToken).ConfigureAwait(false);
 
         if (task is null)
+        {
+            return MoveTaskResult.NotFound;
+        }
+
+        var locked = task.ProjectId;
+
+        await store.LockProjectAsync(locked, cancellationToken).ConfigureAwait(false);
+
+        // Read again under the lock: the set checked must be the set of the Project whose lock is held.
+        task = await store.FindAsync(taskId, cancellationToken).ConfigureAwait(false);
+
+        if (task is null || task.ProjectId != locked)
         {
             return MoveTaskResult.NotFound;
         }

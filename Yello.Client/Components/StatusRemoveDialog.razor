@@ -1,0 +1,148 @@
+@using System.Globalization
+@using Yello.Contracts.Projects
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    THE REMOVAL DIALOG of the Status delta editor, for a Status that Tasks hold: the scope, a destination picker over the
+    Statuses the removal leaves, and the commit.
+
+    THE PICKER HAS NO DEFAULT. Its first option is a placeholder that is not a Status and stays selected until the person
+    chooses; a commit with it selected says why in the field's own message and sends nothing. The commit stays enabled, as
+    every form here does.
+
+    NOT A DESTRUCTIVE CONFIRM: nothing is lost - the Tasks move and a default can be added back - so the commit is the primary
+    button, not the danger one.
+
+    IN FLIGHT, the commit is replaced by a status region that names the scope, with no percentage and no bar, and focus moves
+    to it before the commit leaves the page. Cancel and Escape are ignored then: the removal is already out.
+
+    A MODAL DIALOG labelled by its heading; focus goes to the heading on open and is trapped by a sentinel at each end.
+*@
+
+<div class="status-remove-dialog-layer">
+    <div class="status-remove-dialog" role="dialog" aria-modal="true" aria-labelledby="@HeadingId" aria-describedby="@ScopeId" tabindex="-1" @onkeydown="KeyDownAsync">
+        <div class="status-remove-dialog__sentinel" tabindex="0" @onfocus="FocusHeadingAsync"></div>
+
+        <h2 class="type-dialog-title status-remove-dialog__heading" id="@HeadingId" tabindex="-1" @ref="_heading">@Format("StatusRemoveTitle", StatusName)</h2>
+
+        <p class="status-remove-dialog__scope" id="@ScopeId">@Format("StatusRemoveScope", StatusName, TaskCount)</p>
+
+        @if (InFlightTo is { } destination)
+        {
+            <p class="status-remove-dialog__progress" role="status" tabindex="-1" @ref="_progress">@Format("StatusRemoveInFlight", TaskCount, destination)</p>
+        }
+
+        @if (InFlightTo is null)
+        {
+            <div class="form-field">
+                <label class="form-field__label" for="@PickerId">@Localizer["StatusRemoveDestinationLabel"]</label>
+                <select id="@PickerId"
+                        class="form-field__control"
+                        aria-invalid="@(_missing ? "true" : null)"
+                        aria-describedby="@(_missing ? MessageId : null)"
+                        @onchange="Choose">
+                    <option value="" selected="@(_chosen is null)">@Localizer["StatusRemoveDestinationPlaceholder"]</option>
+                    @foreach (var status in Destinations)
+                    {
+                        <option value="@status.Id.ToString("D")" selected="@(_chosen == status.Id)">@status.Name</option>
+                    }
+                </select>
+
+                @if (_missing)
+                {
+                    <p class="form-field__message" id="@MessageId">@Localizer["StatusRemoveDestinationMissing"]</p>
+                }
+            </div>
+
+            <div class="status-remove-dialog__actions">
+                <button type="button" class="button-primary" @onclick="CommitAsync">@Format("StatusRemoveCommit", TaskCount)</button>
+                <button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["StatusRemoveCancel"]</button>
+            </div>
+        }
+
+        <div class="status-remove-dialog__sentinel" tabindex="0" @onfocus="FocusHeadingAsync"></div>
+    </div>
+</div>
+
+@code {
+    private const string HeadingId = "status-remove-dialog-heading";
+    private const string ScopeId = "status-remove-dialog-scope";
+    private const string PickerId = "status-remove-dialog-picker";
+    private const string MessageId = "status-remove-dialog-message";
+
+    private ElementReference _heading;
+    private ElementReference _progress;
+    private Guid? _chosen;
+    private bool _missing;
+    private bool _opened;
+    private bool _progressFocused;
+
+    /// <summary>The Status being removed, by name.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string StatusName { get; set; } = string.Empty;
+
+    /// <summary>How many Tasks hold it, as the server last counted them.</summary>
+    [Parameter]
+    public int TaskCount { get; set; }
+
+    /// <summary>The Statuses the removal leaves, in effective order: the only destinations offered.</summary>
+    [Parameter]
+    [EditorRequired]
+    public IReadOnlyList<ProjectStatusResponse> Destinations { get; set; } = [];
+
+    /// <summary>The destination's name while the removal is out, or <c>null</c> before it is committed.</summary>
+    [Parameter]
+    public string? InFlightTo { get; set; }
+
+    /// <summary>Raised by the commit, with the destination chosen.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnCommit { get; set; }
+
+    /// <summary>Raised by Cancel or Escape.</summary>
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_opened)
+        {
+            _opened = true;
+            await _heading.FocusAsync();
+        }
+
+        if (InFlightTo is not null && !_progressFocused)
+        {
+            _progressFocused = true;
+            await _progress.FocusAsync();
+        }
+    }
+
+    private string Format(string key, params object[] values) =>
+        string.Format(CultureInfo.CurrentCulture, Localizer[key], values);
+
+    private void Choose(ChangeEventArgs change)
+    {
+        _chosen = Guid.TryParse(change.Value?.ToString(), out var id) ? id : null;
+        _missing = false;
+    }
+
+    private Task CommitAsync()
+    {
+        if (_chosen is not { } destination)
+        {
+            _missing = true;
+            return Task.CompletedTask;
+        }
+
+        return OnCommit.InvokeAsync(destination);
+    }
+
+    private Task CancelAsync() => InFlightTo is null ? OnCancel.InvokeAsync() : Task.CompletedTask;
+
+    private Task KeyDownAsync(KeyboardEventArgs key) => key.Key == "Escape" ? CancelAsync() : Task.CompletedTask;
+
+    private async Task FocusHeadingAsync() => await _heading.FocusAsync();
+}

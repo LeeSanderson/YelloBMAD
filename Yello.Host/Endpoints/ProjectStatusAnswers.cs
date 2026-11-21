@@ -41,6 +41,16 @@ internal static class ProjectStatusAnswers
             type: ProblemTypes.InvalidStatusPosition,
             title: "A Status is placed after another Status of the same Project."),
 
+        ProjectStatusWriteOutcome.DestinationRequired => Results.Problem(
+            statusCode: StatusCodes.Status409Conflict,
+            type: ProblemTypes.StatusDestinationRequired,
+            title: "Tasks hold this Status, so its removal needs a destination for them."),
+
+        ProjectStatusWriteOutcome.DestinationInvalid => Results.Problem(
+            statusCode: StatusCodes.Status400BadRequest,
+            type: ProblemTypes.InvalidStatusDestination,
+            title: "A removed Status's Tasks go to another Status the Project keeps."),
+
         // Not recorded: an in-Space not-found crossed no boundary. The body is the boundary's.
         _ => BoundaryProblems.NotAvailable(),
     };

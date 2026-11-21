@@ -142,6 +142,9 @@ public sealed class AssignTaskHandlerTests
         public Task<TaskItem?> FindAsync(Guid taskId, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The assignment slice reads the Task from the statement.");
 
+        public Task LockProjectAsync(Guid projectId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The assignment slice takes no Project lock.");
+
         public Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The assignment slice edits nothing.");
 

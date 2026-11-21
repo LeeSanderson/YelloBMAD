@@ -1,0 +1,25 @@
+@using Yello.Contracts.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@* ONE REMOVED SPACE DEFAULT in the add-back list: its Space name, and "Add back" described by it. *@
+
+<li class="status-restore__item">
+    <span id="@NameId">@Status.Name</span>
+    <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="RestoreAsync">@Localizer["StatusAddBack"]</button>
+</li>
+
+@code {
+    /// <summary>The removed default.</summary>
+    [Parameter]
+    [EditorRequired]
+    public StatusResponse Status { get; set; } = new(Guid.Empty, string.Empty, 0);
+
+    /// <summary>Raised by the add-back control, with the default's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnRestore { get; set; }
+
+    private string NameId => $"status-restore-{Status.Id:N}";
+
+    private Task RestoreAsync() => OnRestore.InvokeAsync(Status.Id);
+}

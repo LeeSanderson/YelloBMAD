@@ -106,6 +106,16 @@ public static class RefusalCopy
     public static string InvalidStatusPositionKey => "StatusPositionInvalid";
 
     /// <summary>
+    /// The copy key for <c>409 status-destination-required</c>: Tasks hold the Status, so its removal needs a destination.
+    /// </summary>
+    public static string StatusDestinationRequiredKey => "StatusDestinationRequired";
+
+    /// <summary>
+    /// The copy key for <c>400 invalid-status-destination</c>: the destination is not a Status the Project keeps.
+    /// </summary>
+    public static string InvalidStatusDestinationKey => "StatusDestinationInvalid";
+
+    /// <summary>
     /// The copy key for <c>409 label-in-use</c> (story 2.4, AC3): the Label is on Tasks and was not deleted.
     /// </summary>
     public static string LabelInUseKey => "LabelInUse";
@@ -297,6 +307,8 @@ public static class RefusalCopy
         [ProblemTypes.StatusNameTaken] = StatusNameTakenKey,
         [ProblemTypes.StatusSetEmpty] = StatusSetEmptyKey,
         [ProblemTypes.InvalidStatusPosition] = InvalidStatusPositionKey,
+        [ProblemTypes.StatusDestinationRequired] = StatusDestinationRequiredKey,
+        [ProblemTypes.InvalidStatusDestination] = InvalidStatusDestinationKey,
         [ProblemTypes.InvalidTaskLabels] = InvalidTaskLabelsKey,
         [ProblemTypes.InvalidAssignee] = InvalidAssigneeKey,
         [ProblemTypes.TaskPositionUnavailable] = TaskPositionUnavailableKey,

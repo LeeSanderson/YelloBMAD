@@ -47,7 +47,9 @@ using Yello.Application.Statuses.AddProjectStatus;
 using Yello.Application.Statuses.ListProjectStatuses;
 using Yello.Application.Statuses.ListStatuses;
 using Yello.Application.Statuses.PlaceProjectStatus;
+using Yello.Application.Statuses.RemoveProjectStatus;
 using Yello.Application.Statuses.RenameProjectStatus;
+using Yello.Application.Statuses.RestoreProjectStatus;
 using Yello.Application.Tasks.AssignTask;
 using Yello.Application.Tasks.CreateTask;
 using Yello.Application.Tasks.DeleteTask;
@@ -158,6 +160,8 @@ builder.Services.AddScoped<ListProjectStatusesHandler>();
 builder.Services.AddScoped<AddProjectStatusHandler>();
 builder.Services.AddScoped<RenameProjectStatusHandler>();
 builder.Services.AddScoped<PlaceProjectStatusHandler>();
+builder.Services.AddScoped<RemoveProjectStatusHandler>();
+builder.Services.AddScoped<RestoreProjectStatusHandler>();
 builder.Services.AddScoped<CreateSpaceHandler>();
 builder.Services.AddScoped<RenameSpaceHandler>();
 builder.Services.AddScoped<DeleteSpaceHandler>();
@@ -563,6 +567,8 @@ api.MapListProjectStatuses();
 api.MapAddProjectStatus();
 api.MapRenameProjectStatus();
 api.MapPlaceProjectStatus();
+api.MapRemoveProjectStatus();
+api.MapRestoreProjectStatus();
 
 // Invitations (story 4.1). POST /api/v1/spaces/{spaceId}/invitations issues one to an email address at a Role, under
 // IssueAndRevokeInvitations (Owner and Admin), on both surfaces; 204 with no body whether or not the address has an

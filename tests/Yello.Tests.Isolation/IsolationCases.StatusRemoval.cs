@@ -1,6 +1,7 @@
 using System.Net;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Projects;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Isolation;
@@ -15,25 +16,16 @@ namespace Yello.Tests.Isolation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Pending until the routes are mapped</b>; the develop phase makes these rows live before review (GATE-003) and swaps
-/// <see cref="ProjectStatusWire"/>'s stand-ins (<see cref="ProjectStatusWire.Remove"/>, <see cref="ProjectStatusWire.Restore"/>,
-/// <see cref="ProjectStatusWire.InvalidStatusDestination"/>) for the contract members.
-/// </para>
-/// <para>
 /// <b>Statuses are removed only in fresh actors' Spaces, never in A's or B's</b>, for the reason the Project Status rows give:
 /// A's and B's Spaces must keep exactly their three defaults for every other row.
 /// </para>
 /// </remarks>
 internal static partial class IsolationCases
 {
-    private const string StatusRemovalPending = "The remove and restore routes are not mapped until the dev phase of the story that removes a Status from a Project.";
-
-    private const string StatusRemovalStory = "6.2";
-
     private static IEnumerable<IsolationCase> StatusRemovalCases() =>
     [
         new IsolationCase(
-            "ISO-REMOVE-PROJECT-STATUS-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, ProjectStatusWire.Remove,
+            "ISO-REMOVE-PROJECT-STATUS-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, ProjectStatusRoutes.Remove,
             async world =>
             {
                 var (foreignOwner, foreign) = await ForeignProjectAsync(world);
@@ -42,16 +34,14 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Post,
-                    [new(ProjectStatusWire.RemoveOf(foreignOwner.SpaceId, foreign, theirStatus), ProjectStatusWire.RemoveOf(Guid.NewGuid(), foreign, theirStatus))],
+                    [new(ProjectStatusRoutes.RemoveOf(foreignOwner.SpaceId, foreign, theirStatus), ProjectStatusRoutes.RemoveOf(Guid.NewGuid(), foreign, theirStatus))],
                     foreignOwner.SpaceId,
                     Body: () => ProjectStatusWire.RemoveBody(destinationStatusId: null));
             },
-            Both(new BoundaryNotFound { Then = NoDeltaOperationInTheTargetSpaceAsync }),
-            PendingUntil: StatusRemovalStory,
-            PendingReason: StatusRemovalPending),
+            Both(new BoundaryNotFound { Then = NoDeltaOperationInTheTargetSpaceAsync })),
 
         new IsolationCase(
-            "ISO-RESTORE-PROJECT-STATUS-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, ProjectStatusWire.Restore,
+            "ISO-RESTORE-PROJECT-STATUS-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, ProjectStatusRoutes.Restore,
             async world =>
             {
                 var (foreignOwner, foreign) = await ForeignProjectAsync(world);
@@ -60,15 +50,13 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Post,
-                    [new(ProjectStatusWire.RestoreOf(foreignOwner.SpaceId, foreign, theirStatus), ProjectStatusWire.RestoreOf(Guid.NewGuid(), foreign, theirStatus))],
+                    [new(ProjectStatusRoutes.RestoreOf(foreignOwner.SpaceId, foreign, theirStatus), ProjectStatusRoutes.RestoreOf(Guid.NewGuid(), foreign, theirStatus))],
                     foreignOwner.SpaceId);
             },
-            Both(new BoundaryNotFound { Then = NoDeltaOperationInTheTargetSpaceAsync }),
-            PendingUntil: StatusRemovalStory,
-            PendingReason: StatusRemovalPending),
+            Both(new BoundaryNotFound { Then = NoDeltaOperationInTheTargetSpaceAsync })),
 
         new IsolationCase(
-            "ISO-REMOVE-PROJECT-STATUS-FOREIGN-PROJECT-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Post, ProjectStatusWire.Remove,
+            "ISO-REMOVE-PROJECT-STATUS-FOREIGN-PROJECT-IN-OWN-SPACE", "I-4, I-5", IsolationVector.DeepLink, HttpMethod.Post, ProjectStatusRoutes.Remove,
             async world =>
             {
                 var (_, foreign) = await ForeignProjectAsync(world);
@@ -77,39 +65,31 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Post,
-                    [new(ProjectStatusWire.RemoveOf(world.A.SpaceId, foreign, ownStatus), ProjectStatusWire.RemoveOf(world.A.SpaceId, Guid.NewGuid(), ownStatus))],
+                    [new(ProjectStatusRoutes.RemoveOf(world.A.SpaceId, foreign, ownStatus), ProjectStatusRoutes.RemoveOf(world.A.SpaceId, Guid.NewGuid(), ownStatus))],
                     TargetSpaceId: null,
                     Body: () => ProjectStatusWire.RemoveBody(destinationStatusId: null));
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable)),
-            PendingUntil: StatusRemovalStory,
-            PendingReason: StatusRemovalPending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable))),
 
         new IsolationCase(
-            "ISO-REMOVE-FOREIGN-STATUS-IN-OWN-PROJECT", "I-4, I-5, FR-20", IsolationVector.DeepLink, HttpMethod.Post, ProjectStatusWire.Remove,
-            world => ForeignStatusesInOwnProjectAsync(world, "Rm", HttpMethod.Post, ProjectStatusWire.RemoveOf, () => ProjectStatusWire.RemoveBody(destinationStatusId: null)),
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable)),
-            PendingUntil: StatusRemovalStory,
-            PendingReason: StatusRemovalPending),
+            "ISO-REMOVE-FOREIGN-STATUS-IN-OWN-PROJECT", "I-4, I-5, FR-20", IsolationVector.DeepLink, HttpMethod.Post, ProjectStatusRoutes.Remove,
+            world => ForeignStatusesInOwnProjectAsync(world, "Rm", HttpMethod.Post, ProjectStatusRoutes.RemoveOf, () => ProjectStatusWire.RemoveBody(destinationStatusId: null)),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable))),
 
         new IsolationCase(
-            "ISO-RESTORE-FOREIGN-STATUS-IN-OWN-PROJECT", "I-4, I-5, FR-20", IsolationVector.DeepLink, HttpMethod.Post, ProjectStatusWire.Restore,
-            world => ForeignStatusesInOwnProjectAsync(world, "Rs", HttpMethod.Post, ProjectStatusWire.RestoreOf, body: null),
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable)),
-            PendingUntil: StatusRemovalStory,
-            PendingReason: StatusRemovalPending),
+            "ISO-RESTORE-FOREIGN-STATUS-IN-OWN-PROJECT", "I-4, I-5, FR-20", IsolationVector.DeepLink, HttpMethod.Post, ProjectStatusRoutes.Restore,
+            world => ForeignStatusesInOwnProjectAsync(world, "Rs", HttpMethod.Post, ProjectStatusRoutes.RestoreOf, body: null),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable))),
 
         // A destination is body-borne, so a foreign one is the removal's own 400, identical to a random destination's, never
         // the boundary 404 a path id gets.
         new IsolationCase(
-            "ISO-REMOVE-FOREIGN-DESTINATION-IN-OWN-PROJECT", "I-1, I-13, FR-26", IsolationVector.DirectIdentifier, HttpMethod.Post, ProjectStatusWire.Remove,
+            "ISO-REMOVE-FOREIGN-DESTINATION-IN-OWN-PROJECT", "I-1, I-13, FR-26", IsolationVector.DirectIdentifier, HttpMethod.Post, ProjectStatusRoutes.Remove,
             async world => await ForeignDestinationAsync(await world.NewActorAsync("Rd"), (await StatusIdsAsync(world.B))[1]),
-            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProjectStatusWire.InvalidStatusDestination)),
-            PendingUntil: StatusRemovalStory,
-            PendingReason: StatusRemovalPending),
+            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidStatusDestination))),
 
         new IsolationCase(
-            "ISO-REMOVE-SIBLING-DESTINATION-IN-OWN-PROJECT", "I-13, FR-20, FR-26", IsolationVector.DirectIdentifier, HttpMethod.Post, ProjectStatusWire.Remove,
+            "ISO-REMOVE-SIBLING-DESTINATION-IN-OWN-PROJECT", "I-13, FR-20, FR-26", IsolationVector.DirectIdentifier, HttpMethod.Post, ProjectStatusRoutes.Remove,
             async world =>
             {
                 var actor = await world.NewActorAsync("Rn");
@@ -117,26 +97,20 @@ internal static partial class IsolationCases
 
                 return await ForeignDestinationAsync(actor, await AddProjectStatusThroughTheProductAsync(actor, sibling, "Sibling destination"));
             },
-            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProjectStatusWire.InvalidStatusDestination)),
-            PendingUntil: StatusRemovalStory,
-            PendingReason: StatusRemovalPending),
+            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidStatusDestination))),
 
         new IsolationCase(
-            "ISO-RECORD-KIND-PROJECT-STATUS-REMOVE-VIEWER", "V-1, C-6, FR-16", IsolationVector.RecordKind, HttpMethod.Post, ProjectStatusWire.Remove,
+            "ISO-RECORD-KIND-PROJECT-STATUS-REMOVE-VIEWER", "V-1, C-6, FR-16", IsolationVector.RecordKind, HttpMethod.Post, ProjectStatusRoutes.Remove,
             world => ViewerOnAProjectStatusAsync(world, "Vr", restore: false),
-            Both(new RoleRefused(ConfigureCapabilityCode)),
-            PendingUntil: StatusRemovalStory,
-            PendingReason: StatusRemovalPending),
+            Both(new RoleRefused(ConfigureCapabilityCode))),
 
         new IsolationCase(
-            "ISO-RECORD-KIND-PROJECT-STATUS-RESTORE-VIEWER", "V-1, C-6, FR-16", IsolationVector.RecordKind, HttpMethod.Post, ProjectStatusWire.Restore,
+            "ISO-RECORD-KIND-PROJECT-STATUS-RESTORE-VIEWER", "V-1, C-6, FR-16", IsolationVector.RecordKind, HttpMethod.Post, ProjectStatusRoutes.Restore,
             world => ViewerOnAProjectStatusAsync(world, "Vb", restore: true),
-            Both(new RoleRefused(ConfigureCapabilityCode)),
-            PendingUntil: StatusRemovalStory,
-            PendingReason: StatusRemovalPending),
+            Both(new RoleRefused(ConfigureCapabilityCode))),
 
-        TokenOnARemovalElsewhere("PROJECT-STATUS-REMOVE", ProjectStatusWire.Remove, restore: false),
-        TokenOnARemovalElsewhere("PROJECT-STATUS-RESTORE", ProjectStatusWire.Restore, restore: true),
+        TokenOnARemovalElsewhere("PROJECT-STATUS-REMOVE", ProjectStatusRoutes.Remove, restore: false),
+        TokenOnARemovalElsewhere("PROJECT-STATUS-RESTORE", ProjectStatusRoutes.Restore, restore: true),
     ];
 
     /// <summary>
@@ -146,7 +120,7 @@ internal static partial class IsolationCases
     private static async Task<CaseRequest> ForeignDestinationAsync(ProductActor actor, Guid destination)
     {
         var own = await SeedProjectAsync(actor);
-        var path = ProjectStatusWire.RemoveOf(actor.SpaceId, own, (await StatusIdsAsync(actor))[2]);
+        var path = ProjectStatusRoutes.RemoveOf(actor.SpaceId, own, (await StatusIdsAsync(actor))[2]);
 
         return new CaseRequest(
             actor,
@@ -175,8 +149,8 @@ internal static partial class IsolationCases
         await world.Database.ChangeRoleAsync(viewer.SpaceId, viewer.AccountId, "viewer");
 
         var path = restore
-            ? ProjectStatusWire.RestoreOf(viewer.SpaceId, projectId, statuses[2])
-            : ProjectStatusWire.RemoveOf(viewer.SpaceId, projectId, statuses[1]);
+            ? ProjectStatusRoutes.RestoreOf(viewer.SpaceId, projectId, statuses[2])
+            : ProjectStatusRoutes.RemoveOf(viewer.SpaceId, projectId, statuses[1]);
 
         return new CaseRequest(viewer, HttpMethod.Post, [new(path, path)], viewer.SpaceId, Body: restore ? null : () => ProjectStatusWire.RemoveBody(destinationStatusId: null));
     }
@@ -199,8 +173,8 @@ internal static partial class IsolationCases
                 }
 
                 var path = restore
-                    ? ProjectStatusWire.RestoreOf(second.SpaceId, second.ProjectId, statuses[2])
-                    : ProjectStatusWire.RemoveOf(second.SpaceId, second.ProjectId, statuses[2]);
+                    ? ProjectStatusRoutes.RestoreOf(second.SpaceId, second.ProjectId, statuses[2])
+                    : ProjectStatusRoutes.RemoveOf(second.SpaceId, second.ProjectId, statuses[2]);
 
                 return new CaseRequest(
                     first.Actor,
@@ -210,9 +184,7 @@ internal static partial class IsolationCases
                     Body: restore ? null : () => ProjectStatusWire.RemoveBody(statuses[0]),
                     Other: second.Actor);
             },
-            TokenOwnOtherSpaceExpectations(HttpStatusCode.OK),
-            PendingUntil: StatusRemovalStory,
-            PendingReason: StatusRemovalPending);
+            TokenOwnOtherSpaceExpectations(HttpStatusCode.OK));
 
     /// <summary>
     /// Removes one Status of <paramref name="owner"/>'s Project through the product, with no destination.
@@ -222,7 +194,7 @@ internal static partial class IsolationCases
         var removed = await owner.SendAsync(
             IsolationSurface.Session,
             HttpMethod.Post,
-            ProjectStatusWire.RemoveOf(owner.SpaceId, projectId, statusId),
+            ProjectStatusRoutes.RemoveOf(owner.SpaceId, projectId, statusId),
             ProjectStatusWire.RemoveBody(destinationStatusId: null),
             headers: null);
 

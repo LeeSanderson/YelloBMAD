@@ -1767,4 +1767,76 @@
     <value>That place is no longer in this Project&apos;s Statuses. Reload the page and try again.</value>
     <comment>400 invalid-status-position: the Status to place after is not in the set the server holds.</comment>
   </data>
+  <data name="StatusDestinationRequired" xml:space="preserve">
+    <value>Tasks are in this Status. Choose where they go.</value>
+    <comment>409 status-destination-required: the Status holds Tasks and the removal named no destination.</comment>
+  </data>
+  <data name="StatusDestinationInvalid" xml:space="preserve">
+    <value>That destination is no longer one of this Project&apos;s Statuses.</value>
+    <comment>400 invalid-status-destination: the destination is not in the set the removal leaves.</comment>
+  </data>
+  <data name="StatusRemove" xml:space="preserve">
+    <value>Remove</value>
+    <comment>A row&apos;s control that removes its Status from the Project; aria-describedby names the Status.</comment>
+  </data>
+  <data name="StatusRemoveTitle" xml:space="preserve">
+    <value>Remove “{0}”</value>
+    <comment>The removal dialog&apos;s heading. {0} is the Status.</comment>
+  </data>
+  <data name="StatusRemoveScope" xml:space="preserve">
+    <value>Removing “{0}” moves {1} Tasks.</value>
+    <comment>The removal dialog&apos;s scope line. {0} is the Status, {1} how many Tasks hold it.</comment>
+  </data>
+  <data name="StatusRemoveDestinationLabel" xml:space="preserve">
+    <value>Move these Tasks to</value>
+    <comment>The destination picker&apos;s label.</comment>
+  </data>
+  <data name="StatusRemoveDestinationPlaceholder" xml:space="preserve">
+    <value>Choose…</value>
+    <comment>The picker&apos;s first option: not a Status, and selected until the person chooses one.</comment>
+  </data>
+  <data name="StatusRemoveDestinationMissing" xml:space="preserve">
+    <value>Choose where these Tasks go.</value>
+    <comment>The picker&apos;s message when the commit is pressed with no destination chosen.</comment>
+  </data>
+  <data name="StatusRemoveCommit" xml:space="preserve">
+    <value>Remove and move {0} Tasks</value>
+    <comment>The removal dialog&apos;s commit. {0} is how many Tasks move.</comment>
+  </data>
+  <data name="StatusRemoveCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Closes the removal dialog without removing anything.</comment>
+  </data>
+  <data name="StatusRemoveInFlight" xml:space="preserve">
+    <value>Moving {0} Tasks to “{1}”.</value>
+    <comment>The progress region while the removal is out. {0} is how many Tasks, {1} the destination. No percentage.</comment>
+  </data>
+  <data name="StatusRemoved" xml:space="preserve">
+    <value>Removed “{0}”.</value>
+    <comment>Announced after a removal that moved no Task. {0} is the Status.</comment>
+  </data>
+  <data name="StatusRemovedMoved" xml:space="preserve">
+    <value>Removed “{0}”. {1} Tasks moved to “{2}”.</value>
+    <comment>Announced after a removal that moved Tasks. {0} is the Status, {1} how many Tasks, {2} the destination.</comment>
+  </data>
+  <data name="StatusRemoveRefused" xml:space="preserve">
+    <value>Nothing was moved.</value>
+    <comment>The heading of a refused removal&apos;s inline error; the reason follows it.</comment>
+  </data>
+  <data name="StatusNoLongerHere" xml:space="preserve">
+    <value>That Status is no longer in this Project.</value>
+    <comment>A write&apos;s 404 for a Status another person removed; the set shown is read again.</comment>
+  </data>
+  <data name="StatusRemovedDefaultsHeading" xml:space="preserve">
+    <value>Removed from this Project</value>
+    <comment>The heading over the Space defaults this Project removed, each with Add back.</comment>
+  </data>
+  <data name="StatusAddBack" xml:space="preserve">
+    <value>Add back</value>
+    <comment>Adds a removed Space default back to the Project; aria-describedby names the Status.</comment>
+  </data>
+  <data name="StatusAddedBack" xml:space="preserve">
+    <value>{0} added back.</value>
+    <comment>Announced after an add-back. {0} is the Status.</comment>
+  </data>
 </root>

@@ -14,7 +14,7 @@
 
 @*
     THE STATUS DELTA EDITOR: one Project's effective Status set, in effective order, and - for a Role that may shape it -
-    add, rename and reorder.
+    add, rename, reorder, remove, and add back a removed Space default (the removal half lives in StatusDeltaEditor.Removal.cs).
 
     EACH ROW SAYS WHERE ITS STATUS COMES FROM: a Space default, a Space default this Project renamed (and the default's own
     name), or a Status added here. That distinction is what makes a later change to the Space's defaults understandable
@@ -32,7 +32,7 @@
 <LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
 
 <section class="status-delta-editor" aria-labelledby="status-delta-heading">
-    <h2 class="type-space-name status-delta-editor__heading" id="status-delta-heading">@Localizer["ProjectStatusesHeading"]</h2>
+    <h2 class="type-space-name status-delta-editor__heading" id="status-delta-heading" tabindex="-1" @ref="_heading">@Localizer["ProjectStatusesHeading"]</h2>
 
     @if (_statuses is null)
     {
@@ -45,7 +45,7 @@
     {
         @if (_refusal is { } refusal)
         {
-            <InlineErrorRegion @key="_attempts" Heading="@Localizer["StatusChangeRefused"]" Messages="@([refusal])" />
+            <InlineErrorRegion @key="_attempts" Heading="@(_refusalHeading ?? Localizer["StatusChangeRefused"])" Messages="@([refusal])" />
         }
 
         <ol class="status-delta-list">
@@ -62,7 +62,9 @@
                                 OnMove="MoveAsync"
                                 OnStartRename="StartRename"
                                 OnRename="RenameAsync"
-                                OnCancelRename="CancelRename" />
+                                OnCancelRename="CancelRename"
+                                RemoveFocusRequest="@(status.Id == _removeFocusId ? _removeFocusRequests : 0)"
+                                OnRemove="StartRemoveAsync" />
             }
         </ol>
 
@@ -79,6 +81,18 @@
 
                 <PrimaryButton>@Localizer["StatusAdd"]</PrimaryButton>
             </form>
+
+            <StatusRestoreList Removed="@RemovedDefaults" OnRestore="RestoreAsync" />
+        }
+
+        @if (CanEdit && _removing is { } removing)
+        {
+            <StatusRemoveDialog StatusName="@removing.Name"
+                                TaskCount="@removing.TaskCount"
+                                Destinations="@([.. statuses.Where(status => status.Id != removing.Id)])"
+                                InFlightTo="@_inFlightTo"
+                                OnCommit="CommitRemovalAsync"
+                                OnCancel="CancelRemoval" />
         }
     }
 </section>
@@ -109,6 +123,8 @@
     private Guid? _focusId;
     private int _focusRequests;
     private bool _focusUp;
+    private string? _refusalHeading;
+    private ElementReference _heading;
 
     /// <summary>The Space the Project is in.</summary>
     [Parameter]
@@ -159,6 +175,7 @@
         _unanswered = null;
         _renaming = null;
         _focusId = null;
+        PurgeRemoval();
     }
 
     private async Task LoadAsync(int generation)
@@ -177,6 +194,7 @@
             if (response.IsSuccessStatusCode)
             {
                 _statuses = await response.Content.ReadFromJsonAsync<List<ProjectStatusResponse>>(JsonOptions, token);
+                await LoadSpaceDefaultsAsync(generation, token);
                 return;
             }
 
@@ -387,7 +405,11 @@
                 return;
 
             case HttpStatusCode.NotFound:
-                await OnRefused.InvokeAsync(answer.Problem);
+                await RefuseNotFoundAsync(answer.Problem);
+                return;
+
+            case HttpStatusCode.Conflict when answer.Problem?.Type == ProblemTypes.StatusDestinationRequired && _removalPending:
+                _destinationWanted = true;
                 return;
 
             default:
@@ -398,6 +420,7 @@
 
     private void Refuse(string words)
     {
+        _refusalHeading = _removalPending ? Localizer["StatusRemoveRefused"].Value : null;
         _refusal = words;
         _attempts++;
     }

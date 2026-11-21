@@ -23,6 +23,10 @@ public sealed class ProjectStatusDeltaDraft
 
     private readonly HashSet<Guid> _placed;
 
+    private readonly ProjectStatusDelta _delta;
+
+    private readonly Func<Guid, CancellationToken, Task<int>> _occupants;
+
     private int _nextSequence;
 
     internal ProjectStatusDeltaDraft(
@@ -31,10 +35,13 @@ public sealed class ProjectStatusDeltaDraft
         IReadOnlyList<EffectiveStatus> before,
         ProjectStatusDelta delta,
         IIdentifierGenerator identifiers,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        Func<Guid, CancellationToken, Task<int>> occupants)
     {
         _spaceId = spaceId;
         _projectId = projectId;
+        _delta = delta;
+        _occupants = occupants;
         _ownedCount = delta.OwnedDefinitions.Count;
         _placed = delta.Operations.Where(operation => operation.Kind == StatusDeltaKind.Place).Select(operation => operation.StatusId).ToHashSet();
         _nextSequence = delta.NextSequence;
@@ -64,11 +71,104 @@ public sealed class ProjectStatusDeltaDraft
     public Guid? NamedStatusId { get; private set; }
 
     /// <summary>
+    /// The Status the write takes out of the set, if any.
+    /// </summary>
+    public Guid? RemovedStatusId { get; private set; }
+
+    /// <summary>
+    /// Whether the removed Status is one the Project added, so its definition is deleted with it.
+    /// </summary>
+    public bool RemovesOwnedDefinition { get; private set; }
+
+    /// <summary>
+    /// Where the removed Status's Tasks go, if anywhere.
+    /// </summary>
+    public Guid? DestinationStatusId { get; private set; }
+
+    /// <summary>
+    /// The removed Space default the write adds back, if any.
+    /// </summary>
+    public Guid? RestoredStatusId { get; private set; }
+
+    /// <summary>
     /// Whether the set before the write holds <paramref name="statusId"/>.
     /// </summary>
     /// <param name="statusId">The Status.</param>
     /// <returns><c>true</c> when it does.</returns>
     public bool Holds(Guid statusId) => EffectiveStatusSet.Contains(Before, statusId);
+
+    /// <summary>
+    /// Whether this Project's delta removes the Space default <paramref name="statusId"/>.
+    /// </summary>
+    /// <param name="statusId">The Status.</param>
+    /// <returns><c>true</c> when it does.</returns>
+    public bool HasRemoved(Guid statusId) => _delta.Removes(statusId);
+
+    /// <summary>
+    /// How many of the Project's Tasks hold <paramref name="statusId"/>, counted under the Project's lock so a Task that
+    /// arrived after the caller read its counts is seen.
+    /// </summary>
+    /// <param name="statusId">The Status.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The count.</returns>
+    public Task<int> OccupantsAsync(Guid statusId, CancellationToken cancellationToken) => _occupants(statusId, cancellationToken);
+
+    /// <summary>
+    /// Plans a Status's removal: every other place re-anchored so the rest keep their order (see
+    /// <see cref="EffectiveStatusSet.Reanchored"/>), then a <see cref="StatusDeltaKind.Remove"/> for a Space default, or the
+    /// deletion of the definition for a Status the Project added.
+    /// </summary>
+    /// <param name="statusId">A Status the set holds.</param>
+    /// <param name="destinationStatusId">Where its Tasks go, or <c>null</c> when it has none.</param>
+    public void Remove(Guid statusId, Guid? destinationStatusId)
+    {
+        RemovedStatusId = statusId;
+        DestinationStatusId = destinationStatusId;
+        RemovesOwnedDefinition = Before.Single(status => status.Id == statusId).Source == StatusSource.AddedHere;
+        _placed.Remove(statusId);
+
+        foreach (var (placedId, anchor) in EffectiveStatusSet.Reanchored(Before, _placed, statusId))
+        {
+            Record(placedId, StatusDeltaKind.Place, name: null, anchor);
+        }
+
+        if (!RemovesOwnedDefinition)
+        {
+            Record(statusId, StatusDeltaKind.Remove, name: null, afterStatusId: null);
+        }
+    }
+
+    /// <summary>
+    /// Plans a removed Space default's return: its <see cref="StatusDeltaKind.Remove"/> is deleted, and nothing else, so it
+    /// is back at its Space slot under its Space name.
+    /// </summary>
+    /// <param name="statusId">A default this Project's delta removes.</param>
+    public void Restore(Guid statusId)
+    {
+        RestoredStatusId = statusId;
+        NamedStatusId = statusId;
+    }
+
+    /// <summary>
+    /// The delta as it would read after the write.
+    /// </summary>
+    /// <returns>The delta.</returns>
+    internal ProjectStatusDelta After()
+    {
+        var delta = _delta;
+
+        if (RemovedStatusId is { } removed)
+        {
+            delta = delta.Without(removed);
+        }
+
+        if (RestoredStatusId is { } restored)
+        {
+            delta = delta.WithoutRemovalOf(restored);
+        }
+
+        return delta.With(Added, _operations);
+    }
 
     /// <summary>
     /// Plans a Status this Project owns, appended to its set.

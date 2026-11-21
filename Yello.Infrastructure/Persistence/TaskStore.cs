@@ -75,6 +75,11 @@ namespace Yello.Infrastructure.Persistence;
 /// Project's lock.
 /// </para>
 /// <para>
+/// <b>The edit and move slices take the Project's lock before they check the Status</b> (<see cref="LockProjectAsync"/>),
+/// because a Status can leave the set while they wait; the take here is then a re-entry of the same transaction-owned lock,
+/// kept so the store stays safe on its own. The lock order is unchanged: the Project's lock, then the Task row, then Labels.
+/// </para>
+/// <para>
 /// <b>Saves its own effect</b>, as every store does, so the idempotency record is the only thing the
 /// pipeline flushes after it (<see cref="IdempotencyStore"/>).
 /// </para>
@@ -137,6 +142,10 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
         dbContext.Tasks
             .AsNoTracking()
             .SingleOrDefaultAsync(task => task.Id == taskId, cancellationToken);
+
+    /// <inheritdoc />
+    public Task LockProjectAsync(Guid projectId, CancellationToken cancellationToken) =>
+        ApplicationLocks.TakeProjectTasksAsync(dbContext, projectId, cancellationToken);
 
     /// <inheritdoc />
     public Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken)

@@ -52,8 +52,8 @@ public sealed partial class ProjectSettingsTests(ClientSurfaceFixture surface)
 
     /// <summary>
     /// An Owner follows "Project settings" from the Board to the editor, which lists the effective set in effective order,
-    /// each row naming its source - a renamed default says so and states the default's own name - and offers no remove
-    /// control (removal is the next story's).
+    /// each row naming its source - a renamed default says so and states the default's own name - and offering one control
+    /// named "Remove", never a bare "×".
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -76,7 +76,7 @@ public sealed partial class ProjectSettingsTests(ClientSurfaceFixture surface)
             Assert.Equal(
                 ["Space default · renamed here (was Todo)", "Space default", "Space default", "Added here"],
                 [.. (await page.Locator(Editor).Locator(SourceChip).AllInnerTextsAsync()).Select(chip => chip.Trim())]);
-            Assert.Equal(0, await page.Locator(Editor).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Remove" }).CountAsync());
+            Assert.Equal(4, await page.Locator(Editor).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = "Remove", Exact = true }).CountAsync());
             Assert.Equal(0, await page.Locator(Editor).GetByText("×").CountAsync());
         }
     }

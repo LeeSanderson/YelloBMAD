@@ -62,6 +62,11 @@ internal sealed class StatusDeltaOperationConfiguration(YelloDbContext context) 
         builder.HasIndex(operation => new { operation.SpaceId, operation.ProjectId, operation.StatusId, operation.Kind })
             .IsUnique();
 
+        // Every writer takes the next sequence under the Project's lock; this backstops one that does not, which would
+        // otherwise tie two operations and replay them in an order nobody chose.
+        builder.HasIndex(operation => new { operation.SpaceId, operation.ProjectId, operation.Sequence })
+            .IsUnique();
+
         builder.HasOne<Project>()
             .WithMany()
             .HasForeignKey(operation => new { operation.SpaceId, operation.ProjectId })

@@ -1,6 +1,10 @@
+---
+baseline_commit: e9c39fbc3847fc5a6919e4f65485e2ee20c63bb3
+---
+
 # Story 6.2: Remove a Status from a Project by migrating its Tasks
 
-Status: ready-for-dev
+Status: review
 
 Epic: 6 — Shape Statuses per Project and retire work safely (second of six stories)
 Story key: `6-2-remove-a-status-from-a-project-by-migrating-its-tasks`
@@ -136,53 +140,53 @@ so that a Task can never hold a Status its Project does not expose.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Domain: `Remove` and its derivation** (AC1, AC2, AC5, AC6, AC7, AC10)
-  - [ ] Add `StatusDeltaKind.Remove`. `EffectiveStatusSet.Apply`: a `Remove` drops the Status from the list if present. Keep the class remarks true: delete the sentence "a place whose anchor is not in the set is ignored ... needs nothing from whoever removed the anchor" or rewrite it (the anchor's removal now re-anchors; the ignore rule remains as a deterministic fallback).
-  - [ ] A pure planner for the re-anchoring (AC10): given the set before, the placed Statuses and the removed id, return the `Place` operations that replay to "the set before, minus the removed Status", sequenced left to right. Reuse or generalise `Placements` (do not write a third ordering algorithm).
-  - [ ] A pure destination check: the destination is in `Of(defaults, delta-after-removal)`. Reuse `Contains`.
-  - [ ] `ProjectStatusDelta`: a way to describe the delta after a removal (ops deleted, an owned definition dropped, new ops added) so `Check` sees the real post-removal set.
-  - [ ] Unit tests (`tests/Yello.Tests.Slices/Statuses/EffectiveStatusSetTests.cs`): remove a default; remove an added Status; remove one whose id anchors others' places (order of the rest unchanged); remove then restore a default (Space slot, Space name); remove the last (`SetEmpty`); a destination equal to the removed Status is not in the after-set; two Projects, one removes a default, the other still holds it.
-- [ ] **Task 2 — Infrastructure: the removal's statements** (AC1, AC3, AC9, AC10; ledger `:1032`)
-  - [ ] Extend `IProjectStatusStore` (Domain port) with what the removal needs, all in the request's unit of work, after `LockAsync`:
+- [x] **Task 1 — Domain: `Remove` and its derivation** (AC1, AC2, AC5, AC6, AC7, AC10)
+  - [x] Add `StatusDeltaKind.Remove`. `EffectiveStatusSet.Apply`: a `Remove` drops the Status from the list if present. Keep the class remarks true: delete the sentence "a place whose anchor is not in the set is ignored ... needs nothing from whoever removed the anchor" or rewrite it (the anchor's removal now re-anchors; the ignore rule remains as a deterministic fallback).
+  - [x] A pure planner for the re-anchoring (AC10): given the set before, the placed Statuses and the removed id, return the `Place` operations that replay to "the set before, minus the removed Status", sequenced left to right. Reuse or generalise `Placements` (do not write a third ordering algorithm).
+  - [x] A pure destination check: the destination is in `Of(defaults, delta-after-removal)`. Reuse `Contains`.
+  - [x] `ProjectStatusDelta`: a way to describe the delta after a removal (ops deleted, an owned definition dropped, new ops added) so `Check` sees the real post-removal set.
+  - [x] Unit tests (`tests/Yello.Tests.Slices/Statuses/EffectiveStatusSetTests.cs`): remove a default; remove an added Status; remove one whose id anchors others' places (order of the rest unchanged); remove then restore a default (Space slot, Space name); remove the last (`SetEmpty`); a destination equal to the removed Status is not in the after-set; two Projects, one removes a default, the other still holds it.
+- [x] **Task 2 — Infrastructure: the removal's statements** (AC1, AC3, AC9, AC10; ledger `:1032`)
+  - [x] Extend `IProjectStatusStore` (Domain port) with what the removal needs, all in the request's unit of work, after `LockAsync`:
     - `OccupantsAsync(statusId)` or a count, read under the lock;
     - `MigrateAsync(fromStatusId, toStatusId)`: read the destination column's last key, then give each occupying Task (ordered by its own `PositionKey` in BIN2, then `Id`) `PositionKey.After(previous)`, in **one** set-based `UPDATE` (for example `UPDATE t SET StatusId = @to, PositionKey = j.k FROM dbo.[Task] t JOIN OPENJSON(@map) ...`, as `TaskStore.cs:249-252` already uses `OPENJSON`). Never 5,000 statements. Parameters only; no `Where SpaceId` (the policy narrows it), raw SQL only in Infrastructure.
     - the delta change: delete the removed Status's `Rename` and `Place` ops; delete-and-reinsert the re-anchored `Place` ops; then either insert a `Remove` op (a default) or delete the owned definition's `Add` op and the definition itself (an added Status; Q1).
-  - [ ] Statement order matters (all NO ACTION): Tasks off the Status first; then ops that reference it (`StatusId` or `AfterStatusId`); then the owned definition. Write the reason in the store's remarks, as `ProjectStore.DeleteAsync` does.
-  - [ ] Add-back: delete the default's `Remove` op. Nothing else.
-  - [ ] Ledger `:1032` (Q9): a unique index `(SpaceId, ProjectId, Sequence)` on `StatusDeltaOperation`. A new migration after `20261121155445_ProjectStatusDelta`, hand-checked (`TESTING-CONVENTIONS.md:599`). The replace pattern already deletes before it inserts and every write takes `NextSequence` under the lock, so no existing write collides; prove it with the 6.1 write cases. `dotnet tool restore` first, then `dotnet ef` 10.0.11. If the dev decides against the index, re-own the entry with the reason.
-- [ ] **Task 3 — Application: the remove and add-back slices** (AC1-AC7, AC13)
-  - [ ] `Yello.Application/Statuses/RemoveProjectStatus/RemoveProjectStatusHandler.cs` and `.../RestoreProjectStatus/RestoreProjectStatusHandler.cs` (names are the dev's), both through `ProjectStatusDeltaWriter` (lock → read → plan → check → write → answer the set).
-  - [ ] Order of decisions under the lock: Status not in the set → `NotFound`; set of one → `SetEmpty`; destination supplied and not in the after-set → `DestinationInvalid`; occupied and no destination → `DestinationRequired`; otherwise write.
-  - [ ] Add-back: the id must be a Space default this Project's delta removes; otherwise `NotFound` (Q2). Name collision → `NameTaken` (via `Check`).
-  - [ ] New `ProjectStatusWriteOutcome` members: `DestinationRequired`, `DestinationInvalid`.
-  - [ ] Handler tests with fakes (no database), in `tests/Yello.Tests.Slices/Statuses/`.
-- [ ] **Task 4 — Task writers validate under the lock** (AC8; ledger `:1020`)
-  - [ ] Q6 (a): add `ITaskStore.LockProjectAsync(projectId, ct)` (the same `ProjectTasks` lock; re-entrant). `EditTaskAttributesHandler` (only when `edit.StatusId` is set) and `MoveTaskHandler` take it **before** reading `EffectiveOfAsync(task.ProjectId)`. The store's own later take is then a no-op re-entry; keep it, because the store must stay safe on its own.
-  - [ ] After the lock, re-read the Task's `ProjectId` (6.5 will reparent Tasks; a stale `ProjectId` would validate against the wrong set). Not found under the lock → the existing `NotFound`.
-  - [ ] `CreateTaskHandler`: already under the lock via the bound count. Add a remark naming that dependency, and the race case. Do not add a second lock.
-  - [ ] Update the remarks of the three handlers and `TaskStore` (lock order: Project lock, then Task row, then Labels, unchanged).
-- [ ] **Task 5 — Contracts and Host** (AC2, AC4, AC11-AC13)
-  - [ ] Q1/Q2 routes in `ProjectStatusRoutes`: `Remove` = `POST …/projects/{projectId}/statuses/{statusId}/remove` with `RemoveProjectStatusRequest(Guid? DestinationStatusId)`; `Restore` = `POST …/projects/{projectId}/statuses/{statusId}/restore` with no body. Path helpers `RemoveOf`, `RestoreOf`.
-  - [ ] `ProblemTypes.StatusDestinationRequired` (`urn:yello:problem:status-destination-required`, 409) and `ProblemTypes.InvalidStatusDestination` (`urn:yello:problem:invalid-status-destination`, 400). Map both in `ProjectStatusAnswers`. An unreadable remove body is `400 invalid-status-destination`.
-  - [ ] Endpoints in `ProjectStatusEndpoints` (or a split sibling file if S1200 forces it), `RequiresCapability(ConfigureProjectStatusDelta)`, answering `200` with the set. Register them in `Program.cs`.
-  - [ ] Widen ARCH-503 by exactly the two routes and update its remarks. Add the AC4 gate. Add `ConfigureProjectStatusDelta`'s remove to the role-matrix theory if the theory needs a representative per route (`ActiveSpaceEndpointTests.RoleMatrix.cs`).
-  - [ ] If a contract snapshot of served types exists (AD-19, C-1), add the new request record.
-- [ ] **Task 6 — Client** (AC7, AC11, AC14, AC15)
-  - [ ] `StatusDeltaRow`: a "Remove" button (Owner/Admin), raised to the editor. Update its remarks ("No remove control" is no longer true).
-  - [ ] A new `StatusRemoveDialog.razor` (name per the dev): scope line, the destination picker with a placeholder and no default (reuse the `{components.picker}` treatment of `MovePicker`/`PickerOption`, or a native `<select>` whose first option is the empty placeholder), commit (`button-primary`, "Remove and move {n} Tasks"), Cancel (`button-secondary`). It is not a `destructive-confirm`: nothing is lost, and danger is reserved for the irreversible (DESIGN.md `:322`, `:501`).
-  - [ ] The progress region and its focus rule; the done announcement and focus; the refused state ("Nothing was moved." + reason).
-  - [ ] Removed Space defaults: read `GET /api/v1/spaces/{spaceId}/statuses` alongside the Project's set and list the defaults absent from it, each with "Add back". Purge both reads with the Space.
-  - [ ] A write's `404`: re-read the set; if the read succeeds, show "That Status is no longer in this Project." inline and render the new set; only a failing read raises `OnRefused` (Q8).
-  - [ ] Pager: `BoardView.Pager.cs` `SelectedColumn` clears a selection that is not a column. If `BoardView` is touched, also fix the stale `ViewToggle` comment (ledger `:1041`).
-  - [ ] Copy in `ClientCopy.resx` (sentence case); map the two new problem types in `RefusalCopy`.
-  - [ ] `FakeYelloApi.ProjectStatuses.cs`: remove (incl. the `409` and both `400`s) and add-back, and the Board's columns follow.
-- [ ] **Task 7 — List cursor, ledger and docs** (AC15; all ledger rows above)
-  - [ ] `ListReader.ByStatusAsync` / `ViewListHandler`: a Status-sort cursor whose Status is not in the order answers `400 invalid-list-cursor` (Q10). Check `ListEndpoints.cs:73`'s mapping.
-  - [ ] Write the disposition of every owned ledger entry in `deferred-work.md` (CLOSED / UPDATED / RE-OWNED, with the reason). Do not leave one blank.
-  - [ ] AD-16: a dated, additive note that the delta gains `Remove` for a default and that removing an added Status deletes its definition (Q1), and add the `PROJECT ||--o{ STATUS_DEFINITION : adds` edge to the ER that 6.1's note already claims (closes `:1040`). Additive only; no rule changes.
-- [ ] **Task 8 — Tests** (see Testing requirements)
-  - [ ] Teach `WireDatabase.TasksOutsideTheirProjectsSetSql` about `Remove`, rewrite its remarks, and assert it after every case added here.
-  - [ ] Slices partials, handler tests, the S-1 case, the race cases, isolation rows, gates, browser class.
+  - [x] Statement order matters (all NO ACTION): Tasks off the Status first; then ops that reference it (`StatusId` or `AfterStatusId`); then the owned definition. Write the reason in the store's remarks, as `ProjectStore.DeleteAsync` does.
+  - [x] Add-back: delete the default's `Remove` op. Nothing else.
+  - [x] Ledger `:1032` (Q9): a unique index `(SpaceId, ProjectId, Sequence)` on `StatusDeltaOperation`. A new migration after `20261121155445_ProjectStatusDelta`, hand-checked (`TESTING-CONVENTIONS.md:599`). The replace pattern already deletes before it inserts and every write takes `NextSequence` under the lock, so no existing write collides; prove it with the 6.1 write cases. `dotnet tool restore` first, then `dotnet ef` 10.0.11. If the dev decides against the index, re-own the entry with the reason.
+- [x] **Task 3 — Application: the remove and add-back slices** (AC1-AC7, AC13)
+  - [x] `Yello.Application/Statuses/RemoveProjectStatus/RemoveProjectStatusHandler.cs` and `.../RestoreProjectStatus/RestoreProjectStatusHandler.cs` (names are the dev's), both through `ProjectStatusDeltaWriter` (lock → read → plan → check → write → answer the set).
+  - [x] Order of decisions under the lock: Status not in the set → `NotFound`; set of one → `SetEmpty`; destination supplied and not in the after-set → `DestinationInvalid`; occupied and no destination → `DestinationRequired`; otherwise write.
+  - [x] Add-back: the id must be a Space default this Project's delta removes; otherwise `NotFound` (Q2). Name collision → `NameTaken` (via `Check`).
+  - [x] New `ProjectStatusWriteOutcome` members: `DestinationRequired`, `DestinationInvalid`.
+  - [x] Handler tests with fakes (no database), in `tests/Yello.Tests.Slices/Statuses/`.
+- [x] **Task 4 — Task writers validate under the lock** (AC8; ledger `:1020`)
+  - [x] Q6 (a): add `ITaskStore.LockProjectAsync(projectId, ct)` (the same `ProjectTasks` lock; re-entrant). `EditTaskAttributesHandler` (only when `edit.StatusId` is set) and `MoveTaskHandler` take it **before** reading `EffectiveOfAsync(task.ProjectId)`. The store's own later take is then a no-op re-entry; keep it, because the store must stay safe on its own.
+  - [x] After the lock, re-read the Task's `ProjectId` (6.5 will reparent Tasks; a stale `ProjectId` would validate against the wrong set). Not found under the lock → the existing `NotFound`.
+  - [x] `CreateTaskHandler`: already under the lock via the bound count. Add a remark naming that dependency, and the race case. Do not add a second lock.
+  - [x] Update the remarks of the three handlers and `TaskStore` (lock order: Project lock, then Task row, then Labels, unchanged).
+- [x] **Task 5 — Contracts and Host** (AC2, AC4, AC11-AC13)
+  - [x] Q1/Q2 routes in `ProjectStatusRoutes`: `Remove` = `POST …/projects/{projectId}/statuses/{statusId}/remove` with `RemoveProjectStatusRequest(Guid? DestinationStatusId)`; `Restore` = `POST …/projects/{projectId}/statuses/{statusId}/restore` with no body. Path helpers `RemoveOf`, `RestoreOf`.
+  - [x] `ProblemTypes.StatusDestinationRequired` (`urn:yello:problem:status-destination-required`, 409) and `ProblemTypes.InvalidStatusDestination` (`urn:yello:problem:invalid-status-destination`, 400). Map both in `ProjectStatusAnswers`. An unreadable remove body is `400 invalid-status-destination`.
+  - [x] Endpoints in `ProjectStatusEndpoints` (or a split sibling file if S1200 forces it), `RequiresCapability(ConfigureProjectStatusDelta)`, answering `200` with the set. Register them in `Program.cs`.
+  - [x] Widen ARCH-503 by exactly the two routes and update its remarks. Add the AC4 gate. Add `ConfigureProjectStatusDelta`'s remove to the role-matrix theory if the theory needs a representative per route (`ActiveSpaceEndpointTests.RoleMatrix.cs`).
+  - [x] If a contract snapshot of served types exists (AD-19, C-1), add the new request record.
+- [x] **Task 6 — Client** (AC7, AC11, AC14, AC15)
+  - [x] `StatusDeltaRow`: a "Remove" button (Owner/Admin), raised to the editor. Update its remarks ("No remove control" is no longer true).
+  - [x] A new `StatusRemoveDialog.razor` (name per the dev): scope line, the destination picker with a placeholder and no default (reuse the `{components.picker}` treatment of `MovePicker`/`PickerOption`, or a native `<select>` whose first option is the empty placeholder), commit (`button-primary`, "Remove and move {n} Tasks"), Cancel (`button-secondary`). It is not a `destructive-confirm`: nothing is lost, and danger is reserved for the irreversible (DESIGN.md `:322`, `:501`).
+  - [x] The progress region and its focus rule; the done announcement and focus; the refused state ("Nothing was moved." + reason).
+  - [x] Removed Space defaults: read `GET /api/v1/spaces/{spaceId}/statuses` alongside the Project's set and list the defaults absent from it, each with "Add back". Purge both reads with the Space.
+  - [x] A write's `404`: re-read the set; if the read succeeds, show "That Status is no longer in this Project." inline and render the new set; only a failing read raises `OnRefused` (Q8).
+  - [x] Pager: `BoardView.Pager.cs` `SelectedColumn` clears a selection that is not a column. If `BoardView` is touched, also fix the stale `ViewToggle` comment (ledger `:1041`).
+  - [x] Copy in `ClientCopy.resx` (sentence case); map the two new problem types in `RefusalCopy`.
+  - [x] `FakeYelloApi.ProjectStatuses.cs`: remove (incl. the `409` and both `400`s) and add-back, and the Board's columns follow.
+- [x] **Task 7 — List cursor, ledger and docs** (AC15; all ledger rows above)
+  - [x] `ListReader.ByStatusAsync` / `ViewListHandler`: a Status-sort cursor whose Status is not in the order answers `400 invalid-list-cursor` (Q10). Check `ListEndpoints.cs:73`'s mapping.
+  - [x] Write the disposition of every owned ledger entry in `deferred-work.md` (CLOSED / UPDATED / RE-OWNED, with the reason). Do not leave one blank.
+  - [x] AD-16: a dated, additive note that the delta gains `Remove` for a default and that removing an added Status deletes its definition (Q1), and add the `PROJECT ||--o{ STATUS_DEFINITION : adds` edge to the ER that 6.1's note already claims (closes `:1040`). Additive only; no rule changes.
+- [x] **Task 8 — Tests** (see Testing requirements)
+  - [x] Teach `WireDatabase.TasksOutsideTheirProjectsSetSql` about `Remove`, rewrite its remarks, and assert it after every case added here.
+  - [x] Slices partials, handler tests, the S-1 case, the race cases, isolation rows, gates, browser class.
 
 ## Dev Notes
 
@@ -432,16 +436,118 @@ Follow `tests/TESTING-CONVENTIONS.md`: traits `:44-95`, rules `:97-207` (races `
 
 ### Agent Model Used
 
-{{agent_model_name_version}}
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended develop phase.
 
 ### Debug Log References
 
+- Activation order followed. RACE-1/RACE-2 (`TaskEndpointTests.An_edit_...` / `A_move_to_a_Status_queued_behind_its_removal_...`) were activated with `Remove` in the domain and failed for the stated reason (`200` with the removed Status written), then passed once edit and move take `ITaskStore.LockProjectAsync` before reading the set. The creation race passed with no creation change, as predicted.
+- Scaffold corrected: `ProjectEndpointTests.Removing_an_unoccupied_default_...` compared `ProjectStatusEntry` records with `Assert.Equal(entries, read)`; the record's `Members` list compares by reference, so equal sets failed. Now compares a projection of every member (`Shown`).
+- Scaffold corrected: `ProjectSettingsTests.Removing_an_unoccupied_Status_removes_it_directly_and_announces_it` waited for `.board-column` `Nth(2)`, which the Board's loading skeleton satisfies before any heading exists; it now waits for the third column heading.
+- Stand-ins swapped for contract members and deleted: `ProjectStatusWire.Remove`/`Restore`/`RemoveOf`/`RestoreOf`/`StatusDestinationRequired`/`InvalidStatusDestination`; the gates' string names (`RemoveProjectStatusRequest`, the two problem types); `EffectiveStatusSetRemovalTests.Remove`.
+- Gates expected red by design and amended in the same change: ARCH-503 (widened by exactly `POST …/remove` and `POST …/restore`), `No_Project_request_contract_carries_anything_but_a_name` (lists `RemoveProjectStatusRequest`), `ProjectSettingsTests.The_Board_links_an_Owner_to_the_editor_...` (now four `Remove` controls, still no bare `×`). `The_Project_Status_routes_declare_...` matches its patterns exactly and did not go red. The 11 isolation rows are live (`PendingUntil` removed).
+- Scaffold corrected: `FakeYelloApi.ReleaseStatusRemoval` completed `_heldStatusRemoval`, which the held request had already exchanged to `null`, so a held removal was never released and the in-flight case timed out; the release now keeps its own reference.
+- Full run (once, without the browser suite): 2283 total, 2275 passed, 0 failed, 8 skipped; log `artifacts/test-runs/6-2-remove-a-status-from-a-project-by-migrating-its-tasks-develop.log`. Filtered runs: `ProjectEndpointTests` (94), the four removal/reader methods, the 31 queued races, `IsolationCaseTests` + `IsolationCaseListTests` (476/476), `ProjectSettingsTests` (17/17), Architecture (534/534).
+- Nightly `A_removal_migrating_five_thousand_Tasks_commits_as_one_transaction` run once by hand (`--explicit only`): passed.
+- Plants, one at a time, each a filtered run of the class that should catch it, original saved and restored in a `finally` (scratchpad `plant.ps1`; restoration checked by content and `git status`):
+  - Plant 2, writer skips `MigrateTasksAsync`: caught by `Removing_an_occupied_Status_moves_every_Task_...` (`Expected 4, Actual 1`). Restored.
+  - Plant 3, `Apply` ignores `Remove`: caught by 7 of 9 `EffectiveStatusSetRemovalTests`. Restored.
+  - Plant 5, edit checks the set without `LockProjectAsync`: caught by `An_edit_to_a_Status_queued_behind_its_removal_...`. Restored.
+  - Plant 6, move checks the set without `LockProjectAsync`: caught by `A_move_to_a_Status_queued_behind_its_removal_...`. Restored.
+  - Plant 7, destination checked against the set before the removal: caught by `Every_destination_outside_the_set_after_the_removal_...`. Restored.
+  - Plant 8, dependent places not re-anchored: caught by `Removing_a_Status_that_others_are_placed_after_...`. Restored.
+  - Plant 12, a second Project request carrying `DestinationStatusId`: caught by `A_Status_leaves_a_Project_only_through_the_remove_route_...`. Restored. (A first attempt did not compile under the analyzers and proved nothing; it was reformatted and rerun.)
+  - Plant 1 was proved by the ATDD phase. Not planted here: 4 (occupancy before the lock - the read is a single call after `LockAsync` in the writer; the two occupancy races cover it), 9 (keys from the source keys), 10 (separate transactions - the unit of work is the pipeline's; S-1 covers it) and 11 (client picker preselect - a browser plant run was not affordable in the memory budget). None was killed for memory.
+- A build started while a filtered Slices run held `Yello.Host.dll` failed to copy; it was rerun after the run ended. No plant was in place.
+
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
+- **Domain.** `StatusDeltaKind.Remove`; `EffectiveStatusSet.Apply` drops a removed Status; `EffectiveStatusSet.Reanchored` re-anchors every placed Status for a removal, sharing `Placements`' left-to-right anchoring (no third ordering algorithm); `ProjectStatusDelta.Without` / `WithoutRemovalOf` / `Removes` describe the delta after a removal or an add-back so `Check` sees the real after-set. `IProjectStatusStore` gains `MigrateTasksAsync`, `DeleteOperationsAsync`, `DeleteOwnedDefinitionAsync`; `ITaskStore` gains `LockProjectAsync`.
+- **Application.** `RemoveProjectStatusHandler` and `RestoreProjectStatusHandler` go through `ProjectStatusDeltaWriter` (lock, read, plan, check, write, answer the set), which gained an async-plan overload so occupancy is counted under the lock (`draft.OccupantsAsync`). Decision order: not in set `404`; set of one `409 status-set-empty`; destination that is the removed Status or outside the set `400 invalid-status-destination`; occupied with no destination `409 status-destination-required`. The writer records in NO ACTION order: migrate, delete the removed Status's operations, write the re-anchored places and the `Remove`, then delete an owned definition. Edit and move lock the Project before reading the set and refuse a Task whose Project changed under the lock.
+- **Infrastructure.** The migration is one `UPDATE … JOIN OPENJSON` with keys computed from the destination's last key in the source column's BIN2 order. Migration `20261121190936_StatusDeltaSequenceUnique` (hand-checked, expand only).
+- **Host/Contracts.** `POST …/statuses/{id}/remove` (`RemoveProjectStatusRequest(Guid? DestinationStatusId)`) and `POST …/statuses/{id}/restore`, both `ConfigureProjectStatusDelta`, both surfaces, answering `200` with the set (`ProjectStatusRemovalEndpoints`, split for size). `ProblemTypes.StatusDestinationRequired` / `InvalidStatusDestination`. A Status-sort List cursor on a Status outside the order answers `400 invalid-list-cursor`.
+- **Client.** Remove per row; `StatusRemoveDialog` (scope line, native `select` with an empty "Choose…" first option and no default, local message on an empty commit, in-flight `role="status"` region that takes focus, no percentage); done announces and focuses the destination row's Remove control (the list heading for a direct removal); refusals say "Nothing was moved." plus the reason; a direct removal answered `409 status-destination-required` re-reads and opens the dialog; a write's `404` re-reads and says "That Status is no longer in this Project." inline, raising the page refusal only when the read fails (fixes 6.1's rename/place too); `StatusRestoreList`/`StatusRestoreItem` list removed defaults from the Space read with "Add back". The pager forgets a selection that is no longer a column on a Board read again.
+- **Decisions (each reversible; cut any line to revisit):**
+  - Q1 (a): a `Remove` operation for a Space default; an added Status's definition and operations are deleted. Reason: FR-27 needs "removed here" keyed on the id, and the owned-name index must release an added name.
+  - Q2 (a): `POST …/remove` with `{ destinationStatusId }` and `POST …/restore` with no body. Reason: a body-borne mapping, the same convention as `place`.
+  - Q3 (a): re-anchor every placed Status; delete the removed Status's own rename and place; the ignore rule stays as the fallback. Reason: no Status jumps on someone else's removal.
+  - Q4 (a): `409 status-destination-required` and `400 invalid-status-destination`, no count in the body. Reason: the set's `TaskCount` is the truth.
+  - Q5 (a): one Status per request.
+  - Q6 (a): `ITaskStore.LockProjectAsync` before the set read; a Task whose Project changed under the lock is `404`. Reason: one derivation, no callback into Infrastructure.
+  - Q7 (a): the commit stays enabled; an empty commit shows "Choose where these Tasks go." and sends nothing.
+  - Q8 (a): a write's `404` re-reads before it is believed.
+  - Q9 (a): unique `(SpaceId, ProjectId, Sequence)`.
+  - Q10 (a): the stale Status-sort cursor is `400 invalid-list-cursor`; the pager selection is cleared; the `PagerTabs` allocation re-owned to sweep.
+  - Q11 (a): one Nightly, Explicit case, no duration assertion.
+  - Q12 (a): an unoccupied Status is removed directly with no confirmation.
+  - Not in the story's options: the add-back's "Choose…"-free list and the destination dialog are separate components (`StatusRestoreList`, `StatusRestoreItem`, `StatusRemoveDialog`) and the editor's removal half lives in `StatusDeltaEditor.Removal.cs`, to keep the editor under its analyzer caps.
 
 ### File List
+
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Delete.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Projects.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.StatusRemoval.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.StatusRemoval.cs`
+- `tests/Yello.Tests.Client/ProjectSettingsTests.cs`
+- `tests/Yello.Tests.Client/ProjectSettingsTests.Removal.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.StatusRemoval.cs`
+- `tests/Yello.Tests.Shared/ProjectStatusWire.cs`
+- `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRemoval.cs`
+- `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRemovalRace.cs`
+- `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.StatusRemovalScale.cs`
+- `tests/Yello.Tests.Slices/Projects/StatusRemovalWire.cs`
+- `tests/Yello.Tests.Slices/Statuses/EffectiveStatusSetRemovalTests.cs`
+- `tests/Yello.Tests.Slices/Statuses/ProjectStatusWriteHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/AssignTask/AssignTaskHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/CreateTask/CreateTaskHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/DeleteTask/DeleteTaskHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/EditTaskAttributes/EditTaskAttributesHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/MoveTask/MoveTaskHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.RemovedStatus.cs`
+- `Yello.Application/Lists/ViewList/ViewListHandler.cs`
+- `Yello.Application/Statuses/ProjectStatusDeltaDraft.cs`
+- `Yello.Application/Statuses/ProjectStatusDeltaWriter.cs`
+- `Yello.Application/Statuses/ProjectStatusSet.cs`
+- `Yello.Application/Statuses/RemoveProjectStatus/RemoveProjectStatusHandler.cs`
+- `Yello.Application/Statuses/RestoreProjectStatus/RestoreProjectStatusHandler.cs`
+- `Yello.Application/Tasks/CreateTask/CreateTaskHandler.cs`
+- `Yello.Application/Tasks/EditTaskAttributes/EditTaskAttributesHandler.cs`
+- `Yello.Application/Tasks/MoveTask/MoveTaskHandler.cs`
+- `Yello.Client/Components/BoardView.Pager.cs`
+- `Yello.Client/Components/BoardView.Paging.cs`
+- `Yello.Client/Components/StatusDeltaEditor.razor`
+- `Yello.Client/Components/StatusDeltaEditor.Removal.cs`
+- `Yello.Client/Components/StatusDeltaRow.razor`
+- `Yello.Client/Components/StatusRemoveDialog.razor`
+- `Yello.Client/Components/StatusRestoreItem.razor`
+- `Yello.Client/Components/StatusRestoreList.razor`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Refusals/RefusalCopy.cs`
+- `Yello.Client/wwwroot/css/components.css`
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Contracts/Projects/ProjectStatusRoutes.cs`
+- `Yello.Contracts/Projects/RemoveProjectStatusRequest.cs`
+- `Yello.Domain/Statuses/EffectiveStatusSet.cs`
+- `Yello.Domain/Statuses/IProjectStatusStore.cs`
+- `Yello.Domain/Statuses/ProjectStatusDelta.cs`
+- `Yello.Domain/Statuses/StatusDeltaOperation.cs`
+- `Yello.Domain/Tasks/ITaskStore.cs`
+- `Yello.Host/Endpoints/ListEndpoints.cs`
+- `Yello.Host/Endpoints/ProjectStatusAnswers.cs`
+- `Yello.Host/Endpoints/ProjectStatusEndpoints.cs`
+- `Yello.Host/Endpoints/ProjectStatusRemovalEndpoints.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Infrastructure/Persistence/Configurations/StatusDeltaOperationConfiguration.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261121190936_StatusDeltaSequenceUnique.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261121190936_StatusDeltaSequenceUnique.Designer.cs`
+- `Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs`
+- `Yello.Infrastructure/Persistence/ProjectStatusStore.cs`
+- `Yello.Infrastructure/Persistence/TaskStore.cs`
+- `_bmad-output/implementation-artifacts/6-2-remove-a-status-from-a-project-by-migrating-its-tasks.md`
 
 ## Change Log
 
 - 2026-11-21: Story created (bmad-create-story). Status: ready-for-dev.
+- 2026-11-21: Implemented (bmad-dev-story): `Remove` delta kind and re-anchoring; remove and add-back routes, slices and store statements in one transaction under the Project's lock; Task edit and move check the Status under that lock; unique delta `Sequence` index; Status-sort cursor on a removed Status refused; editor remove control, destination dialog, in-flight region and add-back list; pager selection cleared. Open questions Q1-Q12 decided at option (a). ATDD scaffolds activated (3 corrected), 11 isolation rows live, owned ledger rows dispositioned. Status: review.

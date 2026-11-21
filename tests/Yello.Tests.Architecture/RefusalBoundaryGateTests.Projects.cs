@@ -130,7 +130,7 @@ public sealed partial class RefusalBoundaryGateTests
         // Vacuity guard: create and rename both exist, and so do the Project's own Status requests, which share the
         // namespace and are held to their members by the Project Status gates.
         Assert.Equal(
-            ["AddProjectStatusRequest", "CreateProjectRequest", "PlaceProjectStatusRequest", "RenameProjectRequest", "RenameProjectStatusRequest"],
+            ["AddProjectStatusRequest", "CreateProjectRequest", "PlaceProjectStatusRequest", "RemoveProjectStatusRequest", "RenameProjectRequest", "RenameProjectStatusRequest"],
             requests.Select(type => type.Name).Order(StringComparer.Ordinal));
 
         Assert.All(requests.Where(request => !request.Name.Contains("Status", StringComparison.Ordinal)), request => Assert.Equal(

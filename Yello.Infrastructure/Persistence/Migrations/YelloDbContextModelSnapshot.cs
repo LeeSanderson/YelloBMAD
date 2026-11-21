@@ -443,6 +443,9 @@ namespace Yello.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("SpaceId", "StatusId");
 
+                    b.HasIndex("SpaceId", "ProjectId", "Sequence")
+                        .IsUnique();
+
                     b.HasIndex("SpaceId", "ProjectId", "StatusId", "Kind")
                         .IsUnique();
 

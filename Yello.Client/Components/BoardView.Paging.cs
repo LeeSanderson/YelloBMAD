@@ -292,6 +292,7 @@ public sealed partial class BoardView
         var keptIn = kept is { } keptId ? CountedIn(keptId) : null;
 
         _columns = [.. board.Columns.Select(column => new ColumnState(column.StatusId, column.Name, column.Total, [.. column.Tasks.Where(task => !_deleted.Contains(task.Id))], column.NextAfter))];
+        ForgetSelectionThatLeft();
         _heldOut.Clear();
         UseStatuses(board.Columns.Select(column => new TaskStatusOption(column.StatusId, column.Name)));
         await RestoreDepthAsync(kept, keptIn, generation);

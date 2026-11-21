@@ -7,12 +7,15 @@
     ONE STATUS OF A PROJECT'S EFFECTIVE SET in the Status delta editor: its name, where it comes from, how many of the
     Project's Tasks hold it, and - for a Role that may shape the set - "Move up", "Move down" and "Rename".
 
+    "REMOVE" IS RAISED TO THE EDITOR, which decides whether it goes directly or through the destination dialog. It can
+    ask for focus back, after the dialog is cancelled on this row or when this row is where the removed Tasks went.
+
     THE MOVE BUTTONS ARE THE KEYBOARD PATH, and the only one: there is no drag. The first row has no "Move up" and the last
     no "Move down" - absent, never disabled. After a move the row asks for focus back on the button that moved it, or on
     the other one when it reached an end, so a keyboard user can press again.
 
     RENAME IS INLINE: the row keeps its name and source in view, and a field named for the Status opens beneath them with
-    Save and Cancel; Enter saves, Escape cancels. No remove control.
+    Save and Cancel; Enter saves, Escape cancels.
 *@
 
 <li class="status-delta-row">
@@ -53,6 +56,7 @@
             }
 
             <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="StartRenameAsync">@Localizer["StatusRename"]</button>
+            <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="RemoveAsync" @ref="_remove">@Localizer["StatusRemove"]</button>
         </div>
     }
 </li>
@@ -61,6 +65,8 @@
     private ElementReference _field;
     private ElementReference _up;
     private ElementReference _down;
+    private ElementReference _remove;
+    private int _removeFocusSeen;
     private string _draft = string.Empty;
     private bool _wasRenaming;
     private bool _focusField;
@@ -94,6 +100,14 @@
     /// <summary>Which move button the focus request is for: <c>true</c> for the up button.</summary>
     [Parameter]
     public bool FocusUp { get; set; }
+
+    /// <summary>Bumped when the editor asks this row's Remove control to take focus.</summary>
+    [Parameter]
+    public int RemoveFocusRequest { get; set; }
+
+    /// <summary>Raised by "Remove", with the Status's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnRemove { get; set; }
 
     /// <summary>Raised by a move button, with the Status's id and <c>-1</c> for up or <c>1</c> for down.</summary>
     [Parameter]
@@ -158,6 +172,12 @@
             _focusSeen = FocusRequest;
             await (FocusesUp ? _up : _down).FocusAsync();
         }
+
+        if (RemoveFocusRequest != 0 && RemoveFocusRequest != _removeFocusSeen && CanEdit && !Renaming)
+        {
+            _removeFocusSeen = RemoveFocusRequest;
+            await _remove.FocusAsync();
+        }
     }
 
     /// <summary>
@@ -179,6 +199,8 @@
     private Task DownAsync() => OnMove.InvokeAsync((Status.Id, 1));
 
     private Task StartRenameAsync() => OnStartRename.InvokeAsync(Status.Id);
+
+    private Task RemoveAsync() => OnRemove.InvokeAsync(Status.Id);
 
     private Task SaveAsync() => OnRename.InvokeAsync((Status.Id, _draft));
 

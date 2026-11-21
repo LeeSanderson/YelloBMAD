@@ -1,0 +1,34 @@
+@using Yello.Contracts.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    THE SPACE DEFAULTS THIS PROJECT REMOVED, under the editor's add form, each with "Add back". Derived by the editor from the
+    Space's own Status read and the Project's set: a default whose id the set lacks. Rendered only when there is one, and only
+    for a Role that may shape the set.
+*@
+
+@if (Removed.Count > 0)
+{
+    <section class="status-restore" aria-labelledby="status-restore-heading">
+        <h3 class="type-meta status-restore__heading" id="status-restore-heading">@Localizer["StatusRemovedDefaultsHeading"]</h3>
+
+        <ul class="status-restore__list">
+            @foreach (var status in Removed)
+            {
+                <StatusRestoreItem @key="status.Id" Status="@status" OnRestore="OnRestore" />
+            }
+        </ul>
+    </section>
+}
+
+@code {
+    /// <summary>The removed defaults, in Space order.</summary>
+    [Parameter]
+    [EditorRequired]
+    public IReadOnlyList<StatusResponse> Removed { get; set; } = [];
+
+    /// <summary>Raised by the add-back control, with the default's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnRestore { get; set; }
+}

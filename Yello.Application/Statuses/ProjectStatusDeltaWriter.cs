@@ -50,13 +50,32 @@ public sealed class ProjectStatusDeltaWriter(
     {
         ArgumentNullException.ThrowIfNull(plan);
 
+        return WriteUnderLockAsync(spaceId, projectId, (draft, _) => Task.FromResult(plan(draft)), cancellationToken);
+    }
+
+    /// <summary>
+    /// Plans and records one write whose plan reads more under the lock, such as a Status's occupants.
+    /// </summary>
+    /// <param name="spaceId">The active Space, from the pipeline's context.</param>
+    /// <param name="projectId">The Project, from the route.</param>
+    /// <param name="plan">As for the synchronous overload.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The outcome, and the Project's set when it was written.</returns>
+    public Task<ProjectStatusWriteResult> WriteAsync(
+        Guid spaceId,
+        Guid projectId,
+        Func<ProjectStatusDeltaDraft, CancellationToken, Task<ProjectStatusWriteOutcome>> plan,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+
         return WriteUnderLockAsync(spaceId, projectId, plan, cancellationToken);
     }
 
     private async Task<ProjectStatusWriteResult> WriteUnderLockAsync(
         Guid spaceId,
         Guid projectId,
-        Func<ProjectStatusDeltaDraft, ProjectStatusWriteOutcome> plan,
+        Func<ProjectStatusDeltaDraft, CancellationToken, Task<ProjectStatusWriteOutcome>> plan,
         CancellationToken cancellationToken)
     {
         if (!await store.LockAsync(projectId, cancellationToken).ConfigureAwait(false))
@@ -66,28 +85,70 @@ public sealed class ProjectStatusDeltaWriter(
 
         var defaults = await statuses.ListAsync(cancellationToken).ConfigureAwait(false);
         var delta = await statuses.DeltaOfAsync(projectId, cancellationToken).ConfigureAwait(false);
-        var draft = new ProjectStatusDeltaDraft(spaceId, projectId, EffectiveStatusSet.Of(defaults, delta), delta, identifiers, clock.GetUtcNow());
+        var draft = new ProjectStatusDeltaDraft(
+            spaceId,
+            projectId,
+            EffectiveStatusSet.Of(defaults, delta),
+            delta,
+            identifiers,
+            clock.GetUtcNow(),
+            (statusId, token) => boards.CountTasksAsync(projectId, statusId, token));
 
-        var planned = plan(draft);
+        var planned = await plan(draft, cancellationToken).ConfigureAwait(false);
 
         if (planned != ProjectStatusWriteOutcome.Written)
         {
             return ProjectStatusWriteResult.Refused(planned);
         }
 
-        var verdict = EffectiveStatusSet.Check(EffectiveStatusSet.Of(defaults, delta.With(draft.Added, draft.Operations)), draft.NamedStatusId);
+        var verdict = EffectiveStatusSet.Check(EffectiveStatusSet.Of(defaults, draft.After()), draft.NamedStatusId);
 
         if (verdict != StatusDeltaVerdict.Admitted)
         {
             return ProjectStatusWriteResult.Refused(verdict == StatusDeltaVerdict.NameTaken ? ProjectStatusWriteOutcome.NameTaken : ProjectStatusWriteOutcome.SetEmpty);
         }
 
-        if (!await store.WriteAsync(draft.Added, draft.Operations, cancellationToken).ConfigureAwait(false))
+        if (!await RecordAsync(projectId, draft, cancellationToken).ConfigureAwait(false))
         {
             return ProjectStatusWriteResult.Refused(ProjectStatusWriteOutcome.NameTaken);
         }
 
         return new ProjectStatusWriteResult(ProjectStatusWriteOutcome.Written, await ReadAsync(projectId, cancellationToken).ConfigureAwait(false));
+    }
+
+    /// <summary>
+    /// Every key to a definition is <c>NO ACTION</c>, so the order is fixed: the Tasks leave the removed Status first, then
+    /// the operations naming it go (its own, and the places anchored on it, which the re-anchored places replace), and an
+    /// owned definition is deleted last, when nothing refers to it.
+    /// </summary>
+    private async Task<bool> RecordAsync(Guid projectId, ProjectStatusDeltaDraft draft, CancellationToken cancellationToken)
+    {
+        if (draft.RemovedStatusId is { } removed)
+        {
+            if (draft.DestinationStatusId is { } destination)
+            {
+                await store.MigrateTasksAsync(projectId, removed, destination, cancellationToken).ConfigureAwait(false);
+            }
+
+            await store.DeleteOperationsAsync(projectId, removed, kind: null, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (draft.RestoredStatusId is { } restored)
+        {
+            await store.DeleteOperationsAsync(projectId, restored, StatusDeltaKind.Remove, cancellationToken).ConfigureAwait(false);
+        }
+
+        if (!await store.WriteAsync(draft.Added, draft.Operations, cancellationToken).ConfigureAwait(false))
+        {
+            return false;
+        }
+
+        if (draft is { RemovedStatusId: { } owned, RemovesOwnedDefinition: true })
+        {
+            await store.DeleteOwnedDefinitionAsync(projectId, owned, cancellationToken).ConfigureAwait(false);
+        }
+
+        return true;
     }
 
     /// <summary>

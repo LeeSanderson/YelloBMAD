@@ -46,7 +46,7 @@ public sealed partial class ProjectEndpointTests
     /// holds one <c>Remove</c> operation for it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5, AC13 - the remove route and the Remove kind do not exist (Q1, Q2)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     [Trait("Requirement", "AD-16")]
     public async Task Removing_an_unoccupied_default_drops_it_from_the_set_and_the_Board_and_leaves_the_Space_read_unchanged()
@@ -80,7 +80,7 @@ public sealed partial class ProjectEndpointTests
 
         Assert.Equal([defaults[0].Id, defaults[1].Id], entries.Select(entry => entry.Id));
         Assert.All(entries, entry => Assert.Equal(ProjectStatusWire.EntryMembers, entry.Members));
-        Assert.Equal(entries, read);
+        Assert.Equal(entries.Select(Shown), read.Select(Shown));
         Assert.Equal(entries.Select(entry => (entry.Id, entry.Name)), columns);
         Assert.Equal(defaults.Select(row => (row.Id, row.Name)), spaceRead);
         Assert.Equal([(defaults[2].Id, RemovalWire.RemoveKind)], (await RemovalWire.DeltaRowsAsync(database, owner.SpaceId, projectId)).Select(row => (row.StatusId, row.Kind)));
@@ -92,7 +92,7 @@ public sealed partial class ProjectEndpointTests
     /// <c>Remove</c>; adding the same name again is admitted with a new id.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the remove route does not exist; Q1 (a) deletes an added Status's definition")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "FR-26")]
     public async Task Removing_an_unoccupied_added_Status_deletes_its_definition_and_its_name_is_added_again_with_a_new_id()
@@ -139,7 +139,7 @@ public sealed partial class ProjectEndpointTests
     /// date and creation time; the answer's destination entry counts all four Tasks; and the first default leaves the set.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC9 - the remove route does not exist; the migration's keys come from the destination's last key (AD-15)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     [Trait("Requirement", "AD-15")]
     [Trait("Requirement", "AD-17")]
@@ -217,7 +217,7 @@ public sealed partial class ProjectEndpointTests
     /// the set, its Task stays at its key, and the delta is untouched.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the remove route and status-destination-required do not exist (Q4)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     [Trait("Requirement", "AR-24")]
     public async Task An_occupied_Status_removed_without_a_destination_is_refused_409_and_nothing_changes()
@@ -243,7 +243,7 @@ public sealed partial class ProjectEndpointTests
         });
 
         Assert.NotNull(owner);
-        RemovalWire.AssertRefused(refused, HttpStatusCode.Conflict, ProjectStatusWire.StatusDestinationRequired);
+        RemovalWire.AssertRefused(refused, HttpStatusCode.Conflict, ProblemTypes.StatusDestinationRequired);
         Assert.Equal(3, set.Count);
         Assert.Equal(before, await MoveWire.PlacementsAsync(database, owner.SpaceId, projectId));
         Assert.Equal(0, await Wire.DeltaCountAsync(database, owner.SpaceId, projectId));
@@ -257,7 +257,7 @@ public sealed partial class ProjectEndpointTests
     /// is written by any of them.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2 - the remove route and invalid-status-destination do not exist (Q4, Q5)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     [Trait("Requirement", "FR-20")]
     [Trait("Requirement", "NFR-1")]
@@ -300,10 +300,10 @@ public sealed partial class ProjectEndpointTests
         });
 
         Assert.NotNull(owner);
-        RemovalWire.AssertRefused(random, HttpStatusCode.BadRequest, ProjectStatusWire.InvalidStatusDestination);
+        RemovalWire.AssertRefused(random, HttpStatusCode.BadRequest, ProblemTypes.InvalidStatusDestination);
         Assert.Equal(4, refusals.Count);
-        Assert.All(refusals, refusal => RemovalWire.AssertRefused(refusal, HttpStatusCode.BadRequest, ProjectStatusWire.InvalidStatusDestination, random));
-        RemovalWire.AssertRefused(unreadable, HttpStatusCode.BadRequest, ProjectStatusWire.InvalidStatusDestination);
+        Assert.All(refusals, refusal => RemovalWire.AssertRefused(refusal, HttpStatusCode.BadRequest, ProblemTypes.InvalidStatusDestination, random));
+        RemovalWire.AssertRefused(unreadable, HttpStatusCode.BadRequest, ProblemTypes.InvalidStatusDestination);
         Assert.Equal(before, await MoveWire.PlacementsAsync(database, owner.SpaceId, projectId));
         Assert.Equal(deltaBefore, await Wire.DeltaCountAsync(database, owner.SpaceId, projectId));
         Assert.Empty(await RefusalKindsAsync(database, owner.AccountId, owner.SpaceId));
@@ -315,7 +315,7 @@ public sealed partial class ProjectEndpointTests
     /// one removed with a random destination is refused <c>400 invalid-status-destination</c> and stays.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the remove route does not exist (Q2, Q4)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     public async Task An_unoccupied_Status_with_a_valid_destination_is_removed_and_with_an_invalid_one_is_refused()
     {
@@ -337,7 +337,7 @@ public sealed partial class ProjectEndpointTests
         });
 
         Assert.NotNull(owner);
-        RemovalWire.AssertRefused(invalid, HttpStatusCode.BadRequest, ProjectStatusWire.InvalidStatusDestination);
+        RemovalWire.AssertRefused(invalid, HttpStatusCode.BadRequest, ProblemTypes.InvalidStatusDestination);
         Assert.True(valid?.StatusCode == HttpStatusCode.OK, $"{valid?.StatusCode} {valid?.Body}");
         Assert.Equal([defaults[0].Id, defaults[1].Id], ProjectStatusWire.EntriesOf(valid!.Body).Select(entry => entry.Id));
         await Wire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
@@ -348,7 +348,7 @@ public sealed partial class ProjectEndpointTests
     /// destination check (a random destination does not turn it into a <c>400</c>), and nothing is written.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the remove route does not exist; Check's SetEmpty is unreachable over HTTP until it does")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "FR-26")]
     public async Task Removing_the_last_Status_is_refused_409_status_set_empty_before_any_destination_check()
@@ -387,7 +387,7 @@ public sealed partial class ProjectEndpointTests
     /// added back again, each answering the whole set; and no Task is ever outside the set.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7, AC10 - the restore route does not exist; Q2 (a) restores by id, Q3 (a) returns it at its Space slot")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "AD-16")]
     public async Task A_removed_default_is_added_back_with_its_id_at_its_Space_slot_under_its_Space_name()
@@ -439,7 +439,7 @@ public sealed partial class ProjectEndpointTests
     /// answer the in-Space <c>404 not-available</c> byte-identical to a random id; nothing is written by any of them.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the restore route does not exist (Q2)")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "AD-3")]
     public async Task Adding_back_a_name_the_set_now_holds_is_409_and_an_id_that_is_not_a_removed_default_is_404()
@@ -487,7 +487,7 @@ public sealed partial class ProjectEndpointTests
     /// operation is anchored on it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the remove route does not exist; Q3 (a) re-anchors every dependent place (ledger :1022)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     [Trait("Requirement", "AD-16")]
     public async Task Removing_a_Status_that_others_are_placed_after_leaves_the_rest_in_their_order()
@@ -541,7 +541,7 @@ public sealed partial class ProjectEndpointTests
     /// </summary>
     /// <param name="role">The caller's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11 - the remove and restore routes do not exist (Q2)")]
+    [Theory]
     [InlineData("Member")]
     [InlineData("Viewer")]
     [Trait("Requirement", "FR-16")]
@@ -599,7 +599,7 @@ public sealed partial class ProjectEndpointTests
     /// written.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the remove and restore routes do not exist (Q2)")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "NFR-1")]
     [Trait("Requirement", "FR-20")]
@@ -654,7 +654,7 @@ public sealed partial class ProjectEndpointTests
     /// migrates once: the Tasks keep the keys the first answer gave them and the delta holds one <c>Remove</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - the remove route does not exist (AD-18)")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     public async Task A_replayed_removal_returns_the_original_answer_and_migrates_once()
     {
@@ -694,7 +694,7 @@ public sealed partial class ProjectEndpointTests
     /// <c>204</c> in its one statement and leaves nothing of the Space.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the remove route does not exist; Project and Space deletion must take a Remove row with the rest")]
+    [Fact]
     [Trait("Requirement", "FR-7")]
     [Trait("Requirement", "AD-17")]
     public async Task Deleting_a_Project_or_a_Space_holding_a_removed_default_and_Tasks_succeeds()
@@ -741,7 +741,7 @@ public sealed partial class ProjectEndpointTests
     /// rather than an empty page that silently ends the walk; a fresh walk returns every Task once, all in the destination.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - the remove route does not exist; Q10 (a) refuses a cursor on a Status outside the order (ledger :655)")]
+    [Fact]
     [Trait("Requirement", "FR-30")]
     [Trait("Requirement", "FR-26")]
     public async Task A_Status_sort_cursor_on_a_removed_Status_is_refused_400_and_a_fresh_walk_returns_every_Task_once()
@@ -794,6 +794,9 @@ public sealed partial class ProjectEndpointTests
                 .Order(StringComparer.Ordinal),
         ];
     }
+
+    // Members is a list, which a record compares by reference.
+    private static string Shown(ProjectStatusEntry entry) => $"{entry.Id}|{entry.Name}|{entry.Source}|{entry.DefaultName}|{entry.TaskCount}|{string.Join(',', entry.Members)}";
 
     private sealed record StatusRowOf(Guid Id, string Name);
 }

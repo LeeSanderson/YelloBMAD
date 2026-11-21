@@ -36,7 +36,7 @@ public sealed partial class TaskEndpointTests
     /// Task keeps its Status and key; and no Task holds a Status outside its Project's set.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - Task edit validates its Status before the Project's lock (ledger :1020, Q6); the Remove kind does not exist")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-26")]
     public async Task An_edit_to_a_Status_queued_behind_its_removal_is_refused_400_invalid_task_status()
@@ -88,7 +88,7 @@ public sealed partial class TaskEndpointTests
     /// its Status and key; and no Task holds a Status outside its Project's set.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - Task move validates its Status before the Project's lock (ledger :1020, Q6); the Remove kind does not exist")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-26")]
     public async Task A_move_to_a_Status_queued_behind_its_removal_is_refused_400_invalid_task_status()
@@ -140,7 +140,7 @@ public sealed partial class TaskEndpointTests
     /// the new first Status, the second default.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - the Remove kind does not exist, so the set cannot lose its first Status; creation's dependency on the bound's lock is unproven")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     public async Task A_creation_queued_behind_the_removal_of_the_first_Status_lands_in_the_new_first_Status()
     {
@@ -186,7 +186,7 @@ public sealed partial class TaskEndpointTests
     /// it answers <c>404</c> byte-identical to a random Status's column page.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8, AC15 - the remove route does not exist (Q1, Q2)")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-26")]
     public async Task A_removed_Status_is_refused_for_an_edit_and_a_move_and_its_column_page_is_404()

@@ -2,7 +2,6 @@ using System.Globalization;
 using System.Text.Json;
 using Yello.Contracts;
 using Yello.Contracts.Spaces;
-using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -29,6 +28,9 @@ internal sealed partial class FakeYelloApi
     private TaskCompletionSource? _heldStatusRemoval;
     private TaskCompletionSource? _arrivedStatusRemoval;
 
+    // Kept apart from _heldStatusRemoval, which the held request takes (and clears) when it arrives.
+    private TaskCompletionSource? _releaseStatusRemoval;
+
     /// <summary>
     /// Each Space's default Statuses as its own read serves them, in Space order. <see cref="SeedProjectStatuses"/> fills it.
     /// </summary>
@@ -53,6 +55,7 @@ internal sealed partial class FakeYelloApi
     public Task HoldStatusRemovalAsync()
     {
         _heldStatusRemoval = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _releaseStatusRemoval = _heldStatusRemoval;
         _arrivedStatusRemoval = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         return _arrivedStatusRemoval.Task;
@@ -61,7 +64,7 @@ internal sealed partial class FakeYelloApi
     /// <summary>
     /// Lets the held removal go; it is then decided as any other.
     /// </summary>
-    public void ReleaseStatusRemoval() => _heldStatusRemoval?.TrySetResult();
+    public void ReleaseStatusRemoval() => _releaseStatusRemoval?.TrySetResult();
 
     /// <summary>
     /// The answer to a removal, an add-back or a seeded Space's Status read; <c>null</c> when the request is none of them.
@@ -119,19 +122,19 @@ internal sealed partial class FakeYelloApi
         }
         catch (JsonException)
         {
-            return (400, Problem(ProjectStatusWire.InvalidStatusDestination));
+            return (400, Problem(ProblemTypes.InvalidStatusDestination));
         }
 
         if (destination is { } named && (named == statusId || set.TrueForAll(entry => entry.Id != named)))
         {
-            return (400, Problem(ProjectStatusWire.InvalidStatusDestination));
+            return (400, Problem(ProblemTypes.InvalidStatusDestination));
         }
 
         var removed = set[index];
 
         if (removed.TaskCount > 0 && destination is null)
         {
-            return (409, Problem(ProjectStatusWire.StatusDestinationRequired));
+            return (409, Problem(ProblemTypes.StatusDestinationRequired));
         }
 
         set.RemoveAt(index);
