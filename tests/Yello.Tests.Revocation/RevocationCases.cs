@@ -91,6 +91,20 @@ internal static class RevocationCases
                 [IsolationSurface.ApiToken] = new(context => context.World.Database.DeleteAccountAsync(context.Actor.AccountId), new NoCredential()),
             }),
 
+        // The endpoint-driven twin of REV-ACCOUNT-DELETED, which stays as the raw-SQL schema proof: the holder, a Member of
+        // another Account's Space with a Token bound there, deletes its own Personal Space and then its Account through the
+        // product. The Session replays the cookie held before the deletion; the Token is the one bound to the joined Space.
+        new(
+            "REV-ACCOUNT-DELETED-BY-HOLDER", "V-3, V-11, FR-3, FR-36",
+            new Dictionary<IsolationSurface, RevocationStep>
+            {
+                [IsolationSurface.Session] = new(HolderDeletesTheAccountAsync, new NoCredential(ClearsTheDeadCookie: true)),
+                [IsolationSurface.ApiToken] = new(HolderDeletesTheAccountAsync, new JoinedTokenDead()),
+            })
+        {
+            Skip = "red: AC12 - DELETE /api/v1/account is not mapped, so the holder cannot delete its Account through the product",
+        },
+
         new(
             "REV-ROLE-CHANGED", "I-10, NFR-2",
             Both(new RevocationStep(context => context.World.Database.ChangeRoleAsync(context.Actor.SpaceId, context.Actor.AccountId, "viewer"), new ServedAtRole("viewer")))),
@@ -299,6 +313,30 @@ internal static class RevocationCases
         var left = await view.SendAsync(IsolationSurface.Session, HttpMethod.Delete, MembershipRoutes.OwnOf(owner.SpaceId));
 
         Assert.True(left.StatusCode == HttpStatusCode.NoContent, $"The leave through the product: {left.StatusCode} {left.Body}");
+
+        Joined.AddOrUpdate(context, view);
+    }
+
+    /// <summary>
+    /// The row's actor joins a fresh Owner's Space as Member through the product, issues itself a Token bound there and reads
+    /// that Space on both surfaces (the anchor). It deletes its Personal Space, the one Space it owns, then its Account
+    /// through its Session (<c>204</c> each), and holds the Session cookie from before the deletion again.
+    /// </summary>
+    private static async Task HolderDeletesTheAccountAsync(RevocationContext context)
+    {
+        var (world, actor) = (context.World, context.Actor);
+        var owner = await world.NewActorAsync();
+        var view = await JoinOwnersSpaceAsync(world, owner, actor, "member", "rev-account-deleted");
+
+        await AnchorBothSurfacesAsync(view);
+
+        var personal = await actor.SendAsync(IsolationSurface.Session, HttpMethod.Delete, SpaceRoutes.ActiveOf(actor.SpaceId));
+
+        Assert.True(personal.StatusCode == HttpStatusCode.NoContent, $"Deleting the Personal Space through the product: {personal.StatusCode} {personal.Body}");
+
+        var deleted = await AccountDeletionWire.DeleteAndKeepTheOldCookieAsync(actor.Session);
+
+        Assert.True(deleted.StatusCode == HttpStatusCode.NoContent, $"The holder's Account deletion through the product: {deleted.StatusCode} {deleted.Body}");
 
         Joined.AddOrUpdate(context, view);
     }

@@ -146,6 +146,25 @@ public sealed class AuthenticateAccountHandlerTests
         Assert.Equal([(accountId, FakeHasher.NewHash)], store.Rehashes);
     }
 
+    /// <summary>
+    /// A sign-in whose rehash wrote no row - the Account was deleted between the read and the write - authenticates
+    /// nothing: the result is the same <c>null</c> every other failure is, so no Session is issued for an Account that is
+    /// gone. The verifier still ran, so the duration is a success's.
+    /// </summary>
+    [Fact(Skip = "red: AC11 - RehashAsync returns no rowcount, so the handler authenticates an Account its rehash did not find")]
+    [Trait("Requirement", "FR-3")]
+    public async Task A_rehash_that_wrote_no_row_authenticates_nothing()
+    {
+        var store = new FakeCredentialStore(new AccountCredential(Guid.NewGuid(), "old-hash")) { RehashFindsTheRow = false };
+        var hasher = new FakeHasher(PasswordVerification.SuccessRehashNeeded);
+
+        var authenticated = await new AuthenticateAccountHandler(hasher, store)
+            .HandleAsync(Command(), TestContext.Current.CancellationToken);
+
+        Assert.Null(authenticated);
+        Assert.Equal(1, hasher.VerifyCalls);
+    }
+
     [Fact]
     public async Task A_hash_already_at_the_configured_work_factor_is_left_alone()
     {
@@ -242,6 +261,12 @@ public sealed class AuthenticateAccountHandlerTests
 
         public List<(Guid AccountId, string PasswordHash)> Rehashes { get; } = [];
 
+        /// <summary>
+        /// Whether the rehash's <c>UPDATE</c> finds the Account's row; <c>false</c> plays an Account deleted between the read
+        /// and the write, and the rewrite is then not recorded.
+        /// </summary>
+        public bool RehashFindsTheRow { get; init; } = true;
+
         public Task<AccountCredential?> FindByEmailAddressAsync(
             string normalizedEmailAddress,
             CancellationToken cancellationToken)
@@ -253,7 +278,10 @@ public sealed class AuthenticateAccountHandlerTests
 
         public Task RehashAsync(Guid accountId, string passwordHash, CancellationToken cancellationToken)
         {
-            Rehashes.Add((accountId, passwordHash));
+            if (RehashFindsTheRow)
+            {
+                Rehashes.Add((accountId, passwordHash));
+            }
 
             return Task.CompletedTask;
         }

@@ -501,6 +501,39 @@ public sealed class InvitationViewTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// An Invitation whose issuer's Account was deleted still opens, and its issuer line names a deleted Account beside the
+    /// tombstone avatar, never a blank: "A deleted Account invited you to {Space}.". The issuer's name is served as
+    /// <c>null</c>.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC5 - the Invitation view has no deleted-issuer rendering and no tombstone avatar (Q5 (a))")]
+    [Trait("Requirement", "FR-12")]
+    [Trait("Requirement", "UX-DR10")]
+    public async Task A_deleted_issuer_is_named_as_a_deleted_Account_on_the_offer()
+    {
+        var (api, token) = Offered(signedIn: false);
+
+        // The Host serves the issuer's name as null once the issuer's Account is gone.
+        api.Offers[token] = (new OfferedInvitation(SpaceName, "member", IssuerName: null, AddressedToYou: null), Northwind);
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenViewAsync(api, page, token);
+            await page.Locator(Heading, new PageLocatorOptions { HasText = "A deleted Account invited you to " + SpaceName + "." })
+                .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var tombstone = page.Locator("main .avatar-tombstone");
+
+            Assert.Equal(1, await tombstone.CountAsync());
+            Assert.Equal("Deleted Account", await tombstone.GetAttributeAsync("aria-label"));
+            Assert.Equal(string.Empty, (await tombstone.TextContentAsync() ?? string.Empty).Trim());
+            Assert.DoesNotContain(IssuerName, await page.Locator("main").TextContentAsync() ?? string.Empty, StringComparison.Ordinal);
+        }
+    }
+
+    /// <summary>
     /// A fake holding one live Invitation's offer to Northwind as a Member, issued by Ravi Anand; signed in (as the addressee)
     /// or not.
     /// </summary>

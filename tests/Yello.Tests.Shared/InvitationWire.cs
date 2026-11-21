@@ -217,9 +217,9 @@ public static class InvitationWire
 /// </summary>
 /// <param name="SpaceName">The invited Space's name.</param>
 /// <param name="Role">The Role's stable code: <c>admin</c>, <c>member</c> or <c>viewer</c>.</param>
-/// <param name="IssuerName">The issuer's display name as captured at issue.</param>
+/// <param name="IssuerName">The issuer's display name as captured at issue, or <c>null</c> once the issuer's Account is deleted.</param>
 /// <param name="AddressedToYou">With a Session, whether its Account's address is the invited one; otherwise <c>null</c>.</param>
-public sealed record OfferedInvitation(string SpaceName, string Role, string IssuerName, bool? AddressedToYou);
+public sealed record OfferedInvitation(string SpaceName, string Role, string? IssuerName, bool? AddressedToYou);
 
 /// <summary>
 /// One row of story 4.2's Invitation list as the test reads it: the Q5 (a) shape of <c>InvitationResponse</c>, restated
@@ -229,6 +229,6 @@ public sealed record OfferedInvitation(string SpaceName, string Role, string Iss
 /// <param name="Id">The Invitation's id, which the revoke names.</param>
 /// <param name="EmailAddress">The stored, trimmed address.</param>
 /// <param name="Role">The Role's stable code: <c>admin</c>, <c>member</c> or <c>viewer</c>.</param>
-/// <param name="IssuerName">The issuer's display name as captured at issue.</param>
+/// <param name="IssuerName">The issuer's display name as captured at issue, or <c>null</c> once the issuer's Account is deleted.</param>
 /// <param name="IssuedAt">The row's <c>CreatedAt</c>.</param>
-public sealed record ListedInvitation(Guid Id, string EmailAddress, string Role, string IssuerName, DateTimeOffset IssuedAt);
+public sealed record ListedInvitation(Guid Id, string EmailAddress, string Role, string? IssuerName, DateTimeOffset IssuedAt);

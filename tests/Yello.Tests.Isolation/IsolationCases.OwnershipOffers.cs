@@ -183,6 +183,8 @@ internal static partial class IsolationCases
         .. OwnershipOfferAnswerCases(),
 
         .. SettledOwnershipOfferCases(),
+
+        .. AccountDeletionCases(),
     ];
 
     /// <summary>

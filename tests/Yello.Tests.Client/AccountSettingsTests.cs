@@ -44,6 +44,38 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
     private const string RevokeWarning = "Scripts using this Token will stop working.";
     private const string NameInvalid = "Enter a name of 1 to 100 characters.";
 
+    private const string DeletionSection = "main .account-delete-section";
+    private const string OpenDeletion = "Delete your Account";
+    private const string DeletionQuestion = "Delete your Account?";
+    private const string CannotBeUndone = "This cannot be undone.";
+    private const string DeleteAction = "Delete Account";
+    private const string CancelAction = "Cancel";
+    private const string AccountDeleted = "Account deleted.";
+    private const string NotSent = "Not sent.";
+    private const string OwnsSpacesStatement = "You own these Spaces, so your Account cannot be deleted yet.";
+    private const string TwoExits = "For each one, either offer ownership to someone in it and have them accept, or delete the Space.";
+    private const string WhyDeletingIsYours = "Deleting the Space is the only exit you control on your own, because a transfer needs someone else to accept.";
+
+    /// <summary>
+    /// A 1.4.10 reflow probe over the page, as <c>InvitationViewTests.Reflow</c>.
+    /// </summary>
+    private const string Reflow =
+        """
+        () => {
+            const problems = [];
+            const page = document.scrollingElement;
+            if (page.scrollWidth > page.clientWidth + 1) problems.push('the page scrolls sideways by ' + (page.scrollWidth - page.clientWidth) + 'px');
+            for (const element of document.querySelectorAll('main *')) {
+                const style = getComputedStyle(element);
+                if (style.display === 'none') continue;
+                if (['auto', 'scroll'].includes(style.overflowX) && element.scrollWidth > element.clientWidth + 1) {
+                    problems.push('scrolls sideways: ' + element.tagName + '.' + element.className);
+                }
+            }
+            return problems;
+        }
+        """;
+
     private static readonly Guid Northwind = Guid.NewGuid();
     private static readonly Guid Harbour = Guid.NewGuid();
 
@@ -329,6 +361,211 @@ public sealed class AccountSettingsTests(ClientSurfaceFixture surface)
             var revoke = Assert.Single(api.Requests, request => request.Method == "DELETE" && request.Path.Contains(tokenId.ToString("D"), StringComparison.OrdinalIgnoreCase));
             Assert.Equal(api.IssuedToken, revoke.Header(Contracts.Accounts.Antiforgery.HeaderName));
         }
+    }
+
+    /// <summary>
+    /// Deleting the Account asks first, in place, below the API Tokens: "Delete your Account?" as the heading, which takes
+    /// focus, "This cannot be undone." after it, the danger "Delete Account" and Cancel. Cancel and Esc each close it and
+    /// send nothing.
+    /// </summary>
+    [Fact(Skip = "red: AC14 - Account settings has no deletion section (Q4 (a): an in-place confirm, no typed field)")]
+    [Trait("Requirement", "FR-3")]
+    [Trait("Requirement", "UX-DR36")]
+    [Trait("Requirement", "UX-DR40")]
+    public async Task Deleting_the_Account_asks_in_place_and_Cancel_and_Esc_send_nothing()
+    {
+        var api = OwnsNothing();
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenAccountSettingsAsync(api, page);
+
+            foreach (var close in new Func<Task>[] { () => Button(page, CancelAction).ClickAsync(), () => page.Keyboard.PressAsync("Escape") })
+            {
+                await OpenDeletionConfirmAsync(page);
+
+                var confirm = page.Locator($"{DeletionSection} .destructive-confirm");
+                var question = confirm.GetByRole(AriaRole.Heading, new LocatorGetByRoleOptions { Name = DeletionQuestion, Exact = true });
+
+                Assert.True(await question.EvaluateAsync<bool>("e => e === document.activeElement"), "Focus did not move to the question.");
+                Assert.Contains(CannotBeUndone, await confirm.TextContentAsync() ?? string.Empty, StringComparison.Ordinal);
+                Assert.Contains("button-danger", await confirm.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = DeleteAction, Exact = true }).GetAttributeAsync("class") ?? string.Empty, StringComparison.Ordinal);
+
+                await close();
+                await confirm.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
+            }
+
+            Assert.Empty(api.AccountDeletions);
+        }
+    }
+
+    /// <summary>
+    /// Confirmed, the deletion is one <c>DELETE</c> carrying the anti-forgery token and no <c>Idempotency-Key</c> (Q7 (a));
+    /// on <c>204</c> the tab purges and lands on the sign-in page, which says "Account deleted." politely.
+    /// </summary>
+    [Fact(Skip = "red: AC14 - Account settings has no deletion section, so nothing is sent and nothing lands")]
+    [Trait("Requirement", "FR-3")]
+    [Trait("Requirement", "AR-14")]
+    [Trait("Requirement", "UX-DR36")]
+    public async Task A_confirmed_deletion_sends_one_DELETE_and_lands_on_sign_in_saying_Account_deleted()
+    {
+        var api = OwnsNothing();
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenAccountSettingsAsync(api, page);
+            await OpenDeletionConfirmAsync(page);
+            await Button(page, DeleteAction).ClickAsync();
+
+            await WaitForPathAsync(page, "/sign-in");
+            await page.Locator("[aria-live='polite'], [role='status']", new PageLocatorOptions { HasText = AccountDeleted })
+                .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var deletion = Assert.Single(api.AccountDeletions);
+
+            Assert.Equal(api.IssuedToken, deletion.Header(Contracts.Accounts.Antiforgery.HeaderName));
+            Assert.Null(deletion.Header(Contracts.Idempotency.HeaderName));
+            Assert.Equal(0, await page.Locator(ContextBar).CountAsync());
+        }
+    }
+
+    /// <summary>
+    /// An Owner's deletion is refused, and the section states it as a designed state, not a toast or an alert: the
+    /// statement as a heading with focus moved to it; every owned Space by name, each a link to that Space's settings; the
+    /// two exits; and why deleting the Space is the one exit the Account controls. No third exit is offered or implied.
+    /// </summary>
+    [Fact(Skip = "red: AC3 - Account settings has no deletion section and no account-owns-spaces state (Q8 (a): each name links to the Space's settings)")]
+    [Trait("Requirement", "FR-3")]
+    [Trait("Requirement", "AR-29")]
+    [Trait("Requirement", "UX-DR36")]
+    public async Task An_Owner_is_shown_the_Spaces_it_owns_and_exactly_two_exits_with_focus_on_the_statement()
+    {
+        var api = OwnsNothing();
+
+        api.OwnedSpaces.Add((Northwind, "Northwind Redesign"));
+        api.OwnedSpaces.Add((Harbour, "Harbour Ops"));
+        api.Roles[Northwind] = "owner";
+        api.Roles[Harbour] = "owner";
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenAccountSettingsAsync(api, page);
+            await OpenDeletionConfirmAsync(page);
+            await Button(page, DeleteAction).ClickAsync();
+
+            var section = page.Locator(DeletionSection);
+            var statement = section.GetByRole(AriaRole.Heading, new LocatorGetByRoleOptions { Name = OwnsSpacesStatement, Exact = true });
+
+            await statement.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.True(await statement.EvaluateAsync<bool>("e => e === document.activeElement"), "Focus did not move to the statement.");
+
+            foreach (var (id, name) in api.OwnedSpaces)
+            {
+                var link = section.GetByRole(AriaRole.Link, new LocatorGetByRoleOptions { Name = name, Exact = true });
+
+                Assert.Equal($"/spaces/{id:D}/settings", new Uri(await link.EvaluateAsync<string>("e => e.href")).AbsolutePath);
+            }
+
+            var text = await section.TextContentAsync() ?? string.Empty;
+
+            Assert.Contains(TwoExits, text, StringComparison.Ordinal);
+            Assert.Contains(WhyDeletingIsYours, text, StringComparison.Ordinal);
+
+            foreach (var thirdExit in new[] { "leave", "archive", "support", "remove yourself" })
+            {
+                Assert.DoesNotContain(thirdExit, text, StringComparison.OrdinalIgnoreCase);
+            }
+
+            Assert.Equal(0, await page.Locator("[role='alert']:not(:empty)").CountAsync());
+            Assert.Equal(AccountSettingsPath, await page.EvaluateAsync<string>("() => location.pathname"));
+            Assert.Single(api.AccountDeletions);
+        }
+    }
+
+    /// <summary>
+    /// A deletion that gets a server failure says "Not sent." and keeps the confirm open, on Account settings, still signed in.
+    /// </summary>
+    [Fact(Skip = "red: AC14 - Account settings has no deletion section, so no failure is shown")]
+    [Trait("Priority", "P1")]
+    [Trait("Requirement", "UX-DR36")]
+    public async Task A_deletion_that_fails_says_Not_sent_and_keeps_the_confirm()
+    {
+        var api = OwnsNothing();
+
+        api.NextAccountDeletionFailure = 503;
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenAccountSettingsAsync(api, page);
+            await OpenDeletionConfirmAsync(page);
+            await Button(page, DeleteAction).ClickAsync();
+
+            await page.Locator(DeletionSection).GetByText(NotSent).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal(1, await page.Locator($"{DeletionSection} .destructive-confirm").CountAsync());
+            Assert.Equal(AccountSettingsPath, await page.EvaluateAsync<string>("() => location.pathname"));
+            Assert.True(api.SignedIn, "The fake ended the Session on a failed deletion.");
+        }
+    }
+
+    /// <summary>
+    /// At 320 by 256 (1280 by 1024 at 400%) the refusal state reflows: no sideways page scroll and nothing in <c>main</c> that
+    /// scrolls sideways, with a long Space name in the list.
+    /// </summary>
+    [Fact(Skip = "red: AC14 - Account settings has no deletion section and no refusal state to reflow")]
+    [Trait("Priority", "P1")]
+    [Trait("Requirement", "NFR-9")]
+    public async Task The_refusal_state_reflows_at_320_by_256()
+    {
+        var api = OwnsNothing();
+
+        api.OwnedSpaces.Add((Northwind, "Northwind Redesign and the very long name of a Space that wraps"));
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await page.SetViewportSizeAsync(320, 256);
+            await OpenAccountSettingsAsync(api, page);
+            await OpenDeletionConfirmAsync(page);
+            await Button(page, DeleteAction).ClickAsync();
+            await page.Locator(DeletionSection).GetByRole(AriaRole.Heading, new LocatorGetByRoleOptions { Name = OwnsSpacesStatement, Exact = true })
+                .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var problems = await page.EvaluateAsync<string[]>(Reflow);
+
+            Assert.True(problems.Length == 0, string.Join("; ", problems));
+        }
+    }
+
+    /// <summary>
+    /// A signed-in Account who owns nothing: a Member of Northwind Redesign and a Viewer of Harbour Ops. A case that wants
+    /// the refusal sets <see cref="FakeYelloApi.OwnedSpaces"/>.
+    /// </summary>
+    private static FakeYelloApi OwnsNothing()
+    {
+        var api = TwoSpaces();
+
+        api.Roles[Northwind] = "member";
+
+        return api;
+    }
+
+    /// <summary>
+    /// Opens the deletion's confirm from its section and waits for the question.
+    /// </summary>
+    private static async Task OpenDeletionConfirmAsync(IPage page)
+    {
+        await page.Locator(DeletionSection).GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = OpenDeletion, Exact = true }).ClickAsync();
+        await page.Locator(DeletionSection).GetByRole(AriaRole.Heading, new LocatorGetByRoleOptions { Name = DeletionQuestion, Exact = true })
+            .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
     }
 
     /// <summary>

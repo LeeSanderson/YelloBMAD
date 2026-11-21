@@ -400,6 +400,51 @@ Follow `tests/TESTING-CONVENTIONS.md`: traits `:44-95`, rules `:97-207` (races `
 - Prior stories: `5-3-...md` (Dev Notes, review findings), `5-2-...md`, `5-1-...md` (AC5/AC6 Account arms met vacuously, Q10), `4-5-remove-a-membership-or-leave-a-space.md`, `3-3-delete-a-space-and-belong-to-none.md`.
 - Code: `Account.cs`, `AccountConfiguration.cs`, `MembershipStore.cs:178-217`, `MembershipStore.Assignees.cs:114-121`, `OwnershipOfferWrites.cs:158`, `MembershipActiveSpaceResolver.cs:64-109`, `AccountSpaceDirectory.cs:255-299`, `SpaceSessionContext.cs:358`, `:376`, `ApplicationLocks.cs:236`, `:261-284`, `:312`, `InvitationConfiguration.cs:104`, `:128-131`, `ApiTokenConfiguration.cs:60-64`, `SessionRevocation.cs:125-139`, `AccountCredentialStore.cs:257-268`, `AccountScopedResolution.cs:45-87`, `AccountScopedSurface.cs`, `ApiTokenEndpoints.cs:50-61`, `AccountSettings.razor`, `SpaceDeleteSection.razor`, `SessionState.cs:158-207`, `ContextBar.razor:353-379`, `ProblemResponse.cs:38`, `RefusalCopy.cs:253-284`, `WireDatabase.cs:415-431`, `RevocationCases.cs:74-129`, `SpaceSwitcherGateTests.cs:55`, `:77`, `:363`, `RefusalBoundaryGateTests.cs:371`, `:427`, `:697`.
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-5-4-delete-your-account.md` (scenario map, decisions, findings, seed
+data against the schema). Scaffolds follow Q1 (a) and Q3 (a) as Lee decided, and the recommendation (a) of Q2 and Q4-Q10;
+a skip that depends on an open question names it.
+
+| File | Cases | ACs | Today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteAccount.cs` (new) | 7 | AC1, AC2, AC4-AC7, AC9-AC11, AC13 | red (skipped) |
+| `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.DeleteAccountRace.cs` (new) | 2 | AC1, AC2, AC13 (Q2) | red (skipped) |
+| `tests/Yello.Tests.Slices/Accounts/AuthenticateAccount/AuthenticateAccountHandlerTests.cs` (1 added) | 1 | AC11 | red (skipped) |
+| `tests/Yello.Tests.Isolation/IsolationCases.AccountDeletion.cs` (new) | 2 rows | AC12 (I-11, V-3) | `PendingUntil: "5.4"` |
+| `tests/Yello.Tests.Revocation/RevocationCases.cs` (`REV-ACCOUNT-DELETED-BY-HOLDER`) | 1 row x 2 surfaces | AC12 (V-3, V-11) | red (row `Skip`) |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.DeleteAccount.cs` (new) | 4 | AC2, AC4, AC5, AC8 | red (skipped) |
+| `tests/Yello.Tests.Architecture/DesignFoundationGateTests.Tombstone.cs` (new) | 3 | AC5 | red (skipped) |
+| `tests/Yello.Tests.Client/AccountSettingsTests.cs` (5 added) | 5 | AC3, AC14 | red (skipped) |
+| `tests/Yello.Tests.Client/InvitationListTests.cs` (1 added) | 1 | AC5 | red (skipped) |
+| `tests/Yello.Tests.Client/InvitationViewTests.cs` (1 added) | 1 | AC5 | red (skipped) |
+
+Supporting, no cases: `tests/Yello.Tests.Shared/AccountDeletionWire.cs` (stand-ins `Route`, `AccountOwnsSpacesType`,
+`DeletionInterruptedType` - swap for the contract members and delete), `tests/Yello.Tests.Client/FakeYelloApi.AccountDeletion.cs`
+(hooked at the top of `FakeYelloApi.SpaceDeletion.cs`'s `SpaceDeletionAsync`), and `ListedInvitation` / `OfferedInvitation`
+`IssuerName` made `string?` in `InvitationWire.cs`.
+
+Green today: none of the new scaffolds. The existing standing gates `Deleting_the_Account_with_its_Memberships_invalidates_its_Tokens`,
+`REV-ACCOUNT-DELETED` and the three-member `AccountScopedSurface` gate must stay green.
+
+Activation order (riskiest assumption first):
+
+1. `An_Invitation_issued_in_a_Space_its_issuer_was_removed_from_survives_the_issuers_deletion_with_no_issuer` with the gate
+   `The_Invitation_issuer_key_is_nullable_and_set_null_when_the_Account_is_deleted` - Q3's riskiest assumption, that the
+   cascading `SET NULL` from `Account` reaches `Invitation` rows past the Space-only policy. If it does not, take Q3 (b).
+2. `The_Invitation_contracts_serve_a_nullable_issuer_name`.
+3. The route gate and the refusal-type gate (swap the stand-ins; widen `Every_Account_scoped_endpoint_names_an_AD_24_surface`
+   and the `SpaceSwitcherGateTests.Isolation` lists in the same change).
+4. The three refusal cases.
+5. `An_Account_in_three_Spaces_is_erased_from_each_and_every_Space_keeps_its_work`.
+6. The two race cases.
+7. The re-registration case, the dead-Session accept replay, and the rehash handler test.
+8. The two `ISO-DELETE-ACCOUNT-*` rows made live and `REV-ACCOUNT-DELETED-BY-HOLDER` unskipped (GATE-003).
+9. The tombstone CSS gates, the Invitation row and view cases, then the five Account settings cases.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the
+correction recorded in the Debug Log, not deleted.
+
 ## Dev Agent Record
 
 ### Agent Model Used

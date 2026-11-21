@@ -526,6 +526,50 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
+    /// An Invitation whose issuer's Account was deleted is still listed and revocable, and its issuer renders as a deleted
+    /// Account: "Sent by a deleted Account" beside a tombstone avatar - the avatar's box with no initials, an image named
+    /// "Deleted Account", shown and never blank. The issuer's name is served as <c>null</c>, so no name is anywhere.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact(Skip = "red: AC5 - the Invitation row has no deleted-issuer rendering and no tombstone avatar (Q5 (a))")]
+    [Trait("Requirement", "FR-12")]
+    [Trait("Requirement", "UX-DR10")]
+    public async Task A_deleted_issuer_renders_as_a_deleted_Account_beside_a_tombstone_avatar()
+    {
+        var api = TwoSpaces("owner");
+
+        // The Host serves the issuer's name as null once the issuer's Account is gone.
+        var orphaned = Listed("member", issuerName: null);
+        var signed = Listed("viewer", "Ada Admin");
+
+        api.PendingInvitations[Northwind] = [orphaned, signed];
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenSettingsAsync(api, page, Northwind);
+            await Row(page, orphaned).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            var row = Row(page, orphaned);
+
+            Assert.Contains("Sent by a deleted Account", await row.TextContentAsync() ?? string.Empty, StringComparison.Ordinal);
+
+            var tombstone = row.Locator(".avatar-tombstone");
+
+            Assert.Equal(1, await tombstone.CountAsync());
+            Assert.Equal("img", await tombstone.GetAttributeAsync("role"));
+            Assert.Equal("Deleted Account", await tombstone.GetAttributeAsync("aria-label"));
+            Assert.Equal(string.Empty, (await tombstone.TextContentAsync() ?? string.Empty).Trim());
+            Assert.True(await tombstone.IsVisibleAsync(), "The tombstone is not shown.");
+            Assert.True((await tombstone.BoundingBoxAsync())?.Width > 0, "The tombstone has no box.");
+
+            Assert.Equal(1, await row.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RevokeAction, Exact = true }).CountAsync());
+            Assert.Equal(0, await Row(page, signed).Locator(".avatar-tombstone").CountAsync());
+        }
+    }
+
+    /// <summary>
     /// A signed-in Account holding <paramref name="northwindRole"/> in Northwind Redesign and Member of Harbour Ops.
     /// </summary>
     private static FakeYelloApi TwoSpaces(string northwindRole)
@@ -543,7 +587,7 @@ public sealed class InvitationListTests(ClientSurfaceFixture surface)
     /// <summary>
     /// A pending Invitation as the list sends it, to a fresh address (never a shared one), issued a day ago.
     /// </summary>
-    private static ListedInvitation Listed(string role, string issuerName) =>
+    private static ListedInvitation Listed(string role, string? issuerName) =>
         new(Guid.NewGuid(), $"invitee-{Guid.NewGuid():N}@example.test", role, issuerName, DateTimeOffset.UtcNow.AddDays(-1));
 
     private static ILocator Row(IPage page, ListedInvitation listed) =>
