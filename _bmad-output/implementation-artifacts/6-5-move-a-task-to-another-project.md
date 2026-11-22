@@ -395,6 +395,79 @@ Follow `tests/TESTING-CONVENTIONS.md` (traits `:49-86`; rules and races `:87-207
 - Story files: `2-6-move-and-reorder-a-task-by-explicit-control.md:14`, `:78`, `:170-176`; 6-1 to 6-4.
 - Code: everything in "What already exists".
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-6-5-move-a-task-to-another-project.md`. Every scaffold follows each open
+question's recommended option (a). A skip that depends on one names it.
+
+| File | Cases | ACs | Today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.ProjectMoveRace.cs` | 11 (8 methods): races 1-7 and the queued creation | AC2, AC4, AC6, AC7, AC9 | 7 skipped `red:`; **4 green, active** (see below) |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.ProjectMove.cs` | 31 (15 methods): minimum Slices cases 1-14, plus every Task answer stating `projectId` | AC1-AC5, AC7, AC8, AC10-AC13, AC15, AC16 | skipped `red:` |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.ProjectMove.cs` | 8 gates | AC1, AC2, AC6, AC11-AC13 | 6 skipped `red:`; **2 green, active** |
+| `tests/Yello.Tests.Architecture/RefusalCopyTests.ProjectMove.cs` | 1 | AC14 | skipped `red:` |
+| `tests/Yello.Tests.Isolation/IsolationCases.ProjectMove.cs` | 6 rows, both surfaces | AC12, AC13 | `PendingUntil: "6.5"` |
+| `tests/Yello.Tests.Client/TaskProjectMoveTests.cs` | 12 (10 methods), fake API | AC12, AC14 | skipped `red:` |
+
+**Supporting files:**
+- `Yello.Tests.Shared/ProjectMoveWire.cs` holds the stand-ins `Route`, `PathOf` and `InvalidTaskProject`, the bodies, and
+  `ProjectIdIn`. Swap every use for `TaskRoutes.ProjectMove`, `TaskRoutes.ProjectMoveOf` and
+  `ProblemTypes.InvalidTaskProject`, and delete the stand-ins.
+- `Yello.Tests.Slices/Tasks/ProjectMoveSliceWire.cs` holds:
+  - the request on both surfaces;
+  - `TwoProjectsAsync`;
+  - `HoldProjectMoveAsync`, the move played in SQL in the product's shape (sorted `ProjectTasks` locks, then the row, then
+    one `UPDATE`, the key read under the destination's lock);
+  - `SurvivorsAsync`;
+  - the S-1 `AFTER UPDATE` trigger.
+- `Yello.Tests.Client/FakeYelloApi.ProjectMove.cs` decides the route in AC6's order, with the bound, and with hold, release,
+  refused and unanswered. It is hooked in `FakeYelloApi.SpaceDeletion.cs`.
+- One spread line was added in `IsolationCases.All`.
+
+The handler unit tests are not scaffolded, because they need the types to compile. Write them with the slice.
+
+**Green today (standing regression gates, active):**
+- `A_Status_edit_or_a_move_queued_behind_a_cross_Project_move_answers_404_and_writes_nothing` (edit, move). The
+  existing writers already re-check `ProjectId` under the source's lock.
+- `A_creation_queued_behind_a_cross_Project_move_counts_the_moved_Task_and_lands_after_it` (full, not full). The
+  creation's bound count already waits on the destination's lock.
+- `No_Task_request_contract_carries_a_Space_member` and its planted-type oracle.
+
+**Activation order** (riskiest assumption first):
+1. The lock order: `Two_opposite_moves_queued_on_one_lock_both_land_and_neither_deadlocks`.
+2. The bound under concurrency: `At_4999_a_move_and_a_second_write_into_the_destination_admit_exactly_one`.
+3. The re-reads under the locks: races 1, 4 and 7.
+4. The deletion re-check: `A_deletion_queued_behind_a_cross_Project_move_answers_404_and_the_Task_survives`. It needs no
+   route.
+5. The contract gates.
+6. The core wire cases (kept, required, applied, supplied-unneeded, refusals, bodies).
+7. Survivors, the bound, S-1, the read-back, and every answer stating `projectId`.
+8. Role, boundary and replay. Then the 6 isolation rows go live before review (GATE-003).
+9. The browser cases and the copy gate.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
+**Existing gates the implementation will turn red. Amend them deliberately, in the same change:**
+
+- **Wire-shape gates** (`TaskResponse` gains `ProjectId`):
+  - `RefusalBoundaryGateTests.The_due_date_is_a_nullable_DateTimeOffset_on_the_Task_and_its_response`;
+  - the exact `TaskProperties` / `EditedTaskProperties` / `AssignedTaskProperties` pins in `TaskEndpointTests.cs:48`,
+    `TaskEndpointTests.Edit.cs:37`, `BoardEndpointTests.cs:45`, `BoardPagingTests.cs:245`, `ListPagingTests.cs:59` and
+    `ActiveSpaceEndpointTests.AssignTask.cs:47`.
+- **Refusal-boundary gates:**
+  - the two exact Task-request sets (`RefusalBoundaryGateTests.TaskEdit.cs:50`, `.Tasks.cs:126`), widened by exactly
+    `MoveTaskToProjectRequest`;
+  - `The_routes_under_a_Task_are_its_read_edit_deletion_and_move` (`.Move.cs:123`), which says no route moves a Task to
+    another Project. Add `POST …/project` and reword it. Do not delete it.
+- **Isolation route-coverage gates:**
+  - `IsolationCaseListTests.Every_api_route_the_Host_maps_…` and `Every_Space_scoped_route_a_Token_reaches_…`, until the
+    6 rows are live;
+  - GATE-003, if 6.5 reaches review with any row still pending.
+- **Role-matrix gate:** none expected. `ActiveSpaceEndpointTests.RoleMatrix.cs:53` already has a `ManageTasks`
+  representative.
+- **ProblemResponse parameter gates:** none expected. No problem-body member is added; only a new `ProblemTypes`
+  constant, which the uniqueness gates accept.
+
 ## Dev Agent Record
 
 ### Agent Model Used

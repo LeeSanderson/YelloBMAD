@@ -913,6 +913,9 @@ internal static partial class IsolationCases
 
         // A Space default removed across every Project (IsolationCases.SpaceDefaultStatusRemoval.cs).
         .. SpaceDefaultStatusRemovalCases(),
+
+        // A Task moved into another Project (IsolationCases.ProjectMove.cs).
+        .. ProjectMoveCases(),
     ];
 
     /// <summary>
