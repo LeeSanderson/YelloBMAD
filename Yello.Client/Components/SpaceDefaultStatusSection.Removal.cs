@@ -73,6 +73,12 @@ public sealed partial class SpaceDefaultStatusSection
             return;
         }
 
+        if (answer.Status == HttpStatusCode.NotFound)
+        {
+            await RereadAsync(answer);
+            return;
+        }
+
         await RefuseAsync(answer);
     }
 

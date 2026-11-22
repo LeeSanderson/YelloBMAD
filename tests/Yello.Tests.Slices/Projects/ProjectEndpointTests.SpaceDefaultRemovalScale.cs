@@ -20,9 +20,8 @@ namespace Yello.Tests.Slices.Projects;
 /// the ingress timeout. The duration is written to the test output.
 /// </para>
 /// <para>
-/// <b>The seed size is the develop phase's to settle</b>: the full envelope is 50 x 5,000 Tasks. <see cref="TasksPerProject"/>
-/// starts at the full bound; if that does not fit the 2GB engine, the largest that does replaces it and is recorded in the
-/// Debug Log. Tasks are seeded by one set-based statement per Project (<see cref="TaskWire.SeedTasksAsync"/>, whose remarks
+/// <b>The seed is the full envelope</b>, 50 x 5,000 Tasks; if that does not fit the 2GB engine, lower
+/// <see cref="TasksPerProject"/> to the largest that does. Tasks are seeded by one set-based statement per Project (<see cref="TaskWire.SeedTasksAsync"/>, whose remarks
 /// list the constraints it satisfies); every Project, removal and added Status is written by the product.
 /// </para>
 /// </remarks>

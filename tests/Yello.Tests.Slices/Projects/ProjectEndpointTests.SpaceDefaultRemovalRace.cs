@@ -21,7 +21,7 @@ namespace Yello.Tests.Slices.Projects;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The lock order the scaffolds assume</b>: <c>StatusDefaults</c> Exclusive, then <c>ProjectsPerSpace</c>, then
+/// <b>The lock order</b>: <c>StatusDefaults</c> Exclusive, then <c>ProjectsPerSpace</c>, then
 /// <c>ProjectTasks</c> of every Project whose set holds the Status, in sorted id order; every read the plan judges after the
 /// last grant. A Project delta write takes <c>StatusDefaults</c> Shared, then its <c>ProjectTasks</c>.
 /// </para>

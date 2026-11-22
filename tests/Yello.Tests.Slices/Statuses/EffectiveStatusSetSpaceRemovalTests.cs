@@ -11,11 +11,10 @@ namespace Yello.Tests.Slices.Statuses;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Green before the removal exists</b>: these pin the premise the Space-level plan rests on - no second derivation and no
-/// third ordering algorithm. The plan's own unit tests, which need its types, are the develop phase's.
+/// These pin the premise the Space-level plan rests on - no second derivation and no third ordering algorithm.
 /// </para>
 /// <para>
-/// <see cref="AfterSpaceRemoval"/> is the after-set the story states, built from the existing members only.
+/// <see cref="AfterSpaceRemoval"/> is the expected after-set, built from the existing members only.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Slices")]

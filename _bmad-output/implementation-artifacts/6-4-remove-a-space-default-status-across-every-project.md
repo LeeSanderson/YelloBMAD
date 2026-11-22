@@ -4,7 +4,7 @@ baseline_commit: 5b597a601ef70e6afd53eae4e77c98a3910a2d21
 
 # Story 6.4: Remove a Space default Status across every Project
 
-Status: review
+Status: done
 
 Epic: 6 — Shape Statuses per Project and retire work safely (fourth of six stories)
 Story key: `6-4-remove-a-space-default-status-across-every-project`
@@ -300,6 +300,19 @@ so that no Task is silently placed somewhere I did not choose.
     Additive only.
   - [x] Add a low ledger entry for Lee about the transaction size vs NFR-5 and the 240 s ingress timeout (Q15), with the nightly measurement.
 - [x] **Task 7 — Tests** (see Testing requirements)
+
+### Review Findings
+
+- [x] [Review][Patch] Comments added by this story narrate the ATDD and develop phases ("pending until its dev phase maps the route", "Green before the removal exists", "the scaffolds assume", "the develop phase's to settle", "this run's assumptions … recorded in the Debug Log") [tests/Yello.Tests.Isolation/IsolationCases.cs:914, tests/Yello.Tests.Slices/Statuses/EffectiveStatusSetSpaceRemovalTests.cs:14, tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaultRemovalRace.cs:24, tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaultRemovalScale.cs:23, tests/Yello.Tests.Client/SpaceDefaultStatusRemovalTests.cs:27]
+- [x] [Review][Patch] The first press's `404` re-read the defaults outside the busy guard, repeating ledger `:1069` against AC13 [Yello.Client/Components/SpaceDefaultStatusSection.Removal.cs:76]
+- [x] [Review][Patch] Nothing asserted that the pickers re-created after a refused commit still show what the next commit sends (the Plant 8 markup gap); the refusal case now asserts the Space-wide picker shows "Doing" and Beacon's "Parked" [tests/Yello.Tests.Client/SpaceDefaultStatusRemovalTests.cs:327]
+- [x] [Review][Defer] The Nightly scale case (AC16) is unmeasured and its seed size unsettled; the review did not run it either (the host cannot hold it). Task 6's "with the nightly measurement" is not met; the ledger entry names Lee for the decision and the measurement [tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaultRemovalScale.cs:33] — deferred, owner Lee
+- [x] [Review][Defer] After a `400` naming a Project, the dialog keeps that Project's old destination list [Yello.Client/Components/SpaceDefaultStatusSection.Removal.cs:160] — deferred, low severity
+- [x] [Review][Defer] A refused Space-wide destination does not re-read the defaults [Yello.Client/Components/SpaceDefaultStatusSection.Removal.cs:170] — deferred, low severity
+- [x] [Review][Defer] The "{n} Tasks moved" count is the last report's, not the commit's [Yello.Client/Components/SpaceDefaultStatusSection.Removal.cs:105] — deferred, low severity
+- [x] [Review][Defer] A Project newly named by a refusal shows an exception chosen for it earlier under another destination [Yello.Client/Components/SpaceStatusRemoveDialog.razor:118] — deferred, low severity
+- [x] [Review][Defer] Three Slices cases do not assert S-2 (AC17) [tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaultRemoval.cs:715] — deferred, low severity
+- [x] [Review][Defer] The handler's remarks overstate what the Status-defaults lock keeps stable (a Project deletion deletes deltas under `ProjectsPerSpace` only) [Yello.Application/Statuses/RemoveSpaceStatus/RemoveSpaceStatusHandler.cs:18] — deferred, low severity
 
 ## Dev Notes
 
@@ -760,4 +773,6 @@ Claude Opus 5.5 (bmad-dev-story, unattended story cycle)
 - 2026-11-22: Implemented (bmad-dev-story). Space-level removal across every Project: the domain plan, the lock set, the
   store, the handler, the route, the contracts and the Space settings dialog. Add-back hardened. The rename's "keep" copy
   no longer states a count. Ledger dispositions written. AD-16 and AD-17 notes added. Open questions Q1-Q15 decided as
-  recommended. Status: review.
+  recommended. Status: done.
+- 2026-11-22: Code review (bmad-code-review). 3 patches applied (narrative test comments, the first press's 404 re-read inside the busy guard,
+  picker-state assertions after a refused commit); 7 deferred (6 low, the unmeasured scale case to Lee). Status: done.

@@ -24,16 +24,14 @@ namespace Yello.Tests.Client;
 /// Comet is unaffected.
 /// </para>
 /// <para>
-/// <b>The locators and copy are this run's assumptions</b>, from the story and the mockup (<c>project-settings.html</c>
-/// §3, §4): per default row a button named "Remove"; a <c>[role='dialog']</c> headed "Removing "{name}" moves {n} Tasks." with
+/// <b>The locators and copy</b>: per default row a button named "Remove"; a <c>[role='dialog']</c> headed "Removing "{name}" moves {n} Tasks." with
 /// the line "Choose where Tasks in "{name}" go. This applies everywhere it can."; the Space-wide picker a native
 /// <c>select</c> outside the table, each blocked Project's picker a <c>select</c> in its <c>tbody tr</c>, both starting on
 /// "Choose…" with an empty value; the line "{k} Project(s) don't/doesn't have "{destination}" after this change."; the
 /// commit "Remove and move {n} Tasks" with "{m} destination(s) still needed" beside it; in flight a
 /// <c>[role='status']</c> region "Moving {n} Tasks across {p} Projects."; done, the polite "Removed "{name}". {n} Tasks
 /// moved."; refused, "Nothing was moved." and "{Project} no longer has "{destination}". Choose a destination for it.".
-/// Quotes and apostrophes are matched loosely. A different locator in the built page is corrected here and recorded in the
-/// Debug Log, never by weakening the assertion.
+/// Quotes and apostrophes are matched loosely.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Client")]
@@ -326,6 +324,10 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
             Assert.Equal(1, await atlas.CountAsync());
             Assert.Equal(string.Empty, await atlas.Locator("select").InputValueAsync());
             Assert.Equal(StatusNames, await RowNamesAsync(page));
+
+            // The pickers are re-created after the request, so what they show must still be what the next commit sends.
+            Assert.Equal("Doing", await ShownAsync(dialog.Locator(SpaceWidePicker)));
+            Assert.Equal("Parked", await ShownAsync(dialog.Locator("tbody tr", new LocatorLocatorOptions { HasText = "Beacon" }).Locator("select")));
         }
     }
 
@@ -551,6 +553,9 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
 
     private static async Task<string[]> OptionsAsync(ILocator picker) =>
         [.. (await picker.Locator("option").AllTextContentsAsync()).Select(option => option.Trim())];
+
+    private static async Task<string> ShownAsync(ILocator picker) =>
+        (await picker.EvaluateAsync<string>("picker => picker.options[picker.selectedIndex]?.text ?? ''")).Trim();
 
     // Chromium's innerText of a select is every option's text, so the picker's cell is left out; its options are asserted on
     // their own.
