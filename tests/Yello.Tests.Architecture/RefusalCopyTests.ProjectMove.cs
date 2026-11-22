@@ -14,7 +14,7 @@ public sealed partial class RefusalCopyTests
     /// <summary>
     /// A <c>400 invalid-task-project</c> renders copy of its own, not the not-found copy.
     /// </summary>
-    [Fact(Skip = "red: AC14 - RefusalCopy does not map urn:yello:problem:invalid-task-project")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "UX-DR32")]
     public void A_bad_destination_Project_refusal_renders_its_own_copy()

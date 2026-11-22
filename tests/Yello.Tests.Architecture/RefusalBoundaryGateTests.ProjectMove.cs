@@ -18,8 +18,8 @@ namespace Yello.Tests.Architecture;
 /// compile error in an unrelated gate. The route pattern stays a literal: it is what the gate asserts.
 /// </para>
 /// <para>
-/// <b>One gate is green today</b> and stays active: <see cref="No_Task_request_contract_carries_a_Space_member"/>, with an
-/// oracle over a planted type.
+/// <b>The Space-member scan has an oracle</b> (<see cref="The_Space_member_scan_reports_a_planted_Space_member"/>), so an
+/// empty result is never a scan that saw nothing.
 /// </para>
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
@@ -31,7 +31,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// position), consulting no bound in the pipeline (its destination is in the body, and a pipeline lock taken before the
     /// slice's sorted pair could deadlock two opposite moves), and carrying exactly the Space and the Task in its path.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC12 - the route POST /tasks/{taskId}/project is not mapped (Q1 (a), Q2 (a), Q5 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-41")]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "AD-4")]
@@ -52,7 +52,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>TaskRoutes</c> names the move-to-Project template once (<c>ProjectMove</c>), and <c>ProjectMoveOf</c> builds that
     /// path under the Task's own path for a Space and a Task.
     /// </summary>
-    [Fact(Skip = "red: AC1 - TaskRoutes declares no ProjectMove or ProjectMoveOf (Q1 (a))")]
+    [Fact]
     [Trait("Requirement", "AR-35")]
     public void TaskRoutes_names_the_move_to_Project_template_once()
     {
@@ -73,7 +73,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The move-to-Project request names the destination Project and an optional destination Status and nothing else: no
     /// position, no neighbour, no Space. It is the only Task request that names a Project.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC13 - Yello.Contracts.Tasks.MoveTaskToProjectRequest does not exist")]
+    [Fact]
     [Trait("Requirement", "FR-41")]
     [Trait("Requirement", "FR-19")]
     [Trait("Requirement", "AD-15")]
@@ -96,7 +96,7 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// No Task request contract carries a member naming a Space, so no request can ask for a Task to change Space.
-    /// <b>Green today</b>; the vacuity guard is that the scan finds the Task requests that exist.
+    /// The vacuity guard is that the scan finds the Task requests that exist.
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-19")]
@@ -124,7 +124,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The refusal for a destination that is not another Project of the Space is stated once in the contract:
     /// <c>ProblemTypes.InvalidTaskProject</c> is <c>urn:yello:problem:invalid-task-project</c>.
     /// </summary>
-    [Fact(Skip = "red: AC2 - ProblemTypes declares no InvalidTaskProject (Q3 (a))")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     public void The_bad_destination_refusal_is_a_stable_problem_type()
     {
@@ -138,7 +138,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Every Task answer states the Task's Project: <c>TaskResponse</c> carries a <c>Guid</c> <c>ProjectId</c>, appended, since
     /// the Task's own URL holds no Project.
     /// </summary>
-    [Fact(Skip = "red: AC11 - TaskResponse carries no ProjectId (Q11 (a))")]
+    [Fact]
     [Trait("Requirement", "AD-19")]
     [Trait("Requirement", "FR-35")]
     public void TaskResponse_states_the_Tasks_Project()
@@ -151,7 +151,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// never by two single calls - and one slice, <c>Yello.Application.Tasks.MoveTaskToProject.MoveTaskToProjectHandler</c>, a
     /// sealed class with a <c>HandleAsync</c>.
     /// </summary>
-    [Fact(Skip = "red: AC6 - ITaskStore has no several-Project lock port and the MoveTaskToProject slice does not exist (Q4 (a))")]
+    [Fact]
     [Trait("Requirement", "AR-3")]
     [Trait("Requirement", "AD-17")]
     public void A_move_to_another_Project_is_one_sorted_lock_port_and_one_slice()

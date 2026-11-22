@@ -238,6 +238,7 @@ public sealed partial class BoardView
         _moveOrigins.Clear();
         _boardNotice = null;
         _rereadBoard = false;
+        _projectMoveKeys.Clear();
         _activeTaskId = null;
         _activeColumnId = null;
         _runAt = null;
@@ -570,6 +571,16 @@ public sealed partial class BoardView
     private void Deleted(Guid taskId)
     {
         _deleteKeys.Remove(taskId);
+        Departed(taskId);
+        Say(Localizer["TaskDeleted"]);
+    }
+
+    /// <summary>
+    /// The Task has left this Board - deleted, or moved into another Project - and the server has said so: its replica and
+    /// queued edits go, its card leaves its column, and the panel it was open in closes with focus on the column that held it.
+    /// </summary>
+    private void Departed(Guid taskId)
+    {
         _deleted.Add(taskId);
         // A move waiting on this Task's own move (story 2.8, open question 9) need wait no longer.
         if (_replicas.Remove(taskId, out var gone))
@@ -577,13 +588,13 @@ public sealed partial class BoardView
             gone.Settle();
         }
 
-        // A drag or a carry of the deleted Task ends silently: the deletion's own sentence says what happened to it.
+        // A drag or a carry of the Task ends silently: the deletion's or the move's own sentence says what happened to it.
         if (_drag?.LiftedTaskId == taskId || _carried == taskId)
         {
             EndHeld();
         }
 
-        // Focus moves to the column only from the panel the deletion was confirmed in; another panel keeps its focus.
+        // Focus moves to the column only from the panel the Task left from; another panel keeps its focus.
         var fromItsPanel = _openTaskId == taskId;
 
         LeavePanelOf(taskId);
@@ -598,8 +609,6 @@ public sealed partial class BoardView
             _focusColumn = column.StatusId;
             _focusColumnRequests++;
         }
-
-        Say(Localizer["TaskDeleted"]);
     }
 
     private void UseStatuses(IEnumerable<TaskStatusOption> statuses) => _statusOptions = [.. statuses];

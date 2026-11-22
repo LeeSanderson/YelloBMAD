@@ -1,6 +1,10 @@
+---
+baseline_commit: 96371bd500a73d769c09d91598d58c9bcba756a9
+---
+
 # Story 6.5: Move a Task to another Project
 
-Status: ready-for-dev
+Status: review
 
 Epic: 6 — Shape Statuses per Project and retire work safely (fifth of six stories)
 Story key: `6-5-move-a-task-to-another-project`
@@ -171,10 +175,10 @@ so that work can be re-filed without being retyped.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Domain and Application** (AC2-AC9)
-  - [ ] `ITaskStore`: a sorted two-Project lock port (for example `LockProjectsAsync(IReadOnlyCollection<Guid>)`) and a reparent write (for example `MoveToProjectAsync(taskId, sourceProjectId, destinationProjectId, statusId)` → a `TaskProjectMove` result: `Moved`, `NotFound`). Update every fake `ITaskStore` in the tests.
-  - [ ] A read for "is this Project visible in the Space" (reuse an existing Project read if one fits; `IProjectStore` or the store's own `Projects.AnyAsync`).
-  - [ ] `Yello.Application/Tasks/MoveTaskToProject/MoveTaskToProjectHandler.cs` (the slice name 2.6 reserved). Decision order:
+- [x] **Task 1 — Domain and Application** (AC2-AC9)
+  - [x] `ITaskStore`: a sorted two-Project lock port (for example `LockProjectsAsync(IReadOnlyCollection<Guid>)`) and a reparent write (for example `MoveToProjectAsync(taskId, sourceProjectId, destinationProjectId, statusId)` → a `TaskProjectMove` result: `Moved`, `NotFound`). Update every fake `ITaskStore` in the tests.
+  - [x] A read for "is this Project visible in the Space" (reuse an existing Project read if one fits; `IProjectStore` or the store's own `Projects.AnyAsync`).
+  - [x] `Yello.Application/Tasks/MoveTaskToProject/MoveTaskToProjectHandler.cs` (the slice name 2.6 reserved). Decision order:
     1. plain read Task → `NotFound`;
     2. plain read destination: missing or same Project → `ProjectInvalid`;
     3. sorted locks;
@@ -183,32 +187,32 @@ so that work can be re-filed without being retyped.
     6. `EffectiveOfAsync(destination)`: a supplied Status not in it → `StatusDestinationInvalid`; none supplied and the current Status not in it → `StatusDestinationRequired`;
     7. `IBoundCounter.CountAsync(Bound.TasksPerProject, destination)` ≥ limit → `BoundReached`;
     8. write; read Labels; return the Task.
-  - [ ] Remarks: why both locks are taken sorted and only through the helper; why the bound is counted here and not in the pipeline (Q5); why a re-read under the lock answers `404`.
-  - [ ] Handler tests with fakes (`tests/Yello.Tests.Slices/Tasks/MoveTaskToProject/MoveTaskToProjectHandlerTests.cs`), one per outcome and the decision order.
-- [ ] **Task 2 — Infrastructure** (AC6, AC8, AC9)
-  - [ ] `TaskStore`: the lock port (calls `ApplicationLocks.TakeProjectTasksAsync(dbContext, ids)`), and the reparent: row `UPDLOCK, INDEX(1)` read, check `ProjectId == source`, last key of the destination column (`MAX(PositionKey)` for `(destination, status)`), one write of `ProjectId`, `StatusId`, `PositionKey`. Update the class remarks: the move between Projects is the fifth key placer and takes two Project locks in the helper's order.
-  - [ ] `TaskStore.DeleteAsync`: re-check `ProjectId` under the row lock; a moved Task is `NotFound`. Update its remarks.
-  - [ ] `ApplicationLocks`: update the `TakeProjectTasksAsync(…, IReadOnlyCollection<Guid>, …)` and `StatusDefaults` remarks to state what is built (a move between Projects takes its two Projects' locks through it).
-  - [ ] `RemoveSpaceStatusHandler.cs:18`: correct the remark (ledger `:1087`).
-  - [ ] No `Where SpaceId`, no `IgnoreQueryFilters`; raw SQL only here, with parameters.
-- [ ] **Task 3 — Contracts and Host** (AC1, AC2, AC4, AC7, AC11-AC13)
-  - [ ] `TaskRoutes.ProjectMove` = `/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/project` and `ProjectMoveOf(spaceId, taskId)`; remarks list every answer.
-  - [ ] `Yello.Contracts/Tasks/MoveTaskToProjectRequest.cs` (`Guid ProjectId`, `Guid? StatusId`).
-  - [ ] `ProblemTypes.InvalidTaskProject` = `urn:yello:problem:invalid-task-project` (400).
-  - [ ] `TaskResponse.ProjectId` (additive `init`), filled everywhere a `TaskResponse` is built (AC11). Find every construction (`TaskEndpoints.Response`, Board and List readers, the fake API).
-  - [ ] `Yello.Host/Endpoints/TaskProjectMoveEndpoints.cs` + a body reader (`TaskProjectMoveBody.cs`) on the `TaskMoveBody` pattern. `RequiresCapability(ManageTasks)`, both surfaces, no `ConsultsBound`. Register in `Program.cs`.
-  - [ ] Amend the gates in AC13 and add the new ones.
-- [ ] **Task 4 — Client** (AC12, AC14)
-  - [ ] `TaskCapabilities` already decides who can move; reuse it (no new predicate unless the twin gate needs one).
-  - [ ] New `ProjectMovePicker.razor` (steps, no default, Esc steps back, one tab stop per step, on the `MovePicker` / `PickerOption` patterns).
-  - [ ] `TaskDetail.razor`: the control and the picker host only. The writing and the replica live in the Board (a new `BoardView.ProjectMove.cs` partial), through an `OnMoveToProject` callback, as `OnMove` does today.
-  - [ ] `ClientCopy.resx`, `RefusalCopy.cs` (the new type and the reused ones in this context), `components.css` if needed.
-  - [ ] `FakeYelloApi.ProjectMove.cs`: the route with AC6's decision order, the bound, hold/release for the in-flight case, and the Board columns that follow.
-- [ ] **Task 5 — Ledger and docs**
-  - [ ] Write the disposition of every owned ledger entry (table above). Leave none blank.
-  - [ ] Additive dated notes: AD-17 (the cross-Project move: two `ProjectTasks` locks via the sorted helper, one statement, decision order) and AD-25 (the Tasks-per-Project bound is also counted by the cross-Project move, in its slice after its locks, because the destination is in the body and a pipeline lock taken first would break the sorted order). Additive only.
-  - [ ] Add a low ledger entry, owner **UX**, for the card menu's "Move to Project" if Q10 (a) is taken.
-- [ ] **Task 6 — Tests** (see Testing requirements)
+  - [x] Remarks: why both locks are taken sorted and only through the helper; why the bound is counted here and not in the pipeline (Q5); why a re-read under the lock answers `404`.
+  - [x] Handler tests with fakes (`tests/Yello.Tests.Slices/Tasks/MoveTaskToProject/MoveTaskToProjectHandlerTests.cs`), one per outcome and the decision order.
+- [x] **Task 2 — Infrastructure** (AC6, AC8, AC9)
+  - [x] `TaskStore`: the lock port (calls `ApplicationLocks.TakeProjectTasksAsync(dbContext, ids)`), and the reparent: row `UPDLOCK, INDEX(1)` read, check `ProjectId == source`, last key of the destination column (`MAX(PositionKey)` for `(destination, status)`), one write of `ProjectId`, `StatusId`, `PositionKey`. Update the class remarks: the move between Projects is the fifth key placer and takes two Project locks in the helper's order.
+  - [x] `TaskStore.DeleteAsync`: re-check `ProjectId` under the row lock; a moved Task is `NotFound`. Update its remarks.
+  - [x] `ApplicationLocks`: update the `TakeProjectTasksAsync(…, IReadOnlyCollection<Guid>, …)` and `StatusDefaults` remarks to state what is built (a move between Projects takes its two Projects' locks through it).
+  - [x] `RemoveSpaceStatusHandler.cs:18`: correct the remark (ledger `:1087`).
+  - [x] No `Where SpaceId`, no `IgnoreQueryFilters`; raw SQL only here, with parameters.
+- [x] **Task 3 — Contracts and Host** (AC1, AC2, AC4, AC7, AC11-AC13)
+  - [x] `TaskRoutes.ProjectMove` = `/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/project` and `ProjectMoveOf(spaceId, taskId)`; remarks list every answer.
+  - [x] `Yello.Contracts/Tasks/MoveTaskToProjectRequest.cs` (`Guid ProjectId`, `Guid? StatusId`).
+  - [x] `ProblemTypes.InvalidTaskProject` = `urn:yello:problem:invalid-task-project` (400).
+  - [x] `TaskResponse.ProjectId` (additive `init`), filled everywhere a `TaskResponse` is built (AC11). Find every construction (`TaskEndpoints.Response`, Board and List readers, the fake API).
+  - [x] `Yello.Host/Endpoints/TaskProjectMoveEndpoints.cs` + a body reader (`TaskProjectMoveBody.cs`) on the `TaskMoveBody` pattern. `RequiresCapability(ManageTasks)`, both surfaces, no `ConsultsBound`. Register in `Program.cs`.
+  - [x] Amend the gates in AC13 and add the new ones.
+- [x] **Task 4 — Client** (AC12, AC14)
+  - [x] `TaskCapabilities` already decides who can move; reuse it (no new predicate unless the twin gate needs one).
+  - [x] New `ProjectMovePicker.razor` (steps, no default, Esc steps back, one tab stop per step, on the `MovePicker` / `PickerOption` patterns).
+  - [x] `TaskDetail.razor`: the control and the picker host only. The writing and the replica live in the Board (a new `BoardView.ProjectMove.cs` partial), through an `OnMoveToProject` callback, as `OnMove` does today.
+  - [x] `ClientCopy.resx`, `RefusalCopy.cs` (the new type and the reused ones in this context), `components.css` if needed.
+  - [x] `FakeYelloApi.ProjectMove.cs`: the route with AC6's decision order, the bound, hold/release for the in-flight case, and the Board columns that follow.
+- [x] **Task 5 — Ledger and docs**
+  - [x] Write the disposition of every owned ledger entry (table above). Leave none blank.
+  - [x] Additive dated notes: AD-17 (the cross-Project move: two `ProjectTasks` locks via the sorted helper, one statement, decision order) and AD-25 (the Tasks-per-Project bound is also counted by the cross-Project move, in its slice after its locks, because the destination is in the body and a pipeline lock taken first would break the sorted order). Additive only.
+  - [x] Add a low ledger entry, owner **UX**, for the card menu's "Move to Project" if Q10 (a) is taken.
+- [x] **Task 6 — Tests** (see Testing requirements)
 
 ## Dev Notes
 
@@ -472,14 +476,183 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), bmad-dev-story, unattended story cycle.
+
 ### Debug Log References
+
+- **Red-green order.** The server core (port, store, slice, endpoint, contracts) was written before the race scaffolds were
+  activated, so the races went green on first activation (12/12, `artifacts/test-runs/6-5-develop-races.log`). The red
+  step for the lock order, the bound under concurrency, the re-reads and the deletion re-check is shown by the plants
+  instead (table below), each of which turns the named scaffold red. The browser scaffolds were activated after the client
+  was written and passed 12/12 on first run; plants 9-11 are their red step. (`artifacts/test-runs/6-5-develop-client.log`
+  now holds the later, wider Client regression run.)
+- **Scaffold corrected: `What_a_Task_carries_survives_the_move_and_no_email_is_sent`.** It compared the answer's
+  `labelIds` with `LabelWire.AppliedToAsync`, which orders by id, while every Task answer orders Labels by name then id.
+  It failed on the order alone. The answer is now compared with the Labels in name order (`[alpha, bravo]`); the row's
+  applications are still compared before and after as a set in id order.
+- **Scaffold stand-ins swapped.** `ProjectMoveWire.Route`, `PathOf` and `InvalidTaskProject` were replaced by
+  `TaskRoutes.ProjectMove`, `TaskRoutes.ProjectMoveOf` and `ProblemTypes.InvalidTaskProject` in every suite, and deleted.
+  Stale "green today", "stand-in" and "pending" remarks in the scaffolds were reworded.
+- **Gates amended deliberately.** As the ATDD section listed: the `TaskResponse` member pins (`TaskEndpointTests`,
+  `.Edit`, `BoardEndpointTests`, `BoardPagingTests`, `ListPagingTests`, `ActiveSpaceEndpointTests.AssignTask`, and the
+  Architecture pins in `.TaskEdit`, `.Labels`, `.Assignment`) widened by exactly `projectId`; the two Task request sets
+  widened by exactly `MoveTaskToProjectRequest`; `The_routes_under_a_Task_are_its_read_edit_deletion_and_move` gains
+  `POST …/project` and its summary is reworded. **Not listed by the ATDD section, and amended too:**
+  `Nothing_but_the_pipeline_reads_the_bound_registry` and `Only_the_pipeline_depends_on_the_bound_count_port` now admit
+  exactly one more type, `MoveTaskToProjectHandler` (constant `MovesATaskToAnotherProject`, with its reason). The story's
+  Q5 (a) has the slice count with `IBoundCounter` and the registry's limit, which those two gates forbid by design. The
+  remarks of `IBoundCounter`, `RequiredBound` and `BoundRegistry` now name the same one exception.
+- **Analyzer fixes during the build:** S1541 (split the slice into `HandleAsync` → `DecideUnderTheLocksAsync` →
+  `CountAndMoveAsync`; moved the panel's Esc branch for the new picker into `TaskDetail.ProjectMove.cs`), S4457, S126,
+  S108, S131, S3358, S4018, MA0211, S2325.
+- **Scaffold strengthened: case 1 (`A_Task_whose_Status_the_destination_holds_keeps_it_and_lands_last_in_its_column`).**
+  Plant 7 (the key computed from the source key) passed it on the first run: the moved Task was the second of its source
+  column and the destination held two Tasks, so the source key's successor happened to sort after the destination's last
+  key. The destination now holds three Tasks, so a key derived from the source sorts inside the destination column or
+  collides with one of its keys.
+- **S-2 added** after every Slices case of this story that lacked it (refusal, bodies, survivors, bound, Role, boundary,
+  replay, read-back, every-answer, the deletion race and the bound race), per AC15.
+- **Plants.** Each was planted by a script that saved the file's content first and wrote it back in a `finally`, run on its
+  own as a filtered run, before the full run. `git status` showed no residue.
+  1. Reparent without the Status check. Caught: case 2, all four rows.
+  2. Locks taken as two single calls, source first. Caught: race 5 (opposite moves) deadlocked.
+  3. No destination lock in the slice or the store (source only). Caught: race 5. The destination's lock is still taken
+     by the bound count, but after the source's and outside the sorted order, so two opposite moves deadlock. Race 6 stayed
+     green under it: the bound count's own take of the destination's lock still serialises the writers into it.
+  4. No bound count. Caught: case 9 and race 6 (both rows).
+  5. Deletion without the `ProjectId` re-check. Caught: race 3.
+  6. Destination not re-read under its lock. Caught: race 4 (the write met the deleted Project, a `500`).
+  7. Key computed from the source key. Not caught by the scaffold as written (see above); after case 1 was strengthened, caught: case 1 on both surfaces.
+  8. Supplied Status ignored. Caught: case 4.
+  9. The Project step pre-selects the first Project. Planted as a state-derived `aria-checked` on the first option (the analyzer refused a first try that used the null-forgiving operator in Razor; corrected and re-run). Caught: the browser first-step case.
+  10. The Status step pre-selects the first Status. Planted the same way on the Status step. Caught: the browser Status-step case.
+  11. The control rendered for a Viewer. Caught: the browser absence case.
+- **Targeted runs before the full run** (all green): Architecture 555/555; the story's Slices cases 48/48 (wire and races)
+  and the handler tests 13/13; Isolation 553/553 (`artifacts/test-runs/6-5-develop-isolation.log`); Client, filtered to
+  the classes the change touches (`TaskProjectMoveTests`, `TaskDetailTests`, `MoveTests`, `KeyboardTests`,
+  `ViewerSpaceTests`, `AssigneeTests`, `LabelTests`) 135/135, then `DeleteTests` with `TaskProjectMoveTests` 33/33
+  (the `Deleted` → `Departed` extraction).
+- **The one full run** (browser suite excluded, `--max-parallel-test-modules 1`):
+  `artifacts/test-runs/6-5-move-a-task-to-another-project-develop.log`. 2512 total, 2503 passed, 0 failed, 9 skipped
+  (the two migration-bundle cases without `YELLO_MIGRATION_BUNDLE`, and seven Explicit scale, timing and envelope cases).
+  The Slices module took 25m 53s, well above the usual ~6 minutes; nothing failed or was killed, and Isolation (6m 55s)
+  and the other modules ran at their usual pace.
+- **xunit v3 filter note:** `--filter-class` and `--filter-method` in one run AND together (a combined run matched 2
+  tests); classes and methods were run separately.
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
+- **What was built.** `POST /api/v1/spaces/{spaceId}/tasks/{taskId}/project` with `MoveTaskToProjectRequest(Guid ProjectId,
+  Guid? StatusId)`, `ManageTasks`, both surfaces, idempotent through the pipeline. Slice `MoveTaskToProjectHandler`: plain
+  reads of the Task and the destination, then `ITaskStore.LockProjectsAsync` (the sorted `TakeProjectTasksAsync`
+  overload), then under the locks the Task re-read (`404` if gone or moved), the destination re-read (`400
+  invalid-task-project`), the destination's effective set (`400 invalid-status-destination` / `409
+  status-destination-required`), the destination's Tasks-per-Project count (`409 bound-reached`, logged as a creation's),
+  then `TaskStore.MoveToProjectAsync`: row `UPDLOCK, INDEX(1)`, re-check of the source, the destination column's last key,
+  and one `UPDATE` of `ProjectId`, `StatusId`, `PositionKey`. `TaskStore.DeleteAsync` re-checks `ProjectId` under its row
+  lock. `TaskResponse.ProjectId` is filled on every Task answer. New problem type `invalid-task-project`. No migration.
+- **Client.** Task detail gains "Move to Project" (absent for a Viewer) and `ProjectMovePicker`: the Space's other
+  Projects with nothing selected, a Status step only when the destination lacks the Task's Status, Esc stepping back, an
+  in-flight status line holding focus, and the refusals of AC14. The Board writes the move (`BoardView.ProjectMove.cs`),
+  not optimistically; on `200` the card leaves through `Departed` (extracted from `Deleted`), the panel closes, focus goes
+  to the column and the move is announced. Copy in `ClientCopy.resx`; `RefusalCopy` maps `invalid-task-project`.
+- **Ledger.** Closed `:574` (deletion re-check; why the Labels, assignment, title and due-date writers need none),
+  `:861` (Assignee survives, no email) and `:1087` (remark corrected). Noted `:114` still open after 6.5; `:1030`,
+  `:1031`, `:1038`, `:1039`, `:1072`, `:1075` left open with the reason. Added a low entry, owner UX, for the card menu's
+  "Move to Project" (Q10 (a)). Additive AD-17 and AD-25 notes in the spine.
+- **Decisions (reversible; each can be cut):**
+  - Q1 (a): the route is `POST …/tasks/{taskId}/project`; the Task's own URL stays Project-free.
+  - Q2 (a): both surfaces; the move writes no client position, so FR-35's exception does not apply.
+  - Q3 (a): one new type, `400 invalid-task-project`, byte-identical for random, foreign, own and deleted-meanwhile.
+  - Q4 (a): only the two `ProjectTasks` locks, through the sorted helper, then the row; no `ProjectsPerSpace`.
+  - Q5 (a): the slice counts the destination after both locks with `IBoundCounter`; the two pipeline-only bound gates
+    name it as their one exception.
+  - Q6 (a): a supplied Status the destination holds is applied, even when the Task's own would be kept.
+  - Q7 (a): the client reads the destination's set on a Project choice; a `409` re-reads it.
+  - Q8 (a): the deletion re-checks `ProjectId` under its row lock and answers `404`; it never retries on the new Project.
+  - Q9 (a): the Task lands at the end of the destination column; the client is not optimistic; focus goes to the column.
+  - Q10 (a): the control lives in Task detail only; a low ledger entry (owner UX) records the card menu.
+  - Q11 (a): `TaskResponse.ProjectId` appended and filled on every Task answer.
+  - Q12 (a): the `RemoveSpaceStatusHandler` remark is corrected and ledger `:1087` closed.
+  - The store's move port answers `TaskItem?` (null = not found) rather than a new `TaskProjectMove` record: the move has
+    only those two outcomes once the slice has decided.
+  - The bound-reached log line for a move is written under the endpoint's logger category with the creation's
+    `SpaceLog.BoundReachedFor` message and EventId.
+  - When the picker cannot read the Space's Projects or the chosen Project's set, it says "The Projects could not be
+    loaded." in one focusable line, and Esc closes it.
 
 ### File List
+
+New:
+- `Yello.Application/Tasks/MoveTaskToProject/MoveTaskToProjectHandler.cs`
+- `Yello.Contracts/Tasks/MoveTaskToProjectRequest.cs`
+- `Yello.Host/Endpoints/TaskProjectMoveBody.cs`
+- `Yello.Host/Endpoints/TaskProjectMoveEndpoints.cs`
+- `Yello.Client/Components/ProjectMovePicker.razor`
+- `Yello.Client/Components/ProjectMoveChoice.cs`
+- `Yello.Client/Components/TaskDetail.ProjectMove.cs`
+- `Yello.Client/Components/BoardView.ProjectMove.cs`
+- `tests/Yello.Tests.Slices/Tasks/MoveTaskToProject/MoveTaskToProjectHandlerTests.cs`
+
+Modified (production):
+- `Yello.Domain/Tasks/ITaskStore.cs`
+- `Yello.Domain/Bounds/BoundRegistry.cs` (remark)
+- `Yello.Application/Spaces/IBoundCounter.cs` (remark)
+- `Yello.Application/Statuses/RemoveSpaceStatus/RemoveSpaceStatusHandler.cs` (remark)
+- `Yello.Infrastructure/Persistence/TaskStore.cs`
+- `Yello.Infrastructure/Persistence/ApplicationLocks.cs` (remark)
+- `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Contracts/Tasks/TaskResponse.cs`
+- `Yello.Contracts/Tasks/TaskRoutes.cs`
+- `Yello.Host/Endpoints/TaskEndpoints.cs`
+- `Yello.Host/Spaces/RequiredBound.cs` (remark)
+- `Yello.Host/Program.cs`
+- `Yello.Client/Components/TaskDetail.razor`
+- `Yello.Client/Components/BoardView.razor`
+- `Yello.Client/Components/BoardView.razor.cs`
+- `Yello.Client/Localisation/ClientCopy.resx`
+- `Yello.Client/Refusals/RefusalCopy.cs`
+- `Yello.Client/wwwroot/css/components.css`
+
+Modified (tests):
+- `tests/Yello.Tests.Shared/ProjectMoveWire.cs`
+- `tests/Yello.Tests.Slices/Tasks/ProjectMoveSliceWire.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.ProjectMove.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.ProjectMoveRace.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Edit.cs`
+- `tests/Yello.Tests.Slices/Boards/BoardEndpointTests.cs`
+- `tests/Yello.Tests.Slices/Boards/BoardPagingTests.cs`
+- `tests/Yello.Tests.Slices/Lists/ListPagingTests.cs`
+- `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.AssignTask.cs`
+- `tests/Yello.Tests.Slices/Tasks/AssignTask/AssignTaskHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/CreateTask/CreateTaskHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/DeleteTask/DeleteTaskHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/EditTaskAttributes/EditTaskAttributesHandlerTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/MoveTask/MoveTaskHandlerTests.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.ProjectMove.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Projects.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.TaskEdit.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Tasks.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Move.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Labels.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Assignment.cs`
+- `tests/Yello.Tests.Architecture/RefusalCopyTests.ProjectMove.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.ProjectMove.cs`
+- `tests/Yello.Tests.Client/TaskProjectMoveTests.cs`
+- `tests/Yello.Tests.Client/FakeYelloApi.ProjectMove.cs`
+
+Modified (artifacts):
+- `_bmad-output/implementation-artifacts/6-5-move-a-task-to-another-project.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md`
 
 ## Change Log
 
 - 2026-11-22: Story created (bmad-create-story). Status: ready-for-dev.
+- 2026-11-22: Developed (bmad-dev-story). `POST …/tasks/{taskId}/project` on both surfaces, the sorted two-Project lock port,
+  the slice counting the destination's bound, the deletion's `ProjectId` re-check, `TaskResponse.ProjectId`, the
+  `invalid-task-project` problem type, and Task detail's "Move to Project" picker. Open questions 1-12 decided as their
+  recommended option (a), recorded in Completion Notes. Ledger `:574`, `:861`, `:1087` closed; the bound gates admit the
+  one counting slice. Isolation rows live. Status: review.

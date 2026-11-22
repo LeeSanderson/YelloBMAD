@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Yello.Contracts;
-using Yello.Tests.Shared;
+using Yello.Contracts.Tasks;
 
 namespace Yello.Tests.Client;
 
@@ -10,7 +10,7 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Inert unless a case sends <c>POST …/tasks/{taskId}/project</c></b> (<see cref="ProjectMoveWire.Route"/>), which no earlier
+/// <b>Inert unless a case sends <c>POST …/tasks/{taskId}/project</c></b> (<see cref="TaskRoutes.ProjectMove"/>), which no earlier
 /// case does, so every other case is served exactly what it would be without this partial.
 /// </para>
 /// <para>
@@ -44,7 +44,7 @@ internal sealed partial class FakeYelloApi
     /// <param name="spaceId">The Space.</param>
     /// <param name="taskId">The Task.</param>
     /// <returns>The path.</returns>
-    public static string ProjectMovePathOf(Guid spaceId, Guid taskId) => ProjectMoveWire.PathOf(spaceId, taskId);
+    public static string ProjectMovePathOf(Guid spaceId, Guid taskId) => TaskRoutes.ProjectMoveOf(spaceId, taskId);
 
     /// <summary>
     /// Holds the <b>next</b> move into another Project until it is released.
@@ -125,7 +125,7 @@ internal sealed partial class FakeYelloApi
         if (projectId == source.Project.Id || !Boards.TryGetValue((spaceId, projectId), out var destination)
             || !(Projects.TryGetValue(spaceId, out var projects) && projects.Exists(project => project.Id == projectId)))
         {
-            return (400, Problem(ProjectMoveWire.InvalidTaskProject));
+            return (400, Problem(ProblemTypes.InvalidTaskProject));
         }
 
         IReadOnlyList<Guid> set = ProjectStatuses.TryGetValue((spaceId, projectId), out var seeded)
@@ -201,7 +201,7 @@ internal sealed partial class FakeYelloApi
 
         if (project.ValueKind != JsonValueKind.String || !project.TryGetGuid(out var projectId))
         {
-            return (ProjectMoveWire.InvalidTaskProject, Guid.Empty, null);
+            return (ProblemTypes.InvalidTaskProject, Guid.Empty, null);
         }
 
         if (!root.TryGetProperty("statusId", out var status) || status.ValueKind == JsonValueKind.Null)

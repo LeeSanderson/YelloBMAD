@@ -66,6 +66,25 @@ public static class TaskRoutes
     public static string MoveOf(Guid spaceId, Guid taskId) => $"/api/v1/spaces/{spaceId:D}/tasks/{taskId:D}/move";
 
     /// <summary>
+    /// <c>POST</c> a <see cref="MoveTaskToProjectRequest"/> here to move the Task into another Project of its Space:
+    /// <c>200</c> with the <see cref="TaskResponse"/> as stored, its new Project stated, at the end of its column there;
+    /// <c>400 invalid-task-edit</c> for a body that is not such a move; <c>400 invalid-task-project</c> for a destination
+    /// that is not another Project of the Space; <c>400 invalid-status-destination</c> for a Status the destination does not
+    /// hold; <c>409 status-destination-required</c> when the destination lacks the Task's Status and none was named;
+    /// <c>409 bound-reached</c> for a full destination; <c>403</c> for a Role that may not move Tasks; the boundary's
+    /// <c>404</c> for a Task that is not there. Both surfaces: the caller writes no position.
+    /// </summary>
+    public static string ProjectMove => "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/project";
+
+    /// <summary>
+    /// One Task's move-to-Project path, as a client calls it.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="taskId">The Task.</param>
+    /// <returns>The path.</returns>
+    public static string ProjectMoveOf(Guid spaceId, Guid taskId) => $"/api/v1/spaces/{spaceId:D}/tasks/{taskId:D}/project";
+
+    /// <summary>
     /// <c>PUT</c> an <see cref="AssignTaskRequest"/> here: <c>200</c> with the <see cref="TaskResponse"/> as stored;
     /// <c>400 invalid-assignee</c> for a body that names no Membership or one that is not this Space's; <c>403</c> for a Role
     /// that may not assign. Its own route rather than a member of the edit, so it is governed by the matrix's "Assign a

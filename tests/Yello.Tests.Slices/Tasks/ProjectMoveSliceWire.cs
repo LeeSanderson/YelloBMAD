@@ -3,6 +3,7 @@ using System.Data.Common;
 using System.Net;
 using Microsoft.Data.SqlClient;
 using Xunit;
+using Yello.Contracts.Tasks;
 using Yello.Tests.Shared;
 using Yello.Tests.Slices.Accounts.RegisterAccount;
 
@@ -36,10 +37,10 @@ internal static class ProjectMoveSliceWire
     public const string EmptyColumnKey = "V0000";
 
     public static Task<WireResponse> MoveToProjectAsync(Actor actor, Guid spaceId, Guid taskId, HttpContent body, string? key = null) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectMoveWire.PathOf(spaceId, taskId), body, TaskWire.KeyHeader(key));
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, TaskRoutes.ProjectMoveOf(spaceId, taskId), body, TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> MoveToProjectWithTokenAsync(Actor actor, string token, Guid spaceId, Guid taskId, HttpContent body, string? key = null) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, ProjectMoveWire.PathOf(spaceId, taskId), token, body, TaskWire.KeyHeader(key));
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, TaskRoutes.ProjectMoveOf(spaceId, taskId), token, body, TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> MoveToProjectOnAsync(IsolationSurface surface, Actor actor, string token, Guid taskId, HttpContent body, string? key = null) =>
         surface == IsolationSurface.ApiToken

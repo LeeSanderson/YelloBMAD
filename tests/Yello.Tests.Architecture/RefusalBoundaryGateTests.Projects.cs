@@ -26,6 +26,13 @@ namespace Yello.Tests.Architecture;
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
 {
+    /// <summary>
+    /// The one slice admitted to count a bound: a move into another Project names its destination in the body, so the
+    /// pipeline cannot count it, and a pipeline lock on the destination taken before the slice's sorted pair of Project locks
+    /// would let two opposite moves deadlock. It counts with the pipeline's own counter and limit, after its locks.
+    /// </summary>
+    private const string MovesATaskToAnotherProject = "Yello.Application.Tasks.MoveTaskToProject.MoveTaskToProjectHandler";
+
     private static string BoundCountPortName => typeof(Yello.Application.Spaces.IBoundCounter).FullName!;
     private static string IdempotencyPortName => typeof(Yello.Application.Spaces.IIdempotencyStore).FullName!;
     private static string ProjectContractsNamespace => typeof(Yello.Contracts.Projects.ProjectRoutes).Namespace!;
@@ -47,7 +54,7 @@ public sealed partial class RefusalBoundaryGateTests
         // Vacuity guard: the pipeline reads it today (the presence bound), so the scan sees references.
         Assert.Contains(PipelineTypeName, dependents);
 
-        string[] permitted = [registry, PipelineTypeName];
+        string[] permitted = [registry, PipelineTypeName, MovesATaskToAnotherProject];
 
         var offenders = dependents.Where(name => !permitted.Contains(name, StringComparer.Ordinal)).ToList();
 
@@ -69,7 +76,8 @@ public sealed partial class RefusalBoundaryGateTests
         AssertOnlyThePipelineDependsOn(
             BoundCountPortName,
             "Yello.Infrastructure.Persistence.BoundCounter",
-            "Yello.Infrastructure.SpaceBoundaryLimits");
+            "Yello.Infrastructure.SpaceBoundaryLimits",
+            MovesATaskToAnotherProject);
 
     /// <summary>
     /// AC9, A-12's idempotency clause, <c>deferred-work.md:253-256</c> - nothing but the pipeline, the

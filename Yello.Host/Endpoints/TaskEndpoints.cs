@@ -210,5 +210,6 @@ public static class TaskEndpoints
         {
             LabelIds = labelIds,
             AssigneeMembershipId = task.AssigneeMembershipId,
+            ProjectId = task.ProjectId,
         };
 }

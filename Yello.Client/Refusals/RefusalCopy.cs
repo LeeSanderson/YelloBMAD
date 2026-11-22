@@ -129,6 +129,12 @@ public static class RefusalCopy
     public static string InvalidStatusDestinationKey => "StatusDestinationInvalid";
 
     /// <summary>
+    /// The copy key for <c>400 invalid-task-project</c>: the Project chosen for a Task's move is not another Project of the
+    /// Space any more. Never the not-found copy, which would tell the person their Task is gone.
+    /// </summary>
+    public static string InvalidTaskProjectKey => "TaskProjectInvalid";
+
+    /// <summary>
     /// The copy key for <c>409 label-in-use</c> (story 2.4, AC3): the Label is on Tasks and was not deleted.
     /// </summary>
     public static string LabelInUseKey => "LabelInUse";
@@ -324,6 +330,7 @@ public static class RefusalCopy
         [ProblemTypes.StatusDestinationRequired] = StatusDestinationRequiredKey,
         [ProblemTypes.StatusProjectDestinationRequired] = StatusProjectDestinationRequiredKey,
         [ProblemTypes.InvalidStatusDestination] = InvalidStatusDestinationKey,
+        [ProblemTypes.InvalidTaskProject] = InvalidTaskProjectKey,
         [ProblemTypes.InvalidTaskLabels] = InvalidTaskLabelsKey,
         [ProblemTypes.InvalidAssignee] = InvalidAssigneeKey,
         [ProblemTypes.TaskPositionUnavailable] = TaskPositionUnavailableKey,

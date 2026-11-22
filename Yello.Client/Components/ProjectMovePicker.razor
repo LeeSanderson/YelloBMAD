@@ -1,0 +1,336 @@
+@using System.Globalization
+@using System.Net.Http.Json
+@using System.Text.Json
+@using Yello.Client.Spaces
+@using Yello.Contracts.Projects
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+@inject ActiveSpaceState ActiveSpace
+
+@*
+    THE MOVE TO PROJECT PICKER. Rendered in place in the Task detail panel below its "Move to Project" control, never a second
+    dialog, on the Move picker's patterns: options are PickerOptions marking nothing, one tab stop per step, and Esc steps
+    back innermost first - the Status step to the Projects, the Projects out of the picker.
+
+    THE PROJECTS FIRST, NOTHING SELECTED: the Space's other Projects in the server's order, the Task's own left out. A
+    Space with no other Project says so in one line. Choosing a Project reads its effective set: when it holds the Task's
+    Status the choice commits; otherwise a Status step lists the set, in Board order, again with nothing selected.
+
+    NOT OPTIMISTIC: while the commit is out the steps are replaced by a status line holding focus, and nothing in the picker
+    can send a second one. The Board decides what the answer means; a refusal brings back the step it calls for, read again.
+*@
+
+<div class="project-move-picker" @onkeydown="KeyDownAsync" @onkeydown:stopPropagation="true">
+    @if (Step == PickerStep.InFlight && _committing is { } committing)
+    {
+        <p class="project-move-picker__progress" role="status" tabindex="-1" @ref="_progress">@string.Format(CultureInfo.CurrentCulture, Localizer["ProjectMoveInFlight"], committing.ProjectName)</p>
+    }
+
+    @if (Step is PickerStep.Failed or PickerStep.NoOtherProject)
+    {
+        <p class="project-move-picker__empty" tabindex="-1" @ref="_empty">@(Step == PickerStep.Failed ? Localizer["ProjectMoveNotLoaded"] : Localizer["ProjectMoveNoOtherProject"])</p>
+    }
+
+    @if (Step == PickerStep.Statuses && _destination is { } destination && _statuses is { } statuses)
+    {
+        <p class="project-move-picker__heading" id="@HeadingId">@string.Format(CultureInfo.CurrentCulture, Localizer["ProjectMoveStatusStep"], StatusName, destination.Name)</p>
+        <ul class="picker" role="listbox" tabindex="-1" aria-labelledby="@HeadingId" @ref="_list">
+            @foreach (var (status, active) in WithStop(statuses))
+            {
+                <PickerOption @key="status.Id"
+                              Option="@status"
+                              MarksCurrent="false"
+                              Active="@active"
+                              OnFocused="() => _active = status.Id"
+                              OnChoose="ChooseStatusAsync" />
+            }
+        </ul>
+    }
+
+    @if (Step == PickerStep.Projects && _projects is { } projects)
+    {
+        <ul class="picker" role="listbox" tabindex="-1" aria-label="@Localizer["ProjectMoveProjectStep"]" @ref="_list">
+            @foreach (var (project, active) in WithStop(projects))
+            {
+                <PickerOption @key="project.Id"
+                              Option="@project"
+                              MarksCurrent="false"
+                              Active="@active"
+                              OnFocused="() => _active = project.Id"
+                              OnChoose="ChooseProjectAsync" />
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+
+    private readonly string _id = Guid.NewGuid().ToString("N");
+
+    private ElementReference _list;
+    private ElementReference _empty;
+    private ElementReference _progress;
+    private bool _focus = true;
+
+    private List<TaskStatusOption>? _projects;
+    private TaskStatusOption? _destination;
+    private List<TaskStatusOption>? _statuses;
+    private ProjectMoveChoice? _committing;
+    private bool _failed;
+
+    // The step's one tab stop: the option focus was last on, or the step's first.
+    private Guid? _active;
+
+    /// <summary>The Space the Task is in.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid SpaceId { get; set; }
+
+    /// <summary>The Task's own Project, which is never offered.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid ProjectId { get; set; }
+
+    /// <summary>The Task's Status now.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Guid StatusId { get; set; }
+
+    /// <summary>The name of the Task's Status, for the Status step's heading.</summary>
+    [Parameter]
+    public string StatusName { get; set; } = string.Empty;
+
+    /// <summary>Sends the move and answers how it ended: the Board's write.</summary>
+    [Parameter]
+    [EditorRequired]
+    public Func<ProjectMoveChoice, Task<ProjectMoveAnswer>> OnCommit { get; set; } = _ => Task.FromResult(ProjectMoveAnswer.Refused);
+
+    /// <summary>Raised when Esc leaves the picker from its first step: nothing is moved.</summary>
+    [Parameter]
+    public EventCallback OnDismiss { get; set; }
+
+    private string HeadingId => "project-move-heading-" + _id;
+
+    /// <inheritdoc />
+    protected override Task OnInitializedAsync() => ReadProjectsAsync();
+
+    private enum PickerStep
+    {
+        Loading,
+        InFlight,
+        Failed,
+        NoOtherProject,
+        Statuses,
+        Projects,
+    }
+
+    private PickerStep Step
+    {
+        get
+        {
+            if (_committing is not null)
+            {
+                return PickerStep.InFlight;
+            }
+
+            if (_failed)
+            {
+                return PickerStep.Failed;
+            }
+
+            if (_projects is null)
+            {
+                return PickerStep.Loading;
+            }
+
+            if (_destination is not null && _statuses is not null)
+            {
+                return PickerStep.Statuses;
+            }
+
+            return _projects.Count == 0 ? PickerStep.NoOtherProject : PickerStep.Projects;
+        }
+    }
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Focus starts in the picker and stays in it when a step replaces the one that had it.
+        if (!_focus || Step == PickerStep.Loading)
+        {
+            return;
+        }
+
+        _focus = false;
+
+        switch (Step)
+        {
+            case PickerStep.InFlight:
+                await _progress.FocusAsync();
+                break;
+
+            case PickerStep.Failed or PickerStep.NoOtherProject:
+                await _empty.FocusAsync();
+                break;
+
+            default:
+                await _list.FocusAsync();
+                break;
+        }
+    }
+
+    private IEnumerable<(TaskStatusOption Item, bool Active)> WithStop(List<TaskStatusOption> items)
+    {
+        var stop = items.Exists(item => item.Id == _active) ? _active : items.FirstOrDefault()?.Id;
+
+        return items.Select(item => (item, item.Id == stop));
+    }
+
+    private async Task ReadProjectsAsync()
+    {
+        _destination = null;
+        _statuses = null;
+        _projects = null;
+
+        var projects = await ReadAsync(ProjectRoutes.ListIn(SpaceId), (content, token) => content.ReadFromJsonAsync<List<ProjectResponse>>(JsonOptions, token));
+
+        _projects = projects is null ? null : [.. projects.Where(project => project.Id != ProjectId).Select(project => new TaskStatusOption(project.Id, project.Name))];
+        _failed = projects is null;
+        _active = null;
+        _focus = true;
+    }
+
+    /// <summary>
+    /// The destination's effective set, read now: <c>null</c> when it could not be read.
+    /// </summary>
+    private async Task<List<TaskStatusOption>?> ReadSetAsync(Guid projectId)
+    {
+        var set = await ReadAsync(ProjectStatusRoutes.CollectionOf(SpaceId, projectId), (content, token) => content.ReadFromJsonAsync<List<ProjectStatusResponse>>(JsonOptions, token));
+
+        return set is null ? null : [.. set.Select(status => new TaskStatusOption(status.Id, status.Name))];
+    }
+
+    /// <summary>
+    /// One read the picker needs: <c>null</c> for a refusal, no answer or a body it cannot read, all of which the picker says
+    /// the same way.
+    /// </summary>
+    private async Task<T?> ReadAsync<T>(string path, Func<HttpContent, CancellationToken, Task<T?>> read)
+        where T : class
+    {
+        var token = ActiveSpace.Token;
+
+        try
+        {
+            using var response = await Http.GetAsync(new Uri(path, UriKind.Relative), token);
+
+            return response.IsSuccessStatusCode ? await read(response.Content, token) : null;
+        }
+        catch (Exception exception) when (exception is OperationCanceledException or HttpRequestException or JsonException)
+        {
+            return null;
+        }
+    }
+
+    private async Task ChooseProjectAsync(Guid projectId)
+    {
+        if (_committing is not null || _projects?.Find(project => project.Id == projectId) is not { } chosen)
+        {
+            return;
+        }
+
+        var set = await ReadSetAsync(projectId);
+
+        if (set is null)
+        {
+            _failed = true;
+            _focus = true;
+            return;
+        }
+
+        if (set.Exists(status => status.Id == StatusId))
+        {
+            await CommitAsync(new ProjectMoveChoice(chosen.Id, chosen.Name, StatusId: null, StatusName: null));
+            return;
+        }
+
+        ShowStatuses(chosen, set);
+    }
+
+    private Task ChooseStatusAsync(Guid statusId) =>
+        _committing is null && _destination is { } destination && _statuses?.Find(status => status.Id == statusId) is { } chosen
+            ? CommitAsync(new ProjectMoveChoice(destination.Id, destination.Name, chosen.Id, chosen.Name))
+            : Task.CompletedTask;
+
+    private void ShowStatuses(TaskStatusOption destination, List<TaskStatusOption> set)
+    {
+        _destination = destination;
+        _statuses = set;
+        _active = null;
+        _focus = true;
+    }
+
+    /// <summary>
+    /// Sends the move through the Board and takes the step its answer calls for. A second commit while one is out is
+    /// ignored: the steps that could send one are not drawn.
+    /// </summary>
+    private async Task CommitAsync(ProjectMoveChoice choice)
+    {
+        _committing = choice;
+        _focus = true;
+        StateHasChanged();
+
+        var answer = await OnCommit(choice);
+
+        _committing = null;
+        _focus = true;
+
+        switch (answer)
+        {
+            case ProjectMoveAnswer.StatusNeeded or ProjectMoveAnswer.StatusInvalid:
+                var set = await ReadSetAsync(choice.ProjectId);
+
+                if (set is null)
+                {
+                    _failed = true;
+                    break;
+                }
+
+                ShowStatuses(new TaskStatusOption(choice.ProjectId, choice.ProjectName), set);
+                break;
+
+            case ProjectMoveAnswer.ProjectInvalid:
+                await ReadProjectsAsync();
+                break;
+
+            case ProjectMoveAnswer.Refused when choice.StatusId is null:
+                _destination = null;
+                _statuses = null;
+                break;
+
+            default:
+                // Moved or gone, the panel is closing; refused with a Status chosen, the Status step is offered again.
+                break;
+        }
+    }
+
+    private Task KeyDownAsync(KeyboardEventArgs args)
+    {
+        if (args.Key != "Escape" || _committing is not null)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (_destination is not null && !_failed)
+        {
+            _destination = null;
+            _statuses = null;
+            _active = null;
+            _focus = true;
+            return Task.CompletedTask;
+        }
+
+        return OnDismiss.InvokeAsync();
+    }
+}

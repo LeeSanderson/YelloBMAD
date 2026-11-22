@@ -11,7 +11,8 @@ namespace Yello.Host.Spaces;
 /// <see cref="ActiveSpaceResolution"/> reads the limit from <see cref="BoundRegistry"/>, counts inside
 /// the request's unit of work under a lock held to its end, and answers <c>409 bound-reached</c> before
 /// the endpoint runs when the Space - or, for a scoped bound, the route's Project - is already at the
-/// limit. A slice never counts.
+/// limit. A slice never counts, save the move of a Task into another Project, whose destination is in its
+/// body rather than the route (see <c>MoveTaskToProjectHandler</c>).
 /// </remarks>
 /// <param name="Bound">The bound.</param>
 public sealed record RequiredBound(Bound Bound);

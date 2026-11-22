@@ -39,4 +39,10 @@ public sealed record TaskResponse(
     /// person is named from the Space's Assignee candidates, never by an address.
     /// </summary>
     public Guid? AssigneeMembershipId { get; init; }
+
+    /// <summary>
+    /// The Project the Task is in now. Appended on the same terms: the Task's own URL holds no Project, because a move can
+    /// change it, so the answer is where a caller learns it.
+    /// </summary>
+    public Guid ProjectId { get; init; }
 }

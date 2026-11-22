@@ -32,6 +32,10 @@
     destination Status, then the position, with nothing selected; choosing a position commits, optimistically, and the
     panel stays open with focus back on Move. Esc steps the picker back, then closes it, returning focus to Move.
 
+    MOVE TO PROJECT: a secondary button after Move, for a Role that can move Tasks only. Its picker (ProjectMovePicker)
+    opens in place below it; the Board writes the move and, once it is admitted, closes the panel. See
+    TaskDetail.ProjectMove.cs.
+
     DELETE TASK (story 2.5, AC1, AC11; UX-DR12, UX-DR26, UX-DR36): the panel's last control, a secondary button - the
     danger colour is spent only inside the confirm (open question 8). It asks first, IN PLACE: the panel's content is
     replaced by the confirm - still this one dialog, still trapped, never a second dialog stacked on it - which names the
@@ -147,6 +151,25 @@
                 @if (_moveOpen)
                 {
                     <MovePicker Columns="@MoveColumns" Item="@Item" OnChoose="MoveChosenAsync" OnDismiss="MoveDismissed" />
+                }
+            </div>
+
+            <div class="task-detail__field" data-role-gated>
+                <button type="button"
+                        class="button-secondary task-detail__project-move"
+                        aria-haspopup="listbox"
+                        aria-expanded="@(_projectMoveOpen ? "true" : "false")"
+                        @onclick="ToggleProjectMove"
+                        @ref="_projectMoveButton">@Localizer["TaskMoveToProject"]</button>
+
+                @if (_projectMoveOpen)
+                {
+                    <ProjectMovePicker SpaceId="@SpaceId"
+                                       ProjectId="@ProjectId"
+                                       StatusId="@Item.StatusId"
+                                       StatusName="@StatusName"
+                                       OnCommit="CommitProjectMoveAsync"
+                                       OnDismiss="ProjectMoveDismissed" />
                 }
             </div>
 
@@ -408,6 +431,14 @@
     [Parameter]
     public EventCallback<MoveChoice> OnMove { get; set; }
 
+    /// <summary>The Project the Task is in: the Board's.</summary>
+    [Parameter]
+    public Guid ProjectId { get; set; }
+
+    /// <summary>Moves the Task into another Project and answers how that ended: the Board's write.</summary>
+    [Parameter]
+    public Func<ProjectMoveChoice, Task<ProjectMoveAnswer>>? OnMoveToProject { get; set; }
+
     /// <summary>Raised with the Task's whole new set of Labels, in the server's order, when one is toggled.</summary>
     [Parameter]
     public EventCallback<IReadOnlyList<Guid>> OnLabels { get; set; }
@@ -492,6 +523,7 @@
             _pickerOpen = false;
             _labelPickerOpen = false;
             _moveOpen = false;
+            _projectMoveOpen = false;
             _titleMessage = null;
             _confirming = false;
         }
@@ -595,6 +627,8 @@
                 await _assigneeButton.FocusAsync();
             }
         }
+
+        await FocusProjectMoveButtonAsync();
     }
 
     private Task CloseAsync() => OnClose.InvokeAsync();
@@ -650,6 +684,12 @@
             return Task.CompletedTask;
         }
 
+        if (_projectMoveOpen)
+        {
+            EscapeProjectMove();
+            return Task.CompletedTask;
+        }
+
         return OnClose.InvokeAsync();
     }
 
@@ -684,6 +724,7 @@
         _labelPickerOpen = false;
         _moveOpen = false;
         _assigneePickerOpen = false;
+        CloseProjectMove();
         _confirming = true;
         _focusCancel = true;
 
@@ -769,18 +810,21 @@
     {
         _pickerOpen = !_pickerOpen;
         _moveOpen = false;
+        CloseProjectMove();
     }
 
     private void ToggleLabelPicker()
     {
         _labelPickerOpen = !_labelPickerOpen;
         _moveOpen = false;
+        CloseProjectMove();
     }
 
     /// <summary>The panel's Move control: the Move picker opens in place, one picker at a time (story 2.6).</summary>
     private void ToggleMove()
     {
         _moveOpen = !_moveOpen;
+        CloseProjectMove();
         _pickerOpen = false;
         _labelPickerOpen = false;
         _assigneePickerOpen = false;
@@ -790,6 +834,7 @@
     {
         _assigneePickerOpen = !_assigneePickerOpen;
         _moveOpen = false;
+        CloseProjectMove();
     }
 
     /// <summary>

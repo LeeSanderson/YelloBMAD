@@ -338,6 +338,16 @@ public static class ProblemTypes
     public static string InvalidStatusDestination => "urn:yello:problem:invalid-status-destination";
 
     /// <summary>
+    /// A move of a Task into another Project names a destination that is not another Project of the Task's Space, or a
+    /// <c>projectId</c> that is not an id. Answered <c>400</c>; nothing is written.
+    /// </summary>
+    /// <remarks>
+    /// <b>One body whatever the cause</b>: a random id, another Space's real Project, the Task's own Project and a Project
+    /// deleted while the move waited answer the same bytes, so the answer never says where an id exists.
+    /// </remarks>
+    public static string InvalidTaskProject => "urn:yello:problem:invalid-task-project";
+
+    /// <summary>
     /// A Task edit whose <c>labelIds</c> names a Label that is not one of the Space's - unknown, another Space's,
     /// repeated, not an id, or deleted while the edit ran. Answered <c>400</c>; nothing is written. Story 2.4, AC10,
     /// AC11.

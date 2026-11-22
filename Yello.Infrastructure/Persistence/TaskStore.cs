@@ -75,6 +75,17 @@ namespace Yello.Infrastructure.Persistence;
 /// Project's lock.
 /// </para>
 /// <para>
+/// <b>A move between Projects is the fifth key placer and the only writer of a Task's Project.</b> It takes both Projects'
+/// Tasks locks in the one sorted order (<see cref="ApplicationLocks.TakeProjectTasksAsync(YelloDbContext, IReadOnlyCollection{Guid}, CancellationToken)"/>),
+/// never as two single takes, which would deadlock against the opposite move; then the Task's row on its clustered key,
+/// re-read under it - gone, or no longer in the source - is not found; then the destination column's last key; then
+/// <c>ProjectId</c>, <c>StatusId</c> and <c>PositionKey</c> in one <c>UPDATE</c>. Because a Task's Project can now change,
+/// every writer that locked a Project by the Task's Project re-checks it under the row lock - the deletion here, and the
+/// Status edit and the move within a Project by re-reading - and answers not found when the Task left: the lock it holds is
+/// no longer the Task's. A Labels edit, an assignment and a title or due-date edit write nothing the move writes, and take
+/// no Project lock.
+/// </para>
+/// <para>
 /// <b>The edit and move slices take the Project's lock before they check the Status</b> (<see cref="LockProjectAsync"/>),
 /// because a Status can leave the set while they wait; the take here is then a re-entry of the same transaction-owned lock,
 /// kept so the store stays safe on its own. The lock order is unchanged: the Project's lock, then the Task row, then Labels.
@@ -146,6 +157,57 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
     /// <inheritdoc />
     public Task LockProjectAsync(Guid projectId, CancellationToken cancellationToken) =>
         ApplicationLocks.TakeProjectTasksAsync(dbContext, projectId, cancellationToken);
+
+    /// <inheritdoc />
+    public Task LockProjectsAsync(IReadOnlyCollection<Guid> projectIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(projectIds);
+
+        return ApplicationLocks.TakeProjectTasksAsync(dbContext, projectIds, cancellationToken);
+    }
+
+    /// <inheritdoc />
+    public Task<bool> ProjectExistsAsync(Guid projectId, CancellationToken cancellationToken) =>
+        dbContext.Projects
+            .AsNoTracking()
+            .AnyAsync(project => project.Id == projectId, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<TaskItem?> MoveToProjectAsync(
+        Guid taskId,
+        Guid sourceProjectId,
+        Guid destinationProjectId,
+        Guid statusId,
+        CancellationToken cancellationToken)
+    {
+        // Re-entries of locks the slice already holds, in the same sorted order, so the store stays safe on its own.
+        await ApplicationLocks.TakeProjectTasksAsync(dbContext, [sourceProjectId, destinationProjectId], cancellationToken).ConfigureAwait(false);
+
+        var task = await dbContext.Tasks
+            .FromSql($"SELECT * FROM dbo.[Task] WITH (UPDLOCK, INDEX(1)) WHERE Id = {taskId}")
+            .SingleOrDefaultAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        if (task is null || task.ProjectId != sourceProjectId)
+        {
+            return null;
+        }
+
+        // The destination column's last key, read only now that its lock is held: never derived from the Task's key in the
+        // source, which says nothing about what the destination column holds.
+        var last = await dbContext.Database
+            .SqlQuery<string?>($"SELECT MAX(PositionKey) AS [Value] FROM dbo.[Task] WHERE ProjectId = {destinationProjectId} AND StatusId = {statusId}")
+            .SingleAsync(cancellationToken)
+            .ConfigureAwait(false);
+
+        task.ProjectId = destinationProjectId;
+        task.StatusId = statusId;
+        task.PositionKey = PositionKey.After(last);
+
+        await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+        return task;
+    }
 
     /// <inheritdoc />
     public Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken)
@@ -380,10 +442,13 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
         var locked = await dbContext.Tasks
             .FromSql($"SELECT * FROM dbo.[Task] WITH (UPDLOCK, INDEX(1)) WHERE Id = {taskId}")
             .AsNoTracking()
-            .CountAsync(cancellationToken)
+            .Select(task => new { task.ProjectId })
+            .SingleOrDefaultAsync(cancellationToken)
             .ConfigureAwait(false);
 
-        if (locked == 0)
+        // Moved into another Project while this waited on the old one's lock: the lock held is not the Task's any more.
+        // Not found rather than a retry on the new Project, which would take a second Tasks lock out of the sorted order.
+        if (locked is null || locked.ProjectId != project)
         {
             return TaskDeletion.NotFound;
         }

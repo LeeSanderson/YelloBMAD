@@ -167,6 +167,15 @@ public sealed class MoveTaskHandlerTests
             return Task.CompletedTask;
         }
 
+        public Task LockProjectsAsync(IReadOnlyCollection<Guid> projectIds, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Only a move between Projects takes several Projects' locks.");
+
+        public Task<bool> ProjectExistsAsync(Guid projectId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Only a move between Projects reads a destination Project.");
+
+        public Task<TaskItem?> MoveToProjectAsync(Guid taskId, Guid sourceProjectId, Guid destinationProjectId, Guid statusId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Only a move between Projects changes a Task's Project.");
+
         public Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The move slice edits nothing else.");
 

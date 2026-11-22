@@ -13,6 +13,11 @@ namespace Yello.Application.Spaces;
 /// counted would be the place a bound is checked twice, or once and wrongly.
 /// </para>
 /// <para>
+/// <b>One exception: a move of a Task into another Project</b>, whose destination is in the body, where the
+/// pipeline cannot read it, and whose two Project locks must be taken together before any count. Its slice counts
+/// the destination after them with this counter and the registry's limit, and answers as the pipeline does.
+/// </para>
+/// <para>
 /// <b>Some bounds count within something narrower than the Space</b> - Tasks per Project counts one
 /// Project's Tasks. The pipeline reads that scope from the route, never the slice, and a bound that
 /// needs a scope fails closed without one.

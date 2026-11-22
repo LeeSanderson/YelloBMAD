@@ -5,15 +5,11 @@ using System.Text.Json;
 namespace Yello.Tests.Shared;
 
 /// <summary>
-/// Moving one Task into another Project of its Space, as every suite sends and reads it: the route, the one new problem
-/// type, the body <c>{ projectId, statusId? }</c>, and the <c>projectId</c> a Task answer states.
+/// Moving one Task into another Project of its Space, as every suite sends and reads it: the body
+/// <c>{ projectId, statusId? }</c>, and the <c>projectId</c> a Task answer states. The route and the problem type are the
+/// contract's (<c>TaskRoutes.ProjectMove</c>, <c>ProblemTypes.InvalidTaskProject</c>).
 /// </summary>
 /// <remarks>
-/// <para>
-/// <b><see cref="Route"/>, <see cref="PathOf"/> and <see cref="InvalidTaskProject"/> are stand-ins</b> for
-/// <c>TaskRoutes.ProjectMove</c>, <c>TaskRoutes.ProjectMoveOf</c> and <c>ProblemTypes.InvalidTaskProject</c> until the
-/// contract declares them. Swap every use for the contract member and delete the stand-in in the same change.
-/// </para>
 /// <para>
 /// <b>Bodies are anonymous objects or raw JSON</b>, never the contract type, so a case can send what the contract forbids
 /// (a <c>positionKey</c>, a <c>spaceId</c>, a missing <c>projectId</c>). <see cref="Body(Guid)"/> leaves <c>statusId</c>
@@ -23,24 +19,6 @@ namespace Yello.Tests.Shared;
 public static class ProjectMoveWire
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
-    /// <summary>
-    /// The route pattern: <c>POST</c> under the Task's own path, which never holds a Project.
-    /// </summary>
-    public static string Route => "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/project";
-
-    /// <summary>
-    /// The refusal for a destination that is not another Project of the request's Space, whatever the cause.
-    /// </summary>
-    public static string InvalidTaskProject => "urn:yello:problem:invalid-task-project";
-
-    /// <summary>
-    /// One Task's move-to-Project path, as a client calls it.
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <param name="taskId">The Task.</param>
-    /// <returns>The path.</returns>
-    public static string PathOf(Guid spaceId, Guid taskId) => $"/api/v1/spaces/{spaceId:D}/tasks/{taskId:D}/project";
 
     /// <summary>
     /// The body with no destination Status: the Task keeps its Status if the destination holds it.

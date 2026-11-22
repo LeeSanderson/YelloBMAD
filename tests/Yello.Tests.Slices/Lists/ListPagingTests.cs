@@ -56,7 +56,7 @@ public sealed partial class ListPagingTests(MigratedDatabaseFixture fixture) : I
 
     private static readonly string[] PageProperties = ["nextAfter", "project", "statuses", "tasks", "total"];
 
-    private static readonly string[] TaskProperties = ["assigneeMembershipId", "createdAt", "dueDate", "id", "labelIds", "positionKey", "statusId", "title"];
+    private static readonly string[] TaskProperties = ["assigneeMembershipId", "createdAt", "dueDate", "id", "labelIds", "positionKey", "projectId", "statusId", "title"];
 
     private static readonly string[] IdAndName = ["id", "name"];
 

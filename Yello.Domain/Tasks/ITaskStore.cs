@@ -40,6 +40,46 @@ public interface ITaskStore
     Task LockProjectAsync(Guid projectId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// Takes the Tasks lock of several Projects at once, in the one order every taker of several uses, and holds them until
+    /// the unit of work ends.
+    /// </summary>
+    /// <remarks>
+    /// Two single <see cref="LockProjectAsync"/> calls in the caller's own order would deadlock against a writer taking the
+    /// same two the other way round, such as a move between the same Projects in the opposite direction.
+    /// </remarks>
+    /// <param name="projectIds">Projects of the resolved Space; a repeat is taken once.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>A task.</returns>
+    Task LockProjectsAsync(IReadOnlyCollection<Guid> projectIds, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Whether a Project with the id is visible in the resolved Space, read with a plain statement.
+    /// </summary>
+    /// <param name="projectId">The Project.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns><c>true</c> when it is one of the Space's Projects now.</returns>
+    Task<bool> ProjectExistsAsync(Guid projectId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Moves one Task of the resolved Space from <paramref name="sourceProjectId"/> into
+    /// <paramref name="destinationProjectId"/>, in <paramref name="statusId"/>, at the end of that column, and saves it. Only
+    /// the Task's Project, Status and position key are written, in one statement; no sibling's key changes.
+    /// </summary>
+    /// <remarks>
+    /// The caller holds both Projects' Tasks locks (<see cref="LockProjectsAsync"/>) and has already checked the Status
+    /// against the destination's effective set and the destination's bound.
+    /// </remarks>
+    /// <param name="taskId">The Task.</param>
+    /// <param name="sourceProjectId">The Project whose lock is held as the Task's own.</param>
+    /// <param name="destinationProjectId">The Project it moves into.</param>
+    /// <param name="statusId">Its Status in the destination.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>
+    /// The Task as stored, or <c>null</c> when it is gone or no longer in <paramref name="sourceProjectId"/>.
+    /// </returns>
+    Task<TaskItem?> MoveToProjectAsync(Guid taskId, Guid sourceProjectId, Guid destinationProjectId, Guid statusId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Applies an edit to one Task of the resolved Space and saves it. A Status that differs from the Task's
     /// own places it after the last key of its new column (story 2.3, open question 3 (a)); the same Status
     /// writes no key.
@@ -83,7 +123,7 @@ public interface ITaskStore
     /// Moves one Task of the resolved Space to <paramref name="statusId"/>, immediately after
     /// <paramref name="afterTaskId"/> - or to the top of that column when it is <c>null</c> - and saves it (story 2.6, AC3,
     /// AC9). Only the moved Task's Status and position key are written; no sibling's key changes (AD-15). Never changes
-    /// the Task's Project.
+    /// the Task's Project: <see cref="MoveToProjectAsync"/> does.
     /// </summary>
     /// <param name="taskId">The Task, from the route.</param>
     /// <param name="statusId">The destination Status, already checked against the Task's Project's effective set.</param>

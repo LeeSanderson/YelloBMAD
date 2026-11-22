@@ -170,6 +170,15 @@ public sealed class CreateTaskHandlerTests
         public Task LockProjectAsync(Guid projectId, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The create slice relies on the bound count's lock.");
 
+        public Task LockProjectsAsync(IReadOnlyCollection<Guid> projectIds, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Only a move between Projects takes several Projects' locks.");
+
+        public Task<bool> ProjectExistsAsync(Guid projectId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Only a move between Projects reads a destination Project.");
+
+        public Task<TaskItem?> MoveToProjectAsync(Guid taskId, Guid sourceProjectId, Guid destinationProjectId, Guid statusId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Only a move between Projects changes a Task's Project.");
+
         public Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The create slice edits no Task.");
 

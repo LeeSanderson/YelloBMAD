@@ -25,18 +25,12 @@ namespace Yello.Tests.Slices.Tasks;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>The route and the new problem type are <see cref="ProjectMoveWire"/>'s stand-ins</b> until the contract declares
-/// them. Every Project, Task, Label, Assignee and Status here is written through the product; only the bound seed is SQL
-/// (<see cref="TaskWire.SeedTasksAsync"/>, whose constraints it states).
-/// </para>
-/// <para>
-/// <b>Written against each open question's recommended answer</b>; a skip that rests on one names it.
+/// <b>Seeded through the product.</b> Every Project, Task, Label, Assignee and Status here is written through the product;
+/// only the bound seed is SQL (<see cref="TaskWire.SeedTasksAsync"/>, whose constraints it states).
 /// </para>
 /// </remarks>
 public sealed partial class TaskEndpointTests
 {
-    private const string ProjectMoveRoute = "red: AC1 - the route POST /tasks/{taskId}/project is not mapped (Q1 (a), Q2 (a))";
-
     /// <summary>
     /// A Task whose Status the destination's set holds moves with no <c>statusId</c>, on either surface: <c>200</c> with the
     /// Task as stored, its new Project stated; same Status; the last key of the destination's column; and no other Task in
@@ -44,7 +38,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="surface">The surface the move is sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC3, AC8 - the route is not mapped; the Status is kept and the Task lands last (Q1 (a), Q2 (a), Q9 (a))")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "FR-41")]
@@ -64,7 +58,9 @@ public sealed partial class TaskEndpointTests
             owner = await RegisterAsync(client, database);
             var token = await IssueTokenAsync(owner, owner.SpaceId);
 
-            projects = await TwoProjectsAsync(owner, ["Alpha", "Bravo", "Charlie"], ["Xray", "Yankee"]);
+            // The destination column holds more Tasks than precede the moved one in its source, so a key derived from the
+            // source key would sort inside the destination column, or collide with one of its keys, never after its last.
+            projects = await TwoProjectsAsync(owner, ["Alpha", "Bravo", "Charlie"], ["Xray", "Yankee", "Zulu"]);
             defaults = await StatusWire.DefaultsAsync(database, owner.SpaceId);
             othersBefore = await OtherPlacementsAsync(database, owner.SpaceId, projects, projects.InSource[1]);
 
@@ -79,9 +75,9 @@ public sealed partial class TaskEndpointTests
 
         Assert.Equal(defaults[0].Id, statusId);
         Assert.Equal(
-            [projects.InDestination[0], projects.InDestination[1], projects.InSource[1]],
+            [projects.InDestination[0], projects.InDestination[1], projects.InDestination[2], projects.InSource[1]],
             await MoveWire.ColumnAsync(database, owner.SpaceId, projects.DestinationId, defaults[0].Id));
-        MoveWire.AssertStrictlyBetween(await MoveWire.KeyOfAsync(database, owner.SpaceId, projects.InDestination[1]), key, upper: null);
+        MoveWire.AssertStrictlyBetween(await MoveWire.KeyOfAsync(database, owner.SpaceId, projects.InDestination[2]), key, upper: null);
         Assert.Equal(othersBefore, await OtherPlacementsAsync(database, owner.SpaceId, projects, projects.InSource[1]));
         await StatusWire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
@@ -94,7 +90,7 @@ public sealed partial class TaskEndpointTests
     /// <param name="cause">Why the destination lacks the Task's Status.</param>
     /// <param name="explicitNull">Whether <c>statusId</c> is sent as <c>null</c> rather than left out.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC4 - the route is not mapped; a missing destination Status is 409 status-destination-required (Q6 (a), Q7 (a))")]
+    [Theory]
     [InlineData("removed-default", false)]
     [InlineData("removed-default", true)]
     [InlineData("source-added", false)]
@@ -140,7 +136,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="destination">Which kind of destination Status is supplied.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC4, AC6 - the route is not mapped; a supplied destination Status is applied with the reparent in one write")]
+    [Theory]
     [InlineData("default")]
     [InlineData("destination-added")]
     [Trait("Requirement", "FR-41")]
@@ -188,7 +184,7 @@ public sealed partial class TaskEndpointTests
     /// the request means "into this Project, in this Status" whatever the state.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the route is not mapped; a supplied Status is applied even when none was needed (Q6 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-41")]
     public async Task A_supplied_Status_is_applied_even_when_the_current_one_would_be_kept()
     {
@@ -222,7 +218,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="kind">The Status supplied.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC4 - the route is not mapped; a destination Status outside the destination's set is 400 invalid-status-destination")]
+    [Theory]
     [InlineData("source-added")]
     [InlineData("foreign")]
     [InlineData("removed-default")]
@@ -272,7 +268,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="kind">The destination named.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2 - the route is not mapped; a destination that is not another Project of the Space is 400 invalid-task-project (Q3 (a))")]
+    [Theory]
     [InlineData("foreign")]
     [InlineData("own")]
     [Trait("Requirement", "FR-41")]
@@ -304,9 +300,10 @@ public sealed partial class TaskEndpointTests
         });
 
         Assert.NotNull(owner);
-        RemovalWire.AssertRefused(refused, HttpStatusCode.BadRequest, ProjectMoveWire.InvalidTaskProject, random);
+        RemovalWire.AssertRefused(refused, HttpStatusCode.BadRequest, ProblemTypes.InvalidTaskProject, random);
         Assert.Equal(before, await RowAsync(database, owner.SpaceId, taskId));
         Assert.Empty(recorded);
+        await StatusWire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -319,7 +316,7 @@ public sealed partial class TaskEndpointTests
     /// <param name="json">The body, with its placeholders.</param>
     /// <param name="problemType">The refusal it meets.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = ProjectMoveRoute)]
+    [Theory]
     [InlineData("not json", "urn:yello:problem:invalid-task-edit")]
     [InlineData("[]", "urn:yello:problem:invalid-task-edit")]
     [InlineData("{}", "urn:yello:problem:invalid-task-edit")]
@@ -356,6 +353,7 @@ public sealed partial class TaskEndpointTests
         Assert.NotNull(owner);
         RemovalWire.AssertRefused(refused, HttpStatusCode.BadRequest, problemType);
         Assert.Equal(before, await RowAsync(database, owner.SpaceId, taskId));
+        await StatusWire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -364,7 +362,7 @@ public sealed partial class TaskEndpointTests
     /// on a later re-assignment's email arriving: anything the move had enqueued would have been enqueued before it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - the route is not mapped; the move writes only ProjectId, StatusId and PositionKey and enqueues nothing")]
+    [Fact]
     [Trait("Requirement", "FR-41")]
     [Trait("Requirement", "FR-21")]
     [Trait("Requirement", "AD-10")]
@@ -379,6 +377,7 @@ public sealed partial class TaskEndpointTests
         TaskSurvivors? after = null;
         IReadOnlyList<Guid> labelsBefore = [];
         IReadOnlyList<Guid> labelsAfter = [];
+        IReadOnlyList<Guid> byName = [];
         WireResponse? moved = null;
         IReadOnlyList<DroppedEmail> dropped = [];
         IReadOnlyList<OutboxRow> outbox = [];
@@ -401,6 +400,7 @@ public sealed partial class TaskEndpointTests
 
             taskId = projects.InSource[0];
             destinationId = projects.DestinationId;
+            byName = [alpha, bravo];
             Assert.Equal(HttpStatusCode.OK, (await EditTaskAsync(owner, owner.SpaceId, taskId, Body(new { labelIds = new[] { bravo, alpha }, dueDate = "2026-12-01T00:00:00+00:00" }))).StatusCode);
             Assert.Equal(HttpStatusCode.OK, (await AssignAsync(owner, taskId, membershipId)).StatusCode);
             _ = await mail.WaitForAsync(1);
@@ -429,10 +429,11 @@ public sealed partial class TaskEndpointTests
         Assert.Equal(before, after);
         Assert.Equal(labelsBefore, labelsAfter);
         Assert.Equal(before.AssigneeMembershipId, AssignmentWire.AssigneeIn(moved!.Body));
-        Assert.Equal(labelsBefore, LabelWire.LabelIdsOf(moved.Body));
+        Assert.Equal(byName, LabelWire.LabelIdsOf(moved.Body));
         Assert.Equal(2, dropped.Count);
         Assert.All(dropped, email => Assert.True(AssignmentWire.IsAssignmentEmail(email), $"Not an assignment email: {email.Subject}"));
         Assert.DoesNotContain(outbox, row => row.Body.Contains(title, StringComparison.Ordinal) && !row.Subject.Contains("assigned you a Task", StringComparison.Ordinal));
+        await StatusWire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -440,7 +441,7 @@ public sealed partial class TaskEndpointTests
     /// creation in that Project is, and nothing is written. The source's bound is never consulted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the route is not mapped; the slice counts the destination after its locks (Q5 (a))")]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "AD-25")]
     [Trait("Requirement", "AR-30")]
@@ -472,6 +473,7 @@ public sealed partial class TaskEndpointTests
         RemovalWire.AssertRefused(refused, HttpStatusCode.Conflict, ProblemTypes.BoundReached, creation);
         Assert.Equal(before, await RowAsync(database, owner.SpaceId, projects.InSource[0]));
         Assert.Equal(BoundRegistry.For(Bound.TasksPerProject).Limit, await TaskCountAsync(database, owner.SpaceId, projects.DestinationId));
+        await StatusWire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -479,7 +481,7 @@ public sealed partial class TaskEndpointTests
     /// each recorded once, and nothing moves. Anchor: a Member moves over a Token.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the route is not mapped; it declares ManageTasks on both surfaces")]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "AD-20")]
@@ -531,6 +533,7 @@ public sealed partial class TaskEndpointTests
         Assert.Equal([InsufficientRoleKind, InsufficientRoleKind], await RefusalKindsAsync(database, viewer.AccountId, owner.SpaceId));
         Assert.Equal(before, afterRefusals);
         AssertMovedInto(anchor, projects.DestinationId);
+        await StatusWire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -539,7 +542,7 @@ public sealed partial class TaskEndpointTests
     /// recorded nowhere; neither Task moves.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = ProjectMoveRoute)]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "NFR-1")]
@@ -582,6 +585,8 @@ public sealed partial class TaskEndpointTests
         Assert.Equal([CrossSpaceKind], await RefusalKindsAsync(database, owner.AccountId, other.SpaceId));
         Assert.Empty(recordedInOwn);
         Assert.Equal(theirsBefore, await RowAsync(database, other.SpaceId, theirs.InSource[0]));
+        await StatusWire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
+        await StatusWire.AssertNoTaskOutsideItsProjectsSetAsync(database, other.SpaceId);
     }
 
     /// <summary>
@@ -589,7 +594,7 @@ public sealed partial class TaskEndpointTests
     /// Task, moved back to its source by another request in between, stays there.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the route is not mapped; it is idempotent through the pipeline's Idempotency-Key")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     public async Task A_replayed_key_answers_the_original_move_and_moves_nothing_again()
     {
@@ -619,6 +624,7 @@ public sealed partial class TaskEndpointTests
         Assert.Equal(first!.StatusCode, replay?.StatusCode);
         Assert.Equal(first.Body, replay?.Body);
         Assert.Equal(projects.SourceId, (await RowAsync(database, owner.SpaceId, projects.InSource[0]))?.ProjectId);
+        await StatusWire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -627,7 +633,7 @@ public sealed partial class TaskEndpointTests
     /// trigger is dropped.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the route is not mapped; the reparent and the Status change are one write in one transaction")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "AR-24")]
     public async Task A_failure_forced_at_the_row_write_leaves_the_Task_where_it_was()
@@ -679,7 +685,7 @@ public sealed partial class TaskEndpointTests
     /// it and the destination's does.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11, AC16 - the route is not mapped and TaskResponse states no ProjectId (Q11 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-19")]
     [Trait("Requirement", "FR-41")]
     [Trait("Requirement", "AD-19")]
@@ -720,6 +726,7 @@ public sealed partial class TaskEndpointTests
         Assert.Equal(projects.DestinationId, ProjectMoveWire.ProjectIdIn(read.Body));
         Assert.DoesNotContain(DeleteWire.Columns(sourceBoard!).SelectMany(column => column.TaskIds), id => id == projects.InSource[0]);
         Assert.Contains(DeleteWire.Columns(destinationBoard!).SelectMany(column => column.TaskIds), id => id == projects.InSource[0]);
+        await StatusWire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -727,13 +734,14 @@ public sealed partial class TaskEndpointTests
     /// each Task row of the Board.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - TaskResponse gains ProjectId, filled on every Task answer (Q11 (a))")]
+    [Fact]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "AD-19")]
     public async Task Every_Task_answer_states_the_Tasks_Project()
     {
         var database = Available();
         var projectId = Guid.Empty;
+        var spaceId = Guid.Empty;
         var answers = new List<(string Name, WireResponse Answer)>();
         WireResponse? board = null;
 
@@ -743,6 +751,7 @@ public sealed partial class TaskEndpointTests
             var wire = new WireDatabase(fixture.ConnectionString!);
             var self = (await wire.MembershipOfAsync(owner.SpaceId, owner.AccountId)).Id;
 
+            spaceId = owner.SpaceId;
             projectId = await CreateProjectAsync(owner, "States itself");
 
             var created = await CreateTaskAsync(owner, owner.SpaceId, projectId, "Anywhere");
@@ -769,6 +778,7 @@ public sealed partial class TaskEndpointTests
 
         Assert.NotEmpty(rows);
         Assert.All(rows, row => Assert.Equal(projectId, row.GetProperty("projectId").GetGuid()));
+        await StatusWire.AssertNoTaskOutsideItsProjectsSetAsync(database, spaceId);
     }
 
     private static Task<WireResponse> AssignAsync(Actor actor, Guid taskId, Guid? membershipId) =>

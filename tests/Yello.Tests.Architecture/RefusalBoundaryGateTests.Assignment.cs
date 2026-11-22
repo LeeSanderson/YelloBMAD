@@ -125,7 +125,7 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// <c>TaskResponse</c> gains <c>AssigneeMembershipId</c> as a <c>Guid?</c> and keeps every earlier field - a field
-    /// added, none removed or retyped - and still carries no name, address or <c>SpaceId</c>.
+    /// added, none removed or retyped - and still carries no name, address or <c>SpaceId</c>. <c>ProjectId</c> is appended\n    /// on the same terms.
     /// </summary>
     [Fact]
     [Trait("Requirement", "AD-19")]
@@ -134,7 +134,7 @@ public sealed partial class RefusalBoundaryGateTests
     {
         var response = typeof(Yello.Contracts.Tasks.TaskResponse);
 
-        Assert.Equal(["AssigneeMembershipId", "CreatedAt", "DueDate", "Id", "LabelIds", "PositionKey", "StatusId", "Title"], PropertyNames(response));
+        Assert.Equal(["AssigneeMembershipId", "CreatedAt", "DueDate", "Id", "LabelIds", "PositionKey", "ProjectId", "StatusId", "Title"], PropertyNames(response));
         Assert.Equal(typeof(Guid?), response.GetProperty("AssigneeMembershipId")?.PropertyType);
         Assert.Equal(typeof(IReadOnlyList<Guid>), response.GetProperty("LabelIds")?.PropertyType);
     }

@@ -45,9 +45,10 @@ public sealed partial class RefusalBoundaryGateTests
             .Where(type => type.Namespace == TaskContractsNamespace && type.Name.EndsWith("Request", StringComparison.Ordinal))
             .ToList();
 
-        // Widened by exactly MoveTaskRequest, whose own property set is pinned (no key, ever), and by exactly
-        // AssignTaskRequest: the assignment is its own route, never a member of this edit.
-        Assert.Equal(["AssignTaskRequest", "CreateTaskRequest", "EditTaskRequest", "MoveTaskRequest"], requests.Select(type => type.Name).Order(StringComparer.Ordinal));
+        // Widened by exactly MoveTaskRequest, whose own property set is pinned (no key, ever), by exactly
+        // AssignTaskRequest: the assignment is its own route, never a member of this edit, and by exactly
+        // MoveTaskToProjectRequest: a change of Project is its own route too, whose property set is pinned.
+        Assert.Equal(["AssignTaskRequest", "CreateTaskRequest", "EditTaskRequest", "MoveTaskRequest", "MoveTaskToProjectRequest"], requests.Select(type => type.Name).Order(StringComparer.Ordinal));
 
         var edit = requests.Single(type => type.Name == "EditTaskRequest");
 
@@ -60,8 +61,8 @@ public sealed partial class RefusalBoundaryGateTests
     /// <summary>
     /// AC7, AR-34, AD-19 - the due date is held as a <c>DateTimeOffset?</c> on the Task entity and on
     /// <c>TaskResponse</c>, and <c>TaskResponse</c> keeps every field 2.2 shipped (a field is added, none
-    /// removed or retyped). <c>LabelIds</c> and then <c>AssigneeMembershipId</c> were appended on the same terms, so the
-    /// set is widened by exactly those names.
+    /// removed or retyped). <c>LabelIds</c>, <c>AssigneeMembershipId</c> and then <c>ProjectId</c> were appended on the same terms, so
+    /// the set is widened by exactly those names.
     /// </summary>
     [Fact]
     [Trait("Requirement", "AR-34")]
@@ -73,7 +74,7 @@ public sealed partial class RefusalBoundaryGateTests
         Assert.Equal(typeof(DateTimeOffset?), typeof(TaskItem).GetProperty("DueDate")?.PropertyType);
         Assert.Equal(typeof(DateTimeOffset?), response.GetProperty("DueDate")?.PropertyType);
         Assert.Equal(
-            ["AssigneeMembershipId", "CreatedAt", "DueDate", "Id", "LabelIds", "PositionKey", "StatusId", "Title"],
+            ["AssigneeMembershipId", "CreatedAt", "DueDate", "Id", "LabelIds", "PositionKey", "ProjectId", "StatusId", "Title"],
             response.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(property => property.Name).Order(StringComparer.Ordinal));
         Assert.Equal(typeof(DateTimeOffset), response.GetProperty("CreatedAt")?.PropertyType);
     }

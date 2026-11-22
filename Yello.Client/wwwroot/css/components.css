@@ -1372,6 +1372,29 @@
     overflow-wrap: anywhere;
 }
 
+/*
+    THE MOVE TO PROJECT PICKER: in place in the Task detail panel, on the Move picker's surface. Its heading, its lines and
+    its rows wrap rather than clip, so it stays usable at 320px.
+*/
+.project-move-picker {
+    margin-block-start: var(--space-1);
+    overflow-wrap: anywhere;
+}
+
+.project-move-picker .picker {
+    background-color: var(--surface-card);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    box-shadow: none;
+}
+
+.project-move-picker__heading,
+.project-move-picker__empty,
+.project-move-picker__progress {
+    margin-block: var(--space-1);
+    color: var(--text-primary);
+}
+
 /* A refused move made from a card's menu, said on the Board (story 2.6). */
 .board__notice {
     margin-block: 0;

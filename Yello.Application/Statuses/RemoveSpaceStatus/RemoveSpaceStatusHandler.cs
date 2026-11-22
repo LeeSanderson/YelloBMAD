@@ -16,8 +16,9 @@ namespace Yello.Application.Statuses.RemoveSpaceStatus;
 /// <para>
 /// <b>Locks before reads, in one order</b> (see <see cref="ISpaceDefaultStatusRemovalStore"/>): the Status-defaults lock,
 /// the Project list, then the Tasks lock of every Project whose set holds the Status. The holders are known from the
-/// defaults and deltas, which cannot change once the first lock is held, and the Tasks are counted only after the last
-/// lock is granted, so a Task edited into the Status just before is counted and moved, and one edited just after is refused.
+/// defaults and deltas: the first lock keeps every default and every delta write out, and the Project list lock keeps a
+/// Project deletion, which deletes its deltas under that lock alone, from removing a holder. The Tasks are counted only
+/// after the last lock is granted, so a Task edited into the Status just before is counted and moved, and one edited just after is refused.
 /// </para>
 /// <para>
 /// <b>A refusal writes nothing</b>, and every report names only Projects of this Space, read under its isolation.

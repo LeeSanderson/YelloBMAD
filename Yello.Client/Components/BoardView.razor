@@ -178,6 +178,8 @@
                         OnLabels="labelIds => EditAsync(open.Id, TaskAttribute.Labels, labelIds)"
                         MoveColumns="@MoveColumns"
                         OnMove="choice => MoveAsync(open.Id, choice, MoveOrigin.Panel)"
+                        ProjectId="@ProjectId"
+                        OnMoveToProject="choice => MoveToProjectAsync(open.Id, choice)"
                         OnConfirmToggled="ConfirmToggled"
                         DeleteRefusal="@_deleteRefusal"
                         OnDelete="() => DeleteTaskAsync(open.Id)"

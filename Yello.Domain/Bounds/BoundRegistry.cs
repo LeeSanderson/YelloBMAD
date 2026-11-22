@@ -19,8 +19,9 @@ namespace Yello.Domain.Bounds;
 /// 4.3, on the accept; concurrent editors per Task by 7.3.
 /// </para>
 /// <para>
-/// <b>Checked by the pipeline, never by a slice</b> (AR-3), and the refusal is raised inside the
-/// transaction of the creation it refuses, with a machine-readable reason (AC7).
+/// <b>Checked by the pipeline, never by a slice</b> (AR-3) - save the move of a Task into another Project, whose
+/// destination is in its body - and the refusal is raised inside the transaction of the write it refuses, with a
+/// machine-readable reason.
 /// </para>
 /// </remarks>
 public static class BoundRegistry

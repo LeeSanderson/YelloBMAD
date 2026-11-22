@@ -2,7 +2,6 @@ using System.Text.Json;
 using Microsoft.Playwright;
 using Xunit;
 using Yello.Contracts;
-using Yello.Tests.Shared;
 
 namespace Yello.Tests.Client;
 
@@ -20,11 +19,10 @@ namespace Yello.Tests.Client;
 /// destination's set from its seeded Status read.
 /// </para>
 /// <para>
-/// <b>The markup is the story's recommendation, as this scaffold assumes it</b>: a button named "Move to Project" in the
-/// panel; one <c>.project-move-picker</c> rendered in place below it holding <c>[role=option]</c> rows, one tab stop per step;
-/// the Status step headed "“{Status}” is not in {Project}. Choose a Status:"; an in-flight <c>[role=status]</c> line
-/// "Moving to {Project}…"; the panel's refusal region <c>.task-detail__refusal</c>. A different class name in the component
-/// is corrected here and recorded.
+/// <b>The markup the cases read</b>: a button named "Move to Project" in the panel; one <c>.project-move-picker</c> rendered
+/// in place below it holding <c>[role=option]</c> rows, one tab stop per step; the Status step headed
+/// "“{Status}” is not in {Project}. Choose a Status:"; an in-flight <c>[role=status]</c> line "Moving to {Project}…"; and the
+/// panel's refusal region <c>.task-detail__refusal</c>.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Client")]
@@ -52,8 +50,6 @@ public sealed class TaskProjectMoveTests(ClientSurfaceFixture surface)
     private const string NotSentCopy = "Not sent.";
     private const string NothingMoved = "Nothing was moved";
 
-    private const string Red = "red: AC14 - Task detail has no Move to Project control or ProjectMovePicker (Q7 (a), Q9 (a), Q10 (a))";
-
     private static readonly string[] StatusNames = ["Todo", "Doing", "Done"];
 
     private static readonly Guid Northwind = Guid.NewGuid();
@@ -70,7 +66,7 @@ public sealed class TaskProjectMoveTests(ClientSurfaceFixture surface)
     /// nothing in the Board or the panel is disabled for the Viewer.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12, AC14 - Task detail has no Move to Project control (Q10 (a))")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "FR-16")]
     public async Task The_control_is_offered_to_a_Member_and_absent_for_a_Viewer()
@@ -103,7 +99,7 @@ public sealed class TaskProjectMoveTests(ClientSurfaceFixture surface)
     /// Task's own, with nothing selected and one tab stop. Opening it sends nothing.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR21")]
     public async Task The_first_step_lists_the_other_Projects_with_nothing_selected_and_one_tab_stop()
     {
@@ -131,7 +127,7 @@ public sealed class TaskProjectMoveTests(ClientSurfaceFixture surface)
     /// held the Task, and the move is announced politely.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR25")]
     [Trait("Requirement", "AD-15")]
     public async Task A_destination_holding_the_Status_commits_on_the_Project_choice()
@@ -173,7 +169,7 @@ public sealed class TaskProjectMoveTests(ClientSurfaceFixture surface)
     /// names the Status.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     [Trait("Requirement", "AR-24")]
     public async Task A_destination_lacking_the_Status_asks_for_one_with_nothing_selected()
@@ -214,7 +210,7 @@ public sealed class TaskProjectMoveTests(ClientSurfaceFixture surface)
     /// on the control. Nothing is sent.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR12")]
     public async Task Esc_steps_back_from_the_Status_step_to_the_Projects_then_closes_on_the_control()
     {
@@ -250,7 +246,7 @@ public sealed class TaskProjectMoveTests(ClientSurfaceFixture surface)
     /// "Moving to {Project}…" that holds focus, and a second press sends nothing. On release the card leaves.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "AR-20")]
     public async Task In_flight_the_card_stays_the_status_line_holds_focus_and_a_second_press_sends_nothing()
     {
@@ -301,7 +297,7 @@ public sealed class TaskProjectMoveTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="refusal">The refusal the held move is released with.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = Red)]
+    [Theory]
     [InlineData("status-destination-required")]
     [InlineData("invalid-task-project")]
     [InlineData("bound-reached")]
@@ -336,7 +332,7 @@ public sealed class TaskProjectMoveTests(ClientSurfaceFixture surface)
 
                 case "invalid-task-project":
                     api.Projects[Northwind].RemoveAll(project => project.Id == Beacon);
-                    api.ReleaseProjectMoveRefused(400, ProjectMoveWire.InvalidTaskProject);
+                    api.ReleaseProjectMoveRefused(400, ProblemTypes.InvalidTaskProject);
                     await page.Locator(PickerOption, new PageLocatorOptions { HasText = "Comet" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
                     Assert.Equal(["Comet"], await OptionsAsync(page));
                     break;
@@ -358,7 +354,7 @@ public sealed class TaskProjectMoveTests(ClientSurfaceFixture surface)
     /// A move that never got an answer does not claim nothing moved: the panel stays open and says the request was not sent.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task A_move_that_got_no_answer_does_not_claim_nothing_moved()
     {
@@ -391,7 +387,7 @@ public sealed class TaskProjectMoveTests(ClientSurfaceFixture surface)
     /// closes it with focus back on the control.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR21")]
     public async Task With_no_other_Project_the_picker_says_so_and_Esc_closes_it()
     {
@@ -418,7 +414,7 @@ public sealed class TaskProjectMoveTests(ClientSurfaceFixture surface)
     /// At 320px the control and both steps are visible and fit the viewport, with no horizontal scroll.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR41")]
     public async Task The_picker_is_usable_at_320px()
     {

@@ -2051,4 +2051,44 @@
     <value>Some Projects renamed this Status themselves.</value>
     <comment>Refusal: a Space-level rename some Projects renamed themselves, when the question cannot be asked.</comment>
   </data>
+  <data name="TaskMoveToProject" xml:space="preserve">
+    <value>Move to Project</value>
+    <comment>Task detail: the control that moves the Task into another Project of the Space.</comment>
+  </data>
+  <data name="ProjectMoveProjectStep" xml:space="preserve">
+    <value>Choose a Project</value>
+    <comment>Move to Project picker: the name of its first step, the Space's other Projects.</comment>
+  </data>
+  <data name="ProjectMoveNoOtherProject" xml:space="preserve">
+    <value>There is no other Project in this Space.</value>
+    <comment>Move to Project picker: the Space holds no Project but the Task's own.</comment>
+  </data>
+  <data name="ProjectMoveStatusStep" xml:space="preserve">
+    <value>“{0}” is not in {1}. Choose a Status:</value>
+    <comment>Move to Project picker: the Status step's heading. {0} is the Task's Status, {1} the Project chosen.</comment>
+  </data>
+  <data name="ProjectMoveInFlight" xml:space="preserve">
+    <value>Moving to {0}…</value>
+    <comment>Move to Project: the line shown while the move is with the server. {0} is the Project.</comment>
+  </data>
+  <data name="ProjectMoved" xml:space="preserve">
+    <value>Moved “{0}” to {1}.</value>
+    <comment>Announcement: the Task moved into another Project, keeping its Status. {0} is the Task's title, {1} the Project.</comment>
+  </data>
+  <data name="ProjectMovedInStatus" xml:space="preserve">
+    <value>Moved “{0}” to {1}, in {2}.</value>
+    <comment>Announcement: the Task moved into another Project, in the Status chosen. {0} is the title, {1} the Project, {2} the Status.</comment>
+  </data>
+  <data name="ProjectMoveFull" xml:space="preserve">
+    <value>{0} is full ({1} Tasks). Nothing was moved.</value>
+    <comment>Refusal: the Project chosen holds as many Tasks as it may. {0} is the Project, {1} the limit.</comment>
+  </data>
+  <data name="ProjectMoveNotLoaded" xml:space="preserve">
+    <value>The Projects could not be loaded.</value>
+    <comment>Move to Project picker: the Space's Projects, or the chosen Project's Statuses, could not be read.</comment>
+  </data>
+  <data name="TaskProjectInvalid" xml:space="preserve">
+    <value>That Project is no longer in this Space. Nothing was moved.</value>
+    <comment>Refusal: the Project chosen for a move is not another Project of the Space any more.</comment>
+  </data>
 </root>

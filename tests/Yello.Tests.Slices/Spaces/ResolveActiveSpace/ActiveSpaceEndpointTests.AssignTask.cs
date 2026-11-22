@@ -44,7 +44,7 @@ public sealed partial class ActiveSpaceEndpointTests
 {
 
     private static readonly string[] AssignedTaskProperties =
-        ["assigneeMembershipId", "createdAt", "dueDate", "id", "labelIds", "positionKey", "statusId", "title"];
+        ["assigneeMembershipId", "createdAt", "dueDate", "id", "labelIds", "positionKey", "projectId", "statusId", "title"];
 
     /// <summary>
     /// An Owner, an Admin and a Member each assign a Task to a Member of the same Space: <c>200</c>, the body is the Task with

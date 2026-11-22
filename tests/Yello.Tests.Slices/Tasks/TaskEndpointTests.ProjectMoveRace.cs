@@ -25,8 +25,9 @@ namespace Yello.Tests.Slices.Tasks;
 /// commits.
 /// </para>
 /// <para>
-/// <b>Two cases run from now on</b> as standing gates: a Status edit, a move within a Project and a creation already queue on
-/// the lock shape the cross-Project move will take, and already answer the truth once it has committed.
+/// <b>Some cases play the move in SQL rather than send it</b>: a Status edit, a move within a Project, a deletion and a
+/// creation queued behind it are the writers under test, so the move is held in the product's shape and committed by the
+/// test.
 /// </para>
 /// </remarks>
 public sealed partial class TaskEndpointTests
@@ -37,7 +38,7 @@ public sealed partial class TaskEndpointTests
     /// <c>409 status-destination-required</c>, the Task still in its source.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the route is not mapped; the Task and the destination's set are read only after both locks")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "AR-24")]
     public async Task A_move_queued_behind_a_Status_change_decides_on_the_Status_that_change_committed()
@@ -84,7 +85,7 @@ public sealed partial class TaskEndpointTests
     /// <summary>
     /// With a cross-Project move of the Task held, a Status edit or a move within the Project queues on the source's lock;
     /// once the move commits it re-reads the Task under that lock, finds it in another Project, answers the boundary
-    /// <c>404</c> and writes nothing. <b>Green today</b>: both writers already re-check the Project under its lock.
+    /// <c>404</c> and writes nothing. Both writers re-check the Project under its lock.
     /// </summary>
     /// <param name="writer">The writer queued behind the move.</param>
     /// <returns>A task.</returns>
@@ -143,7 +144,7 @@ public sealed partial class TaskEndpointTests
     /// survives in its new Project.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - TaskStore.DeleteAsync does not re-check ProjectId under its row lock (Q8 (a))")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-41")]
     public async Task A_deletion_queued_behind_a_cross_Project_move_answers_404_and_the_Task_survives()
@@ -179,6 +180,7 @@ public sealed partial class TaskEndpointTests
         Assert.NotNull(projects);
         RemovalWire.AssertRefused(queued, HttpStatusCode.NotFound, ProblemTypes.NotAvailable);
         Assert.Equal(projects.DestinationId, (await RowAsync(database, owner.SpaceId, projects.InSource[0]))?.ProjectId);
+        await StatusWire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -186,7 +188,7 @@ public sealed partial class TaskEndpointTests
     /// destination under its lock, finds it gone and answers <c>400 invalid-task-project</c>; the Task is where it was.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2, AC6 - the route is not mapped; the destination is re-read under its lock (Q4 (a))")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-41")]
     public async Task A_move_queued_behind_its_destinations_deletion_is_refused_400_invalid_task_project()
@@ -220,7 +222,7 @@ public sealed partial class TaskEndpointTests
 
         Assert.NotNull(owner);
         Assert.NotNull(projects);
-        RemovalWire.AssertRefused(queued, HttpStatusCode.BadRequest, ProjectMoveWire.InvalidTaskProject);
+        RemovalWire.AssertRefused(queued, HttpStatusCode.BadRequest, ProblemTypes.InvalidTaskProject);
         Assert.Equal(before, await RowAsync(database, owner.SpaceId, projects.InSource[0]));
     }
 
@@ -229,7 +231,7 @@ public sealed partial class TaskEndpointTests
     /// the product takes first: both answer <c>200</c> once it is released, and neither is chosen as a deadlock victim.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the route is not mapped; both Projects' locks are taken only through the sorted helper (Q4 (a))")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "AR-24")]
     public async Task Two_opposite_moves_queued_on_one_lock_both_land_and_neither_deadlocks()
@@ -286,7 +288,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="second">The second write into the destination.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC7 - the route is not mapped; the destination is counted in the slice after both locks (Q5 (a))")]
+    [Theory]
     [InlineData("move")]
     [InlineData("creation")]
     [Trait("Requirement", "NFR-8")]
@@ -344,6 +346,7 @@ public sealed partial class TaskEndpointTests
 
         Assert.Equal(ProblemTypes.BoundReached, Problem(refused)?.Type);
         Assert.Equal(BoundRegistry.For(Bound.TasksPerProject).Limit, await TaskCountAsync(database, owner.SpaceId, projects.DestinationId));
+        await StatusWire.AssertNoTaskOutsideItsProjectsSetAsync(database, owner.SpaceId);
     }
 
     /// <summary>
@@ -352,7 +355,7 @@ public sealed partial class TaskEndpointTests
     /// <c>409 status-destination-required</c>; the Task is where it was.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4, AC6 - the route is not mapped; the destination's set is read after both locks")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-26")]
     public async Task A_move_queued_behind_the_destinations_removal_of_its_Status_needs_a_destination_Status()
@@ -396,7 +399,7 @@ public sealed partial class TaskEndpointTests
 
     /// <summary>
     /// A creation in the destination queued behind a cross-Project move counts the moved Task and lands after it: at 4,999 it
-    /// is refused <c>409 bound-reached</c>; otherwise it lands after the moved Task's key. <b>Green today</b>: the creation's
+    /// is refused <c>409 bound-reached</c>; otherwise it lands after the moved Task's key. The creation's
     /// bound count already waits on the destination's lock the move holds.
     /// </summary>
     /// <param name="full">Whether the destination holds 4,999 Tasks before the move.</param>
