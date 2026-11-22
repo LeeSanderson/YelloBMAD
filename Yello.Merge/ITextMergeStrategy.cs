@@ -1,23 +1,13 @@
-// Declared in the production namespace on purpose, so moving the file into Yello.Merge changes nothing that uses it.
-#pragma warning disable IDE0130
 namespace Yello.Merge;
-#pragma warning restore IDE0130
 
 /// <summary>
 /// The one merge port. It creates and loads replicas, and decodes the bytes replicas exchange. It holds no document state,
 /// so one instance serves every document on any thread.
 /// </summary>
 /// <remarks>
-/// <para>
-/// <b>A stand-in, not the port.</b> This file and its siblings under <c>PortStandIn/</c> declare the port's intended
-/// shape inside the test project, in the production namespace, so the conformance suite compiles before any port exists in
-/// <c>Yello.Merge</c>. The dev phase moves these declarations into <c>Yello.Merge</c> unchanged and deletes this folder:
-/// a type declared in both places is CS0436, which the build treats as an error, so the two cannot coexist.
-/// </para>
-/// <para>
-/// No member names an algorithm. Indexes are UTF-16 code units, as .NET strings and the browser's <c>selectionStart</c>
-/// count them; an index that would split a surrogate pair is refused.
-/// </para>
+/// No member names an algorithm, so a different merge can sit behind it without a caller changing. Indexes are UTF-16 code
+/// units, as .NET strings and the browser's <c>selectionStart</c> count them; an index that would split a surrogate pair
+/// is refused.
 /// </remarks>
 public interface ITextMergeStrategy
 {

@@ -30,8 +30,6 @@ namespace Yello.Tests.Architecture;
 [Trait("Requirement", "AD-12")]
 public sealed class MergePortGateTests
 {
-    private const string Red = "red: AC6 - the port is a stand-in in Yello.Tests.Merge; Yello.Merge declares no ITextMergeStrategy yet";
-
     private const string PortName = "ITextMergeStrategy";
 
     private const string ReplicaName = "ITextReplica";
@@ -42,7 +40,7 @@ public sealed class MergePortGateTests
 
     private const string FactoryMethod = "CreateStrategy";
 
-    [Fact(Skip = Red)]
+    [Fact]
     public void Exactly_one_production_type_is_named_ITextMergeStrategy_and_it_is_an_interface_in_Yello_Merge()
     {
         var named = ProductionTypes().Where(type => type.Name == PortName).ToList();
@@ -54,7 +52,7 @@ public sealed class MergePortGateTests
         Assert.Equal(PortFullName, port.FullName);
     }
 
-    [Fact(Skip = Red)]
+    [Fact]
     public void Exactly_one_production_type_implements_the_port_and_it_is_not_public_and_lives_in_Yello_Merge()
     {
         var implementation = Assert.Single(Implementations(Port()));
@@ -63,7 +61,7 @@ public sealed class MergePortGateTests
         Assert.False(implementation.IsVisible, $"{implementation.FullName} is visible outside Yello.Merge; only the port and its factory may be.");
     }
 
-    [Fact(Skip = Red)]
+    [Fact]
     public void No_type_outside_Yello_Merge_depends_on_the_implementation()
     {
         var implementation = Assert.Single(Implementations(Port()));
@@ -74,7 +72,7 @@ public sealed class MergePortGateTests
             .Check(ProductionAssemblies.Architecture);
     }
 
-    [Fact(Skip = Red)]
+    [Fact]
     public void The_port_is_registered_once_in_each_composition_root_and_always_from_the_factory()
     {
         var host = Registrations(ProductionAssemblies.Host);
@@ -91,7 +89,7 @@ public sealed class MergePortGateTests
         }
     }
 
-    [Fact(Skip = Red)]
+    [Fact]
     public void No_production_type_outside_Yello_Merge_makes_a_replica_except_through_the_port()
     {
         var replicaPort = Assert.Single(ProductionTypes(), type => type.Name == ReplicaName);

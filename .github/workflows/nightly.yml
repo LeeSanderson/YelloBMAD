@@ -3,6 +3,7 @@
 #
 #   nightly        the Tier=Nightly tests: the paged Board's p95 at 5,000 Tasks (P-2), the keyboard step's cost at
 #                  5,000 loaded cards (AC14) and the real-Host traversal of 5,000 Tasks by the arrows (X-5).
+#                  Also the merge's property harness at its large budget: 5,000 seeded editing sessions (M-9).
 #
 # Local Testcontainers engines only - never Azure, no login, no secret, no deployment target (R13). One test module at a
 # time, so one 2 GB SQL Server is alive at once. Each step names the project that holds the tier's tests: a filtered run
@@ -57,6 +58,14 @@ jobs:
 
       - name: Browser for the Client suite
         run: pwsh tests/Yello.Tests.Client/bin/Release/net10.0/playwright.ps1 install chromium --with-deps
+
+      # No engine: the merge suite is pure in-memory.
+      - name: Nightly - the merge at 5,000 random editing sessions
+        run: >-
+          dotnet test --project tests/Yello.Tests.Merge/Yello.Tests.Merge.csproj -c Release --no-build
+          --max-parallel-test-modules 1 --
+          --filter-trait "Tier=Nightly" --explicit on
+          --report-xunit-trx --results-directory "$GITHUB_WORKSPACE/TestResults/merge"
 
       - name: Nightly - the Board at 5,000 over the wire
         run: >-

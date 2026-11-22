@@ -24,11 +24,11 @@ public sealed class InterleavingPropertyTests
 
     public static TheoryData<int> RecordedSeeds { get; } = [1, 2, 3, 42, 2026];
 
-    [Fact(Skip = RedPhase.NoCandidateProperty)]
+    [Fact]
     public void Random_sessions_converge_with_nothing_lost_or_resurrected() =>
         InterleavingHarness.AssertHolds(Candidate.Strategy, Enumerable.Range(PrFirstSeed, PrBudget));
 
-    [Theory(Skip = RedPhase.NoCandidateProperty)]
+    [Theory]
     [MemberData(nameof(RecordedSeeds))]
     public void A_recorded_seed_still_holds(int seed) =>
         InterleavingHarness.AssertHolds(Candidate.Strategy, [seed]);

@@ -752,9 +752,9 @@ the reason: each container-backed project starts a 2 GB SQL Server, and WSL is c
 
 `dotnet test Yello.slnx` is the gate. As of story 1.9 it runs **504 tests: 503 passing, 1 skipped** (the
 legacy-factor duration case): **187** architecture, **221** slice, **44** client, **35** isolation
-and **17** revocation. Merge still reports zero tests and exit 0 - it keeps the
-`--ignore-exit-code 8` switch, and `Yello.Tests.Architecture` asserts that only empty suites may.
-Isolation and Revocation are strict (`ReleaseGatingSuiteTests`): no ignored exit code, so one
+and **17** revocation. Since story 7.1 Merge has cases too (the AD-12 conformance suite, below) and no
+longer carries the `--ignore-exit-code 8` switch; `Yello.Tests.Architecture` asserts that only empty suites may.
+Isolation, Revocation and Merge are strict (`ReleaseGatingSuiteTests`): no ignored exit code, so one
 failing row fails the run with exit code 2. (Story 1.4 closed at 235; story 1.3 at 136.)
 
 **A configured but dead container runtime FAILS fast; an unconfigured one SKIPS.** Story 1.9 made
@@ -910,6 +910,38 @@ existing `ActiveSpaceEndpointTests` (no new engine, fixture or container-backed 
 - **Another Account never waits:** with A's lock held, B's creation must answer without anything being
   released (`LabelWire.WaitUntilBlockedOrAnsweredAsync`), anchored on A's own creation then waiting on it.
 
+## The merge conformance suite - added by story 7.1
+
+`Yello.Tests.Merge` is AD-12's contract for `ITextMergeStrategy`: what may sit behind the port is whatever passes it. It
+needs no container and runs in seconds.
+
+- **The binding point.** Every conformance fact takes its strategy from `Candidate.Strategy`, which calls
+  `TextMerge.CreateStrategy()`. The case bodies live in `Conformance/MergeCases.*.cs` as static methods taking an
+  `ITextMergeStrategy`, and no case names a production type. Admitting a different candidate changes the factory and no
+  assertion.
+- **Never assert an order the requirement does not fix.** Two concurrent inserts at one place must end in the same order
+  everywhere; which comes first is the algorithm's choice. Workloads use unique glyphs (`Glyphs`) and count them
+  (`Ledger`), so survival, duplication and resurrection are read without reading the merge's order.
+- **The falsification double.** `Falsification/WholeFieldLastWriterWins` implements the port as whole-text,
+  timestamp-wins. `LastWriterWinsFalsificationTests` runs the same case bodies against it: it must fail the different-region
+  and offline cases on an assertion, and it must pass the lone-editor and refusal cases, so its failures are about merge
+  semantics and not a broken double. It is a standing gate: a case that LWW starts to pass no longer discriminates.
+- **The network harness.** `Network` holds per-replica inboxes the case drains as sent, reversed or shuffled, so a change
+  can arrive before the one it depends on. Isolation loses traffic both ways; reconnection recovers it only through
+  `ChangesMissingFrom(Version)`, never by copying text.
+- **Seeds and replay.** `Properties/InterleavingHarness` generates seeded sessions of 2 to 10 replicas with inserts,
+  deletes, replaces, partial deliveries, duplicates and partitions. A failure is shrunk to its minimal trace and its message
+  names the seed. Add a failing seed to `InterleavingPropertyTests.RecordedSeeds` for good, and replay it alone with
+  `A_recorded_seed_still_holds`.
+- **Budgets.** The PR run explores 200 sessions (seeds 1-200). `InterleavingNightlyTests` explores 5,000 more as
+  `Tier=Nightly`, `Explicit = true`, from `nightly.yml`. `MergeBudgetTests` (in `MergeTimingCollection`, a
+  `DisableParallelization` collection) holds the native-runtime p95s: one remote change on a 20,000-character description
+  within 16 ms, and a five-minute reconnection exchange within 1 s. The browser's figure is measured where the editor is.
+- **Workload sizes** are an assumption recorded in `Workload`: a working description of up to 20,000 characters; five
+  minutes offline is 1,500 edits per editor; ten editors make 200 concurrent edits each.
+- **Later stories add cases here and never fork the suite.** A new merge-level behaviour (the log, compaction,
+  reconnection, the editor's admit or reject) gets a case body in `MergeCases`, a fact bound through `Candidate`, and a
+  `Requirement` trait. A second conformance suite, or a case written against a concrete merge type, defeats AD-12.
 ## CI: the PR stage - built by story 1.10
 
 `.github/workflows/ci.yml` runs on every push and pull request to `main`. Its `test` job runs these
@@ -961,7 +993,7 @@ or P1 tiers; the test design's checklist settled that in favour of the three sta
   ```
 
   Only the projects that hold the tier's cases are run: a filter that selects nothing exits 8 (the zero-tests trap
-  above). Nightly: Slices (`BoardScaleTimingTests`) and Client (`BoardRenderCostTests`, `RealHostBoardScaleTests`). Weekly: Slices (`EnvelopeLoadTests`). The workflows run them per project
+  above). Nightly: Slices (`BoardScaleTimingTests`), Client (`BoardRenderCostTests`, `RealHostBoardScaleTests`) and Merge (`InterleavingNightlyTests`). Weekly: Slices (`EnvelopeLoadTests`). The workflows run them per project
   for the same reason, which also keeps `dotnet test Yello.slnx` a single job for the promotion gate.
 - **Local engines only** (R13): the scheduled workflows log in nowhere, read no secret and name no deployment target.
   Their figures are a local engine's, warm - never production evidence (R18) - and every report says so.

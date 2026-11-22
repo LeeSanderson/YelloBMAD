@@ -8,8 +8,8 @@ namespace Yello.Merge;
 /// against an assembly they cannot load.
 /// </summary>
 /// <remarks>
-/// Story 1.1 adds no merge implementation. AR-40a is still open and story 7.1 writes the
-/// conformance suite first, so this project exists here as an empty, referenced ring.
+/// The gates load this assembly through the marker rather than through the port, so they still
+/// load it if the port is renamed or moved, and can then report that instead of failing to bind.
 /// </remarks>
 public static class AssemblyMarker
 {

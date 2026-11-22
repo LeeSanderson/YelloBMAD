@@ -4,7 +4,7 @@ baseline_commit: ae9b494f3b03215a7709ef5684fadfc072ce56fd
 
 # Story 7.1: The merge port and its conformance suite
 
-Status: ready-for-dev
+Status: review
 
 Epic: 7 — Write the same Task at the same time, and lose access the moment access ends (the first of eight stories)
 Story key: `7-1-the-merge-port-and-its-conformance-suite`
@@ -180,33 +180,33 @@ So that two stories cannot choose different merge semantics and whole-field last
 
 ## Tasks / Subtasks
 
-- [ ] **T1. Port** (AC1, AC2; Q1, Q2, Q4, Q8, Q9)
-  - [ ] `Yello.Merge/ITextMergeStrategy.cs` holds the interface. Add a replica abstraction, such as `ITextReplica`, and small value types: a change identity, an encoded change, a "has" summary, and a typed decode or admit result. Keep members algorithm-agnostic (AC1).
-  - [ ] `Yello.Merge/TextMerge.cs` holds the public static factory, which returns the interface.
-  - [ ] Replace `AssemblyMarker.cs`'s stale `<remarks>`.
-- [ ] **T2. Falsification double and suite, with no candidate** (AC3, AC4, AC5, AC7; ATDD phase)
-  - [ ] `tests/Yello.Tests.Merge/Conformance/` holds the case bodies as static methods taking `ITextMergeStrategy`, plus a `Network` harness. The harness is in-memory and deterministic, and offers per-replica inboxes, reorder, duplicate, partition and heal.
-  - [ ] Bind the conformance facts to the candidate through one member, `Candidate.Strategy` => `TextMerge.CreateStrategy()`.
-  - [ ] `WholeFieldLastWriterWins.cs` and `LastWriterWinsFalsificationTests.cs`.
-  - [ ] Write the property harness, with its seed replay and the Nightly budget case.
-  - [ ] Remove `--ignore-exit-code 8` from the csproj.
-- [ ] **T3. Candidate** (AC2, AC4, AC7; dev phase; Q5)
-  - [ ] Implement the recommended algorithm (Q5 (a)) as `internal sealed` types in `Yello.Merge`. Use no package and no `unsafe`. Use only BCL types the WASM runtime supports, so no `System.Runtime.Intrinsics` paths.
-  - [ ] Make the whole suite green without editing case assertions.
-- [ ] **T4. Registration** (AC8)
-  - [ ] Host `Program.cs` registers `AddSingleton<ITextMergeStrategy>(_ => TextMerge.CreateStrategy())`. Client `Program.cs` registers `AddScoped<ITextMergeStrategy>(_ => TextMerge.CreateStrategy())`.
-  - [ ] Add the published-client boot-resource case in `Yello.Tests.Client`.
-- [ ] **T5. Architecture gates** (AC6, AC10)
-  - [ ] Add the five gates, for example in a new `MergePortGateTests.cs`. Prove each against its plant and restore the plant in a `finally`.
-  - [ ] Add `Yello.Tests.Merge` to `StrictSuites`.
-- [ ] **T6. Record the choice** (AC9)
-  - [ ] Add the AD-12 Note, close the Deferred row and update the sprint-status header line.
-- [ ] **T7. Docs and ledger** (AC10; Q11)
-  - [ ] Add the `TESTING-CONVENTIONS.md` section and fix `:755`.
-  - [ ] Add the Q11 `deferred-work.md` entry, owned by 7.2.
-- [ ] **T8. Verify**
-  - [ ] Run `dotnet build Yello.slnx` and expect 0 warnings.
-  - [ ] Run the Merge and Architecture suites whole, since both are fast and need no container. Run the one new Client class filtered.
+- [x] **T1. Port** (AC1, AC2; Q1, Q2, Q4, Q8, Q9)
+  - [x] `Yello.Merge/ITextMergeStrategy.cs` holds the interface. Add a replica abstraction, such as `ITextReplica`, and small value types: a change identity, an encoded change, a "has" summary, and a typed decode or admit result. Keep members algorithm-agnostic (AC1).
+  - [x] `Yello.Merge/TextMerge.cs` holds the public static factory, which returns the interface.
+  - [x] Replace `AssemblyMarker.cs`'s stale `<remarks>`.
+- [x] **T2. Falsification double and suite, with no candidate** (AC3, AC4, AC5, AC7; ATDD phase)
+  - [x] `tests/Yello.Tests.Merge/Conformance/` holds the case bodies as static methods taking `ITextMergeStrategy`, plus a `Network` harness. The harness is in-memory and deterministic, and offers per-replica inboxes, reorder, duplicate, partition and heal.
+  - [x] Bind the conformance facts to the candidate through one member, `Candidate.Strategy` => `TextMerge.CreateStrategy()`.
+  - [x] `WholeFieldLastWriterWins.cs` and `LastWriterWinsFalsificationTests.cs`.
+  - [x] Write the property harness, with its seed replay and the Nightly budget case.
+  - [x] Remove `--ignore-exit-code 8` from the csproj.
+- [x] **T3. Candidate** (AC2, AC4, AC7; dev phase; Q5)
+  - [x] Implement the recommended algorithm (Q5 (a)) as `internal sealed` types in `Yello.Merge`. Use no package and no `unsafe`. Use only BCL types the WASM runtime supports, so no `System.Runtime.Intrinsics` paths.
+  - [x] Make the whole suite green without editing case assertions.
+- [x] **T4. Registration** (AC8)
+  - [x] Host `Program.cs` registers `AddSingleton<ITextMergeStrategy>(_ => TextMerge.CreateStrategy())`. Client `Program.cs` registers `AddScoped<ITextMergeStrategy>(_ => TextMerge.CreateStrategy())`.
+  - [x] Add the published-client boot-resource case in `Yello.Tests.Client`.
+- [x] **T5. Architecture gates** (AC6, AC10)
+  - [x] Add the five gates, for example in a new `MergePortGateTests.cs`. Prove each against its plant and restore the plant in a `finally`.
+  - [x] Add `Yello.Tests.Merge` to `StrictSuites`.
+- [x] **T6. Record the choice** (AC9)
+  - [x] Add the AD-12 Note, close the Deferred row and update the sprint-status header line.
+- [x] **T7. Docs and ledger** (AC10; Q11)
+  - [x] Add the `TESTING-CONVENTIONS.md` section and fix `:755`.
+  - [x] Add the Q11 `deferred-work.md` entry, owned by 7.2.
+- [x] **T8. Verify**
+  - [x] Run `dotnet build Yello.slnx` and expect 0 warnings.
+  - [x] Run the Merge and Architecture suites whole, since both are fast and need no container. Run the one new Client class filtered.
   - [ ] Then make **one** full run without the browser suite (`-p:YelloSkipBrowserSuite=true`), in the background, with `--max-parallel-test-modules 1` (CLAUDE.md).
 
 ## Dev Notes
@@ -480,14 +480,159 @@ the correction recorded in the Debug Log, not deleted.
 
 ### Agent Model Used
 
+Claude Opus 5.5 (bmad-dev-story, unattended cycle)
+
 ### Debug Log References
+
+- **Step 0, the port moved.** `tests/Yello.Tests.Merge/PortStandIn/*` moved into `Yello.Merge` unchanged apart from the
+  `IDE0130` pragma and the "stand-in" remarks; the folder is deleted (no CS0436). With `TextMerge.CreateStrategy()` still
+  throwing, the Merge suite ran 45 total / 9 passed / 36 skipped: the falsification class stayed 9/9, so the moved port is
+  the one the suite was written against.
+- **Red evidence.** The red state of every conformance scaffold is the ATDD commit (`ddabd86`): the factory threw
+  `NotSupportedException`, and the cases were skipped with a `red:` reason. The candidate was written in one piece before
+  the scaffolds were un-skipped, so no case was watched failing against a partial candidate; each class was then
+  activated in the checklist's order (withdraw cases, Region, ExactlyOnce, TextIndex, Admission, RoundTrip, Scale,
+  Interleaving, Budgets, gates, boot) and each went green first time.
+- **Scaffold corrections: none.** No case body, assertion or harness was edited. The only test-file edits are the removed
+  `Skip`s, the deleted `RedPhase.cs` (now unreferenced) and the removed `Red` constant in `MergePortGateTests`.
+- **Analyser fixes in the candidate** (TreatWarningsAsErrors): S3059 (members of internal types made `internal`),
+  SA1649 (one type per file: `Format`, `ByteWriter`, `ByteReader`), MA0181 (no casts: `CreateChecked`/`CreateTruncating`,
+  and polymorphic `ApplyTo`/`TakeBackFrom` on the change bodies instead of a downcast), S109, S126, S131, S1301, S3358,
+  S2302, S4018, S1117, and S1200 (UTF-8/UTF-16 scalar helpers moved to `Scalars`).
+- **The Nightly property budget was not run.** The story's activation step 6 says to run it once by hand with
+  `--explicit on`; the orchestrator's standing rule for this phase is "do not run Explicit/Nightly cases", and the attempt
+  was refused. It runs from `nightly.yml`. The PR budget (200 sessions) and the five recorded seeds are green.
+- **M-4 budgets** (`MergeBudgetTests`, `MergeTimingCollection`): both pass on the native runtime (16 ms p95 per remote
+  change on a 20,000-character description; 1 s p95 per five-minute reconnection exchange). These are native figures;
+  the browser's are 7.4's (R15).
+- **Full run (1 attempt), stopped by the harness for low memory, not by a failure.** Log:
+  `artifacts/test-runs/7-1-the-merge-port-and-its-conformance-suite-develop.log`. Before it stopped, Merge, Architecture,
+  Revocation and Isolation had each passed; Slices did not finish. Per the cycle's rule it was not restarted: the
+  orchestrator runs it and sets the status. Five `Yello.Host` processes (started 12:52:31, about 110 MB each) were left
+  over and were not killed.
+- **Plants (A-8), one at a time, each restored from saved content in a `finally`** (script in the session scratchpad;
+  plant builds ran with `-p:RunAnalyzers=false` so the planted file itself could compile, then the solution was rebuilt
+  normally and `git status` showed no plant left):
+  1. A second `public interface ITextMergeStrategy` in `Yello.Application` - **caught** by gate 1 (`Assert.Single()`, 2
+     items).
+  2. A second `internal sealed` implementation in `Yello.Merge` - **caught** by gate 2 (`Assert.Single()`, 2 items).
+  3. The implementation made public and a Host type constructing it - **caught** by gate 3 (ArchUnit:
+     `Yello.Host.PlantedMergeUse does depend on "Yello.Merge.Sequence.SequenceMergeStrategy"`).
+  4. A second registration (`AddScoped<ITextMergeStrategy>`) in Host `Program.cs` - **caught** by gate 4 (expected
+     `["AddSingleton"]`, actual `["AddSingleton", "AddScoped"]`).
+  5. The replica type made public and a Host type constructing one - **caught** by gate 5, on its visibility assertion
+     (`Assert.All()`, 1 of 1 failed) before its ArchUnit half. The ArchUnit half cannot be planted alone: an `internal`
+     replica cannot be named from the Host at all, which is the first line of the rule.
 
 ### Completion Notes List
 
 - Ultimate context engine analysis completed - comprehensive developer guide created.
+- **What was built.** The port (`ITextMergeStrategy`, `ITextReplica`, `ReplicaId`, `ChangeId`, `TextChange`,
+  `ReplicaVersion`, `ChangeAdmission`, `Decoded<T>`) and the factory `TextMerge.CreateStrategy()` in `Yello.Merge`; the
+  candidate as `internal sealed` types under `Yello.Merge/Sequence/`; one registration in each composition root; the five
+  A-8 gates and the boot case activated; the AD-12 note, the closed Deferred row and the sprint-status header; the
+  `TESTING-CONVENTIONS.md` section; the `nightly.yml` Merge step; the Q11 ledger entry (owner 7.2).
+- **The candidate.** An operation-based RGA-family sequence CRDT: one element per Unicode scalar with identity
+  `(replica, Lamport clock)`; an insert names the element it follows and skips concurrent inserts there with a greater
+  identity; a delete names element runs and increments a per-element delete count (a count, so withdrawing one of two
+  concurrent deletes keeps the character deleted); a change whose anchor or targets are missing is held and indexed by
+  the missing element, then applied when it arrives. The "has" is per-origin ranges of change sequence numbers, encoded
+  canonically, because a withdrawn change leaves a permanent gap that a per-origin counter would turn into a stuck
+  causal wait. State is the held change log plus the replica's last sequence, clock and withdrawn set, and loading replays
+  it. No package, no `unsafe`, no intrinsics, no statics.
+- **Decisions taken (reversible; each is a line Lee can cut):**
+  - Q1 (a): the port is declared in `Yello.Merge`, the one assembly both the Host and the client see; the ring table is
+    unchanged.
+  - Q2 (a): the implementation is `internal sealed` behind a public factory, with no `InternalsVisibleTo`, so nothing
+    outside `Yello.Merge` can name it; gates 2, 3 and 5 are the second line.
+  - Q3 (a): Host singleton and Client scoped, both from the factory; the scoped client registration keeps the singleton
+    ban and roots the assembly against trimming.
+  - Q4 (a): the full surface 7.2-7.6 need is in the port now (state encode/load, has and diff, withdraw), so no later
+    story reopens AD-12's one interface. `Withdraw` refuses (`InvalidOperationException`) when a later held change builds
+    on the withdrawn insert; the caller withdraws latest first. Withdrawing a change not held is a no-op, and withdrawing
+    another replica's change is an `ArgumentException`.
+  - Q5 (a): a hand-written RGA-family CRDT in shared C#, following Lee's recorded direction (memlog `:36-37`). Fugue-style
+    non-interleaving was not added: FR-31 does not require it and the suite does not test it; it can be added behind the
+    factory if interleaving is seen in use.
+  - Q6 (a): the two native budgets, 16 ms per remote change and 1 s per five-minute exchange, as written by the ATDD
+    phase.
+  - Q7 (a): 20,000 characters, 1,500 edits per editor for five minutes offline, 200 concurrent edits per editor for ten
+    editors, as recorded in `Workload`.
+  - Q8 (a): refusal is a typed `ChangeAdmission` (`Malformed`, `UnsupportedVersion`), never an exception, from decode,
+    load and apply. An apply whose bytes decode to a different id from the `TextChange.Id` it came in is `Malformed`, as
+    is an insert whose element identities collide with characters already held from another change.
+  - Q9 (a): UTF-16 code-unit indexes at the port, scalars inside; an index inside a pair, an empty insert, an empty delete
+    and text with an unpaired surrogate are refused with `ArgumentException`/`ArgumentOutOfRangeException`.
+  - Q10 (a): 200 sessions on the PR run, 5,000 nightly, with a Merge step added to `nightly.yml` (no engine needed).
+  - Q11 (a): no `Infrastructure -> Merge` edge; recorded in `deferred-work.md`, owner story 7.2.
+  - Q12 (a): the boot case reads the browser's own `_framework/Yello.Merge*.wasm` request.
+  - Q13 (a): the choice is recorded in the spine (AD-12 note and the closed Deferred row) and the sprint-status header.
+  - A loaded replica restores its sequence counter and withdrawn set only when loaded under the identity it was saved
+    from; under a new identity it starts its own sequence at 1 (the clock is always restored, so element identities stay
+    unique).
+- **Standing gates touched, deliberately:** `ReleaseGatingSuiteTests.StrictSuites` (already lists Merge from ATDD),
+  `ClientStaticStateGateTests` (green: the client registers scoped), the ring rule and Merge package ban (unchanged, green),
+  `DeploymentShapeTests` (green with the new `nightly.yml` step), `TestingConventionTests` (green: the switch is gone).
 
 ### File List
+
+New:
+
+- `Yello.Merge/ITextMergeStrategy.cs`
+- `Yello.Merge/ITextReplica.cs`
+- `Yello.Merge/ReplicaId.cs`
+- `Yello.Merge/ChangeId.cs`
+- `Yello.Merge/TextChange.cs`
+- `Yello.Merge/ReplicaVersion.cs`
+- `Yello.Merge/ChangeAdmission.cs`
+- `Yello.Merge/Decoded.cs`
+- `Yello.Merge/TextMerge.cs`
+- `Yello.Merge/Sequence/ByteReader.cs`
+- `Yello.Merge/Sequence/ByteWriter.cs`
+- `Yello.Merge/Sequence/ChangeBody.cs`
+- `Yello.Merge/Sequence/ChangeCodec.cs`
+- `Yello.Merge/Sequence/Document.cs`
+- `Yello.Merge/Sequence/Element.cs`
+- `Yello.Merge/Sequence/ElementId.cs`
+- `Yello.Merge/Sequence/Format.cs`
+- `Yello.Merge/Sequence/HeldChanges.cs`
+- `Yello.Merge/Sequence/ReplicaState.cs`
+- `Yello.Merge/Sequence/Scalars.cs`
+- `Yello.Merge/Sequence/SequenceMergeStrategy.cs`
+- `Yello.Merge/Sequence/SequenceReplica.cs`
+
+Modified:
+
+- `Yello.Merge/AssemblyMarker.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Client/Program.cs`
+- `tests/Yello.Tests.Merge/Conformance/AdmissionConformanceTests.cs`
+- `tests/Yello.Tests.Merge/Conformance/ExactlyOnceConformanceTests.cs`
+- `tests/Yello.Tests.Merge/Conformance/MergeBudgetTests.cs`
+- `tests/Yello.Tests.Merge/Conformance/RegionConformanceTests.cs`
+- `tests/Yello.Tests.Merge/Conformance/RoundTripConformanceTests.cs`
+- `tests/Yello.Tests.Merge/Conformance/ScaleConformanceTests.cs`
+- `tests/Yello.Tests.Merge/Conformance/TextIndexConformanceTests.cs`
+- `tests/Yello.Tests.Merge/Properties/InterleavingNightlyTests.cs`
+- `tests/Yello.Tests.Merge/Properties/InterleavingPropertyTests.cs`
+- `tests/Yello.Tests.Architecture/MergePortGateTests.cs`
+- `tests/Yello.Tests.Client/MergeAssemblyBootTests.cs`
+- `tests/TESTING-CONVENTIONS.md`
+- `.github/workflows/nightly.yml`
+- `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md`
+- `_bmad-output/implementation-artifacts/sprint-status.yaml`
+- `_bmad-output/implementation-artifacts/deferred-work.md`
+- `_bmad-output/implementation-artifacts/7-1-the-merge-port-and-its-conformance-suite.md`
+
+Deleted:
+
+- `tests/Yello.Tests.Merge/PortStandIn/` (all nine files, moved into `Yello.Merge`)
+- `tests/Yello.Tests.Merge/RedPhase.cs`
 
 ## Change Log
 
 - 2026-11-22: Story created (create-story). AR-40a found open but directed. 13 open questions with recommendations, none [LEE].
+- 2026-11-22: Implemented (dev-story). Port moved from the test-project stand-in into `Yello.Merge`; RGA-family sequence
+  CRDT added behind `TextMerge.CreateStrategy()`; registered once per composition root; A-8 gates and the boot case
+  activated and each gate proved against a plant; AR-40a closed in the spine; Merge nightly step added. No conformance
+  case assertion was edited.

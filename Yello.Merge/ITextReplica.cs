@@ -1,15 +1,9 @@
-// Declared in the production namespace on purpose, so moving the file into Yello.Merge changes nothing that uses it.
-#pragma warning disable IDE0130
 namespace Yello.Merge;
-#pragma warning restore IDE0130
 
 /// <summary>
 /// One participant's copy of one document's text. Not thread-safe: a replica belongs to one editing session or one
 /// server-side rebuild at a time.
 /// </summary>
-/// <remarks>
-/// A stand-in declared in the test project; see <see cref="ITextMergeStrategy"/>'s remarks.
-/// </remarks>
 public interface ITextReplica
 {
     ReplicaId Id { get; }

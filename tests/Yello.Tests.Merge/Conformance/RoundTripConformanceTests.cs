@@ -14,19 +14,19 @@ namespace Yello.Tests.Merge.Conformance;
 [Trait("Requirement", "AD-14")]
 public sealed class RoundTripConformanceTests
 {
-    [Fact(Skip = RedPhase.NoCandidate)]
+    [Fact]
     public void A_change_decoded_from_its_encoding_is_the_same_change() =>
         MergeCases.A_change_decoded_from_its_encoding_is_the_same_change(Candidate.Strategy);
 
-    [Fact(Skip = RedPhase.NoCandidate)]
+    [Fact]
     public void A_replica_loaded_from_its_encoded_state_has_the_same_text_and_the_same_changes() =>
         MergeCases.A_replica_loaded_from_its_encoded_state_has_the_same_text_and_the_same_changes(Candidate.Strategy);
 
-    [Fact(Skip = RedPhase.NoCandidate)]
+    [Fact]
     public void A_replica_loaded_from_encoded_state_converges_with_the_others_on_later_changes() =>
         MergeCases.A_replica_loaded_from_encoded_state_converges_with_the_others_on_later_changes(Candidate.Strategy);
 
-    [Fact(Skip = RedPhase.NoCandidate)]
+    [Fact]
     public void A_replica_resumed_from_its_encoded_state_never_reissues_a_change_identity() =>
         MergeCases.A_replica_resumed_from_its_encoded_state_never_reissues_a_change_identity(Candidate.Strategy);
 }

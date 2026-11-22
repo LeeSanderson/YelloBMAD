@@ -27,7 +27,7 @@ public sealed class MergeBudgetTests
 
     private static readonly TimeSpan HalfOfNfr4 = TimeSpan.FromSeconds(1);
 
-    [Fact(Skip = RedPhase.NoCandidateBudget)]
+    [Fact]
     public void One_remote_change_to_a_working_size_description_applies_within_a_frame()
     {
         var strategy = Candidate.Strategy;
@@ -61,7 +61,7 @@ public sealed class MergeBudgetTests
         AssertWithin(OneFrame, durations, "applying one remote change to a 20,000-character description");
     }
 
-    [Fact(Skip = RedPhase.NoCandidateBudget)]
+    [Fact]
     public void A_five_minute_reconnection_exchange_applies_within_half_of_the_convergence_budget()
     {
         var strategy = Candidate.Strategy;

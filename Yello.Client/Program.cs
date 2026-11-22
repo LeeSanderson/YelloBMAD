@@ -12,6 +12,7 @@ using Yello.Client.Sessions;
 using Yello.Client.Spaces;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Localisation;
+using Yello.Merge;
 
 // The client's composition root.
 //
@@ -129,6 +130,10 @@ builder.Services.AddScoped<PageHeadingFocus>();
 
 // Story 4.3: the Invitation view's requests - the view, the accept, and the unchanged registration and sign-in it chains.
 builder.Services.AddScoped<InvitationCalls>();
+
+// The text merge, from the same factory the server uses, so both ends merge identically. Scoped rather than singleton
+// because the client registers no singletons; registering it is also what keeps trimming from dropping the assembly.
+builder.Services.AddScoped<ITextMergeStrategy>(_ => TextMerge.CreateStrategy());
 
 var host = builder.Build();
 

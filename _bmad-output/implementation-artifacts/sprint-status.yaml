@@ -59,7 +59,8 @@
 # OTHER OPEN READINESS ISSUES GATING LATER EPICS (not blocking epic 1):
 #   - issue 3: the AD-24 amendment the UX spine requires — due before epic 3
 #   - issue 5: 13 PRD §12 assumptions hardened into acceptance criteria, none confirmed
-#   - issue 6: AR-40a (merge algorithm, before epic 7), AR-40b (cold start vs NFR-5, story 2.9/1.10),
+#   - issue 6: AR-40a (merge algorithm) CLOSED by story 7.1 (an RGA-family sequence CRDT, AD-12 note),
+#              AR-40b (cold start vs NFR-5, story 2.9/1.10),
 #              AR-40c (MAXDOP/SESSION_CONTEXT, before first production deploy)
 #   - issues 8, 9: PRD §7's stale sentence; missing `status` fields
 
@@ -139,7 +140,7 @@ development_status:
 
   # Epic 7: Write the same Task at the same time — and lose access the moment access ends
   epic-7: in-progress
-  7-1-the-merge-port-and-its-conformance-suite: ready-for-dev
+  7-1-the-merge-port-and-its-conformance-suite: review
   7-2-a-task-has-a-description-stored-as-an-append-only-log: backlog
   7-3-the-sync-channel-that-carries-no-authority: backlog
   7-4-edit-a-description-at-the-same-time-as-someone-else: backlog

@@ -16,7 +16,7 @@ public sealed class InterleavingNightlyTests
 {
     private const int NightlyBudget = 5_000;
 
-    [Fact(Explicit = true, Skip = RedPhase.NoCandidateProperty)]
+    [Fact(Explicit = true)]
     public void Five_thousand_random_sessions_converge_with_nothing_lost_or_resurrected() =>
         InterleavingHarness.AssertHolds(
             Candidate.Strategy,

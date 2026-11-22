@@ -73,6 +73,7 @@ using Yello.Host.Sessions;
 using Yello.Host.Spaces;
 using Yello.Infrastructure;
 using Yello.Infrastructure.Email;
+using Yello.Merge;
 
 // The composition root, AC4's connectivity check, the product's endpoints, and - from story 1.4 -
 // the whole of the cross-origin session contract: the cookie's attributes, CORS, and anti-forgery.
@@ -208,6 +209,10 @@ builder.Services.AddAccountScopedResolution();
 // API Token's row (story 1.8). The two surfaces differ in this one step and share everything after
 // it (AD-4).
 builder.Services.AddSingleton<ISpaceRequestEstablishment, SpaceRequestEstablishment>();
+
+// The text merge, from its factory only: the browser runs the same one, and nothing here may name what is behind it.
+// Stateless, so one instance serves every document.
+builder.Services.AddSingleton<ITextMergeStrategy>(_ => TextMerge.CreateStrategy());
 
 // AUTHENTICATION. A plain cookie ticket, and no Identity builder of any kind - see
 // SessionCookiePolicy for the decision, and Yello.Infrastructure/InfrastructureServices.cs for

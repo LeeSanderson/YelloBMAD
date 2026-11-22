@@ -20,7 +20,7 @@ public sealed class MergeAssemblyBootTests(ClientSurfaceFixture surface)
 {
     private const int RenderTimeoutMilliseconds = 30_000;
 
-    [Fact(Skip = "red: AC8 - nothing in Yello.Client uses Yello.Merge yet, so the published client does not carry it (Q3, Q12)")]
+    [Fact]
     public async Task The_published_client_loads_the_merge_assembly_at_boot()
     {
         var (context, page) = await surface.OpenAsync("en-GB");

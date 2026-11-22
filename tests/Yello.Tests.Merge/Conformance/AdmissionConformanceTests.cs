@@ -15,7 +15,7 @@ namespace Yello.Tests.Merge.Conformance;
 [Trait("Requirement", "AD-12")]
 public sealed class AdmissionConformanceTests
 {
-    [Theory(Skip = RedPhase.NoCandidate)]
+    [Theory]
     [InlineData(Damage.Empty)]
     [InlineData(Damage.FormatByteOnly)]
     [InlineData(Damage.Truncated)]
@@ -24,15 +24,15 @@ public sealed class AdmissionConformanceTests
     public void A_damaged_change_is_refused_and_leaves_the_replica_as_it_was(Damage damage) =>
         MergeCases.A_damaged_change_is_refused_and_leaves_the_replica_as_it_was(Candidate.Strategy, damage);
 
-    [Fact(Skip = RedPhase.NoCandidate)]
+    [Fact]
     public void A_damaged_state_or_version_is_refused() =>
         MergeCases.A_damaged_state_or_version_is_refused(Candidate.Strategy);
 
-    [Fact(Skip = RedPhase.NoCandidate)]
+    [Fact]
     public void A_local_change_withdrawn_after_the_server_refused_it_leaves_the_replica_converged_with_one_that_never_saw_it() =>
         MergeCases.A_local_change_withdrawn_after_the_server_refused_it_leaves_the_replica_converged_with_one_that_never_saw_it(Candidate.Strategy);
 
-    [Fact(Skip = RedPhase.NoCandidate)]
+    [Fact]
     public void A_replica_that_withdrew_a_change_keeps_editing_and_still_converges() =>
         MergeCases.A_replica_that_withdrew_a_change_keeps_editing_and_still_converges(Candidate.Strategy);
 }

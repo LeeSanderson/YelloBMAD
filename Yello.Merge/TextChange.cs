@@ -1,19 +1,13 @@
 using System.Diagnostics.CodeAnalysis;
 
-// Declared in the production namespace on purpose, so moving the file into Yello.Merge changes nothing that uses it.
-#pragma warning disable IDE0130
 namespace Yello.Merge;
-#pragma warning restore IDE0130
 
 /// <summary>
 /// One change, as the opaque bytes that travel and are stored, with its identity read out.
 /// </summary>
 /// <remarks>
-/// <para>
 /// Every encoding the port produces starts with one format byte. A byte above the highest format a build knows is
 /// <see cref="ChangeAdmission.UnsupportedVersion"/>; that is the one thing about the bytes a caller may rely on.
-/// </para>
-/// <para>A stand-in declared in the test project; see <see cref="ITextMergeStrategy"/>'s remarks.</para>
 /// </remarks>
 public sealed class TextChange : IEquatable<TextChange>
 {
