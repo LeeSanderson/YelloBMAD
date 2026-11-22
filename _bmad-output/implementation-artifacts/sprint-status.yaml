@@ -1,5 +1,5 @@
 # generated: 2026-08-22 13:10
-# last_updated: 2026-11-21
+# last_updated: 2026-11-22
 # project: YelloBMAD
 # project_key: NOKEY
 # tracking_system: file-system
@@ -64,7 +64,7 @@
 #   - issues 8, 9: PRD §7's stale sentence; missing `status` fields
 
 generated: 2026-08-22 13:10
-last_updated: 2026-11-21
+last_updated: 2026-11-22
 project: YelloBMAD
 project_key: NOKEY
 tracking_system: file-system
@@ -131,7 +131,7 @@ development_status:
   epic-6: in-progress
   6-1-shape-a-projects-statuses: done
   6-2-remove-a-status-from-a-project-by-migrating-its-tasks: done
-  6-3-define-the-space-default-statuses-and-cascade-a-rename: review
+  6-3-define-the-space-default-statuses-and-cascade-a-rename: done
   6-4-remove-a-space-default-status-across-every-project: backlog
   6-5-move-a-task-to-another-project: backlog
   6-6-move-a-whole-status-of-tasks-at-once: backlog

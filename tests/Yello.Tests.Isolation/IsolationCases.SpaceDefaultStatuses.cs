@@ -17,7 +17,7 @@ namespace Yello.Tests.Isolation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Live</b> (GATE-003): every row runs on both surfaces against the mapped routes.
+/// <b>Every row runs on both surfaces</b> against the mapped routes.
 /// </para>
 /// <para>
 /// <b>Defaults are changed only in fresh actors' Spaces, never in A's or B's</b>: <c>ISO-DIRECT-STATUSES</c>,

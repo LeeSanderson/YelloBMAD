@@ -156,6 +156,36 @@ public sealed class SpaceResolutionSeamTests
     }
 
     /// <summary>
+    /// No production code disarms the query filter, Infrastructure included.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A read that drops the filter is still narrowed by row-level security, so no wire case can see it: the answer is the
+    /// same, with one of NFR-1's two layers gone. Only a scan catches it. Nothing in production needs the call today, so the
+    /// allowlist starts empty, and a store that one day must use it is named here deliberately, with its reason.
+    /// </para>
+    /// </remarks>
+    [Fact]
+    public void No_production_code_disarms_the_query_filter_outside_its_allowlist()
+    {
+        string[] allowlist = [];
+
+        var offenders = ProductionSourceFiles()
+            .Select(file => (Path: RepositoryLayout.RelativePath(file), Text: string.Join('\n', CodeLinesOf(file))))
+            .Where(candidate => candidate.Text.Contains("IgnoreQueryFilters", StringComparison.Ordinal))
+            .Select(candidate => candidate.Path)
+            .Where(path => !allowlist.Contains(path, StringComparer.Ordinal))
+            .OrderBy(path => path, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.True(
+            offenders.Count == 0,
+            "IgnoreQueryFilters appears in production code outside the allowlist, which leaves row-level security alone "
+            + "to keep those reads in the request's Space: "
+            + string.Join(", ", offenders));
+    }
+
+    /// <summary>
     /// AC7 / NFR-2 - everything Space resolution holds lives exactly as long as one request.
     /// </summary>
     /// <remarks>

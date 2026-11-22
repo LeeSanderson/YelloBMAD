@@ -372,7 +372,7 @@ public sealed class SpaceCreateAndRenameTests(ClientSurfaceFixture surface)
 
             Assert.Equal(0, await link.CountAsync());
             Assert.Equal(0, await page.Locator(ContextBar).GetByText(SettingsLink).CountAsync());
-            Assert.Equal(0, await page.Locator("main .space-name-section").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true }).CountAsync());
+            Assert.Equal(0, await page.Locator("main").GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = RenameAction, Exact = true }).CountAsync());
             Assert.Equal(0, await page.Locator("main [disabled], main [aria-disabled='true'], nav.context-bar [disabled], nav.context-bar [aria-disabled='true']").CountAsync());
         }
     }

@@ -20,12 +20,6 @@ namespace Yello.Tests.Architecture;
 /// <b>The lock's name method and the client predicate are found by reflection</b>: the first is internal to
 /// Infrastructure, and the client's predicates are found by name across its assembly, as every Role predicate gate does.
 /// </para>
-/// <para>
-/// <b>Active gates that go red by design in that change</b>, and are amended deliberately there:
-/// <c>The_owned_Spaces_refusal_has_a_stable_type_and_an_appended_identity_only_Spaces_member</c> pins the problem body's
-/// parameters exactly, and <c>The_matrix_theory_covers_exactly_the_capabilities_endpoints_declare</c> fails until the role
-/// matrix theory gains a <c>ConfigureSpaceDefaultStatuses</c> row.
-/// </para>
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
 {

@@ -4,7 +4,7 @@ baseline_commit: 4b1ed3d6f880244f8b31c7f1197f53525e7cbaca
 
 # Story 6.3: Define the Space default Statuses, and cascade a rename
 
-Status: review
+Status: done
 
 Epic: 6 — Shape Statuses per Project and retire work safely (third of six stories)
 Story key: `6-3-define-the-space-default-statuses-and-cascade-a-rename`
@@ -193,6 +193,27 @@ so that a Space-wide change never silently overwrites a deliberate local one.
   - [x] Write the disposition of every owned ledger entry in `deferred-work.md` (CLOSED / UPDATED / RE-OWNED, with the reason). Leave none blank.
   - [x] AD-16: a dated, additive note: a Space-level rename writes the default's name and, on a "replace" decision, deletes the conflicting Projects' `Rename` ops; an add and a reorder write no Project row; a Space-level Status lock (Shared for Project writes) serialises name checks. Additive only; no rule changes.
 - [x] **Task 8 — Tests** (see Testing requirements)
+
+### Review Findings
+
+- [x] [Review][Patch] Plant 8 (`IgnoreQueryFilters` on a Space-wide read) was caught by no test: row-level security still narrows the read, so no wire case can tell, and AD-2 needs both layers. New gate `No_production_code_disarms_the_query_filter_outside_its_allowlist` (empty allowlist), seen red under plant 8 [tests/Yello.Tests.Architecture/SpaceResolutionSeamTests.cs:158]
+- [x] [Review][Patch] The Member/Viewer absence assertion on Space home was narrowed to `main .space-name-section`, which never exists there, so it could no longer fail; restored to `main` [tests/Yello.Tests.Client/SpaceCreateAndRenameTests.cs:375]
+- [x] [Review][Patch] An invalid inline rename closed the field with focus inside it, dropping focus to `body`; focus now returns to the row's rename control [Yello.Client/Components/SpaceDefaultStatusSection.razor.cs:202]
+- [x] [Review][Patch] Comment "pending until its dev phase maps the routes" is narrative history, and false [tests/Yello.Tests.Isolation/IsolationCases.cs:909]
+- [x] [Review][Patch] Gate remarks "Active gates that go red by design in that change" are stale ATDD history [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.SpaceDefaultStatuses.cs:24]
+- [x] [Review][Patch] "(GATE-003)" is a gate id in a comment [tests/Yello.Tests.Isolation/IsolationCases.SpaceDefaultStatuses.cs:20]
+- [x] [Review][Defer] The conflict report and the clash list name a Project deleted mid-request with an empty name (Project deletion does not take the Status-defaults lock) [Yello.Application/Statuses/SpaceDefaultStatusWriter.cs:89] — deferred, low severity
+- [x] [Review][Defer] The "kept their own names" announcement counts the dialog's list, not the Projects conflicting at commit [Yello.Client/Components/SpaceDefaultStatusSection.razor.cs:256] — deferred, low severity
+- [x] [Review][Defer] A press while a write is in flight is ignored with only the "Saving" status to show for it [Yello.Client/Components/SpaceDefaultStatusSection.razor.cs:317] — deferred, low severity
+- [x] [Review][Defer] The re-read after a `404` runs outside the busy guard, so a late GET can overwrite a newer write's answer [Yello.Client/Components/SpaceDefaultStatusSection.razor.cs:405] — deferred, low severity
+- [x] [Review][Defer] The intro "A Project that renamed or moved one keeps its own choice" sits beside the "Rename these too" answer that overrides that choice [Yello.Client/Localisation/ClientCopy.resx (SpaceStatusesIntro)] — deferred, low severity
+- [x] [Review][Defer] `EffectiveStatusSet.Moved` puts an unknown anchor first rather than throwing; every caller validates first today [Yello.Domain/Statuses/EffectiveStatusSet.cs (Moved)] — deferred, low severity
+- [x] [Review][Defer] `DeltasAsync` reads every owned definition and operation of the Space and groups them O(Projects x rows), all under the Exclusive lock [Yello.Infrastructure/Persistence/SpaceDefaultStatusStore.cs:35] — deferred, low severity
+- [x] [Review][Defer] The Project editor returns its written set after the extra Space-defaults await without re-checking the generation [Yello.Client/Components/StatusDeltaEditor.razor:392] — deferred, low severity
+- [x] [Review][Defer] Browser gaps: the cascade dialog's trap wrapping both ways, its Cancel button, focus on the row after "Done", Move up/down `aria-describedby`, the section's purge on Space switch, and a second press during an in-flight rename [tests/Yello.Tests.Client/SpaceDefaultStatusesTests.cs] — deferred, low severity
+- [x] [Review][Defer] No wire case reaches the default-name index backstop (a `2601`/`2627` the plan missed answering `409 status-name-taken`) [Yello.Infrastructure/Persistence/SpaceDefaultStatusStore.cs:104] — deferred, low severity
+- [x] [Review][Defer] The Project editor's re-read of the Space defaults after a `404` has no browser case; only the write-answer path does [Yello.Client/Components/StatusDeltaEditor.Removal.cs:220] — deferred, low severity
+- [x] [Review][Defer] The place isolation rows (foreign Space, foreign Status in own path, Viewer) have no `Then` showing positions unchanged; the Slices cases cover it on Session only [tests/Yello.Tests.Isolation/IsolationCases.SpaceDefaultStatuses.cs:83] — deferred, low severity
 
 ## Dev Notes
 
@@ -596,3 +617,4 @@ Docs: `_bmad-output/implementation-artifacts/deferred-work.md`, `_bmad-output/im
   Status stays in-progress: full run 1 (log `...-develop-run1.log`) had 2359 passed, 1 failed, 8 skipped - the role-matrix
   row had no probe; fixed and green filtered (14/14). Full run 2 was stopped by the harness for low system memory before it
   finished, so the gate before review is still open.
+- 2026-11-22: Code review (bmad-code-review, three layers): 6 patches applied (a gate that forbids `IgnoreQueryFilters` in production code, seen red under plant 8; a Member/Viewer absence assertion made live again; focus kept after an invalid inline rename; three comments), 12 low findings deferred to `deferred-work.md`, 19 dismissed. The develop full run had already closed the gate before review (2368 total, 0 failed). The review full run, with the browser suite: 2971 total, 0 failed, 11 skipped. Status: done.

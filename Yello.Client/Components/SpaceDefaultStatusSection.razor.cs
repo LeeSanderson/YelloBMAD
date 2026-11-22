@@ -200,6 +200,7 @@ public sealed partial class SpaceDefaultStatusSection
         if (!StatusNameRule.IsStatusName(name))
         {
             _renaming = null;
+            FocusRow(status.Id, SpaceStatusFocus.Rename);
             Refuse(Localizer["StatusNameInvalid"]);
             return;
         }
