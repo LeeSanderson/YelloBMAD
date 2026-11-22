@@ -25,6 +25,18 @@ public static class SpaceStatusWire
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
     /// <summary>
+    /// The Space-level removal's route pattern. A stand-in for <c>SpaceRoutes.StatusRemove</c> until the contract declares
+    /// it; the develop phase swaps every use for the contract member and deletes this one.
+    /// </summary>
+    public static string Remove => "/api/v1/spaces/{spaceId:guid}/statuses/{statusId:guid}/remove";
+
+    /// <summary>
+    /// The refusal naming every Project that cannot take the Space-wide destination and was given none of its own. A stand-in
+    /// for <c>ProblemTypes.StatusProjectDestinationRequired</c> until the contract declares it.
+    /// </summary>
+    public static string StatusProjectDestinationRequired => "urn:yello:problem:status-project-destination-required";
+
+    /// <summary>
     /// The add body with no position: the new default goes last.
     /// </summary>
     /// <param name="name">The name, sent as given.</param>
@@ -133,6 +145,61 @@ public static class SpaceStatusWire
     /// <param name="spaceId">The Space.</param>
     /// <returns>The resource name.</returns>
     public static string StatusDefaultsLockOf(Guid spaceId) => $"Yello/StatusDefaults/{spaceId:D}";
+
+    /// <summary>
+    /// One default's removal path, as a client calls it. A stand-in for <c>SpaceRoutes.StatusRemoveOf</c>.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="statusId">The default being removed.</param>
+    /// <returns>The path.</returns>
+    public static string RemoveOf(Guid spaceId, Guid statusId) => $"/api/v1/spaces/{spaceId:D}/statuses/{statusId:D}/remove";
+
+    /// <summary>
+    /// The removal body with no exceptions: <c>destinationStatusId</c> is always present, <c>null</c> meaning none was chosen.
+    /// </summary>
+    /// <param name="destinationStatusId">The Space-wide destination, or <c>null</c>.</param>
+    /// <returns>The body.</returns>
+    public static JsonContent RemoveBody(Guid? destinationStatusId) => RemoveBody(destinationStatusId, exceptions: null);
+
+    /// <summary>
+    /// The removal body, with <c>exceptions</c> - each <c>{ projectId, destinationStatusId }</c> - only when the request
+    /// carries some.
+    /// </summary>
+    /// <param name="destinationStatusId">The Space-wide destination, or <c>null</c>.</param>
+    /// <param name="exceptions">A destination of its own for each named Project, or <c>null</c> for none.</param>
+    /// <returns>The body.</returns>
+    public static JsonContent RemoveBody(Guid? destinationStatusId, IReadOnlyList<(Guid ProjectId, Guid DestinationStatusId)>? exceptions) =>
+        exceptions is null
+            ? JsonContent.Create(new { destinationStatusId }, options: JsonOptions)
+            : JsonContent.Create(
+                new { destinationStatusId, exceptions = exceptions.Select(exception => new { projectId = exception.ProjectId, destinationStatusId = exception.DestinationStatusId }) },
+                options: JsonOptions);
+
+    /// <summary>
+    /// The occupancy report of a removal's refusal: every Project of the Space holding the Status with at least one Task in
+    /// it, with its count and its own set after the removal, or empty when the body carries none. The member is read as
+    /// <c>removal</c>, the story's recommended name; a different name in the contract is corrected here and recorded.
+    /// </summary>
+    /// <param name="body">The refusal's body.</param>
+    /// <returns>The report, in the order served.</returns>
+    public static IReadOnlyList<SpaceStatusOccupancy> RemovalOf(string body)
+    {
+        using var document = JsonDocument.Parse(body);
+
+        if (!document.RootElement.TryGetProperty("removal", out var removal) || removal.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        return
+        [
+            .. removal.EnumerateArray().Select(entry => new SpaceStatusOccupancy(
+                entry.GetProperty("projectId").GetGuid(),
+                entry.GetProperty("projectName").GetString() ?? string.Empty,
+                entry.GetProperty("taskCount").GetInt32(),
+                [.. entry.GetProperty("destinations").EnumerateArray().Select(choice => new SpaceStatusChoice(choice.GetProperty("id").GetGuid(), choice.GetProperty("name").GetString() ?? string.Empty))])),
+        ];
+    }
 }
 
 /// <summary>
@@ -151,3 +218,20 @@ public sealed record SpaceStatusRow(Guid Id, string Name, int Position);
 /// <param name="Name">Its own name for the Status.</param>
 /// <param name="TaskCount">How many of its Tasks hold the Status.</param>
 public sealed record SpaceStatusConflict(Guid ProjectId, string ProjectName, string Name, int TaskCount);
+
+/// <summary>
+/// One Project in a Space-level removal's occupancy report. <see cref="Destinations"/> is a list, which a record compares by
+/// reference: compare a projection.
+/// </summary>
+/// <param name="ProjectId">The Project.</param>
+/// <param name="ProjectName">Its name.</param>
+/// <param name="TaskCount">How many of its Tasks hold the Status being removed.</param>
+/// <param name="Destinations">Its own set after the removal, in Board order: what its picker offers.</param>
+public sealed record SpaceStatusOccupancy(Guid ProjectId, string ProjectName, int TaskCount, IReadOnlyList<SpaceStatusChoice> Destinations);
+
+/// <summary>
+/// One Status a Project's destination picker offers.
+/// </summary>
+/// <param name="Id">The Status.</param>
+/// <param name="Name">The Project's own name for it.</param>
+public sealed record SpaceStatusChoice(Guid Id, string Name);

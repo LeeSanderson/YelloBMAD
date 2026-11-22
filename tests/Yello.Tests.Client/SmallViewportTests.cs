@@ -973,6 +973,72 @@ public sealed class SmallViewportTests(ClientSurfaceFixture surface)
         }
     }
 
+    /// <summary>
+    /// A selected column removed at Space level while the Board is open: at 375px with "Done" selected, the
+    /// server removes "Done" for the whole Space, its Tasks joining "Doing". A reorder in the shown column is refused
+    /// <c>409 task-position-unavailable</c>, which makes the Board read itself again without a remount; the pager then has no
+    /// "Done" tab and its selection names no column that is gone - it shows the first tab. When a later read (forced the same
+    /// way) serves "Done" again under the same id, the pager stays on the first tab: the gone selection was forgotten.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "FR-27")]
+    [Trait("Requirement", "UX-DR20")]
+    public async Task A_selected_column_removed_at_Space_level_leaves_no_selection_after_the_Board_is_read_again()
+    {
+        var api = TwoSpaces(Northwind, Harbour);
+        _ = Seed(api, Northwind, Atlas, ThreeStatuses, ["Alpha", "Echo"], ["Bravo"], ["Charlie", "Delta"]);
+        var doing = StatusOf(api, Northwind, Atlas, "Doing");
+        var done = StatusOf(api, Northwind, Atlas, "Done");
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenNarrowAsync(api, page, 375, 667);
+            await WaitForKeysAsync(page);
+            await TabNamed(page, "Done").ClickAsync(new LocatorClickOptions { Timeout = WaitMs });
+            await WaitForSelectedTabAsync(page, "Done");
+
+            api.RemoveSpaceDefaultBehindThePage(Northwind, done, doing);
+            api.NextTaskMoveRefusal = (409, FakeYelloApi.TaskPositionUnavailableType, null);
+
+            await FocusCardAsync(page, "Charlie");
+            await page.Keyboard.PressAsync(" ");
+            await page.Locator(".task-card--carried").WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
+            await page.Keyboard.PressAsync("ArrowDown");
+            await page.Keyboard.PressAsync(" ");
+            await page.WaitForFunctionAsync(
+                "() => ![...document.querySelectorAll(\"main [role='tab'] .status-pager__name\")].some(name => name.textContent.trim() === 'Done')",
+                null,
+                new PageWaitForFunctionOptions { Timeout = WaitMs, PollingInterval = 50 });
+
+            Assert.Equal(["Todo", "Doing"], await TabNamesAsync(page));
+            Assert.Equal(1, await page.Locator(SelectedTab).CountAsync());
+            Assert.Equal("Todo", await SelectedTabNameAsync(page));
+
+            // The column falls back to the first either way; what the fix adds is that the gone Status is forgotten, so the
+            // same id coming back on a later read is not selected again without the person choosing it.
+            var board = api.Boards[(Northwind, Atlas)];
+
+            api.Boards[(Northwind, Atlas)] = board with { Columns = [.. board.Columns, new FakeColumn(done, "Done", 0, [])] };
+            api.NextTaskMoveRefusal = (409, FakeYelloApi.TaskPositionUnavailableType, null);
+
+            await FocusCardAsync(page, "Alpha");
+            await page.Keyboard.PressAsync(" ");
+            await page.Locator(".task-card--carried").WaitForAsync(new LocatorWaitForOptions { Timeout = WaitMs });
+            await page.Keyboard.PressAsync("ArrowDown");
+            await page.Keyboard.PressAsync(" ");
+            await page.WaitForFunctionAsync(
+                "() => [...document.querySelectorAll(\"main [role='tab'] .status-pager__name\")].some(name => name.textContent.trim() === 'Done')",
+                null,
+                new PageWaitForFunctionOptions { Timeout = WaitMs, PollingInterval = 50 });
+
+            Assert.Equal(ThreeStatuses, await TabNamesAsync(page));
+            Assert.Equal("Todo", await SelectedTabNameAsync(page));
+            Assert.Equal(2, Moves(api).Count);
+        }
+    }
+
     private static ILocator TabNamed(IPage page, string status) =>
         page.Locator(Tab, new PageLocatorOptions { Has = page.Locator(".status-pager__name", new PageLocatorOptions { HasTextRegex = new Regex("^" + Regex.Escape(status) + "$") }) });
 

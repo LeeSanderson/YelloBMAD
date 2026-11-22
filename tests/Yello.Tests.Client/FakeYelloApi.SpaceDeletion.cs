@@ -125,6 +125,12 @@ internal sealed partial class FakeYelloApi
             return spaceDefaultStatus;
         }
 
+        // A Space default removed at Space level (FakeYelloApi.SpaceDefaultStatusRemoval.cs) answers only its own path.
+        if (await SpaceStatusRemovalAsync(request).ConfigureAwait(false) is { } spaceStatusRemoval)
+        {
+            return spaceStatusRemoval;
+        }
+
         if (await StatusRemovalAsync(request).ConfigureAwait(false) is { } statusRemoval)
         {
             return statusRemoval;

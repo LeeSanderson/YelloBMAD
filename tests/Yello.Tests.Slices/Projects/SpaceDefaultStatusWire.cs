@@ -55,6 +55,84 @@ internal static class SpaceDefaultStatusWire
     public static Task<WireResponse> RawAsync(Actor actor, HttpMethod method, string path, string json) =>
         actor.Session.SendWithHeadersAsync(method, path, TaskEditWire.RawBody(json), TaskWire.NoHeaders);
 
+    public static Task<WireResponse> RemoveAsync(
+        Actor actor,
+        Guid spaceId,
+        Guid statusId,
+        Guid? destinationStatusId,
+        IReadOnlyList<(Guid ProjectId, Guid DestinationStatusId)>? exceptions = null,
+        string? key = null) =>
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, SpaceStatusWire.RemoveOf(spaceId, statusId), SpaceStatusWire.RemoveBody(destinationStatusId, exceptions), TaskWire.KeyHeader(key));
+
+    public static Task<WireResponse> RemoveWithTokenAsync(Actor actor, string token, Guid spaceId, Guid statusId, Guid? destinationStatusId) =>
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, SpaceStatusWire.RemoveOf(spaceId, statusId), token, SpaceStatusWire.RemoveBody(destinationStatusId), TaskWire.NoHeaders);
+
+    /// <summary>
+    /// Removes a default at Space level through the product, failing the case unless it answers <c>200</c>, and answers the
+    /// Space's defaults.
+    /// </summary>
+    public static async Task<IReadOnlyList<SpaceStatusRow>> RemovedAsync(
+        Actor actor,
+        Guid spaceId,
+        Guid statusId,
+        Guid? destinationStatusId = null,
+        IReadOnlyList<(Guid ProjectId, Guid DestinationStatusId)>? exceptions = null)
+    {
+        var removed = await RemoveAsync(actor, spaceId, statusId, destinationStatusId, exceptions);
+
+        Assert.True(removed.StatusCode == HttpStatusCode.OK, $"Removing a Space default through the product: {removed.StatusCode} {removed.Body}");
+
+        return SpaceStatusWire.DefaultsOf(removed.Body);
+    }
+
+    /// <summary>
+    /// Every delta operation in the Space as (Project, Status, kind, anchor), ordered so two reads compare, under its key.
+    /// </summary>
+    public static async Task<IReadOnlyList<(Guid ProjectId, Guid StatusId, string Kind, Guid? AfterStatusId)>> SpaceDeltaRowsAsync(RegistrationDatabase database, Guid spaceId)
+    {
+        await using var connection = await database.OpenForSpaceAsync(spaceId, TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+
+        command.CommandText = "SELECT ProjectId, StatusId, Kind, AfterStatusId FROM dbo.[StatusDeltaOperation] ORDER BY ProjectId, Sequence, Id";
+
+        var rows = new List<(Guid ProjectId, Guid StatusId, string Kind, Guid? AfterStatusId)>();
+
+        await using var reader = await command.ExecuteReaderAsync(TestContext.Current.CancellationToken);
+
+        while (await reader.ReadAsync(TestContext.Current.CancellationToken))
+        {
+            rows.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), await reader.IsDBNullAsync(3, TestContext.Current.CancellationToken) ? null : reader.GetGuid(3)));
+        }
+
+        return rows;
+    }
+
+    /// <summary>
+    /// Plants a trigger that fails a Space-level removal at its last statement: <c>AFTER DELETE</c> on <c>StatusDefinition</c>,
+    /// throwing when the removed default's row goes. Every Task migration, re-anchored place and op delete has run by then,
+    /// so the throw proves the whole request is one transaction. A test-only object in the class's database, always dropped by
+    /// the caller in a <c>finally</c> (<see cref="DropTriggersAsync"/>).
+    /// </summary>
+    /// <returns>The trigger's name.</returns>
+    public static async Task<string> PlantFailingDefinitionDeleteTriggerAsync(RegistrationDatabase database, Guid statusId)
+    {
+        var name = "TR_StatusDefinition_ForcedRemovalFailure_" + Guid.NewGuid().ToString("N");
+
+        await using var connection = await database.OpenWithoutSpaceContextAsync(TestContext.Current.CancellationToken);
+        await using var command = connection.CreateCommand();
+
+#pragma warning disable CA2100 // Review SQL queries - DDL takes no parameters; the id is a GUID formatted here.
+        command.CommandText =
+            $"CREATE TRIGGER dbo.[{name}] ON dbo.[StatusDefinition] AFTER DELETE AS " +
+            $"IF EXISTS (SELECT 1 FROM deleted WHERE Id = '{statusId:D}') " +
+            "THROW 50000, 'Forced failure at the removed default''s delete.', 1;";
+#pragma warning restore CA2100
+
+        await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+
+        return name;
+    }
+
     /// <summary>
     /// Renames a default at Space level through the product, failing the case unless it answers <c>200</c>, and answers the
     /// Space's defaults.

@@ -551,6 +551,61 @@ Follow `tests/TESTING-CONVENTIONS.md`:
 - `deferred-work.md`: `:114`, `:1022`, `:1030-1031`, `:1038-1039`, `:1045`, `:1056`, `:1061`, `:1066-1067`, `:1069`, `:1072`.
 - Code: everything in "What already exists".
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-6-4-remove-a-space-default-status-across-every-project.md`. Every
+scaffold is written against each open question's recommended option, and a skip that rests on one names it.
+
+| File | Cases | ACs | Today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaultRemovalRace.cs` | 6 (1 theory): races 1-5, S-1 | AC4, AC6, AC10, AC17 | skipped `red:` |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaultRemoval.cs` | 18 (2 theories): minimum Slices cases 1-15 | AC1-AC5, AC7-AC9, AC11, AC12, AC14, AC15, AC17 | skipped `red:` |
+| `tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaultRemovalScale.cs` | 1 (Nightly, Explicit) | AC16 | skipped `red:` |
+| `tests/Yello.Tests.Slices/Statuses/EffectiveStatusSetSpaceRemovalTests.cs` | 7 (no database) | AC5, AC7, AC8 | **green, active** |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.SpaceDefaultStatusRemoval.cs` | 4 gates | AC1-AC4, AC11 | skipped `red:` |
+| `tests/Yello.Tests.Isolation/IsolationCases.SpaceDefaultStatusRemoval.cs` | 7 rows, both surfaces | AC3, AC11, AC12 | `PendingUntil: "6.4"` |
+| `tests/Yello.Tests.Client/SpaceDefaultStatusRemovalTests.cs` | 11 (2 theories), fake API | AC3-AC5, AC11, AC13 | skipped `red:` |
+| `tests/Yello.Tests.Client/SmallViewportTests.cs` | 1 added: `A_selected_column_removed_at_Space_level_leaves_no_selection_after_the_Board_is_read_again` | AC14 | **green, active** |
+
+Supporting files: `Yello.Tests.Shared/SpaceStatusWire.cs` (stand-ins `Remove`, `RemoveOf`,
+`StatusProjectDestinationRequired`, the body `RemoveBody`, the report reader `RemovalOf` on member `removal`),
+`Yello.Tests.Slices/Projects/SpaceDefaultStatusWire.cs` (the removal on both surfaces, the Space's delta rows, the S-1
+trigger on the definition delete), `Yello.Tests.Client/FakeYelloApi.SpaceDefaultStatusRemoval.cs` (the removal in AC5's
+decision order, hold/release, `RemoveSpaceDefaultBehindThePage`), one hook in `FakeYelloApi.SpaceDeletion.cs` and one
+spread line in `IsolationCases.All`. Swap every stand-in for the contract member and delete it.
+
+**Green today.** `EffectiveStatusSetSpaceRemovalTests` pins AC7's invariant on the existing derivation (`Of` + `Without` +
+`Reanchored`): a standing gate for "no second derivation". The pager case is the ledger `:1045` browser case (Q12): the
+deterministic re-read exists (a reorder refused `409 task-position-unavailable` after the fake removed the column behind
+the open Board), and it passes on 6.3's fix; it forces a second read serving the column again so it asserts what only
+`ForgetSelectionThatLeft` provides. Close `:1045` on it.
+
+**Activation order** (riskiest assumption first): (1) the lock set -
+`A_Space_removal_queued_behind_a_Task_edit_into_the_default_counts_or_migrates_the_edited_Task`, then the
+ProjectsPerSpace race, the queued Task edit, the queued add-back and the "removed the destination first" race; (2) the
+plan's own unit tests with its type, keeping `EffectiveStatusSetSpaceRemovalTests` green; (3) the four contract gates;
+(4) the core wire cases (unoccupied, report, accepted destination, blocked with and without an exception, anchored places,
+removed/renamed Projects); (5) the refusals (Space-wide destination, exception, ignored exceptions, set-empty); (6) S-1,
+add-back `404`, the readers; (7) Role, boundary, replay, then the 7 isolation rows live (GATE-003); (8) the browser cases,
+then the Nightly scale case once to record its duration (Q15).
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
+**Existing gates the implementation will turn red - amend them deliberately, in the same change:**
+
+- `RefusalBoundaryGateTests.The_Space_Status_routes_declare_their_capability_serve_both_surfaces_and_consult_no_bound` (its exact route list).
+- `RefusalBoundaryGateTests.No_route_or_request_under_the_Spaces_Statuses_offers_a_removal_a_reset_or_a_mode` (forbids
+  "Remove" and "Destination"): rewrite it, do not delete it, so it still forbids a reset and a mode everywhere and a removal
+  outside `…/remove`.
+- The `ProblemResponse` parameter gates: `The_problem_body_appends_a_nullable_conflict_report_and_a_nullable_Project_list`
+  and `The_owned_Spaces_refusal_has_a_stable_type_and_an_appended_identity_only_Spaces_member` (`RefusalBoundaryGateTests.DeleteAccount.cs`).
+- The isolation route-coverage gate `IsolationCaseListTests.Every_Space_scoped_route_a_Token_reaches_…` until
+  `ISO-TOKEN-OWN-OTHER-SPACE-SPACE-STATUS-REMOVE` is live; GATE-003 once 6.4 reaches review with any row still pending.
+- The Client case `SpaceDefaultStatusesTests.Each_answer_sends_its_decision_once_and_is_announced(false)`, which asserts
+  the "2 Projects kept their own names." copy AC13 rewords (Q11).
+- The role-matrix theory already has a `ConfigureSpaceDefaultStatuses` row; it needs no new row unless it is changed to
+  need one per route.
+
 ## Dev Agent Record
 
 ### Agent Model Used
