@@ -120,3 +120,13 @@ internal sealed record ReconnectStep(int Replica) : SessionStep
 
     public override string ToString() => $"replica {Replica} reconnects";
 }
+
+/// <summary>
+/// A replica replaced by a reload of its own encoded state, as the server rebuilds a description from its snapshot.
+/// </summary>
+internal sealed record ReloadStep(int Replica) : SessionStep
+{
+    public override void Run(Network network, Glyphs glyphs) => network.Reload(Replica);
+
+    public override string ToString() => $"replica {Replica} is reloaded from its own state";
+}

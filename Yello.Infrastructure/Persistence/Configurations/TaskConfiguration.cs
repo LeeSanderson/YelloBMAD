@@ -73,6 +73,12 @@ internal sealed class TaskConfiguration(YelloDbContext context) : IEntityTypeCon
             .IsRequired(false)
             .HasMaxLength(LabelName.MaxLength);
 
+        // No length: none is stated for a description. The default keeps the change expand-only, so the revision before,
+        // which never names the column, still inserts Tasks.
+        builder.Property(task => task.Description)
+            .IsRequired()
+            .HasDefaultValue(string.Empty);
+
         // AR-8: story 2.4's TaskLabel references a Task through (SpaceId, Id), so an application can never point
         // at a Task in another Space.
         builder.HasAlternateKey(task => new { task.SpaceId, task.Id });

@@ -90,6 +90,13 @@ public static class SchemaNames
     public static string TaskLabelTable => "TaskLabel";
 
     /// <summary>
+    /// The TaskDescriptionChange table: each Task's append-only description log. Space-scoped, and like
+    /// <see cref="ProjectTable"/> its policy carries a BLOCK predicate <c>AFTER UPDATE</c>, so no statement can move a row to
+    /// another Space.
+    /// </summary>
+    public static string TaskDescriptionChangeTable => "TaskDescriptionChange";
+
+    /// <summary>
     /// The Invitation table (story 4.1). Space-scoped, and like <see cref="ProjectTable"/> its policy carries a BLOCK
     /// predicate <c>AFTER UPDATE</c>, so no statement can move an Invitation to another Space.
     /// </summary>
@@ -257,5 +264,5 @@ public static class SchemaNames
     /// reader would have acted on.
     /// </remarks>
     public static IReadOnlyList<string> SpaceScopedTables { get; } =
-        [MembershipTable, StatusDefinitionTable, SpacePresenceTable, ProjectTable, IdempotencyRecordTable, TaskTable, LabelTable, TaskLabelTable, InvitationTable, NotificationSendTable, OwnershipOfferTable, StatusDeltaOperationTable];
+        [MembershipTable, StatusDefinitionTable, SpacePresenceTable, ProjectTable, IdempotencyRecordTable, TaskTable, LabelTable, TaskLabelTable, InvitationTable, NotificationSendTable, OwnershipOfferTable, StatusDeltaOperationTable, TaskDescriptionChangeTable];
 }

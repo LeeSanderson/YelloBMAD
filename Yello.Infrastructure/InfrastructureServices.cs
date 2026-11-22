@@ -127,6 +127,9 @@ public static class InfrastructureServices
         // timer. The sender itself is chosen by configuration in the Host (EmailServices.AddYelloEmailSender).
         services.AddOutbox();
 
+        // The merge adapter - split out only to keep this class's dependencies within S1200's limit.
+        services.AddTaskDescriptionLog();
+
         return services;
     }
 

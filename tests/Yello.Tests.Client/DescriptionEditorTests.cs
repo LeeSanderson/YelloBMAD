@@ -37,9 +37,6 @@ public sealed class DescriptionEditorTests(ClientSurfaceFixture surface)
     private const string HeadingText = "Description";
     private const string EmptyCopy = "No description.";
 
-    private const string Red = "red: AC7 - DescriptionEditor and the fake's description routes do not exist";
-    private const string RedViewer = "red: AC8 - the Viewer's description text does not exist";
-
     private static readonly string[] Banned = ["Save", "Saving", "Saved", "Merge", "Conflict", "Locked"];
 
     private static readonly string[] StatusNames = ["Todo", "Doing", "Done"];
@@ -52,7 +49,7 @@ public sealed class DescriptionEditorTests(ClientSurfaceFixture surface)
     /// editor inside it is a textarea on the page ground (not the card ground) with spellcheck left on.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     public async Task The_editor_sits_in_a_labelled_region_below_the_attributes_on_the_page_ground()
     {
         var api = OwnerSpace("owner");
@@ -87,7 +84,7 @@ public sealed class DescriptionEditorTests(ClientSurfaceFixture surface)
     /// "Saved", "Merge", "Conflict" or "Locked", before or after the batch is answered.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     [Trait("Requirement", "UX-DR26")]
     public async Task A_local_edit_renders_at_once_and_nothing_saves_merges_or_locks()
@@ -122,7 +119,7 @@ public sealed class DescriptionEditorTests(ClientSurfaceFixture surface)
     /// keystrokes, and together they carry every keystroke's change exactly once.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red + " (Q5: 250 ms idle, 1 s oldest, one in flight)")]
+    [Fact]
     [Trait("Requirement", "AR-19")]
     public async Task Twenty_quick_keystrokes_go_in_one_batch_and_one_batch_is_in_flight_at_a_time()
     {
@@ -158,7 +155,7 @@ public sealed class DescriptionEditorTests(ClientSurfaceFixture surface)
     /// remains.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     [Trait("Requirement", "AR-20")]
     public async Task A_refused_change_is_withdrawn_from_the_editor()
@@ -194,7 +191,7 @@ public sealed class DescriptionEditorTests(ClientSurfaceFixture surface)
     /// the first, and nothing new is shown on the page.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "FR-33")]
     public async Task A_failed_batch_is_kept_and_sent_again_with_the_next()
     {
@@ -234,7 +231,7 @@ public sealed class DescriptionEditorTests(ClientSurfaceFixture surface)
     /// panel.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = Red)]
+    [Fact]
     [Trait("Requirement", "UX-DR39")]
     [Trait("Priority", "P1")]
     public async Task The_first_Esc_leaves_the_editor_and_the_second_closes_the_panel()
@@ -267,7 +264,7 @@ public sealed class DescriptionEditorTests(ClientSurfaceFixture surface)
     /// textarea, and nothing disabled, read-only or inert in its place.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = RedViewer)]
+    [Fact]
     [Trait("Requirement", "X-9")]
     [Trait("Requirement", "UX-DR27")]
     public async Task A_Viewer_reads_the_text_in_the_same_region_with_no_editor_in_the_DOM()
@@ -299,7 +296,7 @@ public sealed class DescriptionEditorTests(ClientSurfaceFixture surface)
     /// A Viewer's empty description reads "No description." in the muted text colour.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = RedViewer + " (Q6: the empty copy)")]
+    [Fact]
     [Trait("Requirement", "X-9")]
     [Trait("Priority", "P1")]
     public async Task A_Viewers_empty_description_reads_No_description_in_the_muted_colour()
@@ -325,7 +322,7 @@ public sealed class DescriptionEditorTests(ClientSurfaceFixture surface)
     /// its heading stay, and the textarea goes.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = RedViewer)]
+    [Fact]
     [Trait("Requirement", "UX-DR37")]
     public async Task A_Role_reread_lower_swaps_the_editor_for_the_text_in_place()
     {

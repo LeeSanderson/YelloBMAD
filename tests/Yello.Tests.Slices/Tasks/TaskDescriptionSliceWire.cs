@@ -19,7 +19,7 @@ namespace Yello.Tests.Slices.Tasks;
 /// editor, never <see cref="Guid.Empty"/>, as an opened panel is. A batch carries only changes and the editor's version.
 /// </para>
 /// <para>
-/// <b>Schema assumed</b> (the table does not exist yet): <c>dbo.[TaskDescriptionChange]</c> with <c>Id</c>, <c>SpaceId</c>,
+/// <b>Schema</b> (migration <c>TaskDescriptionLog</c>): <c>dbo.[TaskDescriptionChange]</c> with <c>Id</c>, <c>SpaceId</c>,
 /// <c>TaskId</c>, <c>Sequence</c> (<c>bigint</c>, unique per <c>(SpaceId, TaskId)</c>), <c>Kind</c> stored by name
 /// (<c>Change</c> or <c>Snapshot</c>, as every enum here is stored), <c>Payload</c> (<c>varbinary(max)</c>),
 /// <c>AuthorAccountId</c> and <c>AuthorName</c> (both nullable) and <c>RecordedAt</c>; and <c>dbo.[Task].Description</c>.

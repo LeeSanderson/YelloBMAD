@@ -51,6 +51,7 @@ public sealed partial class ActiveSpaceEndpointTests
         new MatrixRoute(Capability.ReadProjectsAndTasks, "GET", ProjectRoutes.List, HttpStatusCode.OK),
         new MatrixRoute(Capability.ManageProjects, "POST", ProjectRoutes.Create, HttpStatusCode.Created),
         new MatrixRoute(Capability.ManageTasks, "POST", TaskRoutes.Create, HttpStatusCode.Created),
+        new MatrixRoute(Capability.EditTaskDescriptionCollaboratively, "POST", TaskRoutes.DescriptionChanges, HttpStatusCode.OK),
         new MatrixRoute(Capability.AssignTask, "PUT", TaskRoutes.Assignee, HttpStatusCode.OK),
         new MatrixRoute(Capability.ManageLabels, "POST", LabelRoutes.Create, HttpStatusCode.Created),
         new MatrixRoute(Capability.ConfigureProjectStatusDelta, "POST", ProjectStatusRoutes.Collection, HttpStatusCode.Created),
@@ -226,6 +227,19 @@ public sealed partial class ActiveSpaceEndpointTests
                 var projectId = await NamedProjectAsync(owner.Session, spaceId, "Matrix tasks " + Suffix());
 
                 return new MatrixProbe((actor, viaToken) => SendAsAsync(actor, viaToken, HttpMethod.Post, TaskRoutes.CreateIn(spaceId, projectId), JsonContent.Create(new { title = "Matrix " + Suffix() }, options: JsonOptions)));
+            }
+
+            case Capability.EditTaskDescriptionCollaboratively:
+            {
+                var (_, taskId) = await TaskThroughTheProductAsync(owner.Session, spaceId, "Matrix description " + Suffix());
+
+                // A fresh editor per send, as each opened panel is, so every success appends a change of its own.
+                return new MatrixProbe((actor, viaToken) =>
+                {
+                    var editor = Tasks.TaskDescriptionSliceWire.NewEditor();
+
+                    return SendAsAsync(actor, viaToken, HttpMethod.Post, TaskRoutes.DescriptionChangesOf(spaceId, taskId), Tasks.TaskDescriptionSliceWire.BatchOf(editor, editor.Insert(0, "Matrix")));
+                });
             }
 
             case Capability.AssignTask:

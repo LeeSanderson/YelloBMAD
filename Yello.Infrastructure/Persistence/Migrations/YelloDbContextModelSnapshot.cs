@@ -452,6 +452,50 @@ namespace Yello.Infrastructure.Persistence.Migrations
                     b.ToTable("StatusDeltaOperation", (string)null);
                 });
 
+            modelBuilder.Entity("Yello.Domain.Tasks.TaskDescriptionChange", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("AuthorAccountId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("AuthorName")
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
+
+                    b.Property<byte[]>("Payload")
+                        .IsRequired()
+                        .HasColumnType("varbinary(max)");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("datetimeoffset");
+
+                    b.Property<long>("Sequence")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("SpaceId")
+                        .HasColumnType("uniqueidentifier")
+                        .HasColumnName("SpaceId");
+
+                    b.Property<Guid>("TaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AuthorAccountId");
+
+                    b.HasIndex("SpaceId", "TaskId", "Sequence")
+                        .IsUnique();
+
+                    b.ToTable("TaskDescriptionChange", (string)null);
+                });
+
             modelBuilder.Entity("Yello.Domain.Tasks.TaskItem", b =>
                 {
                     b.Property<Guid>("Id")
@@ -462,6 +506,12 @@ namespace Yello.Infrastructure.Persistence.Migrations
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("nvarchar(max)")
+                        .HasDefaultValue("");
 
                     b.Property<DateTimeOffset?>("DueDate")
                         .HasColumnType("datetimeoffset");
@@ -861,6 +911,21 @@ namespace Yello.Infrastructure.Persistence.Migrations
                         .HasForeignKey("SpaceId", "StatusId")
                         .HasPrincipalKey("SpaceId", "Id")
                         .OnDelete(DeleteBehavior.NoAction)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Yello.Domain.Tasks.TaskDescriptionChange", b =>
+                {
+                    b.HasOne("Yello.Domain.Accounts.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AuthorAccountId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.HasOne("Yello.Domain.Tasks.TaskItem", null)
+                        .WithMany()
+                        .HasForeignKey("SpaceId", "TaskId")
+                        .HasPrincipalKey("SpaceId", "Id")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

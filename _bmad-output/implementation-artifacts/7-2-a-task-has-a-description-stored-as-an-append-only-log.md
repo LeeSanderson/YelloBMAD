@@ -1,6 +1,10 @@
+---
+baseline_commit: 5c6892cc5a0f3d3858fd922f7f78025f332d724c
+---
+
 # Story 7.2: A Task has a description, stored as an append-only log
 
-Status: ready-for-dev
+Status: review
 
 Epic: 7 — Write the same Task at the same time, and lose access the moment access ends (the second of eight stories)
 Story key: `7-2-a-task-has-a-description-stored-as-an-append-only-log`
@@ -165,42 +169,42 @@ So that a Task carries more than a title.
 
 ## Tasks / Subtasks
 
-- [ ] **T1. Domain** (AC1, AC2, AC5)
-  - [ ] `Yello.Domain/Tasks/TaskDescriptionChange.cs` (init-only, `Kind` enum in its own file) and `TaskItem.Description`. Update the `TaskItem` remarks at `:20` ("No description").
-  - [ ] The port `ITaskDescriptionLog` (bytes in, an outcome record out, for example `DescriptionAppend` with refused ids, version bytes, missing-change bytes, and a NotFound case) and the read method.
-- [ ] **T2. Merge load check** (AC10), first, before anything persists state
-  - [ ] Add the case bodies in `MergeCases` and watch them fail. Then change `Sequence/ReplicaState.cs` (validation, withdrawn set keyed by `ChangeId`, `Format` bump). Extend `InterleavingHarness` with reload and decoded versions.
-  - [ ] Run `Yello.Tests.Merge` whole. No existing conformance assertion is edited.
-- [ ] **T3. Infrastructure** (AC1, AC2, AC5, AC9)
-  - [ ] `TaskDescriptionChangeConfiguration` (copy `TaskLabelConfiguration`'s FK and `InvitationConfiguration`'s SET NULL), registered in `YelloDbContext.OnModelCreating` (`:136-176`). The `Description` column is added in `TaskConfiguration`.
-  - [ ] `SchemaNames`: the table constant, plus an entry in `SpaceScopedTables`.
-  - [ ] Add the `Yello.Infrastructure → Yello.Merge` reference, update `AllowedReferenceEdges`, and rewrite its remarks.
-  - [ ] `TaskDescriptionStore : ITaskDescriptionLog`: the Task row lock, the rebuild, apply and admit, the append, compaction and the projector. Register it in Host `Program.cs` beside the Task stores.
-  - [ ] **Migration** `TaskDescriptionLog`, created with `dotnet tool restore` then `dotnet ef migrations add TaskDescriptionLog --project Yello.Infrastructure --startup-project Yello.Infrastructure`. **It is required**: a new table plus a new column. Hand-edit it for analysers per `TESTING-CONVENTIONS.md:599-619`:
+- [x] **T1. Domain** (AC1, AC2, AC5)
+  - [x] `Yello.Domain/Tasks/TaskDescriptionChange.cs` (init-only, `Kind` enum in its own file) and `TaskItem.Description`. Update the `TaskItem` remarks at `:20` ("No description").
+  - [x] The port `ITaskDescriptionLog` (bytes in, an outcome record out, for example `DescriptionAppend` with refused ids, version bytes, missing-change bytes, and a NotFound case) and the read method.
+- [x] **T2. Merge load check** (AC10), first, before anything persists state
+  - [x] Add the case bodies in `MergeCases` and watch them fail. Then change `Sequence/ReplicaState.cs` (validation, withdrawn set keyed by `ChangeId`, `Format` bump). Extend `InterleavingHarness` with reload and decoded versions.
+  - [x] Run `Yello.Tests.Merge` whole. No existing conformance assertion is edited.
+- [x] **T3. Infrastructure** (AC1, AC2, AC5, AC9)
+  - [x] `TaskDescriptionChangeConfiguration` (copy `TaskLabelConfiguration`'s FK and `InvitationConfiguration`'s SET NULL), registered in `YelloDbContext.OnModelCreating` (`:136-176`). The `Description` column is added in `TaskConfiguration`.
+  - [x] `SchemaNames`: the table constant, plus an entry in `SpaceScopedTables`.
+  - [x] Add the `Yello.Infrastructure → Yello.Merge` reference, update `AllowedReferenceEdges`, and rewrite its remarks.
+  - [x] `TaskDescriptionStore : ITaskDescriptionLog`: the Task row lock, the rebuild, apply and admit, the append, compaction and the projector. Register it in Host `Program.cs` beside the Task stores.
+  - [x] **Migration** `TaskDescriptionLog`, created with `dotnet tool restore` then `dotnet ef migrations add TaskDescriptionLog --project Yello.Infrastructure --startup-project Yello.Infrastructure`. **It is required**: a new table plus a new column. Hand-edit it for analysers per `TESTING-CONVENTIONS.md:599-619`:
     - the table, the `(SpaceId, TaskId, Sequence)` unique index and the FKs;
     - `Task.Description` `NOT NULL DEFAULT N''`;
     - `ALTER SECURITY POLICY` adding FILTER, BLOCK AFTER INSERT and BLOCK AFTER UPDATE, each statement in its own `Sql()` call, and in `Down` dropping the predicates before the table.
-- [ ] **T4. Application and Host** (AC3, AC4, AC11)
-  - [ ] Slices `EditTaskDescription/` and `ViewTaskDescription/`. Register the handlers in Host `Program.cs` (`:159-165`) and map them in `Program.cs:570-575`, in a new `Yello.Host/Endpoints/TaskDescriptionEndpoints.cs`.
-  - [ ] Contracts: `TaskDescriptionChangesRequest`, `TaskDescriptionChangesResponse`, `TaskDescriptionResponse` and the routes in `TaskRoutes.cs`. Bytes as `ReadOnlyMemory<byte>` (System.Text.Json writes base64), which avoids CA1819 on an array property.
-  - [ ] Problem types for an unparseable body and an oversized batch.
-  - [ ] `RoleMatrix` rows, the isolation partial, and the pinned type lists.
-- [ ] **T5. Client** (AC7, AC8)
-  - [ ] `DescriptionEditor.razor` (plus code-behind if it nears S138), the Viewer text variant in the same section, `TaskCapabilities.PermitsEditDescription` and its agreement gate, `BoardView` and `TaskDetail` parameters, localised strings ("Description", "No description."), and `.description-editor` / `.task-detail__description` in `components.css`.
-  - [ ] `FakeYelloApi`: both description routes, backed by the real strategy so the client test drives a true replica.
-- [ ] **T6. Gates and docs** (AC2, AC5, AC6, AC9)
-  - [ ] The A-11 gate with its plant, and the `DisplayNameReaders` tightening with its plant.
-  - [ ] Spine notes under AD-13 (compaction) and AD-21 (the edge).
-  - [ ] `TESTING-CONVENTIONS.md`: one short section on the description log (the projector rule, the threshold option and M-11), and the attribution line `:551-555` updated now that 7.2 has followed it.
-  - [ ] Ledger: close or re-own every line in the carried-in table, and add new deferrals.
-- [ ] **T7. Amend the absence tests deliberately** (they assert today's "no description")
-  - [ ] `TaskEndpointTests.EditSchema.cs:22-40` `The_due_date_is_a_nullable_datetimeoffset_and_no_column_holds_a_description`: keep the due-date half; replace the description half with the AC2 column assertion. Rename it.
-  - [ ] `TaskDetailTests.cs:188-212` `The_panel_has_no_description_editor`: replace it with AC7 and AC8 cases.
-  - [ ] Record each amendment in the Dev Agent Record.
-- [ ] **T8. Verify**
-  - [ ] `dotnet build Yello.slnx`: 0 warnings, 0 errors.
-  - [ ] Merge and Architecture whole. Slices filtered to `*TaskDescription*`, `*SpaceIsolationSchemaTests`, `*TaskEndpointTests` and `*ActiveSpaceEndpointTests`. Isolation filtered to the list and cross-product classes. Client filtered to `*TaskDetailTests` and the new editor class.
-  - [ ] Then **one** full run without the browser suite (`-p:YelloSkipBrowserSuite=true`, `--max-parallel-test-modules 1`), in the background.
+- [x] **T4. Application and Host** (AC3, AC4, AC11)
+  - [x] Slices `EditTaskDescription/` and `ViewTaskDescription/`. Register the handlers in Host `Program.cs` (`:159-165`) and map them in `Program.cs:570-575`, in a new `Yello.Host/Endpoints/TaskDescriptionEndpoints.cs`.
+  - [x] Contracts: `TaskDescriptionChangesRequest`, `TaskDescriptionChangesResponse`, `TaskDescriptionResponse` and the routes in `TaskRoutes.cs`. Bytes as `ReadOnlyMemory<byte>` (System.Text.Json writes base64), which avoids CA1819 on an array property.
+  - [x] Problem types for an unparseable body and an oversized batch.
+  - [x] `RoleMatrix` rows, the isolation partial, and the pinned type lists.
+- [x] **T5. Client** (AC7, AC8)
+  - [x] `DescriptionEditor.razor` (plus code-behind if it nears S138), the Viewer text variant in the same section, `TaskCapabilities.PermitsEditDescription` and its agreement gate, `BoardView` and `TaskDetail` parameters, localised strings ("Description", "No description."), and `.description-editor` / `.task-detail__description` in `components.css`.
+  - [x] `FakeYelloApi`: both description routes, backed by the real strategy so the client test drives a true replica.
+- [x] **T6. Gates and docs** (AC2, AC5, AC6, AC9)
+  - [x] The A-11 gate with its plant, and the `DisplayNameReaders` tightening with its plant.
+  - [x] Spine notes under AD-13 (compaction) and AD-21 (the edge).
+  - [x] `TESTING-CONVENTIONS.md`: one short section on the description log (the projector rule, the threshold option and M-11), and the attribution line `:551-555` updated now that 7.2 has followed it.
+  - [x] Ledger: close or re-own every line in the carried-in table, and add new deferrals.
+- [x] **T7. Amend the absence tests deliberately** (they assert today's "no description")
+  - [x] `TaskEndpointTests.EditSchema.cs:22-40` `The_due_date_is_a_nullable_datetimeoffset_and_no_column_holds_a_description`: keep the due-date half; replace the description half with the AC2 column assertion. Rename it.
+  - [x] `TaskDetailTests.cs:188-212` `The_panel_has_no_description_editor`: replace it with AC7 and AC8 cases.
+  - [x] Record each amendment in the Dev Agent Record.
+- [x] **T8. Verify**
+  - [x] `dotnet build Yello.slnx`: 0 warnings, 0 errors.
+  - [x] Merge and Architecture whole. Slices filtered to `*TaskDescription*`, `*SpaceIsolationSchemaTests`, `*TaskEndpointTests` and `*ActiveSpaceEndpointTests`. Isolation filtered to the list and cross-product classes. Client filtered to `*TaskDetailTests` and the new editor class.
+  - [x] Then **one** full run without the browser suite (`-p:YelloSkipBrowserSuite=true`, `--max-parallel-test-modules 1`), in the background.
 
 ## Dev Notes
 
@@ -428,14 +432,76 @@ Existing gates the implementation is expected to turn red, to amend deliberately
 
 ### Agent Model Used
 
+Claude Opus 5.5 (bmad-dev-story, unattended story cycle).
+
 ### Debug Log References
+
+- **(Resolved, see Completion Notes) The NuGet audit failed restore of `Yello.AppHost` and `Yello.Tests.Architecture`** (NU1904 `Aspire.Dashboard.Sdk.win-x64` 13.4.6, GHSA-4g86-54fm-h9h8, critical; NU1903 `Aspire.Hosting` and `Aspire.Hosting.AppHost` 13.4.6, GHSA-f7vh-h5g3-7jrh, high). The advisories appeared after the ATDD phase's clean build (commit `5c6892c`); no 7.2 change touches Aspire. `dotnet build Yello.slnx` therefore ends with these 6 errors and no other: every other project builds with 0 warnings and 0 errors. Disabling the audit (`-p:NuGetAudit=false`) was refused by the session's permission policy and was not pursued; an audit suppression or an Aspire upgrade needs Lee. Consequences: the Architecture suite could not be built or run, the A-11 and attribution plants could not run, and the one full run was not made (it needs the whole solution built).
+- Activation order followed. 1: `An_append_rebuilds_the_log_only_under_the_Task_lock` and `Two_appends_queued_on_one_Task_are_both_kept` green on first run after the store landed. 2: the four Merge load cases had been confirmed red for their stated reasons by the ATDD run (`Malformed` not `UnsupportedVersion`; "base refused" not "base"; `Admitted` not `Malformed` twice); green after the `ReplicaState` change. 3-6: the 34 Slices cases; 7: isolation rows live; 8: the 10 browser cases green on first run.
+- **Scaffold corrections** (each a test defect, not a product one):
+  - `ReplicaStateLoadTests.A_state_that_withdrew_a_change_it_still_holds_is_refused`: the forgery rewritten for the new layout (withdrawn entries are origin GUID plus sequence), as its remarks anticipated; anchor unchanged.
+  - `The_description_log_cascades_from_its_Task_...`: the catalogue's `CONCAT` mixed `sys` catalogue collation with the database's (error 468); each part now `COLLATE DATABASE_DEFAULT` and the rows are ordered in C# instead of `ORDER BY 1`.
+  - `Neither_the_write_nor_the_read_logs_...`: the anchor needs the request-finished line, which the product's own log level never writes; the case now runs its Host with `Logging__LogLevel__Microsoft.AspNetCore.Hosting.Diagnostics=Information`, as `RunningHost` does for the isolation Hosts.
+  - `Erasing_an_author_keeps_their_rows_...`: the author owned its Personal Space, so erasure answered `409 account-owns-spaces`; the case now deletes that Space through the product first.
+  - The skip-reason constants left unused by activation were removed (S1144/CA1823), and `TaskDescriptionWire`'s routes and problem types now delegate to `TaskRoutes` and `ProblemTypes` instead of holding literals.
+- **Absence tests amended deliberately**: `The_due_date_is_a_nullable_datetimeoffset_and_no_column_holds_a_description` renamed `..._and_one_column_holds_the_description_projection` (due-date half kept; asserts exactly one `Description` column, `nvarchar`, not null); `TaskDetailTests.The_panel_has_no_description_editor` replaced by `The_panels_one_multi_line_field_is_the_description_editor`; and a third the story did not list, found by full run 1: `TaskEndpointTests.Schema.cs` `Task_carries_a_non_nullable_SpaceId_under_the_Space_policy_with_three_predicates` asserted no description column, and now asserts the projection is the only one.
+- **Gates amended deliberately**: `AllowedReferenceEdges` (Infrastructure -> Merge, remarks rewritten); `SchemaNames.SpaceScopedTables`; `SpaceIsolationSchemaTests.TablesThatCannotMove`; the three pinned contract lists (`.TaskEdit.cs`, `.Tasks.cs` x2); the `RoleMatrix` route and probe; `DisplayNameReaders` (type level) gains `TaskDescriptionStore`. The story asked for the type-level `Attribution_never_reads_a_live_Account_name` to be deleted in favour of the method-level gate; deleting it was refused by the session's permission policy as removing an oversight gate, so both gates stand (the method-level one is the stricter).
+- **Plants** (each restored from saved content in a `finally`, never git): (1) the append rebuilt the log before taking the Task row lock - **caught** by `An_append_rebuilds_the_log_only_under_the_Task_lock` (the waiting append collided and answered non-200; `artifacts/test-runs/7-2-develop-plant-race.log`). (2) the rebuild budget lowered to 0 ms, a measurement rather than a gate plant, to read the figure: p95 49.8 ms, median 40.0 ms. (3) A-11: a public type in Application builds a `TaskItem` with `Description` set - **caught** by `Only_the_projector_writes_a_Tasks_description` (two writers found; `7-2-develop-plant-a11.log`); the file deleted in a `finally`. (4) a second `DisplayName` reader method (`PlantedNames`) in the admitted `InvitationStore` - **caught** by `Attribution_reads_a_live_Account_name_only_in_named_methods`, while the type-level gate stayed green, which is the tightening the ledger asked for (`7-2-develop-plant-displayname.log`); restored from saved content in a `finally`. Plants 3 and 4 ran after the Aspire upgrade unblocked the build.
+- Analyser-driven shape: `YelloDbContext` and `InfrastructureServices` were at S1200's limit, so the Task configurations moved to `TaskModel.Apply` and the store's registration to `TaskDescriptionServices.AddTaskDescriptionLog`; the merge half of the store is `DescriptionReplica` (S1200 on the store); the port takes a `DescriptionBatch` record (S4017). The client's editor is split into the component (timing, caret, rendering) and `DescriptionSession` (replica, pending, exchange).
+- Test runs (logs under `artifacts/test-runs/`): Merge whole 63 passed, 1 skipped (the Explicit nightly); Slices, the 34 description cases plus the renamed schema case, all green (`7-2-develop-slices-description.log`, the last two re-run after their corrections); Isolation `IsolationCaseListTests` + `IsolationCaseTests` + `SchemaVarianceTests`, 561 passed (`7-2-develop-isolation.log`); Client `DescriptionEditorTests` (9) + the amended panel case, 10 passed (`7-2-develop-client-description.log`); Slices role matrix (every capability row, the new one included) + `SpaceIsolationSchemaTests`, 24 passed (`7-2-develop-slices-matrix.log`).
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
+- Implemented AC1-AC11 in code. The write path is `POST …/tasks/{taskId}/description/changes` carrying base64 changes and a version, through `EditTaskDescriptionHandler` -> `ITaskDescriptionLog` -> `TaskDescriptionStore` (plain read, Task row `UPDLOCK, INDEX(1)`, rebuild from the latest snapshot and later rows, admit each change on its own, append only what the replica's pre-batch version lacks, compact, project with one `ExecuteUpdate`). The read is `GET …/description` answering the projection column and the rebuilt state. `TaskResponse` is unchanged.
+- Q1 (a) decided: a REST endpoint carrying a batch of encoded changes, never text, into a slice 7.3's frames can reuse. Reversible: the route can be retired once `/sync` carries frames, the slice stays.
+- Q2 (a) decided: the `Infrastructure -> Merge` edge, with `TaskDescriptionStore` as the merge adapter. Reversible: the adapter could move behind a Host-composed projector and the edge be dropped.
+- Q3 (a) decided: a separate description resource; Board and List payloads carry no description. Reversible: a later contract can add it to the single-Task read.
+- Q4 (a) decided: `AuthorAccountId` with `ON DELETE SET NULL` plus `AuthorName` captured at write; three predicates, the table in `TablesThatCannotMove`. Erasure is proven to keep the rows with the SET NULL cascade under the AFTER UPDATE block.
+- Q5 (a) decided: flush at 250 ms idle or 1 s after the oldest unsent change, and on blur, Esc and close; one POST in flight. Reversible: two constants in `DescriptionEditor.razor.cs`; 7.4 re-tunes on `/sync`.
+- Q6 (a) decided: no per-change authorship in the interface; the Viewer's empty text reads "No description." in `text-muted`. Reversible: one resource string (`TaskDescriptionEmpty`). Tombstone-avatar entries re-owned to 7.5.
+- Q7 (a) decided: a snapshot at 500 changes since the last (`TaskDescription:CompactionThreshold`), appended in the crossing transaction; change rows never removed; the superseded snapshot deleted. Rebuild measured at p95 49.8 ms (native, 20,000 characters, 5,000 changes since the snapshot) against 200 ms; tombstone collection re-owned to 7.4 with that figure.
+- Q8 (a) decided: the load check and a state format bump now. Replica state has its own format byte (2); changes and versions stay at format 1, so nothing on the wire changed. Format-1 state is refused as `UnsupportedVersion`.
+- Q9 (a) decided: no description length limit (`nvarchar(max)`); a transport cap of **256 changes and 256 KiB of body per batch**, refused as `400 description-batch-too-large`. Not registered as an NFR-8 bound.
+- Shape decided for the ATDD finding "refused change ids cannot always be ids": `refused` lists **batch positions from zero**; the client withdraws the change it sent at each position. Reversible: a later contract may add ids where they decode.
+- The client answers a whole-batch `4xx` (a Role lowered, the Task gone) by withdrawing that batch, since the server will never take it; a `5xx` or no answer keeps it for the next flush and shows nothing.
+- Approved by Lee (2026-11-22): Aspire 13.4.6 -> 13.6.5 for GHSA-f7vh-h5g3-7jrh / GHSA-4g86-54fm-h9h8. Changed: both `Aspire.Hosting.*` pins in `Directory.Packages.props`, the `Aspire.AppHost.Sdk` version in `Yello.AppHost.csproj`, `aspire.cli` in `.config/dotnet-tools.json`, `PackageVersionPinTests` (and the example in a `ProjectFileGateTests` remark), and the two values in CLAUDE.md. Restore is now clean of NU1903/NU1904, but the AppHost build fails on `ASPIRE010` (AspireUseCliBundle=false), which needs a further configuration decision.
+- Decided by Lee (2026-11-22): AspireUseCliBundle=true for ASPIRE010 after the 13.6.5 upgrade. The stale "Aspire.Hosting.SqlServer 13.4.6 requires >= 7.0.1" remark in `Directory.Packages.props` was left as it is: 13.6.5 states a different floor (>= 7.0.2, the version already pinned), not the same requirement.
+- Full runs: 2. Run 1 (`7-2-...-develop-run1.log`): 2,757 total, 1 failed - a third "no description" absence test (`Task_carries_a_non_nullable_SpaceId_...`), amended and re-run green. Run 2 (`artifacts/test-runs/7-2-a-task-has-a-description-stored-as-an-append-only-log-develop.log`): **2,757 total, 2,746 passed, 0 failed, 11 skipped**, browser suite left out (`-p:YelloSkipBrowserSuite=true`).
+- After the upgrade: Architecture suite whole, 602 passed, after widening one more pinned list deliberately (`The_routes_under_a_Task_are_its_read_edit_deletion_and_move` gains the description read and change routes); both plants caught.
 
 ### File List
+
+New:
+- `Yello.Domain/Tasks/TaskDescriptionChange.cs`, `Yello.Domain/Tasks/TaskDescriptionChangeKind.cs`, `Yello.Domain/Tasks/ITaskDescriptionLog.cs`
+- `Yello.Application/Tasks/EditTaskDescription/EditTaskDescriptionHandler.cs`, `Yello.Application/Tasks/ViewTaskDescription/ViewTaskDescriptionHandler.cs`
+- `Yello.Infrastructure/Persistence/TaskDescriptionStore.cs`, `Yello.Infrastructure/Persistence/DescriptionReplica.cs`, `Yello.Infrastructure/Persistence/TaskDescriptionOptions.cs`, `Yello.Infrastructure/TaskDescriptionServices.cs`
+- `Yello.Infrastructure/Persistence/Configurations/TaskDescriptionChangeConfiguration.cs`, `Yello.Infrastructure/Persistence/Configurations/TaskModel.cs`
+- `Yello.Infrastructure/Persistence/Migrations/20261122152941_TaskDescriptionLog.cs`, `Yello.Infrastructure/Persistence/Migrations/20261122152941_TaskDescriptionLog.Designer.cs`
+- `Yello.Contracts/Tasks/TaskDescriptionChangesRequest.cs`, `Yello.Contracts/Tasks/TaskDescriptionChangesResponse.cs`, `Yello.Contracts/Tasks/TaskDescriptionResponse.cs`
+- `Yello.Host/Endpoints/TaskDescriptionEndpoints.cs`, `Yello.Host/Endpoints/TaskDescriptionBody.cs`
+- `Yello.Client/Components/DescriptionEditor.razor`, `Yello.Client/Components/DescriptionEditor.razor.cs`, `Yello.Client/Components/DescriptionSession.cs`, `Yello.Client/Components/TextDiff.cs`, `Yello.Client/wwwroot/js/description-editor.js`
+
+Modified:
+- `Yello.Domain/Tasks/TaskItem.cs`
+- `Yello.Merge/Sequence/Format.cs`, `Yello.Merge/Sequence/ReplicaState.cs`, `Yello.Merge/Sequence/SequenceReplica.cs`
+- `Yello.Infrastructure/Yello.Infrastructure.csproj`, `Yello.Infrastructure/InfrastructureServices.cs`, `Yello.Infrastructure/Persistence/SchemaNames.cs`, `Yello.Infrastructure/Persistence/YelloDbContext.cs`, `Yello.Infrastructure/Persistence/Configurations/TaskConfiguration.cs`, `Yello.Infrastructure/Persistence/Migrations/YelloDbContextModelSnapshot.cs`
+- `Yello.Contracts/Tasks/TaskRoutes.cs`, `Yello.Contracts/ProblemTypes.cs`
+- `Yello.Host/Program.cs`
+- `Yello.Client/Components/TaskDetail.razor`, `Yello.Client/Components/BoardView.razor`, `Yello.Client/Spaces/TaskCapabilities.cs`, `Yello.Client/Localisation/ClientCopy.resx`, `Yello.Client/wwwroot/css/components.css`
+- `tests/Yello.Tests.Architecture/AllowedReferenceEdges.cs`, `RefusalBoundaryGateTests.TaskDescription.cs`, `RefusalBoundaryGateTests.Memberships.cs`, `RefusalBoundaryGateTests.TaskEdit.cs`, `RefusalBoundaryGateTests.Tasks.cs`, `DesignFoundationGateTests.DescriptionEditor.cs`
+- `tests/Yello.Tests.Merge/Network.cs`, `Properties/InterleavingHarness.cs`, `Properties/SessionStep.cs`, `ReplicaStateLoadTests.cs`, `Conformance/LoadConformanceTests.cs`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.TaskDescription.cs`, `TaskEndpointTests.TaskDescriptionSchema.cs`, `TaskEndpointTests.TaskDescriptionRace.cs`, `TaskEndpointTests.TaskDescriptionCompaction.cs`, `TaskEndpointTests.EditSchema.cs`, `TaskDescriptionSliceWire.cs`; `tests/Yello.Tests.Slices/Accounts/RegisterAccount/SpaceIsolationSchemaTests.cs`; `tests/Yello.Tests.Slices/Spaces/ResolveActiveSpace/ActiveSpaceEndpointTests.RoleMatrix.cs`
+- `tests/Yello.Tests.Isolation/IsolationCases.TaskDescription.cs`
+- `tests/Yello.Tests.Client/DescriptionEditorTests.cs`, `FakeYelloApi.TaskDescription.cs`, `FakeYelloApi.SpaceDeletion.cs`, `TaskDetailTests.cs`
+- `tests/Yello.Tests.Shared/TaskDescriptionWire.cs`
+- `tests/TESTING-CONVENTIONS.md`
+- `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md`
+- `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.Schema.cs`
+- `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Move.cs`, `PackageVersionPinTests.cs`, `ProjectFileGateTests.cs`
+- `Directory.Packages.props`, `Yello.AppHost/Yello.AppHost.csproj`, `.config/dotnet-tools.json`, `CLAUDE.md` (Aspire 13.6.5, approved by Lee)
+- `_bmad-output/implementation-artifacts/deferred-work.md`, `_bmad-output/implementation-artifacts/sprint-status.yaml`, this story file
 
 ## Change Log
 
 - 2026-11-22: Story created (create-story). Dominant finding: the write path must carry merge changes before `/sync` exists. 9 open questions with recommendations, none [LEE]. EF migration required (new table `TaskDescriptionChange`, new column `Task.Description`).
+- 2026-11-22: Develop (dev-story). The description log, its projector and compaction, the change and read routes, the load check and state format 2 in Merge, the editor and the Viewer's text, the isolation rows live, the spine notes and the ledger. Q1-Q9 decided as (a). Aspire 13.4.6 -> 13.6.5 with AspireUseCliBundle=true (approved and decided by Lee) cleared the new audit advisories; Architecture 602 green, both plants caught, full run 2 green. Status review.

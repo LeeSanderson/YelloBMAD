@@ -141,7 +141,7 @@ development_status:
   # Epic 7: Write the same Task at the same time — and lose access the moment access ends
   epic-7: in-progress
   7-1-the-merge-port-and-its-conformance-suite: done
-  7-2-a-task-has-a-description-stored-as-an-append-only-log: ready-for-dev
+  7-2-a-task-has-a-description-stored-as-an-append-only-log: review
   7-3-the-sync-channel-that-carries-no-authority: backlog
   7-4-edit-a-description-at-the-same-time-as-someone-else: backlog
   7-5-see-who-else-is-here: backlog

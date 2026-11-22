@@ -1,9 +1,11 @@
-<Project Sdk="Aspire.AppHost.Sdk/13.4.6">
+<Project Sdk="Aspire.AppHost.Sdk/13.6.5">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <IsAspireHost>true</IsAspireHost>
     <UserSecretsId>yello-apphost</UserSecretsId>
+    <!-- Aspire 13.6 refuses to build a project AppHost without the CLI bundle (ASPIRE010) unless the diagnostic is suppressed. -->
+    <AspireUseCliBundle>true</AspireUseCliBundle>
   </PropertyGroup>
 
   <!--

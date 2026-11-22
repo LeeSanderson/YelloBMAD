@@ -111,6 +111,12 @@ internal sealed partial class FakeYelloApi
     /// </summary>
     private async Task<(int Status, string Body)?> SpaceDeletionAsync(FakeRequest request)
     {
+        // A Task's description (FakeYelloApi.TaskDescription.cs) answers only its own two routes.
+        if (await DescriptionAsync(request).ConfigureAwait(false) is { } description)
+        {
+            return description;
+        }
+
         // Account deletion (FakeYelloApi.AccountDeletion.cs) is answered here too; it answers only its own route.
         if (AccountDeletion(request) is { } accountDeletion)
         {

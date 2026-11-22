@@ -1,0 +1,49 @@
+@using Yello.Client.Spaces
+@using Yello.Merge
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject HttpClient Http
+@inject ITextMergeStrategy Merge
+@inject ActiveSpaceState ActiveSpace
+@inject IJSRuntime JS
+
+@*
+    THE DESCRIPTION REGION of the Task detail panel.
+
+    ONE LABELLED REGION FOR EVERY ROLE: a section labelled by its own "Description" heading. A Role that may edit gets a
+    textarea on the page ground; one that may not gets the text, line breaks kept, in the same section under the same
+    heading - the editor is absent from the page, never present and switched off. A Role re-read lower swaps the one for
+    the other in place.
+
+    NOTHING SAVES. There is no save control, no merge prompt, no lock and no word for "saving": every keystroke renders at
+    once from the local replica, and the changes go to the server in batches the person never sees.
+
+    ESC: the first Esc in the editor leaves it for the region's heading, sending what is pending; the next closes the panel.
+*@
+
+<section class="task-detail__description" aria-labelledby="@HeadingId">
+    <h3 class="form-field__label task-detail__description-heading" id="@HeadingId" tabindex="-1" @ref="_heading">@Localizer["TaskDescriptionHeading"]</h3>
+
+    @if (Editing)
+    {
+        <textarea class="description-editor"
+                  aria-labelledby="@HeadingId"
+                  name="@_fieldName"
+                  autocomplete="off"
+                  value="@_text"
+                  @oninput="Input"
+                  @onkeydown="KeyDownAsync"
+                  @onblur="FlushAsync"
+                  @ref="_editor"></textarea>
+    }
+
+    @if (!CanEdit && Shown.Length > 0)
+    {
+        <p class="task-detail__description-text">@Shown</p>
+    }
+
+    @if (!CanEdit && Shown.Length == 0 && _loaded)
+    {
+        <p class="task-detail__description-empty">@Localizer["TaskDescriptionEmpty"]</p>
+    }
+</section>

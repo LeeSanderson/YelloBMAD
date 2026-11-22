@@ -15,10 +15,6 @@ namespace Yello.Tests.Isolation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Pending until the routes are mapped</b>; the develop phase makes these rows live before review (GATE-003) and swaps
-/// the <see cref="TaskDescriptionWire"/> stand-ins for the <c>TaskRoutes</c> templates.
-/// </para>
-/// <para>
 /// <b>Every Task a row names is seeded in a fresh actor's Space</b>, never in A's or B's, whose Tasks other rows assert
 /// exactly. Each change body is one insert made by a fresh replica of the real strategy, so every send carries a valid
 /// change and never text. Whether a refused row left anything is read through the product, as the Task's own Owner, so the
@@ -27,10 +23,6 @@ namespace Yello.Tests.Isolation;
 /// </remarks>
 internal static partial class IsolationCases
 {
-    private const string TaskDescriptionStory = "7.2";
-
-    private const string TaskDescriptionPending = "The description routes are not mapped until the dev phase of the story that gives a Task a description.";
-
     private const string IsolationCaseDescription = "written by an isolation case";
 
     private static IEnumerable<IsolationCase> TaskDescriptionCases() =>
@@ -50,9 +42,7 @@ internal static partial class IsolationCases
                     Body: OneInsert,
                     Other: foreign);
             },
-            Both(new BoundaryNotFound { Then = TheNamedTaskHasNoDescriptionAsync }),
-            PendingUntil: TaskDescriptionStory,
-            PendingReason: TaskDescriptionPending),
+            Both(new BoundaryNotFound { Then = TheNamedTaskHasNoDescriptionAsync })),
 
         new IsolationCase(
             "ISO-DESCRIPTION-FOREIGN-SPACE", "I-1", IsolationVector.DirectIdentifier, HttpMethod.Get, TaskDescriptionWire.Route,
@@ -68,9 +58,7 @@ internal static partial class IsolationCases
                     foreign.SpaceId,
                     Other: foreign);
             },
-            Both(new BoundaryNotFound()),
-            PendingUntil: TaskDescriptionStory,
-            PendingReason: TaskDescriptionPending),
+            Both(new BoundaryNotFound())),
 
         // Another Space's Task under the caller's own Space path is a Task that never existed there: the unrecorded in-Space
         // not-found, byte-identical to a random Task id. A leak would write into the foreign Task's log.
@@ -92,9 +80,7 @@ internal static partial class IsolationCases
                     Body: OneInsert,
                     Other: foreign);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheNamedTaskHasNoDescriptionAsync }),
-            PendingUntil: TaskDescriptionStory,
-            PendingReason: TaskDescriptionPending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheNamedTaskHasNoDescriptionAsync })),
 
         new IsolationCase(
             "ISO-DESCRIPTION-FOREIGN-TASK-IN-OWN-SPACE", "I-1, I-4, I-13", IsolationVector.DeepLink, HttpMethod.Get, TaskDescriptionWire.Route,
@@ -113,9 +99,7 @@ internal static partial class IsolationCases
                     TargetSpaceId: null,
                     Other: foreign);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable)),
-            PendingUntil: TaskDescriptionStory,
-            PendingReason: TaskDescriptionPending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable))),
 
         new IsolationCase(
             "ISO-RECORD-KIND-DESCRIPTION-CHANGES-VIEWER", "V-1, C-6, FR-16, X-9", IsolationVector.RecordKind, HttpMethod.Post, TaskDescriptionWire.ChangesRoute,
@@ -126,9 +110,7 @@ internal static partial class IsolationCases
 
                 return new CaseRequest(viewer, HttpMethod.Post, [new(path, path)], viewer.SpaceId, Body: OneInsert);
             },
-            Both(new RoleRefused(TaskDescriptionWire.EditCapabilityCode) { Then = TheNamedTaskHasNoDescriptionAsync }),
-            PendingUntil: TaskDescriptionStory,
-            PendingReason: TaskDescriptionPending),
+            Both(new RoleRefused(TaskDescriptionWire.EditCapabilityCode) { Then = TheNamedTaskHasNoDescriptionAsync })),
 
         // The read declares reading, which every Role holds: a Viewer is served the projection of its own Space's Task.
         new IsolationCase(
@@ -140,23 +122,13 @@ internal static partial class IsolationCases
 
                 return new CaseRequest(viewer, HttpMethod.Get, [new(path, path)], TargetSpaceId: null);
             },
-            Both(new Served(HttpStatusCode.OK, ServedAnEmptyDescriptionAsync, "200, the empty projection and a state; a Viewer reads the description")),
-            PendingUntil: TaskDescriptionStory,
-            PendingReason: TaskDescriptionPending),
+            Both(new Served(HttpStatusCode.OK, ServedAnEmptyDescriptionAsync, "200, the empty projection and a state; a Viewer reads the description"))),
 
         // One row per Space-scoped route a Token reaches. By Session the Account writes to and reads a Task of its second
         // Space; by the first Space's Token each is a non-member's.
-        TokenOwnOtherSpace("DESCRIPTION-CHANGES", HttpMethod.Post, TaskDescriptionWire.ChangesRoute, HttpStatusCode.OK, sa2 => TaskDescriptionWire.ChangesOf(sa2.SpaceId, sa2.TaskIds[0]), OneInsert) with
-        {
-            PendingUntil = TaskDescriptionStory,
-            PendingReason = TaskDescriptionPending,
-        },
+        TokenOwnOtherSpace("DESCRIPTION-CHANGES", HttpMethod.Post, TaskDescriptionWire.ChangesRoute, HttpStatusCode.OK, sa2 => TaskDescriptionWire.ChangesOf(sa2.SpaceId, sa2.TaskIds[0]), OneInsert),
 
-        TokenOwnOtherSpace("DESCRIPTION", HttpMethod.Get, TaskDescriptionWire.Route, HttpStatusCode.OK, sa2 => TaskDescriptionWire.Of(sa2.SpaceId, sa2.TaskIds[0])) with
-        {
-            PendingUntil = TaskDescriptionStory,
-            PendingReason = TaskDescriptionPending,
-        },
+        TokenOwnOtherSpace("DESCRIPTION", HttpMethod.Get, TaskDescriptionWire.Route, HttpStatusCode.OK, sa2 => TaskDescriptionWire.Of(sa2.SpaceId, sa2.TaskIds[0])),
     ];
 
     /// <summary>

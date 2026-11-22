@@ -65,5 +65,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Yello.Application\Yello.Application.csproj" />
     <ProjectReference Include="..\Yello.Domain\Yello.Domain.csproj" />
+    <!-- The merge adapter (the description store) consumes ITextMergeStrategy; it never registers one. -->
+    <ProjectReference Include="..\Yello.Merge\Yello.Merge.csproj" />
   </ItemGroup>
 </Project>

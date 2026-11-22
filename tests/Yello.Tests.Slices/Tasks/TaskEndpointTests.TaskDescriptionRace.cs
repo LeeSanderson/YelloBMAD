@@ -29,7 +29,7 @@ public sealed partial class TaskEndpointTests
     /// texts and equals what the log rebuilds to.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AC2 - the description change route is not mapped; the riskiest assumption, activate first")]
+    [Fact]
     [Trait("Requirement", "AR-19")]
     [Trait("Requirement", "AD-13")]
     [Trait("Requirement", "FR-31")]
@@ -84,7 +84,7 @@ public sealed partial class TaskEndpointTests
     /// and a projection holding both texts that equals what the log rebuilds to.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - the description change route is not mapped")]
+    [Fact]
     [Trait("Requirement", "AR-19")]
     [Trait("Requirement", "AD-13")]
     [Trait("Requirement", "FR-31")]

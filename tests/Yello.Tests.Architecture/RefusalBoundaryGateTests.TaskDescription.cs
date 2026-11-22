@@ -63,7 +63,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>POST</c> on the change route requires <c>EditTaskDescriptionCollaboratively</c>, serves both surfaces, consults no
     /// bound, and carries exactly the Space and the Task in its path.
     /// </summary>
-    [Fact(Skip = "red: AC3 - the description change route is not mapped")]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "FR-31")]
     [Trait("Requirement", "FR-35")]
@@ -83,7 +83,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>GET</c> on the read route requires <c>ReadProjectsAndTasks</c>, so a Viewer reads the description, and serves both
     /// surfaces. No other method is mapped on it.
     /// </summary>
-    [Fact(Skip = "red: AC4 - the description read route is not mapped")]
+    [Fact]
     [Trait("Requirement", "FR-31")]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "AR-19")]
@@ -99,7 +99,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <summary>
     /// <c>TaskRoutes</c> names both templates once, and each builder builds its path under the Task's own path.
     /// </summary>
-    [Fact(Skip = "red: AC3, AC4 - TaskRoutes names no description template")]
+    [Fact]
     [Trait("Requirement", "AR-35")]
     public void TaskRoutes_names_the_description_templates_once()
     {
@@ -127,7 +127,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The change request carries the batch of encoded changes and the client's encoded version, and nothing else: no text in
     /// any form, no Space. Bytes are <c>ReadOnlyMemory&lt;byte&gt;</c>, never a string.
     /// </summary>
-    [Fact(Skip = "red: AC3 - Yello.Contracts.Tasks.TaskDescriptionChangesRequest does not exist")]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     [Trait("Requirement", "AR-20")]
     [Trait("Requirement", "AD-3")]
@@ -144,7 +144,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The change answer lists the refusals, the server's version and the changes the client lacks, and never text for the
     /// client to adopt as truth.
     /// </summary>
-    [Fact(Skip = "red: AC3 - Yello.Contracts.Tasks.TaskDescriptionChangesResponse does not exist")]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     [Trait("Requirement", "AR-20")]
     public void The_change_answer_carries_refusals_a_version_and_the_missing_changes_and_never_text()
@@ -160,7 +160,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The read answer carries the projection as text, the encoded state an editor bootstraps from and the server's version,
     /// and no Space.
     /// </summary>
-    [Fact(Skip = "red: AC4 - Yello.Contracts.Tasks.TaskDescriptionResponse does not exist")]
+    [Fact]
     [Trait("Requirement", "AR-19")]
     [Trait("Requirement", "AD-3")]
     public void The_read_answer_carries_the_projection_a_state_and_a_version()
@@ -175,7 +175,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <summary>
     /// The write and the read are one slice each, sealed classes with a <c>HandleAsync</c>, beside the other Task slices.
     /// </summary>
-    [Fact(Skip = "red: AC3, AC4 - the two description slices do not exist")]
+    [Fact]
     [Trait("Requirement", "AR-3")]
     public void The_description_write_and_read_are_one_slice_each()
     {
@@ -231,7 +231,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// A-11: nothing but the projector writes a Task's description, whether through the setter, an initialiser or an
     /// <c>ExecuteUpdate</c> naming it: exactly one method writes it, in the description store.
     /// </summary>
-    [Fact(Skip = "red: AC2, A-11 - TaskItem has no Description and no projector writes it")]
+    [Fact]
     [Trait("Requirement", "AR-19")]
     [Trait("Requirement", "AD-13")]
     [Trait("Priority", "P1")]
@@ -282,7 +282,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The client's predicate for offering the description editor agrees with the capability matrix for every Role: it offers
     /// it exactly where <c>EditTaskDescriptionCollaboratively</c> is not denied. Sibling of the Task controls predicate gate.
     /// </summary>
-    [Fact(Skip = "red: AC8 - TaskCapabilities has no description predicate")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "UX-DR10")]
     [Trait("Requirement", "AD-1")]
@@ -311,7 +311,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// A Role that may not edit gets no editor at all, never a disabled, read-only or inert one: the component's markup
     /// carries none of those attributes.
     /// </summary>
-    [Fact(Skip = "red: AC7, AC8 - DescriptionEditor.razor does not exist")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "UX-DR10")]
     public void The_description_editor_is_never_disabled_read_only_or_inert()
@@ -330,7 +330,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Attribution reads a live Account name only in named methods: today's readers, and exactly one method of the
     /// description store, the one that captures the author's name at write time.
     /// </summary>
-    [Fact(Skip = "red: AC6 - the description store does not exist, so it captures no author name")]
+    [Fact]
     [Trait("Requirement", "UX-DR34")]
     [Trait("Requirement", "FR-3")]
     public void Attribution_reads_a_live_Account_name_only_in_named_methods()

@@ -99,4 +99,35 @@ public static class TaskRoutes
     /// <param name="taskId">The Task.</param>
     /// <returns>The path.</returns>
     public static string AssigneeOf(Guid spaceId, Guid taskId) => $"/api/v1/spaces/{spaceId:D}/tasks/{taskId:D}/assignee";
+
+    /// <summary>
+    /// <c>GET</c> one Task's description here: <c>200</c> with a <see cref="TaskDescriptionResponse"/>, the projection as text
+    /// and the encoded state an editor starts from. Every Role reads it; both surfaces.
+    /// </summary>
+    public static string Description => "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/description";
+
+    /// <summary>
+    /// One Task's description path, as a client calls it.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="taskId">The Task.</param>
+    /// <returns>The path.</returns>
+    public static string DescriptionOf(Guid spaceId, Guid taskId) => $"/api/v1/spaces/{spaceId:D}/tasks/{taskId:D}/description";
+
+    /// <summary>
+    /// <c>POST</c> a <see cref="TaskDescriptionChangesRequest"/> here: <c>200</c> with a
+    /// <see cref="TaskDescriptionChangesResponse"/>, each change admitted or refused on its own, even when every one is
+    /// refused; <c>400 invalid-description-changes</c> for a body that is not a batch; <c>400 description-batch-too-large</c>
+    /// over the cap; <c>403</c> for a Role that may not edit the description; the boundary's <c>404</c> for a Task that is
+    /// not there. Never text in either direction. Both surfaces.
+    /// </summary>
+    public static string DescriptionChanges => "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/description/changes";
+
+    /// <summary>
+    /// One Task's description change path, as a client calls it.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="taskId">The Task.</param>
+    /// <returns>The path.</returns>
+    public static string DescriptionChangesOf(Guid spaceId, Guid taskId) => $"/api/v1/spaces/{spaceId:D}/tasks/{taskId:D}/description/changes";
 }

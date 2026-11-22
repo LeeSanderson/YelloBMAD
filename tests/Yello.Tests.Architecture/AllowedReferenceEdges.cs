@@ -11,13 +11,13 @@ namespace Yello.Tests.Architecture;
 /// quoted from AD-21 - flagged here so nobody later mistakes a derivation for a citation.
 /// </para>
 /// <para>
-/// Two derivation notes worth carrying forward to Epic 7: the spine's graph shows
-/// <c>Merge --&gt; Contracts</c> as Merge's only outbound edge, yet describes
-/// <c>Yello.Infrastructure</c> as holding the "merge adapter" with no
-/// <c>Infrastructure --&gt; Merge</c> edge; and <c>Yello.AppHost</c> appears in the source
-/// tree and the graph but in no ring-table row. Neither blocks story 1.1 - the adapter
-/// arrives in Epic 7 - but these rows are inferred and should be revisited when Epic 7
-/// wires the adapter.
+/// <b><c>Yello.Infrastructure --&gt; Yello.Merge</c> exists because the merge adapter lives in
+/// Infrastructure</b>, where the spine places it: the description store rebuilds a Task's
+/// description from its log and writes the projection inside the appending transaction, which
+/// needs the merge port and the unit of work in one place. It consumes the port the Host
+/// registers and never registers one itself. Merge carries no EF Core or ASP.NET Core type, so
+/// the edge brings Infrastructure nothing heavy. <c>Yello.AppHost</c> appears in the source
+/// tree and the graph but in no ring-table row; its row below is inferred.
 /// </para>
 /// <para>
 /// <b>The gate asserts EXACT equality</b> - a project's declared edges must match its row
@@ -113,7 +113,7 @@ internal static class AllowedReferenceEdges
             // The five rings. Domain references nothing at all - it is the innermost ring.
             ["Yello.Domain"] = [],
             ["Yello.Application"] = ["Yello.Domain"],
-            ["Yello.Infrastructure"] = ["Yello.Application", "Yello.Domain"],
+            ["Yello.Infrastructure"] = ["Yello.Application", "Yello.Domain", "Yello.Merge"],
             ["Yello.Host"] =
             [
                 "Yello.Domain",

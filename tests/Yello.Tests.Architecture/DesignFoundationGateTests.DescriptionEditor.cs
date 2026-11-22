@@ -19,7 +19,7 @@ public sealed partial class DesignFoundationGateTests
     /// <summary>
     /// Every radius declared on the editor resolves to 3px (<c>rounded.md</c>), and one is declared.
     /// </summary>
-    [Fact(Skip = "red: AC7 - no rule styles .description-editor")]
+    [Fact]
     [Trait("Requirement", "UX-DR5")]
     [Trait("Requirement", "UX-DR10")]
     public void The_description_editor_takes_the_3px_radius() =>
@@ -31,7 +31,7 @@ public sealed partial class DesignFoundationGateTests
     /// </summary>
     /// <param name="property">The property, or its prefix for the border.</param>
     /// <param name="token">The token its value names.</param>
-    [Theory(Skip = "red: AC7 - no rule styles .description-editor")]
+    [Theory]
     [InlineData("background", "var(--surface-page)")]
     [InlineData("color", "var(--text-primary)")]
     [InlineData("border", "var(--border-hairline-width)")]

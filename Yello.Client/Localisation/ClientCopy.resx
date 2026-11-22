@@ -2155,4 +2155,12 @@
     <value>Cancel</value>
     <comment>Closes the bulk move bar before anything is sent.</comment>
   </data>
+  <data name="TaskDescriptionHeading" xml:space="preserve">
+    <value>Description</value>
+    <comment>The Task detail panel's description region heading, over the editor and over a Viewer's rendered text alike.</comment>
+  </data>
+  <data name="TaskDescriptionEmpty" xml:space="preserve">
+    <value>No description.</value>
+    <comment>What a Role that may not edit the description reads when the Task has none.</comment>
+  </data>
 </root>

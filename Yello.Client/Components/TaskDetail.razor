@@ -19,8 +19,9 @@
     in a title field holding an uncommitted change reverts the field first, and Esc in the open picker
     closes the picker. On close the Board returns focus to the card that opened it.
 
-    ATTRIBUTES, THEN DELETE: title, Status, Move, due date, Labels and the Assignee, attributes above. No description
-    region, no heading for one, no placeholder.
+    ATTRIBUTES, THEN THE DESCRIPTION, THEN DELETE: title, Status, Move, due date, Labels and the Assignee above; the
+    description below them in its own labelled region (DescriptionEditor), an editor for a Role that may edit it and the
+    rendered text, under the same heading, for one that may not.
 
     THE ASSIGNEE: an "Assignee" control naming the person - initials and label, never an address - or "Unassigned", which
     opens a single-select listbox in the panel: "Unassigned" first, then every Member of the Space by initials and label.
@@ -314,6 +315,11 @@
             </dl>
         }
 
+        @if (!_confirming)
+        {
+            <DescriptionEditor SpaceId="@SpaceId" TaskId="@Item.Id" CanEdit="@CanEditDescription" OnEscape="EscapeHandled" />
+        }
+
         @if (!_confirming && CanManage)
         {
             <div class="task-detail__field" data-role-gated>
@@ -398,6 +404,10 @@
     /// <summary>Whether the Role held may assign the Task; otherwise its Assignee renders as text.</summary>
     [Parameter]
     public bool CanAssign { get; set; }
+
+    /// <summary>Whether the Role held may edit the description; otherwise it renders as text.</summary>
+    [Parameter]
+    public bool CanEditDescription { get; set; }
 
     /// <summary>The Space's Assignee candidates, labelled over the whole list, in join order.</summary>
     [Parameter]
@@ -632,6 +642,11 @@
     }
 
     private Task CloseAsync() => OnClose.InvokeAsync();
+
+    /// <summary>
+    /// The description editor took this Esc to leave itself, so the panel stays open; the next Esc closes it.
+    /// </summary>
+    private void EscapeHandled() => _escapeHandled = true;
 
     /// <summary>
     /// Esc, after any inner control has had its say: the open picker closes first; otherwise the panel does.

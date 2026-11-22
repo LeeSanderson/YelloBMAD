@@ -29,6 +29,7 @@ internal enum Delivery
 /// </remarks>
 internal sealed class Network
 {
+    private readonly ITextMergeStrategy _strategy;
     private readonly ITextReplica[] _replicas;
     private readonly List<TextChange>[] _inboxes;
     private readonly bool[] _isolated;
@@ -36,6 +37,7 @@ internal sealed class Network
 
     public Network(ITextMergeStrategy strategy, int size)
     {
+        _strategy = strategy;
         _replicas = [.. Enumerable.Range(0, size).Select(index => strategy.CreateReplica(IdOf(index)))];
         _inboxes = [.. Enumerable.Range(0, size).Select(_ => new List<TextChange>())];
         _isolated = new bool[size];
@@ -162,6 +164,13 @@ internal sealed class Network
     public void Isolate(int replica) => _isolated[replica] = true;
 
     /// <summary>
+    /// Replaces a replica mid-session with one loaded from its own encoded state, under its own identity, as a server
+    /// rebuilding a description from its stored state does. The inbox and isolation stay as they were.
+    /// </summary>
+    public void Reload(int replica) =>
+        _replicas[replica] = Port.Admitted(_strategy.LoadReplica(_replicas[replica].Id, _replicas[replica].EncodeState().Span));
+
+    /// <summary>
     /// Ends a replica's isolation and runs the reconnection exchange with every connected replica.
     /// </summary>
     public void Reconnect(int replica)
@@ -172,7 +181,7 @@ internal sealed class Network
         {
             if (other != replica && !_isolated[other])
             {
-                Exchange(_replicas[replica], _replicas[other]);
+                ExchangeDecoded(_replicas[replica], _replicas[other]);
             }
         }
     }
@@ -184,6 +193,27 @@ internal sealed class Network
     {
         var aLacks = b.ChangesMissingFrom(a.Version);
         var bLacks = a.ChangesMissingFrom(b.Version);
+
+        foreach (var change in aLacks)
+        {
+            Admit(a, change);
+        }
+
+        foreach (var change in bLacks)
+        {
+            Admit(b, change);
+        }
+    }
+
+    /// <summary>
+    /// The reconnection exchange as it crosses a wire: each "has" travels as bytes and is decoded before it is asked about.
+    /// </summary>
+    public void ExchangeDecoded(ITextReplica a, ITextReplica b)
+    {
+        var aHas = Port.Admitted(_strategy.DecodeVersion(a.Version.Encoded.Span));
+        var bHas = Port.Admitted(_strategy.DecodeVersion(b.Version.Encoded.Span));
+        var aLacks = b.ChangesMissingFrom(aHas);
+        var bLacks = a.ChangesMissingFrom(bHas);
 
         foreach (var change in aLacks)
         {

@@ -608,4 +608,20 @@ public static class ProblemTypes
     /// Spaces already left stay left, and sending the deletion again finishes it.
     /// </summary>
     public static string AccountDeletionInterrupted => "urn:yello:problem:account-deletion-interrupted";
+
+    /// <summary>
+    /// A description change batch that is not one: a body that is not a JSON object, a <c>changes</c> member that is not an
+    /// array of base64 strings, or a missing or unreadable <c>version</c>. Answered <c>400</c>; nothing is written.
+    /// </summary>
+    /// <remarks>
+    /// <b>Never text.</b> A body carrying whole text in place of changes is refused here: the server only ever admits or
+    /// refuses changes.
+    /// </remarks>
+    public static string InvalidDescriptionChanges => "urn:yello:problem:invalid-description-changes";
+
+    /// <summary>
+    /// A description change batch over the transport cap: more changes, or a larger body, than one request may carry.
+    /// Answered <c>400</c>; nothing is written. The client sends the changes in smaller batches.
+    /// </summary>
+    public static string DescriptionBatchTooLarge => "urn:yello:problem:description-batch-too-large";
 }

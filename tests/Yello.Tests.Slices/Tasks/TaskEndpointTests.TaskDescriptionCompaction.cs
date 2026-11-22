@@ -20,8 +20,6 @@ public sealed partial class TaskEndpointTests
 {
     private const int LoweredThreshold = 5;
 
-    private const string NoCompaction = "the description change route and its compaction do not exist";
-
     private static readonly Dictionary<string, string> CompactionConfigured = new(Configured, StringComparer.Ordinal)
     {
         [TaskDescriptionWire.CompactionThresholdSetting] = LoweredThreshold.ToString(System.Globalization.CultureInfo.InvariantCulture),
@@ -33,7 +31,7 @@ public sealed partial class TaskEndpointTests
     /// row exists with no author, and the projection equals the text rebuilt from the snapshot plus the later rows.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9, M-11, Q7 - " + NoCompaction)]
+    [Fact]
     [Trait("Requirement", "AR-19")]
     [Trait("Requirement", "AD-13")]
     [Trait("Requirement", "SM-5")]
@@ -107,7 +105,7 @@ public sealed partial class TaskEndpointTests
     /// rebuild never needs a row before it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - " + NoCompaction)]
+    [Fact]
     [Trait("Requirement", "AR-19")]
     [Trait("Requirement", "AD-13")]
     [Trait("Priority", "P1")]

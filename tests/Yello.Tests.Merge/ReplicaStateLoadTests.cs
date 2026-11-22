@@ -15,9 +15,8 @@ namespace Yello.Tests.Merge;
 /// </para>
 /// <para>
 /// Layout read here: format byte, the saving identity (16 bytes), the last sequence, the clock, the withdrawn count and
-/// sequences, then the held changes; every varint here is one byte. Each case anchors the offset it edits, so a layout
-/// change fails on the anchor rather than passing on the wrong byte. A format change that keys the withdrawn set by change
-/// identity rewrites the second forgery and its anchor.
+/// identities (origin and sequence), then the held changes; every varint here is one byte. Each case anchors the offset it
+/// edits, so a layout change fails on the anchor rather than passing on the wrong byte.
 /// </para>
 /// </remarks>
 [Trait("Suite", "Merge")]
@@ -32,7 +31,7 @@ public sealed class ReplicaStateLoadTests
 
     private static readonly ReplicaId Owner = Network.IdOf(0);
 
-    [Fact(Skip = "red: AC10, Q8 - load restores a saved last sequence below a held own change instead of refusing it")]
+    [Fact]
     public void A_state_whose_last_sequence_is_below_one_of_its_own_held_changes_is_refused()
     {
         var strategy = Candidate.Strategy;
@@ -50,7 +49,7 @@ public sealed class ReplicaStateLoadTests
         Assert.Equal(ChangeAdmission.Malformed, strategy.LoadReplica(Owner, forged).Admission);
     }
 
-    [Fact(Skip = "red: AC10, Q8 - load accepts a withdrawn sequence that is also held")]
+    [Fact]
     public void A_state_that_withdrew_a_change_it_still_holds_is_refused()
     {
         var strategy = Candidate.Strategy;
@@ -62,12 +61,12 @@ public sealed class ReplicaStateLoadTests
 
         Assert.Equal(0, valid[WithdrawnCountOffset]);
 
-        byte[] forged = [.. valid[..WithdrawnCountOffset], 1, 1, .. valid[(WithdrawnCountOffset + 1)..]];
+        byte[] forged = [.. valid[..WithdrawnCountOffset], 1, .. Owner.Value.ToByteArray(), 1, .. valid[(WithdrawnCountOffset + 1)..]];
 
         Assert.Equal(ChangeAdmission.Malformed, strategy.LoadReplica(Owner, forged).Admission);
     }
 
-    [Fact(Skip = "red: AC10, Q8 - the state format is not bumped, so the format before the current one reads as malformed")]
+    [Fact]
     public void State_in_the_format_before_the_current_one_is_refused_as_unsupported()
     {
         var strategy = Candidate.Strategy;

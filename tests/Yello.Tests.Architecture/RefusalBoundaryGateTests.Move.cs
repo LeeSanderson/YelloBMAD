@@ -115,8 +115,8 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// Under one Task the Host maps its read, edit and deletion on the item, its move within its Project, its move into another
-    /// Project and its assignment, and nothing else: no route that writes a position key directly, and only one that changes
-    /// the Task's Project.
+    /// Project, its assignment, and its description's read and change batch, and nothing else: no route that writes a position
+    /// key directly, and only one that changes the Task's Project.
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-29")]
@@ -134,7 +134,9 @@ public sealed partial class RefusalBoundaryGateTests
             [
                 $"DELETE {TaskItemPattern}",
                 $"GET {TaskItemPattern}",
+                $"GET {TaskItemPattern}/description",
                 $"PATCH {TaskItemPattern}",
+                $"POST {TaskItemPattern}/description/changes",
                 $"POST {TaskMovePattern}",
                 $"POST {TaskItemPattern}/project",
                 $"PUT {TaskItemPattern}/assignee",

@@ -190,6 +190,7 @@
                         SpaceLabels="@Lists.Labels"
                         CanManageLabels="@_canManageLabels"
                         CanAssign="@_canAssign"
+                        CanEditDescription="@_canEditDescription"
                         Assignees="@Lists.Assignees"
                         OnAssignee="membershipId => EditAsync(open.Id, TaskAttribute.Assignee, membershipId)"
                         Refusal="@_panelRefusal"
@@ -225,6 +226,7 @@
     private bool _canManage;
     private bool _canManageLabels;
     private bool _canAssign;
+    private bool _canEditDescription;
     private string? _announcement;
     private int _announcements;
     private bool _saidSinceRender;
@@ -281,6 +283,7 @@
         _canManage = TaskCapabilities.PermitsManageTasks(RoleCode);
         _canManageLabels = LabelCapabilities.PermitsManageLabels(RoleCode);
         _canAssign = TaskCapabilities.PermitsAssignTask(RoleCode);
+        _canEditDescription = TaskCapabilities.PermitsEditDescription(RoleCode);
 
         if (!_canManage)
         {

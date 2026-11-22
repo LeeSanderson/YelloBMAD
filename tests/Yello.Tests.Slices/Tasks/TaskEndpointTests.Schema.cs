@@ -24,8 +24,8 @@ public sealed partial class TaskEndpointTests
 {
     /// <summary>
     /// AC8, AD-2, AR-5 - <c>Task.SpaceId</c> is non-nullable on the Task itself, the Space policy holds a
-    /// FILTER predicate and BLOCK predicates after insert and after update on <c>Task</c>, and there is no
-    /// description column (FR-31 is Epic 7, <c>epics.md:437</c>).
+    /// FILTER predicate and BLOCK predicates after insert and after update on <c>Task</c>, and the only description
+    /// column is the projection.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
@@ -55,7 +55,7 @@ public sealed partial class TaskEndpointTests
         var columns = await CatalogueAsync(database, "SELECT c.name FROM sys.columns c WHERE c.object_id = OBJECT_ID(N'dbo.[Task]')");
 
         Assert.Contains("SpaceId", columns);
-        Assert.DoesNotContain(columns, column => column.Contains("Description", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal(["Description"], columns.Where(column => column.Contains("Description", StringComparison.OrdinalIgnoreCase)));
     }
 
     /// <summary>

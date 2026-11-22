@@ -17,8 +17,8 @@ namespace Yello.Domain.Tasks;
 /// the same change with a <c>BLOCK ... AFTER UPDATE</c> predicate; and no request contract names a Space.
 /// </para>
 /// <para>
-/// <b>No description</b> (<c>epics.md:437</c>; FR-31 is Epic 7) and no navigation properties - see
-/// <c>YelloDbContext</c>'s remarks.
+/// <b>The description is a projection</b> (<see cref="Description"/>) of an append-only log of merge changes
+/// (<see cref="TaskDescriptionChange"/>). No navigation properties - see <c>YelloDbContext</c>'s remarks.
 /// </para>
 /// </remarks>
 public sealed class TaskItem
@@ -91,4 +91,15 @@ public sealed class TaskItem
     /// Membership's display name, never by an address.
     /// </remarks>
     public Guid? AssigneeMembershipId { get; set; }
+
+    /// <summary>
+    /// The description as plain text: empty for a Task never described, never <c>null</c>. The only form of the description
+    /// the REST API and the List View read.
+    /// </summary>
+    /// <remarks>
+    /// <b>Maintained by Infrastructure, never by a request</b>: the description store's projector recomputes it from the
+    /// change log in the same transaction that appends to the log, so a read after an admitted write is never stale. No
+    /// request contract carries it, and the Task answer does not either.
+    /// </remarks>
+    public string Description { get; init; } = string.Empty;
 }

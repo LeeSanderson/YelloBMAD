@@ -33,4 +33,13 @@ public static class TaskCapabilities
     /// <returns><c>true</c> for Owner, Admin and Member; <c>false</c> for Viewer and anything unknown.</returns>
     public static bool PermitsAssignTask(string roleCode) =>
         roleCode is "owner" or "admin" or "member";
+
+    /// <summary>
+    /// Whether a Role may edit a Task's description (the matrix's <c>edit-task-description-collaboratively</c>), so a Viewer
+    /// reads the text with no editor in the page. Held against the matrix by its own gate.
+    /// </summary>
+    /// <param name="roleCode">The Role's stable code, from the active Space's answer.</param>
+    /// <returns><c>true</c> for Owner, Admin and Member; <c>false</c> for Viewer and anything unknown.</returns>
+    public static bool PermitsEditDescription(string roleCode) =>
+        roleCode is "owner" or "admin" or "member";
 }

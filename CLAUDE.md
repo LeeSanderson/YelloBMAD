@@ -26,7 +26,7 @@ and owns its acceptance criteria. `tests/TESTING-CONVENTIONS.md` is the authorit
   | EF Core, ASP.NET Core Identity, Localization, Blazor WebAssembly | 10.0.11 |
   | Microsoft.Data.SqlClient | 7.0.2 |
   | Asp.Versioning.Http | 10.0.0 |
-  | Aspire.Hosting.* | 13.4.6 |
+  | Aspire.Hosting.* | 13.6.5 |
   | xunit.v3 | 4.0.0 |
   | Testcontainers.MsSql / XunitV3 | 4.6.0 |
   | TngTech.ArchUnitNET | 0.13.3 |
@@ -35,7 +35,7 @@ and owns its acceptance criteria. `tests/TESTING-CONVENTIONS.md` is the authorit
 
 - Coding standards, including TreatWarningsAsErrors and Nullable, come from that last package. Do not
   restate them in `Directory.Build.props`.
-- Local tools are listed in `.config/dotnet-tools.json`: aspire.cli 13.4.6 and dotnet-ef 10.0.11. Run
+- Local tools are listed in `.config/dotnet-tools.json`: aspire.cli 13.6.5 and dotnet-ef 10.0.11. Run
   `dotnet tool restore` first.
 - Database: SQL Server 2025 (`mcr.microsoft.com/mssql/server:2025-latest`, set once in
   `Directory.Build.props`).

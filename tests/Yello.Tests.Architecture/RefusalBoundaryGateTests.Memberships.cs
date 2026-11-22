@@ -80,8 +80,10 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// The production types that may read an Account's display name (AC7, Lee's Q5 (a)): the entity and its configuration,
-    /// the Account-scoped registration slice and store, the Invitation store (the issue captures <c>IssuerName</c>), and 4.4's
-    /// Membership store's list projection, for current Members only.
+    /// the Account-scoped registration slice and store, the Invitation store (the issue captures <c>IssuerName</c>), 4.4's
+    /// Membership store's list projection, for current Members only, and the description store (a change captures
+    /// <c>AuthorName</c>). The method-level gate in <c>RefusalBoundaryGateTests.TaskDescription.cs</c> narrows each to the
+    /// methods that read.
     /// </summary>
     private static readonly string[] DisplayNameReaders =
     [
@@ -90,6 +92,7 @@ public sealed partial class RefusalBoundaryGateTests
         "Yello.Infrastructure.Persistence.AccountRegistrationStore",
         "Yello.Infrastructure.Persistence.InvitationStore",
         "Yello.Infrastructure.Persistence.MembershipStore",
+        "Yello.Infrastructure.Persistence.TaskDescriptionStore",
     ];
 
     /// <summary>

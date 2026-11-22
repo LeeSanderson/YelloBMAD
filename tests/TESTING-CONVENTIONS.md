@@ -549,10 +549,11 @@ commit, at process start, or on the next authenticated request. There is no time
   only named stores read `Account.EmailAddress` or `NormalizedEmailAddress`
   (`Only_named_types_read_an_Accounts_email_address`). A new reader or a new carrier is a decision, not a test edit.
 - **Attribution never reads a live Account name.** Authored content shows the name captured at authoring time
-  (`Invitation.IssuerName`; story 7.2's change log follows it). Resolving a current name globally would carry a later name
+  (`Invitation.IssuerName`, `TaskDescriptionChange.AuthorName`). Resolving a current name globally would carry a later name
   change into a Space the reader no longer shares with that person (`EXPERIENCE.md:156`). Only the Membership list reads
-  `Account.DisplayName` live, for current Members (Lee's 4.4 Q5 (a)); `Attribution_never_reads_a_live_Account_name`
-  holds the named readers.
+  `Account.DisplayName` live, for current Members (Lee's 4.4 Q5 (a)). Two gates hold the readers:
+  `Attribution_never_reads_a_live_Account_name` by type, and `Attribution_reads_a_live_Account_name_only_in_named_methods`
+  by method, so a second reading method in an admitted type is caught.
 - **Seed through the product where the case is about Membership.** An Admin, Member or Viewer joins through an Invitation
   at that Role, accepted (4.3). Seed directly (`WireDatabase.AddMembershipAsync`, `SpaceSeeding`) for bulk, for a
   `MembershipChanged` count (the accept publishes its own), and for a second Membership of one address (the mail drop
@@ -942,6 +943,23 @@ needs no container and runs in seconds.
 - **Later stories add cases here and never fork the suite.** A new merge-level behaviour (the log, compaction,
   reconnection, the editor's admit or reject) gets a case body in `MergeCases`, a fact bound through `Candidate`, and a
   `Requirement` trait. A second conformance suite, or a case written against a concrete merge type, defeats AD-12.
+
+## A Task's description - added by story 7.2
+
+- **One projector.** `Task.Description` is written only by `TaskDescriptionStore`'s projector, inside the transaction that
+  appends to `TaskDescriptionChange` (`Only_the_projector_writes_a_Tasks_description`, and its raw-SQL half). A case never
+  sets the column to arrange a state: it sends a batch made by a replica of the real strategy
+  (`TaskDescriptionSliceWire.NewEditor`), so the log and the projection agree.
+- **Changes, never text.** Every batch is encoded changes and a version (`TaskDescriptionWire.Body`). Compare a projection
+  written by two editors with the text the log rebuilds to (`RebuiltText`), and assert each editor's text present, never
+  its position.
+- **The compaction threshold is a Host setting**, `TaskDescription__CompactionThreshold` (default 500). A case that crosses
+  it lowers it on the class's second pooled settings set (`CompactionConfigured`), never a third.
+- **M-11 is the compaction gate.** `Compaction_keeps_every_authored_change_row_and_its_time_and_the_projection_rebuilds_from_the_snapshot`
+  asserts that every change row's bytes, author, name and time survive each crossing, that per-author counts hold, and that
+  only the superseded snapshot is ever deleted.
+- **Races hold the Task row** in the store's shape (`HoldTaskAsync`) and wait on `LCK_M_%`; the read race appends a
+  competing change in the holding transaction, so an append that read the log before its lock is caught.
 ## CI: the PR stage - built by story 1.10
 
 `.github/workflows/ci.yml` runs on every push and pull request to `main`. Its `test` job runs these

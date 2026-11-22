@@ -185,14 +185,14 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// AC6 - Task detail in this epic has no description editor, no heading for one and no placeholder. Anchor:
-    /// the title field is present, so the panel rendered its attributes. The title field is itself a textarea, so a long
-    /// title wraps (WCAG 1.4.12), but a single-line one (<c>data-single-line</c>), which no description editor can be.
+    /// The panel's one multi-line field is the description editor, in its own region: the title field is single-line
+    /// (<c>data-single-line</c>), and nothing else is a textarea, an editable region or a multi-line textbox. Anchor: the
+    /// title field is present, so the panel rendered its attributes.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
-    [Trait("Requirement", "AD-12")]
-    public async Task The_panel_has_no_description_editor()
+    [Trait("Requirement", "UX-DR10")]
+    public async Task The_panels_one_multi_line_field_is_the_description_editor()
     {
         var api = TwoSpaces();
         var tasks = Seed(api, Northwind, Atlas, "Draft the brief");
@@ -207,9 +207,9 @@ public sealed class TaskDetailTests(ClientSurfaceFixture surface)
 
             Assert.Equal(1, await TitleField(page).CountAsync());
             Assert.Equal(1, await dialog.Locator("textarea[data-single-line]").CountAsync());
-            Assert.Equal(0, await dialog.Locator("textarea:not([data-single-line]), [contenteditable], [role='textbox'][aria-multiline='true']").CountAsync());
-            Assert.DoesNotContain("description", await dialog.InnerTextAsync(), StringComparison.OrdinalIgnoreCase);
-            Assert.DoesNotContain("description", await dialog.EvaluateAsync<string>("d => d.innerHTML"), StringComparison.OrdinalIgnoreCase);
+            await dialog.Locator("section.task-detail__description textarea.description-editor").WaitForAsync(new LocatorWaitForOptions { Timeout = 30_000 });
+            Assert.Equal(1, await dialog.Locator("textarea:not([data-single-line]), [contenteditable], [role='textbox'][aria-multiline='true']").CountAsync());
+            Assert.Equal(1, await dialog.Locator("section.task-detail__description textarea.description-editor").CountAsync());
         }
     }
 

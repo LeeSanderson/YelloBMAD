@@ -1322,6 +1322,51 @@
     color: var(--text-muted);
 }
 
+/*
+    THE DESCRIPTION: its own labelled region below the attributes, the same region and heading
+    for the editor and for a Viewer's rendered text, so the label survives the swap. The editor sits on the page ground,
+    not the card's, and grows with its text rather than clipping it; a resize handle is still offered along the block axis
+    for a browser without `field-sizing`. The Viewer's text keeps the line breaks it was written with.
+*/
+.task-detail__description {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.task-detail__description-heading {
+    margin-block: 0;
+}
+
+.description-editor {
+    display: block;
+    box-sizing: border-box;
+    inline-size: 100%;
+    min-block-size: 6rem;
+    padding: var(--space-3);
+    background-color: var(--surface-page);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    font-family: var(--type-body-family);
+    font-size: var(--type-body-size);
+    line-height: var(--type-body-line-height);
+    resize: block;
+    field-sizing: content;
+    overflow-wrap: anywhere;
+}
+
+.task-detail__description-text {
+    margin-block: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.task-detail__description-empty {
+    margin-block: 0;
+    color: var(--text-muted);
+}
+
 /* An empty live region stays in the accessibility tree, so its next text is announced, but takes no room. */
 .task-detail__refusal:empty,
 .task-detail__sentinel {

@@ -15,7 +15,7 @@ namespace Yello.Tests.Merge.Conformance;
 [Trait("Requirement", "AR-19")]
 public sealed class LoadConformanceTests
 {
-    [Fact(Skip = "red: AC10, Q8 - loading under a new identity drops the old identity's withdrawn set")]
+    [Fact]
     public void A_change_withdrawn_before_a_reload_under_a_new_identity_is_never_resurrected() =>
         MergeCases.A_change_withdrawn_before_a_reload_under_a_new_identity_is_never_resurrected(Candidate.Strategy);
 

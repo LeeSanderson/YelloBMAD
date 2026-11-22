@@ -30,13 +30,15 @@ namespace Yello.Tests.Slices.Tasks;
 /// </remarks>
 public sealed partial class TaskEndpointTests
 {
-    private const string NoWritePath = "the description change route is not mapped";
-
-    private const string NoReadPath = "the description read route is not mapped";
-
     private static readonly string[] ChangeAnswerMembers = ["missing", "refused", "version"];
 
     private static readonly string[] ReadAnswerMembers = ["state", "text", "version"];
+
+    // The product's own level writes no request-finished line, so the anchor needs the level the isolation Hosts run at.
+    private static readonly Dictionary<string, string> RequestsLogged = new(Configured, StringComparer.Ordinal)
+    {
+        ["Logging__LogLevel__Microsoft.AspNetCore.Hosting.Diagnostics"] = "Information",
+    };
 
     /// <summary>
     /// An Owner's batch of two changes answers <c>200</c> with nothing refused: two <c>Change</c> rows in order, each carrying
@@ -45,7 +47,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="surface">The surface the batch is sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1, AC2, AC3 - " + NoWritePath)]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "AR-19")]
@@ -96,7 +98,7 @@ public sealed partial class TaskEndpointTests
     /// <c>200</c> with nothing refused, and the log still holds one row per distinct change.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - " + NoWritePath)]
+    [Fact]
     [Trait("Requirement", "AR-19")]
     [Trait("Requirement", "FR-33")]
     public async Task A_resent_change_appends_no_row()
@@ -130,7 +132,7 @@ public sealed partial class TaskEndpointTests
     /// are refused and write nothing, while the two well-formed changes beside them are appended and projected.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AD-11 - " + NoWritePath)]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     [Trait("Requirement", "AR-20")]
     [Trait("Requirement", "AR-19")]
@@ -179,7 +181,7 @@ public sealed partial class TaskEndpointTests
     /// and writes nothing: no row, and the projection is still empty.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3 - " + NoWritePath)]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     [Trait("Requirement", "AR-20")]
     public async Task A_batch_whose_every_change_is_refused_answers_200_and_writes_nothing()
@@ -211,7 +213,7 @@ public sealed partial class TaskEndpointTests
     /// its own, and applying what its answer says it lacks gives it the projection. Its answer names no text member.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AD-11 - " + NoWritePath)]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     [Trait("Requirement", "FR-31")]
     [Trait("Requirement", "FR-33")]
@@ -263,7 +265,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="json">The body.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC3, AD-11 - " + NoWritePath)]
+    [Theory]
     [InlineData("not json")]
     [InlineData("[]")]
     [InlineData("{}")]
@@ -301,7 +303,7 @@ public sealed partial class TaskEndpointTests
     /// with the cap's problem type and write nothing. Anchor: a batch of exactly the cap is admitted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, Q9 - " + NoWritePath)]
+    [Fact]
     [Trait("Requirement", "AD-11")]
     [Trait("Requirement", "NFR-8")]
     [Trait("Priority", "P1")]
@@ -346,7 +348,7 @@ public sealed partial class TaskEndpointTests
     /// handler: no row, no projection. The same Viewer reads the description. Anchor: a Member's identical batch is admitted.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AC8, X-9 - " + NoWritePath)]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "FR-31")]
     [Trait("Requirement", "AD-1")]
@@ -405,7 +407,7 @@ public sealed partial class TaskEndpointTests
     /// A Task that is not in the Space is the floored not-found on both routes, byte-identical to a random id's.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AC4 - " + NoWritePath)]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-20")]
     public async Task An_unknown_Task_answers_the_not_found_on_both_routes()
@@ -435,7 +437,7 @@ public sealed partial class TaskEndpointTests
     /// exactly <c>{ state, text, version }</c>. A Task never described reads as the empty text with a state that loads empty.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4, Q3 - " + NoReadPath)]
+    [Fact]
     [Trait("Requirement", "AR-19")]
     [Trait("Requirement", "AD-13")]
     public async Task The_read_answers_the_projection_and_a_state_that_rebuilds_it()
@@ -471,7 +473,7 @@ public sealed partial class TaskEndpointTests
     /// no description bytes.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2, AC4 - " + NoWritePath)]
+    [Fact]
     [Trait("Requirement", "AD-13")]
     [Trait("Requirement", "NFR-5")]
     public async Task A_title_edit_leaves_the_projection_alone_and_the_Task_answer_carries_no_description()
@@ -504,7 +506,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="what">What is deleted.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - " + NoWritePath)]
+    [Theory]
     [InlineData("task")]
     [InlineData("project")]
     [InlineData("space")]
@@ -548,7 +550,7 @@ public sealed partial class TaskEndpointTests
     /// Moving a Task to another Project of its Space keeps its log and its projection unchanged.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC2 - " + NoWritePath)]
+    [Fact]
     [Trait("Requirement", "AR-19")]
     [Trait("Requirement", "FR-41")]
     [Trait("Priority", "P1")]
@@ -584,7 +586,7 @@ public sealed partial class TaskEndpointTests
     /// A replayed <c>Idempotency-Key</c> answers the original batch's answer and appends nothing again.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AD-18 - " + NoWritePath)]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     [Trait("Priority", "P1")]
     public async Task A_replayed_key_answers_the_original_and_appends_nothing()
@@ -618,7 +620,7 @@ public sealed partial class TaskEndpointTests
     /// stays, so the record that a Membership changed the description at a time survives.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC6, FR-3, Q4 - " + NoWritePath)]
+    [Fact]
     [Trait("Requirement", "FR-3")]
     [Trait("Requirement", "SM-5")]
     [Trait("Requirement", "UX-DR34")]
@@ -644,6 +646,11 @@ public sealed partial class TaskEndpointTests
             taskId = await TaskAsync(owner);
             AssertAnswered(await SendChangesAsync(author, owner.SpaceId, taskId, BatchOf(editor, editor.Insert(0, "outlives me"))), refused: 0);
             before = await RowsAsync(database, owner.SpaceId, taskId);
+
+            // An Account that owns a Space cannot be erased, and registration gave the author one of its own.
+            var ownSpace = await author.Session.SendWithHeadersAsync(HttpMethod.Delete, SpaceRoutes.ActiveOf(author.SpaceId), content: null, NoHeaders);
+
+            Assert.True(ownSpace.StatusCode == HttpStatusCode.NoContent, $"{ownSpace.StatusCode} {ownSpace.Body}");
             erased = await AccountDeletionWire.DeleteAsync(author.Session);
         });
 
@@ -668,7 +675,7 @@ public sealed partial class TaskEndpointTests
     /// the log holds the request-finished line of the change route.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, NFR-6 - " + NoWritePath)]
+    [Fact]
     [Trait("Requirement", "NFR-6")]
     [Trait("Requirement", "AD-11")]
     public async Task Neither_the_write_nor_the_read_logs_the_description_its_payload_or_the_title()
@@ -678,7 +685,7 @@ public sealed partial class TaskEndpointTests
         var title = $"secret title {Guid.NewGuid():N}";
         var payload = string.Empty;
 
-        var log = await HostProcess.RunAsync(fixture.ConnectionString!, Configured, async client =>
+        var log = await HostProcess.RunAsync(fixture.ConnectionString!, RequestsLogged, async client =>
         {
             var owner = await RegisterAsync(client, database);
             var editor = NewEditor();

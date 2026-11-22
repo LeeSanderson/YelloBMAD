@@ -35,7 +35,7 @@ public sealed class ProjectFileGateTests
     /// <c>.BlazorWebAssembly</c> for the client. <c>Aspire.AppHost.Sdk</c> for the AppHost.
     /// <para>
     /// Names only, with any <c>/version</c> suffix stripped before comparison. Listing
-    /// <c>Aspire.AppHost.Sdk/13.4.6</c> here would put a FOURTH copy of the Aspire version in the
+    /// <c>Aspire.AppHost.Sdk/13.6.5</c> here would put a FOURTH copy of the Aspire version in the
     /// solution, and "an ungoverned copy of a version drifting unnoticed" is a defect this suite
     /// already has an assertion for. That assertion
     /// (<c>Every_ungoverned_copy_of_the_Aspire_version_matches_the_pin</c>) owns the version; this

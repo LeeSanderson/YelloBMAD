@@ -119,9 +119,9 @@
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.2" />
   </ItemGroup>
 
-  <ItemGroup Label="AR-1: Aspire 13.4 - referenced by Yello.AppHost (story 1.1)">
-    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.4.6" />
-    <PackageVersion Include="Aspire.Hosting.SqlServer" Version="13.4.6" />
+  <ItemGroup Label="AR-1: Aspire 13.6 - referenced by Yello.AppHost (story 1.1)">
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.6.5" />
+    <PackageVersion Include="Aspire.Hosting.SqlServer" Version="13.6.5" />
   </ItemGroup>
 
   <ItemGroup Label="AR-1: xunit.v3 4.0.0 - runs on Microsoft.Testing.Platform only">

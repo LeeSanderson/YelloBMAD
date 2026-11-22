@@ -14,14 +14,12 @@ namespace Yello.Tests.Slices.Tasks;
 /// </remarks>
 public sealed partial class TaskEndpointTests
 {
-    private const string MigrationPending = "the TaskDescriptionLog migration has not landed";
-
     /// <summary>
     /// The log carries <c>SpaceId</c> non-nullable and directly, its id is supplied by the application (no default), and its
     /// order is unique per Task: one unique index over <c>(SpaceId, TaskId, Sequence)</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - " + MigrationPending)]
+    [Fact]
     [Trait("Requirement", "AR-19")]
     [Trait("Requirement", "AD-13")]
     [Trait("Requirement", "AD-2")]
@@ -65,7 +63,7 @@ public sealed partial class TaskEndpointTests
     /// reads the Task key it asserts.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC6, Q4 - " + MigrationPending)]
+    [Fact]
     [Trait("Requirement", "AR-19")]
     [Trait("Requirement", "AR-5")]
     [Trait("Requirement", "FR-3")]
@@ -75,18 +73,18 @@ public sealed partial class TaskEndpointTests
 
         Assert.Equal(
             ["Account:AuthorAccountId:SET_NULL", "Task:SpaceId,TaskId:CASCADE"],
-            await CatalogueAsync(
+            (await CatalogueAsync(
                 database,
                 """
-                SELECT CONCAT(OBJECT_NAME(fk.referenced_object_id), N':',
-                    STRING_AGG(c.name, N',') WITHIN GROUP (ORDER BY fkc.constraint_column_id), N':', fk.delete_referential_action_desc)
+                SELECT CONCAT(OBJECT_NAME(fk.referenced_object_id) COLLATE DATABASE_DEFAULT, N':',
+                    STRING_AGG(c.name COLLATE DATABASE_DEFAULT, N',') WITHIN GROUP (ORDER BY fkc.constraint_column_id), N':',
+                    fk.delete_referential_action_desc COLLATE DATABASE_DEFAULT)
                 FROM sys.foreign_keys fk
                 JOIN sys.foreign_key_columns fkc ON fkc.constraint_object_id = fk.object_id
                 JOIN sys.columns c ON c.object_id = fkc.parent_object_id AND c.column_id = fkc.parent_column_id
                 WHERE fk.parent_object_id = OBJECT_ID(N'dbo.[TaskDescriptionChange]')
                 GROUP BY fk.object_id, fk.referenced_object_id, fk.delete_referential_action_desc
-                ORDER BY 1
-                """));
+                """)).Order(StringComparer.Ordinal));
     }
 
     /// <summary>
@@ -95,7 +93,7 @@ public sealed partial class TaskEndpointTests
     /// query, carries the same three.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, A-5, Q4 - " + MigrationPending)]
+    [Fact]
     [Trait("Requirement", "AR-5")]
     [Trait("Requirement", "AR-8")]
     [Trait("Requirement", "AD-2")]
@@ -125,7 +123,7 @@ public sealed partial class TaskEndpointTests
     /// Anchor: <c>Title</c>, read by the same query, has its bounded length.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2, Q9 - " + MigrationPending)]
+    [Fact]
     [Trait("Requirement", "AR-19")]
     [Trait("Requirement", "AD-13")]
     public async Task The_projection_is_a_non_nullable_unbounded_text_column_defaulting_to_empty()

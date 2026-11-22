@@ -13,7 +13,7 @@ internal sealed class SequenceReplica(ReplicaId id) : ITextReplica
 {
     private readonly Document _document = new();
     private readonly Dictionary<ChangeId, TextChange> _held = [];
-    private readonly HashSet<long> _withdrawn = [];
+    private readonly HashSet<ChangeId> _withdrawn = [];
     private readonly List<HeldChange> _applied = [];
     private readonly Dictionary<ChangeId, HeldChange> _waiting = [];
     private readonly Dictionary<ElementId, List<HeldChange>> _waitingOn = [];
@@ -35,7 +35,7 @@ internal sealed class SequenceReplica(ReplicaId id) : ITextReplica
     /// </summary>
     internal long Clock { get; private set; }
 
-    internal IReadOnlyCollection<long> Withdrawn => _withdrawn;
+    internal IReadOnlyCollection<ChangeId> Withdrawn => _withdrawn;
 
     /// <summary>
     /// Every change held, applied ones in the order applied, then those still waiting.
@@ -100,7 +100,7 @@ internal sealed class SequenceReplica(ReplicaId id) : ITextReplica
             return held.Encoded.Span.SequenceEqual(change.Encoded.Span) ? ChangeAdmission.Admitted : ChangeAdmission.Malformed;
         }
 
-        if (body.Id.Origin == Id && _withdrawn.Contains(body.Id.Sequence))
+        if (_withdrawn.Contains(body.Id))
         {
             return ChangeAdmission.Admitted;
         }
@@ -160,7 +160,7 @@ internal sealed class SequenceReplica(ReplicaId id) : ITextReplica
         withdrawn.Body.TakeBackFrom(_document);
         _applied.RemoveAt(index);
         _held.Remove(change);
-        _withdrawn.Add(change.Sequence);
+        _withdrawn.Add(change);
         _version = null;
     }
 
@@ -168,7 +168,7 @@ internal sealed class SequenceReplica(ReplicaId id) : ITextReplica
     /// Restores what a resumed replica must not forget: the sequence numbers and clock it already used, and which of its
     /// changes it withdrew.
     /// </summary>
-    internal void Resume(long lastSequence, long clock, IEnumerable<long> withdrawn)
+    internal void Resume(long lastSequence, long clock, IEnumerable<ChangeId> withdrawn)
     {
         LastSequence = Math.Max(LastSequence, lastSequence);
         Clock = Math.Max(Clock, clock);

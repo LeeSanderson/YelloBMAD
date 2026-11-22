@@ -58,10 +58,12 @@ using Yello.Application.Tasks.AssignTask;
 using Yello.Application.Tasks.CreateTask;
 using Yello.Application.Tasks.DeleteTask;
 using Yello.Application.Tasks.EditTaskAttributes;
+using Yello.Application.Tasks.EditTaskDescription;
 using Yello.Application.Tasks.MoveTask;
 using Yello.Application.Tasks.MoveStatusTasksToProject;
 using Yello.Application.Tasks.MoveTaskToProject;
 using Yello.Application.Tasks.ViewTask;
+using Yello.Application.Tasks.ViewTaskDescription;
 using Yello.Contracts.Accounts;
 using Yello.Contracts.Localisation;
 using Yello.Host;
@@ -73,6 +75,7 @@ using Yello.Host.Sessions;
 using Yello.Host.Spaces;
 using Yello.Infrastructure;
 using Yello.Infrastructure.Email;
+using Yello.Infrastructure.Persistence;
 using Yello.Merge;
 
 // The composition root, AC4's connectivity check, the product's endpoints, and - from story 1.4 -
@@ -160,6 +163,8 @@ builder.Services.AddScoped<CreateTaskHandler>();
 builder.Services.AddScoped<ViewTaskHandler>();
 builder.Services.AddScoped<EditTaskAttributesHandler>();
 builder.Services.AddScoped<DeleteTaskHandler>();
+builder.Services.AddScoped<EditTaskDescriptionHandler>();
+builder.Services.AddScoped<ViewTaskDescriptionHandler>();
 builder.Services.AddScoped<MoveTaskHandler>();
 builder.Services.AddScoped<MoveTaskToProjectHandler>();
 builder.Services.AddScoped<MoveStatusTasksToProjectHandler>();
@@ -213,6 +218,9 @@ builder.Services.AddSingleton<ISpaceRequestEstablishment, SpaceRequestEstablishm
 // The text merge, from its factory only: the browser runs the same one, and nothing here may name what is behind it.
 // Stateless, so one instance serves every document.
 builder.Services.AddSingleton<ITextMergeStrategy>(_ => TextMerge.CreateStrategy());
+
+// How many changes follow a description's latest snapshot before a write compacts; tests lower it to cross it quickly.
+builder.Services.Configure<TaskDescriptionOptions>(builder.Configuration.GetSection(TaskDescriptionOptions.SectionName));
 
 // AUTHENTICATION. A plain cookie ticket, and no Identity builder of any kind - see
 // SessionCookiePolicy for the decision, and Yello.Infrastructure/InfrastructureServices.cs for
@@ -573,6 +581,13 @@ api.MapEditTask();
 // Task deletion (story 2.5). DELETE /api/v1/spaces/{spaceId}/tasks/{taskId} deletes the Task and its Label
 // applications, under ManageTasks, on both surfaces; no bound - it adds nothing.
 api.MapDeleteTask();
+
+// A Task's description. GET /api/v1/spaces/{spaceId}/tasks/{taskId}/description reads the projection and the state an
+// editor starts from, under the read capability every Role holds; POST .../description/changes admits a batch of merge
+// changes, never text, under EditTaskDescriptionCollaboratively, so a Viewer is refused before the handler. Both surfaces;
+// no bound.
+api.MapViewTaskDescription();
+api.MapEditTaskDescription();
 
 // Task move (story 2.6). POST /api/v1/spaces/{spaceId}/tasks/{taskId}/move places the Task in a Status after a named
 // neighbour, under ManageTasks; Session only (FR-35: a position is readable, never writable, over the API); no bound.

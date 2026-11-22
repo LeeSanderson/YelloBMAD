@@ -159,9 +159,7 @@ public sealed class YelloDbContext(
         StatusModel.Apply(modelBuilder, this);
         modelBuilder.ApplyConfiguration(new SpacePresenceConfiguration(this));
         modelBuilder.ApplyConfiguration(new ProjectConfiguration(this));
-        modelBuilder.ApplyConfiguration(new TaskConfiguration(this));
-        modelBuilder.ApplyConfiguration(new LabelConfiguration(this));
-        modelBuilder.ApplyConfiguration(new TaskLabelConfiguration(this));
+        TaskModel.Apply(modelBuilder, this);
         modelBuilder.ApplyConfiguration(new IdempotencyRecordConfiguration(this));
         modelBuilder.ApplyConfiguration(new AccountIdempotencyRecordConfiguration(this));
         modelBuilder.ApplyConfiguration(new AccessRefusalConfiguration());

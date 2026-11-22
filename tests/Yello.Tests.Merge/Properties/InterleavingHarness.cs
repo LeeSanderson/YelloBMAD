@@ -7,7 +7,8 @@ namespace Yello.Tests.Merge.Properties;
 
 /// <summary>
 /// A seeded property harness over random editing sessions: 2 to 10 replicas, random inserts, deletes and replaces,
-/// random partial deliveries in random orders, duplicates, and partitions healed by the reconnection exchange. Written by
+/// random partial deliveries in random orders, duplicates, reloads of a replica from its own encoded state, and partitions
+/// healed by the reconnection exchange over versions decoded from their bytes. Written by
 /// hand because the repository has no property-testing package, and adding one needs Lee's approval.
 /// </summary>
 /// <remarks>
@@ -168,8 +169,9 @@ internal static class InterleavingHarness
             < 55 => new ReplaceStep(replica, random.NextDouble(), random.Next(1, 4), random.Next(1, 4)),
             < 80 => new DeliverStep(replica, random.Next(1, 6), random.Next()),
             < 87 => new DuplicateStep(replica, random.NextDouble()),
-            < 93 => new IsolateStep(replica),
-            _ => new ReconnectStep(replica),
+            < 92 => new IsolateStep(replica),
+            < 97 => new ReconnectStep(replica),
+            _ => new ReloadStep(replica),
         };
     }
 }

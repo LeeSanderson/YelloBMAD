@@ -1,6 +1,8 @@
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Yello.Contracts;
+using Yello.Contracts.Tasks;
 
 namespace Yello.Tests.Shared;
 
@@ -11,9 +13,7 @@ namespace Yello.Tests.Shared;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Stand-ins.</b> The routes, the two problem types, the compaction setting and the JSON member names are the story's
-/// recommendation, written before the contract exists. When <c>TaskRoutes</c> declares the two templates and their
-/// builders and <c>ProblemTypes</c> the two problem types, swap every use for them and delete the stand-ins here.
+/// The routes and problem types are the contract's; the member names are the wire's camel case.
 /// </para>
 /// <para>
 /// This project does not reference <c>Yello.Merge</c>, so everything here speaks bytes. A suite that makes changes takes
@@ -42,22 +42,22 @@ public static class TaskDescriptionWire
     /// <summary>
     /// <c>POST</c> a batch of changes here.
     /// </summary>
-    public static string ChangesRoute => "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/description/changes";
+    public static string ChangesRoute => TaskRoutes.DescriptionChanges;
 
     /// <summary>
     /// <c>GET</c> the projection and the encoded state here.
     /// </summary>
-    public static string Route => "/api/v1/spaces/{spaceId:guid}/tasks/{taskId:guid}/description";
+    public static string Route => TaskRoutes.Description;
 
     /// <summary>
     /// The problem type for a change batch that does not parse.
     /// </summary>
-    public static string InvalidChangesType => "urn:yello:problem:invalid-description-changes";
+    public static string InvalidChangesType => ProblemTypes.InvalidDescriptionChanges;
 
     /// <summary>
     /// The problem type for a batch over the cap.
     /// </summary>
-    public static string BatchTooLargeType => "urn:yello:problem:description-batch-too-large";
+    public static string BatchTooLargeType => ProblemTypes.DescriptionBatchTooLarge;
 
     /// <summary>
     /// The Host setting, by environment-variable name, that lowers the compaction threshold for a test.
@@ -70,7 +70,7 @@ public static class TaskDescriptionWire
     /// <param name="spaceId">The Space.</param>
     /// <param name="taskId">The Task.</param>
     /// <returns>The path.</returns>
-    public static string ChangesOf(Guid spaceId, Guid taskId) => $"/api/v1/spaces/{spaceId:D}/tasks/{taskId:D}/description/changes";
+    public static string ChangesOf(Guid spaceId, Guid taskId) => TaskRoutes.DescriptionChangesOf(spaceId, taskId);
 
     /// <summary>
     /// The read path of one Task.
@@ -78,7 +78,7 @@ public static class TaskDescriptionWire
     /// <param name="spaceId">The Space.</param>
     /// <param name="taskId">The Task.</param>
     /// <returns>The path.</returns>
-    public static string Of(Guid spaceId, Guid taskId) => $"/api/v1/spaces/{spaceId:D}/tasks/{taskId:D}/description";
+    public static string Of(Guid spaceId, Guid taskId) => TaskRoutes.DescriptionOf(spaceId, taskId);
 
     /// <summary>
     /// A change batch: each encoded change and the client replica's encoded version.

@@ -65,12 +65,12 @@ public sealed class PackageVersionPinTests
 
         ["Asp.Versioning.Http"] = "10.0.0",
 
-        // AR-1 gives Aspire no patch, so 13.4.6 is the last of the pinned minor line.
-        // Yello.AppHost.csproj repeats 13.4.6 in its Sdk attribute and .config/dotnet-tools.json
+        // AR-1 gives Aspire no patch. 13.6.5 replaced 13.4.6 for GHSA-f7vh-h5g3-7jrh and GHSA-4g86-54fm-h9h8.
+        // Yello.AppHost.csproj repeats it in its Sdk attribute and .config/dotnet-tools.json
         // repeats it a third time; central package management can govern neither, so both
         // copies are asserted separately below.
-        ["Aspire.Hosting.AppHost"] = "13.4.6",
-        ["Aspire.Hosting.SqlServer"] = "13.4.6",
+        ["Aspire.Hosting.AppHost"] = "13.6.5",
+        ["Aspire.Hosting.SqlServer"] = "13.6.5",
 
         ["xunit.v3"] = "4.0.0",
         ["xunit.runner.visualstudio"] = "4.0.0",

@@ -123,8 +123,9 @@ public sealed partial class RefusalBoundaryGateTests
 
         // Widened by exactly MoveTaskRequest, whose own property set is pinned (no key, ever), by exactly
         // AssignTaskRequest, pinned by The_assignment_contracts_carry_exactly_their_named_members, and by exactly
-        // MoveTaskToProjectRequest and MoveStatusTasksToProjectRequest, pinned by the two move-to-Project request gates.
-        Assert.Equal(["AssignTaskRequest", "CreateTaskRequest", "EditTaskRequest", "MoveStatusTasksToProjectRequest", "MoveTaskRequest", "MoveTaskToProjectRequest"], requests.Select(type => type.Name).Order(StringComparer.Ordinal));
+        // MoveTaskToProjectRequest and MoveStatusTasksToProjectRequest, pinned by the two move-to-Project request gates, and by
+        // exactly TaskDescriptionChangesRequest, pinned by The_change_request_carries_changes_and_a_version_and_never_text.
+        Assert.Equal(["AssignTaskRequest", "CreateTaskRequest", "EditTaskRequest", "MoveStatusTasksToProjectRequest", "MoveTaskRequest", "MoveTaskToProjectRequest", "TaskDescriptionChangesRequest"], requests.Select(type => type.Name).Order(StringComparer.Ordinal));
 
         var creation = requests.Single(type => type.Name == "CreateTaskRequest");
 
@@ -145,9 +146,10 @@ public sealed partial class RefusalBoundaryGateTests
                 && type.Name.EndsWith("Response", StringComparison.Ordinal))
             .ToList();
 
-        // Vacuity guard: the four Board and Task answers, the column page, and the bulk move's count.
+        // Vacuity guard: the four Board and Task answers, the column page, the bulk move's count, and the description's read
+        // and change answers.
         Assert.Equal(
-            ["BoardColumnPageResponse", "BoardColumnResponse", "BoardProjectResponse", "BoardResponse", "MoveStatusTasksToProjectResponse", "TaskResponse"],
+            ["BoardColumnPageResponse", "BoardColumnResponse", "BoardProjectResponse", "BoardResponse", "MoveStatusTasksToProjectResponse", "TaskDescriptionChangesResponse", "TaskDescriptionResponse", "TaskResponse"],
             responses.Select(type => type.Name).Order(StringComparer.Ordinal));
 
         Assert.All(responses, response => Assert.DoesNotContain(
