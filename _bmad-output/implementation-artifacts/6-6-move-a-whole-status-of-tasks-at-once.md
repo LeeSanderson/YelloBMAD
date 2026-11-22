@@ -526,6 +526,57 @@ Follow `tests/TESTING-CONVENTIONS.md`: traits `:49-86`, rules and races `:87-207
 - Story files: `6-5-move-a-task-to-another-project.md` (whole), `6-2-…md`, `6-4-…md`, `2-10-…md` (List View read-only).
 - Code: everything in "What already exists".
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+**Checklist:** `_bmad-output/test-artifacts/atdd-checklist-6-6-move-a-whole-status-of-tasks-at-once.md`. Every scaffold is written against each open question's recommended answer, except Q11: by the orchestrator's standing answer, the 5,000-Task case is `Explicit` with `Tier=Nightly` instead of running in the default suite.
+
+| File | Cases | ACs | Today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.StatusBulkMove.cs` | 41 (18 methods) | AC1-AC8, AC12, AC15-AC17, AC19, Q7 trap | 40 red; 1 green (`A_Status_removal_moves_its_Tasks_within_their_own_Project_only`) |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.StatusBulkMoveRace.cs` | 12 (10 methods) | AC2-AC7 (races 1-10) | 9 red; 3 green (`A_writer_queued_behind_a_bulk_move_answers_404_and_writes_nothing`: deletion, Status edit, single move) |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.StatusBulkMoveScale.cs` | 1 (`Explicit`, `Tier=Nightly`) | AC8, Q11 | red |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.StatusBulkMove.cs` | 11 | AC1, AC6, AC9, AC13 | 8 red; 3 green (`Only_the_creation_and_the_single_move_set_a_Tasks_Project`, its oracle, and the raw SQL scan's oracle) |
+| `tests/Yello.Tests.Architecture/DesignFoundationGateTests.BulkMoveBar.cs` | 2 | AC10, AC13 | 1 red; 1 green (`No_component_but_the_bulk_move_bar_is_bordered_in_the_accent`) |
+| `tests/Yello.Tests.Architecture/RefusalCopyTests.StatusBulkMove.cs` | 10 (1 theory) | AC10, AC11 | red |
+| `tests/Yello.Tests.Isolation/IsolationCases.StatusBulkMove.cs` | 7 rows x 2 surfaces | AC15, AC16 | `PendingUntil: "6.6"`; live before review |
+| `tests/Yello.Tests.Client/StatusBulkMoveTests.cs` | 14 (10 methods) | AC9-AC11, AC15 | red |
+
+Supporting files: `tests/Yello.Tests.Shared/StatusBulkMoveWire.cs` (the route stand-ins `Route` and `PathOf`; swap them for `ProjectStatusRoutes.TasksToProject` and `TasksToProjectOf` and delete them), `tests/Yello.Tests.Slices/Tasks/StatusBulkMoveSliceWire.cs` (requests, `AssertBulkMoved`, and the held bulk move, occupied removal and creation), and `tests/Yello.Tests.Client/FakeYelloApi.StatusBulkMove.cs` (the fake route in AC6's order, hooked in `FakeYelloApi.SpaceDeletion.cs`). One spread line was added to `IsolationCases.All`.
+
+Not scaffolded, for the dev phase: `MoveStatusTasksToProjectHandlerTests` (needs the handler and port types); the AC14 fixes to `FakeYelloApi.ProjectMove.cs` and `FakeTask.ProjectId`; the bar's purge on Space switch, sign-out and Account switch; and the plant table. The 6.5 handler's recording assertions already exist in `MoveTaskToProjectHandlerTests.Both_Projects_are_locked_in_one_call_and_every_decision_is_read_after_it`, which is green.
+
+**Finding:** `.button-primary` and `.offer-indicator` already have hairline accent borders (`components.css:166`, `:324`), so "no accent border exists anywhere" is false. The accent-border gate admits those two at the hairline width only. Keep that reading and word AC13 to match in the Debug Log, or ask Lee to remove the two hairline accent edges.
+
+**Activation order** (riskiest assumption first):
+1. `Two_opposite_bulk_moves_queued_on_one_lock_both_land_and_neither_deadlocks` (the lock order).
+2. `A_Task_created_into_the_Status_before_the_move_took_its_locks_is_moved`, then `A_Task_moved_out_of_the_Status_before_the_move_took_its_locks_is_not_moved` (the selection under the locks).
+3. `At_4990_a_bulk_move_of_ten_and_a_creation_into_the_destination_admit_exactly_one`, then `The_destinations_bound_counts_every_Task_the_move_adds` (the bound for *n*).
+4. The other re-read races: the destination's deletion, the source's deletion, the source Status's removal, the destination's removal, and the Labels-edit row.
+5. Keep `A_Status_removal_moves_its_Tasks_within_their_own_Project_only` green through the `TaskStatusMigration` change.
+6. The contract and structure gates, including the SQL writer gate and the two bound gates.
+7. The core wire cases, then survivors, S-1, UJ-9, role, boundary and replay. Make the 7 isolation rows live.
+8. The browser cases, the copy gate and the bar's CSS gate. Run the scale case once with `--explicit on` and append its duration to ledger `:1078`.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
+**Existing gates the implementation will turn red** (amend each deliberately, in the same change):
+- **Bound-registry and bound-count-port gates** (`RefusalBoundaryGateTests.Projects.cs`): `Nothing_but_the_pipeline_reads_the_bound_registry` and `Only_the_pipeline_depends_on_the_bound_count_port` admit only `MoveTaskToProjectHandler`. Delete them when activating the two replacement gates in `RefusalBoundaryGateTests.StatusBulkMove.cs`. Reword the `MovesATaskToAnotherProject` summary, which says "the one slice".
+- **Task request-set gates** (widen by exactly `MoveStatusTasksToProjectRequest`):
+  - `The_Task_creation_request_carries_a_title_and_nothing_else` (`.Tasks.cs`);
+  - `The_Task_edit_request_carries_its_editable_attributes_and_nothing_else` (`.TaskEdit.cs`);
+  - `The_move_to_Project_request_names_a_Project_and_an_optional_Status_and_is_the_only_Task_request_naming_a_Project` (`.ProjectMove.cs`). Reword it; do not delete it.
+- **Route-list gate:** `The_routes_under_a_Project_are_its_deletion_its_rename_its_Task_creation_and_its_Board` (`.Delete.cs`, ARCH-503). Add `POST …/statuses/{statusId:guid}/tasks/project`.
+- **Isolation route-coverage gates:** `IsolationCaseListTests.Every_api_route_the_Host_maps_but_the_named_credential_routes_is_named_by_a_case` and `Every_Space_scoped_route_a_Token_reaches_has_a_row_with_a_Token_of_the_same_Account_bound_elsewhere`, until the rows are live. GATE-003 fails if any row is still pending at review.
+- **Refusal-boundary gates:** the new `ProjectId` setter gate (green) turns red if the bulk move adds a third setter, such as a typed `ExecuteUpdate`. Write `ProjectId` only in `TaskStatusMigration`'s raw SQL.
+- **Must stay green unchanged:**
+  - The role-matrix gate (`ActiveSpaceEndpointTests.RoleMatrix.cs` and its source gate in `.RoleDrop.cs`) needs no change, because `ManageTasks` already has a representative.
+  - The ProblemResponse parameter gates: no problem-body member is added.
+  - `ProblemTypes` uniqueness: no new type.
+  - `Every_spaceId_endpoint_declares_exactly_one_capability`.
+  - The Project Status route gates and `No_Project_request_contract_carries_anything_but_a_name`.
+  - The schema gate.
+  - `MoveTaskToProjectHandlerTests` and `TaskProjectMoveTests`.
+
 ## Dev Agent Record
 
 ### Agent Model Used

@@ -142,6 +142,12 @@ internal sealed partial class FakeYelloApi
             return projectMove;
         }
 
+        // Every Task of one Status moved into another Project (FakeYelloApi.StatusBulkMove.cs) answers only its own path.
+        if (await StatusBulkMoveAsync(request).ConfigureAwait(false) is { } statusBulkMove)
+        {
+            return statusBulkMove;
+        }
+
         if (ProjectStatus(request) is { } projectStatus)
         {
             return projectStatus;
