@@ -45,8 +45,8 @@ internal sealed class InsertBody(ChangeId id, ElementId? after, long clock, IRea
 
     internal IEnumerable<ElementId> Elements() => Enumerable.Range(0, Scalars.Count).Select(ElementAt);
 
-    internal bool Creates(ElementId element) =>
-        element.Replica == Id.Origin.Value && element.Clock >= Clock && element.Clock < Clock + Scalars.Count;
+    internal bool Overlaps(InsertBody other) =>
+        other.Id.Origin == Id.Origin && other.Clock < Clock + Scalars.Count && Clock < other.Clock + other.Scalars.Count;
 
     internal override ElementId? FirstMissing(IReadOnlyDictionary<ElementId, Element> elements) =>
         After is { } anchor && !elements.ContainsKey(anchor) ? anchor : null;

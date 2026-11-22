@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <!--
-    AD-12 merge conformance. Release-gating, so strict: no ignored exit code of any value. The cases reach
+    The merge conformance suite. Release-gating, so strict: no ignored exit code of any value. The cases reach
     the merge only through Candidate.Strategy, and the falsification double (whole-field last-writer-wins)
     must keep failing them.
   -->

@@ -3,7 +3,7 @@ using Xunit;
 namespace Yello.Tests.Merge.Conformance;
 
 /// <summary>
-/// The port's persistence shape (AD-13, AD-14): a change survives its encoding, and a replica survives its encoded state -
+/// The port's persistence shape: a change survives its encoding, and a replica survives its encoded state -
 /// same text, same "has", still converging, and never reissuing an identity when it resumes.
 /// </summary>
 [Trait("Suite", "Merge")]

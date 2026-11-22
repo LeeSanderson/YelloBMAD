@@ -3,8 +3,8 @@ using Xunit;
 namespace Yello.Tests.Merge.Conformance;
 
 /// <summary>
-/// FR-31 at the merge: edits to different parts of a description both survive, and edits to the same part converge on
-/// one text, whatever order each replica receives them in (M-1, M-2).
+/// Edits to different parts of a description both survive, and edits to the same part converge on one text, whatever
+/// order each replica receives them in.
 /// </summary>
 [Trait("Suite", "Merge")]
 [Trait("Priority", "P0")]

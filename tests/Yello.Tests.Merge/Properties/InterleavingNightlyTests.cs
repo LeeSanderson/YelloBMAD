@@ -3,7 +3,7 @@ using Xunit;
 namespace Yello.Tests.Merge.Properties;
 
 /// <summary>
-/// M-9's large budget: 5,000 sessions, on seeds the PR run never reaches. Explicit, so a plain <c>dotnet test</c> never
+/// The large interleaving budget: 5,000 sessions, on seeds the PR run never reaches. Explicit, so a plain <c>dotnet test</c> never
 /// starts it; the Nightly workflow runs it with <c>--explicit on</c>.
 /// </summary>
 [Trait("Suite", "Merge")]

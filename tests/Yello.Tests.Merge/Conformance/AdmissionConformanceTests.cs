@@ -3,7 +3,7 @@ using Xunit;
 namespace Yello.Tests.Merge.Conformance;
 
 /// <summary>
-/// AD-11 at the merge: damaged bytes are refused with a value the caller branches on (open question 8 (a)), and refusing
+/// Damaged bytes are refused with a value the caller branches on, and refusing
 /// leaves the replica untouched; a local change the server refused can be withdrawn without breaking convergence.
 /// </summary>
 [Trait("Suite", "Merge")]

@@ -3,7 +3,7 @@ using Xunit;
 namespace Yello.Tests.Merge.Conformance;
 
 /// <summary>
-/// FR-33 at the merge: a change counts once however many times it arrives - twice, after an exchange that already carried
+/// A change counts once however many times it arrives - twice, after an exchange that already carried
 /// it, or resent after a reconnect - because it keeps its identity through encoding and resending.
 /// </summary>
 [Trait("Suite", "Merge")]

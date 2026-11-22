@@ -22,6 +22,8 @@ public interface ITextReplica
     /// Inserts <paramref name="text"/> at a UTF-16 index and returns the change to send to the other replicas.
     /// </summary>
     /// <exception cref="ArgumentOutOfRangeException">The index is outside the text or splits a surrogate pair.</exception>
+    /// <exception cref="ArgumentException">The text is empty or holds an unpaired surrogate.</exception>
+    /// <exception cref="InvalidOperationException">The document can take no more characters.</exception>
     TextChange Insert(int index, string text);
 
     /// <summary>
@@ -39,6 +41,10 @@ public interface ITextReplica
     /// <summary>
     /// The changes this replica holds that a replica at <paramref name="version"/> lacks: the reconnection exchange.
     /// </summary>
+    /// <exception cref="ArgumentException">
+    /// The version cannot be read. Bytes from another replica go through <see cref="ITextMergeStrategy.DecodeVersion"/>
+    /// first, which refuses them as a value instead.
+    /// </exception>
     IReadOnlyList<TextChange> ChangesMissingFrom(ReplicaVersion version);
 
     /// <summary>
@@ -48,7 +54,11 @@ public interface ITextReplica
 
     /// <summary>
     /// Takes back a local change the server refused, as though it had never been made. Its identity is never issued
-    /// again.
+    /// again. Withdrawing a change this replica does not hold does nothing.
     /// </summary>
+    /// <exception cref="ArgumentException">The change is another replica's.</exception>
+    /// <exception cref="InvalidOperationException">
+    /// A later change builds on this one's text; withdraw the later changes first, the latest first.
+    /// </exception>
     void Withdraw(ChangeId change);
 }

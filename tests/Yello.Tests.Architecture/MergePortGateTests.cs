@@ -8,21 +8,13 @@ using ReflectedAssembly = System.Reflection.Assembly;
 namespace Yello.Tests.Architecture;
 
 /// <summary>
-/// A-8 (AD-12): one merge port, one implementation that nothing outside <c>Yello.Merge</c> can name, and one registration
-/// per composition root, always from the factory. So two stories cannot choose different merge semantics, and a second
-/// merge cannot be wired in beside the first.
+/// One merge port, one implementation that nothing outside <c>Yello.Merge</c> can name, and one registration per
+/// composition root, always from the factory. So two stories cannot choose different merge semantics, and a second merge
+/// cannot be wired in beside the first.
 /// </summary>
 /// <remarks>
-/// <para>
-/// <b>By name, not by type.</b> The port is found by its name across the eight production assemblies, so a second
-/// interface of the same name elsewhere is counted rather than invisible, and this file compiles before the port exists.
-/// </para>
-/// <para>
-/// <b>Every gate is an absence assertion and is proved against its plant</b> (a second interface named
-/// <c>ITextMergeStrategy</c> in another assembly, a second implementation, a Host type naming the implementation, a second
-/// registration), each restored from saved content in a <c>finally</c>. The plant results are in the story's Dev Agent
-/// Record.
-/// </para>
+/// The port is found by name across the production assemblies, not by type, so a second interface of the same name
+/// elsewhere is counted rather than invisible. Every gate is an absence assertion, proved against a planted violation.
 /// </remarks>
 [Trait("Suite", "Architecture")]
 [Trait("Priority", "P0")]

@@ -12,7 +12,7 @@ namespace Yello.Merge.Sequence;
 internal sealed class SequenceReplica(ReplicaId id) : ITextReplica
 {
     private readonly Document _document = new();
-    private readonly HashSet<ChangeId> _held = [];
+    private readonly Dictionary<ChangeId, TextChange> _held = [];
     private readonly HashSet<long> _withdrawn = [];
     private readonly List<HeldChange> _applied = [];
     private readonly Dictionary<ChangeId, HeldChange> _waiting = [];
@@ -23,7 +23,7 @@ internal sealed class SequenceReplica(ReplicaId id) : ITextReplica
 
     public string Text => _document.Text;
 
-    public ReplicaVersion Version => _version ??= HeldChanges.Of(_held).ToVersion();
+    public ReplicaVersion Version => _version ??= HeldChanges.Of(_held.Keys).ToVersion();
 
     /// <summary>
     /// The last sequence number this replica issued, withdrawn ones included, so a resumed replica never issues one again.
@@ -55,6 +55,12 @@ internal sealed class SequenceReplica(ReplicaId id) : ITextReplica
 
         RequireBoundary(index, nameof(index));
 
+        // A clock pushed this high by a received change would wrap to negative identities that every other replica refuses.
+        if (Clock > long.MaxValue - scalars.Count)
+        {
+            throw new InvalidOperationException("The document's character identities are exhausted.");
+        }
+
         return Commit(new InsertBody(NextChangeId(), _document.VisibleBefore(index), Clock + 1, scalars));
     }
 
@@ -83,14 +89,25 @@ internal sealed class SequenceReplica(ReplicaId id) : ITextReplica
             return admission;
         }
 
-        if (body!.Id != change.Id || CollidesWithHeldCharacters(body))
+        if (body!.Id != change.Id)
         {
             return ChangeAdmission.Malformed;
         }
 
-        if (_held.Contains(body.Id) || (body.Id.Origin == Id && _withdrawn.Contains(body.Id.Sequence)))
+        // A second, different payload under an identity already held would leave replicas keeping whichever came first.
+        if (_held.TryGetValue(body.Id, out var held))
+        {
+            return held.Encoded.Span.SequenceEqual(change.Encoded.Span) ? ChangeAdmission.Admitted : ChangeAdmission.Malformed;
+        }
+
+        if (body.Id.Origin == Id && _withdrawn.Contains(body.Id.Sequence))
         {
             return ChangeAdmission.Admitted;
+        }
+
+        if (CollidesWithHeldCharacters(body))
+        {
+            return ChangeAdmission.Malformed;
         }
 
         if (body.Id.Origin == Id)
@@ -173,7 +190,10 @@ internal sealed class SequenceReplica(ReplicaId id) : ITextReplica
         }
     }
 
-    private ChangeId NextChangeId() => new(Id, ++LastSequence);
+    private ChangeId NextChangeId() =>
+        LastSequence < long.MaxValue
+            ? new(Id, ++LastSequence)
+            : throw new InvalidOperationException("This replica's change numbers are exhausted.");
 
     private TextChange Commit(ChangeBody body)
     {
@@ -186,8 +206,15 @@ internal sealed class SequenceReplica(ReplicaId id) : ITextReplica
 
     private void Hold(HeldChange change)
     {
-        _held.Add(change.Body.Id);
+        _held.Add(change.Body.Id, change.Change);
         _version = null;
+
+        // The clock counts characters held but not yet applied too: a replica reloaded from an older state of its own
+        // must not issue an identity that one of its own waiting changes already carries.
+        foreach (var created in change.Body.Created())
+        {
+            Clock = Math.Max(Clock, created.Clock);
+        }
 
         var ready = new Queue<HeldChange>();
 
@@ -226,8 +253,6 @@ internal sealed class SequenceReplica(ReplicaId id) : ITextReplica
 
         foreach (var created in change.Body.Created())
         {
-            Clock = Math.Max(Clock, created.Clock);
-
             if (_waitingOn.Remove(created, out var waiters))
             {
                 waiters.ForEach(ready.Enqueue);
@@ -236,7 +261,9 @@ internal sealed class SequenceReplica(ReplicaId id) : ITextReplica
     }
 
     private bool CollidesWithHeldCharacters(ChangeBody body) =>
-        !_held.Contains(body.Id) && body.Created().Any(_document.Elements.ContainsKey);
+        body is InsertBody insert
+        && (insert.Elements().Any(_document.Elements.ContainsKey)
+            || _waiting.Values.Any(waiting => waiting.Body is InsertBody other && other.Overlaps(insert)));
 
     private bool HasDependents(HeldChange withdrawn)
     {

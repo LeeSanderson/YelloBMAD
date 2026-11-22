@@ -22,9 +22,8 @@ public sealed class ReleaseGatingSuiteTests
     private static readonly string[] StrictSuites = ["Yello.Tests.Isolation", "Yello.Tests.Revocation", "Yello.Tests.Merge"];
 
     /// <summary>
-    /// 1.9-ARCH-004 - the Isolation, Revocation and Merge suites carry no <c>--ignore-exit-code</c>, read from
-    /// evaluated MSBuild state rather than the project file's text. Merge is release-gating too (AR-35): a
-    /// conformance case that fails must fail the run.
+    /// The Isolation, Revocation and Merge suites carry no <c>--ignore-exit-code</c>, read from evaluated
+    /// MSBuild state rather than the project file's text, so a case that fails in any of them fails the run.
     /// </summary>
     /// <remarks>
     /// <b>Active - green today, a standing gate.</b> Story 1.9's red-phase scaffolds are the suites'

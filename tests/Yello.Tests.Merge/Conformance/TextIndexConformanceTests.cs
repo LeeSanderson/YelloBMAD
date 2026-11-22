@@ -3,7 +3,7 @@ using Xunit;
 namespace Yello.Tests.Merge.Conformance;
 
 /// <summary>
-/// The port's index unit (open question 9 (a)): UTF-16 code units, with anything outside the text or inside a surrogate
+/// The port's index unit: UTF-16 code units, with anything outside the text or inside a surrogate
 /// pair refused, and text beyond the basic plane converging with no broken pair at any replica.
 /// </summary>
 [Trait("Suite", "Merge")]

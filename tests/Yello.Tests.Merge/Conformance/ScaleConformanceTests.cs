@@ -3,9 +3,8 @@ using Xunit;
 namespace Yello.Tests.Merge.Conformance;
 
 /// <summary>
-/// NFR-4 and FR-33 at the merge's own scale: ten simultaneous editors (M-5), convergence with no extra round (M-4's unit
-/// half), and five minutes offline reconciled through the "has" exchange alone (M-6). Workload sizes are open question 7
-/// (a); see <see cref="Workload"/>.
+/// The merge at its own scale: ten simultaneous editors, convergence with no extra round, and five minutes offline
+/// reconciled through the "has" exchange alone. The sizes are in <see cref="Workload"/>.
 /// </summary>
 [Trait("Suite", "Merge")]
 [Trait("Priority", "P0")]

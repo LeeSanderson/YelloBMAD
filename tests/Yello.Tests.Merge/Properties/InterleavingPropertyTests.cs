@@ -3,7 +3,7 @@ using Xunit;
 namespace Yello.Tests.Merge.Properties;
 
 /// <summary>
-/// M-9: orderings nobody would enumerate by hand, generated from seeds. The PR run explores a fixed budget; recorded seeds
+/// Orderings nobody would enumerate by hand, generated from seeds. The PR run explores a fixed budget; recorded seeds
 /// replay one session each, and a seed that ever fails is added to <see cref="RecordedSeeds"/> for good.
 /// </summary>
 [Trait("Suite", "Merge")]
@@ -16,7 +16,7 @@ namespace Yello.Tests.Merge.Properties;
 public sealed class InterleavingPropertyTests
 {
     /// <summary>
-    /// Open question 10 (a): 200 sessions on every PR run; <see cref="InterleavingNightlyTests"/> runs 5,000.
+    /// Sessions on every PR run; <see cref="InterleavingNightlyTests"/> runs 5,000 more.
     /// </summary>
     internal const int PrBudget = 200;
 

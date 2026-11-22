@@ -54,6 +54,14 @@ internal ref struct ByteReader(ReadOnlySpan<byte> encoded)
 
             if ((next & ByteWriter.VarintContinues) == 0)
             {
+                // A padded encoding of the same number would make equal versions compare unequal as bytes.
+                if (next == 0 && shift > 0)
+                {
+                    MarkFailed();
+
+                    return 0;
+                }
+
                 return Within(value, max);
             }
         }

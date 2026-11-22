@@ -4,7 +4,7 @@ baseline_commit: ae9b494f3b03215a7709ef5684fadfc072ce56fd
 
 # Story 7.1: The merge port and its conformance suite
 
-Status: review
+Status: done
 
 Epic: 7 — Write the same Task at the same time, and lose access the moment access ends (the first of eight stories)
 Story key: `7-1-the-merge-port-and-its-conformance-suite`
@@ -208,6 +208,35 @@ So that two stories cannot choose different merge semantics and whole-field last
   - [x] Run `dotnet build Yello.slnx` and expect 0 warnings.
   - [x] Run the Merge and Architecture suites whole, since both are fast and need no container. Run the one new Client class filtered.
   - [ ] Then make **one** full run without the browser suite (`-p:YelloSkipBrowserSuite=true`), in the background, with `--max-parallel-test-modules 1` (CLAUDE.md).
+
+### Review Findings
+
+Code review 2026-11-22 (Blind Hunter, Edge Case Hunter, Acceptance Auditor; commit range `f1a8aec..771589b`).
+
+- [x] [Review][Patch] A change whose characters collide with a change still waiting was admitted; when the waiting change later applied, `Apply` threw mid-integration and left the replica half-linked (also reachable through `LoadReplica`, and by a replica reloaded from an older state of its own) [Yello.Merge/Sequence/SequenceReplica.cs:259] — fixed: the collision check covers waiting inserts, and the clock counts held-but-waiting characters
+- [x] [Review][Patch] An insert whose clock was not greater than the character it follows was admitted; the placement rule depends on that ordering, so such a change landed in different places depending on arrival order and replicas diverged for good [Yello.Merge/Sequence/ChangeCodec.cs:111] — fixed: refused as `Malformed`
+- [x] [Review][Patch] A received clock near `long.MaxValue` made later local inserts wrap to negative identities that every other replica refuses (divergence), and a sequence at the limit wrapped `++LastSequence` [Yello.Merge/Sequence/SequenceReplica.cs:58] — fixed: local inserts and new change numbers stop with `InvalidOperationException` instead of wrapping
+- [x] [Review][Patch] A second, different payload under an identity already held was accepted as a duplicate, so replicas kept whichever arrived first while their versions compared equal [Yello.Merge/Sequence/SequenceReplica.cs:91] — fixed: refused as `Malformed` unless the bytes are identical
+- [x] [Review][Patch] Varints accepted padded encodings, so a version or change was not canonical as bytes [Yello.Merge/Sequence/ByteReader.cs:55] — fixed: a padded encoding is refused
+- [x] [Review][Patch] The port did not document what callers in 7.4 and 7.6 must branch on: `Insert`'s `ArgumentException`, `ChangesMissingFrom` throwing on an unreadable version, and `Withdraw`'s refusals and no-op [Yello.Merge/ITextReplica.cs:22] — fixed: `<exception>` docs added
+- [x] [Review][Patch] Comments added by the diff carried requirement, test-design and open-question ids and stale red-phase narrative [tests/Yello.Tests.Architecture/MergePortGateTests.cs:10, tests/Yello.Tests.Client/MergeAssemblyBootTests.cs:9, tests/Yello.Tests.Merge/Conformance/*Tests.cs, tests/Yello.Tests.Merge/Falsification/LastWriterWinsFalsificationTests.cs:10, tests/Yello.Tests.Merge/Properties/*.cs, tests/Yello.Tests.Merge/Workload.cs:7, tests/Yello.Tests.Architecture/ReleaseGatingSuiteTests.cs:25, tests/Yello.Tests.Merge/Yello.Tests.Merge.csproj:4, .github/workflows/nightly.yml:6] — fixed
+- [x] [Review][Patch] The AD-12 note presented the hand-written merge as simply following Lee's direction without acknowledging his earlier "rejected: hand-rolling" (memlog `:27`) [ARCHITECTURE-SPINE.md:165] — fixed: one additive sentence names it, why `:36-37` superseded it, and what covers the risk it named
+- [x] [Review][Defer] A change that can never apply (its dependency was refused or never existed, or a delete names characters not yet typed) is held forever and counted in the version, so reconnection never repairs it [Yello.Merge/Sequence/SequenceReplica.cs:204] — deferred, medium; the server's admit/reject policy owns it (story 7.4)
+- [x] [Review][Defer] A hostile peer can push the clock to its limit, after which local inserts on every replica stop (now refused, no longer wrapping) [Yello.Merge/Sequence/ChangeCodec.cs:103] — deferred, medium; bounding clock jumps at admission is story 7.4's
+- [x] [Review][Defer] The property harness never generates `Withdraw`, `EncodeState`/`LoadReplica` or decoded versions, so those paths are covered only by the fixed cases [tests/Yello.Tests.Merge/Properties/InterleavingHarness.cs:159] — deferred, medium; epic 7 (load is 7.2's, withdraw 7.4's)
+- [x] [Review][Defer] `Withdraw` silently ignores an own change that is held but still waiting [Yello.Merge/Sequence/SequenceReplica.cs:136] — deferred, low severity
+- [x] [Review][Defer] `LoadReplica` does not check the saved counters against the held changes, and loading under a new identity drops the old withdrawn set [Yello.Merge/Sequence/ReplicaState.cs:54] — deferred, low severity
+- [x] [Review][Defer] An origin of `Guid.Empty` is accepted although the document's start sentinel uses it [Yello.Merge/Sequence/ChangeCodec.cs:49] — deferred, low severity
+- [x] [Review][Defer] Every keystroke renders and walks the whole text, and deleted characters are never collected [Yello.Merge/Sequence/Document.cs:88] — deferred, low severity
+- [x] [Review][Defer] A stray blank line opens `Replay` [Yello.Merge/Sequence/ReplicaState.cs:95] — deferred, low severity
+- [x] [Review][Defer] `default(Decoded<T>)` reads as admitted with no value [Yello.Merge/Decoded.cs:7] — deferred, low severity
+- [x] [Review][Defer] Shrinking accepts any non-passing outcome, so the "minimal trace" can show a different failure from the original [tests/Yello.Tests.Merge/Properties/InterleavingHarness.cs:134] — deferred, low severity
+- [x] [Review][Defer] Damaged state and version coverage is partial (no trailing bytes, truncated version or format 0), the no-reissue case has no withdrawn or waiting change, and the withdraw case never redelivers the withdrawn change [tests/Yello.Tests.Merge/Conformance/MergeCases.Admission.cs:34] — deferred, low severity
+- [x] [Review][Defer] The falsification test counts any xUnit assertion, including the harness's own admission asserts, as a merge-semantics failure [tests/Yello.Tests.Merge/Falsification/LastWriterWinsFalsificationTests.cs:50] — deferred, low severity
+- [x] [Review][Defer] Gate 4 sees only generic `Add*<ITextMergeStrategy>` calls, per assembly, so a non-generic registration or one moved out of `Program.cs` passes [tests/Yello.Tests.Architecture/MergePortGateTests.cs:115] — deferred, low severity
+- [x] [Review][Defer] Gate 5's ArchUnit half was never seen failing against a plant [tests/Yello.Tests.Architecture/MergePortGateTests.cs:90] — deferred, low severity
+- [x] [Review][Defer] `RoundTripConformanceTests` and `TextIndexConformanceTests` carry no `AD-11` trait, unlike the testing table [tests/Yello.Tests.Merge/Conformance/RoundTripConformanceTests.cs:9] — deferred, low severity
+- [x] [Review][Defer] The new TESTING-CONVENTIONS section has no blank line before the next heading [tests/TESTING-CONVENTIONS.md:944] — deferred, low severity
 
 ## Dev Notes
 
@@ -600,6 +629,7 @@ New:
 - `Yello.Merge/Sequence/Scalars.cs`
 - `Yello.Merge/Sequence/SequenceMergeStrategy.cs`
 - `Yello.Merge/Sequence/SequenceReplica.cs`
+- `tests/Yello.Tests.Merge/HostileChangeTests.cs` (code review)
 
 Modified:
 
@@ -636,3 +666,9 @@ Deleted:
   CRDT added behind `TextMerge.CreateStrategy()`; registered once per composition root; A-8 gates and the boot case
   activated and each gate proved against a plant; AR-40a closed in the spine; Merge nightly step added. No conformance
   case assertion was edited.
+- 2026-11-22: Code review. 8 patches applied: hostile or identity-reusing changes are now refused instead of crashing or
+  diverging replicas (character collisions with waiting changes, an insert not later than the character it follows, a
+  second payload under a held identity, padded varints); local inserts stop rather than wrap at the clock's limit; the
+  port documents its exceptions; diff-added comments brought under the comment rule; the AD-12 note acknowledges the
+  earlier preference against hand-rolling. New `HostileChangeTests` (5 cases). No conformance case assertion was edited.
+  16 deferrals in `deferred-work.md`. Full run including the browser suite: 3328 total, 0 failed, 14 skipped.

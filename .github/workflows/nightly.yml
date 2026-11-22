@@ -3,7 +3,7 @@
 #
 #   nightly        the Tier=Nightly tests: the paged Board's p95 at 5,000 Tasks (P-2), the keyboard step's cost at
 #                  5,000 loaded cards (AC14) and the real-Host traversal of 5,000 Tasks by the arrows (X-5).
-#                  Also the merge's property harness at its large budget: 5,000 seeded editing sessions (M-9).
+#                  Also the merge's property harness at its large budget: 5,000 seeded editing sessions.
 #
 # Local Testcontainers engines only - never Azure, no login, no secret, no deployment target (R13). One test module at a
 # time, so one 2 GB SQL Server is alive at once. Each step names the project that holds the tier's tests: a filtered run

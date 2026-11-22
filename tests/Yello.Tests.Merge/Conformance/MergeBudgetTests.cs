@@ -4,12 +4,12 @@ using Xunit;
 namespace Yello.Tests.Merge.Conformance;
 
 /// <summary>
-/// M-4's unit half: the merge's own share of NFR-4's two seconds, on the native runtime (open question 6 (a)). One remote
-/// change applies within a frame, because the browser applies it on its UI thread; a whole five-minute reconnection
-/// exchange applies within half of NFR-4's budget, leaving the rest to transport.
+/// The merge's own share of the two-second convergence budget, on the native runtime. One remote change applies within a
+/// frame, because the browser applies it on its UI thread; a whole five-minute reconnection exchange applies within half
+/// of the budget, leaving the rest to transport.
 /// </summary>
 /// <remarks>
-/// Native figures, not the browser's: the WebAssembly runtime is measured where the editor is (R15). Each budget is a
+/// Native figures, not the browser's: the WebAssembly runtime is measured where the editor is. Each budget is a
 /// nearest-rank p95 of at least 100 samples after a warm-up.
 /// </remarks>
 [Trait("Suite", "Merge")]

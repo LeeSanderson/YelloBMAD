@@ -6,7 +6,8 @@ namespace Yello.Tests.Client;
 
 /// <summary>
 /// The browser runs the same merge the server runs: the published client loads <c>Yello.Merge</c> at boot. Trimming drops
-/// an assembly nothing roots, so this fails until the client registers the merge port from <c>Yello.Merge</c>'s factory.
+/// an assembly nothing roots, so this fails if the client stops registering the merge port from <c>Yello.Merge</c>'s
+/// factory.
 /// </summary>
 /// <remarks>
 /// Read from the requests the browser makes, not from the publish folder, because the claim is about what a browser

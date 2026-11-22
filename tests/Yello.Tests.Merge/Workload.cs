@@ -4,7 +4,7 @@ namespace Yello.Tests.Merge;
 /// Random local edits made of fresh <see cref="Glyphs"/>, so the <see cref="Ledger"/> can account for every character.
 /// </summary>
 /// <remarks>
-/// Sizes are open question 7 (a), recorded here as the assumption they are: a working document of up to 20,000
+/// The sizes are an assumption, recorded here as one: a working document of up to 20,000
 /// characters; five minutes offline is about 1,500 local edits per editor (five a second); ten simultaneous editors each
 /// make at least 200 concurrent edits. No product limit on a description's length exists, so none is invented.
 /// </remarks>

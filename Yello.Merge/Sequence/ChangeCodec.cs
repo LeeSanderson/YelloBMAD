@@ -108,10 +108,10 @@ internal static class ChangeCodec
             return null;
         }
 
-        var body = new InsertBody(id, after, clock, scalars);
-
-        // An insert anchored on one of its own characters could never apply.
-        return after is { } own && body.Creates(own) ? null : body;
+        // Placing concurrent inserts relies on every character having a greater clock than the one it follows; an insert
+        // that breaks this would land in a different place depending on arrival order. It also rules out an insert
+        // anchored on one of its own characters, which could never apply.
+        return after is { } followed && clock <= followed.Clock ? null : new InsertBody(id, after, clock, scalars);
     }
 
     private static DeleteBody? ReadDelete(ref ByteReader reader, ChangeId id)

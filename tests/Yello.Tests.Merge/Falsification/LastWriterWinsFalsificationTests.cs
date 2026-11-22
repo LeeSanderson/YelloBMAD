@@ -7,16 +7,13 @@ using Yello.Tests.Merge.Properties;
 namespace Yello.Tests.Merge.Falsification;
 
 /// <summary>
-/// M-3: whole-field last-writer-wins fails the conformance suite. The architecture says it cannot pass; this asserts it,
+/// Whole-field last-writer-wins fails the conformance suite. The architecture says it cannot pass; this asserts it,
 /// so the suite cannot quietly become one that any merge passes, or one written to whichever candidate was chosen.
 /// </summary>
 /// <remarks>
-/// <para>
-/// <b>The same case bodies the conformance facts run</b>, against <see cref="WholeFieldLastWriterWins"/>. Each must fail
-/// with an assertion, never an exception from the double, and the double must pass a lone editor's case: otherwise "it
-/// fails" could only mean "the double is broken".
-/// </para>
-/// <para>Green with no candidate in the repository, and a standing gate after one arrives.</para>
+/// The same case bodies the conformance facts run, against <see cref="WholeFieldLastWriterWins"/>. Each must fail with an
+/// assertion, never an exception from the double, and the double must pass a lone editor's case: otherwise "it fails"
+/// could only mean "the double is broken".
 /// </remarks>
 [Trait("Suite", "Merge")]
 [Trait("Priority", "P0")]
