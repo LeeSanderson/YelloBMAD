@@ -919,6 +919,9 @@ internal static partial class IsolationCases
 
         // Every Task of one Status moved into another Project (IsolationCases.StatusBulkMove.cs).
         .. StatusBulkMoveCases(),
+
+        // A Task's description: the change log and its projection (IsolationCases.TaskDescription.cs).
+        .. TaskDescriptionCases(),
     ];
 
     /// <summary>

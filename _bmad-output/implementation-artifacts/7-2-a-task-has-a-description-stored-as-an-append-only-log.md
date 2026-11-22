@@ -364,6 +364,66 @@ Each has a recommendation, which is the default. The dev phase decides each as a
 - `_bmad-output/implementation-artifacts/7-1-the-merge-port-and-its-conformance-suite.md` (Completion Notes, Review Findings)
 - `_bmad-output/implementation-artifacts/deferred-work.md:24-26`, `:827`, `:993`, `:1010`, `:1014`, `:1137-1147`
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+Checklist: `_bmad-output/test-artifacts/atdd-checklist-7-2-a-task-has-a-description-stored-as-an-append-only-log.md`.
+
+| Scaffold | Cases | ACs | Today |
+|---|---|---|---|
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.TaskDescription.cs` | 16 methods (25 rows) | AC1-AC4, AC6, AC8 | all skipped |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.TaskDescriptionSchema.cs` | 4 | AC1, AC2 | all skipped |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.TaskDescriptionRace.cs` | 2 | AC2, AC3 | all skipped |
+| `tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.TaskDescriptionCompaction.cs` | 2 (M-11, snapshot) | AC9 | all skipped |
+| `tests/Yello.Tests.Merge/Conformance/LoadConformanceTests.cs` (+ `MergeCases.Load.cs`) | 2 | AC10 | 1 skipped, 1 **green** |
+| `tests/Yello.Tests.Merge/ReplicaStateLoadTests.cs` | 3 (candidate-specific forged state) | AC10 | all skipped |
+| `tests/Yello.Tests.Merge/Conformance/DescriptionRebuildBudgetTests.cs` | 1 (200 ms p95, `MergeTimingCollection`) | AC9 | **green** |
+| `tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.TaskDescription.cs` | 15 | AC2-AC8 | 11 skipped, 4 **green** |
+| `tests/Yello.Tests.Architecture/DesignFoundationGateTests.DescriptionEditor.cs` | 2 methods (6 rows) | AC7 | all skipped |
+| `tests/Yello.Tests.Isolation/IsolationCases.TaskDescription.cs` | 8 rows x 2 surfaces | AC11 | `PendingUntil: "7.2"` |
+| `tests/Yello.Tests.Client/DescriptionEditorTests.cs` | 9 | AC7, AC8 | all skipped |
+
+Supporting files: `tests/Yello.Tests.Shared/TaskDescriptionWire.cs` (stand-in routes, problem types, caps, the compaction
+setting `TaskDescription__CompactionThreshold`, body and answer readers; swap for `TaskRoutes`/`ProblemTypes` and delete),
+`tests/Yello.Tests.Slices/Tasks/TaskDescriptionSliceWire.cs` (editors from the real strategy, the log and projection reads,
+the held Task row, the one raw append), `tests/Yello.Tests.Client/FakeYelloApi.TaskDescription.cs` (case-facing controls only;
+not routed until the Client tests reach `Yello.Merge`), and one spread line in `IsolationCases.All`. Assumed schema: `Kind`
+stored by name, `Sequence` `bigint`, a unique `(SpaceId, TaskId, Sequence)` index; correct the wire if the migration differs.
+
+Green today, standing gates: the decoded-version conformance case, the rebuild budget,
+`No_raw_SQL_in_production_sets_a_description`, `No_Task_edit_contract_and_no_Task_answer_names_a_description`, and the two scan
+oracles (`The_description_writer_scans_report_a_planted_writer`, `The_method_level_Account_name_scan_reports_a_planted_reader`).
+
+Activation order:
+
+1. `An_append_rebuilds_the_log_only_under_the_Task_lock` (riskiest: the rebuild after the lock and the in-transaction
+   projector), then `Two_appends_queued_on_one_Task_are_both_kept`.
+2. The load check (T2) before any state is persisted: `ReplicaStateLoadTests` and
+   `A_change_withdrawn_before_a_reload_under_a_new_identity_is_never_resurrected`.
+3. The four schema cases with the migration; the A-11 gate and the ring edge.
+4. The write path; then the read, title edit, unknown Task, Viewer, deletions, move, erasure and log cases.
+5. M-11 and the snapshot case; record the rebuild figure against ledger `:1147`.
+6. The contract, route, slice, attribution and client-predicate gates; the 8 isolation rows live before review.
+7. The fake's routes, the browser cases and the CSS gates.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and the correction recorded in the Debug Log, not deleted.
+
+Existing gates the implementation is expected to turn red, to amend deliberately:
+
+- The ring rule: `AllowedReferenceEdges` gains `Yello.Infrastructure → Yello.Merge` (remarks rewritten); `RingDependencyTests`.
+- RLS and table registries: `SchemaNames.SpaceScopedTables`, `SpaceIsolationSchemaTests.TablesThatCannotMove` (3 predicates),
+  `PersistenceModelGateTests`, `SchemaVarianceTests`, and `RefusalBoundaryGateTests.SpaceScopedEntities` if the handler-reach
+  gates must see the entity.
+- Migration gates: the analyser hand-edit of `TaskDescriptionLog`, the model snapshot, expand-only `DEFAULT N''`.
+- Route-list and role-matrix gates: `The_matrix_theory_covers_exactly_the_capabilities_endpoints_declare` until a `MatrixRoute`
+  for `EditTaskDescriptionCollaboratively` is added; the pinned request and response lists (`.Tasks.cs`, `.TaskEdit.cs:52`,
+  `.Tasks.cs:150`).
+- Isolation route coverage: `Every_api_route_the_Host_maps_but_the_named_credential_routes_is_named_by_a_case` and the
+  Token-row gate until the 8 rows are live; GATE-003 at review.
+- Attribution: the type-level `Attribution_never_reads_a_live_Account_name` turns red when the store reads `DisplayName`;
+  replace it with the method-level gate.
+- The two "no description" tests: `TaskEndpointTests.EditSchema.cs` `The_due_date_is_a_nullable_datetimeoffset_and_no_column_holds_a_description`
+  and `TaskDetailTests.The_panel_has_no_description_editor`.
+
 ## Dev Agent Record
 
 ### Agent Model Used
