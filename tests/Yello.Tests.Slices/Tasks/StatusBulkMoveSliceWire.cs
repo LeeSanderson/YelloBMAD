@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Net;
 using Microsoft.Data.SqlClient;
 using Xunit;
+using Yello.Contracts.Projects;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Slices.Tasks;
@@ -43,10 +44,10 @@ namespace Yello.Tests.Slices.Tasks;
 internal static class StatusBulkMoveSliceWire
 {
     public static Task<WireResponse> BulkMoveAsync(Actor actor, Guid spaceId, Guid projectId, Guid statusId, HttpContent body, string? key = null) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, StatusBulkMoveWire.PathOf(spaceId, projectId, statusId), body, TaskWire.KeyHeader(key));
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, ProjectStatusRoutes.TasksToProjectOf(spaceId, projectId, statusId), body, TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> BulkMoveWithTokenAsync(Actor actor, string token, Guid spaceId, Guid projectId, Guid statusId, HttpContent body, string? key = null) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, StatusBulkMoveWire.PathOf(spaceId, projectId, statusId), token, body, TaskWire.KeyHeader(key));
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, ProjectStatusRoutes.TasksToProjectOf(spaceId, projectId, statusId), token, body, TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> BulkMoveOnAsync(IsolationSurface surface, Actor actor, string token, Guid projectId, Guid statusId, HttpContent body, string? key = null) =>
         surface == IsolationSurface.ApiToken

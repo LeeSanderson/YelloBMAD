@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Net;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Projects;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Isolation;
@@ -15,10 +16,6 @@ namespace Yello.Tests.Isolation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Pending until the route is mapped</b>; the develop phase makes these rows live before review and swaps
-/// <see cref="StatusBulkMoveWire"/>'s route stand-ins for the contract members.
-/// </para>
-/// <para>
 /// <b>Every Task and Project a row names is seeded in a fresh actor's Space</b>, never in A's or B's, whose Projects and
 /// Tasks <c>ISO-DIRECT-BOARD</c>, <c>ISO-DIRECT-STATUSES</c> and <c>ISO-AGGREGATE</c> assert exactly; B is read only for a
 /// Status id, so its Project bound is untouched.
@@ -26,10 +23,6 @@ namespace Yello.Tests.Isolation;
 /// </remarks>
 internal static partial class IsolationCases
 {
-    private const string StatusBulkMovePending = "The bulk move route is not mapped until the dev phase of the story that moves a whole Status of Tasks at once.";
-
-    private const string StatusBulkMoveStory = "6.6";
-
     /// <summary>
     /// The Tasks each seeded source Project held, so a row's check can say they are all still there.
     /// </summary>
@@ -38,7 +31,7 @@ internal static partial class IsolationCases
     private static IEnumerable<IsolationCase> StatusBulkMoveCases() =>
     [
         new IsolationCase(
-            "ISO-STATUS-BULK-MOVE-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, StatusBulkMoveWire.Route,
+            "ISO-STATUS-BULK-MOVE-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, ProjectStatusRoutes.TasksToProject,
             async world =>
             {
                 var foreign = await world.NewActorAsync("Bf");
@@ -47,20 +40,18 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Post,
-                    [new(StatusBulkMoveWire.PathOf(foreign.SpaceId, sourceId, statusId), StatusBulkMoveWire.PathOf(Guid.NewGuid(), sourceId, statusId))],
+                    [new(ProjectStatusRoutes.TasksToProjectOf(foreign.SpaceId, sourceId, statusId), ProjectStatusRoutes.TasksToProjectOf(Guid.NewGuid(), sourceId, statusId))],
                     foreign.SpaceId,
                     Body: () => ProjectMoveWire.Body(destinationId),
                     Other: foreign);
             },
-            Both(new BoundaryNotFound { Then = TheNamedSourceKeptItsTasksAsync }),
-            PendingUntil: StatusBulkMoveStory,
-            PendingReason: StatusBulkMovePending),
+            Both(new BoundaryNotFound { Then = TheNamedSourceKeptItsTasksAsync })),
 
         // Another Space's Project as the source under the caller's own Space path is a Project that never existed there: the
         // unrecorded in-Space not-found, byte-identical to a random Project id. The body names the caller's own other Project,
         // so a leak would move the foreign Tasks into the caller's Space.
         new IsolationCase(
-            "ISO-STATUS-BULK-MOVE-FOREIGN-PROJECT-IN-OWN-SPACE", "I-1, I-4, I-13", IsolationVector.DeepLink, HttpMethod.Post, StatusBulkMoveWire.Route,
+            "ISO-STATUS-BULK-MOVE-FOREIGN-PROJECT-IN-OWN-SPACE", "I-1, I-4, I-13", IsolationVector.DeepLink, HttpMethod.Post, ProjectStatusRoutes.TasksToProject,
             async world =>
             {
                 var own = await world.NewActorAsync("Bo");
@@ -71,19 +62,17 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     own,
                     HttpMethod.Post,
-                    [new(StatusBulkMoveWire.PathOf(own.SpaceId, foreignSource, ownStatus), StatusBulkMoveWire.PathOf(own.SpaceId, Guid.NewGuid(), ownStatus))],
+                    [new(ProjectStatusRoutes.TasksToProjectOf(own.SpaceId, foreignSource, ownStatus), ProjectStatusRoutes.TasksToProjectOf(own.SpaceId, Guid.NewGuid(), ownStatus))],
                     TargetSpaceId: null,
                     Body: () => ProjectMoveWire.Body(ownDestination),
                     Other: foreign);
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheNamedSourceKeptItsTasksAsync }),
-            PendingUntil: StatusBulkMoveStory,
-            PendingReason: StatusBulkMovePending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheNamedSourceKeptItsTasksAsync })),
 
         // A Status is path-borne here, so another Space's real Status as the source is the in-Space 404, identical to a random
         // Status id's, never the body's 400.
         new IsolationCase(
-            "ISO-STATUS-BULK-MOVE-FOREIGN-STATUS-IN-OWN-PATH", "I-1, I-4, I-13", IsolationVector.DeepLink, HttpMethod.Post, StatusBulkMoveWire.Route,
+            "ISO-STATUS-BULK-MOVE-FOREIGN-STATUS-IN-OWN-PATH", "I-1, I-4, I-13", IsolationVector.DeepLink, HttpMethod.Post, ProjectStatusRoutes.TasksToProject,
             async world =>
             {
                 var actor = await world.NewActorAsync("Bs");
@@ -93,23 +82,21 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     actor,
                     HttpMethod.Post,
-                    [new(StatusBulkMoveWire.PathOf(actor.SpaceId, sourceId, foreignStatus), StatusBulkMoveWire.PathOf(actor.SpaceId, sourceId, Guid.NewGuid()))],
+                    [new(ProjectStatusRoutes.TasksToProjectOf(actor.SpaceId, sourceId, foreignStatus), ProjectStatusRoutes.TasksToProjectOf(actor.SpaceId, sourceId, Guid.NewGuid()))],
                     TargetSpaceId: null,
                     Body: () => ProjectMoveWire.Body(destinationId));
             },
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheNamedSourceKeptItsTasksAsync }),
-            PendingUntil: StatusBulkMoveStory,
-            PendingReason: StatusBulkMovePending),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable) { Then = TheNamedSourceKeptItsTasksAsync })),
 
         // The destination is body-borne, so another Space's real Project is the move's own 400, identical to a random id's.
         new IsolationCase(
-            "ISO-STATUS-BULK-MOVE-FOREIGN-PROJECT-IN-BODY", "I-1, I-13, FR-41", IsolationVector.DirectIdentifier, HttpMethod.Post, StatusBulkMoveWire.Route,
+            "ISO-STATUS-BULK-MOVE-FOREIGN-PROJECT-IN-BODY", "I-1, I-13, FR-41", IsolationVector.DirectIdentifier, HttpMethod.Post, ProjectStatusRoutes.TasksToProject,
             async world =>
             {
                 var actor = await world.NewActorAsync("Bp");
                 var (sourceId, statusId, _) = await StatusAndAnotherProjectAsync(actor);
                 var (_, foreignProject) = await ForeignProjectAsync(world);
-                var path = StatusBulkMoveWire.PathOf(actor.SpaceId, sourceId, statusId);
+                var path = ProjectStatusRoutes.TasksToProjectOf(actor.SpaceId, sourceId, statusId);
 
                 return new CaseRequest(
                     actor,
@@ -119,18 +106,16 @@ internal static partial class IsolationCases
                     Body: () => ProjectMoveWire.Body(foreignProject),
                     AnchorBody: () => ProjectMoveWire.Body(Guid.NewGuid()));
             },
-            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidTaskProject) { Then = TheNamedSourceKeptItsTasksAsync }),
-            PendingUntil: StatusBulkMoveStory,
-            PendingReason: StatusBulkMovePending),
+            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidTaskProject) { Then = TheNamedSourceKeptItsTasksAsync })),
 
         new IsolationCase(
-            "ISO-STATUS-BULK-MOVE-FOREIGN-STATUS-IN-BODY", "I-1, I-13, FR-20", IsolationVector.DirectIdentifier, HttpMethod.Post, StatusBulkMoveWire.Route,
+            "ISO-STATUS-BULK-MOVE-FOREIGN-STATUS-IN-BODY", "I-1, I-13, FR-20", IsolationVector.DirectIdentifier, HttpMethod.Post, ProjectStatusRoutes.TasksToProject,
             async world =>
             {
                 var actor = await world.NewActorAsync("Bb");
                 var (sourceId, statusId, destinationId) = await StatusAndAnotherProjectAsync(actor);
                 var foreignStatus = (await StatusIdsAsync(world.B))[1];
-                var path = StatusBulkMoveWire.PathOf(actor.SpaceId, sourceId, statusId);
+                var path = ProjectStatusRoutes.TasksToProjectOf(actor.SpaceId, sourceId, statusId);
 
                 return new CaseRequest(
                     actor,
@@ -140,16 +125,12 @@ internal static partial class IsolationCases
                     Body: () => ProjectMoveWire.Body(destinationId, foreignStatus),
                     AnchorBody: () => ProjectMoveWire.Body(destinationId, Guid.NewGuid()));
             },
-            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidStatusDestination) { Then = TheNamedSourceKeptItsTasksAsync }),
-            PendingUntil: StatusBulkMoveStory,
-            PendingReason: StatusBulkMovePending),
+            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidStatusDestination) { Then = TheNamedSourceKeptItsTasksAsync })),
 
         new IsolationCase(
-            "ISO-RECORD-KIND-STATUS-BULK-MOVE-VIEWER", "V-1, C-6, FR-16", IsolationVector.RecordKind, HttpMethod.Post, StatusBulkMoveWire.Route,
+            "ISO-RECORD-KIND-STATUS-BULK-MOVE-VIEWER", "V-1, C-6, FR-16", IsolationVector.RecordKind, HttpMethod.Post, ProjectStatusRoutes.TasksToProject,
             ViewerMovesAStatusToAnotherProjectAsync,
-            Both(new RoleRefused("manage-tasks") { Then = TheNamedSourceKeptItsTasksAsync }),
-            PendingUntil: StatusBulkMoveStory,
-            PendingReason: StatusBulkMovePending),
+            Both(new RoleRefused("manage-tasks") { Then = TheNamedSourceKeptItsTasksAsync })),
 
         // One row per Space-scoped route a Token reaches. By Session the Account names a random destination for
         // a Status of its second Space's Project (the move's own 400, so nothing moves); by the first Space's Token it is a
@@ -157,14 +138,10 @@ internal static partial class IsolationCases
         TokenOnAProjectsStatusesElsewhere(
             "STATUS-BULK-MOVE",
             HttpMethod.Post,
-            StatusBulkMoveWire.Route,
+            ProjectStatusRoutes.TasksToProject,
             HttpStatusCode.BadRequest,
-            (second, status) => StatusBulkMoveWire.PathOf(second.SpaceId, second.ProjectId, status),
-            () => ProjectMoveWire.Body(Guid.NewGuid())) with
-        {
-            PendingUntil = StatusBulkMoveStory,
-            PendingReason = StatusBulkMovePending,
-        },
+            (second, status) => ProjectStatusRoutes.TasksToProjectOf(second.SpaceId, second.ProjectId, status),
+            () => ProjectMoveWire.Body(Guid.NewGuid())),
     ];
 
     /// <summary>
@@ -192,7 +169,7 @@ internal static partial class IsolationCases
 
         await world.Database.ChangeRoleAsync(viewer.SpaceId, viewer.AccountId, "viewer");
 
-        var path = StatusBulkMoveWire.PathOf(viewer.SpaceId, sourceId, statusId);
+        var path = ProjectStatusRoutes.TasksToProjectOf(viewer.SpaceId, sourceId, statusId);
 
         return new CaseRequest(viewer, HttpMethod.Post, [new(path, path)], viewer.SpaceId, Body: () => ProjectMoveWire.Body(destinationId));
     }

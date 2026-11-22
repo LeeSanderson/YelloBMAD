@@ -123,8 +123,8 @@ public sealed partial class RefusalBoundaryGateTests
 
         // Widened by exactly MoveTaskRequest, whose own property set is pinned (no key, ever), by exactly
         // AssignTaskRequest, pinned by The_assignment_contracts_carry_exactly_their_named_members, and by exactly
-        // MoveTaskToProjectRequest, pinned by the move-to-Project request gate.
-        Assert.Equal(["AssignTaskRequest", "CreateTaskRequest", "EditTaskRequest", "MoveTaskRequest", "MoveTaskToProjectRequest"], requests.Select(type => type.Name).Order(StringComparer.Ordinal));
+        // MoveTaskToProjectRequest and MoveStatusTasksToProjectRequest, pinned by the two move-to-Project request gates.
+        Assert.Equal(["AssignTaskRequest", "CreateTaskRequest", "EditTaskRequest", "MoveStatusTasksToProjectRequest", "MoveTaskRequest", "MoveTaskToProjectRequest"], requests.Select(type => type.Name).Order(StringComparer.Ordinal));
 
         var creation = requests.Single(type => type.Name == "CreateTaskRequest");
 
@@ -145,9 +145,9 @@ public sealed partial class RefusalBoundaryGateTests
                 && type.Name.EndsWith("Response", StringComparison.Ordinal))
             .ToList();
 
-        // Vacuity guard: the four Task 3 names, and story 2.9's column page.
+        // Vacuity guard: the four Task 3 names, story 2.9's column page, and the bulk move's count.
         Assert.Equal(
-            ["BoardColumnPageResponse", "BoardColumnResponse", "BoardProjectResponse", "BoardResponse", "TaskResponse"],
+            ["BoardColumnPageResponse", "BoardColumnResponse", "BoardProjectResponse", "BoardResponse", "MoveStatusTasksToProjectResponse", "TaskResponse"],
             responses.Select(type => type.Name).Order(StringComparer.Ordinal));
 
         Assert.All(responses, response => Assert.DoesNotContain(

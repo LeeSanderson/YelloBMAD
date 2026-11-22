@@ -51,7 +51,7 @@ public sealed partial class DesignFoundationGateTests
     /// The bar is bordered <c>var(--border-emphasis-width) solid var(--accent)</c>, sits on <c>var(--surface-card)</c>, pads by
     /// <c>var(--space-3)</c> and takes the 3px radius.
     /// </summary>
-    [Fact(Skip = "red: AC10 - the .bulk-move-bar rule is not in the sheets yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR17")]
     public void The_bulk_move_bar_takes_the_accent_emphasis_border_on_the_card_surface()
     {

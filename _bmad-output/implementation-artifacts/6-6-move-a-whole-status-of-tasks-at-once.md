@@ -1,6 +1,10 @@
+---
+baseline_commit: a8bfad137dfb36e76a61914bc1292e101c8fd2c6
+---
+
 # Story 6.6: Move a whole Status of Tasks at once
 
-Status: ready-for-dev
+Status: review
 
 Epic: 6 — Shape Statuses per Project and retire work safely (the sixth and last story)
 Story key: `6-6-move-a-whole-status-of-tasks-at-once`
@@ -232,34 +236,34 @@ so that emptying a Project safely takes one action per Status rather than one pe
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Domain and Application** (AC2-AC9, AC13)
-  - [ ] `ITaskStore`: add a set-based port, for example `MoveStatusToProjectAsync(sourceProjectId, statusId, destinationProjectId, destinationStatusId, ct)`. It returns the count written and is called with both locks held. Add `CountInStatusAsync(projectId, statusId, ct)`, or fold the count into the port and return `(n)` before the write. Whichever shape is chosen, the slice must know *n* before the bound check. Update every fake `ITaskStore`.
-  - [ ] A pure helper shared by both slices for the Status decision: supplied-and-invalid, supplied-and-applied, kept, or required. The 6.5 handler's behaviour must stay identical; its handler tests are the proof.
-  - [ ] `Yello.Application/Tasks/MoveStatusTasksToProject/MoveStatusTasksToProjectHandler.cs`, in AC6's order. Its remarks cover: why the locks are sorted and taken only through the port; why the slice counts the bound (the 6.5 reason, now for *n*); why the selection is decided under the locks and never sent by the caller; and the one-Status-at-a-time rationale (AC9).
-  - [ ] Handler tests (`tests/Yello.Tests.Slices/Tasks/MoveStatusTasksToProject/MoveStatusTasksToProjectHandlerTests.cs`): one per outcome, the decision order, and the recording-fake call order (AC13). Add the same recording assertions to `MoveTaskToProjectHandlerTests`.
-- [ ] **Task 2 — Infrastructure** (AC6, AC8)
-  - [ ] Generalise `TaskStatusMigration.MigrateAsync` with a destination Project. The occupants are read in source key order. The destination's last key is read for `(destinationProject, destinationStatus)`. The `UPDATE` writes `ProjectId` only when it differs, or always writes it (same value for the removals); either is fine. The `WHERE` keeps `ProjectId = source AND StatusId = from`. Return the rows affected.
-  - [ ] `TaskStore`: the new port re-enters both locks (sorted), as `MoveToProjectAsync` does, then calls the migration. Update the class remarks: a bulk move between Projects is the sixth key placer and the second writer of `ProjectId`.
-  - [ ] Update the remarks of `TaskStatusMigration` (it now serves the bulk move too, and the no-row-lock reasoning still holds) and the remarks of `ApplicationLocks` (the bulk move takes the same two locks through the sorted helper).
-  - [ ] No `Where SpaceId` and no `IgnoreQueryFilters`. Raw SQL is parameterised.
-- [ ] **Task 3 — Contracts and Host** (AC1, AC3-AC5, AC7, AC13, AC15)
-  - [ ] `ProjectStatusRoutes.TasksToProject` (`…/statuses/{statusId:guid}/tasks/project`) and `TasksToProjectOf(spaceId, projectId, statusId)`. The remarks list every answer.
-  - [ ] `Yello.Contracts/Tasks/MoveStatusTasksToProjectRequest.cs` and `MoveStatusTasksToProjectResponse.cs`.
-  - [ ] `Yello.Host/Endpoints/StatusTasksProjectMoveEndpoints.cs`. Read the body with 6.5's reader, or a sibling that also forbids `taskIds`. Use `RequiresCapability(ManageTasks)`, serve both surfaces, and declare **no** `ConsultsBound`. Log `bound-reached` as the 6.5 endpoint does. Map only `NotFound` to the boundary `404`, and let an unknown outcome throw rather than answer `404` (this learns from the 6.5 review, ledger `:1113`). Register it in `Program.cs`.
-  - [ ] Amend the gates in AC13 and add the new ones. Amend the AD-25 and AD-17 notes in the spine (additive, dated).
-- [ ] **Task 4 — Client** (AC10, AC11, AC15)
-  - [ ] New `BulkMoveBar.razor` (plus `.razor.cs` if it grows). It takes `SpaceId`, `ProjectId`, `StatusId`, `StatusName`, `Count`, `OnMoved(answer, projectName, statusName)`, `OnCancelled` and `OnRefusedGone`. It hosts `ProjectMovePicker`, owns the write (`Writes.SendAsync` with an idempotency key kept per choice), the scope and in-flight line, Cancel and Esc. Purge its state on Space, sign-out and Account change.
-  - [ ] `ProjectMovePicker`: add an optional in-flight text parameter, or let the host draw the in-flight line, without changing the single form's behaviour (its browser cases stay green unamended).
-  - [ ] `BoardColumn.razor`: a head control "Move to Project" (`aria-label` "Move {n} Tasks in “{Status}” to another Project"), present when the Role can manage Tasks and `Total > 0`, and absent otherwise. Add a `Blocked` parameter for `aria-busy` and the handlers.
-  - [ ] `BoardView.BulkMove.cs`: open and close the bar, block the source column, re-read it after `200`, announce, and focus the originating column on commit and on cancel. Add no dependency to `BoardView`.
-  - [ ] `TaskListView`: the control appears when the Role can manage Tasks, exactly one Status is chosen, no other filter is set, and `_total > 0`. Host the bar above the rows, re-read after `200`, and focus as in AC10. Update the view's header remark: it was "nothing in it writes", and it now has the bulk move only. The List View needs the Role, so read it as the Board does, without breaking `ViewToggle`'s parameterless design.
-  - [ ] `components.css`: `.bulk-move-bar` per the `DESIGN.md:263-269` tokens. The blocked-column style must not hide content.
-  - [ ] `ClientCopy.resx` (sentence case, singular and plural) and `RefusalCopy.cs`.
-  - [ ] `FakeYelloApi.StatusBulkMove.cs`. Fix `FakeYelloApi.ProjectMove.cs` (body first) and `FakeTask.ProjectId` (AC14).
-- [ ] **Task 5 — Ledger and docs**
-  - [ ] Write the disposition of every owned ledger entry (table above). Leave none blank, and leave no "Epic 6" or "story 6.6" owner.
-  - [ ] Additive dated notes: AD-17 (the bulk move: the same two sorted locks, one set-based statement, the selection decided under the locks) and AD-25 (two cross-Project slices count `TasksPerProject`, for *n* Tasks, after their locks).
-- [ ] **Task 6 — Tests** (see Testing requirements)
+- [x] **Task 1 — Domain and Application** (AC2-AC9, AC13)
+  - [x] `ITaskStore`: add a set-based port, for example `MoveStatusToProjectAsync(sourceProjectId, statusId, destinationProjectId, destinationStatusId, ct)`. It returns the count written and is called with both locks held. Add `CountInStatusAsync(projectId, statusId, ct)`, or fold the count into the port and return `(n)` before the write. Whichever shape is chosen, the slice must know *n* before the bound check. Update every fake `ITaskStore`.
+  - [x] A pure helper shared by both slices for the Status decision: supplied-and-invalid, supplied-and-applied, kept, or required. The 6.5 handler's behaviour must stay identical; its handler tests are the proof.
+  - [x] `Yello.Application/Tasks/MoveStatusTasksToProject/MoveStatusTasksToProjectHandler.cs`, in AC6's order. Its remarks cover: why the locks are sorted and taken only through the port; why the slice counts the bound (the 6.5 reason, now for *n*); why the selection is decided under the locks and never sent by the caller; and the one-Status-at-a-time rationale (AC9).
+  - [x] Handler tests (`tests/Yello.Tests.Slices/Tasks/MoveStatusTasksToProject/MoveStatusTasksToProjectHandlerTests.cs`): one per outcome, the decision order, and the recording-fake call order (AC13). Add the same recording assertions to `MoveTaskToProjectHandlerTests`.
+- [x] **Task 2 — Infrastructure** (AC6, AC8)
+  - [x] Generalise `TaskStatusMigration.MigrateAsync` with a destination Project. The occupants are read in source key order. The destination's last key is read for `(destinationProject, destinationStatus)`. The `UPDATE` writes `ProjectId` only when it differs, or always writes it (same value for the removals); either is fine. The `WHERE` keeps `ProjectId = source AND StatusId = from`. Return the rows affected.
+  - [x] `TaskStore`: the new port re-enters both locks (sorted), as `MoveToProjectAsync` does, then calls the migration. Update the class remarks: a bulk move between Projects is the sixth key placer and the second writer of `ProjectId`.
+  - [x] Update the remarks of `TaskStatusMigration` (it now serves the bulk move too, and the no-row-lock reasoning still holds) and the remarks of `ApplicationLocks` (the bulk move takes the same two locks through the sorted helper).
+  - [x] No `Where SpaceId` and no `IgnoreQueryFilters`. Raw SQL is parameterised.
+- [x] **Task 3 — Contracts and Host** (AC1, AC3-AC5, AC7, AC13, AC15)
+  - [x] `ProjectStatusRoutes.TasksToProject` (`…/statuses/{statusId:guid}/tasks/project`) and `TasksToProjectOf(spaceId, projectId, statusId)`. The remarks list every answer.
+  - [x] `Yello.Contracts/Tasks/MoveStatusTasksToProjectRequest.cs` and `MoveStatusTasksToProjectResponse.cs`.
+  - [x] `Yello.Host/Endpoints/StatusTasksProjectMoveEndpoints.cs`. Read the body with 6.5's reader, or a sibling that also forbids `taskIds`. Use `RequiresCapability(ManageTasks)`, serve both surfaces, and declare **no** `ConsultsBound`. Log `bound-reached` as the 6.5 endpoint does. Map only `NotFound` to the boundary `404`, and let an unknown outcome throw rather than answer `404` (this learns from the 6.5 review, ledger `:1113`). Register it in `Program.cs`.
+  - [x] Amend the gates in AC13 and add the new ones. Amend the AD-25 and AD-17 notes in the spine (additive, dated).
+- [x] **Task 4 — Client** (AC10, AC11, AC15)
+  - [x] New `BulkMoveBar.razor` (plus `.razor.cs` if it grows). It takes `SpaceId`, `ProjectId`, `StatusId`, `StatusName`, `Count`, `OnMoved(answer, projectName, statusName)`, `OnCancelled` and `OnRefusedGone`. It hosts `ProjectMovePicker`, owns the write (`Writes.SendAsync` with an idempotency key kept per choice), the scope and in-flight line, Cancel and Esc. Purge its state on Space, sign-out and Account change.
+  - [x] `ProjectMovePicker`: add an optional in-flight text parameter, or let the host draw the in-flight line, without changing the single form's behaviour (its browser cases stay green unamended).
+  - [x] `BoardColumn.razor`: a head control "Move to Project" (`aria-label` "Move {n} Tasks in “{Status}” to another Project"), present when the Role can manage Tasks and `Total > 0`, and absent otherwise. Add a `Blocked` parameter for `aria-busy` and the handlers.
+  - [x] `BoardView.BulkMove.cs`: open and close the bar, block the source column, re-read it after `200`, announce, and focus the originating column on commit and on cancel. Add no dependency to `BoardView`.
+  - [x] `TaskListView`: the control appears when the Role can manage Tasks, exactly one Status is chosen, no other filter is set, and `_total > 0`. Host the bar above the rows, re-read after `200`, and focus as in AC10. Update the view's header remark: it was "nothing in it writes", and it now has the bulk move only. The List View needs the Role, so read it as the Board does, without breaking `ViewToggle`'s parameterless design.
+  - [x] `components.css`: `.bulk-move-bar` per the `DESIGN.md:263-269` tokens. The blocked-column style must not hide content.
+  - [x] `ClientCopy.resx` (sentence case, singular and plural) and `RefusalCopy.cs`.
+  - [x] `FakeYelloApi.StatusBulkMove.cs`. Fix `FakeYelloApi.ProjectMove.cs` (body first) and `FakeTask.ProjectId` (AC14).
+- [x] **Task 5 — Ledger and docs**
+  - [x] Write the disposition of every owned ledger entry (table above). Leave none blank, and leave no "Epic 6" or "story 6.6" owner.
+  - [x] Additive dated notes: AD-17 (the bulk move: the same two sorted locks, one set-based statement, the selection decided under the locks) and AD-25 (two cross-Project slices count `TasksPerProject`, for *n* Tasks, after their locks).
+- [x] **Task 6 — Tests** (see Testing requirements)
 
 ## Dev Notes
 
@@ -581,14 +585,70 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (bmad-dev-story, unattended story cycle).
+
 ### Debug Log References
+
+Logs in `artifacts/test-runs/`: `6-6-develop-slices-bulk.log`, `6-6-develop-removals.log`, `6-6-develop-client-bulk.log`, `6-6-plant-*.log`, and the full run `6-6-move-a-whole-status-of-tasks-at-once-develop.log`.
+
+- **Red-green.** Every scaffold was red for the stated reason (the route unmapped, the types and copy absent). The riskiest ones were activated first (race 1, the selection races, the bound). The plants below make the meaningful red for each decision; each was caught, then restored from saved content in a `finally`.
+- **Scaffold corrected: case 1** (`A_Status_the_destination_holds_is_kept_and_its_Tasks_land_last_in_source_order`). The destination held as many Tasks as the source, so keys chained from the source column's last key equalled the destination's and passed by luck (plant 7, first try: not caught). The destination now holds four Tasks against the source's three, and `lastBefore` reads `InDestination[^1]`. Plant 7 is then caught.
+- **Gate not listed as expected-red:** `No_Task_or_Board_response_carries_a_SpaceId_and_a_column_carries_its_own_total` (`.Tasks.cs`) enumerates the Task responses; widened by exactly `MoveStatusTasksToProjectResponse`, which carries no Space.
+- **Expected-red gates amended:** the two old bound gates deleted (replaced by the two in `.StatusBulkMove.cs`), the `MovesATaskToAnotherProject` summary reworded; the request sets in `.Tasks.cs`, `.TaskEdit.cs` and `.ProjectMove.cs` widened by exactly `MoveStatusTasksToProjectRequest` (the `.ProjectMove.cs` gate renamed to `..._is_one_of_the_two_Task_requests_naming_a_Project`); ARCH-503's route list widened by the bulk route.
+- **Stand-ins swapped:** `StatusBulkMoveWire.Route`/`PathOf` replaced by `ProjectStatusRoutes.TasksToProject`/`TasksToProjectOf` everywhere and deleted.
+- **S1200 on `TaskStore`:** the new port pushed it to 31 dependencies. The SQL Server Guid comparer moved to `ServerGuidOrder` (no behaviour change).
+- **Browser:** the first run had 3 refusal cases red because the bar never re-rendered after a refusal (the picker re-renders itself only); the bar now renders itself when the commit settles. Then 15/15 bulk and 12/12 single-move (`TaskProjectMoveTests`) green.
+- **Plants (14 rows, 17 runs), all restored, residue scan clean:**
+  1. Write without the Status decision → caught by case 2 (4/4 rows).
+  2. Locks as two single calls, source first → caught by race 1 (a deadlock victim's `500`).
+  3. Selection counted before the locks → caught by race 2 (the rows-written guard fails the request).
+  4. `count >= limit` → caught by case 11's 4,999 row. The 4,998 row and race 9 cannot tell it apart (race 9 passes when the move is admitted first); the handler test pins `count + n > limit`.
+  5. Destination not re-read under its lock → caught by race 5.
+  6. Source Status not re-checked under the lock → caught by race 7.
+  7. Keys chained from the source column → not caught by the scaffold as written; caught after the case-1 correction above.
+  8. `UPDATE` without `ProjectId = source` → masked (0/1): the occupants are read under the lock with the source predicate, and the `OPENJSON` join limits the statement to them. 8b (predicate dropped from the read only) also masked: the `UPDATE` keeps it. 8c (both dropped) caught by case 18 and race 3. The two predicates back each other; both kept.
+  9. A third `ProjectId` writer (`ExecuteUpdate` in `TaskStore`) → caught by the setter gate.
+  10. An unadmitted type reading `BoundRegistry` → caught by the registry gate.
+  11. Picker marks its first Project → caught by the no-default browser case (first try marked nothing, because `PickerOption` needs `Current` as well as `MarksCurrent`; corrected plant caught).
+  12. Bar inside the column, column `inert` → caught by two browser cases.
+  13. Column control for a Viewer → caught by the absence case.
+  14. A second accent-bordered selector → caught by the accent gate.
+- **Isolation:** the 7 rows were made live. The filtered isolation run (`IsolationCaseTests` + `IsolationCaseListTests`) was stopped by the harness for low memory before it reported and was not restarted on my own; the rows run in the one full run.
+- **Full run 1** (`…-develop-run1.log`): 2,617 total, 1 failed, 10 skipped. `What_each_Task_carries_survives_the_bulk_move_and_no_email_is_sent` was refused by `HostPool` ("already holds 2 Hosts"): the scaffold ran a case with settings of its own (a `MailDrop`) on the class's pool. Scaffold corrected to `HostProcess.RunAsync`, as the pool's own message asks; the single move's `What_a_Task_carries_survives_the_move_and_no_email_is_sent` had the same shape and passed only because it ran before the pool filled, so it was corrected the same way. Both green filtered, then full run 2 (`…-develop.log`): 2,617 total, 2,607 passed, 0 failed, 10 skipped (the Explicit and by-design skips and the three migration-bundle skips). Two full runs in all. The browser suite beyond `StatusBulkMoveTests` and `TaskProjectMoveTests` was not run here: the `FakeTask.ProjectId` stamp changes every fake Task answer, so Review's full run with the browser suite is its first full check.
+- **Not run:** the Explicit Nightly 5,000-Task scale case, per the orchestrator's memory rule; ledger `:1078` says so.
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
+- Implemented FR-41's bulk form: `POST …/projects/{projectId}/statuses/{statusId}/tasks/project` with `{ projectId, statusId? }`, answering `{ projectId, statusId, movedCount }`, on both surfaces under `ManageTasks`, idempotent through the pipeline. Slice `MoveStatusTasksToProjectHandler` follows AC6's order; the set-based write is `TaskStatusMigration`, generalised with a destination Project (the removals pass their own Project). A write that does not cover exactly the Tasks counted throws, so the unit of work rolls back.
+- `CrossProjectStatus.Decide` is the one mapping helper; the 6.5 handler now calls it, and its handler tests are unchanged and green.
+- Client: `BulkMoveBar` owns its write and hosts `ProjectMovePicker` (new optional `InFlightText`); `BoardView.BulkMove.cs` and `TaskListView.BulkMove.cs` host it. `BoardView` gained no injected dependency and stays within S1200.
+- Fake API: the single move's fake reads its body first; `FakeTask.ProjectId` is stamped on every Task answer from the Board holding it; the bulk fake route was already scaffolded.
+- **Decisions (reversible; each a line Lee can cut):**
+  - Q1-Q15 all taken as the recommended option (a), except Q11, which the orchestrator set to (b) (Explicit Nightly).
+  - Q2 (a): the selection is every Task in the Status when the locks are granted; a write that differs from the count fails rather than answering a wrong count.
+  - Q3 (a): focus goes to the originating column on commit and on cancel; the announcement names the destination.
+  - Q6 (a): the slice counts `count + n > limit`; no shared helper type.
+  - Q8 (a): one "Move to Project" control per non-empty column head; while a bar is open no column offers it.
+  - Q9 (a): the List View control needs exactly one Status and no other filter; a filter change closes an open bar unless its move is out.
+  - AC11 `403`: the bar states the refusal text, as the Board's panel does for the single move.
+  - AC11 refusals: a refusal whose copy does not already say so is followed by "Nothing was moved."; "Not sent." never is.
+  - Bound refusal copy has a singular form ("… cannot take 1 more Task …") beside the plural the gate pins.
+  - **AC13 reworded:** "no accent border exists anywhere" was false (`.button-primary` and `.offer-indicator` carry hairline accent edges). The invariant kept is that `.bulk-move-bar` is the only selector with a thicker-than-hairline accent border, as the accent gate encodes; the two hairline edges are unchanged.
+  - The bulk endpoint maps only `NotFound` to the boundary `404` and throws on an outcome it does not name; the 6.5 endpoint (ledger `:1113`, owner sweep) is unchanged.
 
 ### File List
+
+Production (new): `Yello.Application/Tasks/CrossProjectStatus.cs`, `Yello.Application/Tasks/MoveStatusTasksToProject/MoveStatusTasksToProjectHandler.cs`, `Yello.Contracts/Tasks/MoveStatusTasksToProjectRequest.cs`, `Yello.Contracts/Tasks/MoveStatusTasksToProjectResponse.cs`, `Yello.Host/Endpoints/StatusTasksProjectMoveEndpoints.cs`, `Yello.Infrastructure/Persistence/ServerGuidOrder.cs`, `Yello.Client/Components/BulkMoveBar.razor`, `Yello.Client/Components/BulkMoveBar.razor.cs`, `Yello.Client/Components/BoardView.BulkMove.cs`, `Yello.Client/Components/TaskListView.BulkMove.cs`.
+
+Production (modified): `Yello.Application/Tasks/MoveTaskToProject/MoveTaskToProjectHandler.cs`, `Yello.Domain/Tasks/ITaskStore.cs`, `Yello.Infrastructure/Persistence/TaskStatusMigration.cs`, `Yello.Infrastructure/Persistence/TaskStore.cs`, `Yello.Infrastructure/Persistence/ApplicationLocks.cs`, `Yello.Infrastructure/Persistence/ProjectStatusStore.cs`, `Yello.Infrastructure/Persistence/SpaceDefaultStatusRemovalStore.cs`, `Yello.Contracts/Projects/ProjectStatusRoutes.cs`, `Yello.Host/Endpoints/TaskProjectMoveBody.cs`, `Yello.Host/Program.cs`, `Yello.Client/Components/BoardColumn.razor`, `Yello.Client/Components/BoardView.razor`, `Yello.Client/Components/BoardView.razor.cs`, `Yello.Client/Components/BoardView.Drag.cs`, `Yello.Client/Components/BoardView.Keys.cs`, `Yello.Client/Components/ProjectMovePicker.razor`, `Yello.Client/Components/TaskListFilters.cs`, `Yello.Client/Components/TaskListView.razor`, `Yello.Client/Components/TaskListView.razor.cs`, `Yello.Client/Localisation/ClientCopy.resx`, `Yello.Client/wwwroot/css/components.css`.
+
+Tests (new): `tests/Yello.Tests.Slices/Tasks/MoveStatusTasksToProject/MoveStatusTasksToProjectHandlerTests.cs`.
+
+Tests (modified): `tests/Yello.Tests.Architecture/DesignFoundationGateTests.BulkMoveBar.cs`, `RefusalBoundaryGateTests.Delete.cs`, `.ProjectMove.cs`, `.Projects.cs`, `.StatusBulkMove.cs`, `.TaskEdit.cs`, `.Tasks.cs`, `RefusalCopyTests.StatusBulkMove.cs`; `tests/Yello.Tests.Client/FakeYelloApi.cs`, `FakeYelloApi.Assignees.cs`, `FakeYelloApi.ProjectMove.cs`, `FakeYelloApi.StatusBulkMove.cs`, `StatusBulkMoveTests.cs`; `tests/Yello.Tests.Isolation/IsolationCases.StatusBulkMove.cs`; `tests/Yello.Tests.Shared/StatusBulkMoveWire.cs`; `tests/Yello.Tests.Slices/Tasks/StatusBulkMoveSliceWire.cs`, `TaskEndpointTests.StatusBulkMove.cs`, `TaskEndpointTests.StatusBulkMoveRace.cs`, `TaskEndpointTests.StatusBulkMoveScale.cs`, `TaskEndpointTests.ProjectMove.cs`, `AssignTask/AssignTaskHandlerTests.cs`, `CreateTask/CreateTaskHandlerTests.cs`, `DeleteTask/DeleteTaskHandlerTests.cs`, `EditTaskAttributes/EditTaskAttributesHandlerTests.cs`, `MoveTask/MoveTaskHandlerTests.cs`, `MoveTaskToProject/MoveTaskToProjectHandlerTests.cs`.
+
+Artifacts: `_bmad-output/implementation-artifacts/6-6-move-a-whole-status-of-tasks-at-once.md`, `deferred-work.md`, `sprint-status.yaml`; `_bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md` (AD-17 and AD-25 notes).
 
 ## Change Log
 
 - 2026-11-22: Story created (bmad-create-story). Status: ready-for-dev.
+- 2026-11-22: Developed (bmad-dev-story). Bulk move route, slice, set-based write, gates, bar on the Board and the List View, fake API fixes, 7 live isolation rows, ledger dispositions, AD-17/AD-25 notes. AC13's "no accent border exists anywhere" reworded: the bulk move bar is the only selector with a thicker-than-hairline accent border; the two existing hairline accent edges are unchanged. Case 1's scaffold corrected (destination holds four Tasks) after plant 7 passed it.

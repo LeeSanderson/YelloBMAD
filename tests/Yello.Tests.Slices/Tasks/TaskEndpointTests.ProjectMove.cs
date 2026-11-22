@@ -385,7 +385,7 @@ public sealed partial class TaskEndpointTests
 
         using var mail = new MailDrop();
 
-        await fixture.Hosts.RunAsync(fixture.ConnectionString!, mail.With(Configured), async client =>
+        _ = await HostProcess.RunAsync(fixture.ConnectionString!, mail.With(Configured), async client =>
         {
             owner = await RegisterAsync(client, database);
 

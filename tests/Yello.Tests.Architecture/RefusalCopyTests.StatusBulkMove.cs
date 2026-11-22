@@ -20,7 +20,7 @@ public sealed partial class RefusalCopyTests
     /// gone-Status refusals end "Nothing was moved."
     /// </summary>
     /// <param name="expected">The copy, with each placeholder written <c>{}</c>.</param>
-    [Theory(Skip = "red: AC10, AC11 - the bulk move copy is not in ClientCopy yet")]
+    [Theory]
     [InlineData("{} Tasks in “{}”.")]
     [InlineData("1 Task in “{}”.")]
     [InlineData("Moving {} Tasks.")]

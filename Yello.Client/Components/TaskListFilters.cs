@@ -94,6 +94,14 @@ public sealed class TaskListFilters
     /// </summary>
     public IReadOnlyList<(Guid Id, string Label)> AssigneeOptions => [.. _candidates.Select(candidate => (candidate.MembershipId, candidate.Label))];
 
+    /// <summary>
+    /// The one Status the list is narrowed to when it is the only filter set, else <c>null</c>: only then is every Task a
+    /// move of that Status would take exactly what the list shows.
+    /// </summary>
+    public Guid? SoleStatus => Statuses.Count == 1 && OnlyStatusesFiltered ? Statuses.First() : null;
+
+    private bool OnlyStatusesFiltered => Labels.Count == 0 && !AssigneeFiltered && !DueFiltered;
+
     private bool AssigneeFiltered => Assignees.Count > 0 || Unassigned;
 
     private bool DueFiltered => Due == DueNone || (Due == DueRange && ToQuery() is { DueFrom: not null } or { DueTo: not null });

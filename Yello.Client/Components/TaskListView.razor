@@ -7,12 +7,15 @@
 @inject HttpClient Http
 @inject ActiveSpaceState ActiveSpace
 @inject IJSRuntime JS
+@inject Yello.Client.Layout.PageHeadingFocus Heading
 
 @*
     ONE PROJECT'S LIST VIEW.
 
-    THE SAME TASKS AS ROWS, read 50 at a time from the List route (open questions 1 (a), 2 (a)). Nothing in it writes, so
-    every Role sees exactly the same view and no control in it is disabled for a Role (AC16, UX-DR27).
+    THE SAME TASKS AS ROWS, read 50 at a time from the List route (open questions 1 (a), 2 (a)). Its one write is the bulk
+    move: filtered to exactly one Status and nothing else, a Role that manages Tasks is offered "Move to Project", which
+    opens the bulk move bar above the rows (TaskListView.BulkMove.cs). Every other control is the same for every Role, and
+    none is disabled for a Role (AC16, UX-DR27): the move control is absent for a Viewer.
 
     RENDERED ONLY AFTER THE SERVER HAS ANSWERED (UX-DR31, UX-DR35): until the first page answers, a skeleton marked
     aria-busy; completion is said politely once, "List loaded.", and nothing else is said on loading or paging (AC19).
@@ -115,6 +118,24 @@
             </div>
         </div>
 
+        @if (BulkMoveOffered is not null)
+        {
+            <button type="button" class="task-list__bulk-move" data-role-gated @onclick="OpenBulkMove" @ref="_bulkMoveControl">@Localizer["BulkMoveControl"]</button>
+        }
+
+        @if (_bulkMoveStatusId is { } moving)
+        {
+            <BulkMoveBar SpaceId="@SpaceId"
+                         ProjectId="@ProjectId"
+                         StatusId="@moving"
+                         StatusName="@StatusName(moving)"
+                         Count="@_total"
+                         OnBusy="BulkMoveBusy"
+                         OnMoved="BulkMovedAsync"
+                         OnCancelled="BulkMoveCancelled"
+                         OnGone="BulkMoveGoneAsync" />
+        }
+
         @if (_rows is null)
         {
             @* A new list is being read: its rows are gone already, and nothing is said until its total settles (AC9). *@
@@ -130,7 +151,7 @@
 
         @if (_rows is { Count: > 0 } rows && _total > 0)
         {
-            <table class="task-list__table" aria-rowcount="@(_total + 1)">
+            <table class="task-list__table" aria-rowcount="@(_total + 1)" aria-busy="@(_bulkMoveBusy ? "true" : null)">
                 <caption class="visually-hidden">@_projectName</caption>
                 <thead>
                     <tr aria-rowindex="1">

@@ -1,4 +1,3 @@
-using System.Data.SqlTypes;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -75,7 +74,7 @@ namespace Yello.Infrastructure.Persistence;
 /// Project's lock.
 /// </para>
 /// <para>
-/// <b>A move between Projects is the fifth key placer and the only writer of a Task's Project.</b> It takes both Projects'
+/// <b>A move between Projects is the fifth key placer and a writer of a Task's Project.</b> It takes both Projects'
 /// Tasks locks in the one sorted order (<see cref="ApplicationLocks.TakeProjectTasksAsync(YelloDbContext, IReadOnlyCollection{Guid}, CancellationToken)"/>),
 /// never as two single takes, which would deadlock against the opposite move; then the Task's row on its clustered key,
 /// re-read under it - gone, or no longer in the source - is not found; then the destination column's last key; then
@@ -84,6 +83,12 @@ namespace Yello.Infrastructure.Persistence;
 /// Status edit and the move within a Project by re-reading - and answers not found when the Task left: the lock it holds is
 /// no longer the Task's. A Labels edit, an assignment and a title or due-date edit write nothing the move writes, and take
 /// no Project lock.
+/// </para>
+/// <para>
+/// <b>A bulk move of one Status between Projects is the sixth key placer and the other writer of a Task's Project.</b> It
+/// takes the same two locks through the same sorted helper, then writes every Task of the Status in one set-based statement
+/// (<see cref="TaskStatusMigration"/>, which the Status removals share), with no row lock of its own. The writers that re-check
+/// a Task's Project under its old Project's lock behave the same against it as against the single move.
 /// </para>
 /// <para>
 /// <b>The edit and move slices take the Project's lock before they check the Status</b> (<see cref="LockProjectAsync"/>),
@@ -101,12 +106,6 @@ namespace Yello.Infrastructure.Persistence;
 internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator identifiers, TimeProvider clock)
     : ITaskStore
 {
-    /// <summary>
-    /// SQL Server's ordering of <c>uniqueidentifier</c>, which is not <see cref="Guid"/>'s own.
-    /// </summary>
-    private static readonly IComparer<Guid> ServerGuidOrder =
-        Comparer<Guid>.Create((first, second) => new SqlGuid(first).CompareTo(new SqlGuid(second)));
-
     /// <inheritdoc />
     public async Task<TaskItem?> CreateAsync(
         Guid spaceId,
@@ -207,6 +206,28 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
         await dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
         return task;
+    }
+
+    /// <inheritdoc />
+    public Task<int> CountInStatusAsync(Guid projectId, Guid statusId, CancellationToken cancellationToken) =>
+        dbContext.Tasks
+            .AsNoTracking()
+            .CountAsync(task => task.ProjectId == projectId && task.StatusId == statusId, cancellationToken);
+
+    /// <inheritdoc />
+    public async Task<int> MoveStatusToProjectAsync(
+        Guid sourceProjectId,
+        Guid sourceStatusId,
+        Guid destinationProjectId,
+        Guid destinationStatusId,
+        CancellationToken cancellationToken)
+    {
+        // Re-entries of locks the slice already holds, in the same sorted order, so the store stays safe on its own.
+        await ApplicationLocks.TakeProjectTasksAsync(dbContext, [sourceProjectId, destinationProjectId], cancellationToken).ConfigureAwait(false);
+
+        return await TaskStatusMigration
+            .MigrateAsync(dbContext, sourceProjectId, sourceStatusId, destinationProjectId, destinationStatusId, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -317,7 +338,7 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
         {
             // In the server's uniqueidentifier order, so two edits naming the same Labels in different orders lock
             // them in one order and cannot deadlock on each other. UPDLOCK without HOLDLOCK, as the Task's row above.
-            var submitted = JsonSerializer.Serialize(labelIds.Order(ServerGuidOrder));
+            var submitted = JsonSerializer.Serialize(labelIds.Order(ServerGuidOrder.Comparer));
 
             var visible = await dbContext.Labels
                 .FromSql($"SELECT * FROM dbo.[Label] WITH (UPDLOCK, INDEX(1)) WHERE Id IN (SELECT CAST([value] AS uniqueidentifier) FROM OPENJSON({submitted}))")
@@ -332,7 +353,7 @@ internal sealed class TaskStore(YelloDbContext dbContext, IIdentifierGenerator i
 
             // Each Label's applications lock, in the same order, which a deletion of that Label takes after its row lock
             // too: Label rows, then applications locks, in both writers.
-            foreach (var labelId in labelIds.Distinct().Order(ServerGuidOrder))
+            foreach (var labelId in labelIds.Distinct().Order(ServerGuidOrder.Comparer))
             {
                 await ApplicationLocks.TakeLabelApplicationsAsync(dbContext, labelId, cancellationToken).ConfigureAwait(false);
             }

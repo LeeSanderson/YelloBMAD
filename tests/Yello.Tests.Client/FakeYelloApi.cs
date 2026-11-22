@@ -1178,10 +1178,10 @@ internal sealed partial class FakeYelloApi
         // Q18: already there - nothing written, the Task answered unchanged.
         if (destination == column && predecessor == afterTaskId)
         {
-            return (200, JsonSerializer.Serialize(task, JsonOptions));
+            return (200, JsonSerializer.Serialize(Answered(task, board), JsonOptions));
         }
 
-        return (200, JsonSerializer.Serialize(Place(column, current, destination, task, afterTaskId), JsonOptions));
+        return (200, JsonSerializer.Serialize(Answered(Place(column, current, destination, task, afterTaskId), board), JsonOptions));
     }
 
     /// <summary>
@@ -1482,7 +1482,7 @@ internal sealed partial class FakeYelloApi
 
         if (PageSize is not { } size)
         {
-            return (200, JsonSerializer.Serialize(board, JsonOptions));
+            return (200, JsonSerializer.Serialize(Answered(board), JsonOptions));
         }
 
         var paged = new
@@ -1492,7 +1492,7 @@ internal sealed partial class FakeYelloApi
             {
                 var (tasks, nextAfter) = PageOf(column, after: null, size);
 
-                return new { statusId = column.StatusId, name = column.Name, total = column.Total, tasks, nextAfter };
+                return new { statusId = column.StatusId, name = column.Name, total = column.Total, tasks = Answered(tasks, board), nextAfter };
             }),
         };
 
@@ -1527,7 +1527,7 @@ internal sealed partial class FakeYelloApi
 
         var (tasks, nextAfter) = PageOf(column, after, PageSize ?? int.MaxValue);
 
-        return (200, JsonSerializer.Serialize(new { statusId = column.StatusId, total = column.Total, tasks, nextAfter }, JsonOptions));
+        return (200, JsonSerializer.Serialize(new { statusId = column.StatusId, total = column.Total, tasks = Answered(tasks, board), nextAfter }, JsonOptions));
     }
 
     /// <summary>
@@ -1578,7 +1578,7 @@ internal sealed partial class FakeYelloApi
             project = board.Project,
             statuses = board.Columns.Select(column => new { id = column.StatusId, name = column.Name }),
             total = matching.Count,
-            tasks = page,
+            tasks = Answered(page, board),
             nextAfter = next,
         };
 
@@ -1702,7 +1702,7 @@ internal sealed partial class FakeYelloApi
         first.Tasks.Add(task);
         first.Total++;
 
-        var created = JsonSerializer.Serialize(task, JsonOptions);
+        var created = JsonSerializer.Serialize(Answered(task, board), JsonOptions);
 
         if (key is not null)
         {
@@ -1714,7 +1714,7 @@ internal sealed partial class FakeYelloApi
 
     private (int Status, string Body) ViewTask(Guid spaceId, Guid taskId) =>
         FindTaskIn(spaceId, taskId) is { } found
-            ? (200, JsonSerializer.Serialize(found.Task, JsonOptions))
+            ? (200, JsonSerializer.Serialize(Answered(found.Task, found.Board), JsonOptions))
             : (404, Problem(ProblemTypes.NotAvailable));
 
     /// <summary>
@@ -1823,7 +1823,7 @@ internal sealed partial class FakeYelloApi
             destination.Total++;
         }
 
-        return (200, JsonSerializer.Serialize(edited, JsonOptions));
+        return (200, JsonSerializer.Serialize(Answered(edited, board), JsonOptions));
     }
 
     /// <summary>
@@ -1866,6 +1866,22 @@ internal sealed partial class FakeYelloApi
         value.ValueKind == JsonValueKind.String && value.TryGetGuid(out var statusId)
             ? board.Columns.FirstOrDefault(candidate => candidate.StatusId == statusId)
             : null;
+
+    /// <summary>
+    /// A Task as an answer serves it: stamped with the Project of the Board that holds it, as the Host answers it.
+    /// </summary>
+    private static FakeTask Answered(FakeTask task, FakeBoard board) => task with { ProjectId = board.Project.Id };
+
+    private static IEnumerable<FakeTask> Answered(IEnumerable<FakeTask> tasks, FakeBoard board) => tasks.Select(task => Answered(task, board));
+
+    /// <summary>
+    /// A Board as its answer serves it - the shape <see cref="FakeBoard"/> serializes to - with every Task stamped.
+    /// </summary>
+    private static object Answered(FakeBoard board) => new
+    {
+        project = board.Project,
+        columns = board.Columns.Select(column => new { statusId = column.StatusId, name = column.Name, total = column.Total, tasks = Answered(column.Tasks, board) }),
+    };
 
     private (FakeBoard Board, FakeColumn Column, FakeTask Task)? FindTaskIn(Guid spaceId, Guid taskId)
     {
@@ -2376,6 +2392,10 @@ internal sealed class FakeColumn(Guid statusId, string name, int total, List<Fak
 /// Its Assignee's Membership, or <c>null</c> - an appended field. <c>null</c> is left out of the body, so every case
 /// written before assignment existed is served the bytes it always was.
 /// </param>
+/// <param name="ProjectId">
+/// Its Project, as the Host answers it. A stored Task leaves it out; every answer serving a Task stamps it from the Board
+/// that holds the Task (<c>FakeYelloApi.Answered</c>), so a move between Boards can never leave it stale.
+/// </param>
 internal sealed record FakeTask(
     Guid Id,
     string Title,
@@ -2384,7 +2404,8 @@ internal sealed record FakeTask(
     DateTimeOffset CreatedAt,
     DateTimeOffset? DueDate = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<Guid>? LabelIds = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? AssigneeMembershipId = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? AssigneeMembershipId = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? ProjectId = null);
 
 /// <summary>
 /// One Label as the fake serves it - the shape of story 2.4 Task 4's <c>LabelResponse</c> (<c>{id, name, colour}</c>).

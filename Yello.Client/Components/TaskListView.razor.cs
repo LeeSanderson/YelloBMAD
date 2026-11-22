@@ -143,6 +143,8 @@ public sealed partial class TaskListView
             _focusTaskId = null;
             await _keys.FocusAsync(taskId);
         }
+
+        await FocusAfterBulkMoveAsync();
     }
 
     /// <summary>
@@ -161,6 +163,7 @@ public sealed partial class TaskListView
         _after = null;
         _loading = false;
         _filters.Clear();
+        CloseBulkMove();
         _activeTaskId = null;
         _focusTaskId = null;
         Say(null);
@@ -246,6 +249,12 @@ public sealed partial class TaskListView
         _loading = false;
         _activeTaskId = null;
         _focusTaskId = null;
+
+        // A new filter is a new scope: a bar opened for the old one closes, unless its move is already out.
+        if (!_bulkMoveBusy)
+        {
+            _bulkMoveStatusId = null;
+        }
 
         try
         {

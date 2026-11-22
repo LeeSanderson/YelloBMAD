@@ -10,7 +10,9 @@
     THE HEAD: the Status name in typography.column-head (uppercase by text-transform, never in the string),
     then the server's true total in the count chip - the only pill in the product, plain text, never a
     nudge - then the create affordance pushed right. The affordance is the first column's alone, and absent,
-    not disabled, for a Role that lacks manage-tasks (UX-DR27).
+    not disabled, for a Role that lacks manage-tasks (UX-DR27). A non-empty column's head also offers "Move to Project" to
+    such a Role, named for assistive technology by its count and Status; the bar it opens is the Board's, drawn above the
+    columns, so blocking this column while the move is out never takes the bar or its focus away.
 
     THE CARDS scroll within the column, never the page. Each Task appears here only if its Status is this
     column's (the Board answer places it; AC4). For a Role that can move Tasks each card carries its actions control,
@@ -53,6 +55,7 @@
          data-pager-selected="@Selected"
          hidden="@(Narrow && !Selected)"
          tabindex="@(ColumnActive ? "0" : "-1")"
+         aria-busy="@(Blocked ? "true" : null)"
          @ref="_section">
     <div class="board-column__head">
         <h2 class="type-column-head board-column__name" id="@HeadingId">@Name</h2>
@@ -62,6 +65,11 @@
         @if (ShowAdd)
         {
             <button type="button" class="board-column__add" data-role-gated aria-label="@Localizer["TaskAdd"]" @onclick="OnAdd" @ref="_add">+</button>
+        }
+
+        @if (ShowBulkMove)
+        {
+            <button type="button" class="board-column__bulk-move" data-role-gated aria-label="@BulkMoveName" @onclick="OnBulkMove">@Localizer["BulkMoveControl"]</button>
         }
     </div>
 
@@ -175,6 +183,23 @@
     [Parameter]
     public int FocusColumnRequest { get; set; }
 
+    /// <summary>
+    /// Whether the head offers to move every Task of the column into another Project: a Role that manages Tasks, and Tasks
+    /// to move. An empty column hides it for that reason alone, not for a Role.
+    /// </summary>
+    [Parameter]
+    public bool ShowBulkMove { get; set; }
+
+    /// <summary>Raised when the bulk move control is used.</summary>
+    [Parameter]
+    public EventCallback OnBulkMove { get; set; }
+
+    /// <summary>
+    /// Whether a bulk move out of this column is out: the column is busy, and the Board ignores its cards until it settles.
+    /// </summary>
+    [Parameter]
+    public bool Blocked { get; set; }
+
     /// <summary>Whether the Role held may move Tasks: each card carries its actions control and menu (story 2.6).</summary>
     [Parameter]
     public bool CanMove { get; set; }
@@ -281,6 +306,11 @@
     private IEnumerable<(TaskResponse Task, int Position)> Positioned => Tasks.Select((task, index) => (task, index + 1));
 
     private string CountId => "c" + StatusId.ToString("N", System.Globalization.CultureInfo.InvariantCulture);
+
+    private string BulkMoveName =>
+        Total == 1
+            ? string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer["BulkMoveControlNameOne"], Name)
+            : string.Format(System.Globalization.CultureInfo.CurrentCulture, Localizer["BulkMoveControlNameMany"], Total, Name);
 
     // The true total with its unit, never a bare number (AC13): singular and plural are two keys (English-only copy).
     private string CountText =>

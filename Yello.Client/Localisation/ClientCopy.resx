@@ -2091,4 +2091,68 @@
     <value>That Project is no longer in this Space. Nothing was moved.</value>
     <comment>Refusal: the Project chosen for a move is not another Project of the Space any more.</comment>
   </data>
+  <data name="BulkMoveControl" xml:space="preserve">
+    <value>Move to Project</value>
+    <comment>The column head&apos;s and the filtered List View&apos;s control that opens the bulk move bar.</comment>
+  </data>
+  <data name="BulkMoveControlNameOne" xml:space="preserve">
+    <value>Move 1 Task in “{0}” to another Project</value>
+    <comment>Accessible name of the bulk move control. {0}: the Status.</comment>
+  </data>
+  <data name="BulkMoveControlNameMany" xml:space="preserve">
+    <value>Move {0} Tasks in “{1}” to another Project</value>
+    <comment>Accessible name of the bulk move control. {0}: the count; {1}: the Status.</comment>
+  </data>
+  <data name="BulkMoveBarName" xml:space="preserve">
+    <value>Move Tasks to another Project</value>
+    <comment>Accessible name of the bulk move bar.</comment>
+  </data>
+  <data name="BulkMoveScopeOne" xml:space="preserve">
+    <value>1 Task in “{0}”.</value>
+    <comment>The bulk move bar&apos;s scope line. {0}: the Status.</comment>
+  </data>
+  <data name="BulkMoveScopeMany" xml:space="preserve">
+    <value>{0} Tasks in “{1}”.</value>
+    <comment>The bulk move bar&apos;s scope line. {0}: the count shown; {1}: the Status.</comment>
+  </data>
+  <data name="BulkMoveInFlightOne" xml:space="preserve">
+    <value>Moving 1 Task.</value>
+    <comment>The bulk move bar&apos;s line while the move is out. No percentage: it is one transaction.</comment>
+  </data>
+  <data name="BulkMoveInFlightMany" xml:space="preserve">
+    <value>Moving {0} Tasks.</value>
+    <comment>The bulk move bar&apos;s line while the move is out. {0}: the count shown.</comment>
+  </data>
+  <data name="BulkMovedOne" xml:space="preserve">
+    <value>Moved 1 Task to {0}.</value>
+    <comment>Announced when a bulk move lands. {0}: the destination Project.</comment>
+  </data>
+  <data name="BulkMovedMany" xml:space="preserve">
+    <value>Moved {0} Tasks to {1}.</value>
+    <comment>Announced when a bulk move lands. {0}: the count the server moved; {1}: the destination Project.</comment>
+  </data>
+  <data name="BulkMovedInStatusOne" xml:space="preserve">
+    <value>Moved 1 Task to {0}, in {1}.</value>
+    <comment>Announced when a bulk move lands in a Status chosen for it. {0}: the Project; {1}: the Status.</comment>
+  </data>
+  <data name="BulkMovedInStatusMany" xml:space="preserve">
+    <value>Moved {0} Tasks to {1}, in {2}.</value>
+    <comment>Announced when a bulk move lands in a Status chosen for it. {0}: the count; {1}: the Project; {2}: the Status.</comment>
+  </data>
+  <data name="BulkMoveFullOne" xml:space="preserve">
+    <value>{0} cannot take 1 more Task (at most {1}). Nothing was moved.</value>
+    <comment>Refusal: the destination cannot take the Task within its bound. {0}: the Project; {1}: the limit.</comment>
+  </data>
+  <data name="BulkMoveFullMany" xml:space="preserve">
+    <value>{0} cannot take {1} more Tasks (at most {2}). Nothing was moved.</value>
+    <comment>Refusal: the destination cannot take every Task within its bound. {0}: the Project; {1}: the count; {2}: the limit.</comment>
+  </data>
+  <data name="BulkMoveStatusGone" xml:space="preserve">
+    <value>“{0}” is no longer in this Project. Nothing was moved.</value>
+    <comment>Refusal: the Status left the Project before the bulk move ran. {0}: the Status.</comment>
+  </data>
+  <data name="BulkMoveCancel" xml:space="preserve">
+    <value>Cancel</value>
+    <comment>Closes the bulk move bar before anything is sent.</comment>
+  </data>
 </root>

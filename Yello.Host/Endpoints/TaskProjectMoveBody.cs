@@ -28,20 +28,26 @@ internal static class TaskProjectMoveBody
 
     private static readonly string[] ForbiddenMembers = ["positionKey", "afterTaskId", "spaceId"];
 
+    private static readonly string[] BulkForbiddenMembers = [.. ForbiddenMembers, "taskIds"];
+
     /// <summary>
     /// Reads the move, or the refusal that answers it.
     /// </summary>
     /// <param name="request">The request.</param>
     /// <param name="cancellationToken">The request's cancellation token.</param>
     /// <returns>The destination Project and optional Status, or a refusal - exactly one of the two.</returns>
-    internal static async Task<(Guid ProjectId, Guid? StatusId, IResult? Refusal)> ReadAsync(HttpRequest request, CancellationToken cancellationToken)
-    {
-        using var document = await ParseAsync(request, cancellationToken).ConfigureAwait(false);
+    internal static Task<(Guid ProjectId, Guid? StatusId, IResult? Refusal)> ReadAsync(HttpRequest request, CancellationToken cancellationToken) =>
+        ReadAsync(request, ForbiddenMembers, cancellationToken);
 
-        return document?.RootElement is { ValueKind: JsonValueKind.Object } root
-            ? Read(root)
-            : (Guid.Empty, null, InvalidMove());
-    }
+    /// <summary>
+    /// Reads the move of every Task of one Status, or the refusal that answers it: the single move's rules, and a list of
+    /// Tasks is refused as a position is, since the Tasks moved are decided by the server.
+    /// </summary>
+    /// <param name="request">The request.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The destination Project and optional Status, or a refusal - exactly one of the two.</returns>
+    internal static Task<(Guid ProjectId, Guid? StatusId, IResult? Refusal)> ReadBulkAsync(HttpRequest request, CancellationToken cancellationToken) =>
+        ReadAsync(request, BulkForbiddenMembers, cancellationToken);
 
     /// <summary>
     /// <c>400 invalid-task-project</c>: the destination is not another Project of the Space, whatever the cause.
@@ -73,10 +79,19 @@ internal static class TaskProjectMoveBody
             type: ProblemTypes.StatusDestinationRequired,
             title: "The new Project does not hold the Task's Status, so the move needs a Status for it.");
 
-    private static (Guid ProjectId, Guid? StatusId, IResult? Refusal) Read(JsonElement root)
+    private static async Task<(Guid ProjectId, Guid? StatusId, IResult? Refusal)> ReadAsync(HttpRequest request, string[] forbidden, CancellationToken cancellationToken)
+    {
+        using var document = await ParseAsync(request, cancellationToken).ConfigureAwait(false);
+
+        return document?.RootElement is { ValueKind: JsonValueKind.Object } root
+            ? Read(root, forbidden)
+            : (Guid.Empty, null, InvalidMove());
+    }
+
+    private static (Guid ProjectId, Guid? StatusId, IResult? Refusal) Read(JsonElement root, string[] forbidden)
     {
         if (!root.TryGetProperty(ProjectMember, out var projectElement)
-            || Array.Exists(ForbiddenMembers, member => root.TryGetProperty(member, out _)))
+            || Array.Exists(forbidden, member => root.TryGetProperty(member, out _)))
         {
             return (Guid.Empty, null, InvalidMove());
         }

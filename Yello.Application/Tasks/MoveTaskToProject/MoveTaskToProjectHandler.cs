@@ -19,7 +19,7 @@ namespace Yello.Application.Tasks.MoveTaskToProject;
 /// holds its lock until it commits, and the destination's effective set.
 /// </para>
 /// <para>
-/// <b>The one slice that counts a bound.</b> The destination is in the body, so the pipeline, which counts the Project a
+/// <b>One of the two cross-Project slices that count a bound.</b> The destination is in the body, so the pipeline, which counts the Project a
 /// route names before the endpoint, cannot count it; and a pipeline lock on the destination taken before this slice's sorted
 /// pair would reopen the deadlock above. So the destination's Tasks-per-Project count is taken here, after both locks, with
 /// the pipeline's own counter and limit. The source is never counted: a move out never exceeds it.
@@ -85,19 +85,14 @@ public sealed class MoveTaskToProjectHandler(ITaskStore store, IStatusDefinition
         }
 
         var effective = await statuses.EffectiveOfAsync(destinationProjectId, cancellationToken).ConfigureAwait(false);
+        var decision = CrossProjectStatus.Decide(effective, task.StatusId, statusId);
 
-        // A supplied Status is applied even when the Task's own would have been kept, so the request means the same thing
-        // whatever the destination's set is when it arrives.
-        if (statusId is { } supplied && !EffectiveStatusSet.Contains(effective, supplied))
+        return decision.Outcome switch
         {
-            return MoveTaskToProjectResult.StatusDestinationInvalid;
-        }
-
-        var landing = statusId ?? task.StatusId;
-
-        return EffectiveStatusSet.Contains(effective, landing)
-            ? await CountAndMoveAsync(taskId, sourceProjectId, destinationProjectId, landing, cancellationToken).ConfigureAwait(false)
-            : MoveTaskToProjectResult.StatusDestinationRequired;
+            CrossProjectStatusOutcome.Lands => await CountAndMoveAsync(taskId, sourceProjectId, destinationProjectId, decision.Landing, cancellationToken).ConfigureAwait(false),
+            CrossProjectStatusOutcome.Invalid => MoveTaskToProjectResult.StatusDestinationInvalid,
+            _ => MoveTaskToProjectResult.StatusDestinationRequired,
+        };
     }
 
     private async Task<MoveTaskToProjectResult> CountAndMoveAsync(

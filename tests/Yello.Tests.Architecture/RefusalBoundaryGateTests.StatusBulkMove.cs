@@ -24,8 +24,8 @@ namespace Yello.Tests.Architecture;
 /// compile error in an unrelated gate. The route pattern stays a literal: it is what the gate asserts.
 /// </para>
 /// <para>
-/// <b>The two bound gates here replace</b> <c>Nothing_but_the_pipeline_reads_the_bound_registry</c> and
-/// <c>Only_the_pipeline_depends_on_the_bound_count_port</c>: activate them and delete those two in the same change.
+/// <b>The two bound gates here admit exactly the two cross-Project slices.</b> A dependency scan cannot pin call order, so
+/// each slice's handler test pins the bound counted, the Project counted, and that it is counted after both locks.
 /// </para>
 /// <para>
 /// <b>Both scans for a writer of <c>TaskItem.ProjectId</c> have an oracle</b> run over a planted type, so an empty or a
@@ -48,7 +48,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>POST</c> is mapped on the bulk move route requiring <c>ManageTasks</c>, not Session-only, consulting no bound in the
     /// pipeline, and carrying exactly the Space, the source Project and the source Status in its path.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC13 - the bulk move route is not mapped yet (Q1)")]
+    [Fact]
     [Trait("Requirement", "FR-41")]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "AD-4")]
@@ -69,7 +69,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>ProjectStatusRoutes</c> names the bulk move template once (<c>TasksToProject</c>), and <c>TasksToProjectOf</c> builds
     /// that path under the Status's own path.
     /// </summary>
-    [Fact(Skip = "red: AC1 - ProjectStatusRoutes does not name the bulk move route yet (Q1)")]
+    [Fact]
     [Trait("Requirement", "AR-35")]
     public void ProjectStatusRoutes_names_the_bulk_move_template_once()
     {
@@ -92,7 +92,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The bulk move request names the destination Project and an optional destination Status and nothing else: no position,
     /// no Space, no list of Tasks. With the single move's request, it is one of exactly two Task requests that name a Project.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC9, AC13 - MoveStatusTasksToProjectRequest does not exist yet")]
+    [Fact]
     [Trait("Requirement", "FR-41")]
     [Trait("Requirement", "FR-19")]
     [Trait("Requirement", "AD-15")]
@@ -117,7 +117,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <summary>
     /// The bulk move answers where the Tasks went and how many: <c>{ projectId, statusId, movedCount }</c>, never the Tasks.
     /// </summary>
-    [Fact(Skip = "red: AC1 - MoveStatusTasksToProjectResponse does not exist yet (Q13)")]
+    [Fact]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "AD-19")]
     public void The_bulk_move_answer_states_the_destination_its_Status_and_the_count_moved()
@@ -134,7 +134,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The bulk move is one slice, <c>Yello.Application.Tasks.MoveStatusTasksToProject.MoveStatusTasksToProjectHandler</c>, a
     /// sealed class with a <c>HandleAsync</c>, beside the single move's.
     /// </summary>
-    [Fact(Skip = "red: AC6 - MoveStatusTasksToProjectHandler does not exist yet")]
+    [Fact]
     [Trait("Requirement", "AR-3")]
     [Trait("Requirement", "AD-17")]
     public void The_bulk_move_is_one_slice()
@@ -151,7 +151,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// its destination after its own sorted locks, because its destination is in the body. Their handler tests pin which
     /// bound is counted, for which Project, and after which lock.
     /// </summary>
-    [Fact(Skip = "red: AC13 - the bulk slice does not read the registry yet; replaces Nothing_but_the_pipeline_reads_the_bound_registry (Q6)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "AR-3")]
     [Trait("Requirement", "AD-25")]
@@ -177,7 +177,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Nothing but the pipeline, the port's adapter, its registration and the two cross-Project slices depends on the
     /// bound-count port, and both slices do.
     /// </summary>
-    [Fact(Skip = "red: AC13 - the bulk slice does not count yet; replaces Only_the_pipeline_depends_on_the_bound_count_port (Q6)")]
+    [Fact]
     [Trait("Priority", "P1")]
     [Trait("Requirement", "AR-3")]
     [Trait("Requirement", "AD-25")]
@@ -226,7 +226,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The only raw SQL in production that sets a Task's Project is the set-based Status migration, which the bulk move shares
     /// with the Status removals; a predicate on <c>ProjectId</c> is not a write of it.
     /// </summary>
-    [Fact(Skip = "red: AC6, AC13 - TaskStatusMigration does not set ProjectId yet (Q7)")]
+    [Fact]
     [Trait("Requirement", "FR-19")]
     [Trait("Requirement", "AD-17")]
     public void Only_the_Status_migration_sets_a_Tasks_Project_in_raw_SQL()

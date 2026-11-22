@@ -156,6 +156,11 @@ public sealed partial class BoardView
     /// </summary>
     private void Open(Guid taskId)
     {
+        if (BulkMoveBlocksTask(taskId))
+        {
+            return;
+        }
+
         // A drag or a carry ends with nothing moved, and says where the Task is (story 2.8, open question 10).
         Returned(EndHeld());
         _menuTaskId = null;
@@ -239,6 +244,7 @@ public sealed partial class BoardView
         _boardNotice = null;
         _rereadBoard = false;
         _projectMoveKeys.Clear();
+        CloseBulkMove();
         _activeTaskId = null;
         _activeColumnId = null;
         _runAt = null;
@@ -266,7 +272,7 @@ public sealed partial class BoardView
     /// </summary>
     private void OpenMenu(Guid taskId)
     {
-        if (!_canManage)
+        if (!_canManage || BulkMoveBlocksTask(taskId))
         {
             return;
         }

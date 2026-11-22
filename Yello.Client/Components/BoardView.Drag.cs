@@ -98,6 +98,11 @@ public sealed partial class BoardView
             return false;
         }
 
+        if (BulkMoveBlocksTask(taskId))
+        {
+            return false;
+        }
+
         // Starting a drag closes an open card menu (story 2.7, open question 4 (a)).
         _menuTaskId = null;
         _menuPicking = false;
@@ -112,7 +117,7 @@ public sealed partial class BoardView
     /// <inheritdoc />
     async Task IBoardDragHost.DropAsync(Guid taskId, Guid statusId, int index)
     {
-        if (!_canManage || Locate(taskId) is not { } found || _columns?.Find(column => column.StatusId == statusId) is not { } destination)
+        if (!_canManage || Locate(taskId) is not { } found || _columns?.Find(column => column.StatusId == statusId) is not { } destination || BulkMoveBlocks(statusId))
         {
             // The column has gone, or the Role no longer moves Tasks: nothing is sent, and like any cancel after a lift the
             // Task's place is said (AC14).

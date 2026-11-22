@@ -113,7 +113,7 @@ internal sealed class ProjectStatusStore(YelloDbContext dbContext) : IProjectSta
     /// <inheritdoc />
     /// <remarks>See <see cref="TaskStatusMigration"/>.</remarks>
     public Task MigrateTasksAsync(Guid projectId, Guid fromStatusId, Guid toStatusId, CancellationToken cancellationToken) =>
-        TaskStatusMigration.MigrateAsync(dbContext, projectId, fromStatusId, toStatusId, cancellationToken);
+        TaskStatusMigration.MigrateAsync(dbContext, projectId, fromStatusId, projectId, toStatusId, cancellationToken);
 
     /// <inheritdoc />
     public Task DeleteOperationsAsync(Guid projectId, Guid statusId, StatusDeltaKind? kind, CancellationToken cancellationToken)

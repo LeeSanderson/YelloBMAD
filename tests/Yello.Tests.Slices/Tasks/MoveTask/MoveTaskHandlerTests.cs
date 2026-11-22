@@ -176,6 +176,12 @@ public sealed class MoveTaskHandlerTests
         public Task<TaskItem?> MoveToProjectAsync(Guid taskId, Guid sourceProjectId, Guid destinationProjectId, Guid statusId, CancellationToken cancellationToken) =>
             throw new NotSupportedException("Only a move between Projects changes a Task's Project.");
 
+        public Task<int> CountInStatusAsync(Guid projectId, Guid statusId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Only a bulk move counts a Status's Tasks.");
+
+        public Task<int> MoveStatusToProjectAsync(Guid sourceProjectId, Guid sourceStatusId, Guid destinationProjectId, Guid destinationStatusId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("Only a bulk move moves a Status's Tasks.");
+
         public Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The move slice edits nothing else.");
 

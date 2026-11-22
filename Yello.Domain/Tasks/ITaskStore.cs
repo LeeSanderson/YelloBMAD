@@ -80,6 +80,37 @@ public interface ITaskStore
     Task<TaskItem?> MoveToProjectAsync(Guid taskId, Guid sourceProjectId, Guid destinationProjectId, Guid statusId, CancellationToken cancellationToken);
 
     /// <summary>
+    /// How many Tasks of the resolved Space are in <paramref name="statusId"/> of <paramref name="projectId"/>, read with a
+    /// plain statement.
+    /// </summary>
+    /// <remarks>
+    /// Read under the Project's Tasks lock it is exactly the set a bulk move then writes: every writer that puts a Task into
+    /// the column or takes one out of it holds that lock.
+    /// </remarks>
+    /// <param name="projectId">The Project.</param>
+    /// <param name="statusId">The Status.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>The count.</returns>
+    Task<int> CountInStatusAsync(Guid projectId, Guid statusId, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Moves every Task of the resolved Space in <paramref name="sourceStatusId"/> of <paramref name="sourceProjectId"/> into
+    /// <paramref name="destinationProjectId"/>, in <paramref name="destinationStatusId"/>, at the end of that column in their
+    /// source order, in one statement. Only their Project, Status and position key are written; no sibling's key changes.
+    /// </summary>
+    /// <remarks>
+    /// The caller holds both Projects' Tasks locks (<see cref="LockProjectsAsync"/>) and has already checked the Status
+    /// against the destination's effective set and the destination's bound.
+    /// </remarks>
+    /// <param name="sourceProjectId">The Project the Tasks leave.</param>
+    /// <param name="sourceStatusId">The Status whose Tasks move.</param>
+    /// <param name="destinationProjectId">The Project they move into.</param>
+    /// <param name="destinationStatusId">Their Status in the destination.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>How many Tasks were written.</returns>
+    Task<int> MoveStatusToProjectAsync(Guid sourceProjectId, Guid sourceStatusId, Guid destinationProjectId, Guid destinationStatusId, CancellationToken cancellationToken);
+
+    /// <summary>
     /// Applies an edit to one Task of the resolved Space and saves it. A Status that differs from the Task's
     /// own places it after the last key of its new column (story 2.3, open question 3 (a)); the same Status
     /// writes no key.

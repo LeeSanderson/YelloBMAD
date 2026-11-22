@@ -364,6 +364,12 @@ public sealed class MoveTaskToProjectHandlerTests
             });
         }
 
+        public Task<int> CountInStatusAsync(Guid projectId, Guid statusId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The single move counts no Status.");
+
+        public Task<int> MoveStatusToProjectAsync(Guid sourceProjectId, Guid sourceStatusId, Guid destinationProjectId, Guid destinationStatusId, CancellationToken cancellationToken) =>
+            throw new NotSupportedException("The single move is not the bulk move.");
+
         public Task<TaskItem?> EditAsync(Guid taskId, TaskEdit edit, CancellationToken cancellationToken) =>
             throw new NotSupportedException("The move edits nothing else.");
 

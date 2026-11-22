@@ -47,8 +47,9 @@ public sealed partial class RefusalBoundaryGateTests
 
         // Widened by exactly MoveTaskRequest, whose own property set is pinned (no key, ever), by exactly
         // AssignTaskRequest: the assignment is its own route, never a member of this edit, and by exactly
-        // MoveTaskToProjectRequest: a change of Project is its own route too, whose property set is pinned.
-        Assert.Equal(["AssignTaskRequest", "CreateTaskRequest", "EditTaskRequest", "MoveTaskRequest", "MoveTaskToProjectRequest"], requests.Select(type => type.Name).Order(StringComparer.Ordinal));
+        // MoveTaskToProjectRequest and MoveStatusTasksToProjectRequest: a change of Project is its own route too, one for a Task
+        // and one for a whole Status, each with its property set pinned.
+        Assert.Equal(["AssignTaskRequest", "CreateTaskRequest", "EditTaskRequest", "MoveStatusTasksToProjectRequest", "MoveTaskRequest", "MoveTaskToProjectRequest"], requests.Select(type => type.Name).Order(StringComparer.Ordinal));
 
         var edit = requests.Single(type => type.Name == "EditTaskRequest");
 

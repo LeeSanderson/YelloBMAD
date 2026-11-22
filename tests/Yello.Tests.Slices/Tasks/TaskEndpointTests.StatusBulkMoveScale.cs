@@ -33,7 +33,7 @@ public sealed partial class TaskEndpointTests
     /// Project's set.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Explicit = true, Skip = "red: AC8 - the bulk move route is not mapped yet (Q11)")]
+    [Fact(Explicit = true)]
     [Trait("Tier", "Nightly")]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "AD-15")]

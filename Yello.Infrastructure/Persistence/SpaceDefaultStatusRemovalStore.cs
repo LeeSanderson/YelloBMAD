@@ -49,7 +49,7 @@ internal sealed class SpaceDefaultStatusRemovalStore(YelloDbContext dbContext) :
 
         foreach (var migration in plan.Migrations)
         {
-            await TaskStatusMigration.MigrateAsync(dbContext, migration.ProjectId, statusId, migration.DestinationStatusId, cancellationToken).ConfigureAwait(false);
+            await TaskStatusMigration.MigrateAsync(dbContext, migration.ProjectId, statusId, migration.ProjectId, migration.DestinationStatusId, cancellationToken).ConfigureAwait(false);
         }
 
         if (plan.Places.Count > 0)

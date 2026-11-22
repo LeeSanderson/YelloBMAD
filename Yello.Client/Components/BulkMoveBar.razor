@@ -1,0 +1,50 @@
+@using Yello.Client.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+@inject SpaceWrites Writes
+@inject ActiveSpaceState ActiveSpace
+@implements IDisposable
+
+@*
+    THE BULK MOVE BAR: every Task of one Status moved into another Project, in one request.
+
+    DRAWN BY ITS HOST ABOVE THE COLUMNS OR THE ROWS, never inside a column, so blocking a column can never take it away. It
+    is the one component bordered in the accent: the only transient operation that runs over many Tasks at once, and it must
+    be unmistakable while it runs. The accent says nothing about danger.
+
+    BEFORE THE COMMIT it names its scope in a status line, holds the single move's Project picker (nothing selected, one tab
+    stop per step, Esc steps back), and holds the only Cancel. Focus is in it from the moment it appears.
+
+    THE COMMIT is one transaction already sent, so it cannot be cancelled: Cancel goes, Esc is ignored, and the picker's
+    status line says "Moving {n} Tasks." and holds focus. No percentage, no progress bar. A second press sends nothing.
+
+    A REFUSAL keeps the bar and says why, and that nothing moved; a move that got no answer says only that it was not sent,
+    and sending the same choice again reuses its Idempotency-Key.
+*@
+
+<section class="bulk-move-bar" aria-label="@Localizer["BulkMoveBarName"]" @onkeydown="KeyDownAsync">
+    @if (!_inFlight)
+    {
+        <p class="bulk-move-bar__scope" role="status" tabindex="-1" @ref="_scope">@ScopeText</p>
+    }
+
+    @if (_refusal is { } refusal)
+    {
+        <p class="bulk-move-bar__refusal">@refusal</p>
+    }
+
+    <ProjectMovePicker SpaceId="@SpaceId"
+                       ProjectId="@ProjectId"
+                       StatusId="@StatusId"
+                       StatusName="@StatusName"
+                       InFlightText="@InFlightText"
+                       OnCommit="CommitAsync"
+                       OnDismiss="CancelAsync" />
+
+    @if (!_inFlight)
+    {
+        <div class="bulk-move-bar__actions">
+            <button type="button" class="button-secondary" @onclick="CancelAsync">@Localizer["BulkMoveCancel"]</button>
+        </div>
+    }
+</section>

@@ -12,8 +12,8 @@ namespace Yello.Contracts.Projects;
 /// </para>
 /// <para>
 /// <b>Place is an action of its own</b>, never a member of the rename: a body that could carry a name and a position
-/// would need two meanings for <c>null</c>. Every answer is the Project's whole set as <see cref="ProjectStatusResponse"/>
-/// rows, in effective order.
+/// would need two meanings for <c>null</c>. Every answer but the bulk move's is the Project's whole set as
+/// <see cref="ProjectStatusResponse"/> rows, in effective order.
 /// </para>
 /// </remarks>
 public static class ProjectStatusRoutes
@@ -49,6 +49,18 @@ public static class ProjectStatusRoutes
     /// <c>POST</c> here, with no body, to add back a Space default this Project removed, under its own id.
     /// </summary>
     public static string Restore => "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/statuses/{statusId:guid}/restore";
+
+    /// <summary>
+    /// <c>POST</c> a <c>MoveStatusTasksToProjectRequest</c> here to move every Task of this Status into another Project of the
+    /// Space, in one transaction. Answers <c>200</c> with a <c>MoveStatusTasksToProjectResponse</c> (a Status holding no Task
+    /// moves none); the boundary <c>404 not-available</c> for a Project or Status that is not here;
+    /// <c>400 invalid-task-edit</c> for a body that is not a destination, <c>400 invalid-task-project</c> for a destination
+    /// that is not another Project of the Space, <c>400 invalid-status-destination</c> for a Status the destination does not
+    /// hold, <c>409 status-destination-required</c> when the destination lacks the Status and none was named,
+    /// <c>409 bound-reached</c> when the destination cannot take every Task, and <c>403 insufficient-role</c> without
+    /// <c>ManageTasks</c>.
+    /// </summary>
+    public static string TasksToProject => "/api/v1/spaces/{spaceId:guid}/projects/{projectId:guid}/statuses/{statusId:guid}/tasks/project";
 
     /// <summary>
     /// The collection's path, as a client calls it and as an add's <c>Location</c> states it.
@@ -93,4 +105,13 @@ public static class ProjectStatusRoutes
     /// <param name="statusId">The removed Space default.</param>
     /// <returns>The path.</returns>
     public static string RestoreOf(Guid spaceId, Guid projectId, Guid statusId) => $"{ItemOf(spaceId, projectId, statusId)}/restore";
+
+    /// <summary>
+    /// The bulk move's path: every Task of the Status, out of the Project.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="projectId">The source Project.</param>
+    /// <param name="statusId">The source Status.</param>
+    /// <returns>The path.</returns>
+    public static string TasksToProjectOf(Guid spaceId, Guid projectId, Guid statusId) => $"{ItemOf(spaceId, projectId, statusId)}/tasks/project";
 }

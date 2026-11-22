@@ -127,7 +127,8 @@ internal static class ApplicationLocks
     /// several of them only through <see cref="TakeProjectTasksAsync(YelloDbContext, IReadOnlyCollection{Guid}, CancellationToken)"/>.
     /// A Space-level removal takes all three, the last for every Project whose set holds the Status; a Project delta write
     /// takes this one Shared and its own Tasks lock; a Project deletion takes the Project list and its Tasks lock; a move of a
-    /// Task between Projects takes only its two Projects' Tasks locks, through the sorted overload. Nothing
+    /// Task, or of every Task of one Status, between Projects takes only its two Projects' Tasks locks, through the sorted
+    /// overload. Nothing
     /// takes this lock after either of the others, and nothing takes the Project list after a Tasks lock, so no two takers
     /// can wait on each other in a cycle.
     /// </para>

@@ -304,7 +304,7 @@ public sealed partial class BoardView
     /// Whether Space may pick <paramref name="taskId"/> up: the Role moves Tasks, and no panel, menu or pointer lift is in
     /// the way (a lift and a carry never coexist).
     /// </summary>
-    private bool CanPickUp(Guid taskId) => _canManage && NothingInTheWay && Locate(taskId) is not null;
+    private bool CanPickUp(Guid taskId) => _canManage && NothingInTheWay && Locate(taskId) is not null && !BulkMoveBlocksTask(taskId);
 
     private bool NothingInTheWay => _openTaskId is null && _menuTaskId is null && _drag?.LiftedTaskId is null;
 
@@ -430,7 +430,8 @@ public sealed partial class BoardView
 
         if (taskId is not { } id
             || Locate(id) is not { } found
-            || _columns?.Find(column => column.StatusId == statusId) is not { } destination)
+            || _columns?.Find(column => column.StatusId == statusId) is not { } destination
+            || BulkMoveBlocks(destination.StatusId))
         {
             Returned(taskId);
             StateHasChanged();

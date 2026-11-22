@@ -14,9 +14,10 @@ namespace Yello.Tests.Client;
 /// case does, so every other case is served exactly what it would be without this partial.
 /// </para>
 /// <para>
-/// <b>The decisions, in the Host's order</b>, so a browser case proves the page and not the fake: a Task the Space does not
-/// hold is the not-found; an unreadable body, one that is not an object, leaves out <c>projectId</c>, or names a position or a
-/// Space is <c>400 invalid-task-edit</c>; a <c>projectId</c> that is not an id, or not another Project of the Space, is
+/// <b>The decisions, in the Host's order</b>, so a browser case proves the page and not the fake: the body first, before any
+/// lookup - an unreadable body, one that is not an object, leaves out <c>projectId</c>, or names a position or a Space is
+/// <c>400 invalid-task-edit</c>; a <c>projectId</c> that is not an id is <c>400 invalid-task-project</c> - then a Task the
+/// Space does not hold is the not-found; a <c>projectId</c> that is not another Project of the Space is
 /// <c>400 invalid-task-project</c>; a <c>statusId</c> that is neither an id nor <c>null</c>, or one the destination's set does
 /// not hold, is <c>400 invalid-status-destination</c>; no <c>statusId</c> and the Task's own Status outside the destination's
 /// set is <c>409 status-destination-required</c>; a destination holding 5,000 Tasks is <c>409 bound-reached</c>; otherwise the
@@ -108,20 +109,21 @@ internal sealed partial class FakeYelloApi
             return (outcome.Status, ProjectMoveProblem(outcome.ProblemType));
         }
 
-        return FindTaskIn(spaceId, taskId) is { } found
-            ? MoveToProject(spaceId, found.Board, found.Column, found.Task, request.Body)
-            : (404, Problem(ProblemTypes.NotAvailable));
-    }
-
-    private (int Status, string Body) MoveToProject(Guid spaceId, FakeBoard source, FakeColumn column, FakeTask task, string? body)
-    {
-        var (refusal, projectId, statusId) = ReadProjectMove(body);
+        // The body first, as the Host reads it before any lookup: a bad body is refused whatever the Task.
+        var (refusal, projectId, statusId) = ReadProjectMove(request.Body);
 
         if (refusal is not null)
         {
             return (400, Problem(refusal));
         }
 
+        return FindTaskIn(spaceId, taskId) is { } found
+            ? MoveToProject(spaceId, found.Board, found.Column, found.Task, projectId, statusId)
+            : (404, Problem(ProblemTypes.NotAvailable));
+    }
+
+    private (int Status, string Body) MoveToProject(Guid spaceId, FakeBoard source, FakeColumn column, FakeTask task, Guid projectId, Guid? statusId)
+    {
         if (projectId == source.Project.Id || !Boards.TryGetValue((spaceId, projectId), out var destination)
             || !(Projects.TryGetValue(spaceId, out var projects) && projects.Exists(project => project.Id == projectId)))
         {
@@ -164,11 +166,7 @@ internal sealed partial class FakeYelloApi
         into.Tasks.Add(moved);
         into.Total++;
 
-        var answer = JsonSerializer.SerializeToNode(moved, JsonOptions)!.AsObject();
-
-        answer["projectId"] = projectId;
-
-        return (200, answer.ToJsonString(JsonOptions));
+        return (200, JsonSerializer.Serialize(Answered(moved, destination), JsonOptions));
     }
 
     /// <summary>

@@ -71,13 +71,14 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// The move-to-Project request names the destination Project and an optional destination Status and nothing else: no
-    /// position, no neighbour, no Space. It is the only Task request that names a Project.
+    /// position, no neighbour, no Space. With the bulk move's request, which names the same two, it is one of exactly two Task
+    /// requests that name a Project.
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-41")]
     [Trait("Requirement", "FR-19")]
     [Trait("Requirement", "AD-15")]
-    public void The_move_to_Project_request_names_a_Project_and_an_optional_Status_and_is_the_only_Task_request_naming_a_Project()
+    public void The_move_to_Project_request_names_a_Project_and_an_optional_Status_and_is_one_of_the_two_Task_requests_naming_a_Project()
     {
         var request = ProductionAssemblies.Contracts.GetType(TaskContractsNamespace + ".MoveTaskToProjectRequest");
 
@@ -91,7 +92,7 @@ public sealed partial class RefusalBoundaryGateTests
             .Where(type => Array.Exists(type.GetProperties(BindingFlags.Public | BindingFlags.Instance), property => property.Name.Contains("Project", StringComparison.Ordinal)))
             .Select(type => type.Name);
 
-        Assert.Equal(["MoveTaskToProjectRequest"], namingAProject);
+        Assert.Equal(["MoveStatusTasksToProjectRequest", "MoveTaskToProjectRequest"], namingAProject);
     }
 
     /// <summary>

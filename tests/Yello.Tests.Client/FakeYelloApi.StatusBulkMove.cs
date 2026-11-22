@@ -1,6 +1,6 @@
 using System.Text.Json;
 using Yello.Contracts;
-using Yello.Tests.Shared;
+using Yello.Contracts.Projects;
 
 namespace Yello.Tests.Client;
 
@@ -47,7 +47,7 @@ internal sealed partial class FakeYelloApi
     /// <param name="projectId">The source Project.</param>
     /// <param name="statusId">The source Status.</param>
     /// <returns>The path.</returns>
-    public static string StatusBulkMovePathOf(Guid spaceId, Guid projectId, Guid statusId) => StatusBulkMoveWire.PathOf(spaceId, projectId, statusId);
+    public static string StatusBulkMovePathOf(Guid spaceId, Guid projectId, Guid statusId) => ProjectStatusRoutes.TasksToProjectOf(spaceId, projectId, statusId);
 
     /// <summary>
     /// Holds the <b>next</b> bulk move until it is released.

@@ -1395,6 +1395,65 @@
     color: var(--text-primary);
 }
 
+/*
+    THE BULK MOVE BAR: the one component bordered in the accent, at the emphasis width. It is the only transient operation
+    that runs over many Tasks at once and must be unmistakable while it runs; the accent says nothing about danger. Drawn
+    above the columns or the rows, full width of its host, so at 320px it is one column with the Status pager.
+*/
+.bulk-move-bar {
+    margin-block: var(--space-2);
+    padding: var(--space-3);
+    background-color: var(--surface-card);
+    border: var(--border-emphasis-width) solid var(--accent);
+    border-radius: var(--radius-md);
+    font-family: var(--type-meta-family);
+    font-size: var(--type-meta-size);
+    font-weight: var(--type-meta-weight);
+    line-height: var(--type-meta-line-height);
+    color: var(--text-primary);
+    overflow-wrap: anywhere;
+}
+
+.bulk-move-bar__scope,
+.bulk-move-bar__refusal {
+    margin-block: 0 var(--space-1);
+}
+
+.bulk-move-bar__actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-block-start: var(--space-2);
+}
+
+/* The column head's and the List View's control that opens the bar: the create affordance's quiet look. */
+.board-column__bulk-move,
+.task-list__bulk-move {
+    appearance: none;
+    background-color: var(--surface-card);
+    color: var(--text-primary);
+    border: var(--border-hairline-width) solid var(--border-hairline);
+    border-radius: var(--radius-md);
+    padding-block: 0;
+    padding-inline: var(--space-2);
+    font-family: var(--type-body-family);
+    font-size: var(--type-body-size);
+    line-height: var(--type-body-line-height);
+    cursor: pointer;
+}
+
+.board-column__bulk-move {
+    margin-inline-start: auto;
+}
+
+.board-column__add + .board-column__bulk-move {
+    margin-inline-start: 0;
+}
+
+/* A column a bulk move is leaving stays readable: it is busy, never hidden or dimmed out of reach. */
+.board-column[aria-busy="true"] {
+    cursor: progress;
+}
+
 /* A refused move made from a card's menu, said on the Board (story 2.6). */
 .board__notice {
     margin-block: 0;

@@ -73,7 +73,7 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
     /// Status; a Viewer is offered it nowhere - absent from the page, never disabled.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10, AC15 - the column control is not built yet (Q8)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "FR-16")]
     public async Task The_column_control_is_offered_to_a_Member_on_a_non_empty_column_and_absent_for_a_Viewer()
@@ -105,7 +105,7 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
     /// count and the Status; it lists the other Projects with nothing selected and one tab stop. Opening it sends nothing.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the bulk move bar is not built yet (Q12)")]
+    [Fact]
     [Trait("Requirement", "UX-DR21")]
     public async Task Initiating_draws_the_bar_above_the_columns_focused_and_naming_its_scope_with_nothing_selected()
     {
@@ -140,7 +140,7 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
     /// answer - three, since a third Task joined the Status after the bar named two.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the bulk move bar is not built yet (Q3)")]
+    [Fact]
     [Trait("Requirement", "UX-DR25")]
     [Trait("Requirement", "AR-20")]
     public async Task A_destination_holding_the_Status_commits_in_flight_without_progress_and_focuses_the_emptied_column()
@@ -205,7 +205,7 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
     /// names the Status.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the bulk move bar is not built yet (Q5)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     [Trait("Requirement", "AR-24")]
     public async Task A_destination_lacking_the_Status_asks_for_one_with_nothing_selected()
@@ -246,7 +246,7 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="how">How the bar is closed.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC10 - the bulk move bar is not built yet (Q3)")]
+    [Theory]
     [InlineData("escape")]
     [InlineData("cancel")]
     [Trait("Requirement", "UX-DR12")]
@@ -295,7 +295,7 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="refusal">The refusal the held move is released with.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11 - the bulk move bar is not built yet")]
+    [Theory]
     [InlineData("status-destination-required")]
     [InlineData("invalid-task-project")]
     [InlineData("bound-reached")]
@@ -360,7 +360,7 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
     /// A move that never got an answer does not claim nothing moved: the bar stays and says the request was not sent.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - the bulk move bar is not built yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR32")]
     public async Task A_move_that_got_no_answer_does_not_claim_nothing_moved()
     {
@@ -392,7 +392,7 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
     /// heading.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9, AC10, AC15 - the List View control is not built yet (Q9)")]
+    [Fact]
     [Trait("Requirement", "FR-30")]
     [Trait("Requirement", "UX-DR27")]
     public async Task The_List_View_offers_the_move_for_exactly_one_Status_and_no_other_filter()
@@ -446,7 +446,7 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
     /// for a Viewer it is absent whatever is filtered.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9, AC15 - the List View control is not built yet (Q9)")]
+    [Fact]
     [Trait("Requirement", "UX-DR27")]
     [Trait("Requirement", "FR-16")]
     public async Task The_List_View_control_is_absent_beside_another_filter_and_for_a_Viewer()
@@ -482,7 +482,7 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
     /// viewport with no horizontal scroll.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the bulk move bar is not built yet")]
+    [Fact]
     [Trait("Requirement", "UX-DR41")]
     public async Task The_bar_is_usable_at_320px_with_the_Status_pager()
     {
@@ -510,6 +510,41 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
             }
 
             Assert.True(await page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= 320"), "The page scrolls horizontally at 320px.");
+        }
+    }
+
+    /// <summary>
+    /// An open bar goes with its Space: after a switch to another Space and back, in the app, no bar is drawn, the column
+    /// offers its control again, and nothing was sent.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR31")]
+    public async Task An_open_bar_does_not_survive_a_switch_to_another_Space_and_back()
+    {
+        var api = TwoSpaces();
+        _ = SeedSpace(api, Northwind, ["Draft the brief", "Book the room"], Atlas, Beacon);
+        _ = SeedSpace(api, Harbour, ["Viewer's Task"], Dune, Guid.NewGuid());
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenBoardAsync(api, page, Northwind, Atlas);
+            await OpenBarAsync(page, "Todo");
+
+            Assert.Equal(1, await page.Locator(Bar).CountAsync());
+
+            await page.EvaluateAsync("path => Blazor.navigateTo(path)", $"/spaces/{Harbour:D}/projects/{Dune:D}");
+            await page.Locator(Card, new PageLocatorOptions { HasText = "Viewer's Task" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal(0, await page.Locator(Bar).CountAsync());
+
+            await page.EvaluateAsync("path => Blazor.navigateTo(path)", $"/spaces/{Northwind:D}/projects/{Atlas:D}");
+            await page.Locator(Card, new PageLocatorOptions { HasText = "Draft the brief" }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await ColumnControl(page, "Todo").WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+
+            Assert.Equal(0, await page.Locator(Bar).CountAsync());
+            Assert.Empty(api.StatusBulkMoves);
         }
     }
 

@@ -2,7 +2,6 @@ using System.Reflection;
 using System.Runtime.CompilerServices;
 using Xunit;
 using Yello.Domain;
-using Yello.Domain.Bounds;
 using Yello.Domain.Memberships;
 
 namespace Yello.Tests.Architecture;
@@ -20,64 +19,23 @@ namespace Yello.Tests.Architecture;
 /// </para>
 /// <para>
 /// <b>Each was planted</b> (story 2.1's Debug Log): a handler injecting either port, a client predicate
-/// that shows the controls to a Viewer, and - for <see cref="Nothing_but_the_pipeline_reads_the_bound_registry"/>
-/// - the ATDD run's own plant.
+/// that shows the controls to a Viewer, and - for the bound-registry gate, now in the bulk move's partial - the ATDD run's
+/// own plant.
 /// </para>
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
 {
     /// <summary>
-    /// The one slice admitted to count a bound: a move into another Project names its destination in the body, so the
-    /// pipeline cannot count it, and a pipeline lock on the destination taken before the slice's sorted pair of Project locks
-    /// would let two opposite moves deadlock. It counts with the pipeline's own counter and limit, after its locks.
+    /// One of the two cross-Project slices admitted to count a bound: a move into another Project names its destination in
+    /// the body, so the pipeline cannot count it, and a pipeline lock on the destination taken before the slice's sorted pair
+    /// of Project locks would let two opposite moves deadlock. It counts with the pipeline's own counter and limit, after its
+    /// locks.
     /// </summary>
     private const string MovesATaskToAnotherProject = "Yello.Application.Tasks.MoveTaskToProject.MoveTaskToProjectHandler";
 
     private static string BoundCountPortName => typeof(Yello.Application.Spaces.IBoundCounter).FullName!;
     private static string IdempotencyPortName => typeof(Yello.Application.Spaces.IIdempotencyStore).FullName!;
     private static string ProjectContractsNamespace => typeof(Yello.Contracts.Projects.ProjectRoutes).Namespace!;
-
-    /// <summary>
-    /// AC10, AR-30, <c>deferred-work.md:319</c> - nothing but the pipeline reads <c>BoundRegistry</c>: a
-    /// slice that read a bound's limit would be the place it is checked outside the pipeline. Standing gate,
-    /// green before story 2.1.
-    /// </summary>
-    [Fact]
-    [Trait("Priority", "P1")]
-    [Trait("Requirement", "AR-3")]
-    [Trait("Requirement", "AD-25")]
-    public void Nothing_but_the_pipeline_reads_the_bound_registry()
-    {
-        var registry = typeof(BoundRegistry).FullName!;
-        var dependents = DependentsOf(registry);
-
-        // Vacuity guard: the pipeline reads it today (the presence bound), so the scan sees references.
-        Assert.Contains(PipelineTypeName, dependents);
-
-        string[] permitted = [registry, PipelineTypeName, MovesATaskToAnotherProject];
-
-        var offenders = dependents.Where(name => !permitted.Contains(name, StringComparer.Ordinal)).ToList();
-
-        Assert.True(
-            offenders.Count == 0,
-            $"{string.Join(", ", offenders)} read BoundRegistry. A bound is declared once and checked by the pipeline (AR-3, AD-25).");
-    }
-
-    /// <summary>
-    /// AC10, A-12 - nothing but the pipeline, the port's adapter and its registration depends on the
-    /// bound-count port, so the creation bound cannot be counted inside a slice. Plant for Task 12: a
-    /// handler injecting the port is caught.
-    /// </summary>
-    [Fact]
-    [Trait("Priority", "P1")]
-    [Trait("Requirement", "AR-3")]
-    [Trait("Requirement", "AD-25")]
-    public void Only_the_pipeline_depends_on_the_bound_count_port() =>
-        AssertOnlyThePipelineDependsOn(
-            BoundCountPortName,
-            "Yello.Infrastructure.Persistence.BoundCounter",
-            "Yello.Infrastructure.SpaceBoundaryLimits",
-            MovesATaskToAnotherProject);
 
     /// <summary>
     /// AC9, A-12's idempotency clause, <c>deferred-work.md:253-256</c> - nothing but the pipeline, the

@@ -198,7 +198,7 @@ internal sealed partial class FakeYelloApi
 
         found.Column.Tasks[found.Column.Tasks.FindIndex(candidate => candidate.Id == taskId)] = assigned;
 
-        return (200, JsonSerializer.Serialize(assigned, JsonOptions));
+        return (200, JsonSerializer.Serialize(Answered(assigned, found.Board), JsonOptions));
     }
 
     private List<(Guid MembershipId, string DisplayName)> CandidatesOf(Guid spaceId) =>

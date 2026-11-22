@@ -134,7 +134,7 @@ development_status:
   6-3-define-the-space-default-statuses-and-cascade-a-rename: done
   6-4-remove-a-space-default-status-across-every-project: done
   6-5-move-a-task-to-another-project: done
-  6-6-move-a-whole-status-of-tasks-at-once: ready-for-dev
+  6-6-move-a-whole-status-of-tasks-at-once: review
   epic-6-retrospective: optional
 
   # Epic 7: Write the same Task at the same time — and lose access the moment access ends

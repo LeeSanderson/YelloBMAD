@@ -28,20 +28,19 @@ namespace Yello.Tests.Slices.Tasks;
 /// only the bound seed is SQL (<see cref="TaskWire.SeedTasksAsync"/>, whose constraints it states).
 /// </para>
 /// <para>
-/// <b>The route is a stand-in</b> (<see cref="StatusBulkMoveWire.Route"/>) until the contract declares it. The body is the
-/// single move's: a destination Project and an optional destination Status.
+/// <b>The body is the single move's</b>: a destination Project and an optional destination Status.
 /// </para>
 /// </remarks>
 public sealed partial class TaskEndpointTests
 {
     /// <summary>
     /// With no <c>statusId</c> and a destination whose set holds the source Status, on either surface: <c>200</c> stating the
-    /// destination, the kept Status and three moved; the three are at the end of a destination column that already held three
+    /// destination, the kept Status and three moved; the three are at the end of a destination column that already held four
     /// Tasks, in their source order; and no other Task in either Project changes its Status or key.
     /// </summary>
     /// <param name="surface">The surface the move is sent on.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1, AC4, AC8 - the bulk move route is not mapped yet")]
+    [Theory]
     [InlineData(IsolationSurface.Session)]
     [InlineData(IsolationSurface.ApiToken)]
     [Trait("Requirement", "FR-41")]
@@ -63,13 +62,13 @@ public sealed partial class TaskEndpointTests
 
             var token = await IssueTokenAsync(owner, owner.SpaceId);
 
-            // The destination column holds as many Tasks as the source, so keys derived from the source keys would collide
-            // with the destination's or sort inside it, never after its last.
-            projects = await TwoProjectsAsync(owner, ["Alpha", "Bravo", "Charlie"], ["Xray", "Yankee", "Zulu"]);
+            // The destination column holds more Tasks than the source, so keys chained from the source column's last key
+            // would sort inside the destination column, and keys derived from each source key would collide with its keys.
+            projects = await TwoProjectsAsync(owner, ["Alpha", "Bravo", "Charlie"], ["Whiskey", "Xray", "Yankee", "Zulu"]);
             defaults = await StatusWire.DefaultsAsync(database, owner.SpaceId);
             _ = await TasksInStatusAsync(owner, projects.SourceId, defaults[1].Id, defaults[0].Id, "Stays behind");
             othersBefore = await PlacementsOutsideAsync(database, owner.SpaceId, projects, projects.InSource);
-            lastBefore = await MoveWire.KeyOfAsync(database, owner.SpaceId, projects.InDestination[2]);
+            lastBefore = await MoveWire.KeyOfAsync(database, owner.SpaceId, projects.InDestination[^1]);
 
             moved = await BulkMoveOnAsync(surface, owner, token, projects.SourceId, defaults[0].Id, ProjectMoveWire.Body(projects.DestinationId));
         });
@@ -93,7 +92,7 @@ public sealed partial class TaskEndpointTests
     /// <param name="cause">Why the destination lacks the source Status.</param>
     /// <param name="explicitNull">Whether <c>statusId</c> is sent as <c>null</c> rather than left out.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC4 - the bulk move route is not mapped yet")]
+    [Theory]
     [InlineData("removed-default", false)]
     [InlineData("removed-default", true)]
     [InlineData("source-added", false)]
@@ -137,7 +136,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="destination">Which kind of destination Status is supplied.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC4, AC8 - the bulk move route is not mapped yet")]
+    [Theory]
     [InlineData("default")]
     [InlineData("destination-added")]
     [Trait("Requirement", "FR-41")]
@@ -187,7 +186,7 @@ public sealed partial class TaskEndpointTests
     /// the single move applies it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4 - the bulk move route is not mapped yet (Q5)")]
+    [Fact]
     [Trait("Requirement", "FR-41")]
     public async Task A_supplied_Status_is_applied_even_when_the_source_Status_would_be_kept()
     {
@@ -220,7 +219,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="kind">The Status supplied.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC4 - the bulk move route is not mapped yet")]
+    [Theory]
     [InlineData("source-added")]
     [InlineData("foreign")]
     [InlineData("removed-default")]
@@ -271,7 +270,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="kind">The destination named.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC5 - the bulk move route is not mapped yet (Q4)")]
+    [Theory]
     [InlineData("foreign")]
     [InlineData("source")]
     [Trait("Requirement", "FR-41")]
@@ -319,7 +318,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="kind">What the path names.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC3 - the bulk move route is not mapped yet (Q4)")]
+    [Theory]
     [InlineData("foreign-project")]
     [InlineData("random-status")]
     [InlineData("foreign-status")]
@@ -379,7 +378,7 @@ public sealed partial class TaskEndpointTests
     /// <param name="json">The body, with its placeholders.</param>
     /// <param name="problemType">The refusal it meets.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC1 - the bulk move route is not mapped yet")]
+    [Theory]
     [InlineData("not json", "urn:yello:problem:invalid-task-edit")]
     [InlineData("[]", "urn:yello:problem:invalid-task-edit")]
     [InlineData("{}", "urn:yello:problem:invalid-task-edit")]
@@ -425,7 +424,7 @@ public sealed partial class TaskEndpointTests
     /// </summary>
     /// <param name="kind">The empty Status: a default, or one the source added and the destination lacks.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC2, AC6 - the bulk move route is not mapped yet (Q5)")]
+    [Theory]
     [InlineData("default")]
     [InlineData("source-added")]
     [Trait("Requirement", "FR-41")]
@@ -467,7 +466,7 @@ public sealed partial class TaskEndpointTests
     /// <c>400 invalid-status-destination</c>, not <c>200</c> with nothing moved.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2, AC4 - the bulk move route is not mapped yet (Q5)")]
+    [Fact]
     [Trait("Requirement", "FR-41")]
     [Trait("Requirement", "FR-20")]
     public async Task An_empty_Status_still_refuses_a_destination_Status_outside_the_destinations_set()
@@ -498,7 +497,7 @@ public sealed partial class TaskEndpointTests
     /// the move had enqueued would have been enqueued before it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - the bulk move route is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "FR-41")]
     [Trait("Requirement", "FR-21")]
     [Trait("Requirement", "AD-10")]
@@ -520,7 +519,7 @@ public sealed partial class TaskEndpointTests
 
         using var mail = new MailDrop();
 
-        await fixture.Hosts.RunAsync(fixture.ConnectionString!, mail.With(Configured), async client =>
+        _ = await HostProcess.RunAsync(fixture.ConnectionString!, mail.With(Configured), async client =>
         {
             owner = await RegisterAsync(client, database);
 
@@ -598,7 +597,7 @@ public sealed partial class TaskEndpointTests
     /// <param name="destinationHolds">The destination's Tasks before the move.</param>
     /// <param name="admitted">Whether the move of two is admitted.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC7 - the bulk move route is not mapped yet (Q6)")]
+    [Theory]
     [InlineData(4_999, false)]
     [InlineData(4_998, true)]
     [Trait("Requirement", "NFR-8")]
@@ -662,7 +661,7 @@ public sealed partial class TaskEndpointTests
     /// back over a Session.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - the bulk move route is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "FR-35")]
     [Trait("Requirement", "AD-20")]
@@ -729,7 +728,7 @@ public sealed partial class TaskEndpointTests
     /// exist, and recorded as a cross-Space attempt; the other Space's Tasks stay where they were.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AC16 - the bulk move route is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-20")]
     [Trait("Requirement", "NFR-1")]
@@ -772,7 +771,7 @@ public sealed partial class TaskEndpointTests
     /// Tasks, moved back to their source by another request in between, stay there.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1 - the bulk move route is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     public async Task A_replayed_key_answers_the_original_bulk_move_and_moves_nothing_again()
     {
@@ -813,7 +812,7 @@ public sealed partial class TaskEndpointTests
     /// Project's set. Anchored on the same request succeeding once the trigger is dropped.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6, AC17 - the bulk move route is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "AR-24")]
     public async Task A_failure_forced_on_the_last_Task_written_leaves_every_Task_where_it_was()
@@ -864,7 +863,7 @@ public sealed partial class TaskEndpointTests
     /// mapped to a destination Status - after which its Board holds nothing and its deletion deletes no Task.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC19 - the bulk move route is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "FR-41")]
     [Trait("Requirement", "AR-24")]
     public async Task A_Project_emptied_Status_by_Status_is_deleted_with_no_Task_in_it()

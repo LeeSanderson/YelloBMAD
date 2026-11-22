@@ -38,7 +38,7 @@ public sealed partial class TaskEndpointTests
     /// victim, and the outcome is the serial one: the second moves everything the first left in its source.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the bulk move route is not mapped yet (Q7); the riskiest assumption, activate first")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "AR-24")]
     public async Task Two_opposite_bulk_moves_queued_on_one_lock_both_land_and_neither_deadlocks()
@@ -102,7 +102,7 @@ public sealed partial class TaskEndpointTests
     /// selects under its locks and moves the created Task too, counting it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2, AC6 - the bulk move route is not mapped yet (Q2)")]
+    [Fact]
     [Trait("Requirement", "FR-41")]
     [Trait("Requirement", "FR-26")]
     [Trait("Requirement", "AD-17")]
@@ -148,7 +148,7 @@ public sealed partial class TaskEndpointTests
     /// it commits that Task stays in the third Project and the bulk move moves the rest.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2, AC6 - the bulk move route is not mapped yet (Q2)")]
+    [Fact]
     [Trait("Requirement", "FR-41")]
     [Trait("Requirement", "AD-17")]
     public async Task A_Task_moved_out_of_the_Status_before_the_move_took_its_locks_is_not_moved()
@@ -253,7 +253,7 @@ public sealed partial class TaskEndpointTests
     /// destination under its lock, finds it gone and answers <c>400 invalid-task-project</c>; nothing moved.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5, AC6 - the bulk move route is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-41")]
     public async Task A_bulk_move_queued_behind_its_destinations_deletion_is_refused_400_invalid_task_project()
@@ -300,7 +300,7 @@ public sealed partial class TaskEndpointTests
     /// under its lock, finds it gone and answers the boundary <c>404</c>; the destination is unchanged.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AC6 - the bulk move route is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "AD-3")]
     public async Task A_bulk_move_queued_behind_its_sources_deletion_answers_the_boundary_404()
@@ -348,7 +348,7 @@ public sealed partial class TaskEndpointTests
     /// <c>404</c>; the Tasks stay in the source, in the Status the removal gave them.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AC6 - the bulk move route is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-26")]
     public async Task A_bulk_move_queued_behind_the_removal_of_its_source_Status_answers_the_boundary_404()
@@ -393,7 +393,7 @@ public sealed partial class TaskEndpointTests
     /// <c>409 status-destination-required</c>; nothing moved.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4, AC6 - the bulk move route is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-26")]
     public async Task A_bulk_move_queued_behind_the_destinations_removal_of_its_Status_needs_a_destination_Status()
@@ -441,7 +441,7 @@ public sealed partial class TaskEndpointTests
     /// creation lands and the move is refused <c>409 bound-reached</c> with nothing moved.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - the bulk move route is not mapped yet (Q6)")]
+    [Fact]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "AD-25")]
     [Trait("Requirement", "AR-30")]
@@ -523,7 +523,7 @@ public sealed partial class TaskEndpointTests
     /// Task is in the destination carrying the Label.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the bulk move route is not mapped yet")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-41")]
     public async Task A_bulk_move_and_a_Labels_edit_on_one_of_its_rows_both_land()

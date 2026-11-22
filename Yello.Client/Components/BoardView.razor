@@ -60,6 +60,10 @@
     mover's card picks the Task up, carries it and drops it through the same move. The keys live in js/board-keys.js; see
     BoardView.Keys.cs. Announcements go through LiveAnnouncement, so a sentence said twice is heard twice.
 
+    EVERY TASK OF ONE STATUS INTO ANOTHER PROJECT: each non-empty column's head offers "Move to Project" to a Role that
+    manages Tasks, which opens the one bulk move bar above the columns (BulkMoveBar). While the move is out only that
+    column is busy; see BoardView.BulkMove.cs.
+
     BELOW 768PX (story 2.11) the Board is one column at a time behind the Status pager (StatusPager), a tablist over the
     effective Status set whose panel is the column. Every column stays mounted: CSS hides the unselected ones by construction
     at the media query, and the tablist, the tabpanel roles and hidden are rendered once the keys module has said the
@@ -115,6 +119,19 @@
                          FocusRequest="@_focusTabRequests" />
         }
 
+        @if (BulkMoveColumn is { } moving)
+        {
+            <BulkMoveBar SpaceId="@SpaceId"
+                         ProjectId="@ProjectId"
+                         StatusId="@moving.StatusId"
+                         StatusName="@moving.Name"
+                         Count="@moving.Total"
+                         OnBusy="BulkMoveBusy"
+                         OnMoved="BulkMoveSettledAsync"
+                         OnCancelled="BulkMoveCancelled"
+                         OnGone="BulkMoveSettledAsync" />
+        }
+
         <div class="board__columns" @ref="_columnsElement">
             @foreach (var (column, stop) in WithActiveStop(columns))
             {
@@ -129,7 +146,10 @@
                              FocusTaskId="@_focusCard"
                              FocusRequest="@_focusCardRequests"
                              FocusColumnRequest="@(column.StatusId == _focusColumn ? _focusColumnRequests : 0)"
-                             ShowAdd="@(IsFirst(column) && _canManage && !_creating && !IsEmpty)"
+                             ShowAdd="@(OffersAdd(column) && !BulkMoveBlocks(column.StatusId))"
+                             ShowBulkMove="@OffersBulkMove(column)"
+                             OnBulkMove="() => OpenBulkMove(column.StatusId)"
+                             Blocked="@BulkMoveBlocks(column.StatusId)"
                              OnAdd="OpenCreate"
                              FocusAddRequests="@(IsFirst(column) ? _focusAddRequests : 0)"
                              CanMove="@_canManage"
@@ -238,6 +258,8 @@
     private bool IsEmpty => _columns is { } columns && columns.TrueForAll(column => column.Total == 0);
 
     private bool IsFirst(ColumnState column) => _columns is [var first, ..] && ReferenceEquals(first, column);
+
+    private bool OffersAdd(ColumnState column) => IsFirst(column) && _canManage && !_creating && !IsEmpty;
 
     /// <inheritdoc />
     protected override async Task OnInitializedAsync()

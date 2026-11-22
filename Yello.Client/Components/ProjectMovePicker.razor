@@ -11,7 +11,7 @@
 
 @*
     THE MOVE TO PROJECT PICKER. Rendered in place in the Task detail panel below its "Move to Project" control, never a second
-    dialog, on the Move picker's patterns: options are PickerOptions marking nothing, one tab stop per step, and Esc steps
+    dialog, and inside the bulk move bar for a whole Status (BulkMoveBar), on the Move picker's patterns: options are PickerOptions marking nothing, one tab stop per step, and Esc steps
     back innermost first - the Status step to the Projects, the Projects out of the picker.
 
     THE PROJECTS FIRST, NOTHING SELECTED: the Space's other Projects in the server's order, the Task's own left out. A
@@ -25,7 +25,7 @@
 <div class="project-move-picker" @onkeydown="KeyDownAsync" @onkeydown:stopPropagation="true">
     @if (Step == PickerStep.InFlight && _committing is { } committing)
     {
-        <p class="project-move-picker__progress" role="status" tabindex="-1" @ref="_progress">@string.Format(CultureInfo.CurrentCulture, Localizer["ProjectMoveInFlight"], committing.ProjectName)</p>
+        <p class="project-move-picker__progress" role="status" tabindex="-1" @ref="_progress">@(InFlightText ?? string.Format(CultureInfo.CurrentCulture, Localizer["ProjectMoveInFlight"], committing.ProjectName))</p>
     }
 
     @if (Step is PickerStep.Failed or PickerStep.NoOtherProject)
@@ -109,6 +109,13 @@
     [Parameter]
     [EditorRequired]
     public Func<ProjectMoveChoice, Task<ProjectMoveAnswer>> OnCommit { get; set; } = _ => Task.FromResult(ProjectMoveAnswer.Refused);
+
+    /// <summary>
+    /// The line shown while the commit is out, in place of the single move's line naming the destination: the bulk move names its
+    /// scope there instead.
+    /// </summary>
+    [Parameter]
+    public string? InFlightText { get; set; }
 
     /// <summary>Raised when Esc leaves the picker from its first step: nothing is moved.</summary>
     [Parameter]
