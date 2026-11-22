@@ -661,7 +661,10 @@ public sealed class SmallViewportTests(ClientSurfaceFixture surface)
             await WaitUntilSaidAsync(page, "Doing, 2 Tasks.");
 
             await page.WaitForFunctionAsync("() => document.activeElement && document.activeElement.matches(\"[role='tab'][aria-selected='true']\")", null, new PageWaitForFunctionOptions { Timeout = WaitMs, PollingInterval = 50 });
+            // The visible column's bulk move control is the one stop between the tablist and its card.
+            await PressAndFocusAsync(page, "Tab", "BUTTON:Move 2 Tasks in “Doing” to another Project");
             await PressAndFocusAsync(page, "Tab", "Bravo");
+            await PressAndFocusAsync(page, "Shift+Tab", "BUTTON:Move 2 Tasks in “Doing” to another Project");
             await page.Keyboard.PressAsync("Shift+Tab");
             await page.WaitForFunctionAsync("() => document.activeElement && document.activeElement.matches(\"[role='tab'][aria-selected='true']\")", null, new PageWaitForFunctionOptions { Timeout = WaitMs, PollingInterval = 50 });
 

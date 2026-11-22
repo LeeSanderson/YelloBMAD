@@ -102,6 +102,9 @@ public sealed partial class BoardView
         return columns.Select(column => (column, stop));
     }
 
+    private static bool HoldsStop(ColumnState column, (Guid? TaskId, Guid? StatusId) stop) =>
+        stop.StatusId == column.StatusId || (stop.TaskId is { } taskId && column.Tasks.Exists(task => task.Id == taskId));
+
     /// <inheritdoc />
     void IBoardKeysHost.Focused(Guid? taskId, Guid? statusId)
     {

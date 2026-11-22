@@ -4,7 +4,7 @@ baseline_commit: a8bfad137dfb36e76a61914bc1292e101c8fd2c6
 
 # Story 6.6: Move a whole Status of Tasks at once
 
-Status: review
+Status: done
 
 Epic: 6 — Shape Statuses per Project and retire work safely (the sixth and last story)
 Story key: `6-6-move-a-whole-status-of-tasks-at-once`
@@ -264,6 +264,33 @@ so that emptying a Project safely takes one action per Status rather than one pe
   - [x] Write the disposition of every owned ledger entry (table above). Leave none blank, and leave no "Epic 6" or "story 6.6" owner.
   - [x] Additive dated notes: AD-17 (the bulk move: the same two sorted locks, one set-based statement, the selection decided under the locks) and AD-25 (two cross-Project slices count `TasksPerProject`, for *n* Tasks, after their locks).
 - [x] **Task 6 — Tests** (see Testing requirements)
+
+### Review Findings
+
+- [x] [Review][Decision] Keyboard reach of the column-head Move control — the full run caught every non-empty column's control in the Tab order, breaking the Board's one-stop composite (story 2.8 Q2 (a), UX-DR39; `KeyboardTests` x2, `SmallViewportTests` x1). Decided by Lee (2026-11-22): keyboard reach of the column-head Move control - option B (roving, active column only).
+- [x] [Review][Patch] Only the active column's Move control is a tab stop; every other column's is `tabindex="-1"`, and the stop follows the active column as the arrows move it [Yello.Client/Components/BoardColumn.razor:72, Yello.Client/Components/BoardView.Keys.cs:105] — the three tests each expect the one extra stop; new case `The_column_control_tab_stop_moves_with_the_active_column`.
+- [x] [Review][Patch] A `409 idempotency-key-in-flight` was shown as "That was already sent. Reload to see it. Nothing was moved.", although the first send may still land (UX-DR32) [Yello.Client/Components/BulkMoveBar.razor.cs:247] — the in-flight refusal no longer appends "Nothing was moved."; the no-answer browser case is now a theory covering it.
+- [x] [Review][Patch] On the Board, a reread that dropped the bar's column (its Status removed elsewhere) left `_bulkMoveStatusId` set, so no column offered the bulk move again until the Space was left [Yello.Client/Components/BoardView.BulkMove.cs:36] — a bar whose column is gone now counts as closed, and opening one clears the stale state.
+- [x] [Review][Patch] After a `404` whose Status had left the Project, focus fell to the page body: the Board focused only a column that still existed, the List View only a control that was still offered (UX-DR39) [Yello.Client/Components/BoardView.BulkMove.cs:91, Yello.Client/Components/TaskListView.BulkMove.cs:69] — the Board falls back to the first column left, the List View to its heading; new browser case `A_move_whose_Status_left_the_Project_puts_focus_on_the_first_column_left`.
+- [x] [Review][Patch] No browser case would fail if the Board's blocking guards were removed (AC10) [tests/Yello.Tests.Client/StatusBulkMoveTests.cs:180] — the in-flight case now checks that the busy column offers no create and that a click or Enter on its card opens no detail.
+- [x] [Review][Patch] The bar's `400 invalid-status-destination` branch had no browser case (AC11) [tests/Yello.Tests.Client/StatusBulkMoveTests.cs:304] — added to the refusal theory.
+- [x] [Review][Patch] Comments the diff changed carried requirement ids, story references or ATDD process text [Yello.Client/Components/TaskListView.razor:15, Yello.Client/Components/BoardColumn.razor:13, tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Tasks.cs:148, tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Projects.cs:22, tests/Yello.Tests.Client/StatusBulkMoveTests.cs:23] — removed.
+- [x] [Review][Defer] An empty Status with no usable destination Status answers `200` naming the source Status, which the destination does not hold [Yello.Application/Tasks/MoveStatusTasksToProject/MoveStatusTasksToProjectHandler.cs:109] — deferred, low severity
+- [x] [Review][Defer] The bound refusal and the in-flight line quote the tab's count, not the server's [Yello.Client/Components/BulkMoveBar.razor.cs:243] — deferred, low severity
+- [x] [Review][Defer] In the List View, a filter change while the move is out changes the bar's count [Yello.Client/Components/TaskListView.razor:132] — deferred, low severity
+- [x] [Review][Defer] A `200` whose body cannot be read is shown as "Not sent." and the Board is not reread [Yello.Client/Components/BulkMoveBar.razor.cs:197] — deferred, low severity
+- [x] [Review][Defer] A `200` with zero moved is announced "Moved 0 Tasks to X." [Yello.Client/Components/BulkMoveBar.razor.cs:260] — deferred, low severity
+- [x] [Review][Defer] Every `404` says the Status left the Project, also when the source Project itself was deleted [Yello.Client/Components/BulkMoveBar.razor.cs:213] — deferred, low severity
+- [x] [Review][Defer] "Nothing was moved." is detected by suffix-matching localized copy and borrows the Status removal's key [Yello.Client/Components/BulkMoveBar.razor.cs:256] — deferred, low severity
+- [x] [Review][Defer] Drop paths check only the destination column, not the dragged Task's source, against the busy column [Yello.Client/Components/BoardView.Drag.cs:120] — deferred, low severity
+- [x] [Review][Defer] The source column is unblocked before the reread; a failed reread leaves moved cards on the Board [Yello.Client/Components/BoardView.BulkMove.cs:65] — deferred, low severity
+- [x] [Review][Defer] Opening the bar does not close a Task detail panel already open on the source column [Yello.Client/Components/BoardView.BulkMove.cs:42] — deferred, low severity
+- [x] [Review][Defer] A Role downgrade does not close an open bar (the server still refuses `403`) [Yello.Client/Components/TaskListView.BulkMove.cs:35] — deferred, low severity
+- [x] [Review][Defer] Browser coverage gaps: `401`, `403`, key reuse on retry, purge on sign-out and Account switch, List View `aria-busy`, the bar through the 320px Status pager [tests/Yello.Tests.Client/StatusBulkMoveTests.cs] — deferred, low severity
+- [x] [Review][Defer] AC10/AC13 text still says "no other selector"; the gate exempts two hairline edges by name, misses a later `border-width` on them, and its name overclaims [tests/Yello.Tests.Architecture/DesignFoundationGateTests.BulkMoveBar.cs] — deferred, low severity
+- [x] [Review][Defer] `403` shows the refusal text in the bar rather than re-reading the Role as the Board does (recorded decision, differs from AC11's wording) [Yello.Client/Components/BulkMoveBar.razor.cs:256] — deferred, low severity
+- [x] [Review][Defer] EXPERIENCE.md and UX-DR17/UX-DR39 still say focus goes to the destination column on commit; Q3 (a) chose the originating column [_bmad-output/planning-artifacts/ux-designs/ux-YelloBMAD-2026-08-18/EXPERIENCE.md:257] — deferred, low severity
+- [x] [Review][Defer] No case asserts the bulk move's bound-reached log line (AC7) [Yello.Host/Endpoints/StatusTasksProjectMoveEndpoints.cs:85] — deferred, low severity
 
 ## Dev Notes
 
@@ -652,3 +679,4 @@ Artifacts: `_bmad-output/implementation-artifacts/6-6-move-a-whole-status-of-tas
 
 - 2026-11-22: Story created (bmad-create-story). Status: ready-for-dev.
 - 2026-11-22: Developed (bmad-dev-story). Bulk move route, slice, set-based write, gates, bar on the Board and the List View, fake API fixes, 7 live isolation rows, ledger dispositions, AD-17/AD-25 notes. AC13's "no accent border exists anywhere" reworded: the bulk move bar is the only selector with a thicker-than-hairline accent border; the two existing hairline accent edges are unchanged. Case 1's scaffold corrected (destination holds four Tasks) after plant 7 passed it.
+- 2026-11-22: Code review (bmad-code-review). Patched: the in-flight refusal no longer says nothing moved; a Board bar whose column a reread dropped no longer blocks the offer; focus after a 404 falls back to the first column or the List heading; browser cases for blocking and invalid-status-destination; comment-rule fixes. Decided by Lee (2026-11-22): keyboard reach of the column-head Move control - option B (roving, active column only); three keyboard tests each expect the one extra stop. 16 low findings deferred to deferred-work.md.

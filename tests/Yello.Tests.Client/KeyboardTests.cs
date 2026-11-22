@@ -45,6 +45,9 @@ public sealed class KeyboardTests(ClientSurfaceFixture surface)
     private const string NotSentCopy = "Not sent.";
     private const string NotAvailableCopy = "Not available.";
 
+    // The active column's bulk move control is the one stop between the "+" and the Board's card.
+    private const string TodoBulkMove = "BUTTON:Move 2 Tasks in “Todo” to another Project";
+
     private const string InsufficientRoleType = "urn:yello:problem:insufficient-role";
     private const string InvalidTaskStatusType = "urn:yello:problem:invalid-task-status";
 
@@ -82,7 +85,8 @@ public sealed class KeyboardTests(ClientSurfaceFixture surface)
             }
 
             Assert.Equal("Draft the brief", visited[^1]);
-            Assert.Equal("BUTTON:Add a Task", visited[^2]);
+            Assert.Equal(TodoBulkMove, visited[^2]);
+            Assert.Equal("BUTTON:Add a Task", visited[^3]);
             Assert.Equal(["Draft the brief", "Draft the brief"], await TabStopsAsync(page));
 
             await PressAndFocusAsync(page, "Tab", "actions:Draft the brief");
@@ -91,6 +95,7 @@ public sealed class KeyboardTests(ClientSurfaceFixture surface)
             Assert.False(await page.EvaluateAsync<bool>("() => !!document.activeElement && !!document.activeElement.closest('.board__columns')"), "A second card was a tab stop.");
 
             await FocusCardAsync(page, "Draft the brief");
+            await PressAndFocusAsync(page, "Shift+Tab", TodoBulkMove);
             await PressAndFocusAsync(page, "Shift+Tab", "BUTTON:Add a Task");
 
             await FocusCardAsync(page, "Draft the brief");
@@ -604,6 +609,7 @@ public sealed class KeyboardTests(ClientSurfaceFixture surface)
                     break;
 
                 case "create-task":
+                    await PressAndFocusAsync(page, "Shift+Tab", TodoBulkMove);
                     await PressAndFocusAsync(page, "Shift+Tab", "BUTTON:Add a Task");
                     await page.Keyboard.PressAsync("Enter");
                     await page.WaitForFunctionAsync("() => document.activeElement && document.activeElement.matches('input[type=text]')", null, new PageWaitForFunctionOptions { Timeout = WaitMs });

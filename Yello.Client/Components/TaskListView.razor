@@ -12,10 +12,10 @@
 @*
     ONE PROJECT'S LIST VIEW.
 
-    THE SAME TASKS AS ROWS, read 50 at a time from the List route (open questions 1 (a), 2 (a)). Its one write is the bulk
+    THE SAME TASKS AS ROWS, read 50 at a time from the List route. Its one write is the bulk
     move: filtered to exactly one Status and nothing else, a Role that manages Tasks is offered "Move to Project", which
     opens the bulk move bar above the rows (TaskListView.BulkMove.cs). Every other control is the same for every Role, and
-    none is disabled for a Role (AC16, UX-DR27): the move control is absent for a Viewer.
+    none is disabled for a Role: the move control is absent for a Viewer.
 
     RENDERED ONLY AFTER THE SERVER HAS ANSWERED (UX-DR31, UX-DR35): until the first page answers, a skeleton marked
     aria-busy; completion is said politely once, "List loaded.", and nothing else is said on loading or paging (AC19).

@@ -145,7 +145,7 @@ public sealed partial class RefusalBoundaryGateTests
                 && type.Name.EndsWith("Response", StringComparison.Ordinal))
             .ToList();
 
-        // Vacuity guard: the four Task 3 names, story 2.9's column page, and the bulk move's count.
+        // Vacuity guard: the four Board and Task answers, the column page, and the bulk move's count.
         Assert.Equal(
             ["BoardColumnPageResponse", "BoardColumnResponse", "BoardProjectResponse", "BoardResponse", "MoveStatusTasksToProjectResponse", "TaskResponse"],
             responses.Select(type => type.Name).Order(StringComparer.Ordinal));

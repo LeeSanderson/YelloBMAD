@@ -10,7 +10,7 @@
     THE HEAD: the Status name in typography.column-head (uppercase by text-transform, never in the string),
     then the server's true total in the count chip - the only pill in the product, plain text, never a
     nudge - then the create affordance pushed right. The affordance is the first column's alone, and absent,
-    not disabled, for a Role that lacks manage-tasks (UX-DR27). A non-empty column's head also offers "Move to Project" to
+    not disabled, for a Role that lacks manage-tasks. A non-empty column's head also offers "Move to Project" to
     such a Role, named for assistive technology by its count and Status; the bar it opens is the Board's, drawn above the
     columns, so blocking this column while the move is out never takes the bar or its focus away.
 
@@ -69,7 +69,7 @@
 
         @if (ShowBulkMove)
         {
-            <button type="button" class="board-column__bulk-move" data-role-gated aria-label="@BulkMoveName" @onclick="OnBulkMove">@Localizer["BulkMoveControl"]</button>
+            <button type="button" class="board-column__bulk-move" data-role-gated aria-label="@BulkMoveName" tabindex="@(BulkMoveTabStop ? null : "-1")" @onclick="OnBulkMove">@Localizer["BulkMoveControl"]</button>
         }
     </div>
 
@@ -193,6 +193,16 @@
     /// <summary>Raised when the bulk move control is used.</summary>
     [Parameter]
     public EventCallback OnBulkMove { get; set; }
+
+    /// <summary>
+    /// Whether this column holds the Board's tab stop, so its bulk move control is reached by Tab.
+    /// </summary>
+    /// <remarks>
+    /// One control per column in the Tab order would turn the Board's one stop into one per column. The control roves with
+    /// the active column, as the actions control roves with the active card; the others are reached by the arrows first.
+    /// </remarks>
+    [Parameter]
+    public bool BulkMoveTabStop { get; set; }
 
     /// <summary>
     /// Whether a bulk move out of this column is out: the column is busy, and the Board ignores its cards until it settles.

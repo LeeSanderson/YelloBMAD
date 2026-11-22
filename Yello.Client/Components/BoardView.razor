@@ -149,6 +149,7 @@
                              ShowAdd="@(OffersAdd(column) && !BulkMoveBlocks(column.StatusId))"
                              ShowBulkMove="@OffersBulkMove(column)"
                              OnBulkMove="() => OpenBulkMove(column.StatusId)"
+                             BulkMoveTabStop="@HoldsStop(column, stop)"
                              Blocked="@BulkMoveBlocks(column.StatusId)"
                              OnAdd="OpenCreate"
                              FocusAddRequests="@(IsFirst(column) ? _focusAddRequests : 0)"

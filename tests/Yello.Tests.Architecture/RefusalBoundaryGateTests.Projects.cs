@@ -19,8 +19,8 @@ namespace Yello.Tests.Architecture;
 /// </para>
 /// <para>
 /// <b>Each was planted</b> (story 2.1's Debug Log): a handler injecting either port, a client predicate
-/// that shows the controls to a Viewer, and - for the bound-registry gate, now in the bulk move's partial - the ATDD run's
-/// own plant.
+/// that shows the controls to a Viewer, and - for the bound-registry gate in <c>RefusalBoundaryGateTests.StatusBulkMove.cs</c>
+/// - the ATDD run's own plant.
 /// </para>
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests

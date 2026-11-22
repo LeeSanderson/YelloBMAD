@@ -20,8 +20,7 @@ namespace Yello.Tests.Client;
 /// destination's set from its seeded Status read.
 /// </para>
 /// <para>
-/// <b>The markup the cases read</b>, as recommended before it is built; correct each to what is built and record the
-/// correction in the Debug Log: in a column's head (<c>.board-column__head</c>) a button whose text is "Move to Project" and whose
+/// <b>The markup the cases read</b>: in a column's head (<c>.board-column__head</c>) a button whose text is "Move to Project" and whose
 /// accessible name is "Move {n} Tasks in “{Status}” to another Project"; in the List View (<c>.task-list</c>) a button
 /// "Move to Project" outside the table; one <c>.bulk-move-bar</c>, never inside a <c>.board-column</c>, holding a
 /// <c>[role=status]</c> scope line, the <c>.project-move-picker</c> with its <c>[role=option]</c> rows, and a button
@@ -178,6 +177,15 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
 
             Assert.Single(api.StatusBulkMoves);
 
+            // The busy column offers no create, and its cards open nothing while the move is out.
+            Assert.Equal(0, await ColumnNamed(page, "Todo").Locator(".board-column__add").CountAsync());
+
+            await ColumnNamed(page, "Todo").Locator(".task-card__open").First.ClickAsync(new LocatorClickOptions { Timeout = Timeout });
+            await ColumnNamed(page, "Todo").Locator(".task-card__open").First.PressAsync("Enter", new LocatorPressOptions { Timeout = Timeout });
+
+            // A panel renders a frame after the click, so its absence is waited for, not sampled.
+            await Assert.ThrowsAsync<TimeoutException>(() => page.Locator(".task-detail").WaitForAsync(new LocatorWaitForOptions { Timeout = 2_000 }));
+
             api.ReleaseStatusBulkMove();
 
             await page.Locator(LiveRegion, new PageLocatorOptions { HasText = "Moved 3 Tasks to Beacon." })
@@ -299,6 +307,7 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
     [InlineData("status-destination-required")]
     [InlineData("invalid-task-project")]
     [InlineData("bound-reached")]
+    [InlineData("invalid-status-destination")]
     [InlineData("not-available")]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "UX-DR32")]
@@ -342,6 +351,11 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
                         .WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
                     break;
 
+                case "invalid-status-destination":
+                    api.ReleaseStatusBulkMoveRefused(400, ProblemTypes.InvalidStatusDestination);
+                    await page.Locator(Bar, new PageLocatorOptions { HasText = NothingMoved }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+                    break;
+
                 default:
                     api.ReleaseStatusBulkMoveRefused(404, ProblemTypes.NotAvailable);
                     await page.Locator(LiveRegion, new PageLocatorOptions { HasText = "“Todo” is no longer in this Project. Nothing was moved." })
@@ -357,12 +371,56 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
     }
 
     /// <summary>
-    /// A move that never got an answer does not claim nothing moved: the bar stays and says the request was not sent.
+    /// Only the active column's control is a tab stop, and it roves with the active column: after the arrows carry the stop
+    /// into "Doing", Shift+Tab from its card reaches "Doing"'s control, and the first column's is out of the Tab order.
     /// </summary>
     /// <returns>A task.</returns>
     [Fact]
-    [Trait("Requirement", "UX-DR32")]
-    public async Task A_move_that_got_no_answer_does_not_claim_nothing_moved()
+    [Trait("Requirement", "NFR-9")]
+    public async Task The_column_control_tab_stop_moves_with_the_active_column()
+    {
+        var api = TwoSpaces();
+        _ = SeedSpace(api, Northwind, ["Draft the brief"], Atlas, Beacon);
+        var doing = api.Boards[(Northwind, Atlas)].Columns[1];
+
+        doing.Tasks.Add(new FakeTask(Guid.NewGuid(), "Review", doing.StatusId, "a00000", DateTimeOffset.UtcNow));
+        doing.Total++;
+
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenBoardAsync(api, page, Northwind, Atlas);
+
+            Assert.Null(await ColumnControl(page, "Todo").GetAttributeAsync("tabindex"));
+            Assert.Equal("-1", await ColumnControl(page, "Doing").GetAttributeAsync("tabindex"));
+
+            await ColumnNamed(page, "Todo").Locator(".task-card__open").First.FocusAsync();
+            await page.Keyboard.PressAsync("ArrowRight");
+            await page.WaitForFunctionAsync(
+                "() => !!document.activeElement && document.activeElement.textContent.includes('Review')",
+                null,
+                new PageWaitForFunctionOptions { Timeout = Timeout });
+
+            Assert.Equal("-1", await ColumnControl(page, "Todo").GetAttributeAsync("tabindex"));
+            Assert.Null(await ColumnControl(page, "Doing").GetAttributeAsync("tabindex"));
+
+            await page.Keyboard.PressAsync("Shift+Tab");
+            await page.WaitForFunctionAsync(
+                "() => !!document.activeElement && document.activeElement.getAttribute('aria-label') === 'Move 1 Task in “Doing” to another Project'",
+                null,
+                new PageWaitForFunctionOptions { Timeout = Timeout });
+        }
+    }
+
+    /// <summary>
+    /// A Status removed from the Project while its move was out takes its column with it on the reread: the bar closes and
+    /// focus goes to the first column left, never the page body; the offer comes back on the columns that remain.
+    /// </summary>
+    /// <returns>A task.</returns>
+    [Fact]
+    [Trait("Requirement", "UX-DR39")]
+    public async Task A_move_whose_Status_left_the_Project_puts_focus_on_the_first_column_left()
     {
         var api = TwoSpaces();
         _ = SeedSpace(api, Northwind, ["Draft the brief", "Book the room"], Atlas, Beacon);
@@ -378,9 +436,60 @@ public sealed class StatusBulkMoveTests(ClientSurfaceFixture surface)
             await ChooseAsync(page, "Beacon");
             await held.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
 
-            api.ReleaseStatusBulkMoveUnanswered();
+            _ = WithoutTheFirstStatus(api, Northwind, Atlas);
+            api.ReleaseStatusBulkMoveRefused(404, ProblemTypes.NotAvailable);
 
-            await page.Locator(Bar, new PageLocatorOptions { HasText = NotSentCopy }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
+            await page.Locator(LiveRegion, new PageLocatorOptions { HasText = "“Todo” is no longer in this Project. Nothing was moved." })
+                .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = Timeout });
+            await page.Locator(Bar).WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
+            await ColumnNamed(page, "Todo").WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Detached, Timeout = Timeout });
+            await page.WaitForFunctionAsync(
+                "() => !!(document.activeElement && document.activeElement.closest('.board-column'))",
+                null,
+                new PageWaitForFunctionOptions { Timeout = Timeout });
+
+            Assert.Equal("Doing", await FocusedColumnAsync(page));
+        }
+    }
+
+    /// <summary>
+    /// A move whose outcome is not known does not claim nothing moved: with no answer the bar says the request was not sent,
+    /// and while an earlier send of the same key is still out it says so.
+    /// </summary>
+    /// <param name="inFlight">Whether the held move is answered <c>409 idempotency-key-in-flight</c> rather than not at all.</param>
+    /// <returns>A task.</returns>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    [Trait("Requirement", "UX-DR32")]
+    public async Task A_move_that_got_no_answer_does_not_claim_nothing_moved(bool inFlight)
+    {
+        var api = TwoSpaces();
+        _ = SeedSpace(api, Northwind, ["Draft the brief", "Book the room"], Atlas, Beacon);
+        var (context, page) = await surface.OpenAsync(EnglishLocale);
+
+        await using (context)
+        {
+            await OpenBoardAsync(api, page, Northwind, Atlas);
+            await OpenBarAsync(page, "Todo");
+
+            var held = api.HoldStatusBulkMoveAsync();
+
+            await ChooseAsync(page, "Beacon");
+            await held.WaitAsync(TimeSpan.FromMilliseconds(Timeout), TestContext.Current.CancellationToken);
+
+            if (inFlight)
+            {
+                api.ReleaseStatusBulkMoveRefused(409, ProblemTypes.IdempotencyKeyInFlight);
+            }
+            else
+            {
+                api.ReleaseStatusBulkMoveUnanswered();
+            }
+
+            var said = inFlight ? "That was already sent. Reload to see it." : NotSentCopy;
+
+            await page.Locator(Bar, new PageLocatorOptions { HasText = said }).WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
 
             Assert.DoesNotContain(NothingMoved, await page.Locator(Bar).InnerTextAsync(), StringComparison.Ordinal);
         }

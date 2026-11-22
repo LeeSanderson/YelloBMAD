@@ -245,6 +245,14 @@ public sealed partial class BulkMoveBar
         }
 
         var reason = RefusalText.Of(Localizer, problem);
+
+        // The first send is still out and may yet land, so this one must not claim that nothing moved.
+        if (type == ProblemTypes.IdempotencyKeyInFlight)
+        {
+            _refusal = reason;
+            return ProjectMoveAnswer.Refused;
+        }
+
         string nothingMoved = Localizer["StatusRemoveRefused"];
 
         _refusal = reason.EndsWith(nothingMoved, StringComparison.Ordinal) ? reason : reason + " " + nothingMoved;

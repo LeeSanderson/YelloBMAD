@@ -74,10 +74,25 @@ public sealed partial class TaskListView
             await heading.FocusAsync();
         }
 
-        if (_focusBulkMoveControl && BulkMoveOffered is not null)
+        if (!_focusBulkMoveControl || _rows is null)
         {
-            _focusBulkMoveControl = false;
+            return;
+        }
+
+        _focusBulkMoveControl = false;
+
+        if (BulkMoveOffered is not null)
+        {
             await _bulkMoveControl.FocusAsync();
+        }
+        else if (Heading.Current is { } fallback)
+        {
+            // The reread left nothing to move, so the control is gone: the heading, rather than the page body.
+            await fallback.FocusAsync();
+        }
+        else
+        {
+            // No heading drawn yet: nothing better to focus than where focus already is.
         }
     }
 }

@@ -29,7 +29,11 @@ public sealed partial class BoardView
     /// <summary>
     /// Whether a column offers the bulk move: a Role that manages Tasks, Tasks to move, and no bar already open.
     /// </summary>
-    private bool OffersBulkMove(ColumnState column) => _canManage && column.Total > 0 && _bulkMoveStatusId is null;
+    /// <remarks>
+    /// A bar whose column a reread dropped is no longer drawn and never settles, so it counts as closed rather than holding
+    /// the offer off for the rest of the Space.
+    /// </remarks>
+    private bool OffersBulkMove(ColumnState column) => _canManage && column.Total > 0 && BulkMoveColumn is null;
 
     /// <summary>
     /// Whether the column is blocked: the bulk move out of it has been sent and has not settled.
@@ -41,10 +45,12 @@ public sealed partial class BoardView
 
     private void OpenBulkMove(Guid statusId)
     {
-        if (!_canManage || _bulkMoveStatusId is not null)
+        if (!_canManage || BulkMoveColumn is not null)
         {
             return;
         }
+
+        _ = CloseBulkMove();
 
         // A drag or a carry ends with nothing moved, and a menu or a create field closes: the bar is the one thing in hand.
         Returned(EndHeld());
@@ -86,9 +92,13 @@ public sealed partial class BoardView
 
     private void FocusColumnAfterBulkMove(Guid? statusId)
     {
-        if (statusId is { } status && Column(status) is not null)
+        // A Status that left the Project took its column with it on the reread: the first column is the nearest one left, so
+        // focus never falls to the page body.
+        var target = statusId is { } status && Column(status) is not null ? status : _columns?.FirstOrDefault()?.StatusId;
+
+        if (target is { } column)
         {
-            _focusColumn = status;
+            _focusColumn = column;
             _focusColumnRequests++;
         }
     }
