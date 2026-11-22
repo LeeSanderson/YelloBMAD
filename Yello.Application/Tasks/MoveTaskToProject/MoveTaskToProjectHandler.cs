@@ -31,7 +31,7 @@ namespace Yello.Application.Tasks.MoveTaskToProject;
 public sealed class MoveTaskToProjectHandler(ITaskStore store, IStatusDefinitionReader statuses, IBoundCounter bounds)
 {
     /// <summary>
-    /// Moves the Task.
+    /// Decides the move under both Projects' locks and writes it; every outcome but a move writes nothing.
     /// </summary>
     /// <param name="taskId">The Task, from the route.</param>
     /// <param name="destinationProjectId">The Project it moves into.</param>

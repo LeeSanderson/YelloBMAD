@@ -7,6 +7,7 @@
 @inject IStringLocalizer<ClientCopy> Localizer
 @inject HttpClient Http
 @inject ActiveSpaceState ActiveSpace
+@implements IDisposable
 
 @*
     THE MOVE TO PROJECT PICKER. Rendered in place in the Task detail panel below its "Move to Project" control, never a second
@@ -78,6 +79,8 @@
     private TaskStatusOption? _destination;
     private List<TaskStatusOption>? _statuses;
     private ProjectMoveChoice? _committing;
+    private bool _choosing;
+    private bool _disposed;
     private bool _failed;
 
     // The step's one tab stop: the option focus was last on, or the step's first.
@@ -235,12 +238,29 @@
 
     private async Task ChooseProjectAsync(Guid projectId)
     {
-        if (_committing is not null || _projects?.Find(project => project.Id == projectId) is not { } chosen)
+        // The Projects stay drawn while the chosen one's set is read, so a second choice can land before the first commits.
+        if (_committing is not null || _choosing || _projects?.Find(project => project.Id == projectId) is not { } chosen)
         {
             return;
         }
 
-        var set = await ReadSetAsync(projectId);
+        _choosing = true;
+        List<TaskStatusOption>? set;
+
+        try
+        {
+            set = await ReadSetAsync(projectId);
+        }
+        finally
+        {
+            _choosing = false;
+        }
+
+        // Esc or the panel closing while the set was read removed the picker: the person backed out, so nothing is sent.
+        if (_disposed)
+        {
+            return;
+        }
 
         if (set is null)
         {
@@ -277,15 +297,30 @@
     /// </summary>
     private async Task CommitAsync(ProjectMoveChoice choice)
     {
+        if (_committing is not null)
+        {
+            return;
+        }
+
         _committing = choice;
         _focus = true;
         StateHasChanged();
 
-        var answer = await OnCommit(choice);
+        // The status line stays until the step the answer calls for has been read again, so no step that could send
+        // another move is drawn in between.
+        try
+        {
+            await AfterCommitAsync(choice, await OnCommit(choice));
+        }
+        finally
+        {
+            _committing = null;
+            _focus = true;
+        }
+    }
 
-        _committing = null;
-        _focus = true;
-
+    private async Task AfterCommitAsync(ProjectMoveChoice choice, ProjectMoveAnswer answer)
+    {
         switch (answer)
         {
             case ProjectMoveAnswer.StatusNeeded or ProjectMoveAnswer.StatusInvalid:
@@ -314,6 +349,9 @@
                 break;
         }
     }
+
+    /// <inheritdoc />
+    public void Dispose() => _disposed = true;
 
     private Task KeyDownAsync(KeyboardEventArgs args)
     {

@@ -4,7 +4,7 @@ baseline_commit: 96371bd500a73d769c09d91598d58c9bcba756a9
 
 # Story 6.5: Move a Task to another Project
 
-Status: review
+Status: done
 
 Epic: 6 — Shape Statuses per Project and retire work safely (fifth of six stories)
 Story key: `6-5-move-a-task-to-another-project`
@@ -213,6 +213,36 @@ so that work can be re-filed without being retyped.
   - [x] Additive dated notes: AD-17 (the cross-Project move: two `ProjectTasks` locks via the sorted helper, one statement, decision order) and AD-25 (the Tasks-per-Project bound is also counted by the cross-Project move, in its slice after its locks, because the destination is in the body and a pipeline lock taken first would break the sorted order). Additive only.
   - [x] Add a low ledger entry, owner **UX**, for the card menu's "Move to Project" if Q10 (a) is taken.
 - [x] **Task 6 — Tests** (see Testing requirements)
+
+### Review Findings
+
+- [x] [Review][Patch] A second Project choice while the first one's set is read commits a second move (A→B, then B→C under a new key); a commit had no guard of its own and cleared its in-flight state before the follow-up re-read redrew a step [Yello.Client/Components/ProjectMovePicker.razor:236]
+- [x] [Review][Patch] Esc or the panel closing while the chosen Project's set is read still sends the move [Yello.Client/Components/ProjectMovePicker.razor:236]
+- [x] [Review][Patch] Literal `\n` written into an XML doc comment [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Assignment.cs:128]
+- [x] [Review][Patch] `HandleAsync` summary restates the member name ("Moves the Task.") [Yello.Application/Tasks/MoveTaskToProject/MoveTaskToProjectHandler.cs:34]
+- [x] [Review][Defer] The move takes no expected source Project; a stale tab moves the Task from wherever it now is [Yello.Application/Tasks/MoveTaskToProject/MoveTaskToProjectHandler.cs:55] — deferred, low severity
+- [x] [Review][Defer] After an unanswered move, a different choice sends a second move under a new key [Yello.Client/Components/BoardView.ProjectMove.cs:44] — deferred, low severity
+- [x] [Review][Defer] One `invalid-task-project` copy for every cause, including the Task's own Project [Yello.Client/Localisation/ClientCopy.resx:1] — deferred, low severity
+- [x] [Review][Defer] The Status step's heading can be false after a `400 invalid-status-destination` re-read [Yello.Client/Components/ProjectMovePicker.razor:37] — deferred, low severity
+- [x] [Review][Defer] A failed set read has no way back to the Projects step and says the Projects failed [Yello.Client/Components/ProjectMovePicker.razor:263] — deferred, low severity
+- [x] [Review][Defer] Other pickers and the delete confirm still open while a move is in flight [Yello.Client/Components/TaskDetail.ProjectMove.cs:34] — deferred, low severity
+- [x] [Review][Defer] A refusal arriving after the panel closed is never shown [Yello.Client/Components/BoardView.ProjectMove.cs:147] — deferred, low severity
+- [x] [Review][Defer] `409 status-destination-required` leaves the panel's error region empty [Yello.Client/Components/BoardView.ProjectMove.cs:122] — deferred, low severity
+- [x] [Review][Defer] A move drops a queued edit of the same Task and keeps the optimistic Status [Yello.Client/Components/BoardView.razor.cs:582] — deferred, low severity
+- [x] [Review][Defer] `_deleted` hides a Task moved back into this Project by another tab [Yello.Client/Components/BoardView.razor.cs:584] — deferred, low severity
+- [x] [Review][Defer] The fake API reads the body after the Task lookup [tests/Yello.Tests.Client/FakeYelloApi.ProjectMove.cs:1] — deferred, low severity
+- [x] [Review][Defer] Fake Task answers other than the move carry no `projectId` [tests/Yello.Tests.Client/FakeYelloApi.cs:2379] — deferred, low severity
+- [x] [Review][Defer] The bound gates pin neither the bound counted nor the lock order, and their names still say "only the pipeline" [tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.Projects.cs:33] — deferred, low severity
+- [x] [Review][Defer] No gate pins the one production writer of `TaskItem.ProjectId` [Yello.Domain/Tasks/TaskItem.cs:38] — deferred, low severity
+- [x] [Review][Defer] The bound-reached log line is under the endpoint's category and untested [Yello.Host/Endpoints/TaskProjectMoveEndpoints.cs:79] — deferred, low severity
+- [x] [Review][Defer] No Slices case shows an Admin moving a Task [tests/Yello.Tests.Slices/Tasks/TaskEndpointTests.ProjectMove.cs:1] — deferred, low severity
+- [x] [Review][Defer] The handler test's own-Project row does not isolate the equality check [tests/Yello.Tests.Slices/Tasks/MoveTaskToProject/MoveTaskToProjectHandlerTests.cs:1] — deferred, low severity
+- [x] [Review][Defer] `TaskDetail.razor` grew beyond "a parameter and a few lines" [Yello.Client/Components/TaskDetail.razor:144] — deferred, low severity
+- [x] [Review][Defer] The destination's last-key query is inlined rather than reused [Yello.Infrastructure/Persistence/TaskStore.cs:195] — deferred, low severity
+- [x] [Review][Defer] Duplicate JSON members are accepted [Yello.Host/Endpoints/TaskProjectMoveBody.cs:77] — deferred, low severity
+- [x] [Review][Defer] Forbidden body members are matched case-sensitively [Yello.Host/Endpoints/TaskProjectMoveBody.cs:79] — deferred, low severity
+- [x] [Review][Defer] Every unnamed outcome maps to the boundary `404` [Yello.Host/Endpoints/TaskProjectMoveEndpoints.cs:84] — deferred, low severity
+- [x] [Review][Defer] A Space deletion's cascade against a move's FK check could deadlock (speculative; creation shares the shape) [Yello.Infrastructure/Persistence/SpaceStore.cs:86] — deferred, low severity
 
 ## Dev Notes
 
@@ -656,3 +686,8 @@ Modified (artifacts):
   `invalid-task-project` problem type, and Task detail's "Move to Project" picker. Open questions 1-12 decided as their
   recommended option (a), recorded in Completion Notes. Ledger `:574`, `:861`, `:1087` closed; the bound gates admit the
   one counting slice. Isolation rows live. Status: review.
+- 2026-11-22: Code review (bmad-code-review). 44 raw findings, 36 after merging: 4 patched (the picker no longer commits
+  twice on a second choice during the destination-set read, nor after Esc or the panel closing during it; two comments),
+  23 deferred as low (20 ledger entries), 9 dismissed. Lock order checked against every other taker of the Tasks, Project
+  list and Status-defaults locks: no cycle. The slow Slices module (~25 min) predates this story (since 6.2); the story's
+  42 Slices cases take about 45 s together.

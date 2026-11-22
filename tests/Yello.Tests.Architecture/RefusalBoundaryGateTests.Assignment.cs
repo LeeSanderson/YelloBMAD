@@ -125,7 +125,8 @@ public sealed partial class RefusalBoundaryGateTests
 
     /// <summary>
     /// <c>TaskResponse</c> gains <c>AssigneeMembershipId</c> as a <c>Guid?</c> and keeps every earlier field - a field
-    /// added, none removed or retyped - and still carries no name, address or <c>SpaceId</c>. <c>ProjectId</c> is appended\n    /// on the same terms.
+    /// added, none removed or retyped - and still carries no name, address or <c>SpaceId</c>. <c>ProjectId</c> is appended
+    /// on the same terms.
     /// </summary>
     [Fact]
     [Trait("Requirement", "AD-19")]
