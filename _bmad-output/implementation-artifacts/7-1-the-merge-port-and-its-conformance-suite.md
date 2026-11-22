@@ -402,6 +402,80 @@ The recent commits (`ae9b494` closing epic 6, then `992713a`, `80c87ec`, `a8bfad
 - `tests/Yello.Tests.Architecture/AllowedReferenceEdges.cs`, `RingDependencyTests.cs:180-193`, `ReleaseGatingSuiteTests.cs`, `ClientStaticStateGateTests.cs:59-63`
 - `_bmad-output/planning-artifacts/ux-designs/ux-YelloBMAD-2026-08-18/EXPERIENCE.md:208`, `:516` (no merge prompt: the editor's job, 7.4)
 
+### ATDD artifacts - red-phase scaffolds already in the tree
+
+**Checklist:** `_bmad-output/test-artifacts/atdd-checklist-7-1-the-merge-port-and-its-conformance-suite.md`.
+
+**The port is a stand-in in the test project, not in `Yello.Merge`.** The ATDD phase wrote no product code. The port's
+intended shape is declared in `tests/Yello.Tests.Merge/PortStandIn/`, in namespace `Yello.Merge`:
+`ITextMergeStrategy`, `ITextReplica`, `ReplicaId`, `ChangeId`, `TextChange`, `ReplicaVersion`, `ChangeAdmission`,
+`Decoded<T>`, and `TextMerge`, whose factory throws. T1 moves these files into `Yello.Merge` unchanged, drops their
+`IDE0130` pragma and deletes the folder. A type left in both places is CS0436, which fails the build. Refusals are a
+`Decoded<T>` result rather than `out` parameters, because Sonar S3874 rejects `out` on a public member.
+
+**Scaffolds** (one test per row of a theory):
+
+| File | Cases | ACs | Today |
+|---|---|---|---|
+| `tests/Yello.Tests.Merge/Conformance/RegionConformanceTests.cs` | 9: the lone editor, M-1 x4, M-2 x4 | AC4, AC5 | skipped red |
+| `tests/Yello.Tests.Merge/Conformance/ExactlyOnceConformanceTests.cs` | 4 | AC4 | skipped red |
+| `tests/Yello.Tests.Merge/Conformance/ScaleConformanceTests.cs` | 5: M-5, M-4 no extra round, M-6 x3 | AC4 | skipped red |
+| `tests/Yello.Tests.Merge/Conformance/RoundTripConformanceTests.cs` | 4 | AC4 | skipped red |
+| `tests/Yello.Tests.Merge/Conformance/AdmissionConformanceTests.cs` | 8: 5 damage kinds, state and version refusal, withdraw x2 | AC4 | skipped red |
+| `tests/Yello.Tests.Merge/Conformance/TextIndexConformanceTests.cs` | 5 | AC4 | skipped red |
+| `tests/Yello.Tests.Merge/Conformance/MergeBudgetTests.cs` | 2, in `MergeTimingCollection` | AC4 (Q6) | skipped red |
+| `tests/Yello.Tests.Merge/Properties/InterleavingPropertyTests.cs` | 6: the 200-session PR budget and 5 recorded seeds | AC7 | skipped red |
+| `tests/Yello.Tests.Merge/Properties/InterleavingNightlyTests.cs` | 1: 5,000 sessions, `Tier=Nightly`, `Explicit = true` | AC7 | skipped red |
+| `tests/Yello.Tests.Merge/Falsification/LastWriterWinsFalsificationTests.cs` | 9 | AC5 | **green** |
+| `tests/Yello.Tests.Architecture/MergePortGateTests.cs` | 5: the A-8 gates | AC6 | skipped red |
+| `tests/Yello.Tests.Architecture/ReleaseGatingSuiteTests.cs` | 1: `StrictSuites` now lists Merge; the method is renamed `The_release_gating_suites_ignore_no_exit_code` | AC10 | **green** |
+| `tests/Yello.Tests.Client/MergeAssemblyBootTests.cs` | 1 | AC8 (Q12) | skipped red |
+
+The conformance facts reach the strategy only through `tests/Yello.Tests.Merge/Candidate.cs`. The case bodies live in
+`Conformance/MergeCases.*.cs`, and the falsification runs those same bodies. The harness is `Network.cs`, with `Glyphs`,
+`Ledger`, `Workload` (Q7 (a) sizes) and `Properties/InterleavingHarness.cs` (seeded, shrinking, prints the minimal trace).
+The `--ignore-exit-code 8` switch is already removed from `Yello.Tests.Merge.csproj`.
+
+**Green today, and standing gates from now on:**
+
+- `LastWriterWinsFalsificationTests`, 9/9. Whole-field LWW fails all four M-1 cases and the M-6 own-changes and
+  others'-changes cases, each on an assertion. It passes the lone-editor case and the refusal and round-trip cases. The
+  property harness catches it within 20 seeds.
+- `ReleaseGatingSuiteTests`.
+
+**Activation order, riskiest assumption first:**
+
+0. Move the stand-in into `Yello.Merge` with no candidate behind it, and confirm the falsification class stays 9/9.
+1. `AdmissionConformanceTests.A_replica_that_withdrew_a_change_keeps_editing_and_still_converges`, then the other
+   withdraw case. This is the riskiest assumption: that withdrawing a refused local change composes with the "has"
+   exchange and causal delivery. A per-origin contiguous version vector breaks here, and finding that late would reopen
+   the interface (Q4).
+2. `RegionConformanceTests`.
+3. `ExactlyOnceConformanceTests`, `TextIndexConformanceTests`, then the rest of `AdmissionConformanceTests`.
+4. `RoundTripConformanceTests`.
+5. `ScaleConformanceTests`.
+6. `InterleavingPropertyTests`, then the Nightly case once by hand with `--explicit on`.
+7. `MergeBudgetTests`.
+8. The two registrations, then `MergePortGateTests` with each plant, then `MergeAssemblyBootTests`.
+
+Activate one at a time, confirm it fails for the stated reason, then implement. A scaffold that is wrong is corrected and
+the correction recorded in the Debug Log, not deleted.
+
+**Existing gates the implementation will touch, so amend them deliberately:**
+
+- **Ring rule** (`AllowedReferenceEdges`, `RingDependencyTests.Merge_types_depend_on_nothing_but_Contracts`, the Merge
+  package ban): no change is expected. Merge keeps its one edge, to Contracts, and Host -> Merge and Client -> Merge
+  already exist. An Infrastructure -> Merge edge is Q11, owned by 7.2.
+- **Client singleton ban** (`ClientStaticStateGateTests.No_client_service_is_registered_as_a_singleton`): goes red if the
+  Client registers the strategy as a singleton. Use `AddScoped`.
+- **AssemblyMarker** (`Yello.Merge/AssemblyMarker.cs`): its `<remarks>` become false. Update them, and keep the marker,
+  because `ProductionAssemblies` loads Merge through it.
+- **Package pins** (`PackageVersionPinTests`): go red if any package is added. None is needed.
+- **CS0436**: the build fails while `PortStandIn/` and `Yello.Merge` both declare the port.
+- **Tier gates** (`DeploymentShapeTests`): `InterleavingNightlyTests` already satisfies `Every_tiered_test_is_Explicit`.
+  The `nightly.yml` step for Merge (Q10) must keep `Each_scheduled_tier_runs_its_own_tests_against_a_local_engine_only`
+  green.
+
 ## Dev Agent Record
 
 ### Agent Model Used

@@ -19,24 +19,25 @@ namespace Yello.Tests.Architecture;
 [Trait("Requirement", "NFR-1")]
 public sealed class ReleaseGatingSuiteTests
 {
-    private static readonly string[] StrictSuites = ["Yello.Tests.Isolation", "Yello.Tests.Revocation"];
+    private static readonly string[] StrictSuites = ["Yello.Tests.Isolation", "Yello.Tests.Revocation", "Yello.Tests.Merge"];
 
     /// <summary>
-    /// 1.9-ARCH-004 - the Isolation and Revocation suites carry no <c>--ignore-exit-code</c>, read from
-    /// evaluated MSBuild state rather than the project file's text.
+    /// 1.9-ARCH-004 - the Isolation, Revocation and Merge suites carry no <c>--ignore-exit-code</c>, read from
+    /// evaluated MSBuild state rather than the project file's text. Merge is release-gating too (AR-35): a
+    /// conformance case that fails must fail the run.
     /// </summary>
     /// <remarks>
     /// <b>Active - green today, a standing gate.</b> Story 1.9's red-phase scaffolds are the suites'
     /// first cases, so the zero-test switch came off in the same change.
     /// </remarks>
     [Fact]
-    public void The_isolation_and_revocation_suites_ignore_no_exit_code()
+    public void The_release_gating_suites_ignore_no_exit_code()
     {
         var projects = RepositoryLayout.AllProjectFiles
             .Where(project => StrictSuites.Contains(RepositoryLayout.ProjectName(project), StringComparer.Ordinal))
             .ToList();
 
-        // Vacuity guard: both suites are found.
+        // Vacuity guard: every strict suite is found.
         Assert.Equal(StrictSuites.Order(StringComparer.Ordinal), projects.Select(RepositoryLayout.ProjectName).Order(StringComparer.Ordinal));
 
         var lenient = projects
@@ -47,7 +48,7 @@ public sealed class ReleaseGatingSuiteTests
 
         Assert.True(
             lenient.Count == 0,
-            "A release-gating suite ignores an exit code, so a failing isolation or revocation case could report success (AC5): "
+            "A release-gating suite ignores an exit code, so a failing isolation, revocation or merge conformance case could report success: "
             + string.Join(", ", lenient));
     }
 }
