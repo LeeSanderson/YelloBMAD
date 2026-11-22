@@ -128,7 +128,7 @@ development_status:
   epic-5-retrospective: optional
 
   # Epic 6: Shape Statuses per Project and retire work safely
-  epic-6: in-progress
+  epic-6: done
   6-1-shape-a-projects-statuses: done
   6-2-remove-a-status-from-a-project-by-migrating-its-tasks: done
   6-3-define-the-space-default-statuses-and-cascade-a-rename: done
