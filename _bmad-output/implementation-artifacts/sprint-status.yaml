@@ -133,7 +133,7 @@ development_status:
   6-2-remove-a-status-from-a-project-by-migrating-its-tasks: done
   6-3-define-the-space-default-statuses-and-cascade-a-rename: done
   6-4-remove-a-space-default-status-across-every-project: done
-  6-5-move-a-task-to-another-project: backlog
+  6-5-move-a-task-to-another-project: ready-for-dev
   6-6-move-a-whole-status-of-tasks-at-once: backlog
   epic-6-retrospective: optional
 
