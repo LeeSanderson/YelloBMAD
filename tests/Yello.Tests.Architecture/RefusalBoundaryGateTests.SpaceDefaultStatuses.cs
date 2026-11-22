@@ -29,11 +29,13 @@ public sealed partial class RefusalBoundaryGateTests
 
     private const string SpaceStatusPlacePattern = SpaceStatusPattern + "/place";
 
+    private const string SpaceStatusRemoveRoutePattern = SpaceStatusPattern + "/remove";
+
     private static readonly string[] SpaceStatusForbiddenWords = ["Remove", "Restore", "Delete", "Destination", "Reset", "Inherit", "Override", "Mode"];
 
     /// <summary>
     /// The Space's Status routes are exactly <c>GET</c> and <c>POST</c> on the collection, <c>PATCH</c> on one default and
-    /// <c>POST</c> on its <c>place</c> action: the read keeps <c>ReadProjectsAndTasks</c>, every write requires
+    /// <c>POST</c> on its <c>place</c> and <c>remove</c> actions: the read keeps <c>ReadProjectsAndTasks</c>, every write requires
     /// <c>ConfigureSpaceDefaultStatuses</c>, none is Session-only and none consults a bound.
     /// </summary>
     [Fact]
@@ -43,17 +45,17 @@ public sealed partial class RefusalBoundaryGateTests
     public void The_Space_Status_routes_declare_their_capability_serve_both_surfaces_and_consult_no_bound()
     {
         var routes = RouteTable()
-            .Where(endpoint => endpoint.RoutePattern.RawText is SpaceStatusesPattern or SpaceStatusPattern or SpaceStatusPlacePattern)
+            .Where(endpoint => endpoint.RoutePattern.RawText is SpaceStatusesPattern or SpaceStatusPattern or SpaceStatusPlacePattern or SpaceStatusRemoveRoutePattern)
             .SelectMany(endpoint => (endpoint.Metadata.GetMetadata<HttpMethodMetadata>()?.HttpMethods ?? [])
                 .Select(method => (Key: $"{method} {endpoint.RoutePattern.RawText}", Endpoint: endpoint)))
             .ToDictionary(route => route.Key, route => route.Endpoint, StringComparer.Ordinal);
 
         Assert.Equal(
-            [$"GET {SpaceStatusesPattern}", $"PATCH {SpaceStatusPattern}", $"POST {SpaceStatusesPattern}", $"POST {SpaceStatusPlacePattern}"],
+            [$"GET {SpaceStatusesPattern}", $"PATCH {SpaceStatusPattern}", $"POST {SpaceStatusesPattern}", $"POST {SpaceStatusPlacePattern}", $"POST {SpaceStatusRemoveRoutePattern}"],
             routes.Keys.Order(StringComparer.Ordinal));
         Assert.Equal(Capability.ReadProjectsAndTasks, routes[$"GET {SpaceStatusesPattern}"].Metadata.GetMetadata<RequiredCapability>()?.Capability);
 
-        foreach (var write in new[] { $"POST {SpaceStatusesPattern}", $"PATCH {SpaceStatusPattern}", $"POST {SpaceStatusPlacePattern}" })
+        foreach (var write in new[] { $"POST {SpaceStatusesPattern}", $"PATCH {SpaceStatusPattern}", $"POST {SpaceStatusPlacePattern}", $"POST {SpaceStatusRemoveRoutePattern}" })
         {
             Assert.Equal(Capability.ConfigureSpaceDefaultStatuses, routes[write].Metadata.GetMetadata<RequiredCapability>()?.Capability);
         }
@@ -63,14 +65,16 @@ public sealed partial class RefusalBoundaryGateTests
     }
 
     /// <summary>
-    /// Nothing under the Space's Statuses removes a default, resets a Project to the defaults or offers a mode: anchored on the
-    /// place route existing, no route under the collection answers <c>DELETE</c> or names a removal, a reset or a mode, and no
-    /// Space Status request carries a member that could.
+    /// Nothing under the Space's Statuses resets a Project to the defaults or offers a mode, and nothing but the remove route
+    /// removes a default: anchored on the place route existing, no route under the collection answers <c>DELETE</c>, none but
+    /// <c>POST …/remove</c> names a removal, none names a reset or a mode, and neither the add, the rename nor the place request
+    /// carries a member that could remove, reset or choose a mode.
     /// </summary>
     [Fact]
     [Trait("Requirement", "FR-24")]
     [Trait("Requirement", "AD-16")]
-    public void No_route_or_request_under_the_Spaces_Statuses_offers_a_removal_a_reset_or_a_mode()
+    [Trait("Requirement", "AR-24")]
+    public void No_route_or_request_under_the_Spaces_Statuses_offers_a_reset_or_a_mode_or_a_removal_outside_the_remove_route()
     {
         var underStatuses = RouteTable()
             .Where(endpoint => endpoint.RoutePattern.RawText?.StartsWith(SpaceStatusesPattern, StringComparison.Ordinal) == true)
@@ -80,7 +84,10 @@ public sealed partial class RefusalBoundaryGateTests
 
         Assert.Contains(underStatuses, route => route.Pattern == SpaceStatusPlacePattern);
         Assert.DoesNotContain(underStatuses, route => route.Method == "DELETE");
-        Assert.DoesNotContain(underStatuses, route => Array.Exists(SpaceStatusForbiddenWords, word => route.Pattern.Contains(word, StringComparison.OrdinalIgnoreCase)));
+        Assert.DoesNotContain(
+            underStatuses.Where(route => route.Pattern != SpaceStatusRemoveRoutePattern),
+            route => Array.Exists(SpaceStatusForbiddenWords, word => route.Pattern.Contains(word, StringComparison.OrdinalIgnoreCase)));
+        Assert.All(underStatuses.Where(route => route.Pattern == SpaceStatusRemoveRoutePattern), route => Assert.Equal("POST", route.Method));
 
         foreach (var request in new[] { typeof(AddSpaceStatusRequest), typeof(RenameSpaceStatusRequest), typeof(PlaceSpaceStatusRequest) })
         {
@@ -127,8 +134,9 @@ public sealed partial class RefusalBoundaryGateTests
     }
 
     /// <summary>
-    /// The problem body gains two nullable members after its existing ones, and changes nothing else: <c>Conflicts</c>, each
-    /// <c>{ Name, ProjectId, ProjectName, TaskCount }</c>, and <c>Projects</c>, each <c>{ Id, Name }</c> - identity only.
+    /// The problem body carries two nullable members after <c>Spaces</c>, followed only by the removal's report:
+    /// <c>Conflicts</c>, each <c>{ Name, ProjectId, ProjectName, TaskCount }</c>, and <c>Projects</c>, each <c>{ Id, Name }</c> -
+    /// identity only.
     /// </summary>
     [Fact]
     [Trait("Requirement", "AD-19")]
@@ -138,10 +146,10 @@ public sealed partial class RefusalBoundaryGateTests
     {
         var parameters = typeof(Yello.Contracts.ProblemResponse).GetConstructors().Single().GetParameters();
 
-        Assert.Equal(["Type", "Errors", "Capability", "Bound", "Limit", "Spaces", "Conflicts", "Projects"], parameters.Select(parameter => parameter.Name));
+        Assert.Equal(["Type", "Errors", "Capability", "Bound", "Limit", "Spaces", "Conflicts", "Projects", "Removal"], parameters.Select(parameter => parameter.Name));
 
-        var conflicts = parameters[^2];
-        var projects = parameters[^1];
+        var conflicts = parameters[^3];
+        var projects = parameters[^2];
         var nullability = new NullabilityInfoContext();
 
         Assert.Equal(NullabilityState.Nullable, nullability.Create(conflicts).ReadState);

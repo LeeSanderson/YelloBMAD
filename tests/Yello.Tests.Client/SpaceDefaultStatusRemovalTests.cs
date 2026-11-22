@@ -17,7 +17,7 @@ namespace Yello.Tests.Client;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds.</b> The API is <see cref="FakeYelloApi"/> with the Space-level removal added
+/// <b>The API is <see cref="FakeYelloApi"/></b> with the Space-level removal added
 /// (<c>FakeYelloApi.SpaceDefaultStatusRemoval.cs</c>), deciding in the Host's order. Three Projects share the Space's three
 /// defaults: "Atlas" holds three Tasks in "Queued"; "Beacon" removed "Doing", added "Parked" and holds two Tasks in "Queued";
 /// "Comet" removed "Queued". Removing "Queued" to "Doing" therefore moves five Tasks across two Projects, Beacon is blocked, and
@@ -53,7 +53,6 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
     private const string Polite = "[role='status'][aria-live='polite']";
     private const string Placeholder = "Choose…";
     private const string ForOwnersAndAdminsCopy = "Space settings is for Owners and Admins.";
-    private const string Red = "the Space settings removal control and dialog do not exist yet";
 
     private static readonly string[] StatusNames = ["Queued", "Doing", "Done"];
 
@@ -69,7 +68,7 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="role">The Role held in the second Space.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11, AC13 - " + Red)]
+    [Theory]
     [InlineData("member")]
     [InlineData("viewer")]
     [Trait("Requirement", "UX-DR27")]
@@ -107,7 +106,7 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
     /// row, announces it politely and moves focus to the section's heading.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - " + Red + " (Q4: an unoccupied removal is direct)")]
+    [Fact]
     [Trait("Requirement", "UX-DR42")]
     public async Task An_unoccupied_default_is_removed_directly_announced_and_focus_goes_to_the_heading()
     {
@@ -135,7 +134,7 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
     /// Project is listed yet.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - " + Red + " (Q2: the dialog opens from the 409's occupancy report)")]
+    [Fact]
     [Trait("Requirement", "UX-DR42")]
     public async Task An_occupied_default_opens_the_dialog_with_the_scope_and_nothing_chosen()
     {
@@ -167,7 +166,7 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
     /// which removed "Queued", are not listed.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AC13 - " + Red)]
+    [Fact]
     public async Task Choosing_a_destination_lists_each_blocked_Project_with_its_count_and_an_unset_picker()
     {
         var api = Seeded();
@@ -201,7 +200,7 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
     /// it, and "1 destination still needed" is shown beside the commit.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - " + Red + " (Q14: the commit stays enabled; contradiction C5)")]
+    [Fact]
     [Trait("Requirement", "UX-DR42")]
     public async Task A_commit_with_a_picker_unset_sends_nothing_marks_it_and_focuses_it()
     {
@@ -244,7 +243,7 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
     /// destination and Beacon's exception.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - " + Red + " (Q8: no cancel in flight)")]
+    [Fact]
     [Trait("Requirement", "UX-DR42")]
     [Trait("Requirement", "NFR-9")]
     public async Task In_flight_the_progress_region_holds_focus_and_done_announces_the_Tasks_moved()
@@ -301,7 +300,7 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
     /// still in the section.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4, AC13 - " + Red + " (Q2: status-project-destination-required is a stand-in type)")]
+    [Fact]
     public async Task A_refusal_at_commit_says_nothing_was_moved_and_re_renders_the_table_naming_the_Project()
     {
         var api = Seeded();
@@ -335,7 +334,7 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
     /// and the row stays.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5, AC13 - " + Red + " (Q7: a Project left empty is refused, naming it)")]
+    [Fact]
     public async Task A_set_left_empty_is_refused_inline_naming_the_Project()
     {
         var api = Seeded();
@@ -362,7 +361,7 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
     /// </summary>
     /// <param name="key">"Escape", or "Cancel" to press the Cancel button.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC13 - " + Red)]
+    [Theory]
     [InlineData("Cancel")]
     [InlineData("Escape")]
     [Trait("Requirement", "UX-DR42")]
@@ -412,7 +411,7 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
     /// every control stays on screen.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - " + Red)]
+    [Fact]
     [Trait("Requirement", "NFR-9")]
     public async Task The_section_and_the_dialog_reflow_at_320_pixels_wide()
     {
@@ -439,7 +438,7 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
     /// "Waiting". Projects that renamed it kept their own names."
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC13 - the keep announcement still states a count (Q11)")]
+    [Fact]
     [Trait("Requirement", "UX-DR42")]
     public async Task The_rename_keep_answer_is_announced_without_a_count()
     {
@@ -553,8 +552,14 @@ public sealed class SpaceDefaultStatusRemovalTests(ClientSurfaceFixture surface)
     private static async Task<string[]> OptionsAsync(ILocator picker) =>
         [.. (await picker.Locator("option").AllTextContentsAsync()).Select(option => option.Trim())];
 
+    // Chromium's innerText of a select is every option's text, so the picker's cell is left out; its options are asserted on
+    // their own.
     private static async Task<string[]> RowTextsAsync(ILocator rows) =>
-        [.. (await rows.AllInnerTextsAsync()).Select(row => Regex.Replace(row, "\\s+", " ", RegexOptions.None, TimeSpan.FromSeconds(1)).Trim()).Where(row => row.Length > 0)];
+        [
+            .. (await rows.EvaluateAllAsync<string[]>("rows => rows.map(row => [...row.cells].filter(cell => !cell.querySelector('select')).map(cell => cell.innerText).join(' '))"))
+                .Select(row => Regex.Replace(row, "\\s+", " ", RegexOptions.None, TimeSpan.FromSeconds(1)).Trim())
+                .Where(row => row.Length > 0),
+        ];
 
     private static async Task<string[]> RowNamesAsync(IPage page) =>
         [.. (await page.Locator(Section).Locator(RowName).AllInnerTextsAsync()).Select(name => name.Trim())];

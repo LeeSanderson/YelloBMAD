@@ -289,7 +289,8 @@ public static class ProblemTypes
     public static string StatusRenameConflict => "urn:yello:problem:status-rename-conflict";
 
     /// <summary>
-    /// The write would leave the Project with no Status. Answered <c>409</c>; nothing is written.
+    /// The write would leave the Project with no Status, or a Space with no default. Answered <c>409</c>; nothing is
+    /// written. A Space-level removal names, in a <c>projects</c> extension, each Project it would leave with no Status.
     /// </summary>
     public static string StatusSetEmpty => "urn:yello:problem:status-set-empty";
 
@@ -307,13 +308,28 @@ public static class ProblemTypes
     /// occupancy counted under the Project's lock; nothing is written.
     /// </summary>
     /// <remarks>
-    /// <b>No count in the body</b>: the client re-reads the set, whose Task counts are the truth.
+    /// <b>No count in a Project's body</b>: the client re-reads the set, whose Task counts are the truth. A Space-level
+    /// removal answers it with a <c>removal</c> extension instead: every Project of the Space holding the Status with Tasks
+    /// in it, with its count and its own set after the removal, which is what the client's dialog asks about.
     /// </remarks>
     public static string StatusDestinationRequired => "urn:yello:problem:status-destination-required";
 
     /// <summary>
+    /// A Space-level removal left some Project without a destination: its set after the removal lacks the Space-wide
+    /// destination, it has Tasks in the Status, and the request gave it none of its own. Answered <c>409</c> with a
+    /// <c>removal</c> extension naming every such Project, with its count and its own set after the removal; nothing is
+    /// written.
+    /// </summary>
+    /// <remarks>
+    /// <b>Judged at commit, under the locks</b>, so a Project that removed the destination after the client's report is named
+    /// here rather than placed somewhere the Admin did not choose.
+    /// </remarks>
+    public static string StatusProjectDestinationRequired => "urn:yello:problem:status-project-destination-required";
+
+    /// <summary>
     /// A removal's destination is not a Status of the set the removal leaves, or its body cannot be read. Answered
-    /// <c>400</c>; nothing is written.
+    /// <c>400</c>; nothing is written. On a Space-level removal, a Project's own destination outside its set names that
+    /// Project in a <c>projects</c> extension.
     /// </summary>
     /// <remarks>
     /// <b>Never the id sent</b>: the removed Status itself, a random id and another Project's or Space's real one answer the

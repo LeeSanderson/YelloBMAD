@@ -50,6 +50,7 @@ using Yello.Application.Statuses.ListStatuses;
 using Yello.Application.Statuses.PlaceProjectStatus;
 using Yello.Application.Statuses.PlaceSpaceStatus;
 using Yello.Application.Statuses.RemoveProjectStatus;
+using Yello.Application.Statuses.RemoveSpaceStatus;
 using Yello.Application.Statuses.RenameProjectStatus;
 using Yello.Application.Statuses.RenameSpaceStatus;
 using Yello.Application.Statuses.RestoreProjectStatus;
@@ -142,6 +143,7 @@ builder.Services.AddScoped<SpaceDefaultStatusWriter>();
 builder.Services.AddScoped<AddSpaceStatusHandler>();
 builder.Services.AddScoped<RenameSpaceStatusHandler>();
 builder.Services.AddScoped<PlaceSpaceStatusHandler>();
+builder.Services.AddScoped<RemoveSpaceStatusHandler>();
 builder.Services.AddScoped<ListSpacesHandler>();
 builder.Services.AddScoped<IssueApiTokenHandler>();
 builder.Services.AddScoped<ListApiTokensHandler>();
@@ -490,6 +492,7 @@ api.MapListStatuses();
 api.MapAddSpaceStatus();
 api.MapRenameSpaceStatus();
 api.MapPlaceSpaceStatus();
+api.MapRemoveSpaceStatus();
 
 // GET /api/v1/spaces/{spaceId}. The active Space's own answer for the context bar - its name and the
 // caller's Role, as the pipeline resolved them on this request. Space-scoped like the route above.

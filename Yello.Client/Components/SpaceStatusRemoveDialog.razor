@@ -1,0 +1,286 @@
+@using System.Globalization
+@using Yello.Contracts.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    THE SPACE-LEVEL REMOVAL DIALOG of the Default Statuses section, opened from the server's report of every Project whose
+    Tasks hold the Status: the scope, one Space-wide destination over the defaults left, and - once one is chosen - a table
+    of the Projects whose own set lacks it, each with its count and a picker over that Project's set after the removal.
+
+    NO PICKER HAS A DEFAULT, and nothing is chosen for the Admin: each starts on a placeholder that is not a Status. Which
+    Projects are blocked is worked out here from the report as the Admin picks; the server judges again at commit.
+
+    THE COMMIT STAYS ENABLED, as every form here does. Pressed with a picker unset it sends nothing, marks every unset picker
+    and moves focus to the first; how many destinations are still needed is said beside it as text.
+
+    IN FLIGHT, the commit is replaced by a status region naming the scope, with no percentage, no bar and no cancel: the
+    removal is one transaction already sent. The region is drawn first and the controls leave only once it holds focus, so
+    the pressed commit is never removed while focused. Commit, Cancel and Escape are ignored then.
+
+    A REFUSAL AT COMMIT is said in the dialog's error region, and the section re-renders the table from the refusal's report,
+    so a Project that lost the destination meanwhile appears with its picker unset.
+
+    A MODAL DIALOG labelled by its heading; focus goes to the heading on open and is trapped by a sentinel at each end, each
+    sending focus round to the other end's control.
+*@
+
+<div class="status-remove-dialog-layer">
+    <div class="status-remove-dialog" role="dialog" aria-modal="true" aria-labelledby="@HeadingId" aria-describedby="@ScopeId" tabindex="-1" @onkeydown="KeyDownAsync">
+        <div class="status-remove-dialog__sentinel" tabindex="0" @onfocus="FocusLastAsync"></div>
+
+        <h2 class="type-dialog-title status-remove-dialog__heading" id="@HeadingId" tabindex="-1" @ref="_heading">@Heading</h2>
+
+        <p class="status-remove-dialog__scope" id="@ScopeId">@Format("SpaceStatusRemoveScope", StatusName)</p>
+
+        @if (Refusal is { } refusal)
+        {
+            <InlineErrorRegion @key="RefusalAttempt" Heading="@refusal.Heading" Messages="@refusal.Lines" />
+        }
+
+        @if (InFlight)
+        {
+            <p class="status-remove-dialog__progress" role="status" tabindex="-1" @ref="_progress">@InFlightText</p>
+        }
+
+        @if (ControlsShown)
+        {
+            <div class="form-field">
+                <label class="form-field__label" for="@PickerId">@Localizer["SpaceStatusRemoveDestinationLabel"]</label>
+                <select id="@PickerId"
+                        class="form-field__control"
+                        aria-invalid="@(_spaceWideMissing ? "true" : null)"
+                        aria-describedby="@(_spaceWideMissing ? MessageId : null)"
+                        @ref="_picker"
+                        @onchange="Choose">
+                    <option value="" selected="@(_destination is null)">@Localizer["StatusRemoveDestinationPlaceholder"]</option>
+                    @foreach (var status in Defaults)
+                    {
+                        <option value="@status.Id.ToString("D")" selected="@(_destination == status.Id)">@status.Name</option>
+                    }
+                </select>
+
+                @if (_spaceWideMissing)
+                {
+                    <p class="form-field__message" id="@MessageId">@Localizer["StatusRemoveDestinationMissing"]</p>
+                }
+            </div>
+
+            @if (_destination is { } chosen && Blocked is { Count: > 0 } blocked)
+            {
+                <p class="status-remove-dialog__blocked">@BlockedLine(chosen, blocked.Count)</p>
+
+                <div class="space-status-remove-dialog__table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th scope="col">@Localizer["SpaceStatusRemoveProject"]</th>
+                                <th scope="col">@Localizer["SpaceStatusRemoveTasks"]</th>
+                                <th scope="col">@Localizer["SpaceStatusRemoveDestination"]</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var project in blocked)
+                            {
+                                <SpaceStatusExceptionRow @key="project.ProjectId"
+                                                         Project="@project"
+                                                         Chosen="@_exceptions.GetValueOrDefault(project.ProjectId)"
+                                                         Missing="@_projectsMissing.Contains(project.ProjectId)"
+                                                         FocusRequest="@(project.ProjectId == _focusProject ? _focusRequests : 0)"
+                                                         OnChoose="ChooseFor" />
+                            }
+                        </tbody>
+                    </table>
+                </div>
+            }
+
+            <div class="status-remove-dialog__actions">
+                <button type="button" class="button-primary" @onclick="CommitAsync">@CommitText</button>
+                <button type="button" class="button-secondary" @onclick="CancelAsync" @ref="_cancel">@Localizer["StatusRemoveCancel"]</button>
+
+                @if (Needed > 0)
+                {
+                    <p class="status-remove-dialog__needed">@NeededText</p>
+                }
+            </div>
+        }
+
+        <div class="status-remove-dialog__sentinel" tabindex="0" @onfocus="FocusFirstAsync"></div>
+    </div>
+</div>
+
+@code {
+    private const string HeadingId = "space-status-remove-dialog-heading";
+    private const string ScopeId = "space-status-remove-dialog-scope";
+    private const string PickerId = "space-status-remove-dialog-picker";
+    private const string MessageId = "space-status-remove-dialog-message";
+
+    private readonly Dictionary<Guid, Guid> _exceptions = [];
+    private readonly HashSet<Guid> _projectsMissing = [];
+    private ElementReference _heading;
+    private ElementReference _progress;
+    private ElementReference _picker;
+    private ElementReference _cancel;
+    private Guid? _destination;
+    private bool _spaceWideMissing;
+    private bool _opened;
+    private bool _progressFocused;
+    private bool _focusPicker;
+    private Guid? _focusProject;
+    private int _focusRequests;
+
+    /// <summary>The default being removed, by name.</summary>
+    [Parameter]
+    [EditorRequired]
+    public string StatusName { get; set; } = string.Empty;
+
+    /// <summary>Every Project whose Tasks hold it, as the server last reported them.</summary>
+    [Parameter]
+    [EditorRequired]
+    public IReadOnlyList<SpaceStatusOccupancyResponse> Report { get; set; } = [];
+
+    /// <summary>The defaults the removal leaves: the only Space-wide destinations offered.</summary>
+    [Parameter]
+    [EditorRequired]
+    public IReadOnlyList<StatusResponse> Defaults { get; set; } = [];
+
+    /// <summary>Whether the removal is out.</summary>
+    [Parameter]
+    public bool InFlight { get; set; }
+
+    /// <summary>The refusal at commit to say, if any.</summary>
+    [Parameter]
+    public SpaceStatusRemovalRefusal? Refusal { get; set; }
+
+    /// <summary>Bumped with every refusal, so the error region says the next one again.</summary>
+    [Parameter]
+    public int RefusalAttempt { get; set; }
+
+    /// <summary>Raised by the commit, with the Space-wide destination and each blocked Project's own.</summary>
+    [Parameter]
+    public EventCallback<RemoveSpaceStatusRequest> OnCommit { get; set; }
+
+    /// <summary>Raised by Cancel or Escape.</summary>
+    [Parameter]
+    public EventCallback OnCancel { get; set; }
+
+    private bool ControlsShown => !InFlight || !_progressFocused;
+
+    private int TaskCount => Report.Sum(project => project.TaskCount);
+
+    private List<SpaceStatusOccupancyResponse> Blocked =>
+        _destination is { } chosen ? [.. Report.Where(project => !project.Destinations.Any(status => status.Id == chosen))] : [];
+
+    private List<SpaceStatusOccupancyResponse> Unset => [.. Blocked.Where(project => !_exceptions.ContainsKey(project.ProjectId))];
+
+    private int Needed => (_destination is null ? 1 : 0) + Unset.Count;
+
+    private string Heading => TaskCount == 1 ? Format("SpaceStatusRemoveTitleOne", StatusName) : Format("SpaceStatusRemoveTitleMany", StatusName, TaskCount);
+
+    private string CommitText => TaskCount == 1 ? Localizer["SpaceStatusRemoveCommitOne"] : Format("SpaceStatusRemoveCommitMany", TaskCount);
+
+    private string NeededText => Needed == 1 ? Localizer["SpaceStatusRemoveNeededOne"] : Format("SpaceStatusRemoveNeededMany", Needed);
+
+    private string InFlightText => (TaskCount, Report.Count) switch
+    {
+        (1, _) => Localizer["SpaceStatusRemoveInFlightOneTask"],
+        (_, 1) => Format("SpaceStatusRemoveInFlightOne", TaskCount),
+        var (tasks, projects) => Format("SpaceStatusRemoveInFlightMany", tasks, projects),
+    };
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_opened)
+        {
+            _opened = true;
+            await _heading.FocusAsync();
+        }
+
+        if (_focusPicker)
+        {
+            _focusPicker = false;
+            await _picker.FocusAsync();
+        }
+
+        if (InFlight && !_progressFocused)
+        {
+            await _progress.FocusAsync();
+            _progressFocused = true;
+            StateHasChanged();
+        }
+
+        if (!InFlight)
+        {
+            _progressFocused = false;
+        }
+    }
+
+    private string Format(string key, params object[] values) =>
+        string.Format(CultureInfo.CurrentCulture, Localizer[key], values);
+
+    private string BlockedLine(Guid destination, int count)
+    {
+        var name = Defaults.FirstOrDefault(status => status.Id == destination)?.Name ?? string.Empty;
+
+        return count == 1 ? Format("SpaceStatusRemoveBlockedOne", name) : Format("SpaceStatusRemoveBlockedMany", count, name);
+    }
+
+    private void Choose(ChangeEventArgs change)
+    {
+        _destination = Guid.TryParse(change.Value?.ToString(), out var id) ? id : null;
+        _spaceWideMissing = false;
+    }
+
+    private void ChooseFor((Guid ProjectId, Guid? StatusId) choice)
+    {
+        if (choice.StatusId is { } statusId)
+        {
+            _exceptions[choice.ProjectId] = statusId;
+            _projectsMissing.Remove(choice.ProjectId);
+        }
+        else
+        {
+            _exceptions.Remove(choice.ProjectId);
+        }
+    }
+
+    private Task CommitAsync()
+    {
+        if (InFlight)
+        {
+            return Task.CompletedTask;
+        }
+
+        if (_destination is not { } destination)
+        {
+            _spaceWideMissing = true;
+            _focusPicker = true;
+            return Task.CompletedTask;
+        }
+
+        var unset = Unset;
+
+        if (unset.Count > 0)
+        {
+            _projectsMissing.UnionWith(unset.Select(project => project.ProjectId));
+            _focusProject = unset[0].ProjectId;
+            _focusRequests++;
+            return Task.CompletedTask;
+        }
+
+        // Only the blocked Projects' own destinations travel: a choice left over from a Project that is no longer blocked
+        // would be ignored by the server anyway.
+        var exceptions = Blocked.Select(project => new SpaceStatusDestinationRequest(project.ProjectId, _exceptions[project.ProjectId])).ToList();
+
+        return OnCommit.InvokeAsync(new RemoveSpaceStatusRequest(destination, exceptions.Count > 0 ? exceptions : null));
+    }
+
+    private Task CancelAsync() => InFlight ? Task.CompletedTask : OnCancel.InvokeAsync();
+
+    private Task KeyDownAsync(KeyboardEventArgs key) => key.Key == "Escape" ? CancelAsync() : Task.CompletedTask;
+
+    private async Task FocusFirstAsync() => await (ControlsShown ? _picker : _progress).FocusAsync();
+
+    private async Task FocusLastAsync() => await (ControlsShown ? _cancel : _progress).FocusAsync();
+}

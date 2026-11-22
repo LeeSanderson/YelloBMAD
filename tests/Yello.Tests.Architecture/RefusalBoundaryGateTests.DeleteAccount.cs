@@ -72,8 +72,8 @@ public sealed partial class RefusalBoundaryGateTests
 
         var parameters = typeof(Yello.Contracts.ProblemResponse).GetConstructors().Single().GetParameters();
 
-        // Conflicts and Projects follow it: the Space default Status refusals' members, appended after it.
-        Assert.Equal(["Type", "Errors", "Capability", "Bound", "Limit", "Spaces", "Conflicts", "Projects"], parameters.Select(parameter => parameter.Name));
+        // Conflicts, Projects and Removal follow it: the Space default Status refusals' members, appended after it.
+        Assert.Equal(["Type", "Errors", "Capability", "Bound", "Limit", "Spaces", "Conflicts", "Projects", "Removal"], parameters.Select(parameter => parameter.Name));
         Assert.Equal(typeof(IReadOnlyList<Yello.Contracts.Spaces.SpaceIdentityResponse>), parameters.Single(parameter => parameter.Name == "Spaces").ParameterType);
         Assert.Equal(["Id", "Name"], PropertyNames(typeof(Yello.Contracts.Spaces.SpaceIdentityResponse)));
     }

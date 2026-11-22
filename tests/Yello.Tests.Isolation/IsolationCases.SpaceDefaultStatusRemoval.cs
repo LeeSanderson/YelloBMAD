@@ -1,6 +1,7 @@
 using System.Net;
 using Xunit;
 using Yello.Contracts;
+using Yello.Contracts.Spaces;
 using Yello.Tests.Shared;
 
 namespace Yello.Tests.Isolation;
@@ -16,11 +17,6 @@ namespace Yello.Tests.Isolation;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Pending until the route is mapped</b>; the develop phase makes these rows live before review (GATE-003) and swaps
-/// <see cref="SpaceStatusWire"/>'s stand-ins (<see cref="SpaceStatusWire.Remove"/>, <see cref="SpaceStatusWire.RemoveOf"/>)
-/// for the contract members.
-/// </para>
-/// <para>
 /// <b>Defaults are removed only in fresh actors' Spaces, never in A's or B's</b>: <c>ISO-DIRECT-STATUSES</c>,
 /// <c>ISO-AGGREGATE</c> and <c>ISO-RECORD-KIND</c> assert A's and B's three defaults exactly. The foreign Space the first row
 /// reaches is the fresh one <see cref="ForeignProjectAsync"/> seeds, and every removal that succeeds runs in a Space of its
@@ -29,14 +25,10 @@ namespace Yello.Tests.Isolation;
 /// </remarks>
 internal static partial class IsolationCases
 {
-    private const string SpaceStatusRemovalPending = "The Space-level removal route is not mapped until the dev phase of the story that removes a Space default across every Project.";
-
-    private const string SpaceStatusRemovalStory = "6.4";
-
     private static IEnumerable<IsolationCase> SpaceDefaultStatusRemovalCases() =>
     [
         new IsolationCase(
-            "ISO-REMOVE-SPACE-STATUS-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, SpaceStatusWire.Remove,
+            "ISO-REMOVE-SPACE-STATUS-FOREIGN-SPACE", "I-2", IsolationVector.Write, HttpMethod.Post, SpaceRoutes.StatusRemove,
             async world =>
             {
                 var (foreignOwner, _) = await ForeignProjectAsync(world);
@@ -45,34 +37,30 @@ internal static partial class IsolationCases
                 return new CaseRequest(
                     world.A,
                     HttpMethod.Post,
-                    [new(SpaceStatusWire.RemoveOf(foreignOwner.SpaceId, theirStatus), SpaceStatusWire.RemoveOf(Guid.NewGuid(), theirStatus))],
+                    [new(SpaceRoutes.StatusRemoveOf(foreignOwner.SpaceId, theirStatus), SpaceRoutes.StatusRemoveOf(Guid.NewGuid(), theirStatus))],
                     foreignOwner.SpaceId,
                     Body: () => SpaceStatusWire.RemoveBody(destinationStatusId: null),
                     Other: foreignOwner);
             },
-            Both(new BoundaryNotFound { Then = TheOtherSpaceKeepsItsThreeDefaultsAsync }),
-            PendingUntil: SpaceStatusRemovalStory,
-            PendingReason: SpaceStatusRemovalPending),
+            Both(new BoundaryNotFound { Then = TheOtherSpaceKeepsItsThreeDefaultsAsync })),
 
         // B's real default and a Project's added Status of the caller's own Space, each in the caller's own Space path: the
         // first is a row the StatusDefinition query filter must keep out, the second one the removal must refuse as not a
         // default, and each must answer what a random id answers.
         new IsolationCase(
-            "ISO-REMOVE-FOREIGN-STATUS-IN-OWN-SPACE", "I-4, I-5, FR-20", IsolationVector.DeepLink, HttpMethod.Post, SpaceStatusWire.Remove,
-            world => NotADefaultInOwnSpaceAsync(world, "Dx", HttpMethod.Post, SpaceStatusWire.RemoveOf, () => SpaceStatusWire.RemoveBody(destinationStatusId: null)),
-            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable)),
-            PendingUntil: SpaceStatusRemovalStory,
-            PendingReason: SpaceStatusRemovalPending),
+            "ISO-REMOVE-FOREIGN-STATUS-IN-OWN-SPACE", "I-4, I-5, FR-20", IsolationVector.DeepLink, HttpMethod.Post, SpaceRoutes.StatusRemove,
+            world => NotADefaultInOwnSpaceAsync(world, "Dx", HttpMethod.Post, SpaceRoutes.StatusRemoveOf, () => SpaceStatusWire.RemoveBody(destinationStatusId: null)),
+            Both(new SameAsAnchor(HttpStatusCode.NotFound, ExpectedType: ProblemTypes.NotAvailable))),
 
         // A destination is body-borne, so a foreign one is the removal's own 400, identical to a random destination's, never
         // the boundary 404 a path id gets. Unoccupied: a destination sent anyway is still validated.
         new IsolationCase(
-            "ISO-REMOVE-SPACE-STATUS-FOREIGN-DESTINATION", "I-1, I-13, FR-27", IsolationVector.DirectIdentifier, HttpMethod.Post, SpaceStatusWire.Remove,
+            "ISO-REMOVE-SPACE-STATUS-FOREIGN-DESTINATION", "I-1, I-13, FR-27", IsolationVector.DirectIdentifier, HttpMethod.Post, SpaceRoutes.StatusRemove,
             async world =>
             {
                 var actor = await world.NewActorAsync("Dd");
                 var foreign = (await StatusIdsAsync(world.B))[1];
-                var path = SpaceStatusWire.RemoveOf(actor.SpaceId, (await StatusIdsAsync(actor))[2]);
+                var path = SpaceRoutes.StatusRemoveOf(actor.SpaceId, (await StatusIdsAsync(actor))[2]);
 
                 return new CaseRequest(
                     actor,
@@ -82,43 +70,33 @@ internal static partial class IsolationCases
                     Body: () => SpaceStatusWire.RemoveBody(foreign),
                     AnchorBody: () => SpaceStatusWire.RemoveBody(Guid.NewGuid()));
             },
-            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidStatusDestination)),
-            PendingUntil: SpaceStatusRemovalStory,
-            PendingReason: SpaceStatusRemovalPending),
+            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidStatusDestination))),
 
         new IsolationCase(
-            "ISO-REMOVE-SPACE-STATUS-FOREIGN-EXCEPTION-DESTINATION", "I-1, I-13, FR-27", IsolationVector.DirectIdentifier, HttpMethod.Post, SpaceStatusWire.Remove,
+            "ISO-REMOVE-SPACE-STATUS-FOREIGN-EXCEPTION-DESTINATION", "I-1, I-13, FR-27", IsolationVector.DirectIdentifier, HttpMethod.Post, SpaceRoutes.StatusRemove,
             BlockedProjectGivenAForeignDestinationAsync,
-            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidStatusDestination)),
-            PendingUntil: SpaceStatusRemovalStory,
-            PendingReason: SpaceStatusRemovalPending),
+            Both(new SameAsAnchor(HttpStatusCode.BadRequest, ExpectedType: ProblemTypes.InvalidStatusDestination))),
 
         new IsolationCase(
-            "ISO-RECORD-KIND-SPACE-STATUS-REMOVE-VIEWER", "V-1, C-6, FR-16", IsolationVector.RecordKind, HttpMethod.Post, SpaceStatusWire.Remove,
-            world => ViewerOnTheDefaultsAsync(world, "Vx", HttpMethod.Post, SpaceStatusWire.RemoveOf, () => SpaceStatusWire.RemoveBody(destinationStatusId: null)),
-            Both(new RoleRefused(ConfigureDefaultsCapabilityCode)),
-            PendingUntil: SpaceStatusRemovalStory,
-            PendingReason: SpaceStatusRemovalPending),
+            "ISO-RECORD-KIND-SPACE-STATUS-REMOVE-VIEWER", "V-1, C-6, FR-16", IsolationVector.RecordKind, HttpMethod.Post, SpaceRoutes.StatusRemove,
+            world => ViewerOnTheDefaultsAsync(world, "Vx", HttpMethod.Post, SpaceRoutes.StatusRemoveOf, () => SpaceStatusWire.RemoveBody(destinationStatusId: null)),
+            Both(new RoleRefused(ConfigureDefaultsCapabilityCode))),
 
         new IsolationCase(
-            "ISO-SPACE-STATUS-REMOVAL-REPORT-AGGREGATE", "I-3, FR-27, UX-DR16", IsolationVector.Aggregate, HttpMethod.Post, SpaceStatusWire.Remove,
+            "ISO-SPACE-STATUS-REMOVAL-REPORT-AGGREGATE", "I-3, FR-27, UX-DR16", IsolationVector.Aggregate, HttpMethod.Post, SpaceRoutes.StatusRemove,
             OccupancyReportBesideAForeignSameNamedStatusAsync,
-            Both(new Served(HttpStatusCode.Conflict, ReportsOnlyTheCallersOccupiedProjectAsync, "409 status-destination-required reporting the caller's one occupied Project and nothing of the other Space's")),
-            PendingUntil: SpaceStatusRemovalStory,
-            PendingReason: SpaceStatusRemovalPending),
+            Both(new Served(HttpStatusCode.Conflict, ReportsOnlyTheCallersOccupiedProjectAsync, "409 status-destination-required reporting the caller's one occupied Project and nothing of the other Space's"))),
 
         new(
-            "ISO-TOKEN-OWN-OTHER-SPACE-SPACE-STATUS-REMOVE", "I-12", IsolationVector.TokenOwnOtherSpace, HttpMethod.Post, SpaceStatusWire.Remove,
+            "ISO-TOKEN-OWN-OTHER-SPACE-SPACE-STATUS-REMOVE", "I-12", IsolationVector.TokenOwnOtherSpace, HttpMethod.Post, SpaceRoutes.StatusRemove,
             async world =>
             {
                 var (first, second) = await world.OwnerOfTwoAsync("Tx");
-                var path = SpaceStatusWire.RemoveOf(second.SpaceId, (await StatusIdsAsync(second.Actor))[2]);
+                var path = SpaceRoutes.StatusRemoveOf(second.SpaceId, (await StatusIdsAsync(second.Actor))[2]);
 
                 return new CaseRequest(first.Actor, HttpMethod.Post, [new(path, path)], second.SpaceId, Body: () => SpaceStatusWire.RemoveBody(destinationStatusId: null), Other: second.Actor);
             },
-            TokenOwnOtherSpaceExpectations(HttpStatusCode.OK),
-            PendingUntil: SpaceStatusRemovalStory,
-            PendingReason: SpaceStatusRemovalPending),
+            TokenOwnOtherSpaceExpectations(HttpStatusCode.OK)),
     ];
 
     /// <summary>
@@ -135,7 +113,7 @@ internal static partial class IsolationCases
 
         await RemoveProjectStatusThroughTheProductAsync(actor, projectId, statuses[1]);
 
-        var path = SpaceStatusWire.RemoveOf(actor.SpaceId, statuses[0]);
+        var path = SpaceRoutes.StatusRemoveOf(actor.SpaceId, statuses[0]);
 
         return new CaseRequest(
             actor,
@@ -158,7 +136,7 @@ internal static partial class IsolationCases
         _ = await SeedProjectWithTaskAsync(own);
         _ = await SeedProjectWithTaskAsync(other);
 
-        var path = SpaceStatusWire.RemoveOf(own.SpaceId, (await StatusIdsAsync(own))[0]);
+        var path = SpaceRoutes.StatusRemoveOf(own.SpaceId, (await StatusIdsAsync(own))[0]);
 
         return new CaseRequest(own, HttpMethod.Post, [new(path, path)], TargetSpaceId: null, Body: () => SpaceStatusWire.RemoveBody(destinationStatusId: null), Other: other);
     }

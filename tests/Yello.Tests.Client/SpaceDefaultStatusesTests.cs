@@ -205,7 +205,7 @@ public sealed class SpaceDefaultStatusesTests(ClientSurfaceFixture surface)
 
             await dialog.WaitForAsync(new LocatorWaitForOptions { Timeout = Timeout });
             await dialog.GetByRole(AriaRole.Button, new LocatorGetByRoleOptions { Name = replace ? "Rename these too" : "Keep their names" }).ClickAsync();
-            await Announcement(page, replace ? "Renamed .Todo. to .Queued. in every Project\\." : "Renamed .Todo. to .Queued.\\. 2 Projects kept their own names\\.")
+            await Announcement(page, replace ? "Renamed .Todo. to .Queued. in every Project\\." : "Renamed .Todo. to .Queued.\\. Projects that renamed it kept their own names\\.")
                 .WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = Timeout });
 
             Assert.Equal(0, await page.Locator(Dialog).CountAsync());

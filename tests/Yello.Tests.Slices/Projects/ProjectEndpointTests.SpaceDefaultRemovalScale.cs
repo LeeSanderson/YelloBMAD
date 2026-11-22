@@ -40,7 +40,7 @@ public sealed partial class ProjectEndpointTests
     /// Task of a blocked one holds its exception, keys stay distinct per column, and no Task is outside its set.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Explicit = true, Skip = "red: AC16 - the Space-level removal does not exist yet (Q15: measured, not asserted)")]
+    [Fact(Explicit = true)]
     [Trait("Tier", "Nightly")]
     [Trait("Requirement", "NFR-8")]
     [Trait("Requirement", "AD-17")]

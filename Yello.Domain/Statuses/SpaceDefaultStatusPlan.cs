@@ -354,7 +354,22 @@ public enum SpaceDefaultStatusVerdict
     PositionInvalid,
 
     /// <summary>
-    /// The change would leave the Space with no default.
+    /// The change would leave the Space with no default, or some Project with no Status.
     /// </summary>
     SetEmpty,
+
+    /// <summary>
+    /// A removal moves Tasks and names no destination.
+    /// </summary>
+    DestinationRequired,
+
+    /// <summary>
+    /// A removal's Space-wide destination is not another default, or a Project's own destination is outside its set.
+    /// </summary>
+    DestinationInvalid,
+
+    /// <summary>
+    /// A Project that cannot take a removal's Space-wide destination was given none of its own.
+    /// </summary>
+    ProjectDestinationRequired,
 }

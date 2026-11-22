@@ -25,10 +25,8 @@ namespace Yello.Tests.Slices.Projects;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds.</b> Every case is skipped with the AC it waits on. The route, the problem type and the report's
-/// member are <see cref="SpaceStatusWire"/>'s stand-ins (<c>Remove</c>, <c>RemoveOf</c>,
-/// <c>StatusProjectDestinationRequired</c>, <c>RemovalOf</c>) until the contract declares them; the develop phase swaps each
-/// for the contract member.
+/// <b>The report is read from the raw body</b> (<see cref="SpaceStatusWire.RemovalOf"/>), so a member the contract does not
+/// declare is not silently dropped.
 /// </para>
 /// <para>
 /// <b>The shared seed</b> (<see cref="SeedRemovalAsync"/>) is written by the product alone, so every composite key the
@@ -43,15 +41,13 @@ namespace Yello.Tests.Slices.Projects;
 /// </remarks>
 public sealed partial class ProjectEndpointTests
 {
-    private const string RedRoute = "the Space-level removal route is not mapped yet";
-
     /// <summary>
     /// Removing the unoccupied third default with no destination answers <c>200</c> with the two defaults left; a plain
     /// Project and one that renamed and placed the third both lose it from their set and their Board; no operation names it as
     /// its Status or its anchor; and its definition is gone.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC7 - " + RedRoute + " (Q4: an unoccupied removal needs no destination)")]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "AD-16")]
@@ -103,7 +99,7 @@ public sealed partial class ProjectEndpointTests
     /// never the Project that already removed it. Nothing is written anywhere.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC2 - " + RedRoute + " (Q2: the removal itself reports occupancy in its 409)")]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "AR-24")]
     [Trait("Requirement", "UX-DR16")]
@@ -149,7 +145,7 @@ public sealed partial class ProjectEndpointTests
     /// and key; the Project that renamed the first default is migrated like any other; the defaults lose it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC7 - " + RedRoute)]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "AD-15")]
     [Trait("Requirement", "AD-17")]
@@ -219,7 +215,7 @@ public sealed partial class ProjectEndpointTests
     /// is written anywhere - no Project falls back to its first Status.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AC4 - " + RedRoute + " (Q2: status-project-destination-required is a stand-in type)")]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "AR-24")]
     [Trait("Requirement", "UX-DR16")]
@@ -241,7 +237,7 @@ public sealed partial class ProjectEndpointTests
 
         Assert.NotNull(owner);
         Assert.NotNull(seed);
-        RemovalWire.AssertRefused(refused, HttpStatusCode.Conflict, SpaceStatusWire.StatusProjectDestinationRequired);
+        RemovalWire.AssertRefused(refused, HttpStatusCode.Conflict, ProblemTypes.StatusProjectDestinationRequired);
         Assert.Equal(
             [Shown(new SpaceStatusOccupancy(seed.Blocked, "Blocked", 1, [new(seed.Defaults[2].Id, seed.Defaults[2].Name), new(seed.Parked, "Parked")]))],
             SpaceStatusWire.RemovalOf(refused!.Body).Select(Shown));
@@ -256,7 +252,7 @@ public sealed partial class ProjectEndpointTests
     /// </summary>
     /// <param name="toAddedStatus">Whether the exception is the Status the blocked Project added rather than a default.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC3, AC7, AC8 - " + RedRoute)]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "FR-27")]
@@ -303,7 +299,7 @@ public sealed partial class ProjectEndpointTests
     /// unreadable body are the same type; nothing is written.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AC12 - " + RedRoute)]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "NFR-1")]
     [Trait("Requirement", "FR-20")]
@@ -338,7 +334,7 @@ public sealed partial class ProjectEndpointTests
             foreign = await Space.RemoveAsync(actor, owner.SpaceId, d[0].Id, d[1].Id, [(seed.Blocked, (await Wire.DefaultsAsync(database, other.SpaceId))[2].Id)]);
             random = await Space.RemoveAsync(actor, owner.SpaceId, d[0].Id, d[1].Id, [(seed.Blocked, Guid.NewGuid())]);
             twice = await Space.RemoveAsync(actor, owner.SpaceId, d[0].Id, d[1].Id, [(seed.Blocked, d[2].Id), (seed.Blocked, seed.Parked)]);
-            unreadable = await Space.RawAsync(actor, HttpMethod.Post, SpaceStatusWire.RemoveOf(owner.SpaceId, d[0].Id), "{ not json");
+            unreadable = await Space.RawAsync(actor, HttpMethod.Post, SpaceRoutes.StatusRemoveOf(owner.SpaceId, d[0].Id), "{ not json");
         });
 
         Assert.NotNull(owner);
@@ -363,7 +359,7 @@ public sealed partial class ProjectEndpointTests
     /// Project's Tasks take the Space-wide destination, and the foreign Space is untouched.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC3, AC12 - " + RedRoute + " (Q6: exceptions for unblocked or unknown Projects are ignored)")]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "NFR-1")]
     public async Task Exceptions_for_an_unblocked_a_foreign_or_a_random_Project_are_ignored()
@@ -413,7 +409,7 @@ public sealed partial class ProjectEndpointTests
     /// for byte, naming no Project; nothing is written.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC1, AC12 - " + RedRoute)]
+    [Fact]
     [Trait("Requirement", "FR-26")]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "NFR-1")]
@@ -459,7 +455,7 @@ public sealed partial class ProjectEndpointTests
     /// one, removing the last is <c>409 status-set-empty</c> naming no Project. Nothing is written by either.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC5 - " + RedRoute + " (Q7: a Project left empty is refused, naming it; contradiction C1)")]
+    [Fact]
     [Trait("Requirement", "FR-24")]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "FR-27")]
@@ -516,7 +512,7 @@ public sealed partial class ProjectEndpointTests
     /// its Task is migrated and its <c>Rename</c> op is gone.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC8 - " + RedRoute)]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "AD-16")]
     public async Task A_Project_that_removed_the_default_is_unaffected_and_one_that_renamed_it_is_migrated()
@@ -564,7 +560,7 @@ public sealed partial class ProjectEndpointTests
     /// other two defaults in Space order.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC7 - " + RedRoute + " (re-anchoring reuses EffectiveStatusSet.Reanchored)")]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "AD-16")]
     public async Task A_Project_whose_places_anchor_on_the_default_keeps_the_rest_of_its_order()
@@ -620,7 +616,7 @@ public sealed partial class ProjectEndpointTests
     /// definition, and the add-back also requires a current default.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC9 - " + RedRoute + " (Q9: the definition and every op of it are deleted)")]
+    [Fact]
     [Trait("Requirement", "FR-25")]
     [Trait("Requirement", "AD-16")]
     [Trait("Requirement", "AD-3")]
@@ -662,7 +658,7 @@ public sealed partial class ProjectEndpointTests
     /// new Task lands in the Project's first Status after the removal.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC14 - " + RedRoute)]
+    [Fact]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "FR-30")]
     public async Task After_a_Space_removal_the_List_cursor_the_column_page_the_Board_and_Task_creation_follow()
@@ -711,7 +707,7 @@ public sealed partial class ProjectEndpointTests
     /// </summary>
     /// <param name="role">The caller's Role.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC11 - " + RedRoute)]
+    [Theory]
     [InlineData("Member")]
     [InlineData("Viewer")]
     [Trait("Requirement", "FR-16")]
@@ -759,7 +755,7 @@ public sealed partial class ProjectEndpointTests
     /// Token, each answering <c>200</c> with the defaults left.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC11 - " + RedRoute)]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "FR-27")]
     public async Task An_Admin_removes_a_default_on_both_surfaces()
@@ -795,7 +791,7 @@ public sealed partial class ProjectEndpointTests
     /// in-Space <c>404</c>, byte-identical to a random id's, and record nothing. Neither Space's defaults change.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC12 - " + RedRoute)]
+    [Fact]
     [Trait("Requirement", "NFR-1")]
     [Trait("Requirement", "AD-3")]
     [Trait("Requirement", "AD-20")]
@@ -852,7 +848,7 @@ public sealed partial class ProjectEndpointTests
     /// no destination reports only its own Project, and nothing of the other's id or name.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC2, AC12 - " + RedRoute)]
+    [Fact]
     [Trait("Requirement", "NFR-1")]
     [Trait("Requirement", "AD-2")]
     [Trait("Requirement", "FR-27")]
@@ -895,7 +891,7 @@ public sealed partial class ProjectEndpointTests
     /// migrates once: every Task keeps the key the first answer gave it.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC15 - " + RedRoute)]
+    [Fact]
     [Trait("Requirement", "AD-18")]
     public async Task A_replayed_Space_removal_returns_the_original_answer_and_migrates_once()
     {

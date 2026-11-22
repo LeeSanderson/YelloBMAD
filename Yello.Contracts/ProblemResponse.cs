@@ -41,7 +41,14 @@ namespace Yello.Contracts;
 /// </param>
 /// <param name="Projects">
 /// On <see cref="ProblemTypes.StatusNameTaken"/> from a change of the Space's defaults: the Projects whose set already holds
-/// the name, identity only. Absent when the name is another default's.
+/// the name, identity only. Absent when the name is another default's. On a Space-level removal's
+/// <see cref="ProblemTypes.StatusSetEmpty"/> or <see cref="ProblemTypes.InvalidStatusDestination"/>: the Projects it would
+/// leave empty, or whose own destination is outside their set.
+/// </param>
+/// <param name="Removal">
+/// On a Space-level removal's <see cref="ProblemTypes.StatusDestinationRequired"/> or
+/// <see cref="ProblemTypes.StatusProjectDestinationRequired"/>: the Projects it names, each with its Task count and its own
+/// set after the removal.
 /// </param>
 public sealed record ProblemResponse(
     string? Type,
@@ -51,4 +58,5 @@ public sealed record ProblemResponse(
     int? Limit = null,
     IReadOnlyList<Spaces.SpaceIdentityResponse>? Spaces = null,
     IReadOnlyList<Spaces.StatusRenameConflictResponse>? Conflicts = null,
-    IReadOnlyList<Spaces.ProjectIdentityResponse>? Projects = null);
+    IReadOnlyList<Spaces.ProjectIdentityResponse>? Projects = null,
+    IReadOnlyList<Spaces.SpaceStatusOccupancyResponse>? Removal = null);

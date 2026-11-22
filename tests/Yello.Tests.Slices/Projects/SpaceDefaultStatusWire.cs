@@ -62,10 +62,10 @@ internal static class SpaceDefaultStatusWire
         Guid? destinationStatusId,
         IReadOnlyList<(Guid ProjectId, Guid DestinationStatusId)>? exceptions = null,
         string? key = null) =>
-        actor.Session.SendWithHeadersAsync(HttpMethod.Post, SpaceStatusWire.RemoveOf(spaceId, statusId), SpaceStatusWire.RemoveBody(destinationStatusId, exceptions), TaskWire.KeyHeader(key));
+        actor.Session.SendWithHeadersAsync(HttpMethod.Post, SpaceRoutes.StatusRemoveOf(spaceId, statusId), SpaceStatusWire.RemoveBody(destinationStatusId, exceptions), TaskWire.KeyHeader(key));
 
     public static Task<WireResponse> RemoveWithTokenAsync(Actor actor, string token, Guid spaceId, Guid statusId, Guid? destinationStatusId) =>
-        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, SpaceStatusWire.RemoveOf(spaceId, statusId), token, SpaceStatusWire.RemoveBody(destinationStatusId), TaskWire.NoHeaders);
+        actor.Session.SendWithTokenAndHeadersAsync(HttpMethod.Post, SpaceRoutes.StatusRemoveOf(spaceId, statusId), token, SpaceStatusWire.RemoveBody(destinationStatusId), TaskWire.NoHeaders);
 
     /// <summary>
     /// Removes a default at Space level through the product, failing the case unless it answers <c>200</c>, and answers the

@@ -120,12 +120,19 @@ internal static class ApplicationLocks
     /// <para>
     /// <b>Exclusive for a Space-level change, Shared for a Project's delta write</b>, which takes it before its Project's
     /// lock: a Project's name check and a Space-level name change never interleave, and two Projects' writes never wait on
-    /// each other. The order is always this lock, then <see cref="ProjectTasks"/>; nothing takes this one after that.
+    /// each other.
     /// </para>
     /// <para>
-    /// <b>Task writers never take it.</b> No change it guards takes a Status out of a Project's set, so a Status a Task could
-    /// hold before stays one it can hold. A Space-level removal does take Statuses away: it must take this lock Exclusive and
-    /// then every affected Project's <see cref="ProjectTasks"/> lock in a fixed order, by Project id.
+    /// <b>The order, for every taker:</b> this lock, then <see cref="ProjectsPerSpace"/>, then <see cref="ProjectTasks"/>,
+    /// several of them only through <see cref="TakeProjectTasksAsync(YelloDbContext, IReadOnlyCollection{Guid}, CancellationToken)"/>.
+    /// A Space-level removal takes all three, the last for every Project whose set holds the Status; a Project delta write
+    /// takes this one Shared and its own Tasks lock; a Project deletion takes the Project list and its Tasks lock. Nothing
+    /// takes this lock after either of the others, and nothing takes the Project list after a Tasks lock, so no two takers
+    /// can wait on each other in a cycle.
+    /// </para>
+    /// <para>
+    /// <b>Task writers never take it.</b> They take only their Project's Tasks lock, which a Space-level removal holds for
+    /// every Project it takes the Status from, so a Task write queued behind the removal reads the set after it commits.
     /// </para>
     /// </remarks>
     /// <param name="spaceId">The request's Space.</param>
@@ -240,6 +247,26 @@ internal static class ApplicationLocks
             ?? throw new InvalidOperationException("A Project's Tasks lock is taken only inside a Space-scoped unit of work.");
 
         return TakeAsync(dbContext, ProjectTasks(spaceId, projectId), cancellationToken);
+    }
+
+    /// <summary>
+    /// Takes the Tasks lock of several Projects of the request's Space, always in the ordinal order of their lock names,
+    /// so two writers that each need several - a Space-level removal, and a move of Tasks between two Projects - never take
+    /// them in opposite orders.
+    /// </summary>
+    /// <param name="dbContext">The request's unit of work, scoped to a Space and inside its transaction.</param>
+    /// <param name="projectIds">The Projects.</param>
+    /// <param name="cancellationToken">The request's cancellation token.</param>
+    /// <returns>A task.</returns>
+    internal static async Task TakeProjectTasksAsync(YelloDbContext dbContext, IReadOnlyCollection<Guid> projectIds, CancellationToken cancellationToken)
+    {
+        var spaceId = dbContext.ScopedSpaceId
+            ?? throw new InvalidOperationException("A Project's Tasks lock is taken only inside a Space-scoped unit of work.");
+
+        foreach (var resource in projectIds.Distinct().Select(projectId => ProjectTasks(spaceId, projectId)).Order(StringComparer.Ordinal))
+        {
+            await TakeAsync(dbContext, resource, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>

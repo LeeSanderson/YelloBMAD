@@ -1,0 +1,79 @@
+@using System.Globalization
+@using Yello.Contracts.Spaces
+
+@inject IStringLocalizer<ClientCopy> Localizer
+
+@*
+    ONE BLOCKED PROJECT in the Space-level removal dialog: its name, how many of its Tasks hold the Status, and a picker over
+    its own set after the removal - the Space defaults it still holds and the Statuses it added, by its own names.
+
+    THE PICKER HAS NO DEFAULT: it starts on the placeholder, and a commit with it unset marks it and asks the dialog to focus
+    it. Labelled for its Project, since the column heading alone does not name whose destination it is.
+*@
+
+<tr>
+    <td>@Project.ProjectName</td>
+    <td>@Project.TaskCount.ToString(CultureInfo.CurrentCulture)</td>
+    <td>
+        <select class="form-field__control"
+                aria-label="@string.Format(CultureInfo.CurrentCulture, Localizer["SpaceStatusRemoveDestinationFor"], Project.ProjectName)"
+                aria-invalid="@(Missing ? "true" : null)"
+                aria-describedby="@(Missing ? MessageId : null)"
+                @ref="_picker"
+                @onchange="ChooseAsync">
+            <option value="" selected="@(Chosen is null)">@Localizer["StatusRemoveDestinationPlaceholder"]</option>
+            @foreach (var status in Project.Destinations)
+            {
+                <option value="@status.Id.ToString("D")" selected="@(Chosen == status.Id)">@status.Name</option>
+            }
+        </select>
+
+        @if (Missing)
+        {
+            <p class="form-field__message" id="@MessageId">@Localizer["SpaceStatusRemoveProjectDestinationMissing"]</p>
+        }
+    </td>
+</tr>
+
+@code {
+    private ElementReference _picker;
+    private int _focusSeen;
+
+    /// <summary>The blocked Project, as the server reported it.</summary>
+    [Parameter]
+    [EditorRequired]
+    public SpaceStatusOccupancyResponse Project { get; set; } = new(Guid.Empty, string.Empty, 0, []);
+
+    /// <summary>Its own destination, once chosen.</summary>
+    [Parameter]
+    public Guid? Chosen { get; set; }
+
+    /// <summary>Whether a commit was pressed with this picker unset.</summary>
+    [Parameter]
+    public bool Missing { get; set; }
+
+    /// <summary>Bumped when the dialog asks this picker to take focus.</summary>
+    [Parameter]
+    public int FocusRequest { get; set; }
+
+    /// <summary>Raised by the picker, with the Project and the Status chosen, or <c>null</c> for the placeholder.</summary>
+    [Parameter]
+    public EventCallback<(Guid ProjectId, Guid? StatusId)> OnChoose { get; set; }
+
+    private string MessageId => $"space-status-exception-{Project.ProjectId:N}";
+
+    /// <inheritdoc />
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (FocusRequest == 0 || FocusRequest == _focusSeen)
+        {
+            return;
+        }
+
+        _focusSeen = FocusRequest;
+        await _picker.FocusAsync();
+    }
+
+    private Task ChooseAsync(ChangeEventArgs change) =>
+        OnChoose.InvokeAsync((Project.ProjectId, Guid.TryParse(change.Value?.ToString(), out var id) ? id : null));
+}

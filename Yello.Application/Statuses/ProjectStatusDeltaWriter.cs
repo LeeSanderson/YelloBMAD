@@ -88,7 +88,7 @@ public sealed class ProjectStatusDeltaWriter(
         var draft = new ProjectStatusDeltaDraft(
             spaceId,
             projectId,
-            EffectiveStatusSet.Of(defaults, delta),
+            defaults,
             delta,
             identifiers,
             clock.GetUtcNow(),

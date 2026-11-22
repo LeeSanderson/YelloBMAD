@@ -42,7 +42,7 @@ public sealed partial class ProjectEndpointTests
     /// </summary>
     /// <param name="withDestination">Whether the removal names the second default as destination.</param>
     /// <returns>A task.</returns>
-    [Theory(Skip = "red: AC6 - the Space-level removal does not exist yet, so nothing takes the affected Projects' Tasks locks (Q5)")]
+    [Theory]
     [InlineData(false)]
     [InlineData(true)]
     [Trait("Requirement", "AD-17")]
@@ -105,7 +105,7 @@ public sealed partial class ProjectEndpointTests
     /// only once it holds the lock, is refused <c>400 invalid-task-status</c>.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the Space-level removal does not exist yet (Q5)")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-27")]
     public async Task A_Task_edit_into_the_default_queued_behind_the_Space_removal_is_refused_400()
@@ -159,7 +159,7 @@ public sealed partial class ProjectEndpointTests
     /// Project holds the first and second defaults and not the third.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the Space-level removal does not exist yet (Q5)")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-27")]
     public async Task A_Project_add_back_queued_behind_the_Space_removal_applies_to_the_state_after_it()
@@ -215,7 +215,7 @@ public sealed partial class ProjectEndpointTests
     /// <c>409</c> naming it - never placing its Tasks anywhere.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC4, AC6 - the Space-level removal does not exist yet (Q2: the blocked refusal is a stand-in type)")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "UX-DR16")]
@@ -259,7 +259,7 @@ public sealed partial class ProjectEndpointTests
 
         Assert.NotNull(owner);
         Assert.True(projectRemoval?.StatusCode == HttpStatusCode.OK, $"{projectRemoval?.StatusCode} {projectRemoval?.Body}");
-        RemovalWire.AssertRefused(spaceRemoval, HttpStatusCode.Conflict, SpaceStatusWire.StatusProjectDestinationRequired);
+        RemovalWire.AssertRefused(spaceRemoval, HttpStatusCode.Conflict, ProblemTypes.StatusProjectDestinationRequired);
         Assert.Equal([(projectId, 1)], SpaceStatusWire.RemovalOf(spaceRemoval!.Body).Select(entry => (entry.ProjectId, entry.TaskCount)));
         Assert.Equal(3, (await Wire.DefaultsAsync(database, owner.SpaceId)).Count);
         Assert.All(await TaskWire.TaskRowsAsync(database, owner.SpaceId), row => Assert.Equal(defaults[0].Id, row.StatusId));
@@ -272,7 +272,7 @@ public sealed partial class ProjectEndpointTests
     /// the third default.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC6 - the Space-level removal does not exist yet, so nothing takes ProjectsPerSpace (Q5)")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-27")]
     public async Task A_Project_created_while_the_Space_removal_holds_the_Project_list_waits_and_holds_a_set_without_the_default()
@@ -327,7 +327,7 @@ public sealed partial class ProjectEndpointTests
     /// once the trigger is dropped.
     /// </summary>
     /// <returns>A task.</returns>
-    [Fact(Skip = "red: AC10 - the Space-level removal does not exist yet (Q13: the trigger fires at the definition delete)")]
+    [Fact]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "AR-24")]
     [Trait("Requirement", "FR-27")]

@@ -100,6 +100,7 @@ public sealed partial class SpaceDefaultStatusSection
         _renaming = null;
         _focusId = null;
         _cascade = null;
+        PurgeRemoval();
     }
 
     /// <returns><c>true</c> when the defaults answered.</returns>
@@ -254,14 +255,8 @@ public sealed partial class SpaceDefaultStatusSection
             return;
         }
 
-        var kept = replaceProjectNames == false ? rename.Conflicts.Count : 0;
-
-        Say(kept switch
-        {
-            0 => Format("SpaceStatusRenamedEverywhere", rename.OldName, rename.NewName),
-            1 => Format("SpaceStatusRenamedKeptOne", rename.OldName, rename.NewName),
-            _ => Format("SpaceStatusRenamedKeptMany", rename.OldName, rename.NewName, kept),
-        });
+        // No count of the Projects that kept their names: the server decides which conflict at commit, and does not say.
+        Say(Format(replaceProjectNames == false ? "SpaceStatusRenamedKept" : "SpaceStatusRenamedEverywhere", rename.OldName, rename.NewName));
     }
 
     /// <summary>
@@ -476,25 +471,4 @@ public sealed partial class SpaceDefaultStatusSection
     /// A rename being sent, and the Projects the server said renamed the Status themselves.
     /// </summary>
     private sealed record Cascade(Guid StatusId, string OldName, string NewName, IReadOnlyList<StatusRenameConflictResponse> Conflicts);
-}
-
-/// <summary>
-/// Which control of a <see cref="SpaceStatusRow"/> a focus request lands on.
-/// </summary>
-public enum SpaceStatusFocus
-{
-    /// <summary>
-    /// The row's rename control, or its rename field while it is open.
-    /// </summary>
-    Rename,
-
-    /// <summary>
-    /// The row's up control, or its down control once the row is first.
-    /// </summary>
-    Up,
-
-    /// <summary>
-    /// The row's down control, or its up control once the row is last.
-    /// </summary>
-    Down,
 }

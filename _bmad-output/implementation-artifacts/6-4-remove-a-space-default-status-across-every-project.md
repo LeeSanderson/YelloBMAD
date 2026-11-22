@@ -1,6 +1,10 @@
+---
+baseline_commit: 5b597a601ef70e6afd53eae4e77c98a3910a2d21
+---
+
 # Story 6.4: Remove a Space default Status across every Project
 
-Status: ready-for-dev
+Status: review
 
 Epic: 6 — Shape Statuses per Project and retire work safely (fourth of six stories)
 Story key: `6-4-remove-a-space-default-status-across-every-project`
@@ -224,8 +228,8 @@ so that no Task is silently placed somewhere I did not choose.
 
 ## Tasks / Subtasks
 
-- [ ] **Task 1 — Domain: the removal plan** (AC1-AC5, AC7, AC8)
-  - [ ] `SpaceDefaultStatusRemoval` (name is the dev's), next to `SpaceDefaultStatusPlan`. It is a pure function of:
+- [x] **Task 1 — Domain: the removal plan** (AC1-AC5, AC7, AC8)
+  - [x] `SpaceDefaultStatusRemoval` (name is the dev's), next to `SpaceDefaultStatusPlan`. It is a pure function of:
     - the defaults;
     - every delta, keyed by Project;
     - the Project ids of the Space (a Project with no delta holds every default);
@@ -238,10 +242,10 @@ so that no Task is silently placed somewhere I did not choose.
     - the Projects left empty;
     - the invalid-exception Project;
     - the plan: per Project, the destination, the re-anchored places to write, and the ops to delete.
-  - [ ] Every before-set and after-set comes from `EffectiveStatusSet.Of`. The after-set is `Of(defaults without the Status, delta without ops naming it, with re-anchored places)`. Re-anchoring is `EffectiveStatusSet.Reanchored`.
-  - [ ] `CheckDefaults` for the last default. `Check(after, null) == SetEmpty` for each Project.
-  - [ ] New `SpaceDefaultStatusVerdict` members as needed (`DestinationRequired`, `DestinationInvalid`, `ProjectDestinationRequired`; `SetEmpty` with Projects).
-  - [ ] Unit tests (no database) in `tests/Yello.Tests.Slices/Statuses/SpaceDefaultStatusRemovalTests.cs`:
+  - [x] Every before-set and after-set comes from `EffectiveStatusSet.Of`. The after-set is `Of(defaults without the Status, delta without ops naming it, with re-anchored places)`. Re-anchoring is `EffectiveStatusSet.Reanchored`.
+  - [x] `CheckDefaults` for the last default. `Check(after, null) == SetEmpty` for each Project.
+  - [x] New `SpaceDefaultStatusVerdict` members as needed (`DestinationRequired`, `DestinationInvalid`, `ProjectDestinationRequired`; `SetEmpty` with Projects).
+  - [x] Unit tests (no database) in `tests/Yello.Tests.Slices/Statuses/SpaceDefaultStatusRemovalTests.cs`:
     - plain Projects take the destination;
     - a Project that removed the destination is blocked, and with an exception it passes;
     - an exception that is a Project-added Status passes;
@@ -253,49 +257,49 @@ so that no Task is silently placed somewhere I did not choose.
     - unoccupied → no destination needed;
     - a blocked Project with zero Tasks is not reported (Q4);
     - **the order invariant of AC7 for a Project whose places anchor on the Status, on both sides of it**.
-- [ ] **Task 2 — Infrastructure** (AC6, AC7, AC10)
-  - [ ] `ApplicationLocks`:
+- [x] **Task 2 — Infrastructure** (AC6, AC7, AC10)
+  - [x] `ApplicationLocks`:
     - a helper that takes `ProjectTasks` for a set of Projects in one fixed sorted order (one `sp_getapplock` per Project, or one batch);
     - rewrite the `StatusDefaults` remarks to state the built order: StatusDefaults → ProjectsPerSpace → ProjectTasks (sorted);
     - name 6.5's two-Project move as a future user of the same helper.
-  - [ ] Lift `ProjectStatusStore.MigrateTasksAsync`'s body into a shared internal helper. Both stores call it, with no behaviour change. Run the 6.2 removal cases filtered.
-  - [ ] `ISpaceDefaultStatusStore` / `SpaceDefaultStatusStore`:
+  - [x] Lift `ProjectStatusStore.MigrateTasksAsync`'s body into a shared internal helper. Both stores call it, with no behaviour change. Run the 6.2 removal cases filtered.
+  - [x] `ISpaceDefaultStatusStore` / `SpaceDefaultStatusStore`:
     - `LockForRemovalAsync` (or extend `LockAsync`): `ProjectsPerSpace`, then the Project list, then the affected Projects' `ProjectTasks`;
     - the Project ids and names of the Space (one query);
     - occupancy counts (the existing `CountTasksByProjectAsync`, called after the locks);
     - `RemoveAsync(plan)`, issuing the statements in AC7's order: migrate per Project, delete and re-insert the re-anchored places, delete ops by `StatusId`, delete the definition.
 
     No `Where SpaceId`. Raw SQL only in Infrastructure, with parameters.
-- [ ] **Task 3 — Application** (AC1-AC6, AC15)
-  - [ ] `Yello.Application/Statuses/RemoveSpaceStatus/RemoveSpaceStatusHandler.cs`. It goes through `SpaceDefaultStatusWriter` (extended) or a sibling writer (Q3), with the decision order of AC5. Reports carry Project names read under the locks.
-  - [ ] `SpaceStatusWriteOutcome` gains the new outcomes, and `SpaceStatusWriteResult` gains the report.
-  - [ ] `RestoreProjectStatusHandler`: also require the id to be a current default (AC9).
-  - [ ] Handler tests with fakes.
-- [ ] **Task 4 — Contracts and Host** (AC1-AC5, AC11, AC12, AC15)
-  - [ ] `SpaceRoutes.StatusRemove` + `StatusRemoveOf`. Its remarks list every answer.
-  - [ ] `Yello.Contracts.Spaces.RemoveSpaceStatusRequest(Guid? DestinationStatusId, IReadOnlyList<SpaceStatusDestinationRequest>? Exceptions)` and `SpaceStatusDestinationRequest(Guid ProjectId, Guid DestinationStatusId)`.
-  - [ ] `ProblemTypes.StatusProjectDestinationRequired` (409; the name is the dev's).
-  - [ ] `ProblemResponse` gains one additive, nullable member for the report, for example `Removal` → a list of `SpaceStatusOccupancyResponse(ProjectId, ProjectName, TaskCount, IReadOnlyList<StatusChoiceResponse> Destinations)`, emitted only on `status-destination-required` (Space) and `status-project-destination-required`. `Projects` is reused for `status-set-empty` and the invalid exception.
-  - [ ] Endpoint: `RequiresCapability(ConfigureSpaceDefaultStatuses)`, both surfaces, idempotent, `200` with the defaults. An unreadable body is `400 invalid-status-destination`. Register it in `Program.cs`.
-  - [ ] Amend the gates listed in "What already exists" and add the Space AR-24 gate: the remove request has a destination and an exceptions member, and no other Space Status request or route can remove.
-- [ ] **Task 5 — Client** (AC11, AC13, AC14)
-  - [ ] `SpaceStatusRow`: a "Remove" button, raised to the section.
-  - [ ] `SpaceDefaultStatusSection.Removal.cs` (partial) for the flow.
-  - [ ] `SpaceStatusRemoveDialog.razor` per AC13, reusing the patterns of `StatusRemoveDialog`. It may need a child `SpaceStatusExceptionRow.razor` for the caps.
-  - [ ] `RefusalCopy` maps the new type and the `Projects` variants.
-  - [ ] `ClientCopy.resx`: the new copy and the rename "keep" announcement (ledger `:1067`).
-  - [ ] `FakeYelloApi`: the Space removal with each `409`/`400`, and the Project sets and Board columns follow.
-  - [ ] `SmallViewportTests`: the pager case (AC14).
-- [ ] **Task 6 — Ledger and docs**
-  - [ ] Write the disposition of every owned ledger entry in `deferred-work.md`. Leave none blank.
-  - [ ] Add an AD-16/AD-17 additive dated note:
+- [x] **Task 3 — Application** (AC1-AC6, AC15)
+  - [x] `Yello.Application/Statuses/RemoveSpaceStatus/RemoveSpaceStatusHandler.cs`. It goes through `SpaceDefaultStatusWriter` (extended) or a sibling writer (Q3), with the decision order of AC5. Reports carry Project names read under the locks.
+  - [x] `SpaceStatusWriteOutcome` gains the new outcomes, and `SpaceStatusWriteResult` gains the report.
+  - [x] `RestoreProjectStatusHandler`: also require the id to be a current default (AC9).
+  - [x] Handler tests with fakes.
+- [x] **Task 4 — Contracts and Host** (AC1-AC5, AC11, AC12, AC15)
+  - [x] `SpaceRoutes.StatusRemove` + `StatusRemoveOf`. Its remarks list every answer.
+  - [x] `Yello.Contracts.Spaces.RemoveSpaceStatusRequest(Guid? DestinationStatusId, IReadOnlyList<SpaceStatusDestinationRequest>? Exceptions)` and `SpaceStatusDestinationRequest(Guid ProjectId, Guid DestinationStatusId)`.
+  - [x] `ProblemTypes.StatusProjectDestinationRequired` (409; the name is the dev's).
+  - [x] `ProblemResponse` gains one additive, nullable member for the report, for example `Removal` → a list of `SpaceStatusOccupancyResponse(ProjectId, ProjectName, TaskCount, IReadOnlyList<StatusChoiceResponse> Destinations)`, emitted only on `status-destination-required` (Space) and `status-project-destination-required`. `Projects` is reused for `status-set-empty` and the invalid exception.
+  - [x] Endpoint: `RequiresCapability(ConfigureSpaceDefaultStatuses)`, both surfaces, idempotent, `200` with the defaults. An unreadable body is `400 invalid-status-destination`. Register it in `Program.cs`.
+  - [x] Amend the gates listed in "What already exists" and add the Space AR-24 gate: the remove request has a destination and an exceptions member, and no other Space Status request or route can remove.
+- [x] **Task 5 — Client** (AC11, AC13, AC14)
+  - [x] `SpaceStatusRow`: a "Remove" button, raised to the section.
+  - [x] `SpaceDefaultStatusSection.Removal.cs` (partial) for the flow.
+  - [x] `SpaceStatusRemoveDialog.razor` per AC13, reusing the patterns of `StatusRemoveDialog`. It may need a child `SpaceStatusExceptionRow.razor` for the caps.
+  - [x] `RefusalCopy` maps the new type and the `Projects` variants.
+  - [x] `ClientCopy.resx`: the new copy and the rename "keep" announcement (ledger `:1067`).
+  - [x] `FakeYelloApi`: the Space removal with each `409`/`400`, and the Project sets and Board columns follow.
+  - [x] `SmallViewportTests`: the pager case (AC14).
+- [x] **Task 6 — Ledger and docs**
+  - [x] Write the disposition of every owned ledger entry in `deferred-work.md`. Leave none blank.
+  - [x] Add an AD-16/AD-17 additive dated note:
     - a Space-level removal deletes the default's row after migrating every affected Project's Tasks and deleting every op naming it;
     - it re-anchors dependent places;
     - its lock order is as in AC6.
 
     Additive only.
-  - [ ] Add a low ledger entry for Lee about the transaction size vs NFR-5 and the 240 s ingress timeout (Q15), with the nightly measurement.
-- [ ] **Task 7 — Tests** (see Testing requirements)
+  - [x] Add a low ledger entry for Lee about the transaction size vs NFR-5 and the 240 s ingress timeout (Q15), with the nightly measurement.
+- [x] **Task 7 — Tests** (see Testing requirements)
 
 ## Dev Notes
 
@@ -610,14 +614,150 @@ Activate one at a time, confirm it fails for the stated reason, then implement. 
 
 ### Agent Model Used
 
+Claude Opus 5.5 (bmad-dev-story, unattended story cycle)
+
 ### Debug Log References
+
+- **Activation order followed** (lock set first). The race scaffolds were activated against the implementation and all six
+  passed on the first run. Their red step is the lock-set plants below: plant 3 turns race 1 red and plant 4 turns race 5
+  red, which shows they fail for the stated reason.
+- **Scaffold corrections:**
+  - `SpaceDefaultStatusRemovalTests.RowTextsAsync` (Client): Chromium's `innerText` of a `tr` includes every `option` of a
+    `select` in it ("Beacon 2 Choose… Done Parked"). The helper now joins the text of the cells that hold no `select`. The
+    picker's options are still asserted on their own, so nothing is weakened.
+  - Stand-ins swapped for the contract members and deleted: `SpaceStatusWire.Remove`, `RemoveOf` and
+    `StatusProjectDestinationRequired` became `SpaceRoutes.StatusRemove`, `SpaceRoutes.StatusRemoveOf` and
+    `ProblemTypes.StatusProjectDestinationRequired`. The report member kept its recommended name, `removal`.
+  - Red-phase remarks, `Skip` and `PendingUntil` removed from every scaffold file. The 7 isolation rows are live.
+- **Gates amended deliberately:**
+  - `The_Space_Status_routes_declare_their_capability_…` now lists `POST …/remove`.
+  - `No_route_or_request_under_the_Spaces_Statuses_offers_a_removal_a_reset_or_a_mode` was rewritten and renamed
+    `…offers_a_reset_or_a_mode_or_a_removal_outside_the_remove_route`. It still forbids a reset, a mode and `DELETE`
+    everywhere, and every forbidden word in the add, rename and place requests.
+  - Both `ProblemResponse` parameter gates append `Removal`.
+  - The 6.3 Client case `Each_answer_sends_its_decision_once_and_is_announced(false)` now expects the "keep" copy with no
+    count.
+- **Plants.** Each was restored from saved content in a `finally` and run on its own as a filtered run. `git status` showed
+  no residue afterwards.
+  1. A blocked Project without an exception falls to its first Status. Caught (case 4, and the plan unit test).
+  2. Projects that removed the Status are reported. Caught by case 2 (the report) and the plan unit test. Case 9 alone does
+     not catch it, because a reported Project that moves no Task keeps its set unchanged.
+  3. The removal skips the Project Tasks locks. Caught (race 1, both rows).
+  4. The removal skips `ProjectsPerSpace`. Caught (race 5: the creation never blocks).
+  5. No re-anchoring. Caught (case 10, and the plan unit test).
+  6. The Project-left-empty check is skipped. Caught (case 8).
+  7. The Space-wide picker pre-selects the first destination. Caught (the browser "nothing chosen" case).
+  8. An exception picker pre-selects its first Status. Planted as a `selected` attribute on the first option in markup
+     only, it did not take effect in the browser, so nothing was pre-selected and nothing was caught. Planted as a state
+     default (the dialog passing the first Status as `Chosen`), it was caught (the browser blocked-table case).
+  9. The client predicate admits Member. Caught by the matrix gate and by the browser absence case (member row).
+  10. The add-back skips the current-default check and the `Remove` ops are kept. Caught (case 11: the removal itself fails
+      on the definition's key). The current-default check on its own is defensive: once the ops are deleted, no `Remove`
+      is left for the add-back to find.
+- **Scale case (AC16).** Activated (Nightly, Explicit). Its one run in this phase was stopped by the host for low memory
+  before it reported, and the cycle's rules say not to restart it. The seed size and duration are unrecorded. A ledger
+  entry for Lee carries it, and the review's run owns the measurement.
 
 ### Completion Notes List
 
-- Ultimate context engine analysis completed - comprehensive developer guide created.
+- The Space-level removal is built end to end:
+  - Domain: the plan `SpaceDefaultStatusRemoval`, the `SpaceDefaultStatusRemovalPlan` records, three new verdicts and the
+    port `ISpaceDefaultStatusRemovalStore`.
+  - Infrastructure: `SpaceDefaultStatusRemovalStore`; `TaskStatusMigration`, lifted from `ProjectStatusStore` with no
+    behaviour change (the 6.2 and 6.3 Status cases re-ran green); and the sorted multi-Project lock
+    `ApplicationLocks.TakeProjectTasksAsync`.
+  - Application: `RemoveSpaceStatusHandler`.
+  - Contracts: `RemoveSpaceStatusRequest`, `SpaceStatusDestinationRequest`, `SpaceStatusOccupancyResponse`,
+    `StatusChoiceResponse`, `ProblemTypes.StatusProjectDestinationRequired` and `ProblemResponse.Removal`.
+  - Host: `POST /api/v1/spaces/{spaceId}/statuses/{statusId}/remove`.
+  - Client: the Space settings "Remove" control, `SpaceStatusRemoveDialog` and `SpaceStatusExceptionRow`.
+- Adding back a default after a Space removal answers `404`. `RestoreProjectStatusHandler` also requires a current default
+  (AC9).
+- The rename's "keep" announcement no longer states a count (AC13, ledger `:1067`).
+- Decisions. Each is reversible and can be cut:
+  - Q1 (a): `POST …/statuses/{statusId}/remove`, answering `200` with the defaults.
+  - Q2 (a): the removal reports itself. `409 status-destination-required` carries `removal`. One new type,
+    `status-project-destination-required`. `projects` is reused for `status-set-empty` and for an invalid exception.
+  - Q3 (a): a sibling writer. The handler owns the extra locks and the count, and the 6.3 writer is unchanged.
+  - Q4 (a): an unoccupied removal needs no destination. A destination sent anyway is still validated. A Project with no
+    Task in the Status is never reported.
+  - Q5 (a): StatusDefaults X, then ProjectsPerSpace, then ProjectTasks of the holders only, sorted by lock name.
+  - Q6 (a): exceptions for unblocked, foreign or random Projects are ignored.
+  - Q7 (a): a Project left empty is refused `409 status-set-empty`, naming it. Contradiction C1 is resolved by FR-25.
+  - Q8 (a): no cancel in flight. Cancel and Escape work before commit only.
+  - Q9 (a): the definition and every op of it are deleted. The other defaults keep their position gaps.
+  - Q10 (a): the rename keeps its at-commit rule. Ledger `:1061` is closed with the reason.
+  - Q11 (a): the "keep" copy has no count.
+  - Q12 (a): the pager browser case is the green `SmallViewportTests` case. Ledger `:1045` is closed.
+  - Q13 (a): the S-1 trigger is on the definition delete, the last statement.
+  - Q14 (a): the commit stays enabled. Unset pickers are marked and the first is focused. "{m} destinations still needed"
+    is shown as text beside the commit.
+  - Q15 (a): a Nightly Explicit case, plus a ledger entry for Lee. The measurement is still pending (see the Debug Log).
+  - A Project named twice in `exceptions` is treated as an unreadable body: a `400` decided at the endpoint, as the fake
+    does, so the fake and the Host agree. The plan keeps the same guard.
+  - The holders come from the defaults and deltas read after `StatusDefaults` X and `ProjectsPerSpace`, which keep both
+    stable. Only the occupancy is read after the Tasks locks.
+- Ledger dispositions are written for `:114`, `:1022`, `:1030`, `:1031`, `:1038`, `:1039`, `:1045` (closed), `:1056`
+  (closed), `:1061` (closed, as a decision), `:1066` (noted), `:1067` (closed) and `:1072`. One new low entry for Lee
+  covers the scale measurement.
+- Architecture spine: additive 2026-11-22 notes under AD-16 and AD-17.
 
 ### File List
+
+- Yello.Domain/Statuses/SpaceDefaultStatusRemoval.cs (new)
+- Yello.Domain/Statuses/SpaceDefaultStatusRemovalPlan.cs (new)
+- Yello.Domain/Statuses/ISpaceDefaultStatusRemovalStore.cs (new)
+- Yello.Domain/Statuses/SpaceDefaultStatusPlan.cs
+- Yello.Application/Statuses/RemoveSpaceStatus/RemoveSpaceStatusHandler.cs (new)
+- Yello.Application/Statuses/SpaceDefaultStatusWriter.cs
+- Yello.Application/Statuses/ProjectStatusDeltaDraft.cs
+- Yello.Application/Statuses/ProjectStatusDeltaWriter.cs
+- Yello.Application/Statuses/RestoreProjectStatus/RestoreProjectStatusHandler.cs
+- Yello.Infrastructure/Persistence/SpaceDefaultStatusRemovalStore.cs (new)
+- Yello.Infrastructure/Persistence/TaskStatusMigration.cs (new)
+- Yello.Infrastructure/Persistence/ProjectStatusStore.cs
+- Yello.Infrastructure/Persistence/ApplicationLocks.cs
+- Yello.Infrastructure/SpaceContentStores.cs
+- Yello.Contracts/Spaces/RemoveSpaceStatusRequest.cs (new)
+- Yello.Contracts/Spaces/SpaceStatusDestinationRequest.cs (new)
+- Yello.Contracts/Spaces/SpaceStatusOccupancyResponse.cs (new)
+- Yello.Contracts/Spaces/SpaceRoutes.cs
+- Yello.Contracts/ProblemTypes.cs
+- Yello.Contracts/ProblemResponse.cs
+- Yello.Host/Endpoints/SpaceDefaultStatusRemovalEndpoints.cs (new)
+- Yello.Host/Program.cs
+- Yello.Client/Components/SpaceDefaultStatusSection.Removal.cs (new)
+- Yello.Client/Components/SpaceStatusRemoveDialog.razor (new)
+- Yello.Client/Components/SpaceStatusExceptionRow.razor (new)
+- Yello.Client/Components/SpaceStatusFocus.cs (new, moved out of the section's code-behind)
+- Yello.Client/Components/SpaceDefaultStatusSection.razor
+- Yello.Client/Components/SpaceDefaultStatusSection.razor.cs
+- Yello.Client/Components/SpaceStatusRow.razor
+- Yello.Client/Refusals/RefusalCopy.cs
+- Yello.Client/Localisation/ClientCopy.resx
+- Yello.Client/wwwroot/css/components.css
+- tests/Yello.Tests.Slices/Statuses/SpaceDefaultStatusRemovalTests.cs (new)
+- tests/Yello.Tests.Slices/Statuses/RemoveSpaceStatusHandlerTests.cs (new)
+- tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaultRemoval.cs
+- tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaultRemovalRace.cs
+- tests/Yello.Tests.Slices/Projects/ProjectEndpointTests.SpaceDefaultRemovalScale.cs
+- tests/Yello.Tests.Slices/Projects/SpaceDefaultStatusWire.cs
+- tests/Yello.Tests.Shared/SpaceStatusWire.cs
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.SpaceDefaultStatusRemoval.cs
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.SpaceDefaultStatuses.cs
+- tests/Yello.Tests.Architecture/RefusalBoundaryGateTests.DeleteAccount.cs
+- tests/Yello.Tests.Isolation/IsolationCases.SpaceDefaultStatusRemoval.cs
+- tests/Yello.Tests.Client/SpaceDefaultStatusRemovalTests.cs
+- tests/Yello.Tests.Client/SpaceDefaultStatusesTests.cs
+- tests/Yello.Tests.Client/FakeYelloApi.SpaceDefaultStatusRemoval.cs
+- _bmad-output/implementation-artifacts/deferred-work.md
+- _bmad-output/implementation-artifacts/sprint-status.yaml
+- _bmad-output/planning-artifacts/architecture/architecture-YelloBMAD-2026-08-17/ARCHITECTURE-SPINE.md
 
 ## Change Log
 
 - 2026-11-22: Story created (bmad-create-story). Status: ready-for-dev.
+- 2026-11-22: Implemented (bmad-dev-story). Space-level removal across every Project: the domain plan, the lock set, the
+  store, the handler, the route, the contracts and the Space settings dialog. Add-back hardened. The rename's "keep" copy
+  no longer states a count. Ledger dispositions written. AD-16 and AD-17 notes added. Open questions Q1-Q15 decided as
+  recommended. Status: review.

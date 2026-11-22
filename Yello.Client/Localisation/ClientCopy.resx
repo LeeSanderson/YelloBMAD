@@ -1863,13 +1863,9 @@
     <value>Renamed “{0}” to “{1}” in every Project.</value>
     <comment>Announced after a rename that every Project took. {0} is the old name, {1} the new.</comment>
   </data>
-  <data name="SpaceStatusRenamedKeptOne" xml:space="preserve">
-    <value>Renamed “{0}” to “{1}”. 1 Project kept its own name.</value>
-    <comment>Announced after a rename one Project kept its own name through. {0} is the old name, {1} the new.</comment>
-  </data>
-  <data name="SpaceStatusRenamedKeptMany" xml:space="preserve">
-    <value>Renamed “{0}” to “{1}”. {2} Projects kept their own names.</value>
-    <comment>Announced after a rename several Projects kept their own names through. {0} is the old name, {1} the new, {2} how many kept theirs.</comment>
+  <data name="SpaceStatusRenamedKept" xml:space="preserve">
+    <value>Renamed “{0}” to “{1}”. Projects that renamed it kept their own names.</value>
+    <comment>Announced after a rename answered "Keep their names". No count: which Projects conflicted is decided at commit, so the client cannot know it. {0} is the old name, {1} the new.</comment>
   </data>
   <data name="SpaceStatusNameTaken" xml:space="preserve">
     <value>Another default Status already has that name.</value>
@@ -1934,6 +1930,122 @@
   <data name="SpaceStatusCascadeInFlight" xml:space="preserve">
     <value>Renaming “{0}” to “{1}”.</value>
     <comment>Shown while the answer is out. {0} is the old name, {1} the new.</comment>
+  </data>
+  <data name="SpaceStatusRemove" xml:space="preserve">
+    <value>Remove</value>
+    <comment>A default Status row's control that removes it from the Space and every Project.</comment>
+  </data>
+  <data name="SpaceStatusRemoved" xml:space="preserve">
+    <value>Removed “{0}”.</value>
+    <comment>Announced after a default no Task held was removed. {0} is its name.</comment>
+  </data>
+  <data name="SpaceStatusRemovedMovedOne" xml:space="preserve">
+    <value>Removed “{0}”. 1 Task moved.</value>
+    <comment>Announced after a removal that moved one Task. {0} is the Status's name.</comment>
+  </data>
+  <data name="SpaceStatusRemovedMovedMany" xml:space="preserve">
+    <value>Removed “{0}”. {1} Tasks moved.</value>
+    <comment>Announced after a removal that moved several Tasks. {0} is the Status's name, {1} how many moved.</comment>
+  </data>
+  <data name="SpaceStatusRemoveLeavesEmptyOne" xml:space="preserve">
+    <value>{0} has no other Status. Give it another Status before removing this one.</value>
+    <comment>Refusal: removing this default would leave one Project with no Status. {0} is the Project's name.</comment>
+  </data>
+  <data name="SpaceStatusRemoveLeavesEmptyMany" xml:space="preserve">
+    <value>These Projects have no other Status: {0}. Give each another Status before removing this one.</value>
+    <comment>Refusal: removing this default would leave several Projects with no Status. {0} lists their names.</comment>
+  </data>
+  <data name="SpaceStatusRemoveLastDefault" xml:space="preserve">
+    <value>A Space keeps at least one default Status.</value>
+    <comment>Refusal: the default is the Space's last.</comment>
+  </data>
+  <data name="SpaceStatusRemoveTitleOne" xml:space="preserve">
+    <value>Removing “{0}” moves 1 Task.</value>
+    <comment>The Space-level removal dialog's heading when one Task holds the Status. {0} is its name.</comment>
+  </data>
+  <data name="SpaceStatusRemoveTitleMany" xml:space="preserve">
+    <value>Removing “{0}” moves {1} Tasks.</value>
+    <comment>The Space-level removal dialog's heading. {0} is the Status's name, {1} how many Tasks hold it.</comment>
+  </data>
+  <data name="SpaceStatusRemoveScope" xml:space="preserve">
+    <value>Choose where Tasks in “{0}” go. This applies everywhere it can.</value>
+    <comment>The Space-level removal dialog's line above the Space-wide picker. {0} is the Status's name.</comment>
+  </data>
+  <data name="SpaceStatusRemoveDestinationLabel" xml:space="preserve">
+    <value>Move Tasks to</value>
+    <comment>The Space-wide destination picker's label.</comment>
+  </data>
+  <data name="SpaceStatusRemoveBlockedOne" xml:space="preserve">
+    <value>1 Project doesn’t have “{0}” after this change. It needs its own destination:</value>
+    <comment>Above the table of Projects that cannot take the chosen destination, when there is one. {0} is the destination's name.</comment>
+  </data>
+  <data name="SpaceStatusRemoveBlockedMany" xml:space="preserve">
+    <value>{0} Projects don’t have “{1}” after this change. Each needs its own destination:</value>
+    <comment>Above the table of Projects that cannot take the chosen destination. {0} is how many, {1} the destination's name.</comment>
+  </data>
+  <data name="SpaceStatusRemoveProject" xml:space="preserve">
+    <value>Project</value>
+    <comment>Column heading of the blocked Projects' table.</comment>
+  </data>
+  <data name="SpaceStatusRemoveTasks" xml:space="preserve">
+    <value>Tasks affected</value>
+    <comment>Column heading of the blocked Projects' table.</comment>
+  </data>
+  <data name="SpaceStatusRemoveDestination" xml:space="preserve">
+    <value>Destination</value>
+    <comment>Column heading of the blocked Projects' table.</comment>
+  </data>
+  <data name="SpaceStatusRemoveDestinationFor" xml:space="preserve">
+    <value>Destination for {0}</value>
+    <comment>The accessible name of one blocked Project's picker. {0} is the Project's name.</comment>
+  </data>
+  <data name="SpaceStatusRemoveProjectDestinationMissing" xml:space="preserve">
+    <value>Choose where these Tasks go.</value>
+    <comment>Shown on a blocked Project's picker when the commit was pressed with it unset.</comment>
+  </data>
+  <data name="SpaceStatusRemoveNeededOne" xml:space="preserve">
+    <value>1 destination still needed</value>
+    <comment>Beside the commit while one picker is unset.</comment>
+  </data>
+  <data name="SpaceStatusRemoveNeededMany" xml:space="preserve">
+    <value>{0} destinations still needed</value>
+    <comment>Beside the commit while several pickers are unset. {0} is how many.</comment>
+  </data>
+  <data name="SpaceStatusRemoveCommitOne" xml:space="preserve">
+    <value>Remove and move 1 Task</value>
+    <comment>The Space-level removal dialog's commit when one Task moves.</comment>
+  </data>
+  <data name="SpaceStatusRemoveCommitMany" xml:space="preserve">
+    <value>Remove and move {0} Tasks</value>
+    <comment>The Space-level removal dialog's commit. {0} is how many Tasks move.</comment>
+  </data>
+  <data name="SpaceStatusRemoveInFlightOne" xml:space="preserve">
+    <value>Moving {0} Tasks across 1 Project.</value>
+    <comment>Shown while a removal is out whose Tasks are all in one Project. {0} is how many Tasks; {0} is never 1 here.</comment>
+  </data>
+  <data name="SpaceStatusRemoveInFlightOneTask" xml:space="preserve">
+    <value>Moving 1 Task across 1 Project.</value>
+    <comment>Shown while a removal of one Task is out.</comment>
+  </data>
+  <data name="SpaceStatusRemoveInFlightMany" xml:space="preserve">
+    <value>Moving {0} Tasks across {1} Projects.</value>
+    <comment>Shown while a removal is out. {0} is how many Tasks, {1} how many Projects.</comment>
+  </data>
+  <data name="SpaceStatusRemoveNoLongerHasOne" xml:space="preserve">
+    <value>{0} no longer has “{1}”. Choose a destination for it.</value>
+    <comment>Refusal at commit: one Project lost the chosen destination meanwhile. {0} is the Project's name, {1} the destination's.</comment>
+  </data>
+  <data name="SpaceStatusRemoveNoLongerHasMany" xml:space="preserve">
+    <value>{0} no longer have “{1}”. Choose a destination for each.</value>
+    <comment>Refusal at commit: several Projects lost the chosen destination meanwhile. {0} lists their names, {1} is the destination's.</comment>
+  </data>
+  <data name="SpaceStatusRemoveExceptionInvalid" xml:space="preserve">
+    <value>{0} doesn’t have the Status chosen for it. Choose another destination for it.</value>
+    <comment>Refusal at commit: a Project's own destination is no longer in its set. {0} lists the Projects' names.</comment>
+  </data>
+  <data name="StatusProjectDestinationRequired" xml:space="preserve">
+    <value>Some Projects don’t have that Status. Choose a destination for each.</value>
+    <comment>Refusal: a Space-level removal left some Projects with no destination, when the dialog cannot name them.</comment>
   </data>
   <data name="StatusRenameConflict" xml:space="preserve">
     <value>Some Projects renamed this Status themselves.</value>

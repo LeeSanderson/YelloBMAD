@@ -121,4 +121,24 @@ public static class SpaceRoutes
     /// <param name="statusId">The default Status.</param>
     /// <returns>The path.</returns>
     public static string StatusPlaceOf(Guid spaceId, Guid statusId) => $"/api/v1/spaces/{spaceId:D}/statuses/{statusId:D}/place";
+
+    /// <summary>
+    /// <c>POST</c> here, with a <see cref="RemoveSpaceStatusRequest"/>, takes one default out of the Space and every Project
+    /// of it, moving every Task that holds it, in one transaction: <c>200</c> with the defaults left; the boundary's
+    /// <c>404</c> for a Status that is not one of the Space's defaults; <c>409 status-set-empty</c> for the last default, or
+    /// naming each Project it would leave with no Status; <c>400 invalid-status-destination</c> for a Space-wide destination
+    /// that is not another default, an unreadable body or a Project named twice, or naming each Project whose own destination
+    /// is outside its set; <c>409 status-destination-required</c> with the occupancy report when Tasks hold it and no
+    /// destination was sent; or <c>409 status-project-destination-required</c> naming each Project that cannot take the
+    /// Space-wide destination and was given none of its own. Declares <c>ConfigureSpaceDefaultStatuses</c>.
+    /// </summary>
+    public static string StatusRemove => "/api/v1/spaces/{spaceId:guid}/statuses/{statusId:guid}/remove";
+
+    /// <summary>
+    /// One default Status's removal path, as a client calls it.
+    /// </summary>
+    /// <param name="spaceId">The Space.</param>
+    /// <param name="statusId">The default Status.</param>
+    /// <returns>The path.</returns>
+    public static string StatusRemoveOf(Guid spaceId, Guid statusId) => $"/api/v1/spaces/{spaceId:D}/statuses/{statusId:D}/remove";
 }

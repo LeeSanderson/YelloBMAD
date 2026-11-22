@@ -9,7 +9,11 @@
 
 @*
     THE DEFAULT STATUSES SECTION OF SPACE SETTINGS: the Statuses every Project starts from, in Space order, with add,
-    rename and reorder. No removal here.
+    rename, reorder and removal.
+
+    A REMOVAL IS SENT FIRST WITH NO DESTINATION: nothing in the Status, it goes at once; Tasks in it, the server's report
+    opens the removal dialog, which asks for one Space-wide destination and one for each Project that cannot take it. The
+    interface chooses nothing.
 
     EVERY WRITE RE-RENDERS FROM THE SERVER'S ANSWER, the Space's whole default list. Every Project follows through its own
     derived set; this section never reads a Project.
@@ -23,7 +27,7 @@
 <LiveAnnouncement Text="@_announcement" Sequence="@_announcements" />
 
 <section class="space-default-statuses" aria-labelledby="space-default-statuses-heading">
-    <h2 class="type-space-name space-default-statuses__heading" id="space-default-statuses-heading">@Localizer["SpaceStatusesHeading"]</h2>
+    <h2 class="type-space-name space-default-statuses__heading" id="space-default-statuses-heading" tabindex="-1" @ref="_heading">@Localizer["SpaceStatusesHeading"]</h2>
 
     @if (_defaults is null)
     {
@@ -54,7 +58,8 @@
                                 OnMove="MoveAsync"
                                 OnStartRename="StartRename"
                                 OnRename="RenameAsync"
-                                OnCancelRename="CancelRename" />
+                                OnCancelRename="CancelRename"
+                                OnRemove="StartRemoveAsync" />
             }
         </ol>
 
@@ -83,6 +88,18 @@
                                        InFlight="@_busy"
                                        OnDecide="DecideAsync"
                                        OnCancel="CancelCascade" />
+        }
+
+        @if (_removal is { } removal)
+        {
+            <SpaceStatusRemoveDialog StatusName="@removal.Name"
+                                     Report="@removal.Report"
+                                     Defaults="@([.. defaults.Where(status => status.Id != removal.StatusId)])"
+                                     InFlight="@_removing"
+                                     Refusal="@removal.Refusal"
+                                     RefusalAttempt="@_removalAttempts"
+                                     OnCommit="CommitRemovalAsync"
+                                     OnCancel="CancelRemoval" />
         }
     }
 </section>

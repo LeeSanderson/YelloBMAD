@@ -15,24 +15,13 @@ namespace Yello.Tests.Architecture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Red-phase scaffolds.</b> The contract types do not exist yet, so they are found by name in the Contracts assembly
-/// rather than by <c>typeof</c>; the develop phase may switch to <c>typeof</c> once they do. The names are the story's
-/// recommendations (<c>RemoveSpaceStatusRequest</c>, <c>SpaceStatusDestinationRequest</c>,
-/// <c>ProblemTypes.StatusProjectDestinationRequired</c>, the report member <c>Removal</c>); a different name chosen in the
-/// develop phase is corrected here and recorded in the Debug Log.
-/// </para>
-/// <para>
-/// <b>Amended in the same change, not here</b>: <c>The_Space_Status_routes_declare_their_capability_…</c> (its exact route
-/// list), <c>No_route_or_request_under_the_Spaces_Statuses_offers_a_removal_a_reset_or_a_mode</c> (rewritten so it still
-/// forbids a reset and a mode everywhere and a removal anywhere but the route below), and the two gates that pin
-/// <c>ProblemResponse</c>'s parameters.
+/// <b>The contract types are found by name in the Contracts assembly</b>, so a rename fails here with the name it lost
+/// rather than as a compile error in an unrelated gate.
 /// </para>
 /// </remarks>
 public sealed partial class RefusalBoundaryGateTests
 {
     private const string SpaceStatusRemovePattern = SpaceStatusPattern + "/remove";
-
-    private const string SpaceRemovalRed = "the Space-level removal route and contract do not exist yet";
 
     private static readonly string[] SpaceStatusResetWords = ["Restore", "Reset", "Inherit", "Override", "Mode"];
 
@@ -40,7 +29,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The Space-level removal is <c>POST …/statuses/{statusId}/remove</c>, requiring <c>ConfigureSpaceDefaultStatuses</c> as
     /// the other Space writes do, not Session-only, consulting no bound.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC11 - " + SpaceRemovalRed + " (Q1: POST …/statuses/{statusId}/remove)")]
+    [Fact]
     [Trait("Requirement", "FR-16")]
     [Trait("Requirement", "FR-27")]
     [Trait("Requirement", "AD-4")]
@@ -67,7 +56,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// Exceptions }</c> - a <c>Guid?</c> and a nullable list of <c>{ DestinationStatusId, ProjectId }</c>, both <c>Guid</c>;
     /// and no other Space Status request carries a member naming a removal, a destination, a reset or a mode.
     /// </summary>
-    [Fact(Skip = "red: AC1, AC3 - " + SpaceRemovalRed)]
+    [Fact]
     [Trait("Requirement", "AR-24")]
     [Trait("Requirement", "AD-17")]
     [Trait("Requirement", "FR-27")]
@@ -115,7 +104,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// The refusal naming every blocked Project without a destination has a stable type,
     /// <c>urn:yello:problem:status-project-destination-required</c>, and the refusals the removal reuses keep theirs.
     /// </summary>
-    [Fact(Skip = "red: AC4 - " + SpaceRemovalRed + " (Q2: one new problem type)")]
+    [Fact]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "FR-27")]
     public void The_blocked_Project_refusal_has_a_stable_problem_type()
@@ -134,7 +123,7 @@ public sealed partial class RefusalBoundaryGateTests
     /// <c>{ Destinations, ProjectId, ProjectName, TaskCount }</c>, whose destinations are <c>{ Id, Name }</c> - identity only,
     /// nothing a Role or another Space could ride on.
     /// </summary>
-    [Fact(Skip = "red: AC2 - " + SpaceRemovalRed + " (Q2: one additive member, recommended name Removal)")]
+    [Fact]
     [Trait("Requirement", "AD-19")]
     [Trait("Requirement", "AR-34")]
     [Trait("Requirement", "UX-DR16")]

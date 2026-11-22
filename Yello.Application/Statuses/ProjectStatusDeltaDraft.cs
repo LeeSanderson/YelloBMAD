@@ -27,12 +27,14 @@ public sealed class ProjectStatusDeltaDraft
 
     private readonly Func<Guid, CancellationToken, Task<int>> _occupants;
 
+    private readonly IReadOnlyList<StatusDefinition> _defaults;
+
     private int _nextSequence;
 
     internal ProjectStatusDeltaDraft(
         Guid spaceId,
         Guid projectId,
-        IReadOnlyList<EffectiveStatus> before,
+        IReadOnlyList<StatusDefinition> defaults,
         ProjectStatusDelta delta,
         IIdentifierGenerator identifiers,
         DateTimeOffset now,
@@ -40,6 +42,7 @@ public sealed class ProjectStatusDeltaDraft
     {
         _spaceId = spaceId;
         _projectId = projectId;
+        _defaults = defaults;
         _delta = delta;
         _occupants = occupants;
         _ownedCount = delta.OwnedDefinitions.Count;
@@ -47,7 +50,7 @@ public sealed class ProjectStatusDeltaDraft
         _nextSequence = delta.NextSequence;
         _identifiers = identifiers;
         _now = now;
-        Before = before;
+        Before = EffectiveStatusSet.Of(defaults, delta);
     }
 
     /// <summary>
@@ -103,6 +106,13 @@ public sealed class ProjectStatusDeltaDraft
     /// <param name="statusId">The Status.</param>
     /// <returns><c>true</c> when it does.</returns>
     public bool HasRemoved(Guid statusId) => _delta.Removes(statusId);
+
+    /// <summary>
+    /// Whether <paramref name="statusId"/> is one of the Space's defaults as read under the lock.
+    /// </summary>
+    /// <param name="statusId">The Status.</param>
+    /// <returns><c>true</c> when it is.</returns>
+    public bool IsDefault(Guid statusId) => _defaults.Any(status => status.Id == statusId);
 
     /// <summary>
     /// How many of the Project's Tasks hold <paramref name="statusId"/>, counted under the Project's lock so a Task that

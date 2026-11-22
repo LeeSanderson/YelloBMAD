@@ -127,6 +127,13 @@ public sealed record SpaceStatusWriteResult(SpaceStatusWriteOutcome Outcome, IRe
     public IReadOnlyList<SpaceStatusProject> Projects { get; init; } = [];
 
     /// <summary>
+    /// On a removal's <see cref="SpaceStatusWriteOutcome.DestinationRequired"/> or
+    /// <see cref="SpaceStatusWriteOutcome.ProjectDestinationRequired"/>: the Projects it names, each with its Task count and
+    /// its own set after the removal.
+    /// </summary>
+    public IReadOnlyList<SpaceStatusOccupancyReport> Removal { get; init; } = [];
+
+    /// <summary>
     /// A written change.
     /// </summary>
     /// <param name="defaults">The defaults as the read now returns them.</param>
@@ -156,6 +163,22 @@ public sealed record SpaceStatusConflictReport(Guid ProjectId, string ProjectNam
 /// <param name="Id">The Project.</param>
 /// <param name="Name">Its name.</param>
 public sealed record SpaceStatusProject(Guid Id, string Name);
+
+/// <summary>
+/// One Project in a removal's report.
+/// </summary>
+/// <param name="ProjectId">The Project.</param>
+/// <param name="ProjectName">Its name.</param>
+/// <param name="TaskCount">How many of its Tasks hold the Status being removed.</param>
+/// <param name="Destinations">Its own set after the removal, in Board order, by its own names.</param>
+public sealed record SpaceStatusOccupancyReport(Guid ProjectId, string ProjectName, int TaskCount, IReadOnlyList<StatusChoice> Destinations);
+
+/// <summary>
+/// One Status a Project's destination picker offers.
+/// </summary>
+/// <param name="Id">The Status.</param>
+/// <param name="Name">The Project's own name for it.</param>
+public sealed record StatusChoice(Guid Id, string Name);
 
 /// <summary>
 /// What a change of the Space's defaults came to.
@@ -188,7 +211,22 @@ public enum SpaceStatusWriteOutcome
     PositionInvalid,
 
     /// <summary>
-    /// The change would leave the Space with no default.
+    /// The change would leave the Space with no default, or some Project with no Status.
     /// </summary>
     SetEmpty,
+
+    /// <summary>
+    /// A removal moves Tasks and names no destination.
+    /// </summary>
+    DestinationRequired,
+
+    /// <summary>
+    /// A removal's Space-wide destination is not another default, or a Project's own destination is outside its set.
+    /// </summary>
+    DestinationInvalid,
+
+    /// <summary>
+    /// A Project that cannot take a removal's Space-wide destination was given none of its own.
+    /// </summary>
+    ProjectDestinationRequired,
 }

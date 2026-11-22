@@ -117,6 +117,13 @@ public static class RefusalCopy
     public static string StatusDestinationRequiredKey => "StatusDestinationRequired";
 
     /// <summary>
+    /// The copy key for <c>409 status-project-destination-required</c>: some Projects cannot take the destination chosen and
+    /// need one of their own. The Space settings removal dialog names them from the refusal instead; this is the words when it
+    /// cannot.
+    /// </summary>
+    public static string StatusProjectDestinationRequiredKey => "StatusProjectDestinationRequired";
+
+    /// <summary>
     /// The copy key for <c>400 invalid-status-destination</c>: the destination is not a Status the Project keeps.
     /// </summary>
     public static string InvalidStatusDestinationKey => "StatusDestinationInvalid";
@@ -315,6 +322,7 @@ public static class RefusalCopy
         [ProblemTypes.StatusRenameConflict] = StatusRenameConflictKey,
         [ProblemTypes.InvalidStatusPosition] = InvalidStatusPositionKey,
         [ProblemTypes.StatusDestinationRequired] = StatusDestinationRequiredKey,
+        [ProblemTypes.StatusProjectDestinationRequired] = StatusProjectDestinationRequiredKey,
         [ProblemTypes.InvalidStatusDestination] = InvalidStatusDestinationKey,
         [ProblemTypes.InvalidTaskLabels] = InvalidTaskLabelsKey,
         [ProblemTypes.InvalidAssignee] = InvalidAssigneeKey,

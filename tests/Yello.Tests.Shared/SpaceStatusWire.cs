@@ -24,17 +24,6 @@ public static class SpaceStatusWire
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
-    /// <summary>
-    /// The Space-level removal's route pattern. A stand-in for <c>SpaceRoutes.StatusRemove</c> until the contract declares
-    /// it; the develop phase swaps every use for the contract member and deletes this one.
-    /// </summary>
-    public static string Remove => "/api/v1/spaces/{spaceId:guid}/statuses/{statusId:guid}/remove";
-
-    /// <summary>
-    /// The refusal naming every Project that cannot take the Space-wide destination and was given none of its own. A stand-in
-    /// for <c>ProblemTypes.StatusProjectDestinationRequired</c> until the contract declares it.
-    /// </summary>
-    public static string StatusProjectDestinationRequired => "urn:yello:problem:status-project-destination-required";
 
     /// <summary>
     /// The add body with no position: the new default goes last.
@@ -146,13 +135,6 @@ public static class SpaceStatusWire
     /// <returns>The resource name.</returns>
     public static string StatusDefaultsLockOf(Guid spaceId) => $"Yello/StatusDefaults/{spaceId:D}";
 
-    /// <summary>
-    /// One default's removal path, as a client calls it. A stand-in for <c>SpaceRoutes.StatusRemoveOf</c>.
-    /// </summary>
-    /// <param name="spaceId">The Space.</param>
-    /// <param name="statusId">The default being removed.</param>
-    /// <returns>The path.</returns>
-    public static string RemoveOf(Guid spaceId, Guid statusId) => $"/api/v1/spaces/{spaceId:D}/statuses/{statusId:D}/remove";
 
     /// <summary>
     /// The removal body with no exceptions: <c>destinationStatusId</c> is always present, <c>null</c> meaning none was chosen.
@@ -177,8 +159,7 @@ public static class SpaceStatusWire
 
     /// <summary>
     /// The occupancy report of a removal's refusal: every Project of the Space holding the Status with at least one Task in
-    /// it, with its count and its own set after the removal, or empty when the body carries none. The member is read as
-    /// <c>removal</c>, the story's recommended name; a different name in the contract is corrected here and recorded.
+    /// it, with its count and its own set after the removal, or empty when the body carries none.
     /// </summary>
     /// <param name="body">The refusal's body.</param>
     /// <returns>The report, in the order served.</returns>

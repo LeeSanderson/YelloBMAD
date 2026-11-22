@@ -4,8 +4,9 @@
 @inject IStringLocalizer<ClientCopy> Localizer
 
 @*
-    ONE OF THE SPACE'S DEFAULT STATUSES in the Default Statuses section: its name, "Move up", "Move down" and "Rename".
-    There is no remove: a default leaves only through a removal that also decides where every Project's Tasks go.
+    ONE OF THE SPACE'S DEFAULT STATUSES in the Default Statuses section: its name, "Move up", "Move down", "Rename" and
+    "Remove". "Remove" only asks the section: the removal decides where every Project's Tasks go, so the section sends it,
+    and opens its dialog when Tasks need a destination.
 
     THE MOVE BUTTONS ARE THE KEYBOARD PATH, and the only one. The first row has no "Move up" and the last no "Move down" -
     absent, never disabled. After a move the row asks for focus back on the button that moved it, or on the other one
@@ -50,6 +51,7 @@
             }
 
             <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="StartRenameAsync" @ref="_rename">@Localizer["StatusRename"]</button>
+            <button type="button" class="button-secondary" aria-describedby="@NameId" @onclick="RemoveAsync" @ref="_remove">@Localizer["SpaceStatusRemove"]</button>
         </div>
     }
 </li>
@@ -59,6 +61,7 @@
     private ElementReference _up;
     private ElementReference _down;
     private ElementReference _rename;
+    private ElementReference _remove;
     private string _draft = string.Empty;
     private bool _wasRenaming;
     private bool _focusField;
@@ -105,6 +108,10 @@
     [Parameter]
     public EventCallback OnCancelRename { get; set; }
 
+    /// <summary>Raised by "Remove", with the Status's id.</summary>
+    [Parameter]
+    public EventCallback<Guid> OnRemove { get; set; }
+
     private string NameId => $"space-status-{Status.Id:N}";
 
     /// <inheritdoc />
@@ -148,6 +155,11 @@
             return _field;
         }
 
+        if (FocusTarget == SpaceStatusFocus.Remove)
+        {
+            return _remove;
+        }
+
         if (FocusTarget == SpaceStatusFocus.Rename || Count < 2)
         {
             return _rename;
@@ -165,6 +177,8 @@
     private Task DownAsync() => OnMove.InvokeAsync((Status.Id, 1));
 
     private Task StartRenameAsync() => OnStartRename.InvokeAsync(Status.Id);
+
+    private Task RemoveAsync() => OnRemove.InvokeAsync(Status.Id);
 
     private Task SaveAsync() => OnRename.InvokeAsync((Status.Id, _draft));
 

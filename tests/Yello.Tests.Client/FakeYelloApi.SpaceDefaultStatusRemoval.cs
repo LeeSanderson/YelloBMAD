@@ -28,8 +28,8 @@ namespace Yello.Tests.Client;
 /// ignored.
 /// </para>
 /// <para>
-/// <b>The report's member is <c>removal</c></b>, as <see cref="SpaceStatusWire.RemovalOf"/> reads it - the story's
-/// recommended name, corrected in both places if the contract chooses another.
+/// <b>The report's member is <c>removal</c></b>, as the contract's <c>ProblemResponse.Removal</c> serialises it and
+/// <see cref="SpaceStatusWire.RemovalOf"/> reads it.
 /// </para>
 /// </remarks>
 internal sealed partial class FakeYelloApi
@@ -181,7 +181,7 @@ internal sealed partial class FakeYelloApi
 
         if (missing.Count > 0)
         {
-            return (409, Reporting(SpaceStatusWire.StatusProjectDestinationRequired, spaceId, missing, statusId));
+            return (409, Reporting(ProblemTypes.StatusProjectDestinationRequired, spaceId, missing, statusId));
         }
 
         foreach (var (projectId, entries) in SetsOf(spaceId))

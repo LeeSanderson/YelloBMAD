@@ -2753,3 +2753,58 @@
         border-block-end: var(--border-hairline-width) solid var(--border-hairline);
     }
 }
+
+/*
+    THE SPACE-LEVEL REMOVAL DIALOG: the Project removal dialog's frame, with the rename question's table of Projects, each
+    row ending in its own destination picker. The table reflows into stacked rows below 30em, as the rename question's does.
+*/
+.status-remove-dialog__blocked,
+.status-remove-dialog__needed {
+    margin-block: 0;
+}
+
+.status-remove-dialog__needed {
+    align-self: center;
+    color: var(--text-muted);
+}
+
+.space-status-remove-dialog__table table {
+    inline-size: 100%;
+    border-collapse: collapse;
+}
+
+.space-status-remove-dialog__table th,
+.space-status-remove-dialog__table td {
+    padding-block: var(--space-2);
+    padding-inline-end: var(--space-3);
+    text-align: start;
+    vertical-align: top;
+    border-block-end: var(--border-hairline-width) solid var(--border-hairline);
+}
+
+.space-status-remove-dialog__table .form-field__control {
+    max-inline-size: 100%;
+}
+
+@media (max-width: 29.9375em) {
+    .space-status-remove-dialog__table thead {
+        position: absolute;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
+
+    .space-status-remove-dialog__table tr,
+    .space-status-remove-dialog__table td {
+        display: block;
+    }
+
+    .space-status-remove-dialog__table td {
+        padding-block: 0;
+        border-block-end: 0;
+    }
+
+    .space-status-remove-dialog__table tr {
+        padding-block: var(--space-2);
+        border-block-end: var(--border-hairline-width) solid var(--border-hairline);
+    }
+}
